@@ -1,0 +1,812 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Splitting pipelex.hub</title>
+<style>
+  :root{
+    --paper:#f6f7f8; --card:#ffffff; --sunk:#eef1f3;
+    --ink:#12161b; --ink-2:#4a5560; --ink-3:#78838d;
+    --rule:#dfe3e7; --rule-2:#cbd2d8;
+    --rt:#0d7a6f; --rt-soft:#e2f1ee; --rt-line:#0d7a6f;
+    --it:#6d43d6; --it-soft:#eee8fc; --it-line:#6d43d6;
+    --stop:#b3261e; --stop-soft:#fbeae8;
+    --code-bg:#f1f4f6; --code-fg:#1a2027;
+    --add-bg:#e3f1e9; --del-bg:#fbeae8;
+    --shadow:0 1px 1px rgba(18,22,27,.04), 0 10px 30px -22px rgba(18,22,27,.5);
+    --serif:"Iowan Old Style","Charter","Bitstream Charter","Sitka Text",Cambria,Georgia,serif;
+    --sans:ui-sans-serif,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,"JetBrains Mono","Cascadia Mono",Menlo,Consolas,monospace;
+    --measure:68ch;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#0f1216; --card:#161b21; --sunk:#12171c;
+      --ink:#e7ecf0; --ink-2:#a3aeb8; --ink-3:#7d8892;
+      --rule:#252d35; --rule-2:#333d47;
+      --rt:#5eead4; --rt-soft:#0c2b28; --rt-line:#2dd4bf;
+      --it:#c0aaf9; --it-soft:#1e1836; --it-line:#a78bfa;
+      --stop:#f5a3a0; --stop-soft:#301a1a;
+      --code-bg:#0c1015; --code-fg:#dde3e9;
+      --add-bg:#0f2a1d; --del-bg:#301a1a;
+      --shadow:0 1px 1px rgba(0,0,0,.5), 0 10px 30px -22px rgba(0,0,0,.9);
+    }
+  }
+  :root[data-theme="light"]{
+    --paper:#f6f7f8; --card:#ffffff; --sunk:#eef1f3;
+    --ink:#12161b; --ink-2:#4a5560; --ink-3:#78838d;
+    --rule:#dfe3e7; --rule-2:#cbd2d8;
+    --rt:#0d7a6f; --rt-soft:#e2f1ee; --rt-line:#0d7a6f;
+    --it:#6d43d6; --it-soft:#eee8fc; --it-line:#6d43d6;
+    --stop:#b3261e; --stop-soft:#fbeae8;
+    --code-bg:#f1f4f6; --code-fg:#1a2027;
+    --add-bg:#e3f1e9; --del-bg:#fbeae8;
+    --shadow:0 1px 1px rgba(18,22,27,.04), 0 10px 30px -22px rgba(18,22,27,.5);
+  }
+  :root[data-theme="dark"]{
+    --paper:#0f1216; --card:#161b21; --sunk:#12171c;
+    --ink:#e7ecf0; --ink-2:#a3aeb8; --ink-3:#7d8892;
+    --rule:#252d35; --rule-2:#333d47;
+    --rt:#5eead4; --rt-soft:#0c2b28; --rt-line:#2dd4bf;
+    --it:#c0aaf9; --it-soft:#1e1836; --it-line:#a78bfa;
+    --stop:#f5a3a0; --stop-soft:#301a1a;
+    --code-bg:#0c1015; --code-fg:#dde3e9;
+    --add-bg:#0f2a1d; --del-bg:#301a1a;
+    --shadow:0 1px 1px rgba(0,0,0,.5), 0 10px 30px -22px rgba(0,0,0,.9);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans);
+    font-size:16.5px; line-height:1.68; -webkit-font-smoothing:antialiased;
+  }
+  .frame{max-width:1040px; margin:0 auto; padding:0 1.25rem 6rem}
+  p,ul,ol,figcaption,.note,.tldr,blockquote{max-width:var(--measure)}
+
+  a{color:inherit; text-decoration:underline; text-decoration-thickness:1px;
+    text-decoration-color:var(--rule-2); text-underline-offset:3px}
+  a:hover{text-decoration-color:currentColor}
+  a:focus-visible,summary:focus-visible,input:focus-visible + label{outline:2px solid var(--rt-line); outline-offset:2px; border-radius:3px}
+  @media (prefers-reduced-motion: reduce){*{animation:none !important; transition:none !important; scroll-behavior:auto !important}}
+
+  /* ── masthead ─────────────────────────────────────────── */
+  .masthead{padding:3.2rem 0 1.6rem; border-bottom:1px solid var(--rule)}
+  .eyebrow{font-family:var(--mono); font-size:.74rem; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3); margin:0 0 .9rem}
+  h1{font-family:var(--serif); font-weight:600; letter-spacing:-.02em; text-wrap:balance;
+     font-size:clamp(2.15rem,1.55rem + 2.2vw,3rem); line-height:1.1; margin:0 0 .6rem}
+  h1 .mono{font-family:var(--mono); font-size:.82em; font-weight:500; letter-spacing:-.01em}
+  .deck{font-size:1.12rem; color:var(--ink-2); margin:0 0 1.6rem; max-width:60ch; text-wrap:pretty}
+  .deck b{color:var(--ink); font-weight:600}
+  .meta{display:flex; flex-wrap:wrap; gap:.4rem; list-style:none; margin:0; padding:0; max-width:none}
+  .meta li{font-family:var(--mono); font-size:.74rem; letter-spacing:.01em; color:var(--ink-2);
+           border:1px solid var(--rule); background:var(--card); border-radius:2px; padding:.24rem .55rem}
+  .meta li b{color:var(--ink); font-weight:600}
+  .meta li.live{border-color:var(--rt); color:var(--rt)}
+
+  /* ── sticky section rail ─────────────────────────────── */
+  .rail{position:sticky; top:0; z-index:9; display:flex; gap:.15rem; overflow-x:auto; scrollbar-width:none;
+        padding:.5rem 0; margin:0 0 .4rem; border-bottom:1px solid var(--rule);
+        background:color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter:blur(8px)}
+  .rail::-webkit-scrollbar{display:none}
+  .rail a{font-family:var(--mono); font-size:.72rem; letter-spacing:.04em; text-transform:uppercase;
+          color:var(--ink-3); text-decoration:none; white-space:nowrap; padding:.28rem .5rem; border-radius:3px}
+  .rail a:hover{color:var(--ink); background:var(--sunk)}
+
+  /* ── headings ────────────────────────────────────────── */
+  h2{font-family:var(--serif); font-weight:600; font-size:1.6rem; letter-spacing:-.015em; text-wrap:balance;
+     margin:3.4rem 0 1rem; scroll-margin-top:4rem; display:flex; align-items:baseline; gap:.7rem}
+  h2 .n{font-family:var(--mono); font-size:.72rem; font-weight:500; letter-spacing:.1em; color:var(--rt);
+        border:1px solid var(--rule); border-radius:2px; padding:.1rem .38rem; flex:none; position:relative; top:-.25em}
+  h3{font-size:1.02rem; font-weight:650; margin:2rem 0 .4rem; letter-spacing:-.005em}
+  h4{font-family:var(--mono); font-size:.74rem; font-weight:500; letter-spacing:.12em; text-transform:uppercase;
+     color:var(--ink-3); margin:1.6rem 0 .3rem}
+  p{margin:.75rem 0} ul,ol{margin:.75rem 0; padding-left:1.15rem} li{margin:.32rem 0}
+
+  code,kbd{font-family:var(--mono); font-size:.86em}
+  :is(p,li,td,th,summary,figcaption,.deck) code{background:var(--code-bg); padding:.08em .32em; border-radius:3px; white-space:nowrap}
+
+  /* ── TL;DR ───────────────────────────────────────────── */
+  .tldr{margin:2.2rem 0; padding:1.3rem 1.5rem 1.4rem; background:var(--card);
+        border:1px solid var(--rule); border-top:2px solid var(--ink); border-radius:3px; box-shadow:var(--shadow)}
+  .tldr h2{font-family:var(--mono); font-size:.78rem; font-weight:600; letter-spacing:.16em; text-transform:uppercase;
+           color:var(--ink-3); margin:0 0 .7rem; display:block}
+  .tldr ul{margin:0; padding-left:1.05rem; max-width:none}
+  .tldr li{margin:.5rem 0}
+  .tldr li::marker{color:var(--rule-2)}
+
+  /* ── figures / stats ─────────────────────────────────── */
+  .stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(158px,1fr)); gap:.6rem; margin:1.6rem 0}
+  .stat{background:var(--card); border:1px solid var(--rule); border-radius:3px; padding:.75rem .9rem .8rem}
+  .stat .n{display:block; font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:1.4rem;
+           font-weight:600; letter-spacing:-.03em; line-height:1.2}
+  .stat .n s{color:var(--ink-3); font-weight:400; font-size:.62em; text-decoration-color:var(--rule-2)}
+  .stat .n em{font-style:normal; color:var(--rt)}
+  .stat .l{display:block; font-size:.78rem; line-height:1.4; color:var(--ink-2); margin-top:.25rem}
+
+  figure{margin:1.8rem 0; padding:1.1rem 1.1rem .75rem; background:var(--card);
+         border:1px solid var(--rule); border-radius:3px; box-shadow:var(--shadow)}
+  figure svg{display:block; width:100%; height:auto}
+  figcaption{font-size:.83rem; line-height:1.55; color:var(--ink-2); margin-top:.7rem; padding-top:.7rem; border-top:1px solid var(--rule)}
+
+  .s-box{fill:var(--card); stroke:var(--rule-2)}
+  .s-rt{fill:var(--rt-soft); stroke:var(--rt-line)}
+  .s-it{fill:var(--it-soft); stroke:var(--it-line)}
+  .s-bad{fill:var(--stop-soft); stroke:var(--stop)}
+  .s-t{fill:var(--ink); font:600 13px var(--sans)}
+  .s-ts{fill:var(--ink-2); font:400 11.5px var(--mono)}
+  .s-tm{fill:var(--ink-2); font:400 11.5px var(--sans)}
+  .s-trt{fill:var(--rt); font:600 10.5px var(--mono); letter-spacing:.1em}
+  .s-tit{fill:var(--it); font:600 10.5px var(--mono); letter-spacing:.1em}
+  .s-tbad{fill:var(--stop); font:600 11.5px var(--sans)}
+  .s-tok{fill:var(--rt); font:600 12px var(--sans)}
+  .s-line{stroke:var(--rule-2); fill:none}
+  .s-badline{stroke:var(--stop); fill:none}
+  .s-okline{stroke:var(--rt-line); fill:none}
+  .s-barwas{fill:var(--rule)}
+  .s-barnow{fill:var(--rt-line)}
+
+  /* ── tables ──────────────────────────────────────────── */
+  .scroll{overflow-x:auto; margin:1.2rem 0; border:1px solid var(--rule); border-radius:3px; background:var(--card)}
+  table{border-collapse:collapse; width:100%; font-size:.89rem; font-variant-numeric:tabular-nums}
+  th,td{padding:.55rem .7rem; text-align:left; vertical-align:top; border-bottom:1px solid var(--rule)}
+  th{font-family:var(--mono); font-size:.72rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+     color:var(--ink-3); background:var(--sunk); white-space:nowrap}
+  tbody tr:last-child td{border-bottom:0}
+
+  /* ── code ────────────────────────────────────────────── */
+  pre{background:var(--code-bg); color:var(--code-fg); border:1px solid var(--rule); border-radius:3px;
+      padding:.9rem 1rem; overflow-x:auto; font-size:.8rem; line-height:1.6; margin:1rem 0}
+  pre code{font-family:var(--mono)}
+  .diff .del{display:block; margin:0 -1rem; padding:0 1rem; background:var(--del-bg); color:var(--stop)}
+  .diff .add{display:block; margin:0 -1rem; padding:0 1rem; background:var(--add-bg); color:var(--rt)}
+  .diff .hdr{display:block; color:var(--ink-3)}
+  .cmt{color:var(--ink-3)}
+
+  /* ── tabs ────────────────────────────────────────────── */
+  .tabs{display:flex; flex-wrap:wrap; gap:.3rem; margin:1.3rem 0}
+  .tabs input{position:absolute; width:1px; height:1px; opacity:0; clip-path:inset(50%)}
+  .tabs label{cursor:pointer; font-family:var(--mono); font-size:.74rem; letter-spacing:.02em;
+              border:1px solid var(--rule); background:var(--card); color:var(--ink-2);
+              border-radius:2px; padding:.3rem .6rem; user-select:none}
+  .tabs label:hover{color:var(--ink); border-color:var(--rule-2)}
+  .tabs .panels{flex:1 0 100%; margin-top:.35rem}
+  .tabs .panel{display:none}
+  .tabs .panel > :first-child{margin-top:0}
+  #d1:checked ~ label[for="d1"],#d2:checked ~ label[for="d2"],#d3:checked ~ label[for="d3"],
+  #d4:checked ~ label[for="d4"],#d5:checked ~ label[for="d5"],#d6:checked ~ label[for="d6"]
+    {background:var(--ink); color:var(--paper); border-color:var(--ink)}
+  #d1:focus-visible ~ label[for="d1"],#d2:focus-visible ~ label[for="d2"],#d3:focus-visible ~ label[for="d3"],
+  #d4:focus-visible ~ label[for="d4"],#d5:focus-visible ~ label[for="d5"],#d6:focus-visible ~ label[for="d6"]
+    {outline:2px solid var(--rt-line); outline-offset:2px}
+  #d1:checked ~ .panels > .panel:nth-child(1),
+  #d2:checked ~ .panels > .panel:nth-child(2),
+  #d3:checked ~ .panels > .panel:nth-child(3),
+  #d4:checked ~ .panels > .panel:nth-child(4),
+  #d5:checked ~ .panels > .panel:nth-child(5),
+  #d6:checked ~ .panels > .panel:nth-child(6){display:block}
+
+  /* ── misc blocks ─────────────────────────────────────── */
+  details{background:var(--card); border:1px solid var(--rule); border-radius:3px; padding:.75rem 1rem; margin:1.2rem 0}
+  details[open]{padding-bottom:1rem}
+  summary{cursor:pointer; font-weight:600; font-size:.92rem}
+  summary::marker{color:var(--rule-2)}
+  details > :nth-child(2){margin-top:.85rem}
+
+  .note{border-left:2px solid var(--rule-2); padding:.1rem 0 .1rem .95rem; color:var(--ink-2); font-size:.93rem; margin:1.1rem 0}
+  .note.stop{border-left-color:var(--stop)}
+  .note.go{border-left-color:var(--rt-line)}
+
+  .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(255px,1fr)); gap:.7rem; margin:1.4rem 0}
+  .cards .card{background:var(--card); border:1px solid var(--rule); border-radius:3px; padding:.9rem 1rem}
+  .cards h3{margin:0 0 .3rem; font-size:.95rem}
+  .cards p{margin:.3rem 0; font-size:.88rem; color:var(--ink-2); max-width:none}
+  .cards p strong{color:var(--ink)}
+
+  .legend{display:flex; flex-wrap:wrap; gap:1rem; margin:1.4rem 0 0; font-family:var(--mono); font-size:.74rem; color:var(--ink-2)}
+  .legend span{display:flex; align-items:center; gap:.4rem}
+  .legend i{width:10px; height:10px; border-radius:2px; display:block}
+  .legend .k-rt{background:var(--rt-line)} .legend .k-it{background:var(--it-line)} .legend .k-stop{background:var(--stop)}
+
+  footer{margin-top:3.5rem; padding-top:1.2rem; border-top:1px solid var(--rule); color:var(--ink-3); font-size:.83rem}
+  footer p{max-width:none}
+</style>
+
+<div class="frame">
+
+<header class="masthead">
+  <p class="eyebrow">Pipelex · refactor/Hub · architecture note</p>
+  <h1>Splitting <span class="mono">pipelex.hub</span></h1>
+  <p class="deck">One god-object became two hubs with a single enforced arrow between them — and importing the Pipelex runtime now loads <b>zero</b> interpreter modules.</p>
+  <ul class="meta">
+    <li>branch <b>refactor/Hub</b></li>
+    <li>base <b>v0.40.0</b></li>
+    <li class="live">PR <b><a href="https://github.com/Pipelex/pipelex/pull/1062">#1062 → dev</a></b> open</li>
+    <li>follow-ups <b><a href="https://github.com/Pipelex/pipelex/pull/1063">#1063</a></b> merged</li>
+    <li>535 files · ~490 mechanical</li>
+    <li>measured <b>2026-07-27</b></li>
+  </ul>
+</header>
+
+<nav class="rail" aria-label="Sections">
+  <a href="#s1">01 · Problem</a>
+  <a href="#s2">02 · What we built</a>
+  <a href="#s3">03 · The code</a>
+  <a href="#s4">04 · Where core splits</a>
+  <a href="#s5">05 · What we gained</a>
+  <a href="#s6">06 · Enforcement</a>
+  <a href="#s7">07 · For you</a>
+  <a href="#s8">08 · Limits</a>
+</nav>
+
+<div class="tldr">
+  <h2>TL;DR</h2>
+  <ul>
+    <li><strong>What was wrong.</strong> <code>pipelex/hub.py</code> brokered <em>every</em> cross-cutting dependency — config, console, secrets, storage, the model deck, the inference workers — <em>and</em> the concept/pipe libraries, the router, the pipeline manager. Four module-level imports meant that asking it for <code>get_console()</code> loaded the entire MTHDS interpreter. It also formed a real import cycle, papered over by three <code>importlib.import_module("pipelex.hub")</code> hacks that no lint and no type checker can see.</li>
+    <li><strong>What we did.</strong> Deleted <code>pipelex/hub.py</code> outright — no alias — and replaced it with <code>pipelex/runtime_hub.py</code> (<code>RuntimeHub</code>) and <code>pipelex/interpreter_hub.py</code> (<code>InterpreterHub</code>). One rule: <em>the interpreter hub may import the runtime hub; the runtime hub must never import the interpreter hub.</em> Then the misplaced types moved down, and core's data model got injected providers so it could join the runtime layer.</li>
+    <li><strong>What it bought.</strong> The inference layer went from 50 interpreter modules to <strong>0</strong>; the runtime closure from 357 modules / 29,193 SLOC to <strong>269 / 20,299</strong>. Six <code>core.*</code> entry points went 50 → 0 each. The cycle and its three hacks are gone.</li>
+    <li><strong>It is mechanically enforced, not review-enforced.</strong> An AST guard (<code>make check-hub-layering</code>, in <code>make agent-check</code> and CI) checks the rule on imports <em>and on string literals</em>; a subprocess closure test pins the <em>property</em> across eight runtime entry points, with a negative control so it can never pass vacuously.</li>
+    <li><strong>What changes for you.</strong> Pick your hub by what you need: infrastructure → <code>pipelex.runtime_hub</code>; anything about the loaded method → <code>pipelex.interpreter_hub</code>. A stale <code>from pipelex.hub import …</code> fails loudly at import time, by design.</li>
+    <li><strong>Not done yet.</strong> The layer rule is enforced only one hop deep — 4 of 476 declared runtime-layer modules breach it transitively, all in <code>pipelex.plugins</code>, and the headline property is unaffected. Remedy decided, its own PR after #1062. The cross-repo sweep is release-gated: external repos still import <code>pipelex.hub</code> and break the moment this ships.</li>
+  </ul>
+</div>
+
+<div class="stats">
+  <div class="stat"><span class="n"><s>50</s> <em>0</em></span><span class="l">interpreter modules loaded by the inference layer</span></div>
+  <div class="stat"><span class="n"><s>357</s> <em>269</em></span><span class="l">pipelex modules in the runtime closure</span></div>
+  <div class="stat"><span class="n"><s>29,193</s> <em>20,299</em></span><span class="l">SLOC parsed and executed at import</span></div>
+  <div class="stat"><span class="n"><s>3</s> <em>0</em></span><span class="l"><code>importlib</code> cycle hacks in <code>core/concepts/</code></span></div>
+</div>
+
+<div class="legend" aria-hidden="true">
+  <span><i class="k-rt"></i> runtime layer</span>
+  <span><i class="k-it"></i> interpreter layer</span>
+  <span><i class="k-stop"></i> forbidden / deleted</span>
+</div>
+
+<h2 id="s1"><span class="n">01</span> The problem</h2>
+
+<p>One module brokered everything, so everything imported it: 309 files. Because the hub annotated its own getters with <code>Library</code>, <code>LibraryManagerAbstract</code>, <code>PipeAbstract</code> and <code>Concept</code>, those annotations dragged the whole interpretation layer into the import graph of every consumer — including consumers that only ever wanted a console handle.</p>
+
+<figure>
+<svg viewBox="0 0 760 250" role="img" aria-label="Before: every runtime-layer caller reaches the interpreter through pipelex.hub">
+  <rect class="s-box" x="8" y="52" width="176" height="120" rx="3"/>
+  <text class="s-trt" x="24" y="76">RUNTIME CALLERS</text>
+  <text class="s-ts" x="24" y="98">cogt · tools · system</text>
+  <text class="s-ts" x="24" y="116">plugins · reporting</text>
+  <text class="s-tm" x="24" y="142">“I just want</text>
+  <text class="s-tm" x="24" y="158">get_console()”</text>
+
+  <path class="s-line" d="M188 112 H244" stroke-width="1.5" marker-end="url(#ar)"/>
+
+  <rect class="s-bad" x="248" y="46" width="184" height="132" rx="3" stroke-width="1.5"/>
+  <text class="s-t" x="268" y="76">pipelex/hub.py</text>
+  <text class="s-ts" x="268" y="98">one module</text>
+  <text class="s-ts" x="268" y="116">309 importers</text>
+  <text class="s-tbad" x="268" y="146">god object</text>
+  <text class="s-ts" x="268" y="164">323 modules on import</text>
+
+  <path class="s-badline" d="M436 112 H520" stroke-width="1.5" marker-end="url(#arb)"/>
+  <text class="s-tbad" x="437" y="102">4 module-level imports</text>
+  <text class="s-ts" x="437" y="132">(type annotations only)</text>
+
+  <rect class="s-it" x="524" y="34" width="228" height="156" rx="3" stroke-width="1.5"/>
+  <text class="s-tit" x="544" y="58">INTERPRETER</text>
+  <text class="s-ts" x="544" y="82">libraries</text>
+  <text class="s-ts" x="544" y="100">pipe_operators</text>
+  <text class="s-ts" x="544" y="118">pipe_controllers</text>
+  <text class="s-ts" x="544" y="136">codegen</text>
+  <text class="s-ts" x="544" y="154">builder</text>
+  <text class="s-tbad" x="544" y="178">50 modules pulled in</text>
+
+  <path class="s-badline" d="M600 190 C600 224, 360 236, 340 186" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#arb)"/>
+  <text class="s-tbad" x="366" y="228">↺ cycle: core/concepts/concept.py ⇄ hub.py — 3 × importlib.import_module("pipelex.hub")</text>
+
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="var(--rule-2)"/>
+    </marker>
+    <marker id="arb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="var(--stop)"/>
+    </marker>
+  </defs>
+</svg>
+<figcaption>Before. Traced on the base commit: <code>cogt.content_generation.content_generator</code> reached <code>pipe_controllers</code>, <code>libraries</code>, <code>pipe_operators</code> and <code>codegen</code> <em>only</em> via <code>pipelex.hub</code> — never independently. The hub was the single edge holding the two halves together.</figcaption>
+</figure>
+
+<p>Three consequences, all of them daily costs:</p>
+
+<ul>
+  <li><strong>An unanalyzable cycle.</strong> <code>core/concepts/concept.py</code>, <code>concept_factory.py</code> and <code>structure_generation/generator.py</code> each carried an identical lazy-import shim to break a circular dependency with the hub. All three wanted exactly one symbol — <code>get_class_registry</code>, an infrastructure-level one. Those shims are invisible to every import lint and to pyright's module graph: real coupling, load-bearing, unanalyzable.</li>
+  <li><strong>A layer boundary that existed but could not be expressed.</strong> Of the 309 importers, 134 used only infrastructure symbols, 139 only method-machinery ones, and just 36 straddled. Every package below <code>core</code> used infrastructure symbols exclusively, with zero exceptions. The architecture was already layered — the hub was the one place the layering was unstateable, and therefore the one place it silently rotted.</li>
+  <li><strong>Import cost paid by everyone.</strong> <code>pipelex-api</code>'s health check, the CLI's <code>--version</code>, every plugin registration module and every test touching <code>get_console</code> paid for the full interpreter.</li>
+</ul>
+
+<h2 id="s2"><span class="n">02</span> What we built</h2>
+
+<p><code>pipelex/hub.py</code> is <strong>deleted</strong>, not aliased. That is deliberate: a stale import must fail loudly at import time rather than silently resolve to the wrong layer, and it matches the repo's no-backward-compatibility principle. In its place, two containers with genuinely different lifecycles.</p>
+
+<figure>
+<svg viewBox="0 0 760 330" role="img" aria-label="After: two hubs, one permitted arrow, one forbidden arrow">
+  <rect class="s-rt" x="8" y="20" width="340" height="236" rx="3" stroke-width="1.5"/>
+  <text class="s-trt" x="28" y="46">RUNTIME LAYER — PROCESS-SCOPED</text>
+  <rect class="s-box" x="28" y="60" width="300" height="46" rx="3" stroke-width="1.5"/>
+  <text class="s-t" x="44" y="80">pipelex/runtime_hub.py</text>
+  <text class="s-ts" x="44" y="97">RuntimeHub · get_runtime_hub()</text>
+  <text class="s-ts" x="28" y="128">cogt · tools · system · plugins · reporting</text>
+  <text class="s-ts" x="28" y="146">core.concepts · core.domains · core.memory</text>
+  <text class="s-ts" x="28" y="164">core.stuffs · core.pipes.inputs · …stuff_spec</text>
+  <text class="s-tm" x="28" y="192">config · console · secrets · storage · telemetry</text>
+  <text class="s-tm" x="28" y="210">model deck · inference workers · content generator</text>
+  <text class="s-tm" x="28" y="228">reporting · run mode · plugin registries</text>
+  <text class="s-tok" x="28" y="248">0 interpreter modules — measured, per entry point</text>
+
+  <rect class="s-it" x="412" y="20" width="340" height="236" rx="3" stroke-width="1.5"/>
+  <text class="s-tit" x="432" y="46">INTERPRETER LAYER — LIBRARY-SCOPED</text>
+  <rect class="s-box" x="432" y="60" width="300" height="46" rx="3" stroke-width="1.5"/>
+  <text class="s-t" x="448" y="80">pipelex/interpreter_hub.py</text>
+  <text class="s-ts" x="448" y="97">InterpreterHub · get_interpreter_hub()</text>
+  <text class="s-ts" x="432" y="128">libraries · pipe_operators · pipe_controllers</text>
+  <text class="s-ts" x="432" y="146">codegen · builder · core.bundles · core.interpreter</text>
+  <text class="s-ts" x="432" y="164">core.pipes.pipe_abstract · core.pipes.rendering</text>
+  <text class="s-tm" x="432" y="192">library manager · concept / domain / pipe libraries</text>
+  <text class="s-tm" x="432" y="210">current-library contextvars · pipe router</text>
+  <text class="s-tm" x="432" y="228">pipe run · pipeline manager · PipeFunc executor</text>
+
+  <path class="s-okline" d="M430 84 H352" stroke-width="2" marker-end="url(#ar2)"/>
+  <text class="s-tm" x="391" y="76" text-anchor="middle">may import</text>
+
+  <path class="s-badline" d="M330 148 H430" stroke-width="2" stroke-dasharray="6 4"/>
+  <line class="s-badline" x1="372" y1="138" x2="388" y2="158" stroke-width="2.5"/>
+  <line class="s-badline" x1="388" y1="138" x2="372" y2="158" stroke-width="2.5"/>
+  <text class="s-tbad" x="380" y="176" text-anchor="middle">never</text>
+
+  <rect class="s-box" x="8" y="272" width="744" height="46" rx="3"/>
+  <text class="s-t" x="28" y="292">The one rule</text>
+  <text class="s-tm" x="28" y="310">interpreter_hub may import runtime_hub · runtime_hub must never import interpreter_hub · pipelex.hub no longer exists</text>
+
+  <defs>
+    <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="var(--rt-line)"/>
+    </marker>
+  </defs>
+</svg>
+<figcaption>After. Two containers, two singletons, two lifecycles: the runtime hub is built once at boot from config plus plugin registration and never varies; the interpreter hub is bound to the loaded method, and already had contextvar machinery for exactly that. Today the permitted arrow is not even used — the one runtime-layer thing the interpreter hub needs lives <em>below</em> both hubs — which is stronger than the rule requires.</figcaption>
+</figure>
+
+<h4>Why these names</h4>
+<p>It is the textbook language-implementation split, so it explains itself to anyone who has implemented a language: the <strong>runtime</strong> is the machinery present at execution time (allocator, stdlib, FFI — here: models, workers, config, values); the <strong>interpreter</strong> reads the program and executes it (here: reads <code>.mthds</code>, builds pipes, routes them). It also gives one word across both layer and hub. The earlier working names <code>service_hub</code> / <code>method_hub</code> <strong>never shipped</strong> — <em>service</em> collides with the hosted product (<code>from pipelex.service_hub import get_secret</code> inside <code>pipelex-platform</code> reads two ways one line apart), and <em>method</em> borrows an MTHDS language noun for a Pipelex runtime container, against the brand-boundary rule.</p>
+
+<details>
+<summary>Names considered and rejected — so nobody re-proposes them</summary>
+<div class="scroll">
+<table>
+<thead><tr><th>Candidate</th><th>For</th><th>Why not</th></tr></thead>
+<tbody>
+<tr><td><code>inference</code> (layer)</td><td>Names the valuable half</td><td>A subset masquerading as the whole — <code>tools</code>, <code>system</code>, <code>reporting</code> and the value data model are not inference. It also collides with live usage: “the inference layer” already means <code>cogt</code> specifically.</td></tr>
+<tr><td><code>foundation</code> (layer)</td><td>Genuinely viable; the fallback</td><td>Less informative than <code>runtime</code>, and shares no word with the hub.</td></tr>
+<tr><td><code>core</code> (layer)</td><td>—</td><td>Catastrophic: <code>pipelex/core/</code> exists and straddles both layers.</td></tr>
+<tr><td><code>library_hub</code></td><td>Names the biggest occupant</td><td>A library is inert; the container is active machinery (router, pipeline manager). Undersells it.</td></tr>
+<tr><td><code>pipe_hub</code></td><td>Short, concrete</td><td>Narrower than its contents — a meaningful share is concepts and domains, and <code>get_native_concept()</code> on a <code>pipe_hub</code> reads wrong.</td></tr>
+<tr><td>keep <code>hub.py</code> for one half</td><td>Smaller diff</td><td>A stale import would silently succeed and resolve to the wrong layer. The whole point is that it must not.</td></tr>
+</tbody>
+</table>
+</div>
+</details>
+
+<h2 id="s3"><span class="n">03</span> The critical code</h2>
+
+<p>Six changes carry the design; everything else in the 535-file diff is import churn.</p>
+
+<div class="tabs">
+  <input type="radio" name="diffs" id="d1" checked>
+  <input type="radio" name="diffs" id="d2">
+  <input type="radio" name="diffs" id="d3">
+  <input type="radio" name="diffs" id="d4">
+  <input type="radio" name="diffs" id="d5">
+  <input type="radio" name="diffs" id="d6">
+  <label for="d1">1 · the cause</label>
+  <label for="d2">2 · the cycle</label>
+  <label for="d3">3 · resolver slot</label>
+  <label for="d4">4 · a straddler</label>
+  <label for="d5">5 · injected providers</label>
+  <label for="d6">6 · boot</label>
+
+  <div class="panels">
+
+    <div class="panel">
+      <h3>Four imports, serving nothing but type annotations</h3>
+      <p>This is the entire cause. Each annotated a getter's return type, and each dragged a subtree behind it.</p>
+      <pre class="diff"><code><span class="hdr">--- a/pipelex/hub.py   (deleted)</span>
+<span class="del">-from pipelex.libraries.library import Library                    # concrete → concept_library, pipe_controllers, codegen</span>
+<span class="del">-from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract   # → core.bundles → all twelve pipe blueprints</span>
+<span class="del">-from pipelex.core.pipes.pipe_abstract import PipeAbstract        # → graph.graph_tracer_manager</span>
+<span class="del">-from pipelex.core.concepts.concept import Concept                # ← the cycle behind the three importlib hacks</span></code></pre>
+      <p class="note">Deferring them under <code>TYPE_CHECKING</code> would not have been the fix — that keeps the god object and adds a fig leaf. The four annotations belong to getters that are <em>interpreter</em> concerns, so they moved to the module where naming them is free.</p>
+    </div>
+
+    <div class="panel">
+      <h3>Three identical lazy-import shims become one plain import</h3>
+      <pre class="diff"><code><span class="hdr">--- a/pipelex/core/concepts/concept.py   (also concept_factory.py, structure_generation/generator.py)</span>
+<span class="del">-def _get_class_registry() -&gt; ClassRegistryAbstract:</span>
+<span class="del">-    """Lazy import to break circular dependency between concept.py and hub.py."""</span>
+<span class="del">-    import importlib  # noqa: PLC0415</span>
+<span class="del">-</span>
+<span class="del">-    hub = importlib.import_module("pipelex.hub")</span>
+<span class="del">-    return hub.get_class_registry()  # type: ignore[no-any-return]</span>
+<span class="add">+from pipelex.system.registries.class_registry_access import get_class_registry</span></code></pre>
+      <p>Note where the import points: <strong>not</strong> at <code>runtime_hub</code>. <code>core.concepts.concept</code> sits <em>inside</em> <code>runtime_hub</code>'s own closure (<code>runtime_hub → cogt.llm.llm_worker_abstract → system.telemetry.otel_factory → core.pipes.pipe_output → core.stuffs.stuff → core.concepts.concept</code>), so importing the hub from there is a hard cycle in <em>both</em> orders. The accessor lives one level below both hubs instead.</p>
+    </div>
+
+    <div class="panel">
+      <h3>Library scoping crosses <em>downward at boot</em>, never as an import</h3>
+      <p><code>get_class_registry()</code> must stay library-scoped — a Temporal workflow pins its own registry — but resolving <em>which</em> library is current is interpreter knowledge. So the runtime side holds a defaulted callable slot, and the interpreter installs the real resolver when it is constructed.</p>
+      <pre><code><span class="cmt"># pipelex/system/registries/class_registry_access.py — imports nothing from pipelex</span>
+class ClassRegistryScoping:
+    def __init__(self) -&gt; None:
+        self._resolver: Callable[[], ClassRegistryAbstract | None] = _no_library_scoping
+
+    def install(self, *, resolver: Callable[[], ClassRegistryAbstract | None]) -&gt; None:
+        self._resolver = resolver
+
+    def reset(self) -&gt; None:
+        self._resolver = _no_library_scoping
+
+class_registry_scoping = ClassRegistryScoping()
+
+def get_class_registry() -&gt; ClassRegistryAbstract:
+    scoped = class_registry_scoping.resolve()
+    if scoped is not None:
+        return scoped
+    return KajsonManager.get_class_registry()          <span class="cmt"># degrade, never raise</span>
+
+<span class="cmt"># pipelex/interpreter_hub.py — set_interpreter_hub() installs the library-scoped resolver.</span>
+<span class="cmt"># pipelex.runtime_hub.get_class_registry delegates here and stays the public accessor.</span></code></pre>
+      <p class="note go">The default matters: a process that only ever builds a <code>RuntimeHub</code> — the doctor path, most unit tests — degrades to the process-global registry instead of raising. A defaulted callable, never an unset attribute; the same shape as the existing <code>HubSlot.ISOLATED_EXECUTION_PROBE</code>.</p>
+    </div>
+
+    <div class="panel">
+      <h3>What a straddling call site looks like now</h3>
+      <p>36 of the 309 files used symbols from both halves. Those are the only ones that gained a second import line — and the line itself now says which layer each symbol belongs to.</p>
+      <pre class="diff"><code><span class="hdr">--- a/pipelex/pipe_operators/llm/pipe_llm.py</span>
+<span class="del">-from pipelex.hub import (</span>
+<span class="del">-    get_class_registry,</span>
+<span class="del">-    get_concept_library,</span>
+<span class="del">-    get_content_generator,</span>
+<span class="del">-    get_model_deck,</span>
+<span class="del">-    get_native_concept,</span>
+<span class="del">-    get_required_concept,</span>
+<span class="del">-)</span>
+<span class="add">+from pipelex.interpreter_hub import get_concept_library, get_native_concept, get_required_concept</span>
+<span class="add">+from pipelex.runtime_hub import get_class_registry, get_content_generator, get_model_deck</span></code></pre>
+      <p>Everything else was a one-line module swap, applied by an AST pass over whole import statements — not a regex, because 29 of the blocks were parenthesized and multi-line.</p>
+    </div>
+
+    <div class="panel">
+      <h3>Core's data model stopped reaching upward</h3>
+      <p>Five <code>core/</code> modules looked concepts up through the hub. They now <em>declare</em> what they need as a parameter, which is what lets them join the runtime layer.</p>
+      <pre class="diff"><code><span class="hdr">--- a/pipelex/core/stuffs/stuff_factory.py</span>
+<span class="del">-def make_from_blueprint(cls, blueprint: StuffBlueprint) -&gt; "Stuff":</span>
+<span class="del">-    concept_library = get_concept_library()                          # ← reaches into the interpreter</span>
+<span class="del">-    if isinstance(blueprint.content, str) and concept_library.is_compatible(</span>
+<span class="del">-        tested_concept=concept_library.get_required_concept(concept_ref=blueprint.concept_ref),</span>
+<span class="del">-        wanted_concept=get_native_concept(native_concept=NativeConceptCode.TEXT),</span>
+<span class="add">+def make_from_blueprint(cls, blueprint: StuffBlueprint, *, concept_provider: ConceptProviderAbstract) -&gt; "Stuff":</span>
+<span class="add">+    if isinstance(blueprint.content, str) and concept_provider.is_compatible(</span>
+<span class="add">+        tested_concept=concept_provider.get_required_concept(concept_ref=blueprint.concept_ref),</span>
+<span class="add">+        wanted_concept=concept_provider.get_native_concept(native_concept=NativeConceptCode.TEXT),</span>
+     ):</code></pre>
+      <p><code>ConceptProviderAbstract</code> is a new <em>read-side</em> contract owned by <code>core/</code>: resolve a ref, resolve a native code, answer compatibility. <code>ConceptLibraryAbstract</code> <strong>extends</strong> it, keeping add/remove/list/setup/teardown in the interpreter layer. The split is the point — core depends on <em>resolution</em>, never on a library <em>lifecycle</em>. Injection happens on the interpreter side: <code>pipe_factory</code>, the renderers and <code>pipeline/execution_seams.py</code> call the hub themselves and hand the result down.</p>
+    </div>
+
+    <div class="panel">
+      <h3>Boot builds both, then changes nothing else</h3>
+      <pre><code><span class="cmt"># pipelex/pipelex.py — Pipelex.__init__</span>
+self.runtime_hub = RuntimeHub()
+set_runtime_hub(self.runtime_hub)
+self.interpreter_hub = InterpreterHub()
+set_interpreter_hub(self.interpreter_hub)          <span class="cmt"># also installs the class-registry resolver</span></code></pre>
+      <p class="note stop">The setter sequence after this is <strong>byte-identical in order</strong>, deliberately. Reordering to get a clean “runtime first, then interpreter” run would have moved setters across documented ordering dependencies — the storage-provider block resolves <em>after</em> secrets is on the hub, so the GCP factory's secret read works — a real behavior risk at a checkpoint whose bar was zero behavior change. Constructing both hubs up front already delivers what the ordering was protecting: no setter can run against a missing hub.</p>
+      <p>Teardown releases both, and drops any scoping the interpreter hub installed — pinned by <code>tests/unit/pipelex/test_hub_lifecycle.py</code>.</p>
+    </div>
+
+  </div>
+</div>
+
+<h2 id="s4"><span class="n">04</span> Where <code>core/</code> splits</h2>
+
+<p>The original plan assumed all of <code>pipelex/core/</code> could join the runtime layer once the five hub-straddling modules were converted. Measurement said otherwise, and this is the main finding of the work: beyond those five, seven <code>core/</code> modules import the interpreter <em>directly</em> — no hub involved, so no amount of dependency injection touches them. <code>core.pipes.pipe_abstract</code> alone loads 30 interpreter modules while importing no hub at all.</p>
+
+<figure>
+<svg viewBox="0 0 760 250" role="img" aria-label="pipelex/core splits between the two layers along the Pipe-touching line">
+  <text class="s-t" x="8" y="22">pipelex/core/ — one package, two layers</text>
+
+  <rect class="s-rt" x="8" y="38" width="360" height="150" rx="3" stroke-width="1.5"/>
+  <text class="s-trt" x="26" y="62">RUNTIME — THE VALUE DATA MODEL</text>
+  <text class="s-ts" x="26" y="86">concepts/ · domains/ · memory/ · stuffs/</text>
+  <text class="s-ts" x="26" y="104">pipes/inputs/ · pipes/stuff_spec/</text>
+  <text class="s-tm" x="26" y="132">Takes resolution as a parameter:</text>
+  <text class="s-ts" x="26" y="150">concept_provider: ConceptProviderAbstract</text>
+  <text class="s-tok" x="26" y="174">6 entry points measured 50 → 0</text>
+
+  <rect class="s-it" x="392" y="38" width="360" height="150" rx="3" stroke-width="1.5"/>
+  <text class="s-tit" x="410" y="62">INTERPRETER — EVERYTHING NAMING A PIPE</text>
+  <text class="s-ts" x="410" y="86">registry_models · bundles/ · interpreter/</text>
+  <text class="s-ts" x="410" y="104">pipes/pipe_abstract · pipes/rendering/</text>
+  <text class="s-tm" x="410" y="132">Irreducible: a discriminated union over</text>
+  <text class="s-tm" x="410" y="150">every pipe kind, the base class every pipe</text>
+  <text class="s-tm" x="410" y="168">extends, the registry of pipe kinds.</text>
+
+  <path class="s-okline" d="M392 113 H370" stroke-width="2" marker-end="url(#ar3)"/>
+  <text class="s-tm" x="381" y="106" text-anchor="middle">injects</text>
+
+  <rect class="s-box" x="8" y="200" width="744" height="42" rx="3"/>
+  <text class="s-t" x="28" y="226">The honest boundary is not “pipelex.core” — it is: if it names a Pipe, it is interpreter-layer.</text>
+
+  <defs>
+    <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="var(--rt-line)"/>
+    </marker>
+  </defs>
+</svg>
+<figcaption>Threading a provider through <code>PipeFactory.make_from_blueprint</code> as well was considered and rejected: 337 call sites for <em>no</em> additional closure property, since <code>pipe_factory</code> stays interpreter-bound either way.</figcaption>
+</figure>
+
+<h2 id="s5"><span class="n">05</span> What we gained</h2>
+
+<h3>Import cost — the measurable part</h3>
+
+<figure>
+<svg viewBox="0 0 760 210" role="img" aria-label="Before and after: modules, SLOC and interpreter modules in the runtime closure">
+  <text class="s-tm" x="8" y="18">runtime closure · entry point pipelex.cogt.content_generation.content_generator</text>
+
+  <text class="s-ts" x="8" y="52">modules</text>
+  <rect class="s-barwas" x="110" y="38" width="360" height="14" rx="2"/>
+  <text class="s-tm" x="480" y="50">357 before</text>
+  <rect class="s-barnow" x="110" y="58" width="271" height="14" rx="2"/>
+  <text class="s-tok" x="480" y="70">269 after</text>
+
+  <text class="s-ts" x="8" y="116">SLOC</text>
+  <rect class="s-barwas" x="110" y="102" width="360" height="14" rx="2"/>
+  <text class="s-tm" x="480" y="114">29,193 before</text>
+  <rect class="s-barnow" x="110" y="122" width="250" height="14" rx="2"/>
+  <text class="s-tok" x="480" y="134">20,299 after</text>
+
+  <text class="s-ts" x="8" y="180">interpreter</text>
+  <rect class="s-barwas" x="110" y="166" width="360" height="14" rx="2"/>
+  <text class="s-tm" x="480" y="178">50 before</text>
+  <rect class="s-barnow" x="110" y="186" width="4" height="14" rx="2"/>
+  <text class="s-tok" x="480" y="198">0 after — the headline property</text>
+</svg>
+<figcaption>Reproduced on the branch tip on 2026-07-27: <strong>269 modules / 20,299 SLOC / 0 interpreter modules</strong>. The closure test runs this measurement over eight entry points on every CI run.</figcaption>
+</figure>
+
+<p>Be precise about what this buys: <strong>it does not make pipeline execution faster.</strong> It removes import cost from every consumer that never needed the interpreter. Measured today as a proxy — adding <code>pipelex.interpreter_hub</code> on top of the runtime entry point costs <strong>+90 pipelex modules and ~50 ms</strong> of in-process import time (median of seven runs, warm cache, one machine). Before the split that was unavoidable: every caller of <code>get_console()</code> paid it. Who collects the refund:</p>
+
+<ul>
+  <li><code>pipelex-api</code>'s health and version paths, and any cold container or Lambda start that imports the runtime before serving.</li>
+  <li>The CLI's fast paths — <code>--version</code>, <code>which</code>, anything that does not load a method.</li>
+  <li>Every plugin registration module, which by definition runs at import time inside a host process.</li>
+  <li>The test suite: hundreds of unit tests that touch the runtime no longer parse and execute ~9,000 lines of interpreter to do it.</li>
+</ul>
+
+<p class="note">On that timing figure: the before/after wall clock was never captured at the base commit, so the number above is measured <em>today</em> as “what the interpreter half costs to load”. The durable, reproducible numbers are the module and SLOC counts.</p>
+
+<h3>Working on this codebase with agents</h3>
+
+<div class="cards">
+  <div class="card">
+    <h3>Blast radius is now structural</h3>
+    <p>A change to a pipe blueprint's module-level imports <strong>cannot</strong> perturb the import graph of <code>cogt</code> any more. Before, it could — silently. That is the difference between “please be careful” and “the arrow does not exist”.</p>
+  </div>
+  <div class="card">
+    <h3>Failures are loud and local</h3>
+    <p>Deleting <code>pipelex.hub</code> outright means stale knowledge — a model's memory of the old API, a copied snippet, an old branch — produces an <strong>ImportError at import time</strong>, not a wrong-layer resolution that works until it doesn't.</p>
+  </div>
+  <div class="card">
+    <h3>Placement has a mechanical answer</h3>
+    <p>“Which hub does this new accessor go on?” used to be taste. Now it is two partition tables plus one rule — <em>if it names a Pipe, it is interpreter-layer</em> — and getting it wrong fails a check rather than a review.</p>
+  </div>
+  <div class="card">
+    <h3>String references are caught too</h3>
+    <p>The guard scans <em>string constants</em>, not just imports. That is the class of edit tooling gets wrong most often: <code>mocker.patch("pipelex.hub.get_console", …)</code> broke 36 tests once, and is invisible to every import-graph tool and to pyright.</p>
+  </div>
+  <div class="card">
+    <h3>Smaller closure, smaller context</h3>
+    <p>Reasoning about the runtime layer no longer means reasoning about the interpreter. Fewer modules in the graph is fewer files to read before an answer is trustworthy.</p>
+  </div>
+  <div class="card">
+    <h3>The property is tested, not just the rule</h3>
+    <p>A stray import elsewhere can re-drag the interpreter without touching a hub. The subprocess closure test catches exactly that, and prints the offending modules so the shortest path to the fix is in the failure message.</p>
+  </div>
+</div>
+
+<h3>Cleaner dev docs and a real plugin contract</h3>
+
+<ul>
+  <li><strong>The partition tables are the contract.</strong> A plugin author or external consumer reads one of two scoped tables instead of a 300-symbol god module. Placement is decided by <em>kind</em>, not by in-tree usage — which is why accessors with no in-tree importers were kept rather than deleted: several are live external plugin contract.</li>
+  <li><strong>Plugin registries are filed by layer.</strong> <code>inference_backend</code>, <code>model_lister</code>, <code>orchestrator</code>, <code>bundle_validator</code>, <code>storage_provider</code>, <code>secrets_provider</code> are runtime-layer; the PipeFunc executor and its registry are interpreter-layer, because their protocol lives in <code>pipe_operators/func/</code>. That call is recorded with its underlying inversion rather than quietly rounded off.</li>
+  <li><strong>The spec is shipped, not tribal.</strong> <code>docs/contribute/hub-layering.md</code> follows the shape the repo already uses for a mechanically-enforced convention, and <code>docs/under-the-hood/architecture-overview.md</code> names the boundary. A <code>hub-layering-convention</code> drift contract keeps both from rotting: touch the guard or either hub, and you owe a review.</li>
+  <li><strong>One outward-facing claim, now true and pinned:</strong> <em>importing the Pipelex runtime loads zero interpreter modules</em> — the inference engine does not know the MTHDS language exists, so it can be embedded without loading a line of the interpreter.</li>
+  <li><strong>Two documented-but-inert APIs were found and fixed in passing.</strong> <code>docs/advanced/observer-provider-injection.md</code> documented <code>hub.set_observer()</code> as the supported way to register an observer — the value was written and never read, so anyone following that page got a silently ignored observer. That page and <code>docs/advanced/index.md</code>, which showed a bare hub being hand-constructed and was equally inert, were rewritten to the mechanism that actually works.</li>
+</ul>
+
+<h3>Placement fixes that fell out of the same measurement</h3>
+
+<div class="scroll">
+<table>
+<thead><tr><th>Moved</th><th>From → to</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td><code>JobMetadata</code>, <code>JobCategory</code>, <code>UnitJobId</code>, <code>TraceContext</code>, <code>DataInclusionConfig</code></td><td><code>pipeline/</code> and <code>graph/</code> → <code>pipelex/system/</code></td><td><code>cogt → pipeline</code>: 18 statements → <strong>0</strong>. <code>TraceContext</code> had to travel with <code>JobMetadata</code> — leaving it behind would only have renamed the inversion. The TOML shape is unchanged.</td></tr>
+<tr><td><code>TextFormat</code>, <code>TemplatingStyle</code>, <code>TagStyle</code>, <code>TemplateCategory</code></td><td><code>cogt/templating/</code> → <code>tools/templating/</code> and <code>tools/jinja2/</code></td><td><code>tools → cogt</code>: 15 → <strong>3</strong>, the pdf renderer only. They split across two packages on purpose: <code>TemplateCategory</code>'s payload is jinja2 filters, so filing it beside the others would have created a cycle inside one layer.</td></tr>
+</tbody>
+</table>
+</div>
+
+<details>
+<summary>Reproduce the measurement yourself</summary>
+<pre><code>.venv/bin/python - &lt;&lt;'PY'
+import sys
+from pathlib import Path
+
+import pipelex.cogt.content_generation.content_generator  # noqa: F401
+
+INTERPRETER = {"libraries", "pipe_operators", "pipe_controllers", "codegen", "builder"}
+loaded = {name: mod for name, mod in sys.modules.items() if name.startswith("pipelex.")}
+interpreter = sorted(n for n in loaded if n.split(".")[1] in INTERPRETER)
+sloc = 0
+for mod in loaded.values():
+    file = getattr(mod, "__file__", None)
+    if file:
+        sloc += sum(1 for line in Path(file).read_text(encoding="utf-8").splitlines() if line.strip() and not line.strip().startswith("#"))
+print(f"pipelex modules: {len(loaded)} | sloc: {sloc} | interpreter modules: {len(interpreter)}")
+print("offenders:", interpreter)
+PY</code></pre>
+<p>Swap the imported module to measure any other entry point. If <code>interpreter modules</code> is not 0, the offenders it prints are what to fix — the shortest import path to one of them is the defect.</p>
+</details>
+
+<h2 id="s6"><span class="n">06</span> How it stays true</h2>
+
+<figure>
+<svg viewBox="0 0 760 230" role="img" aria-label="Three gates: the AST guard, the closure test, and where they run">
+  <rect class="s-box" x="8" y="30" width="232" height="130" rx="3" stroke-width="1.5"/>
+  <text class="s-t" x="26" y="54">1 · The guard</text>
+  <text class="s-ts" x="26" y="74">pipelex-dev check-hub-layering</text>
+  <text class="s-tm" x="26" y="98">Rule A — no runtime-layer module</text>
+  <text class="s-tm" x="26" y="114">may import pipelex.interpreter_hub</text>
+  <text class="s-tm" x="26" y="136">Rule B — no module anywhere may</text>
+  <text class="s-tm" x="26" y="152">reference pipelex.hub (deleted)</text>
+
+  <path class="s-line" d="M244 95 H272" stroke-width="1.5" marker-end="url(#ar4)"/>
+
+  <rect class="s-box" x="276" y="30" width="232" height="130" rx="3" stroke-width="1.5"/>
+  <text class="s-t" x="294" y="54">2 · The closure test</text>
+  <text class="s-ts" x="294" y="74">test_runtime_layer_import_closure</text>
+  <text class="s-tm" x="294" y="98">8 runtime entry points, each in a</text>
+  <text class="s-tm" x="294" y="114">subprocess → 0 interpreter modules</text>
+  <text class="s-tm" x="294" y="136">+ 1 dirty negative control, so the</text>
+  <text class="s-tm" x="294" y="152">suite can never pass vacuously</text>
+
+  <path class="s-line" d="M512 95 H540" stroke-width="1.5" marker-end="url(#ar4)"/>
+
+  <rect class="s-box" x="544" y="30" width="208" height="130" rx="3" stroke-width="1.5"/>
+  <text class="s-t" x="562" y="54">3 · Where it runs</text>
+  <text class="s-ts" x="562" y="74">make agent-check</text>
+  <text class="s-ts" x="562" y="92">make check</text>
+  <text class="s-ts" x="562" y="110">CI job lint-hub-layering</text>
+  <text class="s-tm" x="562" y="134">Hard block, empty exception</text>
+  <text class="s-tm" x="562" y="150">list — the tree is compliant</text>
+
+  <rect class="s-box" x="8" y="176" width="744" height="46" rx="3"/>
+  <text class="s-tm" x="26" y="196">Both rules match imports AND bare string literals — importlib, mocker.patch, any config-driven dotted path.</text>
+  <text class="s-tm" x="26" y="214">Carve-outs: if TYPE_CHECKING (layer rule only, receiver must be typing) · inline # hub-layering: ignore</text>
+
+  <defs>
+    <marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="var(--rule-2)"/>
+    </marker>
+  </defs>
+</svg>
+<figcaption>The lint guards the <em>rule</em>; the closure test guards the <em>property</em>, which is what actually matters and which a stray import elsewhere could break without touching a hub.</figcaption>
+</figure>
+
+<pre><code><span class="cmt"># pipelex/cli/dev_cli/commands/hub_layering_guard.py</span>
+RUNTIME_LAYER_PACKAGES: tuple[str, ...] = (
+    "pipelex.cogt", "pipelex.plugins", "pipelex.reporting", "pipelex.system", "pipelex.tools",
+    "pipelex.runtime_hub",                     <span class="cmt"># a module, not a package — the rule now covers the hub itself</span>
+    "pipelex.core.concepts", "pipelex.core.domains", "pipelex.core.memory",
+    "pipelex.core.pipes.inputs", "pipelex.core.pipes.stuff_spec", "pipelex.core.stuffs",
+)
+
+INTERPRETER_HUB_MODULE = "pipelex.interpreter_hub"   <span class="cmt"># rule A: forbidden above</span>
+DELETED_HUB_MODULE = "pipelex.hub"  # hub-layering: ignore   <span class="cmt"># rule B: dead everywhere, tests/ included</span></code></pre>
+
+<details>
+<summary>Two things the guard taught us, worth stealing for the next one</summary>
+<p><strong>Generalizing the string check is what made it work.</strong> The plan framed it as an <code>importlib.import_module</code> special case. Scanning <em>every</em> string constant for an exact-or-boundary match on the module path catches <code>importlib</code>, <code>mocker.patch</code>, <code>pkgutil.resolve_name</code> and any config-driven dotted path in one mechanism, with no call-site special-casing. Matching is exact-or-dotted-prefix, which is why <code>pipelex.runtime_hub</code> does not match <code>pipelex.hub</code>, and why a docstring that merely <em>mentions</em> a module is not a reference.</p>
+<p><strong>A negative control has to assert the message, not the exit code.</strong> The closure test's dirty entry point exits 1 for a second reason — <code>pipelex.interpreter_hub in sys.modules</code> — whatever the offender predicate does. An exit-code-only control would have passed over a completely broken detector, leaving all eight real entry points green and vacuous forever. It asserts the offender message too. Confirmed by mutation: typo the package set, and the control fails while everything else stays green.</p>
+<p>Every item in the test-hardening pass was verified <em>by mutation</em> — remove the pinned behavior, watch the new test fail, revert. Watching a new test go green proves nothing about what it pins, and two of those items existed precisely because an existing test appeared to pin something it did not.</p>
+</details>
+
+<h2 id="s7"><span class="n">07</span> What this means for you</h2>
+
+<h3>Picking a hub</h3>
+<div class="scroll">
+<table>
+<thead><tr><th>You need…</th><th>Import from</th></tr></thead>
+<tbody>
+<tr><td>config, console, secrets, storage, telemetry / OTel tracer, class registry, func registry</td><td><code>pipelex.runtime_hub</code></td></tr>
+<tr><td>models manager, model deck, SDK clients, inference manager, LLM / img-gen / extract workers, content generator</td><td><code>pipelex.runtime_hub</code></td></tr>
+<tr><td>report delegate, run mode, event log, and the plugin registries (backend, model lister, orchestrator, bundle validator, storage, secrets)</td><td><code>pipelex.runtime_hub</code></td></tr>
+<tr><td>library manager, concept / domain / pipe lookups, the current-library contextvars, library dirs</td><td><code>pipelex.interpreter_hub</code></td></tr>
+<tr><td>pipe router, pipe run, pipeline manager, the PipeFunc executor and its registry</td><td><code>pipelex.interpreter_hub</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>What failure looks like</h3>
+<div class="scroll">
+<table>
+<thead><tr><th>You did</th><th>You get</th></tr></thead>
+<tbody>
+<tr><td><code>from pipelex.hub import get_console</code></td><td><code>ModuleNotFoundError</code> at import time. The module is gone on purpose — pick a half.</td></tr>
+<tr><td>Imported <code>interpreter_hub</code> from a runtime-layer module</td><td><code>make check-hub-layering</code> fails with the file, the line, the kind and the remedy. Also fails <code>make agent-check</code> and the <code>lint-hub-layering</code> CI job.</td></tr>
+<tr><td>Left a <code>"pipelex.hub"</code> string in a <code>mocker.patch</code> target</td><td>Same guard, dead-module rule — inside <code>tests/</code> too.</td></tr>
+<tr><td>Added an import that re-drags the interpreter without touching a hub</td><td><code>tests/unit/pipelex/test_runtime_layer_import_closure.py</code> fails and prints the offending modules.</td></tr>
+<tr><td>Genuinely need an exception</td><td><code>if TYPE_CHECKING:</code> for a type-only import (layer rule only), or an inline <code>&#35; hub-layering: ignore</code> on the statement.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Cross-repo — release-gated, three waves, one pass per repo</h3>
+<p>External repos still import <code>pipelex.hub</code> and break the moment this ships. The sweep is deliberately <strong>not</strong> in PR #1062; it lands with the release, already retargeted to the final names, so each repo is rewritten exactly once.</p>
+
+<div class="scroll">
+<table>
+<thead><tr><th>Wave</th><th>Old</th><th>New</th></tr></thead>
+<tbody>
+<tr><td rowspan="4">1 · the split</td><td><code>from pipelex.hub import &lt;runtime symbol&gt;</code></td><td><code>from pipelex.runtime_hub import …</code></td></tr>
+<tr><td><code>from pipelex.hub import &lt;interpreter symbol&gt;</code></td><td><code>from pipelex.interpreter_hub import …</code></td></tr>
+<tr><td><code>get_pipelex_hub</code></td><td><code>get_runtime_hub</code> <strong>or</strong> <code>get_interpreter_hub</code> — pick the container the call site meant</td></tr>
+<tr><td><code>PipelexHub</code></td><td><code>RuntimeHub</code> <strong>or</strong> <code>InterpreterHub</code></td></tr>
+<tr><td rowspan="4">2 · moved types</td><td><code>pipelex.pipeline.job_metadata</code></td><td><code>pipelex.system.job_metadata</code></td></tr>
+<tr><td><code>pipelex.graph.trace_context</code> · <code>pipelex.graph.graph_config:DataInclusionConfig</code></td><td><code>pipelex.system.trace_context</code> · <code>pipelex.system.data_inclusion_config</code></td></tr>
+<tr><td><code>pipelex.pipeline.exceptions:JobMetadataError</code></td><td><code>pipelex.system.exceptions</code></td></tr>
+<tr><td><code>pipelex.cogt.templating.{text_format,templating_style}</code> · <code>…template_category</code></td><td><code>pipelex.tools.templating.…</code> · <code>pipelex.tools.jinja2.template_category</code></td></tr>
+<tr><td rowspan="2">3 · moves + signatures</td><td><code>pipelex.codegen.resolved_fields</code> · <code>core.pipes.inputs.input_renderer</code> · <code>core.pipes.output.output_renderer</code></td><td><code>core.concepts.resolved_fields</code> · <code>core.pipes.rendering.{input,output}_renderer</code></td></tr>
+<tr><td><code>StuffFactory.make_stuff_from_stuff_content_or_data</code>, <code>WorkingMemoryFactory.make_from_pipeline_inputs</code>, <code>InputShaper.shape</code>, <code>InputStuffSpecsFactory.make_from_*</code>, <code>StuffSpecFactory.make_from_blueprint</code></td><td>all now require <code>concept_provider=get_concept_library()</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<details>
+<summary>Which repos, and which one bites first</summary>
+<div class="scroll">
+<table>
+<thead><tr><th>Repo</th><th><code>pipelex.hub</code> files</th><th>moved-type files</th><th>note</th></tr></thead>
+<tbody>
+<tr><td><code>pipelex-temporal</code> (private)</td><td>35</td><td>22</td><td>Heaviest consumer. Runner and worker must roll forward together — worth a changelog sentence.</td></tr>
+<tr><td><code>pipelex-mistralai-workflows</code></td><td>11</td><td>6</td><td><code>set_pipe_router</code> / <code>teardown_current_pipe_router</code> / <code>scoped_pipe_router</code> are documented as depended upon here — a contract change to <em>announce</em>, not just make.</td></tr>
+<tr><td><code>pipelex-api</code></td><td>9</td><td>1</td><td></td></tr>
+<tr><td><code>pipelex-transport</code></td><td>8 (2 production)</td><td>7</td><td><strong>The sharp one.</strong> <code>bridge.py</code> calls <code>WorkingMemoryFactory.make_from_pipeline_inputs</code> without the now-required <code>concept_provider</code> — the only production call site of a changed signature outside this repo. Also missing from the workspace repo table, which is why it was missed.</td></tr>
+<tr><td><code>pipelex-daytona-sandbox</code></td><td>1</td><td>3</td><td>An entry-point plugin, so it fails inside a <em>host</em> pipelex process at registration, not in its own tests.</td></tr>
+<tr><td><code>pipelex-demo-mistral</code> · <code>pipelex-demo-vibe</code></td><td>9 each</td><td>5 each</td><td>Example workflows call the changed signatures.</td></tr>
+<tr><td><code>pipelex-cookbook</code> · <code>cocode</code></td><td>2 each</td><td>—</td><td></td></tr>
+<tr><td><code>conformance</code> + <code>docs/specs/</code></td><td>—</td><td>1</td><td><code>docs/specs/pipelex-transport-boundary.md</code> §A declares <code>pipelex.hub</code> a stable cross-boundary seam, verified by an <em>active</em> conformance test. Spec and test move in lockstep with the sweep, then <code>make check-spec-links</code>.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Clean, no action: <code>pipelex-worker</code>, <code>pipelex-starter-python</code>, <code>pipelex-relay</code>, <code>n8n-nodes-pipelex</code>, <code>sandbox</code>. Version-pinned and therefore safe for now: <code>pipelex-workshop</code>, <code>pipelex-demos</code>, <code>pipelex-demo-frostbeam</code>.</p>
+</details>
+
+<h2 id="s8"><span class="n">08</span> Known limits — stated, not hidden</h2>
+
+<ul>
+  <li><strong>The layer rule is enforced only one hop deep.</strong> The guard checks direct imports, so a runtime-layer module can reach <code>interpreter_hub</code> transitively with both gates green. Blast radius measured exactly: <strong>4 of 476</strong> declared runtime-layer modules, all in <code>pipelex.plugins</code> — the other ten declared packages are clean across 345 modules — via three transitive routes. <em>The headline property is not damaged</em>: the inference layer and <code>runtime_hub</code> still measure 0 and never reach the breaching modules. The remedy is decided — split the built-in plugins by layer, give the two interpreter-touching ones a single interpreter-side home, and teach the guard the transitive check. Its own PR after #1062 merges; simulated at 0 of 128 breaching once three modules relocate.</li>
+  <li><strong>Known inversions, named so the docs stay honest.</strong> Two <code>plugins/</code> modules import from <code>pipe_operators/</code> and one from <code>pipeline/</code>. They import no hub, so the guard does not flag them — which is exactly why they are written down. Remaining measured cross-layer edges: <code>cogt → core</code> (21), <code>system → cogt</code> (7), <code>plugins → runtime_bridge</code> (6), <code>tools → cogt</code> (3), and one genuine wart, <code>cogt/model_backends/model_lists.py</code> importing a CLI exception.</li>
+  <li><strong>A general layering ratchet is a sequel, not this change.</strong> “No runtime module may import any interpreter module, with an allowlist” is a much cheaper argument now that the two biggest clusters are gone — but it is a bigger change than this one should carry.</li>
+  <li><strong>One eager optional-SDK import is out of scope but worth knowing:</strong> <code>tracing/event_log_factory.py</code> imports the DynamoDB event log at module level, which runs a module-level <code>try: import boto3</code>, so boto3 and friends load in every process that touches the tracing factory. Three-line fix, entirely independent of this work.</li>
+</ul>
+
+<footer>
+  <p>Branch <code>refactor/Hub</code> off <code>dev</code> at v0.40.0 · PR <a href="https://github.com/Pipelex/pipelex/pull/1062">#1062</a> open, follow-ups merged via <a href="https://github.com/Pipelex/pipelex/pull/1063">#1063</a> · gates green: <code>make agent-check</code>, full <code>make agent-test</code>, <code>make drift-check</code> · numbers re-measured 2026-07-27 on the branch tip. The shipped specification of the boundary is <code>docs/contribute/hub-layering.md</code>; the executable tracker with every checkpoint record is <code>TODOS.md</code>.</p>
+</footer>
+
+</div>
