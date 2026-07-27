@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Callable
 
-from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 from pipelex.pipe_operators.shared.image_reference import ImageReferenceKind

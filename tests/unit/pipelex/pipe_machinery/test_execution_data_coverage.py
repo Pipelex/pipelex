@@ -17,7 +17,7 @@ import re
 import pytest
 
 from pipelex import pipe_controllers, pipe_operators
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
 REGISTER_CALL = "self._register_execution_data("
 SELF_CALL_RE = re.compile(r"self\.(\w+)\(")

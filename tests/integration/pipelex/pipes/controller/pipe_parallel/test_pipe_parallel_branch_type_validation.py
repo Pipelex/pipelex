@@ -6,7 +6,6 @@ from pydantic import Field
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.exceptions import PipeValidationError
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
@@ -14,6 +13,7 @@ from pipelex.interpreter_hub import get_concept_library, get_pipe_library
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.runtime_hub import get_class_registry

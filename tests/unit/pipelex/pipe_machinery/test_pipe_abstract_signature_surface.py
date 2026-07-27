@@ -1,6 +1,6 @@
 from typing import cast
 
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
 # Resolve the property descriptors directly via __dict__ so mypy doesn't lose the
 # `property` type the way it does through attribute access on a `BaseModel` subclass.

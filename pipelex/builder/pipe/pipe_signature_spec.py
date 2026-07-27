@@ -9,7 +9,7 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
-from pipelex.core.pipes.pipe_blueprint import PipeType
+from pipelex.pipe_machinery.pipe_blueprint import PipeType
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
 from pipelex.tools.misc.pretty import PrettyPrintable
 

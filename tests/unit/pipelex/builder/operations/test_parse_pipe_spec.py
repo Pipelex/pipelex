@@ -20,7 +20,7 @@ from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_search_spec import PipeSearchSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.builder.pipe.pipe_signature_spec import PipeSignatureSpec
-from pipelex.core.pipes.pipe_blueprint import PipeType
+from pipelex.pipe_machinery.pipe_blueprint import PipeType
 from tests.unit.pipelex.builder.operations.test_data import PipeOpsTestData
 
 _BASE_LLM = PipeOpsTestData.BASE_LLM_SPEC

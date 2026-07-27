@@ -4,9 +4,9 @@ from typing import TYPE_CHECKING, Any, cast
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.core.pipes.pipe_blueprint import PipeType
 from pipelex.interpreter_hub import get_required_pipe
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
+from pipelex.pipe_machinery.pipe_blueprint import PipeType
 
 if TYPE_CHECKING:
     from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition

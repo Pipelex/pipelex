@@ -2912,23 +2912,23 @@ rationale = "Factory from source: builds from the needed inputs; single operand.
 param = "typed_named_stuff_spec"
 rationale = "Factory from source: builds from the typed-named spec; single operand."
 
-["pipelex/core/pipes/handle_pipe_errors.py::_handle_pipe_errors"]
+["pipelex/mthds_parsing/handle_pipe_errors.py::_handle_pipe_errors"]
 param = "error"
 rationale = "Verb-object: handles the error; context stays keyword."
 
-["pipelex/core/pipes/handle_pipe_errors.py::categorize_pipe_factory_error"]
+["pipelex/mthds_parsing/handle_pipe_errors.py::categorize_pipe_factory_error"]
 param = "factory_error"
 rationale = "Verb-object: categorizes the factory error; context stays keyword."
 
-["pipelex/core/pipes/handle_pipe_errors.py::categorize_pipe_validation_error"]
+["pipelex/mthds_parsing/handle_pipe_errors.py::categorize_pipe_validation_error"]
 param = "validation_error"
 rationale = "Verb-object: categorizes the validation error; context stays keyword."
 
-["pipelex/core/pipes/handle_pipe_errors.py::categorize_pipe_validation_with_libraries_error"]
+["pipelex/mthds_parsing/handle_pipe_errors.py::categorize_pipe_validation_with_libraries_error"]
 param = "pipe_error"
 rationale = "Verb-object: categorizes the pipe error; context stays keyword."
 
-["pipelex/core/pipes/handle_pipe_errors.py::extract_wrapped_pipe_validation_error"]
+["pipelex/mthds_parsing/handle_pipe_errors.py::extract_wrapped_pipe_validation_error"]
 param = "error"
 rationale = "Verb-object: unwraps the error; single operand."
 
@@ -2948,31 +2948,31 @@ rationale = "Setter: installs the default domain code; single operand."
 param = "named"
 rationale = "Factory from source: builds from the named spec; context stays keyword."
 
-["pipelex/core/pipes/pipe_abstract.py::PipeAbstract._end_pipe_span_error"]
+["pipelex/pipe_machinery/pipe_abstract.py::PipeAbstract._end_pipe_span_error"]
 param = "span"
 rationale = "Verb-object: ends the span; error fields stay keyword."
 
-["pipelex/core/pipes/pipe_abstract.py::PipeAbstract._end_pipe_span_success"]
+["pipelex/pipe_machinery/pipe_abstract.py::PipeAbstract._end_pipe_span_success"]
 param = "span"
 rationale = "Verb-object: ends the span; result fields stay keyword."
 
-["pipelex/core/pipes/pipe_abstract.py::PipeAbstract._expected_inputs_for_fix"]
+["pipelex/pipe_machinery/pipe_abstract.py::PipeAbstract._expected_inputs_for_fix"]
 param = "needed_inputs"
 rationale = "Noun-named derivation from the needed inputs; single operand."
 
-["pipelex/core/pipes/pipe_abstract.py::PipeAbstract._format_pipe_run_info"]
+["pipelex/pipe_machinery/pipe_abstract.py::PipeAbstract._format_pipe_run_info"]
 param = "pipe_run_params"
 rationale = "Derivation from the run params; single operand."
 
-["pipelex/core/pipes/pipe_abstract.py::PipeAbstract._make_single_concept_data_for_registry"]
+["pipelex/pipe_machinery/pipe_abstract.py::PipeAbstract._make_single_concept_data_for_registry"]
 param = "concept"
 rationale = "Derivation from the concept; single operand."
 
-["pipelex/core/pipes/pipe_blueprint.py::PipeCategory.is_controller_by_str"]
+["pipelex/pipe_machinery/pipe_blueprint.py::PipeCategory.is_controller_by_str"]
 param = "category_str"
 rationale = "Predicate on the category string; single operand."
 
-["pipelex/core/pipes/pipe_blueprint.py::explicit_signature_tag_migration_message"]
+["pipelex/pipe_machinery/pipe_blueprint.py::explicit_signature_tag_migration_message"]
 param = "pipe_code"
 rationale = "Noun-named derivation: the migration message for the given pipe code; single operand."
 
@@ -2988,83 +2988,83 @@ rationale = "Type-directed accessor: the target item type; single operand."
 param = "item_type"
 rationale = "Type-directed accessor: the target item type; single operand."
 
-["pipelex/core/pipes/rendering/input_renderer.py::_delighten_entry"]
+["pipelex/pipe_machinery/rendering/input_renderer.py::_delighten_entry"]
 param = "entry"
 rationale = "Single-operand transformation of the entry; kind is a mode and stays keyword."
 
-["pipelex/core/pipes/rendering/input_renderer.py::_delighten_template"]
+["pipelex/pipe_machinery/rendering/input_renderer.py::_delighten_template"]
 param = "envelope_template"
 rationale = "Single-operand transformation of the template; specs stay keyword."
 
-["pipelex/core/pipes/rendering/input_renderer.py::_substitute_none_values"]
+["pipelex/pipe_machinery/rendering/input_renderer.py::_substitute_none_values"]
 param = "value"
 rationale = "Single-operand transformation of the value."
 
-["pipelex/core/pipes/rendering/input_renderer.py::_to_toml_value"]
+["pipelex/pipe_machinery/rendering/input_renderer.py::_to_toml_value"]
 param = "value"
 rationale = "Single-operand conversion of the value."
 
-["pipelex/core/pipes/rendering/input_renderer.py::_unwrap_scalar_content"]
+["pipelex/pipe_machinery/rendering/input_renderer.py::_unwrap_scalar_content"]
 param = "content"
 rationale = "Single-operand unwrap of the content; envelope is context."
 
-["pipelex/core/pipes/rendering/input_renderer.py::build_concept_comments"]
+["pipelex/pipe_machinery/rendering/input_renderer.py::build_concept_comments"]
 param = "input_specs"
 rationale = "Noun-named derivation: the comments mapping for the input specs; single operand."
 
-["pipelex/core/pipes/rendering/input_renderer.py::build_inputs_template"]
+["pipelex/pipe_machinery/rendering/input_renderer.py::build_inputs_template"]
 param = "the_pipe"
 rationale = "Noun-named derivation: the inputs template for the pipe; explicit is a mode."
 
-["pipelex/core/pipes/rendering/input_renderer.py::render_inputs"]
+["pipelex/pipe_machinery/rendering/input_renderer.py::render_inputs"]
 param = "the_pipe"
 rationale = "Verb-object: renders the pipe's inputs; format stays keyword."
 
-["pipelex/core/pipes/rendering/input_renderer.py::render_inputs_toml"]
+["pipelex/pipe_machinery/rendering/input_renderer.py::render_inputs_toml"]
 param = "the_pipe"
 rationale = "Verb-object: renders the pipe's inputs; explicit is a mode."
 
-["pipelex/core/pipes/rendering/input_renderer.py::serialize_inputs_template_to_toml"]
+["pipelex/pipe_machinery/rendering/input_renderer.py::serialize_inputs_template_to_toml"]
 param = "template"
 rationale = "Single-operand serialization of the template; options stay keyword."
 
-["pipelex/core/pipes/rendering/output_renderer.py::_collect_possible_outputs"]
+["pipelex/pipe_machinery/rendering/output_renderer.py::_collect_possible_outputs"]
 param = "the_pipe"
 rationale = "Verb-object: collects from the pipe; single operand."
 
-["pipelex/core/pipes/rendering/output_renderer.py::_render_json_output"]
+["pipelex/pipe_machinery/rendering/output_renderer.py::_render_json_output"]
 param = "the_pipe"
 rationale = "Verb-object: renders the pipe's output; single operand."
 
-["pipelex/core/pipes/rendering/output_renderer.py::_render_python_output"]
+["pipelex/pipe_machinery/rendering/output_renderer.py::_render_python_output"]
 param = "the_pipe"
 rationale = "Verb-object: renders the pipe's output; single operand."
 
-["pipelex/core/pipes/rendering/output_renderer.py::_render_schema_output"]
+["pipelex/pipe_machinery/rendering/output_renderer.py::_render_schema_output"]
 param = "the_pipe"
 rationale = "Verb-object: renders the pipe's output; single operand."
 
-["pipelex/core/pipes/rendering/output_renderer.py::render_output"]
+["pipelex/pipe_machinery/rendering/output_renderer.py::render_output"]
 param = "the_pipe"
 rationale = "Verb-object: renders the pipe's output; format stays keyword."
 
-["pipelex/core/pipes/validation.py::is_input_used_by_variables"]
+["pipelex/pipe_machinery/validation.py::is_input_used_by_variables"]
 param = "input_name"
 rationale = "Predicate on the input named; the variables stay keyword."
 
-["pipelex/core/pipes/validation.py::is_pipe_code_valid"]
+["pipelex/pipe_machinery/validation.py::is_pipe_code_valid"]
 param = "pipe_code"
 rationale = "Predicate on the pipe code; single operand."
 
-["pipelex/core/pipes/validation.py::is_valid_input_name"]
+["pipelex/pipe_machinery/validation.py::is_valid_input_name"]
 param = "input_name"
 rationale = "Predicate on the input name; single operand."
 
-["pipelex/core/pipes/validation.py::is_variable_satisfied_by_inputs"]
+["pipelex/pipe_machinery/validation.py::is_variable_satisfied_by_inputs"]
 param = "variable_path"
 rationale = "Predicate on the variable path; the inputs stay keyword."
 
-["pipelex/core/pipes/validation.py::validate_input_name"]
+["pipelex/pipe_machinery/validation.py::validate_input_name"]
 param = "input_name"
 rationale = "Verb-object: validates the input name; single operand."
 

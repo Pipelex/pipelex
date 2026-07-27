@@ -21,15 +21,20 @@ from typing import TYPE_CHECKING, Any, cast
 import pytest
 import tomli
 
-from pipelex.core.pipes.rendering.input_renderer import render_inputs, render_inputs_toml
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_pipe, set_current_library
+from pipelex.pipe_machinery.rendering.input_renderer import render_inputs, render_inputs_toml
 from pipelex.pipeline.validate_bundle import validate_bundle
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-_TRIAGE = Path(__file__).parents[4] / "e2e" / "pipelex" / "pipes" / "smart_inputs" / "smart_inputs_triage" / "smart_inputs_triage.mthds"
-_FILES = Path(__file__).parents[4] / "e2e" / "pipelex" / "pipes" / "smart_inputs" / "smart_inputs_files" / "smart_inputs_files.mthds"
+#: Anchored on the `tests/` root by name rather than by a parent count: a depth index silently
+#: resolves to the wrong directory when the module moves, which is exactly what happened when this
+#: test followed `input_renderer` out of `core/pipes/` into the `pipe_machinery/` mirror.
+_TESTS_ROOT = next(parent for parent in Path(__file__).parents if parent.name == "tests")
+_SMART_INPUTS = _TESTS_ROOT / "e2e" / "pipelex" / "pipes" / "smart_inputs"
+_TRIAGE = _SMART_INPUTS / "smart_inputs_triage" / "smart_inputs_triage.mthds"
+_FILES = _SMART_INPUTS / "smart_inputs_files" / "smart_inputs_files.mthds"
 
 
 def _teardown_validation_library(outer_library_id: str) -> None:

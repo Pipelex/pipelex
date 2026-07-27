@@ -5,8 +5,8 @@ import pytest
 from pipelex import pretty_print
 from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.interpreter_hub import get_concept_library
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from tests.unit.pipelex.builder.pipe.pipe_operator.pipe_llm.test_data import PipeLLMTestCases

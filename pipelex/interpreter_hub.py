@@ -22,12 +22,12 @@ from kajson.class_registry_abstract import ClassRegistryAbstract
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import Domain
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.libraries.domain.domain_library_abstract import DomainLibraryAbstract
 from pipelex.libraries.library import Library
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutorProtocol
 from pipelex.pipeline.pipeline import Pipeline
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract

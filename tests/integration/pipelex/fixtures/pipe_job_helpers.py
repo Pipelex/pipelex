@@ -4,10 +4,10 @@ from pathlib import Path
 
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.interpreter_hub import clear_current_library, get_library_manager, get_required_pipe, set_current_library
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.mthds_parsing.parser import MthdsParser
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode

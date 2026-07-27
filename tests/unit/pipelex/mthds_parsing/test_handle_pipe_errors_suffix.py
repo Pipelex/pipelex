@@ -1,5 +1,5 @@
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
-from pipelex.core.pipes.handle_pipe_errors import categorize_pipe_validation_with_libraries_error
+from pipelex.mthds_parsing.handle_pipe_errors import categorize_pipe_validation_with_libraries_error
 
 
 class TestRequiredProvidedSuffix:

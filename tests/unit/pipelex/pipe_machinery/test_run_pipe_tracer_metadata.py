@@ -7,10 +7,10 @@ from pytest_mock import MockerFixture
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_abstract import InputPresenceScan
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.pipe_machinery.pipe_abstract import InputPresenceScan
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -61,7 +61,7 @@ class TestRunPipeForwardsTracerMetadata:
         mock_manager = mocker.MagicMock()
         mock_manager.on_pipe_start = on_pipe_start_mock
         mocker.patch(
-            "pipelex.core.pipes.pipe_abstract.GraphTracerManager.get_instance",
+            "pipelex.pipe_machinery.pipe_abstract.GraphTracerManager.get_instance",
             return_value=mock_manager,
         )
 

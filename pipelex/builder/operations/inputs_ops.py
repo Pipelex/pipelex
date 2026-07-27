@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
-from pipelex.core.pipes.pipe_factory import PipeFactory
-from pipelex.core.pipes.rendering.input_renderer import build_concept_comments, render_inputs
 from pipelex.interpreter_hub import get_library_manager, get_required_pipe, resolve_library_dirs, set_current_library
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
+from pipelex.pipe_machinery.rendering.input_renderer import build_concept_comments, render_inputs
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.validate_bundle import validate_bundle
 

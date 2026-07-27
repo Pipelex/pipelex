@@ -10,10 +10,10 @@ import pytest
 from pydantic import ValidationError
 
 from pipelex.core.pipes.exceptions import PipeValidationErrorType
-from pipelex.core.pipes.handle_pipe_errors import extract_wrapped_pipe_validation_error
-from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.mthds_parsing.handle_pipe_errors import extract_wrapped_pipe_validation_error
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen

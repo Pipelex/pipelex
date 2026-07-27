@@ -13,12 +13,6 @@ from typing_extensions import TypedDict
 from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.pipes.exceptions import PipeFactoryError, PipeValidationError
-from pipelex.core.pipes.handle_pipe_errors import (
-    categorize_pipe_factory_error,
-    categorize_pipe_validation_error,
-    categorize_pipe_validation_with_libraries_error,
-)
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.validation import report_validation_error
 from pipelex.interpreter_hub import (
@@ -32,8 +26,14 @@ from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.mthds_parsing.exceptions import MthdsParserError
+from pipelex.mthds_parsing.handle_pipe_errors import (
+    categorize_pipe_factory_error,
+    categorize_pipe_validation_error,
+    categorize_pipe_validation_with_libraries_error,
+)
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.exceptions import DryRunError, PipeRunError
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunOutput, DryRunStatus
 from pipelex.pipeline.exceptions import ValidateBundleError

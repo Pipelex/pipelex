@@ -22,7 +22,7 @@ Each kind lives in its own package under `pipelex/pipe_operators/<kind>/` or `pi
 
 1. **The kind's package** — the three classes above, plus an `exceptions.py` if the kind raises its own errors (see the error-class location convention in the Python standards).
 
-2. **The type tag** — add the value to `PipeType` in `pipelex/core/pipes/pipe_blueprint.py`, and give it an arm in the `category` property that maps it to `PipeCategory.PIPE_OPERATOR` or `PipeCategory.PIPE_CONTROLLER`. The match is exhaustive with no `case _`, so the type checker walks you to every remaining site — that is the point of writing it that way.
+2. **The type tag** — add the value to `PipeType` in `pipelex/pipe_machinery/pipe_blueprint.py`, and give it an arm in the `category` property that maps it to `PipeCategory.PIPE_OPERATOR` or `PipeCategory.PIPE_CONTROLLER`. The match is exhaustive with no `case _`, so the type checker walks you to every remaining site — that is the point of writing it that way.
 
 3. **The blueprint union** — add `PipeFooBlueprint` to `PipeBlueprintUnion` in `pipelex/mthds_parsing/pipelex_bundle_blueprint.py`. It is a pydantic discriminated union keyed on the `type` field, so a kind absent from the union is a parse error on any `.mthds` file that names it, not a silent skip.
 

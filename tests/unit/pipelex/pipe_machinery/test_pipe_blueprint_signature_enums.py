@@ -1,6 +1,6 @@
 import pytest
 
-from pipelex.core.pipes.pipe_blueprint import PIPE_SIGNATURE_TYPE_TAG, PipeCategory, PipeType
+from pipelex.pipe_machinery.pipe_blueprint import PIPE_SIGNATURE_TYPE_TAG, PipeCategory, PipeType
 
 
 class TestPipeSignatureTaxonomyEviction:

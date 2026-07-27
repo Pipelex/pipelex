@@ -8,15 +8,15 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.exceptions import PipeFactoryError, PipeFactoryErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeCategory, PipeType
 from pipelex.core.pipes.stuff_spec.exceptions import StuffSpecFactoryError
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.stuff_spec.stuff_spec_factory import StuffSpecFactory
 from pipelex.interpreter_hub import get_concept_library
+from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint, PipeCategory, PipeType
 from pipelex.runtime_hub import get_class_registry
 
 if TYPE_CHECKING:
-    from pipelex.core.pipes.pipe_abstract import PipeAbstract
+    from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
 PipeBlueprintType = TypeVar("PipeBlueprintType", bound="PipeBlueprint", contravariant=True)
 PipeAbstractType = TypeVar("PipeAbstractType", bound="PipeAbstract", covariant=True)

@@ -6,11 +6,12 @@ itself, must pull in zero interpreter modules. The distinction matters because a
 else entirely — a runtime-layer module reaching into `pipe_operators` directly, without touching a hub —
 would break the property while the lint stays green.
 
-"Interpreter module" is spelled out twice below, because the interpreter top-level packages alone
-under-state it: core's Pipe-machinery modules are interpreter-layer too, and most of them only get
-caught *transitively*, through the `pipe_operators` / `libraries` they happen to pull in.
-`core.pipes.pipe_blueprint` pulls in none of it, so a runtime-layer import of it would pass a
-package-only predicate. Naming them makes the predicate state the boundary instead of approximating it.
+"Interpreter module" used to need spelling out twice, because core's Pipe-machinery modules were
+interpreter-layer while living under a runtime-named package — so the predicate carried a second tuple
+naming them one by one, plus an exclusion for the one leaf model that landed in every runtime closure.
+It does not any more: every one of those modules now lives under `pipe_machinery` or `mthds_parsing`,
+so the top-level package set says exactly what it means, with no per-module list and no exclusion. A
+package-granular predicate is only honest once the packages match the layers, which is what M1 bought.
 
 Two documented interpreter homes are deliberately absent, and their absence is a known wart rather than
 an oversight: `pipeline` and `pipe_run` already leak leaf models into every runtime closure —
@@ -94,18 +95,8 @@ _CLOSURE_SCRIPT = textwrap.dedent(
         "mthds_parsing",
     )
 
-    # Core's Pipe machinery: interpreter-layer by construction, but not under a top-level package of its own.
-    INTERPRETER_CORE = (
-        "pipelex.core.pipes.pipe_abstract",
-        "pipelex.core.pipes.pipe_blueprint",
-        "pipelex.core.pipes.pipe_factory",
-        "pipelex.core.pipes.rendering",
-    )
-
     def is_interpreter(name):
-        if name.split(".")[1] in INTERPRETER_PACKAGES:
-            return True
-        return any(name == module or name.startswith(module + ".") for module in INTERPRETER_CORE)
+        return name.split(".")[1] in INTERPRETER_PACKAGES
 
     offenders = sorted(name for name in sys.modules if name.startswith("pipelex.") and is_interpreter(name))
     if offenders:

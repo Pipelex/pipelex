@@ -34,7 +34,7 @@ class TestRegistryModelsSplit:
         """A pipe kind and its factory never drift apart — one dropped without the other is a run-time miss.
 
         `PipeFactory` resolves a pipe's factory by string (`f"{pipe_type.value}Factory"`, see
-        `pipelex/core/pipes/pipe_factory.py:121`), so this suffix pairing is the live lookup contract,
+        `pipelex/pipe_machinery/pipe_factory.py:121`), so this suffix pairing is the live lookup contract,
         not a naming preference. Dropping both halves is a deliberate removal and stays green.
         """
         pipe_names = _model_names(PipeRegistryModels.get_all_models())

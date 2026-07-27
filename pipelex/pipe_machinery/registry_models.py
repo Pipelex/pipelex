@@ -1,7 +1,5 @@
 from typing import Any, ClassVar
 
-from pipelex.core.pipes.pipe_abstract import PipeAbstractType
-from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_factory import PipeBatchFactory
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
@@ -10,6 +8,8 @@ from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.parallel.pipe_parallel_factory import PipeParallelFactory
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.sequence.pipe_sequence_factory import PipeSequenceFactory
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstractType
+from pipelex.pipe_machinery.pipe_factory import PipeFactoryProtocol
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_factory import PipeComposeFactory
 from pipelex.pipe_operators.extract.pipe_extract import PipeExtract

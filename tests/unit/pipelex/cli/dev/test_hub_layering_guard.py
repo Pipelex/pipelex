@@ -46,10 +46,11 @@ class TestHubLayeringGuard:
         assert is_runtime_layer(module_qname="pipelex.core.memory.input_shaper")
         assert is_runtime_layer(module_qname="pipelex.core.pipes.inputs.input_stuff_specs_factory")
         assert is_runtime_layer(module_qname="pipelex.core.pipes.stuff_spec.stuff_spec_factory")
-        # Everything that names a `Pipe` imports the interpreter directly and stays in the interpreter layer.
-        assert not is_runtime_layer(module_qname="pipelex.core.pipes.pipe_factory")
-        assert not is_runtime_layer(module_qname="pipelex.core.pipes.rendering.output_renderer")
-        # Two of core's interpreter tenants left `core/` entirely; their new homes are interpreter-layer too.
+        # Core's interpreter tenants have left `core/` for two top-level packages of their own. Everything
+        # that names a `Pipe` imports the interpreter directly, so both homes are interpreter-layer.
+        assert not is_runtime_layer(module_qname="pipelex.pipe_machinery.pipe_factory")
+        assert not is_runtime_layer(module_qname="pipelex.pipe_machinery.pipe_blueprint")
+        assert not is_runtime_layer(module_qname="pipelex.pipe_machinery.rendering.output_renderer")
         assert not is_runtime_layer(module_qname="pipelex.pipe_machinery.registry_models")
         assert not is_runtime_layer(module_qname="pipelex.mthds_parsing.pipelex_bundle_blueprint")
         assert not is_runtime_layer(module_qname="pipelex.mthds_parsing.bundle_elaborator")

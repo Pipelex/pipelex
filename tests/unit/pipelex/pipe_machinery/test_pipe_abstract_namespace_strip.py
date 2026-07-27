@@ -1,6 +1,6 @@
 import pytest
 
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
 
 class TestPipeAbstractNamespaceStrip:

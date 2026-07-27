@@ -33,7 +33,7 @@ from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.tracing.event_log_factory import make_event_log
 
 if TYPE_CHECKING:
-    from pipelex.core.pipes.pipe_abstract import PipeAbstract
+    from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
     from pipelex.system.trace_context import TraceContext
     from pipelex.tracing.event_log_protocol import EventLogProtocol
 

@@ -37,7 +37,6 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.config import get_config
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.interpreter_hub import (
     clear_current_library,
     get_current_library,
@@ -49,6 +48,7 @@ from pipelex.interpreter_hub import (
 )
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.observer.observer_protocol import ObserverNoOp
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_run import PipeRun

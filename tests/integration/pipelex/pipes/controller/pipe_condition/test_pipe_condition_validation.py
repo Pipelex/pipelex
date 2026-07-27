@@ -2,11 +2,11 @@ from pathlib import Path
 from typing import Callable
 
 from pipelex.core.concepts.concept_factory import ConceptBlueprint, ConceptFactory
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.interpreter_hub import get_concept_library
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 
 
 class TestPipeConditionValidation:

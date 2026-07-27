@@ -4,7 +4,6 @@ from pydantic import ValidationError
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.pipes.validation import is_pipe_code_valid
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.mthds_parsing.exceptions import BundleElaboratorError
@@ -16,6 +15,7 @@ from pipelex.mthds_parsing.pipelex_bundle_blueprint import (
 )
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
+from pipelex.pipe_machinery.validation import is_pipe_code_valid
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.structure.pipe_structure_blueprint import PipeStructureBlueprint
 

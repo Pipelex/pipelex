@@ -1,7 +1,7 @@
 import pytest
 
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.libraries.contract_match import contracts_match
+from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 
 
 class ConcretePipeBlueprint(PipeBlueprint):

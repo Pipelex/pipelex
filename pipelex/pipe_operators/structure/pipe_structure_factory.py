@@ -3,9 +3,9 @@ from typing import Any
 from typing_extensions import override
 
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
-from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import make_variable_multiplicity, parse_concept_with_multiplicity
+from pipelex.pipe_machinery.pipe_factory import PipeFactoryProtocol
 from pipelex.pipe_operators.structure.pipe_structure import PipeStructure
 from pipelex.pipe_operators.structure.pipe_structure_blueprint import PipeStructureBlueprint
 

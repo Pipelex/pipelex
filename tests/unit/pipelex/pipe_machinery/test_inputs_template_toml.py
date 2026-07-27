@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import tomli
 
-from pipelex.core.pipes.rendering.input_renderer import serialize_inputs_template_to_toml
+from pipelex.pipe_machinery.rendering.input_renderer import serialize_inputs_template_to_toml
 
 
 class TestSerializeInputsTemplateToml:

@@ -9,7 +9,7 @@ from pipelex.runtime_bridge.exceptions import PipelexBridgeDispatchError
 from pipelex.system.job_metadata import JobMetadata
 
 if TYPE_CHECKING:
-    from pipelex.core.pipes.pipe_abstract import PipeAbstract
+    from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
 
 class _StubPipe:

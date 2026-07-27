@@ -1,6 +1,6 @@
 import pytest
 
-from pipelex.core.pipes.validation import is_valid_input_name, validate_input_name
+from pipelex.pipe_machinery.validation import is_valid_input_name, validate_input_name
 
 
 class TestInputNameValidation:

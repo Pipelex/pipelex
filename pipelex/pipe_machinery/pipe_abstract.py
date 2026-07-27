@@ -16,16 +16,16 @@ from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.exceptions import OptionalValueAbsentError, PipeRunInputsError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, NamedStuffSpec
-from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType, valid_pipe_type_tags
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
-from pipelex.core.pipes.validation import is_variable_satisfied_by_inputs
 from pipelex.core.pipes.variable_multiplicity import PresenceMarker
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.graph.graph_tracer_manager import GraphTracerManager, IOSpec, NodeKind
 from pipelex.libraries.library_crate import LibraryCrate
+from pipelex.pipe_machinery.pipe_blueprint import PipeCategory, PipeType, valid_pipe_type_tags
+from pipelex.pipe_machinery.validation import is_variable_satisfied_by_inputs
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError

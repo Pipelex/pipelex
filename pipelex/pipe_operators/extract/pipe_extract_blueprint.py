@@ -5,9 +5,9 @@ from typing_extensions import override
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 
 
 class PipeExtractBlueprint(PipeBlueprint):

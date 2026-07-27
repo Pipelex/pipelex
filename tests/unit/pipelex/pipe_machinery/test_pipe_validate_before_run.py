@@ -9,8 +9,8 @@ import pytest
 
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.interpreter_hub import get_concept_library
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode

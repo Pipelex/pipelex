@@ -11,11 +11,11 @@ from pipelex.builder.exceptions import PipelexBundleSpecBlueprintError
 from pipelex.builder.pipe.pipe_spec_union import PipeSpecUnion
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
-from pipelex.core.pipes.pipe_blueprint import SIGNATURE_ONLY_KEYS, normalize_typeless_signature_section
-from pipelex.core.pipes.validation import is_pipe_code_valid
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.mthds_parsing.pipe_sorter import sort_pipes_by_dependencies
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
+from pipelex.pipe_machinery.pipe_blueprint import SIGNATURE_ONLY_KEYS, normalize_typeless_signature_section
+from pipelex.pipe_machinery.validation import is_pipe_code_valid
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 

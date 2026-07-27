@@ -5,9 +5,9 @@ from pytest_mock import MockerFixture
 
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.concepts.exceptions import ConceptError
-from pipelex.core.pipes.rendering.output_renderer import _collect_possible_outputs  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+from pipelex.pipe_machinery.rendering.output_renderer import _collect_possible_outputs  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
 
-GET_REQUIRED_PIPE_TARGET = "pipelex.core.pipes.rendering.output_renderer.get_required_pipe"
+GET_REQUIRED_PIPE_TARGET = "pipelex.pipe_machinery.rendering.output_renderer.get_required_pipe"
 
 
 def _make_sequence_pipe(mocker: MockerFixture, sub_pipe_codes: list[str]) -> Any:
