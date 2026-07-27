@@ -85,13 +85,14 @@ _CLOSURE_SCRIPT = textwrap.dedent(
         "builder",
         # The built-ins that adapt interpreter-layer ports; they construct interpreter-layer objects.
         "interpreter_plugins",
+        # The pipe-kind registration manifest, hoisted out of `core/`.
+        "pipe_machinery",
     )
 
     # Core's Pipe machinery: interpreter-layer by construction, but not under a top-level package of its own.
     INTERPRETER_CORE = (
         "pipelex.core.bundles",
         "pipelex.core.interpreter",
-        "pipelex.core.registry_models",
         "pipelex.core.pipes.pipe_abstract",
         "pipelex.core.pipes.pipe_blueprint",
         "pipelex.core.pipes.pipe_factory",

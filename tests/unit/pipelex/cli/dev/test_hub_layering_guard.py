@@ -49,11 +49,14 @@ class TestHubLayeringGuard:
         # Everything that names a `Pipe` imports the interpreter directly and stays in the interpreter layer.
         assert not is_runtime_layer(module_qname="pipelex.core.pipes.pipe_factory")
         assert not is_runtime_layer(module_qname="pipelex.core.pipes.rendering.output_renderer")
-        assert not is_runtime_layer(module_qname="pipelex.core.registry_models")
         assert not is_runtime_layer(module_qname="pipelex.core.bundles.pipelex_bundle_blueprint")
         assert not is_runtime_layer(module_qname="pipelex.core.interpreter.bundle_elaborator")
-        # `pipelex.core` itself is not a declared package — the split is deliberate, not an omission.
+        # The pipe-kind manifest left `core/` entirely; its new home is interpreter-layer too.
+        assert not is_runtime_layer(module_qname="pipelex.pipe_machinery.registry_models")
+        # `pipelex.core` itself is not a declared package, so what is left of core's own top level is
+        # undeclared rather than interpreter — the split is deliberate, not an omission.
         assert not is_runtime_layer(module_qname="pipelex.core.qualified_ref")
+        assert not is_runtime_layer(module_qname="pipelex.core.registry_models")
 
     def test_runtime_layer_may_import_runtime_hub(self) -> None:
         """The permitted direction is never flagged — the runtime layer lives on `runtime_hub`."""

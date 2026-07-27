@@ -330,6 +330,7 @@ plugins:
         - contribute/configuration-defaults-and-overrides.md: "Configuration Internals"
         - contribute/keyword-only-arguments.md: "Keyword-Only Arguments"
         - contribute/hub-layering.md: "Hub Layering"
+        - contribute/registration-surface.md: "Registration Surface"
         - contribute/drift-contracts.md: "Drift Contracts"
         - changelog.md: "Changelog"
 
@@ -569,6 +570,7 @@ nav:
     - Configuration Internals: contribute/configuration-defaults-and-overrides.md
     - Keyword-Only Arguments: contribute/keyword-only-arguments.md
     - Hub Layering: contribute/hub-layering.md
+    - Registration Surface: contribute/registration-surface.md
     - Drift Contracts: contribute/drift-contracts.md
     - Code of Conduct: CODE_OF_CONDUCT.md
     - License: license.md

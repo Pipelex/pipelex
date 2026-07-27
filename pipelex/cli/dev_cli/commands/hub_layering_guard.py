@@ -98,11 +98,13 @@ SCAN_ROOTS: tuple[Path, ...] = (SOURCE_ROOT, TESTS_ROOT)
 #: layers. Its data model — concepts, domains, stuffs, working memory, the input/output *specs* — is
 #: runtime: it describes what a method's values are, and nothing in it needs a loaded method. The
 #: remainder names a `Pipe`, and a pipe is the interpreter's own object: `pipe_abstract`,
-#: `pipe_blueprint`, `pipe_factory`, `registry_models`, `bundles/` (a discriminated union over every
-#: pipe blueprint), `interpreter/`, and `pipes/rendering/` all import the interpreter *directly*, so
-#: declaring them runtime would be a claim the measurement contradicts. Those modules resolve their
-#: collaborators from the hub and inject them downward into the runtime half — the one-way arrow the
-#: whole design rests on. See the "Where core splits" section of ``docs/contribute/hub-layering.md``.
+#: `pipe_blueprint`, `pipe_factory`, `bundles/` (a discriminated union over every pipe blueprint),
+#: `interpreter/`, and `pipes/rendering/` all import the interpreter *directly*, so declaring them
+#: runtime would be a claim the measurement contradicts. (The pipe-kind registration manifest was the
+#: fattest of them and no longer lives here at all — it is `pipelex.pipe_machinery`.) Those modules
+#: resolve their collaborators from the hub and inject them downward into the runtime half — the
+#: one-way arrow the whole design rests on. See the "Where core splits" section of
+#: ``docs/contribute/hub-layering.md``.
 RUNTIME_LAYER_PACKAGES: tuple[str, ...] = (
     "pipelex.cogt",
     "pipelex.plugins",
