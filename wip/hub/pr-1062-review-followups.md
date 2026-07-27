@@ -260,7 +260,7 @@ The [four moves of (d)](#remedy-d--split-the-built-ins-by-layer) plus [(c)](#rem
 
 ```
                                         before        after
-declared runtime-layer modules              476          473   (3 relocated)
+declared runtime-layer modules              477          473   (4 relocated)
   ... reaching interpreter_hub                4            0
 pipelex.plugins modules                     131          127
 pipelex.plugins.discovery   interp=          67            0
@@ -268,6 +268,8 @@ pipelex.plugins.builtins    interp=          67            0
 ```
 
 The plan's simulation predicted **128** modules left in `pipelex.plugins`, not 127: its `RELOCATED` filter used the prefix `pipelex.plugins.pipe_func.` with a trailing dot, which misses the package's own `__init__`. Four files moved, not three.
+
+The *before* figure is **477**, not the 476 the [F1.a sweep](#f1a--the-blast-radius-is-exactly-pipelexplugins) printed: that table has one row per declared runtime-layer **package** and so omits `pipelex.runtime_hub`, which is a bare *module* entry in `RUNTIME_LAYER_PACKAGES` — and the one module the whole rule exists to protect. Its reaching count was 0 either way, so no conclusion moves; the sweep's own rows are kept verbatim above as the record. Re-measured on the base commit with the shipped guard's helpers: per-entry sum and distinct count both 477, `pipelex.runtime_hub → 1`. 477 → 473 is the same four relocated modules the `pipelex.plugins 131 → 127` row already counts.
 
 **What the transitive rule costs, measured honestly.** Do not difference against the 2.79s in the [remedy options](#remedy-options-with-what-was-measured-about-each) — that was taken in an earlier session on a different tree, and comparing to it understates the cost. Measured back-to-back on this tree, same binary, with the transitive pass enabled and then disabled:
 
