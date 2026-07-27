@@ -64,7 +64,7 @@ class StoragePlugin:
     """Always-on built-in provider of the local / in_memory / s3 / gcp storage backends.
 
     Core-unconditional: storage is required infra, so this plugin cannot be disabled into a
-    boot with no storage (see ``CORE_UNCONDITIONAL_PLUGIN_NAMES``). It registers one factory per
+    boot with no storage (see ``RUNTIME_CORE_UNCONDITIONAL_PLUGIN_NAMES``). It registers one factory per
     built-in method; ``storage_config.method`` selects which one boot invokes. Importing this
     module is import-light — the s3/gcp SDKs load lazily inside their providers, not at register.
     """

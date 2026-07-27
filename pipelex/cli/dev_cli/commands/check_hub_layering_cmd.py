@@ -2,8 +2,9 @@
 
 `interpreter_hub` may import `runtime_hub`; **`runtime_hub` must never import `interpreter_hub`.** The guard
 checks the forbidden direction — a declared runtime-layer module may not import or name
-``pipelex.interpreter_hub`` — plus the dead-module rule: nothing anywhere may still reference the deleted
-``pipelex.hub``. The canonical human-readable specification lives in ``docs/contribute/hub-layering.md``.
+``pipelex.interpreter_hub``, nor *reach* it through a chain of module-level imports — plus the
+dead-module rule: nothing anywhere may still reference the deleted ``pipelex.hub``. The canonical
+human-readable specification lives in ``docs/contribute/hub-layering.md``.
 
 The pure-AST collection logic lives in the stdlib-only ``hub_layering_guard`` module; this module is
 the ``rich``/``pipelex.runtime_hub`` presentation layer wired into the ``pipelex-dev`` Typer app
@@ -26,8 +27,10 @@ from rich.panel import Panel
 from pipelex.cli.dev_cli.commands.hub_layering_guard import (
     RUNTIME_LAYER_PACKAGES,
     SCAN_ROOTS,
+    SOURCE_ROOT,
     HubLayeringViolation,
     collect_all_violations,
+    collect_transitive_violations,
 )
 from pipelex.runtime_hub import get_console
 
@@ -52,7 +55,12 @@ def check_hub_layering_cmd(*, quiet: bool = False) -> None:
         console.print(f"[red]✗ Hub-layering check: FAILED[/red] - scan root(s) {roots} do not exist")
         sys.exit(1)
 
-    violations = collect_all_violations(roots=SCAN_ROOTS)
+    # Two passes, because they see different things: the per-file rules over both roots, then the
+    # transitive rule over `pipelex/` only (`tests.*` sits in no declared layer, so it has no closure
+    # to protect). One merged list, because they are one gate: either pass alone fails the check.
+    # Each pass returns its own findings location-sorted, and the report groups by kind below, so the
+    # concatenation order is not what the reader sees.
+    violations = collect_all_violations(roots=SCAN_ROOTS) + collect_transitive_violations(root=SOURCE_ROOT)
 
     if not violations:
         # Success is the only thing quiet trims: one line in quiet mode, a panel otherwise.
@@ -79,7 +87,8 @@ def _print_success_panel() -> None:
     console.print()
     console.print(
         Panel(
-            f"[green]✓[/green] No hub-layering violations.\n\n[dim]Runtime layer: {escape(layers)}[/dim]",
+            f"[green]✓[/green] No hub-layering violations — no runtime-layer module imports the interpreter hub, "
+            f"directly or transitively.\n\n[dim]Runtime layer: {escape(layers)}[/dim]",
             title="[bold green]Hub-layering Check: PASSED[/bold green]",
             border_style="green",
             padding=(1, 2),

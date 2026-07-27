@@ -15,8 +15,8 @@ Core names no backend by import or by string. The built-in drivers (OpenAI, Gate
 
 ```
 boot (Pipelex.setup)
-  └─ build_registrar(config)            # pure, import-light
-       ├─ for each plugin in BUILTIN_PLUGINS
+  └─ build_registrar(config, builtin_plugins=BUILTIN_PLUGINS, …)   # pure, import-light
+       ├─ for each built-in plugin (both layers' halves, composed)
        └─ for each installed "pipelex.plugins" entry point
             └─ plugin.register(registrar)        # side-effect-free
                  └─ registrar.add_inference_backend(family=…, sdk=…, make_worker=…)

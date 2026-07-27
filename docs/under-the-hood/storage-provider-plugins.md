@@ -25,8 +25,8 @@ This is deliberately **not** a hub slot (those are orchestrator-coupled, claimed
 
 ```
 boot (Pipelex.setup)
-  └─ build_registrar(config)                       # pure, import-light
-       ├─ for each plugin in BUILTIN_PLUGINS         (StoragePlugin is one)
+  └─ build_registrar(config, builtin_plugins=BUILTIN_PLUGINS, …)   # pure, import-light
+       ├─ for each built-in plugin                   (StoragePlugin is one)
        └─ for each installed "pipelex.plugins" entry point
             └─ plugin.register(registrar)            # side-effect-free
                  └─ registrar.add_storage_provider(method=…, factory=…)
@@ -79,7 +79,7 @@ The factory is a plain callable stored at registration and **invoked only at the
 
 ## The built-in `StoragePlugin`
 
-`pipelex/plugins/storage/storage_plugin.py` is the reference storage plugin. It is **core-unconditional** — storage is required infra, so it joins `CORE_UNCONDITIONAL_PLUGIN_NAMES` and cannot be disabled into a boot with no storage:
+`pipelex/plugins/storage/storage_plugin.py` is the reference storage plugin. It is **core-unconditional** — storage is required infra, so it joins the runtime layer's `RUNTIME_CORE_UNCONDITIONAL_PLUGIN_NAMES` — composed into `CORE_UNCONDITIONAL_PLUGIN_NAMES` at the boot entrypoint — and cannot be disabled into a boot with no storage:
 
 ```python
 class StoragePlugin:

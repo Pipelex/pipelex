@@ -15,10 +15,10 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
+from pipelex.interpreter_plugins.pipe_func.pipe_func_plugin import PipeFuncPlugin
 from pipelex.pipe_operators.func.direct_pipe_func_executor import DirectPipeFuncExecutor
 from pipelex.plugins.contract import PLUGIN_API_VERSION
 from pipelex.plugins.exceptions import DuplicatePipeFuncExecutorError, UnknownPipeFuncExecutionModeError
-from pipelex.plugins.pipe_func.pipe_func_plugin import PipeFuncPlugin
 from pipelex.plugins.pipe_func_executor_registry import DIRECT_PIPE_FUNC_EXECUTION_MODE, PipeFuncExecutorRegistry
 from pipelex.plugins.registrar import PluginOrigin, PluginRegistrar
 

@@ -6,7 +6,7 @@ itself, must pull in zero interpreter modules. The distinction matters because a
 else entirely — a runtime-layer module reaching into `pipe_operators` directly, without touching a hub —
 would break the property while the lint stays green.
 
-"Interpreter module" is spelled out twice below, because the five interpreter top-level packages alone
+"Interpreter module" is spelled out twice below, because the interpreter top-level packages alone
 under-state it: core's Pipe-machinery modules are interpreter-layer too, and most of them only get
 caught *transitively*, through the `pipe_operators` / `libraries` they happen to pull in.
 `core.pipes.pipe_blueprint` pulls in none of it, so a runtime-layer import of it would pass a
@@ -30,14 +30,23 @@ import textwrap
 
 import pytest
 
-#: Entry points that must never load the interpreter: the inference layer, the runtime hub itself, and the
-#: heaviest module of each runtime-layer `core/` package — the ones that historically reached for a library
-#: and now take a `ConceptProviderAbstract` instead. `core/`'s Pipe-touching remainder is deliberately
-#: absent; it names the interpreter's own object and belongs to the interpreter layer by construction (see
-#: the guard's `RUNTIME_LAYER_PACKAGES` note).
+#: Entry points that must never load the interpreter: the inference layer, the runtime hub itself, the
+#: built-in plugin aggregator, and the heaviest module of each runtime-layer `core/` package — the ones
+#: that historically reached for a library and now take a `ConceptProviderAbstract` instead. `core/`'s
+#: Pipe-touching remainder is deliberately absent; it names the interpreter's own object and belongs to
+#: the interpreter layer by construction (see the guard's `RUNTIME_LAYER_PACKAGES` note).
+#:
+#: `plugins.builtins` earns its place by history: it and three neighbours reached `interpreter_hub`
+#: transitively — through `runtime_bridge`, `pipeline` and `pipe_operators` — while both gates stayed
+#: green, because the guard was one hop deep and `pipelex.plugins`, the largest declared runtime-layer
+#: package, had no entry point here. The guard now follows the import graph, but that is *static*
+#: analysis: it cannot see a dynamic import, so the package that bit us gets a runtime-truth check too.
+#: It is the aggregator of every built-in runtime-layer plugin, hence the broadest single entry point
+#: into the package.
 RUNTIME_LAYER_ENTRY_POINTS = [
     "pipelex.cogt.content_generation.content_generator",
     "pipelex.runtime_hub",
+    "pipelex.plugins.builtins",
     "pipelex.core.concepts.structure_generation.generator",
     "pipelex.core.memory.input_shaper",
     "pipelex.core.memory.working_memory_factory",
@@ -68,7 +77,15 @@ _CLOSURE_SCRIPT = textwrap.dedent(
     target = sys.argv[1]
     importlib.import_module(target)
 
-    INTERPRETER_PACKAGES = ("libraries", "pipe_operators", "pipe_controllers", "codegen", "builder")
+    INTERPRETER_PACKAGES = (
+        "libraries",
+        "pipe_operators",
+        "pipe_controllers",
+        "codegen",
+        "builder",
+        # The built-ins that adapt interpreter-layer ports; they construct interpreter-layer objects.
+        "interpreter_plugins",
+    )
 
     # Core's Pipe machinery: interpreter-layer by construction, but not under a top-level package of its own.
     INTERPRETER_CORE = (

@@ -3592,6 +3592,18 @@ rationale = "Module-level setter: installs the InterpreterHub singleton; single 
 param = "pipe_router"
 rationale = "Module-level setter: installs the pipe router; single self-labelling operand."
 
+["pipelex/interpreter_plugins/direct/direct_plugin.py::DirectOrchestratorPlugin.register"]
+param = "registrar"
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
+
+["pipelex/interpreter_plugins/pipe_func/pipe_func_plugin.py::PipeFuncPlugin.register"]
+param = "registrar"
+rationale = "Plugin entrypoint: registers into the registrar; single self-labelling operand, consistent with sibling plugins."
+
+["pipelex/interpreter_plugins/pipe_func/pipe_func_plugin.py::_make_direct_pipe_func_executor"]
+param = "config"
+rationale = "PipeFuncExecutorFactoryFn implementation: the registry invokes factories positionally via the Callable type."
+
 ["pipelex/kit/cursor_rules.py::_is_pipelex_managed"]
 param = "mdc_path"
 rationale = "Predicate on the .mdc file path; single operand."
@@ -4668,10 +4680,6 @@ rationale = "Plugin protocol register: the registrar is the sole sink the plugin
 param = "registrar"
 rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
-["pipelex/plugins/direct/direct_plugin.py::DirectOrchestratorPlugin.register"]
-param = "registrar"
-rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
-
 ["pipelex/plugins/discovery.py::_load_external_plugin"]
 param = "entry_point"
 rationale = "Loads the plugin from the entry point; single operand."
@@ -5083,14 +5091,6 @@ rationale = "Factory from source: builds the result from the extra_config; singl
 ["pipelex/plugins/openrouter/openrouter_plugin.py::OpenRouterPlugin.register"]
 param = "registrar"
 rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
-
-["pipelex/plugins/pipe_func/pipe_func_plugin.py::PipeFuncPlugin.register"]
-param = "registrar"
-rationale = "Plugin entrypoint: registers into the registrar; single self-labelling operand, consistent with sibling plugins."
-
-["pipelex/plugins/pipe_func/pipe_func_plugin.py::_make_direct_pipe_func_executor"]
-param = "config"
-rationale = "PipeFuncExecutorFactoryFn implementation: the registry invokes factories positionally via the Callable type."
 
 ["pipelex/plugins/portkey/portkey_completions_factory.py::PortkeyCompletionsFactory.make_portkey_openai_client_for_completions"]
 param = "model_handle"

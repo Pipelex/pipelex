@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:951772e532e83bafefb42f75214b9c65098a722c290ec1e36f943a4b3e23ac6e"
-reviewed_by = "Claude (Opus 5)"
-reviewed_at = "2026-07-26T09:35:23Z"
-rationale = "All 28 triggers changed by hub import lines only — the runtime/interpreter rename (service_hub -> runtime_hub, method_hub -> interpreter_hub). Verified mechanically: diffed all 28 trigger files together and filtered out every changed line naming a hub; nothing remained, so no CLI argument, flag, format value, default, or command behavior moved. The vocabulary and identifier edits of this rename (LOW_LAYER_PACKAGES -> RUNTIME_LAYER_PACKAGES, the guard's success panel) live under pipelex/cli/dev_cli/**, which this contract excludes. Opened both review targets: docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md contain zero references to pipelex.hub, service_hub, method_hub, or either new hub module — they document the user-facing command surface, not Python import paths, so the rename is invisible to them. Nothing to update."
+digest = "sha256:9751fa52ad13dfb7bed9032afdf36e1d1263af8d3892ccb713b0ce57532cbbf5"
+reviewed_by = "Claude (Opus 5 1M context)"
+reviewed_at = "2026-07-27T02:26:00Z"
+rationale = "Single trigger change: pipelex/cli/commands/plugins_cmd.py now imports the composed built-in plugin list from pipelex.interpreter_plugins.builtins and passes it (plus core_unconditional_plugin_names) to build_registrar, which stopped importing them so the runtime-layer plugins package stays importable without the interpreter. Import-and-call-shape only — no argument, flag, output column, or command behavior moved. Verified against the live CLI rather than by reading: 'pipelex plugins --help' still shows only the 'list' subcommand with no options, and 'pipelex plugins list' still prints the same Name/Origin/Status/API/Contributions table, with all 19 built-ins in the same order as before the split (direct, pipe_func, storage, secrets, openai, gateway, portkey, anthropic, mistral, bedrock, google, fal, huggingface, blackboxai, openrouter, azure_rest, docling, pypdfium2, linkup) and the same core-unconditional set. Opened both review targets: docs/tools/cli/ has zero references to the plugins command or to any Python import path, and pipelex/cli/agent_cli/CLAUDE.md's only 'plugins' hits are mthds-plugins skill paths. Nothing stale. Noted but out of scope: 'pipelex plugins list' is undocumented in docs/tools/cli/ — a pre-existing gap, not created by this change."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -104,7 +104,7 @@ rationale = "All 28 triggers changed by hub import lines only — the runtime/in
 "pipelex/cli/commands/init/ui/types.py" = "blob:1361f29ca95bacc90bca90ea6c0e39f44b6734ab"
 "pipelex/cli/commands/login/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/login/command.py" = "blob:ace1db9879626cc1722adaac12761aadaa6b24ed"
-"pipelex/cli/commands/plugins_cmd.py" = "blob:4ad42bd78b117985f2d7478939e4cabc5b64dc4b"
+"pipelex/cli/commands/plugins_cmd.py" = "blob:6019e102c644ff6adeee6a5b3f1423efc4af39f1"
 "pipelex/cli/commands/resolve_cmd.py" = "blob:2233ab12b7cd5ef0bce697d9599d13a09e242dde"
 "pipelex/cli/commands/run/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/run/_inputs_file_loader.py" = "blob:dde781f846968b667a0acfb4b3e3cea01cef7049"

@@ -15,9 +15,9 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.interpreter_hub import get_pipe_router
+from pipelex.interpreter_plugins.pipe_func.pipe_func_plugin import PipeFuncPlugin
 from pipelex.pipelex import Pipelex
 from pipelex.plugins.contract import PLUGIN_API_VERSION
-from pipelex.plugins.pipe_func.pipe_func_plugin import PipeFuncPlugin
 from pipelex.plugins.registrar import HubSlot, PluginOrigin, PluginRegistrar
 from pipelex.runtime_hub import get_content_generator
 from pipelex.system.runtime import IntegrationMode, runtime_manager

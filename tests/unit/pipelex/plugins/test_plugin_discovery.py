@@ -24,6 +24,8 @@ from pipelex.plugins.inference_backend_registry import InferenceFamily
 from pipelex.plugins.registrar import PluginOrigin, PluginRegistrar, PluginStatus
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from pytest_mock import MockerFixture
 
     from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
@@ -31,6 +33,9 @@ if TYPE_CHECKING:
     from pipelex.system.configuration.configs import PipelexConfig
 
 DISCOVERY_MODULE = "pipelex.plugins.discovery"
+
+#: The default for tests that exercise no core-unconditional plugin: nothing is undisableable.
+NO_CORE_UNCONDITIONAL: frozenset[str] = frozenset()
 
 
 def _noop_make_worker(**_kwargs: object) -> InferenceWorkerAbstract:
@@ -82,24 +87,62 @@ class _BrokenPlugin:
         raise ValueError(msg)
 
 
-def _patch_builtins(mocker: MockerFixture, plugins: list[object]) -> None:
-    mocker.patch(f"{DISCOVERY_MODULE}.BUILTIN_PLUGINS", plugins)
+def _build_registrar_with(
+    *,
+    mocker: MockerFixture,
+    plugins: Sequence[object],
+    disabled: list[str] | None = None,
+    core_unconditional: frozenset[str] = NO_CORE_UNCONDITIONAL,
+) -> PluginRegistrar:
+    """Build a registrar over exactly ``plugins``, with external entry points stubbed out.
+
+    The built-in list is a *parameter* of ``build_registrar`` rather than a module global it imports:
+    some built-ins adapt interpreter-layer ports, so importing them from the runtime-layer discovery
+    module would put the method interpreter back into every runtime import closure. Which is why these
+    tests hand the list in instead of patching a module attribute.
+    """
     mocker.patch(f"{DISCOVERY_MODULE}._external_entry_points", return_value=[])
+    return build_registrar(
+        config=_fake_config(disabled or []),
+        builtin_plugins=cast("Sequence[PipelexPlugin]", plugins),
+        core_unconditional_plugin_names=core_unconditional,
+    )
 
 
 class TestPluginDiscovery:
     def test_builtin_plugins_satisfy_the_protocol(self) -> None:
         """Every shipped built-in is a structural PipelexPlugin; a bare object is not."""
-        from pipelex.plugins.builtins import BUILTIN_PLUGINS  # noqa: PLC0415
+        from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS  # noqa: PLC0415
 
         for plugin in BUILTIN_PLUGINS:
             assert isinstance(plugin, PipelexPlugin)
         assert not isinstance(object(), PipelexPlugin)
 
+    def test_the_two_layer_halves_compose_into_one_list(self) -> None:
+        """The composition root's list is exactly both halves, and each name appears once.
+
+        The halves are filed by layer — `pipelex.plugins` for the runtime adapters,
+        `pipelex.interpreter_plugins` for the ones that construct interpreter-layer objects — so the
+        failure mode this pins is a half silently dropping out of the composition, which would present
+        as a plugin quietly missing at boot rather than as an import error.
+        """
+        from pipelex.interpreter_plugins.builtins import (  # noqa: PLC0415
+            BUILTIN_PLUGINS,
+            CORE_UNCONDITIONAL_PLUGIN_NAMES,
+            INTERPRETER_BUILTIN_PLUGINS,
+            INTERPRETER_CORE_UNCONDITIONAL_PLUGIN_NAMES,
+        )
+        from pipelex.plugins.builtins import RUNTIME_BUILTIN_PLUGINS, RUNTIME_CORE_UNCONDITIONAL_PLUGIN_NAMES  # noqa: PLC0415
+
+        assert [*INTERPRETER_BUILTIN_PLUGINS, *RUNTIME_BUILTIN_PLUGINS] == BUILTIN_PLUGINS
+        assert CORE_UNCONDITIONAL_PLUGIN_NAMES == INTERPRETER_CORE_UNCONDITIONAL_PLUGIN_NAMES | RUNTIME_CORE_UNCONDITIONAL_PLUGIN_NAMES
+        names = [plugin.name for plugin in BUILTIN_PLUGINS]
+        assert len(names) == len(set(names))
+        assert set(names) >= CORE_UNCONDITIONAL_PLUGIN_NAMES
+
     def test_registry_round_trip(self, mocker: MockerFixture) -> None:
         """A registered backend is retrievable by (family, sdk) and is the exact callable."""
-        _patch_builtins(mocker, [_InferencePlugin(name="synthetic", sdk="synthetic_sdk")])
-        registrar = build_registrar(config=_fake_config([]))
+        registrar = _build_registrar_with(mocker=mocker, plugins=[_InferencePlugin(name="synthetic", sdk="synthetic_sdk")])
 
         from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry  # noqa: PLC0415
 
@@ -107,39 +150,35 @@ class TestPluginDiscovery:
         assert registry.lookup(family=InferenceFamily.LLM, sdk="synthetic_sdk") is _noop_make_worker
 
     def test_version_mismatch_fails_loud(self, mocker: MockerFixture) -> None:
-        _patch_builtins(mocker, [_InferencePlugin(name="from_the_future", sdk="future_sdk", targets_api=PLUGIN_API_VERSION + 1)])
+        future_plugin = _InferencePlugin(name="from_the_future", sdk="future_sdk", targets_api=PLUGIN_API_VERSION + 1)
         with pytest.raises(PluginApiVersionMismatchError) as exc_info:
-            build_registrar(config=_fake_config([]))
+            _build_registrar_with(mocker=mocker, plugins=[future_plugin])
         assert "from_the_future" in str(exc_info.value)
 
     def test_duplicate_inference_backend_names_both(self, mocker: MockerFixture) -> None:
-        _patch_builtins(mocker, [_InferencePlugin(name="alpha", sdk="dup"), _InferencePlugin(name="beta", sdk="dup")])
         with pytest.raises(DuplicateInferenceBackendError) as exc_info:
-            build_registrar(config=_fake_config([]))
+            _build_registrar_with(mocker=mocker, plugins=[_InferencePlugin(name="alpha", sdk="dup"), _InferencePlugin(name="beta", sdk="dup")])
         message = str(exc_info.value)
         assert "alpha" in message
         assert "beta" in message
 
     def test_duplicate_orchestrator_names_both(self, mocker: MockerFixture) -> None:
-        _patch_builtins(mocker, [_OrchestratorPlugin(name="orch_a"), _OrchestratorPlugin(name="orch_b")])
         with pytest.raises(DuplicateOrchestratorError) as exc_info:
-            build_registrar(config=_fake_config([]))
+            _build_registrar_with(mocker=mocker, plugins=[_OrchestratorPlugin(name="orch_a"), _OrchestratorPlugin(name="orch_b")])
         message = str(exc_info.value)
         assert "orch_a" in message
         assert "orch_b" in message
 
     def test_double_claimed_slot_names_both(self, mocker: MockerFixture) -> None:
-        _patch_builtins(mocker, [_SlotPlugin(name="claimer_1"), _SlotPlugin(name="claimer_2")])
         with pytest.raises(HubSlotAlreadyClaimedError) as exc_info:
-            build_registrar(config=_fake_config([]))
+            _build_registrar_with(mocker=mocker, plugins=[_SlotPlugin(name="claimer_1"), _SlotPlugin(name="claimer_2")])
         message = str(exc_info.value)
         assert "claimer_1" in message
         assert "claimer_2" in message
 
     def test_broken_plugin_register_wrapped(self, mocker: MockerFixture) -> None:
-        _patch_builtins(mocker, [_BrokenPlugin()])
         with pytest.raises(BrokenPluginError) as exc_info:
-            build_registrar(config=_fake_config([]))
+            _build_registrar_with(mocker=mocker, plugins=[_BrokenPlugin()])
         assert "broken" in str(exc_info.value)
         assert "kaboom" in str(exc_info.value)
 
@@ -151,10 +190,9 @@ class TestPluginDiscovery:
             raise ImportError(msg)
 
         bad_entry_point = SimpleNamespace(name="bad_ep", load=_explode)
-        mocker.patch(f"{DISCOVERY_MODULE}.BUILTIN_PLUGINS", [])
         mocker.patch(f"{DISCOVERY_MODULE}._external_entry_points", return_value=[bad_entry_point])
         with pytest.raises(BrokenPluginError) as exc_info:
-            build_registrar(config=_fake_config([]))
+            build_registrar(config=_fake_config([]), builtin_plugins=[], core_unconditional_plugin_names=NO_CORE_UNCONDITIONAL)
         assert "bad_ep" in str(exc_info.value)
 
     def test_disabled_broken_external_entry_point_is_skipped_before_load(self, mocker: MockerFixture) -> None:
@@ -167,10 +205,9 @@ class TestPluginDiscovery:
             raise ImportError(msg)
 
         bad_entry_point = SimpleNamespace(name="bad_ep", load=_explode)
-        mocker.patch(f"{DISCOVERY_MODULE}.BUILTIN_PLUGINS", [])
         mocker.patch(f"{DISCOVERY_MODULE}._external_entry_points", return_value=[bad_entry_point])
 
-        registrar = build_registrar(config=_fake_config(["bad_ep"]))
+        registrar = build_registrar(config=_fake_config(["bad_ep"]), builtin_plugins=[], core_unconditional_plugin_names=NO_CORE_UNCONDITIONAL)
 
         disabled_discovery = next(discovery for discovery in registrar.discoveries if discovery.name == "bad_ep")
         assert disabled_discovery.status == PluginStatus.DISABLED
@@ -178,15 +215,14 @@ class TestPluginDiscovery:
 
     def test_build_registrar_is_idempotent(self, mocker: MockerFixture) -> None:
         """Two builds produce equivalent registrars — register is side-effect-free (D3)."""
-        _patch_builtins(mocker, [_InferencePlugin(name="synthetic", sdk="synthetic_sdk")])
-        first = build_registrar(config=_fake_config([]))
-        second = build_registrar(config=_fake_config([]))
+        synthetic = [_InferencePlugin(name="synthetic", sdk="synthetic_sdk")]
+        first = _build_registrar_with(mocker=mocker, plugins=synthetic)
+        second = _build_registrar_with(mocker=mocker, plugins=synthetic)
         assert set(first.inference_backends) == set(second.inference_backends)
         assert [discovery.name for discovery in first.discoveries] == [discovery.name for discovery in second.discoveries]
 
     def test_disabled_plugin_is_skipped(self, mocker: MockerFixture) -> None:
-        _patch_builtins(mocker, [_InferencePlugin(name="optional", sdk="optional_sdk")])
-        registrar = build_registrar(config=_fake_config(["optional"]))
+        registrar = _build_registrar_with(mocker=mocker, plugins=[_InferencePlugin(name="optional", sdk="optional_sdk")], disabled=["optional"])
         assert (InferenceFamily.LLM, "optional_sdk") not in registrar.inference_backends
         disabled_discovery = next(discovery for discovery in registrar.discoveries if discovery.name == "optional")
         assert disabled_discovery.status == PluginStatus.DISABLED
@@ -194,13 +230,25 @@ class TestPluginDiscovery:
     @pytest.mark.parametrize("plugin_name", ["direct", "pipe_func", "storage", "secrets", "openai"])
     def test_disabling_core_unconditional_plugin_raises(self, plugin_name: str) -> None:
         """Denylisting any plugin core requires unconditionally (pipe_func/storage/secrets included) is a startup error."""
+        from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS, CORE_UNCONDITIONAL_PLUGIN_NAMES  # noqa: PLC0415
+
         with pytest.raises(CoreUnconditionalPluginDisabledError) as exc_info:
-            build_registrar(config=_fake_config([plugin_name]))
+            build_registrar(
+                config=_fake_config([plugin_name]),
+                builtin_plugins=BUILTIN_PLUGINS,
+                core_unconditional_plugin_names=CORE_UNCONDITIONAL_PLUGIN_NAMES,
+            )
         assert plugin_name in str(exc_info.value)
 
     def test_discoveries_describe_builtins(self) -> None:
         """build_registrar records each built-in with origin/status/contributions for `plugins list`."""
-        registrar = build_registrar(config=_fake_config([]))
+        from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS, CORE_UNCONDITIONAL_PLUGIN_NAMES  # noqa: PLC0415
+
+        registrar = build_registrar(
+            config=_fake_config([]),
+            builtin_plugins=BUILTIN_PLUGINS,
+            core_unconditional_plugin_names=CORE_UNCONDITIONAL_PLUGIN_NAMES,
+        )
         by_name = {discovery.name: discovery for discovery in registrar.discoveries}
         assert "openai" in by_name
         openai_discovery = by_name["openai"]

@@ -17,8 +17,8 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.exceptions import MissingDependencyError
+from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS
 from pipelex.plugins.blackboxai.blackboxai_completions_factory import BlackboxaiCompletionsFactory
-from pipelex.plugins.builtins import BUILTIN_PLUGINS
 from pipelex.plugins.exceptions import InferenceBackendNotFoundError
 from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory
 from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry

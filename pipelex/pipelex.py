@@ -39,6 +39,7 @@ from pipelex.core.validation import report_validation_error
 from pipelex.graph.mermaidflow.template_set import MERMAID_TEMPLATE_SET
 from pipelex.graph.reactflow.template_set import REACTFLOW_TEMPLATE_SET
 from pipelex.interpreter_hub import InterpreterHub, set_interpreter_hub
+from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS, CORE_UNCONDITIONAL_PLUGIN_NAMES
 from pipelex.libraries.library_manager import LibraryManager
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.observer.multi_observer import MultiObserver
@@ -296,7 +297,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # (inference, storage, …) are still built later at their own hub-set points, all referencing this
         # same already-built registrar; the slot-claim thunks / teardown callbacks it also accumulates are
         # applied at their ordered apply-points in later phases.
-        plugin_registrar = build_registrar(config=get_config())
+        plugin_registrar = build_registrar(
+            config=get_config(),
+            builtin_plugins=BUILTIN_PLUGINS,
+            core_unconditional_plugin_names=CORE_UNCONDITIONAL_PLUGIN_NAMES,
+        )
         self._plugin_registrar = plugin_registrar
         # Reject an unknown boot orchestrator before falling through to the core defaults. The requested
         # name (CLI --orchestrator / setup(boot_orchestrator=...) / config) is matched against registered

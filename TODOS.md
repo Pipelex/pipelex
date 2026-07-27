@@ -1,16 +1,14 @@
 # TODOS — split `pipelex.hub` into `runtime_hub` + `interpreter_hub`
 
-**Worktree:** `_hub/` · **Branch:** `refactor/Hub` (off `origin/dev`, base `f23fda7a0` = v0.40.0) · **PR:** [#1062 → `dev`](https://github.com/Pipelex/pipelex/pull/1062), open.
+**Worktree:** `_hub/` · **Branch:** `refactor/Hub-2` (off `6fbdcb2fd`, the #1062 merge) · **PR #1062:** [merged to `dev`](https://github.com/Pipelex/pipelex/pull/1062) 2026-07-27.
 
-**Status:** **ALL PHASES DONE + THE RENAME LANDED + PHASES A AND B OF THE REVIEW FOLLOW-UPS APPLIED — all gates green.** PR #1062 is open. **Jump to [Checkpoint B record](#checkpoint-b-record--test-hardening) first**, then [Checkpoint A record](#checkpoint-a-record--pr-1062-review-follow-ups), then [▶ Resume here](#-resume-here-the-rename-is-landed) for the state they build on.
+**Status:** **ALL PHASES DONE + THE RENAME LANDED + THE FULL `/review` FOLLOW-UP APPLIED (Phases A, B and the F1 remedy) — all gates green.** PR #1062 carried the split plus Phases A and B and is merged. The F1 remedy is on `refactor/Hub-2`, uncommitted-but-staged, awaiting its own PR. **Jump to [Checkpoint A1](wip/hub/pr-1062-review-followups.md#checkpoint-a1-record--the-f1-remedy) first**, then [Checkpoint B record](#checkpoint-b-record--test-hardening), [Checkpoint A record](#checkpoint-a-record--pr-1062-review-follow-ups), then [▶ Resume here](#-resume-here-the-rename-is-landed) for the state they build on.
 
-> ⚠ **The `/review` follow-ups are partially applied.** The executable plan is [`wip/hub/pr-1062-review-followups.md`](wip/hub/pr-1062-review-followups.md) — read it before touching this branch. **Phase A (A1's doc-honesty fix + A2–A8) is done**, recorded at [Checkpoint A](#checkpoint-a-record--pr-1062-review-follow-ups); **Phase B (test hardening, B1–B7) is done**, recorded at [Checkpoint B](#checkpoint-b-record--test-hardening) — every item mutation-verified. **Phase C (release-wave additions) is not started**, and neither is the F1 remedy.
+> ✅ **The `/review` follow-ups are applied except the release-gated Phase C.** The executable plan is [`wip/hub/pr-1062-review-followups.md`](wip/hub/pr-1062-review-followups.md) — read it before touching this branch. **Phase A** (A1's doc-honesty fix + A2–A8) at [Checkpoint A](#checkpoint-a-record--pr-1062-review-follow-ups); **Phase B** (test hardening, B1–B7, every item mutation-verified) at [Checkpoint B](#checkpoint-b-record--test-hardening); **the F1 remedy** (D-R4 = (d)+(c)) at [Checkpoint A1](wip/hub/pr-1062-review-followups.md#checkpoint-a1-record--the-f1-remedy). **Phase C (release-wave additions) is not started** and is gated on the release.
 >
-> **The defect Phase A documents is still live**, deliberately: the layer rule is enforced only one hop deep, so four modules of the *declared runtime-layer* `pipelex.plugins` package load `interpreter_hub` (plus 57–67 interpreter modules) with both gates green. Re-verified twice — 2026-07-26 by the review, and again at Checkpoint A before publishing the numbers. Three things about it are settled and worth not re-deriving: the blast radius is exactly 4 of 476 declared runtime-layer modules, all in `plugins` (the other ten packages are clean across 345 modules); there are three transitive routes, not just the `runtime_bridge` one named in the first draft, and only two of the four modules are leaves; and **the shipped 0-interpreter-modules headline property is *not* damaged** — the inference layer and `runtime_hub` still measure 0 and never reach the breaching modules. What was false was the doc's *scope claim*, and A1 fixed exactly that.
+> **F1 is fixed, not just documented.** The layer rule used to be enforced one hop deep, so four modules of the *declared runtime-layer* `pipelex.plugins` package loaded `interpreter_hub` (plus 57–67 interpreter modules) with both gates green. The two leaves — the plugins whose job is to *construct* interpreter-layer objects — now live in **`pipelex/interpreter_plugins/`**, `builtins.py` is split by layer with the composition in the interpreter half, `build_registrar` takes the plugin list and the core-unconditional names as **parameters**, and the guard grew a **transitive rule** that resolves the module-level import graph of `pipelex/` and flags any runtime-layer module that *reaches* the interpreter hub. Measured after: **0 of 473** declared runtime-layer modules breaching, down from 4 of 476; `plugins.discovery` and `plugins.builtins` both load 0 interpreter modules, down from 67. The new rule was verified by re-running it against the pre-remedy tree, where it reproduces F1 exactly. The shipped 0-interpreter-modules headline property was never damaged by the defect and is unchanged.
 >
-> **D-R4 is DECIDED (2026-07-27): remedy (d) paired with a minimal (c), in its own PR after #1062 merges** — the built-ins split by layer, the two interpreter-touching plugins relocate to a single interpreter-side home (e.g. `pipelex/interpreter_plugins/`), the weld moves to where welding is legal, and the guard learns the transitive check. Simulated: `pipelex.plugins` goes to 0 of 128 breaching with 3 modules relocated, so the declaration keeps its single line and becomes true. The full decision record and resolutions are in the plan (D-R4 + "Remedy (d) — resolutions").
->
-> The plan also carries additions the [cross-repo sweep](#cross-repo-sweep) tables below are missing — five consumer repos, and the `docs/specs/` + `conformance/` governed surface that names `pipelex.hub` explicitly. Those are Phase C, folded into the release-gated sweep per D-R1.
+> The plan also carries additions the [cross-repo sweep](#cross-repo-sweep) tables below are missing — five consumer repos, and the `docs/specs/` + `conformance/` governed surface that names `pipelex.hub` explicitly. Those are Phase C, folded into the release-gated sweep per D-R1. **One addition from the remedy belongs in that sweep too:** any external repo that calls `build_registrar` directly must now pass `builtin_plugins=` and `core_unconditional_plugin_names=`, and anything importing `pipelex.plugins.direct.direct_plugin` or `pipelex.plugins.pipe_func.pipe_func_plugin` must retarget to `pipelex.interpreter_plugins.*`.
 
 The split is landed, the boundary is mechanically enforced (`make check-hub-layering` + a subprocess import-closure test over eight entry points), the misplaced types are moved, and core's data model has joined the runtime layer behind injected providers. Every runtime-layer entry point measures **0 interpreter modules**. Docs and the CHANGELOG breaking-change note are written, and the [runtime/interpreter rename](wip/hub/layer-and-hub-renaming.md) is applied throughout.
 
@@ -544,7 +542,23 @@ The inference-layer numbers are unchanged by design — Phase 4 widened *which* 
 | `pipelex.core.pipes.inputs.input_renderer` | `pipelex.core.pipes.rendering.input_renderer` |
 | `pipelex.core.pipes.output.output_renderer` | `pipelex.core.pipes.rendering.output_renderer` |
 
-Plus the signature changes: any external caller of `StuffFactory.make_stuff_from_stuff_content_or_data`, `WorkingMemoryFactory.make_from_pipeline_inputs`, `InputShaper.shape`, `InputStuffSpecsFactory.make_from_*` or `StuffSpecFactory.make_from_blueprint` must now pass `concept_provider=get_concept_library()`. Do all three waves in one pass per repo.
+Plus the signature changes: any external caller of `StuffFactory.make_stuff_from_stuff_content_or_data`, `WorkingMemoryFactory.make_from_pipeline_inputs`, `InputShaper.shape`, `InputStuffSpecsFactory.make_from_*` or `StuffSpecFactory.make_from_blueprint` must now pass `concept_provider=get_concept_library()`. Do all four waves in one pass per repo.
+
+#### Cross-repo impact added by the F1 remedy
+
+| old | new |
+| --- | --- |
+| `pipelex.plugins.direct.direct_plugin` | `pipelex.interpreter_plugins.direct.direct_plugin` |
+| `pipelex.plugins.pipe_func.pipe_func_plugin` | `pipelex.interpreter_plugins.pipe_func.pipe_func_plugin` |
+| `pipelex.plugins.builtins` → `BUILTIN_PLUGINS` / `CORE_UNCONDITIONAL_PLUGIN_NAMES` | `pipelex.interpreter_plugins.builtins` → same names (composed); the runtime half stays in `pipelex.plugins.builtins` as `RUNTIME_BUILTIN_PLUGINS` / `RUNTIME_CORE_UNCONDITIONAL_PLUGIN_NAMES` |
+
+Plus one signature change with a **real production call site outside this repo**: `build_registrar` now requires `builtin_plugins=` and `core_unconditional_plugin_names=`.
+
+| repo | site | fix |
+| --- | --- | --- |
+| `pipelex-api` | `api/main.py:110`, `_resolve_http_error_mappers` — `build_registrar(config=config).get_http_error_mappers()` at module import | import the composed lists from `pipelex.interpreter_plugins.builtins` and pass both. Its docstring's "the same standalone pattern `pipelex plugins list` uses" stays true — that command passes the same two lists |
+
+Verified by grep across the workspace: no other repo calls `build_registrar` or imports either relocated module (`pipelex-mistralai-workflows`'s two hits are prose in docstrings). External plugins are unaffected — they arrive through the `pipelex.plugins` entry point and sit in no declared layer.
 
 ### Checkpoint A record — PR #1062 review follow-ups
 
@@ -599,6 +613,15 @@ Phase B of [`wip/hub/pr-1062-review-followups.md`](wip/hub/pr-1062-review-follow
 **No CHANGELOG entry.** Phase B adds tests and tightens a `pipelex-dev` guard, and `pipelex/cli/dev_cli` is excluded from both wheel and sdist — nothing here reaches a release consumer.
 
 The measurement is untouched by Phase B — no production module changed except the guard, which is dev-CLI-only and outside every closure. The [Checkpoint A column](#measured-after-1) stands.
+
+### Checkpoint A1 record — the F1 remedy
+
+Applied on `refactor/Hub-2`, after #1062 merged. **The full record lives with the plan**, at [`wip/hub/pr-1062-review-followups.md` → Checkpoint A1](wip/hub/pr-1062-review-followups.md#checkpoint-a1-record--the-f1-remedy): what landed against what D-R4 planned, the measurements, how the new rule was verified by reproducing the defect on the pre-remedy tree, which existing tests it touched and why, and what it deliberately does not do. Summarized here only so this tracker is not misleading on its own:
+
+- `pipelex/interpreter_plugins/` is the interpreter-side home for `direct/` and `pipe_func/`; `plugins/builtins.py` keeps the runtime half; the interpreter half composes both.
+- `build_registrar` takes `builtin_plugins` and `core_unconditional_plugin_names` as required parameters — see the [sweep row](#cross-repo-impact-added-by-the-f1-remedy) for the one external call site this breaks.
+- The guard gained a **transitive rule** over the module-level import graph; `pipelex.plugins.builtins` gained a closure-test entry point.
+- **0 of 473** declared runtime-layer modules reach `interpreter_hub`, down from 4 of 476. Gates all green, and the headline measurement below is unchanged (nothing that loads at runtime moved — only where the built-ins are filed).
 
 ## Exit criteria — measured, not asserted
 
@@ -678,6 +701,6 @@ Two notes on that list: `get_pipelex_hub` splits into two accessors, so every ex
 
 Named so the docs stay honest, not scheduled.
 
-- `plugins/pipe_func/pipe_func_plugin.py` and `plugins/pipe_func_executor_registry.py` import from `pipe_operators/`; `plugins/direct/direct_plugin.py` imports from `pipeline/`. None import the hub, so the guard will not flag them — but they mean "plugins is a low layer" is not yet unconditionally true. This is D3's underlying inversion.
+- `plugins/pipe_func_executor_registry.py` imports from `pipe_operators/` — under `TYPE_CHECKING`, so it loads nothing and breaches no rule, but the *placement* is still inverted: a runtime-layer module typed by an interpreter-layer protocol. This is D3's underlying inversion, and it is what is left of it. The two plugins that used to sit beside it — `pipe_func_plugin.py` and `direct_plugin.py`, which imported `pipe_operators/` and `pipeline/` for real — are no longer in `plugins/`: the F1 remedy moved them to `pipelex/interpreter_plugins/`, and the guard's transitive rule would now flag them if they came back.
 - A general layering ratchet ("no low module may import any high module", with an allowlist) is out of scope. The measured inversion set is real but larger than this change should carry. **Re-measured at H-3**, after Phase 3 removed the two biggest clusters: `cogt → core` (21), `system → cogt` (7), `plugins → runtime_bridge` (6), `tools → cogt` (3 — the pdf renderer reaching for `cogt.extract` / `cogt.image` types, the same misfiling pattern Phase 3 fixed elsewhere), and one genuine wart — `cogt/model_backends/model_lists.py` importing `pipelex.cli.exceptions.PipelexCLIError`. `cogt → pipeline` (18) is gone. The general rule is now a more plausible sequel than it was at H-2.
 - Eager optional-SDK imports: `pipelex/tracing/event_log_factory.py` imports `dynamodb_event_log` at module level, which runs a module-level `try: import boto3`, so `boto3`/`botocore`/`jmespath`/`dateutil`/`six` load in every process that touches the tracing factory. A three-line fix (import `DynamoDBEventLog` inside the factory branch, the pattern already used for `pypdfium2` in `cogt/content_generation/render_generate.py`), entirely independent of this plan. Most other heavy roots (`posthog`, `pypdfium2`, `pillow`, `polyfactory`, `datamodel-code-generator`) are **base** dependencies, not extras — not the same kind of finding.

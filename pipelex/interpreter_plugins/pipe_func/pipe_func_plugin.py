@@ -14,7 +14,7 @@ class PipeFuncPlugin:
     """Always-on built-in provider of the ``direct`` (in-process) PipeFunc execution mode.
 
     Core-unconditional: PipeFunc execution is required infra, so this plugin cannot be disabled into a
-    boot with no executor (see ``CORE_UNCONDITIONAL_PLUGIN_NAMES``). It registers the one mode core
+    boot with no executor (see ``INTERPRETER_CORE_UNCONDITIONAL_PLUGIN_NAMES``). It registers the one mode core
     owns — ``direct``, which imports and runs the customer function in this process. Running a PipeFunc
     in a sandbox instead is a commercial capability contributed out of tree by our Daytona
     plugin (mode ``daytona``); core never imports it.

@@ -1,15 +1,15 @@
 # PR #1062 — `/review` follow-ups
 
-**Status: [Phase A](#phase-a--in-pr-fixes) and [Phase B](#phase-b--test-hardening) are APPLIED**, recorded at [Checkpoint A](../../TODOS.md#checkpoint-a-record--pr-1062-review-follow-ups) and [Checkpoint B](../../TODOS.md#checkpoint-b-record--test-hardening) in the tracker. [Phase C](#phase-c--release-wave-additions) and the [F1](#f1--the-layer-rule-is-only-enforced-one-hop-deep) remedy (the A1-PR) are **not** started. PR [#1062](https://github.com/Pipelex/pipelex/pull/1062) is open against `dev`. This document is the executable follow-up plan from a full `/review` pass, written so it can be picked up cold in a new session.
+**Status: [Phase A](#phase-a--in-pr-fixes), [Phase B](#phase-b--test-hardening) and the [F1](#f1--the-layer-rule-is-only-enforced-one-hop-deep) remedy (the A1-PR) are APPLIED.** PR [#1062](https://github.com/Pipelex/pipelex/pull/1062) merged to `dev` on 2026-07-27 (squash `6fbdcb2fd`), carrying Phases A and B — recorded at [Checkpoint A](../../TODOS.md#checkpoint-a-record--pr-1062-review-follow-ups) and [Checkpoint B](../../TODOS.md#checkpoint-b-record--test-hardening). The A1-PR — remedy (d)+(c) per [D-R4](#decisions-taken) — is applied on branch `refactor/Hub-2` and recorded at [Checkpoint A1](#checkpoint-a1-record--the-f1-remedy). **[Phase C](#phase-c--release-wave-additions) is the only phase left**, and it is release-gated. This document is the executable follow-up plan from a full `/review` pass, written so it can be picked up cold in a new session.
 
 **Related:** [`../pr-1062-review-notes.md`](../pr-1062-review-notes.md) records the earlier Codex thread triage (the closure-predicate widening, the `pipe_output` reclassification, and one deliberately-deferred item). That file is about *one* review thread; this one is the whole review. They do not overlap except where noted.
 
 ## Cold start — read in this order
 
-1. This section, then [Decisions taken](#decisions-taken) — what was chosen and what was declined. Every decision is now taken, including [D-R4](#decisions-taken) (decided 2026-07-27).
-2. [F1](#f1-the-layer-rule-is-only-enforced-one-hop-deep) — the biggest finding, and the only one that changes how the boundary is enforced. It invalidates a claim the shipped doc makes. **It was re-verified on 2026-07-26 and three specifics in the first draft were corrected**; read the section as it now stands, not any summary of it elsewhere.
-3. [Phase A](#phase-a--in-pr-fixes) — the code changes, in dependency order. A1 is now split per D-R4: only its doc-honesty fix stayed in #1062; the remedy itself is its own follow-up PR. Everything else in the phase is applied.
-4. [Phase B](#phase-b--test-hardening) — applied, every item mutation-verified. [Phase C](#phase-c--release-wave-additions) is the only phase left here, and it is release-gated.
+1. This section, then [Decisions taken](#decisions-taken) — what was chosen and what was declined. Every decision is taken, including [D-R4](#decisions-taken) (decided 2026-07-27, applied the same day).
+2. [Checkpoint A1](#checkpoint-a1-record--the-f1-remedy) — **start here for the current state**: what the remedy actually did, what it measured, and where it differed from the plan.
+3. [F1](#f1-the-layer-rule-is-only-enforced-one-hop-deep) — the finding the remedy closed. Kept in full as the record: the measurement, the three routes, and why the headline property was never damaged. It is history now, not open work.
+4. [Phase A](#phase-a--in-pr-fixes) and [Phase B](#phase-b--test-hardening) — applied, every Phase B item mutation-verified. [Phase C](#phase-c--release-wave-additions) is the only phase left here, and it is release-gated.
 
 Every finding below was **verified by running it**, not by reading alone. The reproduction command is quoted with each one; re-run it first if you doubt a claim, because several of them contradict what the tracker and the shipped docs currently say.
 
@@ -32,6 +32,8 @@ Recorded so nobody re-audits it. Each of these was independently re-measured, no
 - **D-R4 — DECIDED 2026-07-27: the [F1](#f1-the-layer-rule-is-only-enforced-one-hop-deep) remedy is [(d)](#remedy-d--split-the-built-ins-by-layer) paired with a minimal (c), in its own PR after #1062 merges.** Rationale: (d) is the only option that *removes* the defect — (a) re-describes it (enumerate ~24 subpackages and maintain the list forever), (b) hides it behind deferred imports with the false claim standing, (c) alone cannot land (red on today's tree). (d) deletes a weld rather than adding machinery, and moves the built-ins onto the seam external plugins (Temporal, Daytona) already use from outside the repo. (c) rides along because this exact failure mode — transitive breach with both gates green — already occurred invisibly in the PR that introduced the guard, so prevention is not speculative; at ~0.8 s it is cheaper than the guard's current run. The two formerly-blocking questions are settled: **the relocated plugins get one interpreter-side home** (e.g. `pipelex/interpreter_plugins/`, matching the `runtime_hub`/`interpreter_hub` vocabulary) — see [Resolutions](#remedy-d--resolutions-2026-07-27) under Remedy (d) for why "next to what they adapt" was never actually available and how the two-places-to-look smell dissolves; and **(d)+(c) is its own PR** — #1062 carries only [A1](#phase-a--in-pr-fixes)'s doc-honesty fix. A1.1's broad entry-point additions are **superseded by (c)** and consciously skipped; the (d) PR adds a single `pipelex.plugins` entry point as a runtime-truth check. All four candidates and their measurements remain under [Remedy options](#remedy-options-with-what-was-measured-about-each) for the record.
 
 ## F1 — the layer rule is only enforced one hop deep
+
+> ✅ **RESOLVED 2026-07-27** by remedy (d)+(c) — see [Checkpoint A1](#checkpoint-a1-record--the-f1-remedy). Everything below is kept verbatim as the record of what was measured and why; the tree now reports **0 of 473** declared runtime-layer modules reaching `interpreter_hub`, and the guard follows the import graph so this class of breach cannot recur silently. Read it for the reasoning, not for open work.
 
 **This is the finding that matters most, and it is not what the earlier review thread was about.**
 
@@ -201,7 +203,7 @@ Ordered so each step leaves the tree green. **A1, A2 and A6 touch `hub-layering-
 **A1 is the only item that changes what the boundary actually guarantees. Per [D-R4](#decisions-taken) (decided 2026-07-27) it is now split: only the doc-honesty fix below stays in #1062; the remedy — (d)+(c) — is its own follow-up PR.** Everything else in the phase is independent of A1 and of each other, and can be done in any order.
 
 - [x] **A1 (in #1062) — correct the doc.** ✅ Applied. Per [F1.c](#f1c--the-headline-property-is-not-damaged): `docs/contribute/hub-layering.md:184` ("Every declared package is compliant") is true only of the direct-import rule and reads as a claim about the property — the branch must not merge shipping a claim the measurement contradicts; the Known-inversions preamble at `:217` needs the measurement (the inversion loads `interpreter_hub` and 67 interpreter modules today), not just the placement note, and understates both listed instances; `plugins/discovery.py` + `plugins/builtins.py` are not listed there at all despite pulling `builder` and `codegen`. State that the fix is decided and planned ([D-R4](#decisions-taken)). Do **not** repeat the original draft's framing that the headline property is broken — it is not.
-- [ ] **A1-PR (own follow-up PR, after #1062 merges) — apply remedy (d)+(c).** Scope per [D-R4](#decisions-taken) and the [Resolutions](#remedy-d--resolutions-2026-07-27): the four moves of [(d)](#remedy-d--split-the-built-ins-by-layer) with the interpreter-side home and parameter-passed `CORE_UNCONDITIONAL_PLUGIN_NAMES`; the transitive check [(c)](#remedy-options-with-what-was-measured-about-each) in the guard; one `pipelex.plugins` closure-test entry point (the broad five-package addition from the original A1.1 is consciously skipped — superseded by (c)); the contract-docstring sentence; and the `hub-layering.md` rewrite removing the inversion from Known-inversions once it is actually gone.
+- [x] **A1-PR (own branch `refactor/Hub-2`, off the #1062 merge commit) — apply remedy (d)+(c).** ✅ Applied 2026-07-27, exactly the scope [D-R4](#decisions-taken) and the [Resolutions](#remedy-d--resolutions-2026-07-27) set, with no scope added. Full record at [Checkpoint A1](#checkpoint-a1-record--the-f1-remedy).
 - [x] **A2 — close the [F2](#f2-the-guard-does-not-enforce-its-own-rule-on-runtime_hubpy) guard gap.** ✅ Applied; re-verified both ways (0 violations tree-wide, injected import caught). Add `"pipelex.runtime_hub"` to `RUNTIME_LAYER_PACKAGES`; fix the `:110` sentence in `hub-layering.md`. Note the tuple is named `..._PACKAGES` but `is_runtime_layer` matches a bare module fine (`==` or `startswith(pkg + ".")`); add a line to its docstring saying so. Verified zero-risk: still 0 violations, and it catches an injected `interpreter_hub` import at line 35.
 - [x] **A3 — delete write-only `RuntimeHub._class_registry`.** ✅ Applied, grant dropped. Remove the field, `set_class_registry`, `get_required_class_registry`, the `pipelex/pipelex.py:339` call, and the now-stale grant `pipelex/runtime_hub.py::RuntimeHub.set_class_registry` (grant staleness is symmetric — `make cko` hard-fails until the registry is cleaned). `get_required_class_registry` has **zero callers** in this repo or any sibling repo; verified. It is pre-existing, but this PR deleted `_observer` for exactly this reason, so the twin is a missed sweep. It is also a live trap: it returns the boot-time global while the module-level `get_class_registry()` returns the **library-scoped** registry, so under `scoped_current_library(...)` the two differ — and the PR's own new test pins that divergence.
 - [x] **A4 — hoist the loop-invariant lookup.** ✅ Applied. `pipelex/core/pipes/rendering/input_renderer.py:134` calls `get_concept_library()` once per `_delighten_template` iteration. Hoist it above the `for`. It also defeats `resolve_input_kind`'s `DYNAMIC` early return, which used to skip the lookup entirely.
@@ -238,6 +240,70 @@ Additive; landed in one commit after Checkpoint A. B1 and B2 are the two that pi
 > **Correction to this plan: B6 *does* re-open a drift contract.** `pipelex/cli/dev_cli/commands/hub_layering_guard.py` is a `hub-layering-convention` trigger, so the note that said "nothing here re-opens a drift contract" was wrong. Reviewed and acked: `docs/contribute/hub-layering.md`'s `TYPE_CHECKING` bullet now states the receiver constraint, and its two test-module sentences were refreshed for B1/B2/B7. Worth carrying forward — the review caught staleness the contract's own triggers **cannot** see: the two test modules are deliberately not triggers, so the contract fired on the guard and the read-through found the spillover. Logged in `wip/drift-contracts/dogfood-log.md` as the second consecutive `real-catch` for this contract.
 >
 > Per [D-R4](#decisions-taken) the property-side fix is in the A1-PR, not here: no new green entry point landed in #1062, and B2's control is dirty by definition so it survives the remedy unchanged.
+
+## Checkpoint A1 record — the F1 remedy
+
+Branch `refactor/Hub-2`, off `6fbdcb2fd` (the #1062 merge). Gates: `make agent-check` ✅ (pyright 0 errors, mypy 2,361 files, keyword-only PASSED, hub-layering PASSED) · full `make agent-test` ✅ · `make tb` ✅ · `make drift-check` ✅ (two contracts reviewed and acked — see below).
+
+### What landed, against what was planned
+
+The [four moves of (d)](#remedy-d--split-the-built-ins-by-layer) plus [(c)](#remedy-options-with-what-was-measured-about-each), and nothing else:
+
+- **`pipelex/interpreter_plugins/`** is the new interpreter-side home. `plugins/direct/` and `plugins/pipe_func/` moved there wholesale (`git mv`, subpackage shape preserved, so the only churn is the parent path). Its `builtins.py` imports the runtime half — downward, which the interpreter layer may do — and exports the composed `BUILTIN_PLUGINS` / `CORE_UNCONDITIONAL_PLUGIN_NAMES`.
+- **`pipelex/plugins/builtins.py`** keeps the seventeen runtime adapters as `RUNTIME_BUILTIN_PLUGINS` / `RUNTIME_CORE_UNCONDITIONAL_PLUGIN_NAMES`. The composed list keeps the canonical names, so exactly one symbol still answers "what are the built-in plugins".
+- **`build_registrar` takes both as required keyword parameters.** No default, so a caller cannot silently boot with half the plugins. Both call sites — `pipelex.py` and the `pipelex plugins list` diagnostic — pass the composed lists.
+- **The guard learned the transitive rule** (`collect_transitive_violations`): build the module-level import graph of `pipelex/`, reverse-BFS once from `interpreter_hub` to find every module that reaches it, then report the runtime-layer ones with the shortest chain and the line of the first hop. Module-level imports only, `TYPE_CHECKING` and function bodies excluded; a *direct* import is left to rule 1 rather than double-reported; no escape hatch.
+- **`pipelex.plugins.builtins` joined the closure test's entry points** — one, as decided, not the broad five-package addition.
+- **`PipelexPlugin`'s docstring carries the one-plugin-one-layer invariant**, as a sentence, not machinery.
+
+### Measured
+
+```
+                                        before        after
+declared runtime-layer modules              476          473   (3 relocated)
+  ... reaching interpreter_hub                4            0
+pipelex.plugins modules                     131          127
+pipelex.plugins.discovery   interp=          67            0
+pipelex.plugins.builtins    interp=          67            0
+```
+
+The plan's simulation predicted **128** modules left in `pipelex.plugins`, not 127: its `RELOCATED` filter used the prefix `pipelex.plugins.pipe_func.` with a trailing dot, which misses the package's own `__init__`. Four files moved, not three.
+
+**What the transitive rule costs, measured honestly.** Do not difference against the 2.79s in the [remedy options](#remedy-options-with-what-was-measured-about-each) — that was taken in an earlier session on a different tree, and comparing to it understates the cost. Measured back-to-back on this tree, same binary, with the transitive pass enabled and then disabled:
+
+```
+with    3.06s / 2.87s / 2.83s        in-process: per-file rules (both roots)  1.50s
+without 2.46s / 2.48s / 2.47s                    transitive rule (pipelex/)   0.38s
+```
+
+**+0.38s, or +15% of the command** (+25% of the scan work; the remaining ~1.0s is process startup). Under the 0.83s the prototype suggested, but not free.
+
+**All of it is re-parsing.** Over 956 modules and 4,403 edges: the reverse-BFS reachability is **0.5ms**, and the graph visitor is cheaper than the per-file collector (it skips function bodies and walks no string constants). So the honest description is not "reachability is cheap because it runs once in reverse" — it is "the pass parses the tree a second time, and parsing is the whole bill."
+
+That is also where the optimization is, if the cost ever matters: the per-file pass already parses every `pipelex/` module, so feeding one parse to both collectors would recover most of the 0.38s. **Deliberately not done.** It would couple two passes that are currently independent and independently testable — `find_violations_in_source` takes *source text* and is what the snippet tests drive, while the graph builder needs an AST plus a resolved qname per file — and 0.38s on a gate whose parent (`make agent-check`) is dominated by pyright and mypy is not worth that. Revisit only if `pipelex/` grows enough to make the guard a felt cost in CI.
+
+### Verified by reproducing the defect, not only by going green
+
+A rule that reports nothing is indistinguishable from a rule that sees nothing. So the new check was run against **`HEAD` — the pre-remedy tree** (`git archive HEAD pipelex`, scanned with the new guard from the working tree): it reproduces F1 exactly — the same four modules, with the same three routes [F1.b](#f1b--there-are-three-routes-not-one) documented, including both of `direct_plugin`'s independent routes. On the fixed tree it reports 0. The ten unit tests in `tests/unit/pipelex/cli/dev/test_hub_layering_transitive.py` were mutation-verified: dropping the function-body skip fails the two deferred-import cases, dropping the runtime-layer filter fails two more, and reporting direct imports fails the no-double-report case.
+
+### The existing tests this touched, and why
+
+- `test_plugin_discovery.py` patched `discovery.BUILTIN_PLUGINS`, a module global that no longer exists. Its helper now passes the list in — which is the honest shape anyway, since that is how production calls it. It gained one test pinning that the composed list *is* both halves in order, with unique names: the failure mode the split introduces is a half silently dropping out, which would present as a plugin quietly missing at boot rather than as an import error.
+- `test_import_light_boot.py` imports the composed list inside its blocked-SDK subprocess. Loading it pulls the interpreter, which is expected and is exactly why discovery takes the list as a parameter; the assertion — that registering the built-ins imports no backend SDK — is unchanged and still passes.
+- `test_check_hub_layering_cmd.py` now mocks **both** scans. Mocking only the per-file one would have left the transitive pass walking the real tree inside a unit test. Two tests were added: the merged report, and a transitive finding failing the gate on its own.
+
+### Drift
+
+Both re-opened contracts were reviewed for real and acked, with entries in `wip/drift-contracts/dogfood-log.md`:
+
+- **`hub-layering-convention` — real-catch (third consecutive non-import-churn opening).** This one is a new mode worth naming: the doc honestly recorded the defect *and* announced the planned fix, so landing the fix falsified two of its sections by design. A doc that records a known defect accrues a debt only a trigger can call in. The contract's two prescribed mechanical checks both passed unchanged (33 + 32 hub symbols covered, 12 declared packages named) and again saw none of it — three for three.
+- **`cli-docs` — clean-pass, but the first on a genuinely behavior-adjacent trigger** rather than an import sweep: `plugins_cmd.py`'s call actually changed shape. Reviewed against the live CLI: same subcommand, same options, same five columns, all 19 built-ins in the same order.
+
+### What this does *not* do
+
+- **Nothing loads less.** `pipelex.py` is still the only caller that needs everything, so boot's closure is unchanged — as [the counterargument](#remedy-d--split-the-built-ins-by-layer) said it would be. The payoff is that the declaration is now true and mechanically kept true.
+- **`plugins/pipe_func_executor_registry.py`'s placement inversion is still unfixed** — it is type-only under `TYPE_CHECKING`, so it breaches neither rule. Still recorded in Known inversions.
+- **Phase C is untouched** and still release-gated.
 
 ## Phase C — release-wave additions
 
