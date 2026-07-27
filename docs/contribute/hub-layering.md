@@ -77,7 +77,7 @@ Placement is decided by *kind*, not by who currently imports it. Several accesso
 
 ## Why the boundary exists
 
-`runtime_hub` must not name anything from `libraries`, `pipe_operators`, `pipe_controllers`, `codegen`, `builder`, `pipe_machinery`, `core.bundles`, `core.interpreter`, or the Pipe-touching modules of `core.pipes` at module level. Those module-level imports exist only to type the getters, but they are what made a single hub drag the entire method interpreter into every consumer that just wanted `get_console()`.
+`runtime_hub` must not name anything from `libraries`, `pipe_operators`, `pipe_controllers`, `codegen`, `builder`, `interpreter_plugins`, `pipe_machinery`, `pipe_signature`, `core.bundles`, `core.interpreter`, or the Pipe-touching modules of `core.pipes` at module level. Those module-level imports exist only to type the getters, but they are what made a single hub drag the entire method interpreter into every consumer that just wanted `get_console()`.
 
 The property that matters is measurable: **importing the Pipelex runtime loads zero interpreter modules.** That is both the assertion the closure test pins and the outward-facing claim — the inference engine does not know the MTHDS language exists, so you can embed it without loading a line of the interpreter. Verify it from the repo root on a synced venv:
 
@@ -88,7 +88,7 @@ from pathlib import Path
 
 import pipelex.cogt.content_generation.content_generator  # noqa: F401
 
-INTERPRETER = {"libraries", "pipe_operators", "pipe_controllers", "codegen", "builder", "interpreter_plugins", "pipe_machinery"}
+INTERPRETER = {"libraries", "pipe_operators", "pipe_controllers", "codegen", "builder", "interpreter_plugins", "pipe_machinery", "pipe_signature"}
 loaded = {name: mod for name, mod in sys.modules.items() if name.startswith("pipelex.")}
 interpreter = sorted(n for n in loaded if n.split(".")[1] in INTERPRETER)
 sloc = 0

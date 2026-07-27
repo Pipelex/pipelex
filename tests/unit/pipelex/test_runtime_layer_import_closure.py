@@ -87,6 +87,8 @@ _CLOSURE_SCRIPT = textwrap.dedent(
         "interpreter_plugins",
         # The pipe-kind registration manifest, hoisted out of `core/`.
         "pipe_machinery",
+        # Signature resolution: `signature_walk` imports `interpreter_hub` to resolve pipes by code.
+        "pipe_signature",
     )
 
     # Core's Pipe machinery: interpreter-layer by construction, but not under a top-level package of its own.
