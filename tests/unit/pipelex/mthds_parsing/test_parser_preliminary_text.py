@@ -1,5 +1,5 @@
-from pipelex.core.bundles.pipelex_bundle_blueprint import StepRole
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.mthds_parsing.parser import MthdsParser
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import StepRole
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.structure.pipe_structure_blueprint import PipeStructureBlueprint
@@ -21,7 +21,7 @@ output = "Foo"
 prompt = "Talk about $topic"
 structuring_method = "preliminary_text"
 """
-        bundle = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
+        bundle = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
 
         assert bundle.pipe is not None
         assert set(bundle.pipe.keys()) == {"make_foo", "make_foo__draft_text", "make_foo__structure"}
@@ -62,7 +62,7 @@ inputs = { topic = "Text" }
 output = "Foo"
 prompt = "Talk about $topic"
 """
-        bundle = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
+        bundle = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
         assert bundle.pipe is not None
         assert set(bundle.pipe.keys()) == {"make_foo"}
         assert isinstance(bundle.pipe["make_foo"], PipeLLMBlueprint)

@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING, NamedTuple
 
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactory
@@ -10,6 +9,7 @@ from pipelex.libraries.contract_match import contracts_match
 from pipelex.libraries.domain.domain_metadata_merge import merge_domain_metadata_field
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
 
 if TYPE_CHECKING:
     from pipelex.core.concepts.concept_blueprint import ConceptBlueprint

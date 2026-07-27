@@ -24,7 +24,7 @@ Each kind lives in its own package under `pipelex/pipe_operators/<kind>/` or `pi
 
 2. **The type tag** — add the value to `PipeType` in `pipelex/core/pipes/pipe_blueprint.py`, and give it an arm in the `category` property that maps it to `PipeCategory.PIPE_OPERATOR` or `PipeCategory.PIPE_CONTROLLER`. The match is exhaustive with no `case _`, so the type checker walks you to every remaining site — that is the point of writing it that way.
 
-3. **The blueprint union** — add `PipeFooBlueprint` to `PipeBlueprintUnion` in `pipelex/core/bundles/pipelex_bundle_blueprint.py`. It is a pydantic discriminated union keyed on the `type` field, so a kind absent from the union is a parse error on any `.mthds` file that names it, not a silent skip.
+3. **The blueprint union** — add `PipeFooBlueprint` to `PipeBlueprintUnion` in `pipelex/mthds_parsing/pipelex_bundle_blueprint.py`. It is a pydantic discriminated union keyed on the `type` field, so a kind absent from the union is a parse error on any `.mthds` file that names it, not a silent skip.
 
 4. **The registration manifest** — add `PipeFoo` and `PipeFooFactory` to `PipeRegistryModels` in `pipelex/pipe_machinery/registry_models.py`, in `PIPE_OPERATORS` / `PIPE_OPERATORS_FACTORY` or `PIPE_CONTROLLERS` / `PIPE_CONTROLLERS_FACTORY`. This is the one whose omission is **silent**: boot succeeds either way, and the failure surfaces later as a kajson deserialization error on a pipe. `tests/unit/pipelex/test_registry_models_split.py` pins the manifests against the class registry for exactly that reason.
 

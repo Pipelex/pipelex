@@ -39,7 +39,7 @@ from pipelex.tools.misc.file_utils import (
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+    from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 
 COMMAND = "build"
 SUB_COMMAND_RUNNER = "runner"

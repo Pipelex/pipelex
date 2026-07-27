@@ -2,8 +2,8 @@
 
 from typing import ClassVar
 
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion
 from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipeBlueprintUnion
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint

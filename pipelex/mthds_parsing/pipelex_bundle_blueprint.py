@@ -4,7 +4,6 @@ from typing import Annotated, Any, cast
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
-from pipelex.core.bundles.exceptions import InvalidPipeCodeSyntaxError, NativeConceptRedeclarationError
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -14,6 +13,7 @@ from pipelex.core.domains.validation import validate_domain_code
 from pipelex.core.pipes.pipe_blueprint import normalize_typeless_signature_section
 from pipelex.core.pipes.validation import is_pipe_code_valid
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
+from pipelex.mthds_parsing.exceptions import InvalidPipeCodeSyntaxError, NativeConceptRedeclarationError
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint

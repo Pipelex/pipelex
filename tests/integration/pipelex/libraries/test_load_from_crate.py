@@ -2,9 +2,9 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.interpreter_hub import clear_current_library, get_current_library, get_library_manager, set_current_library
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
+from pipelex.mthds_parsing.parser import MthdsParser
 
 SCORING_MTHDS = """\
 domain = "scoring"
@@ -58,8 +58,8 @@ class TestLoadFromCrate:
 
             # Parse blueprints
             blueprints = [
-                PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=scoring_path),
-                PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=analytics_path),
+                MthdsParser.make_pipelex_bundle_blueprint(bundle_path=scoring_path),
+                MthdsParser.make_pipelex_bundle_blueprint(bundle_path=analytics_path),
             ]
 
             # Path A: load_from_blueprints (existing path)
@@ -99,7 +99,7 @@ class TestLoadFromCrate:
             scoring_path.write_text(SCORING_MTHDS, encoding="utf-8")
 
             blueprints = [
-                PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=scoring_path),
+                MthdsParser.make_pipelex_bundle_blueprint(bundle_path=scoring_path),
             ]
 
             crate = LibraryCrateFactory.make_from_blueprints(blueprints=blueprints)
@@ -112,8 +112,8 @@ class TestLoadFromCrate:
         second_path = tmp_path / "second.mthds"
         first_path.write_text(SCORING_MTHDS, encoding="utf-8")
         second_path.write_text(SCORING_MTHDS, encoding="utf-8")
-        first_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=first_path)
-        second_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=second_path)
+        first_blueprint = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=first_path)
+        second_blueprint = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=second_path)
         library_manager = get_library_manager()
         first_library_id, _ = library_manager.open_library()
         second_library_id, _ = library_manager.open_library()
@@ -140,7 +140,7 @@ class TestLoadFromCrate:
         """
         bundle_path = tmp_path / "scoring.mthds"
         bundle_path.write_text(SCORING_MTHDS, encoding="utf-8")
-        blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=bundle_path)
+        blueprint = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=bundle_path)
         library_manager = get_library_manager()
         current_library_id, _ = library_manager.open_library()
         target_library_id, _ = library_manager.open_library()

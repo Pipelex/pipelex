@@ -3,17 +3,17 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
-from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.interpreter.bundle_elaborator import BundleElaborator
-from pipelex.core.interpreter.exceptions import BundleElaboratorError, PipelexInterpreterError
-from pipelex.core.interpreter.validation_error_categorizer import PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD, categorize_blueprint_validation_error
+from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
+from pipelex.mthds_parsing.bundle_elaborator import BundleElaborator
+from pipelex.mthds_parsing.exceptions import BundleElaboratorError, MthdsParserError
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.mthds_parsing.validation_error_categorizer import PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD, categorize_blueprint_validation_error
 from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.toml_utils import load_toml_from_content, load_toml_from_path
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
-class PipelexInterpreter(BaseModel):
+class MthdsParser(BaseModel):
     """MTHDS -> PipelexBundleBlueprint"""
 
     @classmethod
@@ -50,12 +50,12 @@ class PipelexInterpreter(BaseModel):
                 # which reads ``source`` off this dict) in agreement on one value.
                 blueprint_dict[PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD] = mthds_source
             else:
-                msg = "Either 'bundle_path' or 'mthds_content' must be provided for the PipelexInterpreter to make a PipelexBundleBlueprint"
-                raise PipelexInterpreterError(msg)
+                msg = "Either 'bundle_path' or 'mthds_content' must be provided for the MthdsParser to make a PipelexBundleBlueprint"
+                raise MthdsParserError(msg)
         except TomlError as exc:
             msg = f"TOML syntax error at line {exc.lineno}, column {exc.colno}: {exc.message}"
             source = str(bundle_path) if bundle_path is not None else mthds_source
-            raise PipelexInterpreterError(
+            raise MthdsParserError(
                 msg,
                 validation_errors=[
                     PipelexBundleBlueprintValidationErrorData(
@@ -67,7 +67,7 @@ class PipelexInterpreter(BaseModel):
 
         if not blueprint_dict:
             msg = "Could not make 'PipelexBundleBlueprint': no blueprint found in the MTHDS file"
-            raise PipelexInterpreterError(msg)
+            raise MthdsParserError(msg)
 
         try:
             # ``source`` is already populated from the seeded ``blueprint_dict`` above
@@ -83,7 +83,7 @@ class PipelexInterpreter(BaseModel):
                 if categorized_error:
                     blueprint_validation_errors.append(categorized_error)
 
-            raise PipelexInterpreterError(
+            raise MthdsParserError(
                 message=format_pydantic_validation_error(exc),
                 validation_errors=blueprint_validation_errors,
             ) from exc
@@ -91,4 +91,4 @@ class PipelexInterpreter(BaseModel):
         try:
             return BundleElaborator.elaborate(bundle=pipelex_bundle_blueprint)
         except BundleElaboratorError as exc:
-            raise PipelexInterpreterError(message=str(exc)) from exc
+            raise MthdsParserError(message=str(exc)) from exc

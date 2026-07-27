@@ -124,7 +124,7 @@ class TestErrorReportProblemDocument:
     def test_strict_mode_passes_through_detail_for_caller_facing_report(self) -> None:
         """A caller-facing-message report reflects ``detail`` back unchanged in STRICT mode."""
         report = ErrorReport(
-            error_type="PipelexInterpreterError",
+            error_type="MthdsParserError",
             message="pipe 'summarize' references unknown concept at line 14",
             title="Pipelex interpreter error",
             type_uri="https://docs.pipelex.com/latest/errors/pipelex-interpreter-error/",
@@ -159,7 +159,7 @@ class TestErrorReportProblemDocument:
         the RFC 7807 envelope.
         """
         report = ErrorReport(
-            error_type="PipelexInterpreterError",
+            error_type="MthdsParserError",
             message="pipe 'summarize' references unknown concept at line 14",
             title="Pipelex interpreter error",
             type_uri="https://docs.pipelex.com/latest/errors/pipelex-interpreter-error/",
@@ -178,7 +178,7 @@ class TestErrorReportProblemDocument:
     def test_caller_facing_message_flag_never_rides_as_extension_member(self) -> None:
         """``caller_facing_message`` is internal redaction plumbing — never an RFC 7807 extension member."""
         report = ErrorReport(
-            error_type="PipelexInterpreterError",
+            error_type="MthdsParserError",
             message="pipe 'summarize' references unknown concept at line 14",
             title="Pipelex interpreter error",
             type_uri="https://docs.pipelex.com/latest/errors/pipelex-interpreter-error/",

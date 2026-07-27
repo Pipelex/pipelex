@@ -1,8 +1,8 @@
 import pytest
 
-from pipelex.core.interpreter.exceptions import PipelexInterpreterError
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeValidationErrorType
+from pipelex.mthds_parsing.exceptions import MthdsParserError
+from pipelex.mthds_parsing.parser import MthdsParser
 
 # A PipeBatch whose ``input_item_name`` equals its ``input_list_name`` — the collision
 # ``PipeBatchBlueprint.validate_inputs`` raises as a ``PipeValidationError`` from inside a pydantic
@@ -71,8 +71,8 @@ class TestBlueprintValidationErrorCategorizer:
         carrying the ``pipe_code`` / ``domain_code`` / ``source`` locators recovered from the parse.
         """
         source = f"{test_name}.mthds"
-        with pytest.raises(PipelexInterpreterError) as exc_info:
-            PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source=source)
+        with pytest.raises(MthdsParserError) as exc_info:
+            MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source=source)
 
         collision_items = [
             error for error in exc_info.value.validation_errors if error.error_type == PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION

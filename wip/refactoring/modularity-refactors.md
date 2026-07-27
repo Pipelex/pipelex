@@ -259,7 +259,7 @@ Each track is its own PR with its own checkpoint, branched from the #1064-inclus
 
 ## Measurement
 
-Core module classification, run from the repo root on a synced venv. Reports, per `pipelex.core.*` module, how many interpreter modules it loads and whether it drags in `interpreter_hub`. `I` must name every interpreter top-level package — it is one of three copies of that set (the others are `INTERPRETER_PACKAGES` in the closure test and the `INTERPRETER` set in `docs/contribute/hub-layering.md`'s verification snippet), and a package missing from any one of them makes that check pass vacuously. `"pipe_machinery"` was added by M3; extend `I` with `"mthds_parsing"` when M1a lands it:
+Core module classification, run from the repo root on a synced venv. Reports, per `pipelex.core.*` module, how many interpreter modules it loads and whether it drags in `interpreter_hub`. `I` must name every interpreter top-level package — it is one of three copies of that set (the others are `INTERPRETER_PACKAGES` in the closure test and the `INTERPRETER` set in `docs/contribute/hub-layering.md`'s verification snippet), and a package missing from any one of them makes that check pass vacuously. `"pipe_machinery"` was added by M3, `"mthds_parsing"` by M1a:
 
 ```bash
 .venv/bin/python - <<'PY'
@@ -269,7 +269,7 @@ ROOT = os.getcwd()
 SNIP = '''
 import sys, importlib
 importlib.import_module(%r)
-I = {"libraries", "pipe_operators", "pipe_controllers", "codegen", "builder", "interpreter_plugins", "pipe_signature", "pipe_machinery"}
+I = {"libraries", "pipe_operators", "pipe_controllers", "codegen", "builder", "interpreter_plugins", "pipe_signature", "pipe_machinery", "mthds_parsing"}
 bad = sorted(n for n in sys.modules if n.startswith("pipelex.") and len(n.split(".")) > 1 and n.split(".")[1] in I)
 print(len(bad), int("pipelex.interpreter_hub" in sys.modules))
 '''

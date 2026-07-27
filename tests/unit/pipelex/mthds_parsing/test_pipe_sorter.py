@@ -2,10 +2,10 @@
 
 import pytest
 
-from pipelex.core.bundles.pipe_sorter import sort_pipes_by_dependencies
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion
 from pipelex.core.pipes.exceptions import PipeValidationError
-from tests.unit.pipelex.core.bundles.test_data_pipe_sorter import PipeSorterTestCases
+from pipelex.mthds_parsing.pipe_sorter import sort_pipes_by_dependencies
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipeBlueprintUnion
+from tests.unit.pipelex.mthds_parsing.test_data_pipe_sorter import PipeSorterTestCases
 
 
 class TestSortPipesByDependencies:

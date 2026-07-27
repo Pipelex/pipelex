@@ -3,9 +3,9 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipeBlueprintUnion
 
 
 class LibraryCrate(BaseModel):

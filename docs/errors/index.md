@@ -18,7 +18,7 @@ the error came from:
 - [Authoring & language](authoring-and-language.md) — Core language, Pipe operators, Pipe controllers, Pipe signatures, Builder, Libraries.
 - [Execution & runtime](execution-and-runtime.md) — Pipe execution, Pipeline execution, Runtime bridge, Graph, Tracing.
 - [Inference & providers](inference-and-providers.md) — Inference (Cogt), Provider plugins.
-- [Platform & tooling](platform-and-tooling.md) — Base & root errors, Tools, Kit, System & configuration, CLI, Codegen.
+- [Platform & tooling](platform-and-tooling.md) — Base & root errors, Tools, Kit, System & configuration, CLI, Codegen, Mthds parsing.
 
 See [Error Model](../under-the-hood/error-model.md) for the underlying contract
 and classification rules.

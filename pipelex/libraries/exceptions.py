@@ -1,6 +1,5 @@
 from pipelex.base_exceptions import PipelexError
-from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
-from pipelex.core.exceptions import PipesAndConceptValidationErrorData
+from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 
 
 class LibraryError(PipelexError):

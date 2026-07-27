@@ -11,7 +11,7 @@ Today, exactly one directive is elaborated: `structuring_method = "preliminary_t
 
 ## Where it runs
 
-`BundleElaborator.elaborate(bundle)` runs inside `PipelexInterpreter.make_pipelex_bundle_blueprint()`, right after the bundle dict has been validated into a `PipelexBundleBlueprint`. Every code path that loads a bundle from a `.mthds` file goes through it.
+`BundleElaborator.elaborate(bundle)` runs inside `MthdsParser.make_pipelex_bundle_blueprint()`, right after the bundle dict has been validated into a `PipelexBundleBlueprint`. Every code path that loads a bundle from a `.mthds` file goes through it.
 
 The elaborator has a fast-path short-circuit: if no pipe in the bundle carries `structuring_method = "preliminary_text"`, the input bundle is returned unchanged (identity-preserving). Loading a bundle without preliminary-text pipes pays no overhead.
 

@@ -12,7 +12,6 @@ own page. Classes are grouped by subsystem.
 
 ## Core language
 
-- [`BundleElaboratorError`](bundle-elaborator-error.md) — Bundle elaborator
 - [`ConceptCodeError`](concept-code-error.md) — Concept code
 - [`ConceptError`](concept-error.md) — Concept error
 - [`ConceptFactoryError`](concept-factory-error.md) — Concept factory
@@ -39,7 +38,6 @@ own page. Classes are grouped by subsystem.
 - [`PipeInputsFactoryError`](pipe-inputs-factory-error.md) — Pipe inputs factory
 - [`PipeOperatorModelChoiceError`](pipe-operator-model-choice-error.md) — Pipe operator model choice
 - [`PipeRunInputsError`](pipe-run-inputs-error.md) — Pipe run inputs
-- [`PipelexInterpreterError`](pipelex-interpreter-error.md) — Pipelex interpreter
 - [`StructureClassError`](structure-class-error.md) — Structure class
 - [`StructureValidationError`](structure-validation-error.md) — Structure validation
 - [`StuffArtefactError`](stuff-artefact-error.md) — Stuff artefact

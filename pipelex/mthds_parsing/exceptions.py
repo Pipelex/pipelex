@@ -1,6 +1,5 @@
-from pydantic import BaseModel
-
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
+from pipelex.base_exceptions import ErrorDomain, PipelexError
+from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
 
 
 class NativeConceptRedeclarationError(ValueError):
@@ -37,23 +36,28 @@ class InvalidPipeCodeSyntaxError(ValueError):
         super().__init__(message)
 
 
-class PipelexBundleBlueprintValidationErrorData(BaseModel):
-    """Structured validation error data for bundle blueprint validation errors.
+class MthdsParserError(PipelexError):
+    """Raised when MthdsParser fails.
 
-    This model captures information about validation errors that occur during
-    blueprint validation (before pipe instantiation).
+    Covers every way the caller's ``.mthds`` source can be rejected — TOML that
+    does not parse, and TOML that parses but fails blueprint validation. The
+    message is always caller-facing copy describing a fault in the caller's own
+    input.
     """
 
-    error_type: PipeValidationErrorType | None = None
-    domain_code: str | None = None
-    source: str | None = None
-    pipe_code: str | None = None
-    concept_code: str | None = None
-    message: str
-    variable_names: list[str] | None = None
+    error_domain = ErrorDomain.INPUT
+    # The parser's messages describe faults in the caller's own .mthds
+    # source — caller-facing copy, kept verbatim under STRICT disclosure.
+    _authors_caller_facing_message = True
 
-    # The namespace-stripped bare code for a strippable same-domain over-qualified pipe code
-    # (``strip-namespace`` enrichment). Present only when the fix planner can act; ``pipe_code``
-    # discriminates the two raise sites — set to the offending dotted code for a declaration-key
-    # rename, ``None`` for a ``main_pipe`` value strip (which is a root ``set_key``, not a rename).
-    stripped_pipe_code: str | None = None
+    def __init__(
+        self,
+        message: str,
+        validation_errors: list[PipelexBundleBlueprintValidationErrorData] | None = None,
+    ):
+        self.validation_errors = validation_errors or []
+        super().__init__(message)
+
+
+class BundleElaboratorError(MthdsParserError):
+    """Raised when bundle elaboration fails (e.g. synthetic-name collision, invalid output for preliminary_text)."""

@@ -117,7 +117,7 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "ArgumentError": "Check command usage with 'pipelex-agent <command> --help'",
     "JSONDecodeError": "Verify the JSON input is valid (check for trailing commas, unquoted keys, etc.)",
     # Interpreter errors
-    "PipelexInterpreterError": "Check MTHDS file TOML syntax and ensure all referenced concepts and pipes are defined",
+    "MthdsParserError": "Check MTHDS file TOML syntax and ensure all referenced concepts and pipes are defined",
     # Configuration/initialization errors
     "TelemetryConfigValidationError": "Run 'pipelex init telemetry' to create a valid telemetry configuration",
     "GatewayTermsNotAcceptedError": "Run 'pipelex init config' to accept gateway terms, or disable pipelex_gateway in backends.toml",

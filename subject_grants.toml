@@ -2300,27 +2300,27 @@ rationale = "Cost report op on the records; single operand."
 param = "tokens_usage"
 rationale = "Verb-object: compute the cost of one usage record; the single obvious operand is the usage."
 
-["pipelex/core/bundles/pipe_sorter.py::sort_pipes_by_dependencies"]
+["pipelex/mthds_parsing/pipe_sorter.py::sort_pipes_by_dependencies"]
 param = "pipes"
 rationale = "Verb-object: sorts the pipes; single operand."
 
-["pipelex/core/bundles/pipe_sorter.py::sort_pipes_by_dependencies.visit"]
+["pipelex/mthds_parsing/pipe_sorter.py::sort_pipes_by_dependencies.visit"]
 param = "pipe_code"
 rationale = "Nested DFS visitor on the pipe code; single operand."
 
-["pipelex/core/bundles/pipelex_bundle_blueprint.py::PipelexBundleBlueprint._collect_local_refs_from_concept"]
+["pipelex/mthds_parsing/pipelex_bundle_blueprint.py::PipelexBundleBlueprint._collect_local_refs_from_concept"]
 param = "concept_code"
 rationale = "Verb-object: collects refs from the concept named; context stays keyword."
 
-["pipelex/core/bundles/pipelex_bundle_blueprint.py::PipelexBundleBlueprint._collect_local_refs_from_pipe"]
+["pipelex/mthds_parsing/pipelex_bundle_blueprint.py::PipelexBundleBlueprint._collect_local_refs_from_pipe"]
 param = "pipe_code"
 rationale = "Verb-object: collects refs from the pipe named; context stays keyword."
 
-["pipelex/core/bundles/pipelex_bundle_blueprint.py::PipelexBundleBlueprint.get_elaboration_for"]
+["pipelex/mthds_parsing/pipelex_bundle_blueprint.py::PipelexBundleBlueprint.get_elaboration_for"]
 param = "pipe_code"
 rationale = "Query accessor keyed by the pipe code; single operand."
 
-["pipelex/core/bundles/pipelex_bundle_blueprint.py::_strippable_same_domain_pipe_code"]
+["pipelex/mthds_parsing/pipelex_bundle_blueprint.py::_strippable_same_domain_pipe_code"]
 param = "code"
 rationale = "Single-operand transformation of the code; the rest is context."
 
@@ -2592,63 +2592,63 @@ rationale = "Predicate on the domain code; single operand."
 param = "code"
 rationale = "Verb-object: validates the domain code; single operand."
 
-["pipelex/core/interpreter/bundle_elaborator.py::BundleElaborator.elaborate"]
+["pipelex/mthds_parsing/bundle_elaborator.py::BundleElaborator.elaborate"]
 param = "bundle"
 rationale = "Verb-object: elaborates the bundle; single operand."
 
-["pipelex/core/interpreter/bundle_elaborator.py::_is_preliminary_text_pipe"]
+["pipelex/mthds_parsing/bundle_elaborator.py::_is_preliminary_text_pipe"]
 param = "pipe_blueprint"
 rationale = "Predicate on the pipe blueprint; single operand."
 
-["pipelex/core/interpreter/helpers.py::ValidationErrorScope.is_pipe_scope"]
+["pipelex/mthds_parsing/helpers.py::ValidationErrorScope.is_pipe_scope"]
 param = "scope"
 rationale = "Predicate on the scope; single operand."
 
-["pipelex/core/interpreter/helpers.py::get_error_scope"]
+["pipelex/mthds_parsing/helpers.py::get_error_scope"]
 param = "loc"
 rationale = "Derivation from the error loc; single operand."
 
-["pipelex/core/interpreter/helpers.py::is_pipelex_file"]
+["pipelex/mthds_parsing/helpers.py::is_pipelex_file"]
 param = "file_path"
 rationale = "Predicate on the file path; single operand."
 
-["pipelex/core/interpreter/interpreter.py::PipelexInterpreter.make_pipelex_bundle_blueprint"]
+["pipelex/mthds_parsing/parser.py::MthdsParser.make_pipelex_bundle_blueprint"]
 param = "bundle_path"
 rationale = "Factory from source: parses the bundle at the path; options stay keyword."
 
-["pipelex/core/interpreter/validation_error_categorizer.py::_categorize_concept_validation_error"]
+["pipelex/mthds_parsing/validation_error_categorizer.py::_categorize_concept_validation_error"]
 param = "loc"
 rationale = "Verb-object: categorizes the error at the loc; context stays keyword."
 
-["pipelex/core/interpreter/validation_error_categorizer.py::_categorize_input_validation_error"]
+["pipelex/mthds_parsing/validation_error_categorizer.py::_categorize_input_validation_error"]
 param = "message"
 rationale = "Verb-object: categorizes the error message; context stays keyword."
 
-["pipelex/core/interpreter/validation_error_categorizer.py::_categorize_syntax_validation_error"]
+["pipelex/mthds_parsing/validation_error_categorizer.py::_categorize_syntax_validation_error"]
 param = "message"
 rationale = "Verb-object: categorizes the error message; context stays keyword."
 
-["pipelex/core/interpreter/validation_error_categorizer.py::_categorize_typeless_pipe_error"]
+["pipelex/mthds_parsing/validation_error_categorizer.py::_categorize_typeless_pipe_error"]
 param = "message"
 rationale = "Verb-object: categorizes the message; the rest is context."
 
-["pipelex/core/interpreter/validation_error_categorizer.py::_extract_variable_names_from_message"]
+["pipelex/mthds_parsing/validation_error_categorizer.py::_extract_variable_names_from_message"]
 param = "message"
 rationale = "Verb-object: extracts from the message; single operand."
 
-["pipelex/core/interpreter/validation_error_categorizer.py::_extract_wrapped_invalid_pipe_code_syntax_error"]
+["pipelex/mthds_parsing/validation_error_categorizer.py::_extract_wrapped_invalid_pipe_code_syntax_error"]
 param = "error"
 rationale = "Extraction from the single error operand."
 
-["pipelex/core/interpreter/validation_error_categorizer.py::_extract_wrapped_native_concept_redeclaration_error"]
+["pipelex/mthds_parsing/validation_error_categorizer.py::_extract_wrapped_native_concept_redeclaration_error"]
 param = "error"
 rationale = "Extraction from the single error operand."
 
-["pipelex/core/interpreter/validation_error_categorizer.py::_is_pydantic_internal_loc_element"]
+["pipelex/mthds_parsing/validation_error_categorizer.py::_is_pydantic_internal_loc_element"]
 param = "element"
 rationale = "Predicate on the loc element; single operand."
 
-["pipelex/core/interpreter/validation_error_categorizer.py::categorize_blueprint_validation_error"]
+["pipelex/mthds_parsing/validation_error_categorizer.py::categorize_blueprint_validation_error"]
 param = "error"
 rationale = "Verb-object: categorizes the error; context stays keyword."
 

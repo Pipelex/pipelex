@@ -49,10 +49,10 @@ class TestHubLayeringGuard:
         # Everything that names a `Pipe` imports the interpreter directly and stays in the interpreter layer.
         assert not is_runtime_layer(module_qname="pipelex.core.pipes.pipe_factory")
         assert not is_runtime_layer(module_qname="pipelex.core.pipes.rendering.output_renderer")
-        assert not is_runtime_layer(module_qname="pipelex.core.bundles.pipelex_bundle_blueprint")
-        assert not is_runtime_layer(module_qname="pipelex.core.interpreter.bundle_elaborator")
-        # The pipe-kind manifest left `core/` entirely; its new home is interpreter-layer too.
+        # Two of core's interpreter tenants left `core/` entirely; their new homes are interpreter-layer too.
         assert not is_runtime_layer(module_qname="pipelex.pipe_machinery.registry_models")
+        assert not is_runtime_layer(module_qname="pipelex.mthds_parsing.pipelex_bundle_blueprint")
+        assert not is_runtime_layer(module_qname="pipelex.mthds_parsing.bundle_elaborator")
         # `pipelex.core` itself is not a declared package, so what is left of core's own top level is
         # undeclared rather than interpreter — the split is deliberate, not an omission.
         assert not is_runtime_layer(module_qname="pipelex.core.qualified_ref")

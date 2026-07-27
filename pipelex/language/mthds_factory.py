@@ -12,7 +12,7 @@ from pipelex.language.toml_string_utils import format_toml_string
 from pipelex.tools.misc.json_utils import remove_none_values_from_dict
 
 if TYPE_CHECKING:
-    from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+    from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
     from pipelex.system.configuration.configs import MthdsConfig
 
 

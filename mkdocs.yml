@@ -58,6 +58,9 @@ plugins:
       separator: '[\s\-\.]+'
   - redirects:
       redirect_maps:
+        # `PipelexInterpreterError` was renamed `MthdsParserError`; the error page filename and the
+        # `type_uri` it publishes both derive from the class name, so the retired URI needs a redirect.
+        'errors/pipelex-interpreter-error.md': 'errors/mthds-parser-error.md'
         'under-the-hood/temporal-deployment.md': 'distributed-execution/index.md'
         'distributed-execution/temporal/index.md': 'distributed-execution/index.md'
         'distributed-execution/cluster-setup.md': 'distributed-execution/index.md'

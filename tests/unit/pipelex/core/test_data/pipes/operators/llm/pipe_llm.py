@@ -1,6 +1,6 @@
 # ruff: noqa: E501
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 
 # Basic PipeLLM with prompt_template

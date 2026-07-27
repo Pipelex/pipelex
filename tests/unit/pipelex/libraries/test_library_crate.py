@@ -2,11 +2,11 @@ import logging
 
 import pytest
 
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from tests.unit.pipelex.libraries.test_library_crate_data import BlueprintSamples
 
 

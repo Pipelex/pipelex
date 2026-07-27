@@ -1,4 +1,4 @@
-from pipelex.core.bundles.pipelex_bundle_blueprint import ElaborationMetadata, PipelexBundleBlueprint, StepRole
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import ElaborationMetadata, PipelexBundleBlueprint, StepRole
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 
 

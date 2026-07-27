@@ -1,5 +1,5 @@
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
 
 PIPE_EXTRACT = (

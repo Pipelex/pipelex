@@ -13,10 +13,11 @@ caught *transitively*, through the `pipe_operators` / `libraries` they happen to
 package-only predicate. Naming them makes the predicate state the boundary instead of approximating it.
 
 Two documented interpreter homes are deliberately absent, and their absence is a known wart rather than
-an oversight: `pipeline` and `pipe_run` (plus `core.bundles.exceptions`) already leak leaf models into
-every runtime closure — `SpecialPipelineId`, `PipeRunMode`, the bundle validation-error data. Naming
-them here would fail the test over a *placement* problem, not a broken hub arrow. See
-`wip/pr-1062-review-notes.md`.
+an oversight: `pipeline` and `pipe_run` already leak leaf models into every runtime closure —
+`SpecialPipelineId`, `PipeRunMode`. Naming them here would fail the test over a *placement* problem,
+not a broken hub arrow. See `wip/pr-1062-review-notes.md`. The third leak of that family is gone:
+the bundle validation-error data that `pipeline/` carries into every closure now lives in
+`core.exceptions`, beside the two sibling error-data models, so `mthds_parsing` needs no exclusion.
 
 Run in a subprocess so the closure is exactly what the entry point pulls in: an in-process
 `sys.modules` check would see everything the test session already imported.
@@ -89,28 +90,21 @@ _CLOSURE_SCRIPT = textwrap.dedent(
         "pipe_machinery",
         # Signature resolution: `signature_walk` imports `interpreter_hub` to resolve pipes by code.
         "pipe_signature",
+        # The MTHDS parser and its blueprint, hoisted out of `core/`.
+        "mthds_parsing",
     )
 
     # Core's Pipe machinery: interpreter-layer by construction, but not under a top-level package of its own.
     INTERPRETER_CORE = (
-        "pipelex.core.bundles",
-        "pipelex.core.interpreter",
         "pipelex.core.pipes.pipe_abstract",
         "pipelex.core.pipes.pipe_blueprint",
         "pipelex.core.pipes.pipe_factory",
         "pipelex.core.pipes.rendering",
     )
-    # The one straddler: structured bundle validation-error data that `pipeline/` imports, so it lands in
-    # every runtime closure -- dragging the empty `core.bundles` package placeholder in with it. A placement
-    # wart, not a hub violation -- see wip/pr-1062-review-notes.md. Matched exactly, never as a prefix, so
-    # the rest of `core.bundles` stays flagged.
-    INTERPRETER_CORE_EXCLUDED = ("pipelex.core.bundles", "pipelex.core.bundles.exceptions")
 
     def is_interpreter(name):
         if name.split(".")[1] in INTERPRETER_PACKAGES:
             return True
-        if name in INTERPRETER_CORE_EXCLUDED:
-            return False
         return any(name == module or name.startswith(module + ".") for module in INTERPRETER_CORE)
 
     offenders = sorted(name for name in sys.modules if name.startswith("pipelex.") and is_interpreter(name))

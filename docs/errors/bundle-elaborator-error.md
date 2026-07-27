@@ -15,7 +15,7 @@ Raised when bundle elaboration fails (e.g. synthetic-name collision, invalid out
 | `title` | Bundle elaborator |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/bundle-elaborator-error/` |
 | `error_domain` | _(inherited from parent)_ |
-| Defined in | `pipelex.core.interpreter.exceptions` |
-| Parent class | [`PipelexInterpreterError`](pipelex-interpreter-error.md) |
+| Defined in | `pipelex.mthds_parsing.exceptions` |
+| Parent class | [`MthdsParserError`](mthds-parser-error.md) |
 
 [Back to Error Reference](index.md)
