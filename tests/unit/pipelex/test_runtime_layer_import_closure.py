@@ -42,17 +42,19 @@ import pytest
 #: `mthds_parsing`, which is what let `pipelex.core` be declared wholesale (see the guard's
 #: `RUNTIME_LAYER_PACKAGES` note).
 #:
-#: `plugins.builtins` earns its place by history: it and three neighbours reached `interpreter_hub`
-#: transitively — through `runtime_bridge`, `pipeline` and `pipe_operators` — while both gates stayed
-#: green, because the guard was one hop deep and `pipelex.plugins`, the largest declared runtime-layer
-#: package, had no entry point here. The guard now follows the import graph, but that is *static*
-#: analysis: it cannot see a dynamic import, so the package that bit us gets a runtime-truth check too.
-#: It is the aggregator of every built-in runtime-layer plugin, hence the broadest single entry point
-#: into the package.
+#: `providers.builtins` earns its place by history, under its former name `plugins.builtins`: it and
+#: three neighbours reached `interpreter_hub` transitively — through `runtime_bridge`, `pipeline` and
+#: `pipe_operators` — while both gates stayed green, because the guard was one hop deep and
+#: `pipelex.plugins`, the largest declared runtime-layer package, had no entry point here. The guard
+#: now follows the import graph, but that is *static* analysis: it cannot see a dynamic import, so the
+#: package that bit us gets a runtime-truth check too. It instantiates every built-in vendor adapter,
+#: so importing it pulls in all seventeen — the broadest single entry point into `pipelex.providers`,
+#: which is where those adapters now live. The plugin *mechanism* it registers through stayed behind
+#: in `pipelex.plugins` and is reached from here, so one entry point still covers both halves.
 RUNTIME_LAYER_ENTRY_POINTS = [
     "pipelex.cogt.content_generation.content_generator",
     "pipelex.runtime_hub",
-    "pipelex.plugins.builtins",
+    "pipelex.providers.builtins",
     "pipelex.core.concepts.structure_generation.generator",
     "pipelex.core.memory.input_shaper",
     "pipelex.core.memory.working_memory_factory",

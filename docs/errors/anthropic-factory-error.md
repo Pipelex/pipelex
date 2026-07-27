@@ -13,7 +13,7 @@ description: "Reference for the `AnthropicFactoryError` Pipelex error class."
 | `title` | Anthropic factory |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/anthropic-factory-error/` |
 | `error_domain` | _(inherited from parent)_ |
-| Defined in | `pipelex.plugins.anthropic.anthropic_exceptions` |
+| Defined in | `pipelex.providers.anthropic.anthropic_exceptions` |
 | Parent class | [`CogtError`](cogt-error.md) |
 
 [Back to Error Reference](index.md)

@@ -34,8 +34,8 @@ from pipelex.cogt.img_gen.img_gen_model_rules import (
     SpecificTaxonomy,
 )
 from pipelex.config import get_config
-from pipelex.plugins.google.google_img_gen_factory import GoogleImgGenFactory
-from pipelex.plugins.openai.openai_img_gen_factory import OpenAIImgGenFactory
+from pipelex.providers.google.google_img_gen_factory import GoogleImgGenFactory
+from pipelex.providers.openai.openai_img_gen_factory import OpenAIImgGenFactory
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl
 

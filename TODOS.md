@@ -2,7 +2,7 @@
 
 **Design doc:** [`wip/refactoring/modularity-refactors.md`](wip/refactoring/modularity-refactors.md) — the *why*, the rulings, the measurement snippets. This file is the *how*: ordered work, checkboxes, hard checkpoints.
 
-**Worktree:** `_hub/` · **Branch:** `refactor/Modularity-3` · **Base:** `refactor/Hub-2` (PR #1064, still open — see [Gating](#gating)) · **Status:** **M1 complete and reviewed — at CHECKPOINT M1, awaiting sign-off.** M1a+M1b+M1c committed, review round done and its fixes committed. M3 done and reviewed earlier. M2 not started.
+**Worktree:** `_hub/` · **Branch:** `refactor/Modularity-3` · **Base:** `refactor/Hub-2` (PR #1064, still open — see [Gating](#gating)) · **Status:** **M2 complete — at CHECKPOINT M2, awaiting review verdicts.** M3, M1 and M2 all committed on one branch; M3 and M1 reviewed and their fixes committed. Only follow-up F1 and Phase 5 remain.
 
 **Reviewed 2026-07-27** (`/plan-eng-review`, 8 issues, all ruled). The review reversed **D-M1-2**, ruled **D-M1-4**/**D-M1-5**/**D-M1-6**, re-scoped **F1**, and corrected the cross-repo blast radius in both directions. The changes are folded in below; see [Review findings](#review-findings) for what moved and why.
 
@@ -32,7 +32,10 @@ Three tracks, ordered by dependency: **M3 → M1** (M3 is a prerequisite slice o
         └─ F1 ─────── PR → M2
   ```
 
-- [ ] **Landing order is prescribed, not optional.** M1 and M2 both modify `hub_layering_guard.py`, `test_runtime_layer_import_closure.py` and `docs/contribute/hub-layering.md`. They are *architecturally* independent but **not operationally** independent — parallel branches conflict on those three files. Land M3 → M1 first, then rebase M2. ⚠ **A drift ack does not survive the rebase**: the digest reads the git index, so re-review and re-ack `hub-layering-convention` after rebasing M2.
+  ⚠ **Superseded in practice by [D-M2-4](#decisions).** M3, M1 and M2 all landed as commits on `refactor/Modularity-3`, in that order. The prescribed *landing order* is what mattered and it is satisfied; splitting the branch into three PRs after the fact would re-create exactly the three-file conflict the topology existed to avoid. Open it as **one PR against `dev`** once #1064 merges (or split M3 off first if a smaller review is wanted — it is the only one of the three that is genuinely self-contained). F1 stays a separate PR on top, since it is the only behavior change in the track.
+
+- [x] **Landing order is prescribed, not optional.** M1 and M2 both modify `hub_layering_guard.py`, `test_runtime_layer_import_closure.py` and `docs/contribute/hub-layering.md`. They are *architecturally* independent but **not operationally** independent — parallel branches conflict on those three files. Land M3 → M1 first, then rebase M2. ⚠ **A drift ack does not survive the rebase**: the digest reads the git index, so re-review and re-ack `hub-layering-convention` after rebasing M2.
+  → **Resolved by construction (D-M2-4): M2 was built directly on top of M1 on this branch, not on a parallel branch.** The prescribed landing order is satisfied, the three-file conflict never arises, and the rebase-and-re-ack step disappears — the `hub-layering-convention` ack recorded at CHECKPOINT M2 is already against the final tree. The PR topology below collapses accordingly.
 - [ ] **M2 is NOT release-gated.** Measured 2026-07-27 across every sibling repo: **zero** external consumers import `pipelex.plugins.<vendor>`. The "one breaking wave" argument covers M3 and M1 only. M2 may land whenever it is ready — it does not have to wait for the sweep, and its row comes out of the [Phase 5](#phase-5--close-out) table.
 
 ---
@@ -278,33 +281,35 @@ Four reviews over `6d5b9418a..a23c1b70b`. **All four cleared the moves themselve
 
 ### Work
 
-- [ ] **Create `pipelex/providers/__init__.py` (empty)** — same `INP001` reason as `mthds_parsing/` (ruff `select = ["ALL"]`, tests-only exemption). The commit fails lint without it.
-- [ ] `git mv` the 17 vendor directories to a new `pipelex/providers/`: `anthropic`, `azure_rest`, `bedrock`, `blackboxai`, `docling`, `fal`, `gateway`, `google`, `huggingface`, `linkup`, `mistral`, `openai`, `openrouter`, `portkey`, `pypdfium2`, `secrets`, `storage`. (D-M2-1: `providers/` over `backends/` — `backends/` would collide with `pipelex/cogt/model_backends/`, and the code's own vocabulary for the non-inference adapters is already "provider": `secrets_provider_registry`, `storage_provider_registry`.)
-- [ ] `pipelex/plugins/` keeps the mechanism only: `contract.py`, `registrar.py`, `discovery.py`, `exceptions.py`, the seven `*_registry.py`, `model_handle.py`, `sdk_client_registry.py`, `sdk_client_manager.py`, `backend_extras_factory.py`.
-- [ ] `builtins.py` follows the vendors → `pipelex/providers/builtins.py`, still exporting `RUNTIME_BUILTIN_PLUGINS` / `RUNTIME_CORE_UNCONDITIONAL_PLUGIN_NAMES`. Re-point the downward import in `pipelex/interpreter_plugins/builtins.py`. Both stay parameters of `build_registrar` — unchanged.
-- [ ] Rewrite imports. **Watch the `secrets` / `storage` trap** (ground rules): `pipelex.plugins.secrets` is a vendor dir, `pipelex.plugins.secrets_provider_registry` is a mechanism module that must not move. Same for `storage`.
-- [ ] **Rewrite the 189 string-literal module references** (ground rules) — `mocker.patch("pipelex.plugins.<vendor>...")` targets, invisible to import rewrites and to pyright. They fail loudly at test time, so `make agent-test` is the gate, but budget them as real work: an import-only rewrite turns the suite red in bulk and reads as a catastrophic move rather than expected residue.
-- [ ] **Add `"pipelex.providers"` to `RUNTIME_LAYER_PACKAGES`, and add a guard test that proves it.** This is the one step where a mistake is invisible — dropping the vendors from the guard silently un-declares the largest runtime package.
+- [x] **Create `pipelex/providers/__init__.py` (empty)** — same `INP001` reason as `mthds_parsing/` (ruff `select = ["ALL"]`, tests-only exemption). The commit fails lint without it.
+- [x] `git mv` the 17 vendor directories to a new `pipelex/providers/`: `anthropic`, `azure_rest`, `bedrock`, `blackboxai`, `docling`, `fal`, `gateway`, `google`, `huggingface`, `linkup`, `mistral`, `openai`, `openrouter`, `portkey`, `pypdfium2`, `secrets`, `storage`. (D-M2-1: `providers/` over `backends/` — `backends/` would collide with `pipelex/cogt/model_backends/`, and the code's own vocabulary for the non-inference adapters is already "provider": `secrets_provider_registry`, `storage_provider_registry`.)
+- [x] `pipelex/plugins/` keeps the mechanism only: `contract.py`, `registrar.py`, `discovery.py`, `exceptions.py`, the seven `*_registry.py`, `model_handle.py`, `sdk_client_registry.py`, `sdk_client_manager.py`, `backend_extras_factory.py`.
+- [x] `builtins.py` follows the vendors → `pipelex/providers/builtins.py`, still exporting `RUNTIME_BUILTIN_PLUGINS` / `RUNTIME_CORE_UNCONDITIONAL_PLUGIN_NAMES`. Re-point the downward import in `pipelex/interpreter_plugins/builtins.py`. Both stay parameters of `build_registrar` — unchanged.
+- [x] Rewrite imports. **Watch the `secrets` / `storage` trap** (ground rules): `pipelex.plugins.secrets` is a vendor dir, `pipelex.plugins.secrets_provider_registry` is a mechanism module that must not move. Same for `storage`.
+- [x] **Rewrite the 189 string-literal module references** (ground rules) — `mocker.patch("pipelex.plugins.<vendor>...")` targets, invisible to import rewrites and to pyright. They fail loudly at test time, so `make agent-test` is the gate, but budget them as real work: an import-only rewrite turns the suite red in bulk and reads as a catastrophic move rather than expected residue.
+- [x] **Add `"pipelex.providers"` to `RUNTIME_LAYER_PACKAGES`, and add a guard test that proves it.** This is the one step where a mistake is invisible — dropping the vendors from the guard silently un-declares the largest runtime package.
   ⚠ **The plan previously claimed "the transitive rule is what catches it." That is backwards.** Verified at `pipelex/cli/dev_cli/commands/hub_layering_guard.py:677`: the rule iterates `sorted(module for module in reaching if is_runtime_layer(module_qname=module))`. An **undeclared** package is excluded from the rule's domain, so omitting it makes the guard go *quieter*, not louder. **No existing gate catches this.** Add an explicit assertion to `tests/unit/pipelex/cli/dev/test_hub_layering_guard.py` that a representative `pipelex.providers.*` module `is_runtime_layer`.
-- [ ] Add `pipelex/providers/builtins.py` to the closure test's `RUNTIME_LAYER_ENTRY_POINTS` (replacing `pipelex.plugins.builtins`, which after the move no longer aggregates anything). Its presence there is load-bearing history: that module and three neighbours breached the boundary transitively while both gates stayed green.
-- [ ] Move tests: `tests/unit/pipelex/plugins/` and `tests/integration/pipelex/plugins/` — split so vendor tests land under a `providers/` mirror and mechanism tests stay under `plugins/`.
-- [ ] Re-path subject grants (160 hits under `plugins/` — the bulk are vendor workers), then `make cko`.
-- [ ] `make gep` — several vendor directories carry exceptions modules (`gateway`, `portkey`, `bedrock`, `google`, `mistral`, `openai`, …), so expect a wide `Defined in` diff. Filenames and `type_uri`s must be **unchanged** (no class renames in M2); if one changes, something got renamed by accident.
-- [ ] Docs sweep for `pipelex/plugins/<vendor>/` paths: `docs/under-the-hood/reasoning-controls.md` (a table of ~10 paths), `error-model.md` (3 refs to `pipelex/plugins/*/`), `inference-backend-plugins.md`, `secrets-provider-plugins.md`, `orchestrator-plugins.md`. **Do not touch the entry-point group name** `"pipelex.plugins"` — it is a group identifier, not a module path, and it is the third-party contract.
-- [ ] **Sweep architectural prose in *source*, not just `docs/`.** Two module docstrings describe the pre-M2 layout and go stale silently: `pipelex/plugins/contract.py:33-35` ("``pipelex.plugins`` for the runtime half, ``pipelex.interpreter_plugins`` for the interpreter half" — after M2 the runtime *adapters* are in `pipelex.providers`), and `pipelex/interpreter_plugins/builtins.py:3-8` (describes `pipelex.plugins` as the neighbouring runtime adapter package). Both are the kind of comment the repo's own diagram-maintenance rule says must move with the code.
-- [ ] `docs/contribute/hub-layering.md` → **Known inversions**: record the four `cogt → provider config` imports (`anthropic`, `google`, `mistral`, `openai` config classes reached from `cogt/config_cogt.py`) as a deliberate, documented exception. Rationale (D-M2-2): the main config model is statically typed end-to-end (`configs.py` ⇄ `pipelex.toml` structural sync); making vendor config sections plugin-contributed would trade that static typing for a dynamic registry.
-- [ ] **`make drift-ack CONTRACT=hub-layering-convention`.** M2 adds `pipelex.providers` to `RUNTIME_LAYER_PACKAGES`, a trigger file in `drift.toml:65-69`, so the contract opens and M2's checkpoint `make drift-check` fails without an ack. Review the doc for real — M2 adds a whole runtime-layer package, which the "Where core splits" and Known-inversions sections both describe.
-- [ ] Changelog entry, **breaking**: `pipelex.plugins.<vendor>` → `pipelex.providers.<vendor>`. Two things to state explicitly: (a) the *plugin entry-point contract is unaffected* — an external plugin imports `pipelex.plugins.contract` / `pipelex.plugins.registrar`, both of which stay put; (b) **no known external consumer imports the vendor paths** (measured 2026-07-27: zero hits across every sibling repo), so the break is in-tree only. Do not imply a consumer migration that nobody needs.
+- [x] Add `pipelex/providers/builtins.py` to the closure test's `RUNTIME_LAYER_ENTRY_POINTS` (replacing `pipelex.plugins.builtins`, which after the move no longer aggregates anything). Its presence there is load-bearing history: that module and three neighbours breached the boundary transitively while both gates stayed green.
+- [x] Move tests: `tests/unit/pipelex/plugins/` and `tests/integration/pipelex/plugins/` — split so vendor tests land under a `providers/` mirror and mechanism tests stay under `plugins/`.
+- [x] Re-path subject grants (160 hits under `plugins/` — the bulk are vendor workers), then `make cko`.
+- [x] `make gep` — several vendor directories carry exceptions modules (`gateway`, `portkey`, `bedrock`, `google`, `mistral`, `openai`, …), so expect a wide `Defined in` diff. Filenames and `type_uri`s must be **unchanged** (no class renames in M2); if one changes, something got renamed by accident.
+- [x] Docs sweep for `pipelex/plugins/<vendor>/` paths: `docs/under-the-hood/reasoning-controls.md` (a table of ~10 paths), `error-model.md` (3 refs to `pipelex/plugins/*/`), `inference-backend-plugins.md`, `secrets-provider-plugins.md`, `orchestrator-plugins.md`. **Do not touch the entry-point group name** `"pipelex.plugins"` — it is a group identifier, not a module path, and it is the third-party contract.
+- [x] **Sweep architectural prose in *source*, not just `docs/`.** Two module docstrings describe the pre-M2 layout and go stale silently: `pipelex/plugins/contract.py:33-35` ("``pipelex.plugins`` for the runtime half, ``pipelex.interpreter_plugins`` for the interpreter half" — after M2 the runtime *adapters* are in `pipelex.providers`), and `pipelex/interpreter_plugins/builtins.py:3-8` (describes `pipelex.plugins` as the neighbouring runtime adapter package). Both are the kind of comment the repo's own diagram-maintenance rule says must move with the code.
+- [x] `docs/contribute/hub-layering.md` → **Known inversions**: record the four `cogt → provider config` imports (`anthropic`, `google`, `mistral`, `openai` config classes reached from `cogt/config_cogt.py`) as a deliberate, documented exception. Rationale (D-M2-2): the main config model is statically typed end-to-end (`configs.py` ⇄ `pipelex.toml` structural sync); making vendor config sections plugin-contributed would trade that static typing for a dynamic registry.
+- [x] **`make drift-ack CONTRACT=hub-layering-convention`.** M2 adds `pipelex.providers` to `RUNTIME_LAYER_PACKAGES`, a trigger file in `drift.toml:65-69`, so the contract opens and M2's checkpoint `make drift-check` fails without an ack. Review the doc for real — M2 adds a whole runtime-layer package, which the "Where core splits" and Known-inversions sections both describe.
+- [x] Changelog entry, **breaking**: `pipelex.plugins.<vendor>` → `pipelex.providers.<vendor>`. Two things to state explicitly: (a) the *plugin entry-point contract is unaffected* — an external plugin imports `pipelex.plugins.contract` / `pipelex.plugins.registrar`, both of which stay put; (b) **no known external consumer imports the vendor paths** (measured 2026-07-27: zero hits across every sibling repo), so the break is in-tree only. Do not imply a consumer migration that nobody needs.
 
 ### Exit criteria
 
-| | baseline | target |
-| --- | --- | --- |
-| mechanism modules importing a vendor | 1 (`builtins.py`, by design) | **0 in `plugins/`**, 1 in `providers/` |
-| vendor modules importing outside `providers/` + `plugins/` | 0 | 0 (unchanged) |
-| guard test asserting `pipelex.providers.*` is runtime-layer | 0 | **1** |
-| `cogt → <specific vendor>` statements | 7 | 7 (4 documented, 2 in F1, 1 self-resolving) |
-| `RUNTIME_LAYER_PACKAGES` covers every vendor module | yes | yes |
+| | baseline | target | **actual** |
+| --- | --- | --- | --- |
+| mechanism modules importing a vendor | 1 (`builtins.py`, by design) | **0 in `plugins/`**, 1 in `providers/` | ✅ **0 / 1** — `providers/builtins.py` names all 17, nothing under `pipelex/plugins/` names any |
+| vendor modules importing outside `providers/` + `plugins/` | 0 | 0 (unchanged) | ✅ **0** |
+| guard test asserting `pipelex.providers.*` is runtime-layer | 0 | **1** | ✅ **1**, derived from disk and mutation-checked red |
+| `cogt → <specific vendor>` statements | 7 | 7 (4 documented, 2 in F1, 1 self-resolving) | ✅ **7**, and they are the *only* three source files outside `providers/` naming a vendor |
+| `RUNTIME_LAYER_PACKAGES` covers every vendor module | yes | yes | ✅ **17 / 17** |
+
+⚠ **Measurement trap, cost ~10 min and it under-counted silently.** `pypdfium2` contains a digit, so a `[a-z_]*` character class in a grep pattern skips it — the first pass reported 16 of 17 vendor imports in `builtins.py` and would have reported a clean `cogt` count even if a `pypdfium2` import existed. Use `[a-z0-9_]+` for anything matching a vendor segment. The *rewrite* script was never at risk (it uses literal vendor names), only the measurements taken afterwards — which is the worse of the two, because a measurement is what tells you the rewrite was complete.
 
 > **The "vendor imports nothing but the mechanism" metric was false by construction** and is restated above. The design doc deliberately preserves cross-vendor edges (`blackboxai` / `openrouter` / `portkey` → `openai`; `gateway` → `fal` / `google` / `openai` / `portkey`) because they stay inside the new package — e.g. `blackboxai/blackboxai_completions_factory.py:9` and `openrouter/openrouter_completions_factory.py:8` import `OpenAICompletionsFactory` at module level. A metric targeting zero could never be met. Measure "imports outside `providers/` **and** `plugins/`" instead.
 
@@ -315,6 +320,26 @@ Four reviews over `6d5b9418a..a23c1b70b`. **All four cleared the moves themselve
 3. **Update this file** + [Cold-start brief](#cold-start-brief) + [Measurements](#measurements).
 4. **Commit**, then **fan out reviews**. M2 reviews: `correctness-and-imports` + `boundary-and-naming` + `over-engineering`.
 5. **Stop.** Report verdicts and wait.
+
+#### Checkpoint record — reached 2026-07-28
+
+**All gates green**: `cko`, `cleanderived` + fixture regen, `agent-check` (ruff / pyright 0 / mypy 0 / cko / chl), full `agent-test`, `drift-check` (two contracts acked), `chl`, `gep` (diff reviewed, see below), `tb`. Every exit-criterion actual is in the table above.
+
+**Scale of the move:** 17 vendor packages + `builtins.py` out of `pipelex/plugins/`; **1364 substitutions across 136 files**, of which **191 were string literals** (the plan predicted 189 — the drift is two, both in test mock targets). The completion check was the one that makes "did I get them all?" answerable: grep the whole tree for the old paths and assert the only survivors are in the deliberately excluded files (`CHANGELOG.md`, `TODOS.md`, `wip/`, `docs/errors/` — history and generated pages, which must not be textually rewritten; the error pages are regenerated by `make gep` instead).
+
+**The `secrets` / `storage` trap was real and was avoided by construction.** Every substitution anchors the vendor name on a `(?![A-Za-z0-9_])` lookahead, so `plugins.secrets` (vendor dir) rewrites while `plugins.secrets_provider_registry` (mechanism module) does not. Verified after the fact by asserting that no mechanism module is reachable at a `pipelex.providers.*` path, and that the `pipelex.plugins` **entry-point group name** — a group identifier, not a module path, and the third-party contract — is untouched.
+
+**Decisions taken during implementation:**
+
+- **D-M2-4 — M2 was built on top of M1 on this branch, not on a parallel branch off #1064.** The plan's topology had M2 independent and rebased after M1, with a mandatory drift re-ack because a rebase invalidates the digest. Building it stacked satisfies the prescribed landing order, eliminates the three-file conflict the plan warned about, and makes the ack recorded here final. See [Gating](#gating).
+- **Test split derived per module, not from the plan's two-line instruction.** The vendor subdirectories were unambiguous, but the flat modules needed reading. `test_linkup_plugin_guard.py`, `test_secrets_plugin.py` and `test_storage_plugin.py` are *vendor* tests despite sitting at the `plugins/` root (they moved into the matching `providers/<vendor>/` mirrors); `test_transport_retry_wiring.py` and `test_plugin_pipelex_storage_images.py` are cross-vendor and moved to the `providers/` root; `test_inference_backend_coverage.py` reads as a vendor test by name but is a *mechanism* round-trip over `BUILTIN_PLUGINS` and stayed. On the integration side `conftest.py` moved with the four vendor tests, because all four of its consumers moved and the three modules that stayed use none of it.
+- **`tests/CLAUDE.md` gained a `pipelex/providers/` row.** The source-to-test mapping is 1:1 by convention; a new source package with no row silently drops out of every targeted test run.
+
+**The one user-facing defect, and it is the same shape M1 hit three weeks ago.** `_SUBSYSTEM_SECTIONS` in `pipelex/errors/error_pages_generator.py` had a `plugins` row and no `providers` row. `_subsystem_key` reads a module's **second dotted segment**, so every vendor error class would have silently reclassified out of *Inference & providers* into the `_FALLBACK_MACRO_SLUG` (*Platform & tooling*) — with `make gep` exiting 0 and producing an entirely plausible diff. This is M1's `mthds_parsing` regression repeating on the next module move, and it was caught **only** because M1's recorded lesson was to read the generated diff rather than trust the exit code. Fixed by splitting the row in two, which the content wanted anyway: **Provider adapters** (a vendor SDK rejected the call) and **Plugin system** (a plugin failed to load or claimed a taken slot). Verified by the negative: `docs/errors/platform-and-tooling.md` is byte-identical, so nothing fell through. No page was added or removed, so no `type_uri` changed.
+
+**Two drift contracts opened, not one.** `hub-layering-convention` was predicted. `config-docs` was not — re-pathing the four vendor config imports touches `cogt/config_cogt.py`, a trigger. Reviewed for real and logged as **friction**: `docs/configuration/` cites no Python import path anywhere, so an import-only diff cannot affect it *by construction*. That is the second such opening on that contract from a pure refactor sweep, and the dogfood log now carries a concrete narrowing proposal (ignore diffs confined to import statements) backed by two data points.
+
+**Not done here, deliberately:** the `wip/` docs that still describe the pre-M2 layout (`wip/plugins/*.md`, the design doc's own prose) were excluded from the rewrite along with `CHANGELOG.md` and `TODOS.md`, per M1's method. The design doc's classification snippet needs **no** change — M2 adds a runtime-layer package, not an interpreter one, so the matched triple is undisturbed.
 
 ---
 
@@ -423,6 +448,7 @@ Ruled during the **2026-07-27 review**:
 | **D-M1-7** | **M1 stacks on M3** (PR → M3, retargeted to `dev` on merge). M2 lands after M1 and re-acks drift post-rebase | The plan asserted both "M3 → M1" and "each track branches from #1064 against `dev`"; M1 cannot be both. M1/M2 share three files, so they are not operationally parallel |
 | **D-M2-3** | **M2 is not release-gated** and comes out of the sweep table | Measured: zero external consumers import `pipelex.plugins.<vendor>` |
 | **D-M1-8** | **`PipelexBundleBlueprintValidationErrorData` moved to `pipelex.core.exceptions`**, not into `mthds_parsing/` with the parser that raises it | Ruled during M1a under the authority M1c's plan granted ("if the closure test *does* fail on it, move the data class to a runtime-layer home instead"). It does fail: `core.memory.working_memory_factory` reaches it, and the closure test's `INTERPRETER_CORE_EXCLUDED` existed for exactly that. `core/exceptions.py` already holds the two sibling structured error-data models keyed on the same `PipeValidationErrorType`. Moving the leaf is what let the exclusion be deleted outright rather than carried forward |
+| **D-M2-4** | **M2 is stacked on M1 on one branch**, not a parallel branch off #1064 rebased afterwards | The plan's own [Gating](#gating) already prescribed the landing order M3 → M1 → M2 and warned that the three shared files make them non-parallel. Stacking satisfies the order, removes the conflict, and removes the mandatory post-rebase drift re-ack — the ack recorded at CHECKPOINT M2 is against the final tree rather than a tree that will move |
 | **D-R-1** | **No third layer** between runtime and interpreter | A layer encodes a forbidden arrow; there is only one (`runtime_hub ↛ interpreter_hub`). The shared kernel a third layer would hold already exists as `core/`'s value model, which both layers use. The pipe vocabulary fails the entry test — only the interpreter needs it |
 
 ---
@@ -497,6 +523,19 @@ Inbound test, re-derived at move time rather than trusted: everything that moved
 
 `core/pipes/` final contents: `inputs/`, `stuff_spec/`, `exceptions.py`, `pipe_output.py`, `variable_multiplicity.py` — exactly the runtime half the plan predicted.
 
+### Post-M2, measured 2026-07-28
+
+The move: **17** vendor packages + `builtins.py` from `pipelex/plugins/` to `pipelex/providers/`. **136** files rewritten, **1364** substitutions, of which **191** string literals (predicted 189) and **145** `subject_grants.toml` path keys (12 grants stay, all on mechanism modules).
+
+| | before | after |
+| --- | --- | --- |
+| directories under `pipelex/plugins/` | 17 vendors + mechanism | **0 vendors** — mechanism modules only |
+| `RUNTIME_LAYER_PACKAGES` entries | 7 | **8** (`pipelex.providers` added) |
+| source files outside `providers/` naming a specific vendor | 3 | **3** (unchanged — the documented `cogt` edges) |
+| `pipelex/plugins/` modules naming a vendor | 1 (`builtins.py`) | **0** |
+
+`INTERPRETER_PACKAGES` is **unchanged** — M2 adds a runtime-layer package, so the matched triple (guard tuple / closure predicate / hub-layering snippet / design-doc snippet) is undisturbed, and the design doc needed no edit. Verified by script rather than assumed: the closure predicate and the doc snippet still name the same set.
+
 *(Append post-phase re-measurements here as each checkpoint clears.)*
 
 ---
@@ -554,10 +593,11 @@ Not in this wave. Captured with their evidence so they are not re-derived.
 - **Where:** worktree `_hub/`, branch `refactor/Modularity-3`, based on `refactor/Hub-2` (PR #1064). Related memory: `project_modularity_refactors.md`, `project_hub_split_refactor.md`.
 - **What:** three refactors continuing the hub split — M3 (split the boot manifest, seed `pipe_machinery/`), M1 (hoist core's interpreter half into `mthds_parsing/` + `pipe_machinery/`, collapse the guard declaration), M2 (split `plugins/` into mechanism + `providers/`), then follow-up F1 (two img-gen factory imports behind a new registry slot).
 - **Why now:** **M3 and M1** break external imports, and the repo already owes a release-gated cross-repo sweep for the hub split — landing them first means consumers absorb one breaking wave instead of several. **M2 does not** (measured zero external consumers) and can land on its own schedule.
-- **State:** **M3 and M1 both done and committed — sitting at CHECKPOINT M1.** M1 is three commits: `0f0309b8f` (M1a, parser → `mthds_parsing/`), `c9c45c475` (M1b, Pipe machinery → `pipe_machinery/`), `10080cf26` (M1c, declaration collapse + guards + docs). All gates green, all exit criteria met — see the [Checkpoint record](#checkpoint-record--reached-2026-07-27-commits-0f0309b8f--c9c45c475--10080cf26) for the decisions taken, the one real bug, and the cross-repo state. **Checkpoint reviews are done (2026-07-28) and their fixes are committed** — see [Review round](#review-round--done-2026-07-28-fixes-applied); the moves cleared, every defect was docs/fixture/test-quality drift, and three placement items are deferred to `wip/refactoring/deferred-placement-follow-ups.md`. M2 not started.
-- **Blocking:** PR #1064 must merge before M3/M1 open a PR against `dev`. **No open decisions.**
+- **State:** **M3, M1 and M2 all done and committed on one branch — sitting at CHECKPOINT M2.** M1 is three commits: `0f0309b8f` (M1a, parser → `mthds_parsing/`), `c9c45c475` (M1b, Pipe machinery → `pipe_machinery/`), `10080cf26` (M1c, declaration collapse + guards + docs), plus `7beda698f` for the review fixes. M2 is one commit on top (D-M2-4 — stacked, not parallel). All gates green at every checkpoint, all exit criteria met. **M3's and M1's review rounds are done and their fixes committed**; see [Review round](#review-round--done-2026-07-28-fixes-applied) — the moves cleared, every defect was docs/fixture/test-quality drift, and three placement items are deferred to `wip/refactoring/deferred-placement-follow-ups.md`. **M2's review round has not run yet** — that is the next action. Only F1 and Phase 5 remain after it.
+- **Blocking:** PR #1064 must merge before this branch opens a PR against `dev`. **No open decisions.**
 - **⚠ Two cross-repo edits are uncommitted in sibling repos** — `conformance/tests/pipelex_transport/test_data.py` and workspace-root `docs/specs/pipelex-transport-boundary.md`, one line each, repointing `PipeAbstract` to `pipelex.pipe_machinery`. They are release-gated with the rest of the sweep and must not be lost.
 - **What M3 actually changed:** no module moved paths and no class was renamed — only the six pipe lists moved from `CoreRegistryModels` to `pipelex.pipe_machinery.registry_models.PipeRegistryModels`. M3 contributes **nothing** to the cross-repo sweep. **M1 is where the sweep debt is incurred**, and it is bigger than the module moves: `PipelexInterpreterError` → `MthdsParserError` is the `error_type` **wire string** four TypeScript consumers branch on, and the docs redirect does nothing for them.
+- **What M2 confirmed, and the one thing it adds:** every M1 lesson below fired again. The test inventory in the plan was incomplete a third time (six flat modules needed per-module classification, and one — `test_inference_backend_coverage.py` — reads as a vendor test by name while being a mechanism test by subject). The generated-output lesson paid off directly: `_SUBSYSTEM_SECTIONS` was missing a `providers` row, the identical defect M1 hit with `mthds_parsing`, and `make gep` exits 0 either way. **The new one: a grep character class is a measurement bug.** `pypdfium2` has a digit, so `[a-z_]*` silently skips it — the rewrite was safe (literal vendor names) but the *verification* under-counted, which is worse, because the verification is what licenses "done". Use `[a-z0-9_]+`.
 - **What M1 learned that M2 will hit again:**
     1. **Test inventories written in advance are wrong.** Both of M1's were materially incomplete. Derive the move list from each test's actual subject, at move time.
     2. **A `Path(__file__).parents[N]` in a moved test is a silent bug** — nothing static sees a parent count, and it fails only under the full suite. Sweep for it after every test move.
@@ -597,8 +637,8 @@ Synthesized from the review's findings. Each derives from a specific finding abo
 - [x] **T6 (P2, human: ~1h / CC: ~10min)** — M3 + M2 — Add `drift-ack` steps for `hub-layering-convention`
   - Surfaced by: Issue 5 — `drift.toml:65-69` triggers on the guard; all three tracks touch it, only M1c acked
   - Files: `TODOS.md`, `drift.toml`
-  - Verify: `make drift-check` green at each checkpoint — ✅ M3 half done: the contract opened exactly as predicted (only after `git add`; the digest reads the index), was reviewed for real, acked, and logged in `wip/drift-contracts/dogfood-log.md` (mandatory per ack). M2's ack step still pending.
-- [ ] **T7 (P2, human: ~1d / CC: ~30min)** — M2 — Rewrite the 189 string-literal module references
+  - Verify: `make drift-check` green at each checkpoint — ✅ M3 half done: the contract opened exactly as predicted (only after `git add`; the digest reads the index), was reviewed for real, acked, and logged in `wip/drift-contracts/dogfood-log.md` (mandatory per ack). M2's ack landed at CHECKPOINT M2 — and M2 opened a *second* contract the plan did not predict, `config-docs`, because re-pathing the four vendor config imports touches `config_cogt.py`. Both reviewed for real, both acked, both logged.
+- [x] **T7 (P2, human: ~1d / CC: ~30min)** — M2 — Rewrite the 189 string-literal module references
   - Surfaced by: Issue 7 — invisible to import rewrites and pyright; 189 in M2, 15 in M1
   - Files: `tests/unit/pipelex/plugins/`, `pipelex/plugins/`
   - Verify: `make agent-test`; zero surviving `pipelex.plugins.<vendor>` literals
@@ -606,7 +646,7 @@ Synthesized from the review's findings. Each derives from a specific finding abo
   - Surfaced by: Issue 8 + Codex #14/#15 — `make_args_for_model` takes no sdk, dispatch is by `AspectRatioTaxonomy`, gateway is one SDK spanning both; a registry slot would force a plugin-API bump
   - Files: `pipelex/cogt/img_gen/img_gen_args_factory.py`, `pipelex/plugins/{google,openai}/*_img_gen_factory.py`
   - Verify: a test per taxonomy branch incl. the unmapped-taxonomy path; `pipelex.plugins.contract` untouched
-- [ ] **T11 (P1, human: ~2h / CC: ~15min)** — M2 — Add a guard test asserting `pipelex.providers.*` is runtime-layer
+- [x] **T11 (P1, human: ~2h / CC: ~15min)** — M2 — Add a guard test asserting `pipelex.providers.*` is runtime-layer
   - Surfaced by: Codex #5 — the transitive rule filters through `is_runtime_layer`, so an omitted declaration is excluded from the check, not caught by it. No existing gate covers this
   - Files: `tests/unit/pipelex/cli/dev/test_hub_layering_guard.py`
   - Verify: drop `"pipelex.providers"` from the tuple and confirm the test goes red
@@ -614,7 +654,7 @@ Synthesized from the review's findings. Each derives from a specific finding abo
   - Surfaced by: Codex #8 — the key carries `PipelexInterpreter.make_pipelex_bundle_blueprint`; re-pathing alone leaves it stale and hard-fails `check-keyword-only`
   - Files: `subject_grants.toml`
   - Verify: `make cko`
-- [ ] **T13 (P2, human: ~1h / CC: ~10min)** — ~~M1a~~ + M2 — Create the two missing `__init__.py` files — M1a half ✅ done (`pipelex/mthds_parsing/__init__.py`); `pipelex/providers/__init__.py` still pending for M2
+- [x] **T13 (P2, human: ~1h / CC: ~10min)** — ~~M1a~~ + ~~M2~~ — Create the two missing `__init__.py` files — ✅ both done (`pipelex/mthds_parsing/__init__.py`, `pipelex/providers/__init__.py`)
   - Surfaced by: Codex #2 — ruff `select = ["ALL"]`, `INP001` exempt only for `tests/**`; both commits fail lint as written
   - Files: `pipelex/mthds_parsing/__init__.py`, `pipelex/providers/__init__.py`
   - Verify: `make agent-check`

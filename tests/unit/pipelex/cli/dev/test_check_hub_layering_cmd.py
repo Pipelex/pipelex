@@ -155,7 +155,7 @@ class TestCheckHubLayeringCmd:
     def test_a_transitive_finding_alone_is_a_failure(self, mocker: MockerFixture, console_buffer: io.StringIO) -> None:
         """The pass that found the real breach must be able to fail the gate on its own."""
         transitive = HubLayeringViolation(
-            relative_path="pipelex/plugins/builtins.py",
+            relative_path="pipelex/providers/builtins.py",
             lineno=6,
             kind=HubLayeringViolationKind.INTERPRETER_HUB_TRANSITIVE,
             detail="reaches `pipelex.interpreter_hub` via pipelex.runtime_bridge.direct_orchestrator → pipelex.interpreter_hub",
@@ -166,7 +166,7 @@ class TestCheckHubLayeringCmd:
             check_hub_layering_cmd(quiet=True)
 
         assert exit_info.value.code == 1
-        assert "pipelex/plugins/builtins.py:6" in console_buffer.getvalue()
+        assert "pipelex/providers/builtins.py:6" in console_buffer.getvalue()
 
     def test_missing_scan_root_fails_without_scanning(self, mocker: MockerFixture, console_buffer: io.StringIO, tmp_path: Path) -> None:
         """A vanished scan root must never read as a pass: scanning nothing finds nothing."""

@@ -412,7 +412,11 @@ _SUBSYSTEM_SECTIONS: tuple[tuple[str, str, str], ...] = (
     ("tracing", "execution-and-runtime", "Tracing"),
     # Inference & providers
     ("cogt", "inference-and-providers", "Inference (Cogt)"),
-    ("plugins", "inference-and-providers", "Provider plugins"),
+    # Two rows, because the vendor adapters and the plugin mechanism they register through are
+    # two packages. `providers` is the one a method author hits (a vendor SDK rejected the call);
+    # `plugins` is the one an integrator hits (a plugin failed to load or claimed a taken slot).
+    ("providers", "inference-and-providers", "Provider adapters"),
+    ("plugins", "inference-and-providers", "Plugin system"),
     # Platform & tooling
     ("base_exceptions", "platform-and-tooling", "Base & root errors"),
     ("tools", "platform-and-tooling", "Tools"),

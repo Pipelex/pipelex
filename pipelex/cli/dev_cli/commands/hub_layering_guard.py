@@ -108,11 +108,21 @@ SCAN_ROOTS: tuple[Path, ...] = (SOURCE_ROOT, TESTS_ROOT)
 #: which is why the claim is scoped to those packages rather than to "zero interpreter modules".)
 #: A package-granular declaration is only honest when the packages match the layers; naming
 #: `pipelex.core` wholesale is now a claim the measurement supports rather than contradicts.
+#:
+#: `pipelex.plugins` and `pipelex.providers` are two entries for what used to be one package, and
+#: both are runtime-layer: `plugins` is the plugin *mechanism* (the contract, the registrar, the
+#: capability registries), `providers` the built-in vendor *adapters* that register through it.
+#: Splitting them did not move the boundary — it made the one-way dependency legible — so leaving
+#: `pipelex.providers` undeclared would silently un-declare the largest runtime-layer package. Note
+#: that omitting an entry makes this guard **quieter**, not louder: the transitive rule below filters
+#: its candidates through :func:`is_runtime_layer`, so an undeclared package is excluded from the
+#: rule's domain rather than reported by it. That is why the declaration is asserted by a test.
 #: See the "Where core splits" section of ``docs/contribute/hub-layering.md``.
 RUNTIME_LAYER_PACKAGES: tuple[str, ...] = (
     "pipelex.cogt",
     "pipelex.core",
     "pipelex.plugins",
+    "pipelex.providers",
     "pipelex.reporting",
     "pipelex.system",
     "pipelex.tools",

@@ -18,15 +18,15 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.exceptions import MissingDependencyError
 from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS
-from pipelex.plugins.blackboxai.blackboxai_completions_factory import BlackboxaiCompletionsFactory
 from pipelex.plugins.exceptions import InferenceBackendNotFoundError
-from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory
 from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
 from pipelex.plugins.model_handle import ModelHandle
-from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
-from pipelex.plugins.openrouter.openrouter_completions_factory import OpenRouterCompletionsFactory
 from pipelex.plugins.registrar import PluginRegistrar
 from pipelex.plugins.sdk_client_registry import SdkClientRegistry
+from pipelex.providers.blackboxai.blackboxai_completions_factory import BlackboxaiCompletionsFactory
+from pipelex.providers.gateway.gateway_completions_factory import GatewayCompletionsFactory
+from pipelex.providers.openai.openai_completions_factory import OpenAICompletionsFactory
+from pipelex.providers.openrouter.openrouter_completions_factory import OpenRouterCompletionsFactory
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -52,21 +52,21 @@ def build_builtin_inference_backend_registry() -> InferenceBackendRegistry:
 
 FACTORY_MODULE = "pipelex.cogt.img_gen.img_gen_worker_factory"
 
-GATEWAY_CLIENT = "pipelex.plugins.gateway.gateway_factory.GatewayFactory.make_portkey_client"
+GATEWAY_CLIENT = "pipelex.providers.gateway.gateway_factory.GatewayFactory.make_portkey_client"
 GATEWAY_COMPLETIONS_CLIENT = (
-    "pipelex.plugins.gateway.gateway_completions_factory.GatewayCompletionsFactory.make_portkey_openai_client_for_completions"
+    "pipelex.providers.gateway.gateway_completions_factory.GatewayCompletionsFactory.make_portkey_openai_client_for_completions"
 )
-OPENAI_CLIENT = "pipelex.plugins.openai.openai_client_factory.OpenAIClientFactory.make_openai_client"
-GOOGLE_CLIENT = "pipelex.plugins.google.google_factory.GoogleFactory.make_google_client"
-HUGGINGFACE_PROVIDER = "pipelex.plugins.huggingface.huggingface_factory.HuggingFaceFactory.make_huggingface_inference_provider"
+OPENAI_CLIENT = "pipelex.providers.openai.openai_client_factory.OpenAIClientFactory.make_openai_client"
+GOOGLE_CLIENT = "pipelex.providers.google.google_factory.GoogleFactory.make_google_client"
+HUGGINGFACE_PROVIDER = "pipelex.providers.huggingface.huggingface_factory.HuggingFaceFactory.make_huggingface_inference_provider"
 
-GATEWAY_WORKER = "pipelex.plugins.gateway.gateway_img_gen_worker.GatewayImgGenWorker"
-FAL_WORKER = "pipelex.plugins.fal.fal_img_gen_worker.FalImgGenWorker"
-HUGGINGFACE_WORKER = "pipelex.plugins.huggingface.huggingface_img_gen_worker.HuggingFaceImgGenWorker"
-OPENAI_WORKER = "pipelex.plugins.openai.openai_img_gen_worker.OpenAIImgGenWorker"
-COMPLETIONS_WORKER = "pipelex.plugins.openai.openai_completions_img_gen_worker.OpenAICompletionsImgGenWorker"
-AZURE_WORKER = "pipelex.plugins.azure_rest.azure_img_gen_worker.AzureImgGenWorker"
-GOOGLE_WORKER = "pipelex.plugins.google.google_img_gen_worker.GoogleImgGenWorker"
+GATEWAY_WORKER = "pipelex.providers.gateway.gateway_img_gen_worker.GatewayImgGenWorker"
+FAL_WORKER = "pipelex.providers.fal.fal_img_gen_worker.FalImgGenWorker"
+HUGGINGFACE_WORKER = "pipelex.providers.huggingface.huggingface_img_gen_worker.HuggingFaceImgGenWorker"
+OPENAI_WORKER = "pipelex.providers.openai.openai_img_gen_worker.OpenAIImgGenWorker"
+COMPLETIONS_WORKER = "pipelex.providers.openai.openai_completions_img_gen_worker.OpenAICompletionsImgGenWorker"
+AZURE_WORKER = "pipelex.providers.azure_rest.azure_img_gen_worker.AzureImgGenWorker"
+GOOGLE_WORKER = "pipelex.providers.google.google_img_gen_worker.GoogleImgGenWorker"
 
 
 def make_img_gen_model_spec(sdk: str, backend_name: str = "test_backend", variant: str | None = None) -> InferenceModelSpec:

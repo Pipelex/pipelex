@@ -19,17 +19,17 @@ from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.exceptions import MissingDependencyError
 from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS
 from pipelex.plugins.exceptions import InferenceBackendNotFoundError
-from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory
-from pipelex.plugins.gateway.gateway_responses_factory import GatewayResponsesFactory
 from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
-from pipelex.plugins.mistral.mistral_factory import MistralFactory
 from pipelex.plugins.model_handle import ModelHandle
-from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
-from pipelex.plugins.openai.openai_responses_factory import OpenAIResponsesFactory
-from pipelex.plugins.portkey.portkey_completions_factory import PortkeyCompletionsFactory
-from pipelex.plugins.portkey.portkey_responses_factory import PortkeyResponsesFactory
 from pipelex.plugins.registrar import PluginRegistrar
 from pipelex.plugins.sdk_client_registry import SdkClientRegistry
+from pipelex.providers.gateway.gateway_completions_factory import GatewayCompletionsFactory
+from pipelex.providers.gateway.gateway_responses_factory import GatewayResponsesFactory
+from pipelex.providers.mistral.mistral_factory import MistralFactory
+from pipelex.providers.openai.openai_completions_factory import OpenAICompletionsFactory
+from pipelex.providers.openai.openai_responses_factory import OpenAIResponsesFactory
+from pipelex.providers.portkey.portkey_completions_factory import PortkeyCompletionsFactory
+from pipelex.providers.portkey.portkey_responses_factory import PortkeyResponsesFactory
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -56,25 +56,25 @@ def build_builtin_inference_backend_registry() -> InferenceBackendRegistry:
 FACTORY_MODULE = "pipelex.cogt.llm.llm_worker_factory"
 
 GATEWAY_COMPLETIONS_CLIENT = (
-    "pipelex.plugins.gateway.gateway_completions_factory.GatewayCompletionsFactory.make_portkey_openai_client_for_completions"
+    "pipelex.providers.gateway.gateway_completions_factory.GatewayCompletionsFactory.make_portkey_openai_client_for_completions"
 )
-GATEWAY_RESPONSES_CLIENT = "pipelex.plugins.gateway.gateway_responses_factory.GatewayResponsesFactory.make_portkey_openai_client_for_responses"
+GATEWAY_RESPONSES_CLIENT = "pipelex.providers.gateway.gateway_responses_factory.GatewayResponsesFactory.make_portkey_openai_client_for_responses"
 PORTKEY_COMPLETIONS_CLIENT = (
-    "pipelex.plugins.portkey.portkey_completions_factory.PortkeyCompletionsFactory.make_portkey_openai_client_for_completions"
+    "pipelex.providers.portkey.portkey_completions_factory.PortkeyCompletionsFactory.make_portkey_openai_client_for_completions"
 )
-PORTKEY_RESPONSES_CLIENT = "pipelex.plugins.portkey.portkey_responses_factory.PortkeyResponsesFactory.make_portkey_openai_client_for_responses"
-OPENAI_CLIENT = "pipelex.plugins.openai.openai_client_factory.OpenAIClientFactory.make_openai_client"
-ANTHROPIC_CLIENT = "pipelex.plugins.anthropic.anthropic_factory.AnthropicFactory.make_anthropic_client"
-MISTRAL_CLIENT = "pipelex.plugins.mistral.mistral_factory.MistralFactory.make_mistral_client"
-BEDROCK_CLIENT = "pipelex.plugins.bedrock.bedrock_factory.BedrockFactory.make_bedrock_client"
-GOOGLE_CLIENT = "pipelex.plugins.google.google_factory.GoogleFactory.make_google_client"
+PORTKEY_RESPONSES_CLIENT = "pipelex.providers.portkey.portkey_responses_factory.PortkeyResponsesFactory.make_portkey_openai_client_for_responses"
+OPENAI_CLIENT = "pipelex.providers.openai.openai_client_factory.OpenAIClientFactory.make_openai_client"
+ANTHROPIC_CLIENT = "pipelex.providers.anthropic.anthropic_factory.AnthropicFactory.make_anthropic_client"
+MISTRAL_CLIENT = "pipelex.providers.mistral.mistral_factory.MistralFactory.make_mistral_client"
+BEDROCK_CLIENT = "pipelex.providers.bedrock.bedrock_factory.BedrockFactory.make_bedrock_client"
+GOOGLE_CLIENT = "pipelex.providers.google.google_factory.GoogleFactory.make_google_client"
 
-COMPLETIONS_WORKER = "pipelex.plugins.openai.openai_completions_llm_worker.OpenAICompletionsLLMWorker"
-RESPONSES_WORKER = "pipelex.plugins.openai.openai_responses_llm_worker.OpenAIResponsesLLMWorker"
-ANTHROPIC_WORKER = "pipelex.plugins.anthropic.anthropic_llm_worker.AnthropicLLMWorker"
-MISTRAL_WORKER = "pipelex.plugins.mistral.mistral_llm_worker.MistralLLMWorker"
-BEDROCK_WORKER = "pipelex.plugins.bedrock.bedrock_llm_worker.BedrockLLMWorker"
-GOOGLE_WORKER = "pipelex.plugins.google.google_llm_worker.GoogleLLMWorker"
+COMPLETIONS_WORKER = "pipelex.providers.openai.openai_completions_llm_worker.OpenAICompletionsLLMWorker"
+RESPONSES_WORKER = "pipelex.providers.openai.openai_responses_llm_worker.OpenAIResponsesLLMWorker"
+ANTHROPIC_WORKER = "pipelex.providers.anthropic.anthropic_llm_worker.AnthropicLLMWorker"
+MISTRAL_WORKER = "pipelex.providers.mistral.mistral_llm_worker.MistralLLMWorker"
+BEDROCK_WORKER = "pipelex.providers.bedrock.bedrock_llm_worker.BedrockLLMWorker"
+GOOGLE_WORKER = "pipelex.providers.google.google_llm_worker.GoogleLLMWorker"
 
 
 def make_llm_model_spec(sdk: str, backend_name: str = "test_backend") -> InferenceModelSpec:

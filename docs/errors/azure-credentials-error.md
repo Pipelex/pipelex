@@ -13,7 +13,7 @@ description: "Reference for the `AzureCredentialsError` Pipelex error class."
 | `title` | Azure credentials |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/azure-credentials-error/` |
 | `error_domain` | _(inherited from parent)_ |
-| Defined in | `pipelex.plugins.azure_rest.azure_exceptions` |
+| Defined in | `pipelex.providers.azure_rest.azure_exceptions` |
 | Parent class | [`CredentialsError`](credentials-error.md) |
 
 [Back to Error Reference](index.md)

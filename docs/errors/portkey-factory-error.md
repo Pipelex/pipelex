@@ -13,7 +13,7 @@ description: "Reference for the `PortkeyFactoryError` Pipelex error class."
 | `title` | Portkey factory |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/portkey-factory-error/` |
 | `error_domain` | _(inherited from parent)_ |
-| Defined in | `pipelex.plugins.portkey.portkey_exceptions` |
+| Defined in | `pipelex.providers.portkey.portkey_exceptions` |
 | Parent class | [`PortkeyError`](portkey-error.md) |
 
 [Back to Error Reference](index.md)
