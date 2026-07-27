@@ -10,7 +10,7 @@ Three tracks that continue the boundary work the hub split started. They are ord
 | [M1](#m1--make-cores-layer-split-physical) | hoist core's interpreter-layer modules out of `core/` | makes the boundary visible in the tree instead of in a guard tuple; collapses `RUNTIME_LAYER_PACKAGES` |
 | [M2](#m2--separate-the-plugin-mechanism-from-the-vendor-adapters) | split `pipelex/plugins/` into mechanism + providers | one package name currently hides a clean one-way dependency behind an apparent cycle |
 
-**All three break external imports.** The repo already owes a release-gated cross-repo sweep for the hub split, the Phase 3 type moves, and the `interpreter_plugins` relocation (see [`../TODOS.md`](../TODOS.md) → Cross-repo sweep). Every rename below lands in the same consumer repos. **Do these before that sweep executes**, so consumers absorb one breaking wave instead of four. That is the single strongest scheduling argument in this document.
+**All three break external imports.** The repo already owes a release-gated cross-repo sweep for the hub split, the Phase 3 type moves, and the `interpreter_plugins` relocation (see [`wip/hub/hub-split-tracker.md`](../hub/hub-split-tracker.md) → Cross-repo sweep). Every rename below lands in the same consumer repos. **Do these before that sweep executes**, so consumers absorb one breaking wave instead of four. That is the single strongest scheduling argument in this document.
 
 ---
 
