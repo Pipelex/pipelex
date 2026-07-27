@@ -1,5 +1,13 @@
 # Three modularity refactors after the hub split
 
+> ⚠ **SUPERSEDED IN PART — read [`../../TODOS.md`](../../TODOS.md) first.** An engineering review on 2026-07-27 (plus an independent Codex pass) reversed and re-ruled several decisions below. The tracker is now authoritative for *what to do*; this document remains the record of the *original* reasoning. Specifically:
+>
+> - **D-M1-2 is REVERSED.** `pipe_blueprint.py` is **interpreter-layer and moves**, together with `validation.py`, `template_guard_lint.py` and `handle_pipe_errors.py`. The measurement below counts **outbound** imports, which tells you whether a module is a *leaf*, not which layer owns it. The deciding test is **inbound**: zero declared runtime-layer modules import any of those four. Sections "The rulings that shape the hoist" (below), move 5, and the Decisions row for D-M1-2 are all stale.
+> - **The rule of thumb is NOT rewritten.** *"If it names a `Pipe`, it belongs to the interpreter layer"* was correct all along; move 5's proposed replacement only existed to accommodate the `pipe_blueprint` misclassification.
+> - **F1 uses no registry.** `inference_backend_registry` is `(family, sdk) → MakeWorkerFn`, and `make_args_for_model` receives no sdk — dispatch is by `AspectRatioTaxonomy`. The fix is a neutral mapping module under `cogt/img_gen/`.
+> - **M2 is not release-gated** (zero external consumers of `pipelex.plugins.<vendor>`), and its "vendor modules importing anything but the mechanism = 0" exit metric is false by construction — cross-vendor edges are deliberately preserved.
+> - **M1 stacks on M3**; the "each track branches from the #1064 base" note in [Sequencing](#sequencing) is superseded.
+
 **Status: DRAFT v2, not started.** Written on `refactor/Modularity-3`, which is based on `refactor/Hub-2` (PR #1064) — deliberately: all three tracks build on the F1 remedy (`pipelex/interpreter_plugins/`, the transitive guard rule), so #1064 merges first and these PRs land on top of it. Every number below is measured on that tree with the snippets recorded in [Measurement](#measurement); nothing here is estimated. v2 folds in the review pass: the naming and layer questions that were open in v1 are now recorded rulings in [Decisions](#decisions), and the operational costs v1 missed (subject-grant re-pathing, error-page regeneration, test-tree mirroring) are in [Ground rules for the moves](#ground-rules-for-the-moves).
 
 Three tracks that continue the boundary work the hub split started. They are ordered by dependency, not by value: **M3 is a prerequisite slice of M1**, and **M2 is independent of both**.
