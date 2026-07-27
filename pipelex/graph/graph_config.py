@@ -1,16 +1,7 @@
 from pipelex.graph.mermaidflow.mermaid_config import MermaidRenderingConfig
 from pipelex.graph.reactflow.reactflow_config import ReactFlowRenderingConfig
 from pipelex.system.configuration.config_model import ConfigModel
-
-
-class DataInclusionConfig(ConfigModel):
-    """Controls which data is included in graph outputs."""
-
-    stuff_json_content: bool
-    stuff_text_content: bool
-    stuff_html_content: bool
-    error_stack_traces: bool
-    pipe_and_concept_registry: bool
+from pipelex.system.data_inclusion_config import DataInclusionConfig
 
 
 class GraphsInclusionConfig(ConfigModel):

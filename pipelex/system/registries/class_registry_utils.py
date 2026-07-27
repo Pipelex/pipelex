@@ -6,7 +6,7 @@ from typing import Any
 
 from pipelex import log
 from pipelex.config import get_config
-from pipelex.hub import get_class_registry
+from pipelex.runtime_hub import get_class_registry
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.typing.exceptions import ModuleFileError
 from pipelex.tools.typing.module_inspector import (

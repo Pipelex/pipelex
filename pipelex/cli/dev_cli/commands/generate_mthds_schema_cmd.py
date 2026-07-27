@@ -8,8 +8,8 @@ from pathlib import Path
 
 from rich.panel import Panel
 
-from pipelex.hub import get_console
 from pipelex.language.mthds_schema_generator import generate_mthds_schema
+from pipelex.runtime_hub import get_console
 
 # Path to the generated schema file, in the derived/ directory (gitignored)
 MTHDS_SCHEMA_PATH = Path("derived/mthds_schema.json")

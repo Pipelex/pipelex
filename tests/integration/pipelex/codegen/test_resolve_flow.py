@@ -13,7 +13,7 @@ from pipelex.codegen.emitters.target import CodegenTarget
 from pipelex.codegen.emitters.types_emitter import emit_types
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
-from pipelex.hub import get_library_manager
+from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint

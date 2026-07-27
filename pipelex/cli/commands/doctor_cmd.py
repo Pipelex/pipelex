@@ -38,8 +38,8 @@ from pipelex.cogt.models.deck_manifest import DeckFileStatus, DeckSyncReport, co
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.config import get_config
 from pipelex.core.validation import report_validation_error
-from pipelex.hub import PipelexHub, get_console, set_pipelex_hub
 from pipelex.kit.paths import get_kit_configs_dir
+from pipelex.runtime_hub import RuntimeHub, get_console, set_runtime_hub
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.environment import get_optional_env
@@ -739,7 +739,7 @@ def check_deck_sync(*, config_dir: Path | None = None) -> tuple[bool, DeckSyncRe
 
 
 def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = None, config_dir: Path | None = None) -> None:
-    """Spin up a fresh PipelexHub and configure logging for doctor checks.
+    """Spin up a fresh RuntimeHub and configure logging for doctor checks.
 
     Doctor intentionally bypasses ``Pipelex.make`` so it can diagnose a broken config
     without crashing during full init. This helper performs the minimum runtime setup
@@ -771,10 +771,10 @@ def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = Non
         PipelexConfigError: If config validation fails. Translation of
             ``pydantic.ValidationError`` to keep doctor's error surface stable.
     """
-    pipelex_hub = PipelexHub()
-    set_pipelex_hub(pipelex_hub)
+    runtime_hub = RuntimeHub()
+    set_runtime_hub(runtime_hub)
     try:
-        pipelex_hub.setup_config(config_cls=PipelexConfig, config_dir=config_dir)
+        runtime_hub.setup_config(config_cls=PipelexConfig, config_dir=config_dir)
     except ValidationError as validation_error:
         validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
         msg = f"Could not setup config because of: {validation_error_msg}"
@@ -785,7 +785,7 @@ def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = Non
         merged = log_config.model_dump()
         deep_update(merged, updates=log_config_overrides)
         log_config = LogConfig.model_validate(merged)
-    pipelex_hub.set_console_print_target(target=log_config.console_print_target)
+    runtime_hub.set_console_print_target(target=log_config.console_print_target)
     log.configure_if_unset(log_config=log_config)
 
 

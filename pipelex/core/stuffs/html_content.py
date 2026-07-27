@@ -3,9 +3,9 @@ import json
 from pydantic import Field
 from typing_extensions import override
 
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
+from pipelex.tools.jinja2.template_category import TemplateCategory
 
 
 class HtmlContent(StuffContent):

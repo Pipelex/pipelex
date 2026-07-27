@@ -1,0 +1,10 @@
+contract = "hub-layering-convention"
+digest = "sha256:236faf135b429372b9f93c0f750a55726db9e23d6dcd18943c30db7de7e131b0"
+reviewed_by = "Claude (Opus 5 1M context)"
+reviewed_at = "2026-07-26T17:04:11Z"
+rationale = "Guard-only trigger change, and it tightens a carve-out rather than churning imports: `_is_type_checking_test` matched `ast.Attribute(attr=...)` with an unconstrained receiver, so any `settings.TYPE_CHECKING:` block claimed the layer-rule exemption while being an ordinary runtime condition. The attributed form is now rooted at `typing` (new TYPING_MODULE_NAME constant), with a test asserting three unrelated receivers stay violations; verified by mutation that reverting the predicate fails that test and nothing else. Re-ran both mechanical checks the last ack prescribes: 33 + 32 public module-level hub symbols, all still present in the doc's partition tables, and all 12 declared runtime-layer entries still named under Enforcement — neither hub module changed here, so no table could have moved. Updated the doc's TYPE_CHECKING carve-out bullet to state the receiver constraint, since as written it read as exempting any attribute merely named TYPE_CHECKING. Also refreshed the two test-module sentences in the same section, which the same change made stale: the closure test now carries a negative control (its detector lives in a dedent string that nothing lints, so a typo would make every entry point pass vacuously) plus a subprocess timeout, and the lifecycle test now pins the real `Pipelex.teardown` rather than a stand-in calling `class_registry_scoping.reset()` directly. Rest of the page re-read: the two rules, the string-literal half, the core split, Known inversions and the F1 measurement are all unaffected by this change and remain accurate."
+
+[trigger_files]
+"pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:93d985daadb6323335090caa3a1fd2ba6050496e"
+"pipelex/interpreter_hub.py" = "blob:4081f279518a8ed82fe425f035a916f8053edd5c"
+"pipelex/runtime_hub.py" = "blob:02f910112ad53872b2f6760bd601fdafc5161058"

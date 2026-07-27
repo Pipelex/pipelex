@@ -13,8 +13,8 @@ from pipelex.cogt.inference.error_classify import classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.hub import get_storage_provider
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.runtime_hub import get_storage_provider
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
 from pipelex.tools.pdf.pypdfium2_renderer import PdfInput, pypdfium2_renderer
 from pipelex.tools.uri.resolved_uri import (

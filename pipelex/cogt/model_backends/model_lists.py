@@ -4,7 +4,7 @@ from rich.markup import escape
 
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.exceptions import ModelListingUnsupportedError, ModelManagerError
-from pipelex.hub import get_console, get_model_lister_registry, get_models_manager
+from pipelex.runtime_hub import get_console, get_model_lister_registry, get_models_manager
 
 
 class ModelLister:

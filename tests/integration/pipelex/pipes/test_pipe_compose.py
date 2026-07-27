@@ -4,21 +4,21 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
-from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle
-from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_native_concept, get_pipe_router
+from pipelex.interpreter_hub import get_native_concept, get_pipe_router
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose, PipeComposeOutput
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
+from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
+from pipelex.tools.templating.text_format import TextFormat
 from tests.cases import JINJA2TestCases
 
 

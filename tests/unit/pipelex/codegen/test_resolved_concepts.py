@@ -1,6 +1,6 @@
 from pipelex.codegen.resolved_concepts import resolve_concepts_from_crate
-from pipelex.codegen.resolved_fields import ResolvedTypeKind, iter_imprecision_reasons
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+from pipelex.core.concepts.resolved_fields import ResolvedTypeKind, iter_imprecision_reasons
 from pipelex.libraries.library_crate import LibraryCrate
 
 

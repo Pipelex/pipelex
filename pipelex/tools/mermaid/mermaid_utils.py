@@ -15,9 +15,9 @@ import json
 import zlib
 
 from pipelex import pretty_print
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_jinja2_sync
 from pipelex.tools.jinja2.jinja2_template_loader import load_template
+from pipelex.tools.jinja2.template_category import TemplateCategory
 
 # Template package and name for generic Mermaid HTML
 _TEMPLATE_PACKAGE = "pipelex.tools.mermaid.templates"

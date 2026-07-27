@@ -12,7 +12,7 @@ from collections.abc import Callable
 import pytest
 
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
-from pipelex.hub import get_library_manager
+from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 
 CONCEPT_MTHDS = """

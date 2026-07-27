@@ -5,11 +5,11 @@ Non-subject function parameters must be keyword-only so call sites are self-docu
 human-readable specification lives in ``docs/contribute/keyword-only-arguments.md``.
 
 This module holds the AST collection logic that mechanically enforces the convention. It depends
-on **stdlib only** (``ast``/``re``/``pathlib``) — no ``rich``, ``pipelex.hub``, or ``typer`` — so it
+on **stdlib only** (``ast``/``re``/``pathlib``) — no ``rich``, ``pipelex.runtime_hub``, or ``typer`` — so it
 can be loaded in two cold-start budgets:
 
 - The full-tree command (``pipelex-dev check-keyword-only``) imports from here and adds the
-  ``rich``/``pipelex.hub`` presentation layer (see ``check_keyword_only_cmd.py``).
+  ``rich``/``pipelex.runtime_hub`` presentation layer (see ``check_keyword_only_cmd.py``).
 - The lean single-file entry below, invoked **by file path** (``python
   pipelex/cli/dev_cli/commands/keyword_only_guard.py <file>``), skips the whole Typer/hub import
   graph so a ``PostToolUse`` hook can check just the edited file in a few tens of milliseconds. Run

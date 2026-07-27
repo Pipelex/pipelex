@@ -6,8 +6,8 @@ from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.search.search_report import SearchTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.pipeline.job_metadata import JobCategory, JobMetadata, UnitJobId
 from pipelex.reporting.reporting_types import AnyTokensUsage
+from pipelex.system.job_metadata import JobCategory, JobMetadata, UnitJobId
 
 RATED_NB_TOKENS: NbTokensByCategoryDict = {
     TokenCategory.INPUT: 1000,

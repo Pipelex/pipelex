@@ -16,7 +16,7 @@ The node tree is always built when either stream is on — including costs-only
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex.graph.graph_config import DataInclusionConfig
+from pipelex.system.data_inclusion_config import DataInclusionConfig
 
 
 class TraceContext(BaseModel):

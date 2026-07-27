@@ -25,7 +25,7 @@ from mthds.protocol.pipeline_inputs import PipelineInputs
 
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.hub import get_library_manager
+from pipelex.interpreter_hub import get_concept_library, get_library_manager
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.tools.tabular.csv_codec import csv_from_list_content
@@ -52,7 +52,7 @@ class TestCsvRoundtrip:
 
     def test_csv_input_builds_typed_list(self, load_test_library: Callable[[list[Path]], None]) -> None:
         load_test_library([BUNDLE_DIR])
-        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(people_inputs())
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(people_inputs(), concept_provider=get_concept_library())
 
         people = working_memory.get_stuff("people").content
         assert isinstance(people, ListContent)

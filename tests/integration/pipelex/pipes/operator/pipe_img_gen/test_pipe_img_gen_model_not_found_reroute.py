@@ -7,14 +7,14 @@ from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundEr
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.pipe_factory import PipeFactory
-from pipelex.hub import get_pipe_library, get_pipe_router
+from pipelex.interpreter_hub import get_pipe_library, get_pipe_router
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 
 
 @pytest.mark.asyncio(loop_scope="class")

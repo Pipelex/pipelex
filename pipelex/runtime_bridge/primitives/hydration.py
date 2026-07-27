@@ -12,8 +12,8 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_content_factory import StuffContentFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_class_registry
 from pipelex.pipe_run.exceptions import PipeJobError
+from pipelex.runtime_hub import get_class_registry
 
 
 def _validate_as_known_class(*, item_class: type[StuffContent], raw_item: StuffContent | dict[str, Any]) -> StuffContent:

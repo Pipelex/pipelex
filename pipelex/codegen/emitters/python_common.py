@@ -11,7 +11,7 @@ from datetime import date, datetime, time
 from typing import Any, cast
 
 from pipelex.codegen.resolved_concepts import ResolvedConcept
-from pipelex.codegen.resolved_fields import ResolvedField, iter_imprecision_reasons
+from pipelex.core.concepts.resolved_fields import ResolvedField, iter_imprecision_reasons
 
 
 def python_header(*, target: str) -> str:

@@ -25,6 +25,7 @@ from pydantic import ValidationError
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.concepts.exceptions import ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -48,7 +49,6 @@ from pipelex.core.stuffs.stuff import DictStuff, Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_content_factory import StuffContentFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_concept_library, get_native_concept
 from pipelex.tools.uri.uri_resolver import resolve_local_path_reference
 
 
@@ -98,6 +98,7 @@ class InputShaper:
         cls,
         pipeline_inputs: PipelineInputs,
         *,
+        concept_provider: ConceptProviderAbstract,
         input_specs: InputStuffSpecs,
         search_domain_codes: list[str] | None = None,
         inputs_base_dir: Path | None = None,
@@ -106,6 +107,9 @@ class InputShaper:
 
         Args:
             pipeline_inputs: The caller-provided inputs (name -> value/envelope/object).
+            concept_provider: Resolves concepts and answers compatibility questions. Injected rather
+                than looked up so this module stays out of the method interpreter's import closure
+                (see hub-layering); the caller holds the loaded method's library.
             input_specs: The entry pipe's declared inputs (name -> StuffSpec).
             search_domain_codes: Domain codes used to resolve envelope/object concepts.
             inputs_base_dir: Directory that bare *relative local* file paths resolve against (D3) —
@@ -124,6 +128,7 @@ class InputShaper:
             stuff_spec = input_specs.get_required_stuff_spec(variable_name=variable_name)
             stuff = cls._shape_one(
                 value,
+                concept_provider=concept_provider,
                 stuff_spec=stuff_spec,
                 variable_name=variable_name,
                 search_domain_codes=search_domain_codes,
@@ -146,6 +151,7 @@ class InputShaper:
         cls,
         value: Any,
         *,
+        concept_provider: ConceptProviderAbstract,
         stuff_spec: StuffSpec,
         variable_name: str,
         search_domain_codes: list[str] | None,
@@ -158,6 +164,7 @@ class InputShaper:
         if cls._is_explicit(value):
             return cls._shape_explicit(
                 value,
+                concept_provider=concept_provider,
                 declared_concept=declared_concept,
                 stuff_spec=stuff_spec,
                 variable_name=variable_name,
@@ -173,13 +180,14 @@ class InputShaper:
             )
 
         # (D5) Bare value: dispatch on the declared concept's nature.
-        input_kind = cls.resolve_input_kind(declared_concept)
+        input_kind = cls.resolve_input_kind(declared_concept, concept_provider=concept_provider)
         match input_kind:
             case InputKind.DYNAMIC:
                 # The signature genuinely does not know how to shape this — hand the whole raw value
                 # to the bottom-up factory (today's behavior, including its own list handling).
                 return StuffFactory.make_stuff_from_stuff_content_or_data(
                     stuff_content_or_data=value,
+                    concept_provider=concept_provider,
                     name=variable_name,
                     search_domain_codes=search_domain_codes,
                 )
@@ -195,6 +203,7 @@ class InputShaper:
             ):
                 content = cls._shape_with_multiplicity(
                     value,
+                    concept_provider=concept_provider,
                     stuff_spec=stuff_spec,
                     input_kind=input_kind,
                     variable_name=variable_name,
@@ -204,7 +213,7 @@ class InputShaper:
                 return StuffFactory.make_stuff(concept=declared_concept, content=content, name=variable_name)
 
     @classmethod
-    def resolve_input_kind(cls, concept: Concept) -> InputKind:
+    def resolve_input_kind(cls, concept: Concept, *, concept_provider: ConceptProviderAbstract) -> InputKind:
         """Map a declared concept to its interpretation arm via ordered strict-compatibility checks (D5).
 
         ``strict=True`` means refinement / structural-equivalence only — a concept refining ``Number``
@@ -213,7 +222,6 @@ class InputShaper:
         if NativeConceptCode.is_dynamic_concept(concept_code=concept.code):
             return InputKind.DYNAMIC
 
-        concept_library = get_concept_library()
         ordered_natives: list[tuple[NativeConceptCode, InputKind]] = [
             (NativeConceptCode.YES_NO, InputKind.YES_NO),
             (NativeConceptCode.DATE, InputKind.DATE),
@@ -224,8 +232,8 @@ class InputShaper:
             (NativeConceptCode.TEXT, InputKind.TEXT),
         ]
         for native_code, input_kind in ordered_natives:
-            wanted_concept = get_native_concept(native_concept=native_code)
-            if concept_library.is_compatible(tested_concept=concept, wanted_concept=wanted_concept, strict=True):
+            wanted_concept = concept_provider.get_native_concept(native_concept=native_code)
+            if concept_provider.is_compatible(tested_concept=concept, wanted_concept=wanted_concept, strict=True):
                 return input_kind
 
         # A user (non-native) concept whose structure is StructuredContent dispatches its dict
@@ -259,6 +267,7 @@ class InputShaper:
         cls,
         value: Any,
         *,
+        concept_provider: ConceptProviderAbstract,
         stuff_spec: StuffSpec,
         input_kind: InputKind,
         variable_name: str,
@@ -287,6 +296,7 @@ class InputShaper:
         if is_list:
             return cls._shape_list(
                 value,
+                concept_provider=concept_provider,
                 stuff_spec=stuff_spec,
                 input_kind=input_kind,
                 variable_name=variable_name,
@@ -305,6 +315,7 @@ class InputShaper:
             )
         return cls._build_item_content(
             value,
+            concept_provider=concept_provider,
             input_kind=input_kind,
             stuff_spec=stuff_spec,
             variable_name=variable_name,
@@ -358,6 +369,7 @@ class InputShaper:
         cls,
         value: Any,
         *,
+        concept_provider: ConceptProviderAbstract,
         stuff_spec: StuffSpec,
         input_kind: InputKind,
         variable_name: str,
@@ -379,6 +391,7 @@ class InputShaper:
         items = [
             cls._build_item_content(
                 item_value,
+                concept_provider=concept_provider,
                 input_kind=input_kind,
                 stuff_spec=stuff_spec,
                 variable_name=variable_name,
@@ -394,6 +407,7 @@ class InputShaper:
         cls,
         value: Any,
         *,
+        concept_provider: ConceptProviderAbstract,
         input_kind: InputKind,
         stuff_spec: StuffSpec,
         variable_name: str,
@@ -412,9 +426,9 @@ class InputShaper:
         concept = stuff_spec.concept
         if isinstance(value, StuffContent):
             built = StuffFactory.make_stuff_from_stuff_content_or_data(
-                stuff_content_or_data=value, name=variable_name, search_domain_codes=search_domain_codes
+                stuff_content_or_data=value, concept_provider=concept_provider, name=variable_name, search_domain_codes=search_domain_codes
             )
-            if not get_concept_library().is_compatible(tested_concept=built.concept, wanted_concept=concept):
+            if not concept_provider.is_compatible(tested_concept=built.concept, wanted_concept=concept):
                 raise ExplicitConceptIncompatibleError.make(
                     variable_name=variable_name,
                     declared_concept_ref=concept.concept_ref,
@@ -507,6 +521,7 @@ class InputShaper:
         cls,
         value: Any,
         *,
+        concept_provider: ConceptProviderAbstract,
         declared_concept: Concept,
         stuff_spec: StuffSpec,
         variable_name: str,
@@ -521,10 +536,11 @@ class InputShaper:
         """
         stuff = StuffFactory.make_stuff_from_stuff_content_or_data(
             stuff_content_or_data=cast("StuffContentOrData", value),
+            concept_provider=concept_provider,
             name=variable_name,
             search_domain_codes=search_domain_codes,
         )
-        if not get_concept_library().is_compatible(tested_concept=stuff.concept, wanted_concept=declared_concept):
+        if not concept_provider.is_compatible(tested_concept=stuff.concept, wanted_concept=declared_concept):
             raise ExplicitConceptIncompatibleError.make(
                 variable_name=variable_name,
                 declared_concept_ref=declared_concept.concept_ref,

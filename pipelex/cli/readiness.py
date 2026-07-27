@@ -10,7 +10,7 @@ from rich.markup import escape
 
 import pipelex
 from pipelex.cli.exceptions import ReadinessCheckError
-from pipelex.hub import get_console
+from pipelex.runtime_hub import get_console
 
 
 def _is_in_virtual_environment() -> bool:

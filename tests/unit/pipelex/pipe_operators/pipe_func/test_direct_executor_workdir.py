@@ -9,14 +9,14 @@ from pytest_mock import MockerFixture
 from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.hub import get_library_manager, scoped_current_library, set_current_library
+from pipelex.interpreter_hub import get_library_manager, scoped_current_library, set_current_library
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_operators.func import direct_pipe_func_executor
 from pipelex.pipe_operators.func.direct_pipe_func_executor import DirectPipeFuncExecutor
 from pipelex.pipe_operators.func.pipe_func_execution_dtos import PipeFuncExecutionRequest
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 
 # A method whose ONLY custom source is the PipeFunc — its output structure (Greeting) is a concept
 # declared in the .mthds, NOT a shipped .py. The box must regenerate `structures.py` from the crate's

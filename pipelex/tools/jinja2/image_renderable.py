@@ -13,8 +13,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from pipelex.cogt.templating.text_format import TextFormat
     from pipelex.tools.jinja2.image_registry import ImageRegistry
+    from pipelex.tools.templating.text_format import TextFormat
 
 
 @runtime_checkable

@@ -61,6 +61,9 @@ jobs:
       - name: Run keyword-only convention check
         run: make check-keyword-only
 
+      - name: Run hub layering check
+        run: make check-hub-layering
+
       - name: Run drift contracts check
         run: make drift-check
 

@@ -18,14 +18,14 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_native_concept, get_pipe_router
+from pipelex.interpreter_hub import get_native_concept, get_pipe_router
 from pipelex.pipe_operators.compose.exceptions import PipeComposeError
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 from tests.integration.pipelex.pipes.operator.pipe_compose_structured.models_for_pipe_compose import (
     Employee,
     Location,

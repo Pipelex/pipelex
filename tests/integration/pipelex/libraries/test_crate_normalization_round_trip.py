@@ -3,7 +3,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
-from pipelex.hub import get_library_manager
+from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 

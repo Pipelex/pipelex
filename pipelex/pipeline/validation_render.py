@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
-from pipelex.hub import resolve_library_dirs
+from pipelex.interpreter_hub import resolve_library_dirs
 from pipelex.pipeline.fixes.applicability import is_safe_fix_for_load_scope, is_target_in_write_scope
 from pipelex.tools.misc.string_utils import count_with_noun
 

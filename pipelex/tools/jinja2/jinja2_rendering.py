@@ -7,8 +7,6 @@ from jinja2.exceptions import (
     UndefinedError,
 )
 
-from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.tools.jinja2.exceptions import (
     Jinja2ContextError,
     Jinja2StuffError,
@@ -19,6 +17,8 @@ from pipelex.tools.jinja2.jinja2_environment import (
     make_jinja2_env_without_loader,
 )
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
+from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.templating.templating_style import TemplatingStyle
 
 
 def _add_to_templating_context(templating_context: dict[str, Any], *, jinja2_context_key: Jinja2ContextKey, value: Any) -> None:

@@ -2,13 +2,13 @@ import re
 from typing import TYPE_CHECKING
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.pipes.inputs.exceptions import InputStuffSpecsFactoryError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, PipeInputsRoot
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import PresenceMarker
-from pipelex.hub import get_required_concept
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
@@ -26,12 +26,14 @@ class InputStuffSpecsFactory:
     def make_from_blueprint(
         cls,
         *,
+        concept_provider: ConceptProviderAbstract,
         domain_code: str,
         blueprint: dict[str, str],
     ) -> InputStuffSpecs:
         stuff_specs: PipeInputsRoot = {}
         for var_name, stuff_spec_str in blueprint.items():
             stuff_spec = InputStuffSpecsFactory.make_from_string(
+                concept_provider=concept_provider,
                 domain_code=domain_code,
                 stuff_spec_str=stuff_spec_str,
             )
@@ -42,6 +44,7 @@ class InputStuffSpecsFactory:
     def make_from_string(
         cls,
         *,
+        concept_provider: ConceptProviderAbstract,
         domain_code: str,
         stuff_spec_str: str,
     ) -> StuffSpec:
@@ -54,6 +57,8 @@ class InputStuffSpecsFactory:
         - "ConceptCode[5]" -> multiplicity = 5 (resolved with domain)
 
         Args:
+            concept_provider: Resolves the parsed concept ref. Injected rather than looked up so this
+                module stays out of the method interpreter's import closure (see hub-layering).
             domain_code: The domain code to use for resolving concept codes without domain prefix
             stuff_spec_str: String in the format "domain.ConceptCode" or "ConceptCode" with optional "[multiplicity]"
 
@@ -100,5 +105,5 @@ class InputStuffSpecsFactory:
                 multiplicity = int(multiplicity_str)
         # else: No brackets, multiplicity stays None
 
-        concept = get_required_concept(concept_ref=concept_ref_with_domain)
+        concept = concept_provider.get_required_concept(concept_ref=concept_ref_with_domain)
         return StuffSpec(concept=concept, multiplicity=multiplicity, presence=PresenceMarker.from_symbol(marker_symbol))

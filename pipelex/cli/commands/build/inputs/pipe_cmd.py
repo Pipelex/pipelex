@@ -6,7 +6,7 @@ from typing import Annotated
 import typer
 
 from pipelex.cli.commands.build.inputs._inputs_core import execute_generate_inputs
-from pipelex.core.pipes.inputs.input_renderer import InputsTemplateFormat
+from pipelex.core.pipes.rendering.input_renderer import InputsTemplateFormat
 
 
 def build_inputs_pipe_cmd(

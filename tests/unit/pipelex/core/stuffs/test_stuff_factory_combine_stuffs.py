@@ -9,7 +9,7 @@ from pipelex.core.stuffs.exceptions import StuffFactoryError
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_concept_library
+from pipelex.interpreter_hub import get_concept_library
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 
 if TYPE_CHECKING:

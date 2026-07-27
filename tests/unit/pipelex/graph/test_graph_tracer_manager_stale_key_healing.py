@@ -13,8 +13,8 @@ import logging
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.graph.graph_config import DataInclusionConfig
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
+from pipelex.system.data_inclusion_config import DataInclusionConfig
 
 _DATA_INCLUSION_OFF = DataInclusionConfig(
     pipe_and_concept_registry=False,

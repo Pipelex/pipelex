@@ -2,8 +2,8 @@ import typer
 from rich import box
 from rich.table import Table
 
-from pipelex.hub import get_console
 from pipelex.plugins.discovery import build_registrar
+from pipelex.runtime_hub import get_console
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.configs import PipelexConfig
 

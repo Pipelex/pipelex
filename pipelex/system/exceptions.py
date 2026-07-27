@@ -2,11 +2,15 @@ import logging
 from enum import StrEnum
 from typing import ClassVar
 
-from pipelex.base_exceptions import ErrorDomain, PipelexError
+from pipelex.base_exceptions import ErrorDomain, PipelexError, PipelexUnexpectedError
 
 
 class ToolError(PipelexError):
     _declared_title = "Tool error"
+
+
+class JobMetadataError(PipelexUnexpectedError):
+    pass
 
 
 class NestedKeyConflictError(ToolError):

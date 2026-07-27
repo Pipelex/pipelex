@@ -9,7 +9,6 @@ from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_rendering import render_template
-from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.pipe_operators.llm.document_reference import DocumentReference, DocumentReferenceKind
@@ -21,6 +20,7 @@ from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
 from pipelex.tools.misc.dict_utils import substitute_nested_in_context
 from pipelex.tools.misc.exceptions import ContextProviderError
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
+from pipelex.tools.templating.templating_style import TemplatingStyle
 
 if TYPE_CHECKING:
     from pipelex.cogt.image.prompt_image import PromptImage

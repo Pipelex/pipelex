@@ -2,13 +2,13 @@
 
 These two functions walk a pipe's dependency graph to find every reachable signature.
 They live outside `PipeAbstract` on purpose: the walk needs `get_optional_pipe` to
-resolve dependency codes to pipes, and `pipe_abstract` importing `pipelex.hub` would
+resolve dependency codes to pipes, and `pipe_abstract` importing `pipelex.interpreter_hub` would
 form an import cycle (`pipe_abstract → hub → library → pipe_library → pipe_abstract`).
 Keeping the walk here — downstream of `hub` — keeps `pipe_abstract` cycle-free.
 """
 
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.hub import get_optional_pipe
+from pipelex.interpreter_hub import get_optional_pipe
 
 
 def collect_signature_refs(pipe: PipeAbstract, *, visited: set[str] | None = None) -> set[str]:

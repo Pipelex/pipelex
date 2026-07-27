@@ -9,9 +9,9 @@ from typing import ClassVar
 import pytest
 
 from pipelex.cogt.templating.exceptions import TemplateSigilSyntaxError
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.jinja2.template_category import TemplateCategory
 
 
 class TestData:

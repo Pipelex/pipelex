@@ -11,8 +11,8 @@ from rich.markup import escape
 from rich.panel import Panel
 
 from pipelex.cli.dev_cli.commands.generate_mthds_schema_cmd import MTHDS_SCHEMA_PATH
-from pipelex.hub import get_console
 from pipelex.language.mthds_schema_generator import generate_mthds_schema
+from pipelex.runtime_hub import get_console
 
 if TYPE_CHECKING:
     from rich.console import Console

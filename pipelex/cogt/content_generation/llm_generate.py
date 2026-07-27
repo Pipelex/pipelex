@@ -12,7 +12,7 @@ from pipelex.cogt.content_generation.dry_mock import (
 from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_utils import dump_prompt, dump_response_from_text_gen
-from pipelex.hub import get_llm_worker
+from pipelex.runtime_hub import get_llm_worker
 
 
 async def llm_gen_text(llm_assignment: LLMAssignment) -> str:

@@ -10,7 +10,7 @@ from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
-from pipelex.hub import get_console
+from pipelex.runtime_hub import get_console
 from pipelex.tools.misc.toml_sync import TomlSyncResult, sync_toml_values
 
 # Config file paths

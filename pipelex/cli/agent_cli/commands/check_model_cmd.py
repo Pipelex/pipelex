@@ -14,8 +14,8 @@ from pipelex.cogt.models.model_suggestion import (
     get_collection_keys,
     suggest_model_alternatives,
 )
-from pipelex.hub import get_model_deck
 from pipelex.pipelex import Pipelex
+from pipelex.runtime_hub import get_model_deck
 
 
 def _format_check_markdown(result: dict[str, Any]) -> str:

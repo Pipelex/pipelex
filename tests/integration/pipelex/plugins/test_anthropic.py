@@ -3,10 +3,10 @@ from anthropic import AuthenticationError
 from rich import box
 from rich.table import Table
 
-from pipelex.hub import get_console, get_models_manager
 from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicSDKUnsupportedError
 from pipelex.plugins.anthropic.anthropic_llms import anthropic_list_available_models
 from pipelex.plugins.model_handle import ModelHandle
+from pipelex.runtime_hub import get_console, get_models_manager
 from pipelex.system.environment import all_env_vars_are_set, any_env_var_is_placeholder
 from tests.integration.pipelex.plugins.conftest import is_backend_available
 

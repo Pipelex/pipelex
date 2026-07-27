@@ -16,13 +16,14 @@ from pytest_mock import MockerFixture
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.yes_no_content import YesNoContent
-from pipelex.hub import get_content_generator, get_pipe_library, get_pipe_router
+from pipelex.interpreter_hub import get_pipe_library, get_pipe_router
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.runtime_hub import get_content_generator
+from pipelex.system.job_metadata import JobMetadata
 
 
 @pytest.mark.asyncio(loop_scope="class")

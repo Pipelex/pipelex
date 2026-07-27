@@ -7,7 +7,7 @@ from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 
 
 class SampleOutputModel(BaseModel):

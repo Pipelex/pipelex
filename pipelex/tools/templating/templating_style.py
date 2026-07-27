@@ -4,7 +4,7 @@ from typing import Self
 from pydantic import BaseModel, Field
 from typing_extensions import override
 
-from pipelex.cogt.templating.text_format import TextFormat
+from pipelex.tools.templating.text_format import TextFormat
 
 
 class TagStyle(StrEnum):

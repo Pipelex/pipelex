@@ -5,15 +5,15 @@ import pytest
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.hub import get_current_library
+from pipelex.interpreter_hub import get_current_library
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
 from pipelex.pipe_signature.pipe_signature import PipeSignature
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunStatus
-from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from tests.integration.pipelex.pipe_signature.conftest import SIGNATURES_DOMAIN_CODE
 

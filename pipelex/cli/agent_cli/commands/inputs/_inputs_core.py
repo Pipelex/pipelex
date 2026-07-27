@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from pipelex.builder.operations.inputs_ops import build_inputs_for_pipe
 from pipelex.cli.agent_cli.commands.agent_output import agent_success
-from pipelex.core.pipes.inputs.input_renderer import InputsTemplateFormat, serialize_inputs_template_to_toml
+from pipelex.core.pipes.rendering.input_renderer import InputsTemplateFormat, serialize_inputs_template_to_toml
 
 if TYPE_CHECKING:
     from pathlib import Path

@@ -264,10 +264,10 @@ Trace events travel through an `EventLogProtocol` backend (`pipelex/tracing/`): 
 
 The assembled usage rides back on `pipe_output.tokens_usages` (with any assembly failure on `usage_assembly_error`), which the sync `/execute` response returns directly. For delivery-enabled runs (a storage target set), the delivery executor (`pipelex/pipe_run/delivery_executor.py`) also persists it as a `tokens_usages.json` result artifact — `{"tokens_usages": [...], "usage_assembly_error": null}` — next to `working_memory.json`, the `main_stuff.*` renders, and the graph outputs, so a durable client polling result files gets the same usage records a sync caller does. The artifact is written unconditionally on every successful result delivery: explicit nulls mean usage assembly was off for that run. A failed run stores no result files at all, so an absent `tokens_usages.json` means either the run failed or it was delivered before the artifact existed — tell those apart from the delivery status, not from the file's presence.
 
-For fully in-process runs, `pipelex.hub.scoped_event_log` pins one shared instance for both sides instead:
+For fully in-process runs, `pipelex.runtime_hub.scoped_event_log` pins one shared instance for both sides instead:
 
 ```python
-from pipelex.hub import scoped_event_log
+from pipelex.runtime_hub import scoped_event_log
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 
 with scoped_event_log(InMemoryEventLog()):
@@ -520,7 +520,8 @@ validate_graphspec(graph_spec)
 | `pipelex/graph/graph_tracer.py` | GraphTracer implementation |
 | `pipelex/graph/graph_tracer_manager.py` | Singleton manager for tracers |
 | `pipelex/graph/graph_tracer_protocol.py` | Protocol + NoOp implementation |
-| `pipelex/graph/trace_context.py` | Serializable tracing context |
+| `pipelex/system/trace_context.py` | Serializable tracing context — sits below `graph/` because it rides in every job's metadata |
+| `pipelex/system/data_inclusion_config.py` | Data-capture flags carried by the trace context, surfaced in the TOML under `graph_config.data_inclusion` |
 | `pipelex/graph/graph_analysis.py` | Pre-computed graph analysis |
 | `pipelex/graph/graph_factory.py` | Output generation factory |
 | `pipelex/graph/graph_config.py` | Configuration models |

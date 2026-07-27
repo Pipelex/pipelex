@@ -304,7 +304,8 @@ flowchart TB
 | LibraryCrate model | `pipelex/libraries/library_crate.py` |
 | LibraryCrate factory | `pipelex/libraries/library_crate_factory.py` |
 | Deferred hydration utility (open core) | `pipelex/runtime_bridge/primitives/hydration.py` |
-| Hub (get_required_pipe, get_class_registry) | `pipelex/hub.py` |
+| Interpreter hub (get_required_pipe) | `pipelex/interpreter_hub.py` |
+| Runtime hub (get_class_registry) | `pipelex/runtime_hub.py` |
 | PipeSequence | `pipelex/pipe_controllers/sequence/pipe_sequence.py` |
 | PipeCondition | `pipelex/pipe_controllers/condition/pipe_condition.py` |
 | PipeBatch | `pipelex/pipe_controllers/batch/pipe_batch.py` |

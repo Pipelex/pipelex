@@ -7,7 +7,7 @@ from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.graph.graphspec import NodeKind
-from pipelex.pipeline.job_metadata import JobCategory, JobMetadata, UnitJobId
+from pipelex.system.job_metadata import JobCategory, JobMetadata, UnitJobId
 from pipelex.tracing.trace_events import PipeStartEvent, TraceEvent, UsageReportEvent
 from pipelex.tracing.usage_aggregator import UsageAggregator
 

@@ -16,7 +16,7 @@ import pytest
 
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import EdgeKind, EdgeSpec, GraphSpec, IOSpec, NodeKind, NodeSpec
-from pipelex.graph.trace_context import TraceContext
+from pipelex.system.trace_context import TraceContext
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 from tests.unit.pipelex.graph.conftest import make_defaulted_data_inclusion_config

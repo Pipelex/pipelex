@@ -1,6 +1,6 @@
 from pipelex.cogt.search.search_job import SearchJob, SearchJobParams
 from pipelex.cogt.search.search_setting import SearchSetting
-from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
+from pipelex.system.job_metadata import JobCategory, JobMetadata
 
 
 class SearchJobFactory:

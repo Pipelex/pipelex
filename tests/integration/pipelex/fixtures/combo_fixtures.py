@@ -24,8 +24,8 @@ from pathlib import Path
 import pytest
 from pytest import MonkeyPatch
 
-from pipelex.hub import get_console
 from pipelex.pipelex import Pipelex
+from pipelex.runtime_hub import get_console
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path

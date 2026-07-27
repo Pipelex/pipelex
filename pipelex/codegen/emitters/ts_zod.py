@@ -25,7 +25,7 @@ from typing import Any
 from pipelex.codegen.emitters.naming import allocate_ts_type_names
 from pipelex.codegen.emitters.target import EmittedFile
 from pipelex.codegen.resolved_concepts import ResolvedConcept, ResolvedLibrary
-from pipelex.codegen.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind, iter_imprecision_reasons
+from pipelex.core.concepts.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind, iter_imprecision_reasons
 from pipelex.tools.misc.json_utils import clean_json_content
 
 _FILENAME = "types.ts"

@@ -2,12 +2,12 @@ from typing import ClassVar
 
 import pytest
 
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import (
     detect_jinja2_required_variables,
     detect_jinja2_variable_references,
 )
+from pipelex.tools.jinja2.template_category import TemplateCategory
 
 
 class TestData:

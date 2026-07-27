@@ -98,7 +98,7 @@ def build_input_specs(entries: list[tuple[str, str, VariableMultiplicity | None]
     Concepts are resolved against the current concept library, so this must run after the
     ``shaper_library`` fixture has registered the test concepts.
     """
-    from pipelex.hub import get_concept_library  # noqa: PLC0415
+    from pipelex.interpreter_hub import get_concept_library  # noqa: PLC0415
 
     library = get_concept_library()
     root: dict[str, StuffSpec] = {}

@@ -15,12 +15,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.builder.operations.runner_code_ops import build_runner_code_for_pipe
-from pipelex.hub import (
-    clear_current_library,
-    get_current_library_id_or_none,
-    get_library_manager,
-    set_current_library,
-)
+from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 
 _RC_DOMAIN = "runner_code_lifecycle"

@@ -10,7 +10,7 @@ import tomli
 from pipelex.cli.agent_cli.commands.inputs._inputs_core import emit_inputs_result  # noqa: PLC2701
 from pipelex.cli.agent_cli.commands.inputs.pipe_cmd import inputs_pipe_cmd
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
-from pipelex.core.pipes.inputs.input_renderer import InputsTemplateFormat
+from pipelex.core.pipes.rendering.input_renderer import InputsTemplateFormat
 
 if TYPE_CHECKING:
     import pytest

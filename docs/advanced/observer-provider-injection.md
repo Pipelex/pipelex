@@ -103,20 +103,24 @@ class MyCustomObserver(ObserverProtocol):
         print(f"Failed pipe: {pipe_job.pipe.code}")
 ```
 
-### Step 2: Register Your Observer with Dependency Injection
+### Step 2: Register Your Observer at Boot
 
-The observer is injected through the PipelexHub dependency injection system:
+Observers are injected at boot, through `Pipelex.make()`. Pass a dict keyed by a name of your choosing — Pipelex wraps the whole dict in a `MultiObserver` and hands it to the pipe router, so every observer you register is notified:
 
 ```python
-from pipelex.hub import get_pipelex_hub
+from pipelex.pipelex import Pipelex
 
 # Create your observer instance
 my_observer = MyCustomObserver(config_param="production")
 
-# Inject it into the hub
-hub = get_pipelex_hub()
-hub.set_observer(my_observer)
+# Inject it at boot
+Pipelex.make(observers={"my_observer": my_observer})
 ```
+
+!!! warning "Observers must be registered at boot"
+    Passing `observers` to `Pipelex.make()` is the only way to register one. The router receives its observer when it is constructed during setup, so there is no supported way to swap an observer on a already-running instance.
+
+Registering your own `observers` dict **replaces** the defaults (a no-op observer and the telemetry observer). Include the built-ins explicitly if you want to keep them alongside your own.
 
 ### Step 3: Ensure Proper Integration
 
@@ -140,7 +144,7 @@ local_observer = LocalObserver()
 local_observer = LocalObserver(storage_dir="/path/to/custom/dir")
 
 # Inject the observer
-get_pipelex_hub().set_observer(local_observer)
+Pipelex.make(observers={"local": local_observer})
 ```
 
 The LocalObserver creates separate JSONL files for each event type:
@@ -209,20 +213,13 @@ class MetricsObserver(ObserverProtocol):
 For automatic observer setup, integrate with your Pipelex initialization:
 
 ```python
-from pipelex.hub import get_pipelex_hub
 from pipelex.pipelex import Pipelex
 
 from my_project.observers import MyCustomObserver
 
 def setup_pipelex():
-    # Initialize Pipelex
-    pipelex_instance = Pipelex.make()
-
-    # Setup custom observer
-    observer = MyCustomObserver()
-    get_pipelex_hub().set_observer(observer)
-
-    return pipelex_instance
+    # Initialize Pipelex with the observer wired in from the start
+    return Pipelex.make(observers={"my_observer": MyCustomObserver()})
 ```
 
 The observer system provides powerful insights into your pipeline execution patterns and is essential for monitoring, debugging, and optimizing your Pipelex methods.

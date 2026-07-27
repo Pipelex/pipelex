@@ -30,8 +30,9 @@ from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.hub import (
+from pipelex.interpreter_hub import (
     clear_current_library,
+    get_concept_library,
     get_current_library_id_or_none,
     get_library_manager,
     resolve_library_dirs,
@@ -44,13 +45,13 @@ from pipelex.pipe_run.pipe_run_params import VariableMultiplicity
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
-from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.system.configuration.configs import PipelineExecutionConfig
+from pipelex.system.job_metadata import JobMetadata, OtelContext
 from pipelex.tools.misc.file_utils import reject_bare_str_or_path
 
 if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-    from pipelex.graph.trace_context import TraceContext
+    from pipelex.system.trace_context import TraceContext
 
 
 def acquire_library(
@@ -201,6 +202,7 @@ async def prepare_pipe_job(
             # source the Optionals pass reads below — not the aggregated `needed_inputs()`.
             working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
                 pipeline_inputs=inputs,
+                concept_provider=get_concept_library(),
                 input_specs=pipe.inputs,
                 search_domain_codes=search_domain_codes,
                 inputs_base_dir=inputs_base_dir,

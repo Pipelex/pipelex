@@ -21,8 +21,8 @@ from pipelex.cli.commands.init.ui.gateway_ui import (
     prompt_gateway_acceptance,
 )
 from pipelex.cogt.model_backends.backend import PipelexBackend
-from pipelex.hub import get_console
 from pipelex.kit.paths import get_kit_configs_dir
+from pipelex.runtime_hub import get_console
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.pipelex_service.pipelex_service_agreement import update_service_terms_acceptance
 from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_tomlkit, save_toml_to_path

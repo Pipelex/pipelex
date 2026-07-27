@@ -8,11 +8,9 @@ description: "Extend Pipelex through dependency injection — swap in custom sec
 
 Pipelex uses dependency injection to manage service dependencies and make components more modular and testable. The system allows you to customize and extend Pipelex's functionality by injecting your own implementations of various services.
 
-## Injection Methods
+## Injecting your implementation
 
-There are two main ways to inject custom implementations:
-
-### 1. During Initialization
+Inject at boot, by passing your implementation to `Pipelex.make()`:
 
 ```python
 from pipelex.pipelex import Pipelex
@@ -25,15 +23,30 @@ pipelex = Pipelex.make(
 )
 ```
 
-### 2. Through the Hub
+This is the supported path. `Pipelex.make()` builds the hubs, applies your overrides in the right order, and wires the results into the components that consume them.
+
+## Reading a dependency: the two hubs
+
+Injection happens at boot; *lookup* happens through a hub. Pipelex has two, split by lifecycle:
+
+- `pipelex.runtime_hub` — process-scoped infrastructure: config, console, secrets, storage, telemetry, the model deck, inference workers, the content generator, the plugin registries.
+- `pipelex.interpreter_hub` — library-scoped method machinery: the library manager and the concept/domain/pipe libraries, the current-library binding, the pipe router, the pipeline manager.
+
+Read a dependency through the module-level accessor for the half that owns it:
 
 ```python
-from pipelex.hub import PipelexHub
+from pipelex.interpreter_hub import get_required_pipe
+from pipelex.runtime_hub import get_model_deck, get_secrets_provider
 
-hub = PipelexHub()
-hub.set_report_delegate(MyReportingDelegate())
-# ... and so on for other components
+secrets = get_secrets_provider()
+deck = get_model_deck()
+pipe = get_required_pipe(pipe_code="my_domain.my_pipe")
 ```
+
+!!! warning "Don't construct a hub yourself"
+    Building a `RuntimeHub()` or `InterpreterHub()` by hand and calling setters on it has no effect on a running Pipelex — the instance you build is not the one the process resolves. Inject through `Pipelex.make()` instead.
+
+Contributors adding a new dependency should read [Hub Layering](../contribute/hub-layering.md), which specifies which half a symbol belongs on and why the boundary is enforced.
 
 ## Protocol Compliance
 

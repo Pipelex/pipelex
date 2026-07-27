@@ -7,16 +7,12 @@ from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
-from pipelex.hub import (
+from pipelex.interpreter_hub import (
     clear_current_library,
     get_current_library_id_or_none,
-    get_event_log_override,
     get_library_manager,
-    get_otel_tracer,
     get_pipeline_manager,
-    get_report_delegate,
     get_required_pipe,
-    get_telemetry_manager,
     set_current_library,
 )
 from pipelex.pipe_run.pipe_job import PipeJob
@@ -27,9 +23,10 @@ from pipelex.pipe_run.pipe_run_params import (
 )
 from pipelex.pipeline.exceptions import PipeExecutionError
 from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
-from pipelex.pipeline.job_metadata import OtelContext
+from pipelex.runtime_hub import get_event_log_override, get_otel_tracer, get_report_delegate, get_telemetry_manager
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.environment import get_optional_env
+from pipelex.system.job_metadata import OtelContext
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.otel_factory import OtelFactory
@@ -37,7 +34,7 @@ from pipelex.tracing.event_log_factory import make_event_log
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_abstract import PipeAbstract
-    from pipelex.graph.trace_context import TraceContext
+    from pipelex.system.trace_context import TraceContext
     from pipelex.tracing.event_log_protocol import EventLogProtocol
 
 
@@ -129,7 +126,7 @@ async def pipeline_run_setup(
         Optional inbound ``X-Request-ID`` from the dispatcher (the value the
         external HTTP caller can use to correlate every log line and every
         ``ErrorReport`` back to its originating request). Threaded onto
-        :class:`pipelex.pipeline.job_metadata.JobMetadata.request_id` so it
+        :class:`pipelex.system.job_metadata.JobMetadata.request_id` so it
         crosses the Temporal serialization boundary intact.
     inputs_base_dir:
         Directory that bare *relative local* file paths in ``inputs`` resolve against (Smart

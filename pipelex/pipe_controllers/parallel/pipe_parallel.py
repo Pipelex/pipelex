@@ -22,7 +22,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.graphspec import IOSpec
-from pipelex.hub import get_optional_pipe, get_required_pipe
+from pipelex.interpreter_hub import get_optional_pipe, get_required_pipe
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_controllers.absence_taint import (
     ForceConsumptionInfo,
@@ -36,7 +36,7 @@ from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 if TYPE_CHECKING:

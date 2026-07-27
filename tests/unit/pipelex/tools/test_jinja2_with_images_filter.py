@@ -10,7 +10,6 @@ import pytest
 from jinja2.runtime import Context, Undefined
 from pytest_mock import MockerFixture, MockType
 
-from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.tools.jinja2.exceptions import Jinja2ContextError
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
@@ -18,6 +17,7 @@ from pipelex.tools.jinja2.jinja2_with_images_filter import (
     _render_sequence_with_images,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
     with_images,
 )
+from pipelex.tools.templating.text_format import TextFormat
 
 
 class TestWithImagesFilterValidation:

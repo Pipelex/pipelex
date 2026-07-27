@@ -24,7 +24,7 @@ from pipelex.core.pipes.handle_pipe_errors import (
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.validation import report_validation_error
-from pipelex.hub import (
+from pipelex.interpreter_hub import (
     clear_current_library,
     get_current_library_id_or_none,
     get_library_manager,

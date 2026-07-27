@@ -14,7 +14,7 @@ from mthds.package.dependency_resolver import ResolvedDependency
 from mthds.package.manifest.schema import MethodsManifest
 from pytest_mock import MockerFixture
 
-from pipelex.hub import get_library_manager
+from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_manager import LibraryManager
 from pipelex.libraries.pipe.exceptions import PipeLibraryError

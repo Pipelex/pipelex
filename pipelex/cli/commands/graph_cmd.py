@@ -21,8 +21,8 @@ from pipelex.cli.error_handlers import ErrorContext
 from pipelex.config import get_config
 from pipelex.graph.graph_rendering import render_graph_from_spec
 from pipelex.graph.graphspec import GraphSpec
-from pipelex.hub import get_console, get_telemetry_manager
 from pipelex.pipelex import Pipelex
+from pipelex.runtime_hub import get_console, get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.tools.misc.chart_utils import FlowchartDirection

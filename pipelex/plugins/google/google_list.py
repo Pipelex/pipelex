@@ -7,7 +7,7 @@ from rich import box
 from rich.table import Table
 
 from pipelex.exceptions import MissingDependencyError
-from pipelex.hub import get_console
+from pipelex.runtime_hub import get_console
 
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.backend import InferenceBackend

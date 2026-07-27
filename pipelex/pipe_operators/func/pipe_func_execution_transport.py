@@ -1,5 +1,5 @@
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.hub import get_current_library, get_library_manager
+from pipelex.interpreter_hub import get_current_library, get_library_manager
 from pipelex.pipe_operators.func.exceptions import PipeFuncTransportError
 from pipelex.pipe_operators.func.pipe_func_execution_dtos import (
     DEFAULT_PIPE_FUNC_TIMEOUT_SECONDS,
@@ -8,8 +8,8 @@ from pipelex.pipe_operators.func.pipe_func_execution_dtos import (
 )
 from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutionResult
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
+from pipelex.system.job_metadata import JobMetadata
 
 # The transport DTOs (``PipeFuncExecutionRequest`` / ``PipeFuncExecutionResponse``) live in the leaf
 # ``pipe_func_execution_dtos`` module so the executor protocol can reference them without a hub cycle;

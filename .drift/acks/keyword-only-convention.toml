@@ -1,8 +1,8 @@
 contract = "keyword-only-convention"
-digest = "sha256:2d2a8228601e1fa98d483b5c1d162ddcb8037ac02391d1c0409f8bd48d203571"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-07-11T15:45:25Z"
-rationale = "Phase 5 closed the transitional door: --seed and the seeded field are deleted, the registry schema is strict (param + rationale only). Rewrote the doc's transitional-state section as the post-transitional Registry schema section and fixed the --report description."
+digest = "sha256:0814e13945bbe89a6d731218e5324ef877bcaa6354b101d409d7981b93a213fd"
+reviewed_by = "Claude (Opus 5)"
+reviewed_at = "2026-07-26T09:35:34Z"
+rationale = "The trigger diff in keyword_only_guard.py is docstring-only: two prose references to pipelex.service_hub renamed to pipelex.runtime_hub by the runtime/interpreter rename. No guard behavior changed — no new violation kind, no registry schema change, no carve-out, no CLI flag, no change to the stdlib-only constraint the docstring describes. Opened docs/contribute/keyword-only-arguments.md: it names the presentation layer generically ('no Typer/hub import'), which stays accurate with two hubs under any name; its one worked grant example keys off pipelex/builder/build.py, not a hub module; and it carries no hardcoded grant count, so this change's registry migration (55 hub grants re-keyed from pipelex/service_hub.py and pipelex/method_hub.py to pipelex/runtime_hub.py and pipelex/interpreter_hub.py, with the ServiceHub./MethodHub. qualnames and the two set_instance param names rewritten) needed no doc edit. That migration is itself the doc's documented 'staleness is symmetric' path, exercised as specified — done before any check ran, and make cko passes. Nothing to update."
 
 [trigger_files]
-"pipelex/cli/dev_cli/commands/keyword_only_guard.py" = "blob:c998cfc324c7f1096e974133b75db59c6190c117"
+"pipelex/cli/dev_cli/commands/keyword_only_guard.py" = "blob:c1d6ae57b3814ed57eff2169109db1ddb3fe0d58"

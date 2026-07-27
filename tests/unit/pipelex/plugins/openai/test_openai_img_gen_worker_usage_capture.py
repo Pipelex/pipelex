@@ -28,8 +28,8 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
-from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.plugins.openai.openai_img_gen_worker import OpenAIImgGenWorker
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.misc.image_utils import ImageFormat
 
 if TYPE_CHECKING:
