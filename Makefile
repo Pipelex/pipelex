@@ -539,6 +539,10 @@ codex-tests: env
 # balance the 8 CI shards. Runs the same selection as gha-tests but records how
 # long each test takes instead of sharding. Run at release time (see the release
 # skill) so the shards stay balanced; a stale file silently unbalances them.
+# tests/unit/repo/test_test_durations_paths.py gates the one kind of staleness
+# that is never benign: an entry whose test FILE no longer exists (a bulk path
+# rewrite). Drifting parametrization ids are left alone — pytest-split treats an
+# unknown id as average duration.
 store-test-durations: env
 	$(call PRINT_TITLE,"Storing test durations for pytest-split shard balancing")
 	@echo "• Regenerating test model fixtures with ci profile"

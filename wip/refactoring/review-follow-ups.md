@@ -10,7 +10,7 @@ The three items the modularity track's review rounds recorded but did not fix. E
 | --- | --- | --- | --- | --- |
 | [FU-1](#fu-1--nothing-flags-an-error-class-rename-and-it-is-a-wire-break) | Nothing flags an error-class rename, and it is a wire break | still true — **do this first** | small | ✅ **DONE** |
 | [FU-2](#fu-2--the-img-gen-neutrality-guard-is-weaker-than-its-comment-and-its-recorded-remedy-is-wrong) | The img-gen neutrality guard overclaims; its recorded remedy rests on a false measurement | still true, **remedy corrected here** | two small edits | ✅ **DONE** |
-| [FU-3](#fu-3--the-bookkeeping-files-a-bulk-rewrite-breaks-are-still-ungated) | The bookkeeping files a bulk rewrite breaks are still ungated | gate absent, artifacts currently clean | small, do half | ⬜ next |
+| [FU-3](#fu-3--the-bookkeeping-files-a-bulk-rewrite-breaks-are-still-ungated) | The bookkeeping files a bulk rewrite breaks are still ungated | gate absent, artifacts currently clean | small, do half | ✅ **DONE** |
 
 ---
 
@@ -195,6 +195,8 @@ Gates: `make agent-check`, `make drift-check`, `make agent-test` all green.
 
 ## FU-3 — The bookkeeping files a bulk rewrite breaks are still ungated
 
+> ✅ **DONE** — see [what shipped](#what-shipped-2) at the end of this section.
+
 ### Verified: the gate is absent, the artifacts are clean
 
 No sort check and no durations check exist anywhere in `Makefile`, `scripts/` or `tests/` — confirmed by grep across all three. Neither `make check` nor `make agent-check` covers either file.
@@ -232,6 +234,32 @@ Whereas a strict node-id check needs a full unfiltered collection *and* a policy
 - Parse a collect dump with `.splitlines()`, **never `.split()`**. Parametrized ids contain spaces (`[CV Batch-tests/data/graphs/cv_batch.json]`), so whitespace-splitting shreds them into tokens and manufactures hundreds of phantom orphans. I hit this while measuring for this doc — same family as M2's `[a-z_]*` character class, and worse than a rewrite bug, because the verification is what licenses "done".
 
 **Skip the third instance.** The matched triple (guard tuple / closure predicate / `hub-layering.md` snippet) is already mechanically bound by tests as of M1c; only the design doc's fourth copy is unasserted, and that lives in `wip/`, which is archived at track end.
+
+### What shipped
+
+Both measurements re-taken before starting, and both held: no sort or durations check exists in `Makefile` / `scripts/` / `tests/` (the only `.test_durations` mentions are the regeneration target's own comment and two CI workflow comments), and both artifacts are still clean — 1757 grants with **0 out-of-order pairs**, 9242 duration entries across 907 distinct files with **0 dead paths**. Both halves were done, the durations one in the reshaped form the item prescribed.
+
+| file | role |
+| --- | --- |
+| `pipelex/cli/dev_cli/commands/keyword_only_guard.py` | `ViolationKind.UNSORTED_GRANT` + `find_unsorted_grants()` — the registry-order rule |
+| `pipelex/cli/dev_cli/commands/check_keyword_only_cmd.py` | folds the registry-order violations into the full-scan gate |
+| `tests/unit/pipelex/cli/dev/test_subject_grant_registry.py` | `TestSubjectGrantRegistryOrder` |
+| `tests/unit/repo/test_test_durations_paths.py` | the `.test_durations` file-path gate |
+| `docs/contribute/keyword-only-arguments.md`, `Makefile`, `CHANGELOG.md` | docs |
+
+Decisions taken, and why:
+
+- **The order rule reads the raw text, and cross-checks the scan against the parser.** The item warned that `load_subject_grants()` returns a `dict`, which is not evidence of file order. It is worth being precise about *why*, because the shortcut is tempting: CPython dicts do preserve insertion order and `tomllib` does insert in document order, so reading order off the parsed dict would in fact work today — it would just be resting on undocumented behaviour of a parser for a format that declares table order insignificant. So the scan is a line-anchored regex over table headers. That opens its own hole (a multi-line rationale can carry a line that looks like a header), closed by asserting the scanned key set equals the parsed key set and raising `SubjectGrantRegistryError` when it does not. An entry the scan cannot see must fail loudly, not silently drop out of the rule's domain — the FU-1 anti-vacuity concern in a different costume.
+- **Registry order is a full-scan rule, wired at the command layer, not in `collect_all_violations`.** Two reasons. It is a whole-file property, so the per-file `PostToolUse` hook cannot see it — exactly the boundary `dead-grant` already sits on. And `collect_all_violations` is filesystem-pure with respect to the registry (its callers pass `grants` in, and its tests run from a `tmp_path` with no `subject_grants.toml` at all); making it read the registry off disk would have broken four existing tests for no gain.
+- **No re-sorting fixer.** `--fix` rewrites signatures; the registry has exactly one writer, the `subject-grant` command, and the guard module is stdlib-only by design (the writer needs tomlkit). The remedy is stated instead: re-record any grant, which rewrites the whole file sorted.
+- **The durations gate is on the file path only, and not parametrized.** Per the item. The two known orphan node ids are profile-dependent parametrizations, and a node-id gate would need a full unfiltered collection plus a tolerance policy for them; the path gate needs neither, and it is the one that catches a bulk rewrite. Anti-vacuity is a non-parametrized "the file is committed and not empty" test, plus a shape assertion that every key really is `<path.py>::<test>` — without which "every extracted path exists" could pass over keys that are not paths at all.
+- **Both traps in the item were avoided by not collecting node ids at all** — no `-m ""` run, no collect dump to parse, so neither the marker-filter nor the `.split()` trap is reachable. That is a third argument for the path gate the item did not make: the cheap check is also the one with no way to mis-measure.
+
+Negative-tested, all four: swapping two adjacent registry entries fails with the offending key, the registry line number, and the entry it sorts before; a multi-line rationale carrying a phantom `["…"]` header fails with the scan/parser count mismatch; a `.test_durations` entry under a moved-away path fails naming the dead path; a non-node-id key fails the shape assertion. Both real artifacts restored clean afterwards (`git diff --stat` empty).
+
+Docs updated in the same change: `docs/contribute/keyword-only-arguments.md` in five places (the kinds table, the order paragraph under "Staleness is symmetric", the hook bullet, the auto-fix paragraph — which listed only `grant-param-mismatch` as never-rewritten and silently omitted `dead-grant` — and a pointer after the top-of-page rule list, since that list is scoped to *signatures* and registry order is not a signature property); the `store-test-durations` comment in the `Makefile` names its new gate; CHANGELOG under `[Unreleased] / Added`. The `keyword-only-convention` drift contract was reviewed and acked, with its dogfood-log entry.
+
+**Noticed, not fixed:** `make check-test-badge` is red on this branch — badge 9146 vs 9241 collected. It was already off by 88 before this change (7 tests added here), the badge is refreshed at release time by the release skill, and its CI job only runs on PRs into `main`. Bumping it mid-branch would just make it stale differently before the release.
 
 ---
 
