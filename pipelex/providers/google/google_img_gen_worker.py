@@ -11,6 +11,7 @@ from pipelex import log
 from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
+from pipelex.cogt.img_gen.img_gen_gemini_mapping import ImgGenGeminiMapping
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_google_metadata
@@ -18,7 +19,6 @@ from pipelex.cogt.inference.error_classify import classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.providers.google.google_factory import GoogleFactory
-from pipelex.providers.google.google_img_gen_factory import GoogleImgGenFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
@@ -88,8 +88,8 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
     ) -> GeneratedImageRawDetails:
         """Generate a single image using Google Gemini Image API."""
         prompt_text = img_gen_job.img_gen_prompt.positive_text
-        resolved = GoogleImgGenFactory.resolve_image_config(
-            GoogleImgGenFactory.img_gen_taxonomy(self.inference_model),
+        resolved = ImgGenGeminiMapping.resolve_image_config(
+            ImgGenGeminiMapping.img_gen_taxonomy(self.inference_model),
             aspect_ratio=img_gen_job.job_params.aspect_ratio,
             size=img_gen_job.job_params.size,
             model_name=self.inference_model.name,

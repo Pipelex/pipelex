@@ -1,3 +1,14 @@
+"""Wire-value mappings for the Gemini Image taxonomy family.
+
+Keyed by the `AspectRatioTaxonomy` members `GEMINI_2_5` / `GEMINI_3_PRO` / `GEMINI_3_FLASH` /
+`GEMINI_3_FLASH_LITE` — a `cogt`-owned enum — so this lives beside the args factory that
+consumes it rather than in the Google adapter. The native Google worker and the Pipelex
+gateway (one Portkey SDK spanning several vendors' taxonomies) both resolve geometry through
+it, which is why the mapping cannot belong to either adapter.
+
+Reference: https://ai.google.dev/gemini-api/docs/image-generation
+"""
+
 import math
 import operator
 from collections.abc import Mapping
@@ -9,34 +20,33 @@ from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, SizeTier
 from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy, ImgGenArgTopic
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 
-GoogleAspectRatioType = Literal["1:1", "1:4", "1:8", "2:3", "3:2", "3:4", "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9"]
+GeminiAspectRatioType = Literal["1:1", "1:4", "1:8", "2:3", "3:2", "3:4", "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9"]
 
-GoogleImageSize = Literal["1K", "2K", "4K"]
+GeminiImageSize = Literal["1K", "2K", "4K"]
 
-AspectRatioToDimensions = dict[GoogleAspectRatioType, tuple[int, int]]
+AspectRatioToDimensions = dict[GeminiAspectRatioType, tuple[int, int]]
 
 
-class ResolvedGoogleImageConfig(NamedTuple):
+class ResolvedGeminiImageConfig(NamedTuple):
     """Wire-ready Google `image_config` values plus the grid dimensions they map to.
 
     An `image_size` of None means the parameter must be omitted on the wire so the
     provider applies its own default (the 1K class) — never send a made-up value.
     """
 
-    aspect_ratio: GoogleAspectRatioType
-    image_size: GoogleImageSize | None
+    aspect_ratio: GeminiAspectRatioType
+    image_size: GeminiImageSize | None
     width: int
     height: int
 
 
-class GoogleImgGenFactory:
-    """Factory class for Google image generation parameter mappings.
+class ImgGenGeminiMapping:
+    """Aspect-ratio and size mappings for the Gemini Image models.
 
     Dimension tables mirror the resolution grids Google publishes per model generation.
     Which sizes and aspect ratios each model accepts is keyed by its deck-rules
     `AspectRatioTaxonomy` value (gemini_2_5 / gemini_3_pro / gemini_3_flash /
     gemini_3_flash_lite) — model handles are deck config, not code constants.
-    Reference: https://ai.google.dev/gemini-api/docs/image-generation
     """
 
     # Gemini 2.5 generation grid — used by the gemini_2_5 taxonomy (nano-banana).
@@ -105,14 +115,14 @@ class GoogleImgGenFactory:
         "16:9": (5504, 3072),
         "21:9": (6336, 2688),
     }
-    SIZE_TO_ASPECT_RATIO_TO_DIMENSIONS_GEMINI_3: ClassVar[dict[GoogleImageSize, AspectRatioToDimensions]] = {
+    SIZE_TO_ASPECT_RATIO_TO_DIMENSIONS_GEMINI_3: ClassVar[dict[GeminiImageSize, AspectRatioToDimensions]] = {
         "1K": ASPECT_RATIO_TO_DIMENSIONS_GEMINI_3_1K,
         "2K": ASPECT_RATIO_TO_DIMENSIONS_GEMINI_3_2K,
         "4K": ASPECT_RATIO_TO_DIMENSIONS_GEMINI_3_4K,
     }
 
     # Gemini 3 Pro Image publishes only the standard ratios — no 1:4/4:1/1:8/8:1 banners.
-    GEMINI_3_PRO_ASPECT_RATIOS: ClassVar[frozenset[GoogleAspectRatioType]] = frozenset(
+    GEMINI_3_PRO_ASPECT_RATIOS: ClassVar[frozenset[GeminiAspectRatioType]] = frozenset(
         ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"]
     )
 
@@ -163,7 +173,7 @@ class GoogleImgGenFactory:
         aspect_ratio: AspectRatio,
         size: SizeTier | ImageSize | None,
         model_name: str,
-    ) -> ResolvedGoogleImageConfig:
+    ) -> ResolvedGeminiImageConfig:
         """Resolve the wire-ready (aspect_ratio, image_size) pair and its grid dimensions.
 
         An exact size derives its grid cell from the taxonomy's grids and ignores the
@@ -178,7 +188,7 @@ class GoogleImgGenFactory:
         """
         if isinstance(size, ImageSize):
             ratio_literal, google_size = cls.derive_ratio_and_size_from_exact_size(taxonomy, exact_size=size, model_name=model_name)
-            return ResolvedGoogleImageConfig(aspect_ratio=ratio_literal, image_size=google_size, width=size.width, height=size.height)
+            return ResolvedGeminiImageConfig(aspect_ratio=ratio_literal, image_size=google_size, width=size.width, height=size.height)
         image_size = cls.image_size_for_tier(size) if size is not None else None
         width, height = cls.dimensions_for_aspect_ratio_and_size(
             taxonomy,
@@ -186,10 +196,10 @@ class GoogleImgGenFactory:
             size=image_size or "1K",
             model_name=model_name,
         )
-        return ResolvedGoogleImageConfig(aspect_ratio=cls.aspect_ratio_literal(aspect_ratio), image_size=image_size, width=width, height=height)
+        return ResolvedGeminiImageConfig(aspect_ratio=cls.aspect_ratio_literal(aspect_ratio), image_size=image_size, width=width, height=height)
 
     @classmethod
-    def aspect_ratio_literal(cls, aspect_ratio: AspectRatio) -> GoogleAspectRatioType:
+    def aspect_ratio_literal(cls, aspect_ratio: AspectRatio) -> GeminiAspectRatioType:
         """Map AspectRatio enum to Google's string format."""
         match aspect_ratio:
             case AspectRatio.SQUARE:
@@ -221,7 +231,7 @@ class GoogleImgGenFactory:
                 raise ImgGenParameterError(msg)
 
     @classmethod
-    def image_size_for_tier(cls, tier: SizeTier) -> GoogleImageSize:
+    def image_size_for_tier(cls, tier: SizeTier) -> GeminiImageSize:
         """Map a portable size tier to Google's `image_size` wire token."""
         match tier:
             case SizeTier.ONE_K:
@@ -235,7 +245,7 @@ class GoogleImgGenFactory:
                 raise ImgGenParameterError(msg)
 
     @classmethod
-    def grids_for_taxonomy(cls, taxonomy: AspectRatioTaxonomy, *, model_name: str) -> Mapping[GoogleImageSize, AspectRatioToDimensions]:
+    def grids_for_taxonomy(cls, taxonomy: AspectRatioTaxonomy, *, model_name: str) -> Mapping[GeminiImageSize, AspectRatioToDimensions]:
         """The (size -> ratio -> dimensions) cells a Google taxonomy accepts, ratio-filtered.
 
         The returned mapping shares the class-level grid tables — read-only by contract.
@@ -268,7 +278,7 @@ class GoogleImgGenFactory:
         taxonomy: AspectRatioTaxonomy,
         *,
         aspect_ratio: AspectRatio,
-        size: GoogleImageSize,
+        size: GeminiImageSize,
         model_name: str,
     ) -> tuple[int, int]:
         """Get pixel dimensions (width, height) for the given aspect ratio and size, gated per taxonomy."""
@@ -292,7 +302,7 @@ class GoogleImgGenFactory:
         *,
         exact_size: ImageSize,
         model_name: str,
-    ) -> tuple[GoogleAspectRatioType, GoogleImageSize]:
+    ) -> tuple[GeminiAspectRatioType, GeminiImageSize]:
         """Exact-grid match: derive the (ratio, size) pair whose grid cell equals the exact WxH.
 
         Raises:
