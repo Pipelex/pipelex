@@ -334,7 +334,7 @@ Each provider has an `effort_to_level_map` in its subconfig within `pipelex.toml
 
 The special value `"disabled"` causes the accessor to return `None`, signaling that reasoning should be skipped. OpenAI uses `"none"` as a valid API value instead (not `"disabled"`).
 
-The level is resolved at runtime via `<ProviderConfig>.get_reasoning_level()` in each plugin's config module (e.g., `pipelex/plugins/openai/openai_config.py`). Each config class returns the provider's native SDK type.
+The level is resolved at runtime via `<ProviderConfig>.get_reasoning_level()` in each plugin's config module (e.g., `pipelex/providers/openai/openai_config.py`). Each config class returns the provider's native SDK type.
 
 ## Effort-to-Budget Configuration
 
@@ -438,17 +438,17 @@ All reasoning-related errors use `LLMCapabilityError` (`pipelex/cogt/exceptions.
 | `pipelex/cogt/llm/reasoning_config_base.py` | Shared helpers: `EffortToLevelMap`, `validate_effort_to_level_map()`, `get_reasoning_level_str()` |
 | `pipelex/cogt/llm/llm_setting.py` | `LLMSetting` with reasoning fields and `make_llm_job_params()` |
 | `pipelex/cogt/config_cogt.py` | `LLMConfig` with `get_reasoning_budget()` and effort-to-budget map validation |
-| `pipelex/plugins/openai/openai_config.py` | `OpenAIConfig` with `get_reasoning_level()` returning `ChatCompletionReasoningEffort \| None` |
-| `pipelex/plugins/anthropic/anthropic_config.py` | `AnthropicConfig` with `get_reasoning_level()` returning `AnthropicEffortLevel \| None` |
-| `pipelex/plugins/google/google_config.py` | `GoogleConfig` with `get_reasoning_level()` returning `genai_types.ThinkingLevel \| None` |
-| `pipelex/plugins/mistral/mistral_config.py` | `MistralConfig` with `get_reasoning_level()` returning `MistralPromptMode \| None` |
+| `pipelex/providers/openai/openai_config.py` | `OpenAIConfig` with `get_reasoning_level()` returning `ChatCompletionReasoningEffort \| None` |
+| `pipelex/providers/anthropic/anthropic_config.py` | `AnthropicConfig` with `get_reasoning_level()` returning `AnthropicEffortLevel \| None` |
+| `pipelex/providers/google/google_config.py` | `GoogleConfig` with `get_reasoning_level()` returning `genai_types.ThinkingLevel \| None` |
+| `pipelex/providers/mistral/mistral_config.py` | `MistralConfig` with `get_reasoning_level()` returning `MistralPromptMode \| None` |
 | `pipelex/cogt/model_backends/model_spec.py` | `InferenceModelSpec.thinking_mode` field |
-| `pipelex/plugins/openai/openai_completions_llm_worker.py` | OpenAI Completions reasoning resolution |
-| `pipelex/plugins/openai/openai_responses_llm_worker.py` | OpenAI Responses reasoning resolution |
-| `pipelex/plugins/anthropic/anthropic_llm_worker.py` | Anthropic thinking params builder |
-| `pipelex/plugins/google/google_llm_worker.py` | Google thinking config builder |
-| `pipelex/plugins/mistral/mistral_llm_worker.py` | Mistral prompt mode resolution |
-| `pipelex/plugins/bedrock/bedrock_llm_worker.py` | Bedrock reasoning validation |
+| `pipelex/providers/openai/openai_completions_llm_worker.py` | OpenAI Completions reasoning resolution |
+| `pipelex/providers/openai/openai_responses_llm_worker.py` | OpenAI Responses reasoning resolution |
+| `pipelex/providers/anthropic/anthropic_llm_worker.py` | Anthropic thinking params builder |
+| `pipelex/providers/google/google_llm_worker.py` | Google thinking config builder |
+| `pipelex/providers/mistral/mistral_llm_worker.py` | Mistral prompt mode resolution |
+| `pipelex/providers/bedrock/bedrock_llm_worker.py` | Bedrock reasoning validation |
 | `pipelex/pipelex.toml` | Default effort-to-budget maps and effort-to-level maps |
 
 ---

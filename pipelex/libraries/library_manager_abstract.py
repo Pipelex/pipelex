@@ -4,9 +4,9 @@ from typing import TYPE_CHECKING
 
 from kajson.class_registry import ClassRegistry
 
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.libraries.library_crate import LibraryCrate
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
 if TYPE_CHECKING:
     from pipelex.libraries.library import Library

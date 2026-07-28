@@ -77,18 +77,19 @@ The COGT layer abstracts AI provider details from business logic:
 
 ### Plugin System
 
-Located in [`pipelex/plugins/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/plugins)
+Two packages, one for the mechanism and one for the built-in adapters:
 
-Provider-specific integrations handle API specifics:
+- [`pipelex/plugins/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/plugins) — the plugin **mechanism**: the `PipelexPlugin` contract, the registrar every plugin registers into, and the capability registries. This is what an out-of-tree plugin imports, and what the `pipelex.plugins` entry point resolves against.
+- [`pipelex/providers/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/providers) — the built-in **provider adapters**, one directory per vendor, each handling that vendor's API specifics:
 
-- OpenAI
-- Anthropic
-- Google (Gemini)
-- Mistral
-- AWS Bedrock
-- And more...
+    - OpenAI
+    - Anthropic
+    - Google (Gemini)
+    - Mistral
+    - AWS Bedrock
+    - And more...
 
-Each plugin translates Pipelex's unified interface into provider-specific API calls.
+The dependency runs one way: adapters depend on the mechanism, never the reverse. Each adapter translates Pipelex's unified interface into provider-specific API calls.
 
 ---
 

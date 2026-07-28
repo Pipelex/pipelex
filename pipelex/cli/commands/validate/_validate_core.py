@@ -35,7 +35,7 @@ from pipelex.tools.misc.string_utils import count_with_noun
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from pipelex.core.pipes.pipe_abstract import PipeAbstract
+    from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
 COMMAND = "validate"
 

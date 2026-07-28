@@ -6,7 +6,7 @@
 through the curated subset (just ``status_code`` and ``retry_after_seconds`` —
 actionable HTTP client hints), and the ``message`` is kept only when the report
 is flagged ``caller_facing_message`` — the flag set by error classes
-(``PipelexInterpreterError`` / ``ValidateBundleError``) whose message describes
+(``MthdsParserError`` / ``ValidateBundleError``) whose message describes
 the caller's own input. Every other report has its ``message`` replaced with a
 generic placeholder and ``user_action`` dropped, keeping the stable identifiers
 (``error_type`` / ``error_domain`` / ``error_category`` / ``retryable`` /
@@ -34,7 +34,7 @@ from pipelex.base_exceptions import (
 )
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.cogt.inference.provider_name import ProviderName
-from pipelex.core.interpreter.exceptions import PipelexInterpreterError
+from pipelex.mthds_parsing.exceptions import MthdsParserError
 
 
 def _runtime_report(message: str = "rate limited on the worker") -> ErrorReport:
@@ -71,10 +71,10 @@ def _config_report(message: str = "OPENAI_API_KEY is not set") -> ErrorReport:
 def _caller_facing_report(message: str = "pipe 'summarize' references unknown concept 'Reportt' at line 14") -> ErrorReport:
     """A report whose message was authored as caller-facing copy (interpreter / bundle-validation)."""
     return ErrorReport(
-        error_type="PipelexInterpreterError",
+        error_type="MthdsParserError",
         message=message,
-        title="Pipelex interpreter error",
-        type_uri="https://docs.pipelex.com/latest/errors/pipelex-interpreter-error/",
+        title="MTHDS parser",
+        type_uri="https://docs.pipelex.com/latest/errors/mthds-parser-error/",
         error_domain=ErrorDomain.INPUT,
         user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail="fix the concept name in your .mthds"),
         caller_facing_message=True,
@@ -252,12 +252,12 @@ class TestErrorReportDisclosureMode:
         """A domain-less wrapper raised ``from`` an INPUT cause must not leak its own message in STRICT.
 
         ``PipelexUnexpectedError`` (no domain, internal message) wrapping a
-        ``PipelexInterpreterError`` (INPUT) produces a report classified
+        ``MthdsParserError`` (INPUT) produces a report classified
         ``error_domain=INPUT`` via ``__cause__``-chain inheritance — yet the
         report's ``message`` is the wrapper's internal text. ``caller_facing_message``
         is NOT inherited, so STRICT redacts the message.
         """
-        cause = PipelexInterpreterError("parse failed at /srv/secret/internal/bundle.mthds")
+        cause = MthdsParserError("parse failed at /srv/secret/internal/bundle.mthds")
         wrapper_message = "internal invariant violated: cache slot is None"
         try:
             raise PipelexUnexpectedError(wrapper_message) from cause
@@ -272,8 +272,8 @@ class TestErrorReportDisclosureMode:
         assert "invariant" not in payload["message"]
 
     def test_strict_passes_through_real_interpreter_error_message(self) -> None:
-        """A genuine ``PipelexInterpreterError`` reflects its caller-facing message through STRICT."""
-        report = PipelexInterpreterError("pipe 'foo' references unknown concept at line 5").to_error_report()
+        """A genuine ``MthdsParserError`` reflects its caller-facing message through STRICT."""
+        report = MthdsParserError("pipe 'foo' references unknown concept at line 5").to_error_report()
         assert report.caller_facing_message is True
         payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
         assert payload["message"] == "pipe 'foo' references unknown concept at line 5"
@@ -403,10 +403,10 @@ class TestErrorReportDisclosureMode:
         # exercise each branch — using ``model_copy`` so pyright sees the
         # concrete field types instead of the union we'd get from ``**kwargs``.
         caller_facing_report = ErrorReport(
-            error_type="PipelexInterpreterError",
+            error_type="MthdsParserError",
             message="pipe references unknown concept",
-            title="Pipelex interpreter error",
-            type_uri="https://docs.pipelex.com/latest/errors/pipelex-interpreter-error/",
+            title="MTHDS parser",
+            type_uri="https://docs.pipelex.com/latest/errors/mthds-parser-error/",
             error_category="capacity",
             error_domain=ErrorDomain.INPUT,
             retryable=False,

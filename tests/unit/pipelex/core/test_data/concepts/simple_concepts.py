@@ -1,4 +1,4 @@
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 
 SIMPLE_CONCEPTS = (
     "simple_concept",

@@ -2,10 +2,10 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
+from pipelex.mthds_parsing.parser import MthdsParser
 
 MTHDS_TEST_VERSION = "0.0.0-test"
 
@@ -54,7 +54,7 @@ class TestCrateNormalizationRoundTrip:
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_path = Path(tmp_dir) / "report.mthds"
             report_path.write_text(REPORT_MTHDS, encoding="utf-8")
-            blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=report_path)]
+            blueprints = [MthdsParser.make_pipelex_bundle_blueprint(bundle_path=report_path)]
 
             crate = LibraryCrateFactory.make_from_blueprints(blueprints=blueprints)
             normalized = normalize_crate(crate, mthds_version=MTHDS_TEST_VERSION)
@@ -89,7 +89,7 @@ class TestCrateNormalizationRoundTrip:
         with tempfile.TemporaryDirectory() as tmp_dir:
             intake_path = Path(tmp_dir) / "intake.mthds"
             intake_path.write_text(INTAKE_MTHDS, encoding="utf-8")
-            blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=intake_path)]
+            blueprints = [MthdsParser.make_pipelex_bundle_blueprint(bundle_path=intake_path)]
 
             crate = LibraryCrateFactory.make_from_blueprints(blueprints=blueprints)
             normalized = normalize_crate(crate, mthds_version=MTHDS_TEST_VERSION)

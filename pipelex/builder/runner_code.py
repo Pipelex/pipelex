@@ -20,8 +20,8 @@ from pipelex.core.concepts.concept_representation_generator import (
 )
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.runtime_hub import get_class_registry
 
 STRUCTURES_MODULE = "structures.structures"

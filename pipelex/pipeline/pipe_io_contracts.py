@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field, PydanticUndefinedAnnotation, PydanticUser
 
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.concepts.exceptions import ConceptValueError
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipeline.exceptions import PipeIOContractError
 
 

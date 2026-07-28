@@ -14,9 +14,9 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.interpreter_hub import get_pipe_library, get_pipe_router
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory

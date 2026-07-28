@@ -3,9 +3,9 @@ from typing import Callable
 import pytest
 
 from pipelex import log
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from tests.unit.pipelex.pipe_controllers.batch.data import PipeBatchInputTestCases
 
 

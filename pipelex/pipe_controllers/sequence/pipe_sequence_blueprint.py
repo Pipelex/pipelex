@@ -3,8 +3,8 @@ from typing import Literal
 from pydantic import field_validator
 from typing_extensions import override
 
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
+from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 
 
 class PipeSequenceBlueprint(PipeBlueprint):

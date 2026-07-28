@@ -13,7 +13,7 @@ description: "Reference for the `GatewayError` Pipelex error class."
 | `title` | Gateway |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/gateway-error/` |
 | `error_domain` | _(inherited from parent)_ |
-| Defined in | `pipelex.plugins.gateway.gateway_exceptions` |
+| Defined in | `pipelex.providers.gateway.gateway_exceptions` |
 | Parent class | [`CogtError`](cogt-error.md) |
 
 [Back to Error Reference](index.md)

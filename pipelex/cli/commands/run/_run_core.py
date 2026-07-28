@@ -21,14 +21,14 @@ from pipelex.cli.error_handlers import (
 )
 from pipelex.config import get_config
 from pipelex.core.concepts.exceptions import ConceptValueError
-from pipelex.core.interpreter.exceptions import PipelexInterpreterError
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.absence_render import build_absence_json, build_absence_markdown
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
+from pipelex.mthds_parsing.exceptions import MthdsParserError
+from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
@@ -118,7 +118,7 @@ async def _execute_run(
             # Use lightweight parsing to extract main_pipe without full validation
             # Full validation happens later during execute
             if not pipe_code:
-                bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
+                bundle_blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
                 main_pipe_code = bundle_blueprint.main_pipe
                 if not main_pipe_code:
                     msg = (
@@ -132,7 +132,7 @@ async def _execute_run(
             print_traceback_if_requested(console=get_console())
             typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
-        except PipelexInterpreterError as exc:
+        except MthdsParserError as exc:
             print_traceback_if_requested(console=get_console())
             typer.secho(f"Failed to parse bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc

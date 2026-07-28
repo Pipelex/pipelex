@@ -7,8 +7,8 @@ form an import cycle (`pipe_abstract → hub → library → pipe_library → pi
 Keeping the walk here — downstream of `hub` — keeps `pipe_abstract` cycle-free.
 """
 
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.interpreter_hub import get_optional_pipe
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
 
 def collect_signature_refs(pipe: PipeAbstract, *, visited: set[str] | None = None) -> set[str]:

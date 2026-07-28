@@ -7,10 +7,10 @@ from rich.table import Table
 from typing_extensions import override
 
 from pipelex import pretty_print
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundError
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
 PipeLibraryRoot = dict[str, PipeAbstract]
 

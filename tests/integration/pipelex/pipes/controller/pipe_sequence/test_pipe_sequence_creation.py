@@ -2,11 +2,11 @@ from pathlib import Path
 from typing import Callable
 
 from pipelex.core.concepts.concept_factory import ConceptBlueprint, ConceptFactory
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.interpreter_hub import get_concept_library
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 
 
 class TestPipeSequenceCreation:

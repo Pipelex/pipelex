@@ -1,1 +1,1 @@
-"""Error test cases for PipelexInterpreter tests."""
+"""Error test cases for MthdsParser tests."""

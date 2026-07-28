@@ -12,16 +12,7 @@ from typing_extensions import TypedDict
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.interpreter.exceptions import PipelexInterpreterError
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeFactoryError, PipeValidationError
-from pipelex.core.pipes.handle_pipe_errors import (
-    categorize_pipe_factory_error,
-    categorize_pipe_validation_error,
-    categorize_pipe_validation_with_libraries_error,
-)
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.validation import report_validation_error
 from pipelex.interpreter_hub import (
@@ -34,6 +25,15 @@ from pipelex.interpreter_hub import (
 from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
+from pipelex.mthds_parsing.exceptions import MthdsParserError
+from pipelex.mthds_parsing.handle_pipe_errors import (
+    categorize_pipe_factory_error,
+    categorize_pipe_validation_error,
+    categorize_pipe_validation_with_libraries_error,
+)
+from pipelex.mthds_parsing.parser import MthdsParser
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.exceptions import DryRunError, PipeRunError
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunOutput, DryRunStatus
 from pipelex.pipeline.exceptions import ValidateBundleError
@@ -121,18 +121,18 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
     Single source of truth for the bundle-loading error cascade, shared by the
     bundle-loading entry points: ``validate_bundle``, ``validate_bundles_from_directory``,
     and ``pipelex.pipeline.resolve_bundle.resolve_crate_from_contents``.
-    A ``PipelexInterpreterError`` becomes a ``ValidateBundleError`` carrying the
+    A ``MthdsParserError`` becomes a ``ValidateBundleError`` carrying the
     blueprint validation errors, a ``PipeFactoryError`` carries the categorized
     factory error, etc. Sharing one source of truth means a new handler only
     needs to be added once.
     """
     try:
         yield
-    except PipelexInterpreterError as interpreter_error:
+    except MthdsParserError as parser_error:
         raise ValidateBundleError(
-            message=interpreter_error.message,
-            pipelex_bundle_blueprint_validation_errors=interpreter_error.validation_errors,
-        ) from interpreter_error
+            message=parser_error.message,
+            pipelex_bundle_blueprint_validation_errors=parser_error.validation_errors,
+        ) from parser_error
     except PipeFactoryError as factory_error:
         factory_error_data = categorize_pipe_factory_error(factory_error=factory_error)
         raise ValidateBundleError(
@@ -289,7 +289,7 @@ async def validate_bundle(
             if mthds_contents is not None:
                 content_sources: list[str | None] = list(mthds_sources) if mthds_sources is not None else [None] * len(mthds_contents)
                 loaded_blueprints = [
-                    PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content, mthds_source=source)
+                    MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content, mthds_source=source)
                     for content, source in zip(mthds_contents, content_sources, strict=True)
                 ]
                 loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
@@ -307,7 +307,7 @@ async def validate_bundle(
 
             else:
                 assert mthds_file_path is not None
-                blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file_path)
+                blueprint = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=mthds_file_path)
                 loaded_blueprints = [blueprint]
 
                 if mthds_file_path.resolve() not in library.loaded_mthds_paths:
@@ -358,7 +358,7 @@ async def validate_bundles_from_directory(directory: Path, *, allow_signatures: 
         set_current_library(library_id=library_id)
         with translate_to_validate_bundle_error():
             for mthds_file in mthds_files:
-                blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
+                blueprint = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
                 all_blueprints.append(blueprint)
 
             loaded_pipes = library_manager.load_libraries(library_id=library_id, library_dirs=[Path(directory)])

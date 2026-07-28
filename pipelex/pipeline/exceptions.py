@@ -2,8 +2,7 @@ from typing_extensions import override
 
 from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexError, PipelexUnexpectedError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
-from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
-from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
+from pipelex.core.exceptions import PipeFactoryErrorData, PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.validation_errors import build_validation_error_items
 

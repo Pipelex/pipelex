@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from pipelex.cli.commands.build.inputs._inputs_core import _generate_inputs_core  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
-from pipelex.core.pipes.rendering.input_renderer import InputsTemplateFormat
+from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat
 
 if TYPE_CHECKING:
     from pathlib import Path

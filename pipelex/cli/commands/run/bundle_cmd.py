@@ -9,7 +9,7 @@ from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
 from pipelex.cli.commands.run._inputs_file_loader import find_default_inputs_file
 from pipelex.cli.commands.run._run_core import COMMAND, execute_run, validate_run_flag_combination
 from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError
-from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
+from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
 
 
 def run_bundle_cmd(

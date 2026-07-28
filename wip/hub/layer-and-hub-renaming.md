@@ -1,6 +1,6 @@
 # Renaming the layers and the hubs — `runtime` / `interpreter`
 
-**Status: EXECUTED.** Landed as its own commit after H-4, with all three gates green. The outcome record — what the plan got right, the two places it under-specified, and the judgment calls made while sweeping the docs — is in [`TODOS.md` → The runtime/interpreter rename, record](../../TODOS.md#the-runtimeinterpreter-rename--record). This document stays as the decision record: it is the *why*, and its old→new tables are deliberately not swept.
+**Status: EXECUTED.** Landed as its own commit after H-4, with all three gates green. The outcome record — what the plan got right, the two places it under-specified, and the judgment calls made while sweeping the docs — is in [`TODOS.md` → The runtime/interpreter rename, record](hub-split-tracker.md#the-runtimeinterpreter-rename--record). This document stays as the decision record: it is the *why*, and its old→new tables are deliberately not swept.
 
 Two corrections to the mechanical plan below, for anyone reading it as a template:
 
@@ -209,6 +209,6 @@ Expect **`cli-docs` to fire** — the rename touches many CLI modules' import li
 
 ## Cross-repo
 
-This **replaces**, not adds to, the first wave of the [cross-repo sweep](../../TODOS.md#cross-repo-sweep): external repos go straight from `pipelex.hub` to `pipelex.runtime_hub` / `pipelex.interpreter_hub`, never touching the intermediate names. Update the sweep tables in `TODOS.md` to the final names as part of this work, so the sweep is done once with the right target.
+This **replaces**, not adds to, the first wave of the [cross-repo sweep](hub-split-tracker.md#cross-repo-sweep): external repos go straight from `pipelex.hub` to `pipelex.runtime_hub` / `pipelex.interpreter_hub`, never touching the intermediate names. Update the sweep tables in `TODOS.md` to the final names as part of this work, so the sweep is done once with the right target.
 
 Affected: `pipelex-temporal` (35 files, private), `pipelex-mistralai-workflows` (11), `pipelex-api` (9), `pipelex-cookbook` (2), `cocode` (2). `get_pipelex_hub` splits into `get_runtime_hub` / `get_interpreter_hub`.

@@ -25,11 +25,9 @@ from typing import TYPE_CHECKING
 from mthds.protocol.pipeline_inputs import PipelineInputs
 
 from pipelex import log
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.interpreter_hub import (
     clear_current_library,
     get_concept_library,
@@ -38,6 +36,8 @@ from pipelex.interpreter_hub import (
     resolve_library_dirs,
     set_current_library,
 )
+from pipelex.mthds_parsing.parser import MthdsParser
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -50,7 +50,7 @@ from pipelex.system.job_metadata import JobMetadata, OtelContext
 from pipelex.tools.misc.file_utils import reject_bare_str_or_path
 
 if TYPE_CHECKING:
-    from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+    from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
     from pipelex.system.trace_context import TraceContext
 
 
@@ -94,7 +94,7 @@ def acquire_library(
 
         qualified_main_pipe: str | None = None
         if mthds_contents:
-            all_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
+            all_blueprints = [MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
 
             # Filter out blueprints whose URIs are already loaded (e.g. via PIPELEXPATH).
             blueprints_to_load: list[PipelexBundleBlueprint] = list(all_blueprints)

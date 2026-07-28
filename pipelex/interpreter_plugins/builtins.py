@@ -1,11 +1,12 @@
 """The composition root's view of the built-in plugins: both layers' halves, welded into one list.
 
-``pipelex.plugins`` is a declared runtime-layer package, so it may not name anything that reaches
-``interpreter_hub`` — which the two plugins next door do, by construction: their job is to construct
-interpreter-layer objects (a ``DirectOrchestrator``, a ``DirectBundleValidator``, a
-``DirectPipeFuncExecutor``). This package is the interpreter-side home for them, and it is *allowed*
-to import downward, so composing the two halves here is legal where doing it in ``plugins/builtins.py``
-was the weld that made "``plugins`` is a runtime layer" false.
+``pipelex.providers`` — the built-in vendor adapters — is a declared runtime-layer package, so it may
+not name anything that reaches ``interpreter_hub``, which the two plugins next door do by
+construction: their job is to construct interpreter-layer objects (a ``DirectOrchestrator``, a
+``DirectBundleValidator``, a ``DirectPipeFuncExecutor``). This package is the interpreter-side home
+for them, and it is *allowed* to import downward, so composing the two halves here is legal where
+doing it in the runtime adapters' own manifest was the weld that made "the adapters are a runtime
+layer" false.
 
 There is still exactly one place that answers "what are the built-in plugins" — it just lives in the
 layer permitted to do the welding. Both callers of ``build_registrar`` (boot in ``pipelex.py``, and the
@@ -14,8 +15,8 @@ layer permitted to do the welding. Both callers of ``build_registrar`` (boot in 
 
 from pipelex.interpreter_plugins.direct.direct_plugin import DirectOrchestratorPlugin
 from pipelex.interpreter_plugins.pipe_func.pipe_func_plugin import PipeFuncPlugin
-from pipelex.plugins.builtins import RUNTIME_BUILTIN_PLUGINS, RUNTIME_CORE_UNCONDITIONAL_PLUGIN_NAMES
 from pipelex.plugins.contract import PipelexPlugin
+from pipelex.providers.builtins import RUNTIME_BUILTIN_PLUGINS, RUNTIME_CORE_UNCONDITIONAL_PLUGIN_NAMES
 
 # The interpreter-layer half: plugins whose adapters name the method interpreter. Both are
 # core-unconditional — in-process execution is required infra.

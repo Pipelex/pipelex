@@ -44,6 +44,7 @@ from pipelex.libraries.library_manager import LibraryManager
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.observer.multi_observer import MultiObserver
 from pipelex.observer.observer_protocol import ObserverNoOp, ObserverProtocol
+from pipelex.pipe_machinery.registry_models import PipeRegistryModels
 from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutorProtocol
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
@@ -497,7 +498,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.interpreter_hub.set_pipeline_manager(pipeline_manager=self.pipeline_manager)
         self.pipeline_manager.setup()
 
+        # Two manifests, one registry: core's value model and the pipe kinds. They are disjoint by
+        # construction and pinned as such by tests/unit/pipelex/test_registry_models_split.py.
         self.class_registry.register_classes(CoreRegistryModels.get_all_models())
+        self.class_registry.register_classes(PipeRegistryModels.get_all_models())
         if runtime_manager.is_unit_testing:
             log.verbose("Registering test models for unit testing")
             self.class_registry.register_classes(TestRegistryModels.get_all_models())

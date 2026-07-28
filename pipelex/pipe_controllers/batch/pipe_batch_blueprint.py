@@ -3,7 +3,7 @@ from typing import Literal
 from typing_extensions import override
 
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 
 
 class PipeBatchBlueprint(PipeBlueprint):

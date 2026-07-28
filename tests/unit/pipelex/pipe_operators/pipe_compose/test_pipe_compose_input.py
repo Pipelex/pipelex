@@ -3,7 +3,7 @@ from typing import Callable
 import pytest
 
 from pipelex import log
-from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from tests.unit.pipelex.pipe_operators.pipe_compose.data import PipeComposeInputTestCases

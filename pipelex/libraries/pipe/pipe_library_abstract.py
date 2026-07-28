@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
 
 class PipeLibraryAbstract(ABC):
@@ -10,7 +10,7 @@ class PipeLibraryAbstract(ABC):
     :class:`~pipelex.core.concepts.concept_provider_abstract.ConceptProviderAbstract`: no core module
     takes pipe resolution as a parameter. The two places that follow a pipe reference found *inside* a
     pipe graph — a condition's mapped pipes and a sequence's last step, both in
-    `core/pipes/rendering/` — are interpreter-layer and call `interpreter_hub.get_required_pipe`
+    `pipe_machinery/rendering/` — are interpreter-layer and call `interpreter_hub.get_required_pipe`
     directly. Split the read half out if and when a runtime-layer caller needs it.
     """
 

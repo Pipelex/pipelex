@@ -16,8 +16,8 @@ from pipelex.cogt.exceptions import (
     PromptImageFormatError,
     SdkTypeError,
 )
-from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.stuffs.exceptions import DateContentError
+from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError, ValidateBundleError
 from pipelex.plugins.exceptions import UnknownSecretsMethodError, UnknownStorageMethodError
@@ -48,7 +48,7 @@ class TestClassLevelMetadata:
             ("pipeline_execution", _PIPELINE_EXEC_ERROR, ErrorDomain.RUNTIME),
             ("pipe_execution", PipeExecutionError("boom"), ErrorDomain.RUNTIME),
             ("validate_bundle", ValidateBundleError("boom"), ErrorDomain.INPUT),
-            ("interpreter", PipelexInterpreterError("boom"), ErrorDomain.INPUT),
+            ("interpreter", MthdsParserError("boom"), ErrorDomain.INPUT),
             ("setup", PipelexSetupError("boom"), ErrorDomain.CONFIG),
             ("config", PipelexConfigError("boom"), ErrorDomain.CONFIG),
             ("service_base", PipelexServiceError("boom"), ErrorDomain.CONFIG),
@@ -101,7 +101,7 @@ class TestClassLevelMetadata:
     @pytest.mark.parametrize(
         ("_topic", "exc", "expected_caller_facing"),
         [
-            ("interpreter", PipelexInterpreterError("boom"), True),
+            ("interpreter", MthdsParserError("boom"), True),
             ("validate_bundle", ValidateBundleError("boom"), True),
             ("csv", CsvError("boom"), True),
             ("unknown_storage_method", UnknownStorageMethodError(method="bogus", registered_methods=["local", "s3"]), True),
@@ -115,7 +115,7 @@ class TestClassLevelMetadata:
     def test_caller_facing_message(self, _topic: str, exc: PipelexError, expected_caller_facing: bool) -> None:
         """Only classes whose message describes the caller's own input carry caller_facing_message in to_error_report().
 
-        ``PipelexInterpreterError`` / ``ValidateBundleError`` author caller-facing
+        ``MthdsParserError`` / ``ValidateBundleError`` author caller-facing
         copy (.mthds syntax, bundle validation); every other class defaults to
         False so STRICT disclosure redacts its message.
         """
@@ -123,7 +123,7 @@ class TestClassLevelMetadata:
         assert report.caller_facing_message is expected_caller_facing
 
     def test_caller_facing_message_inherits_for_interpreter_subclass(self) -> None:
-        """A subclass of ``PipelexInterpreterError`` stays caller-facing.
+        """A subclass of ``MthdsParserError`` stays caller-facing.
 
         Pins the deliberate inheritance contract on ``_authors_caller_facing_message``
         (plain attribute access — see ``base_exceptions.py``): a future refactor
@@ -133,7 +133,7 @@ class TestClassLevelMetadata:
         STRICT — or, more likely, silently redact authored caller-facing copy.
         """
 
-        class _SubInterpreterError(PipelexInterpreterError):
+        class _SubInterpreterError(MthdsParserError):
             pass
 
         report = _SubInterpreterError("boom").to_error_report()

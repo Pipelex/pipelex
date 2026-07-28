@@ -6,10 +6,10 @@ from typing_extensions import override
 from pipelex.cogt.llm.llm_setting import LLMSettingChoices
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
-from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import make_variable_multiplicity, parse_concept_with_multiplicity
 from pipelex.interpreter_hub import get_optional_domain
+from pipelex.pipe_machinery.pipe_factory import PipeFactoryProtocol
 from pipelex.pipe_operators.llm.exceptions import PipeLLMFactoryError
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM

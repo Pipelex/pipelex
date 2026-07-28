@@ -1,1 +1,1 @@
-"""Pipe-related test data for PipelexInterpreter tests."""
+"""Pipe-related test data for MthdsParser tests."""

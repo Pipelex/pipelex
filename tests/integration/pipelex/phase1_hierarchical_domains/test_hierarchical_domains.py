@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.core.interpreter.exceptions import PipelexInterpreterError
+from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle, validate_bundles_from_directory
 
@@ -97,21 +97,21 @@ class TestHierarchicalDomainsAndPipeNamespacing:
 
     async def test_invalid_double_dot_domain(self):
         """Domain 'legal..contracts' should raise a validation error."""
-        with pytest.raises((ValidateBundleError, PipelexInterpreterError)):
+        with pytest.raises((ValidateBundleError, MthdsParserError)):
             await validate_bundle(
                 mthds_file_path=INVALID_DIR / "invalid_double_dot.mthds_invalid",
             )
 
     async def test_invalid_leading_dot_domain(self):
         """Domain '.legal' should raise a validation error."""
-        with pytest.raises((ValidateBundleError, PipelexInterpreterError)):
+        with pytest.raises((ValidateBundleError, MthdsParserError)):
             await validate_bundle(
                 mthds_file_path=INVALID_DIR / "invalid_leading_dot.mthds_invalid",
             )
 
     async def test_invalid_same_domain_pipe_ref_to_nonexistent(self):
         """Same-domain pipe ref to non-existent pipe should raise error."""
-        with pytest.raises((ValidateBundleError, PipelexInterpreterError)):
+        with pytest.raises((ValidateBundleError, MthdsParserError)):
             await validate_bundle(
                 mthds_file_path=INVALID_DIR / "invalid_same_domain_pipe_ref.mthds_invalid",
             )

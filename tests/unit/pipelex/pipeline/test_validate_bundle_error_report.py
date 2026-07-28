@@ -8,8 +8,7 @@ of only a single ``detail`` string. The cause-chain enrichment from the base
 """
 
 from pipelex.base_exceptions import DisclosureMode, ErrorDomain, ValidationErrorCategory
-from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
-from pipelex.core.exceptions import PipesAndConceptValidationErrorData
+from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.pipeline.exceptions import ValidateBundleError
 
