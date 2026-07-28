@@ -1,24 +1,41 @@
-from typing import ClassVar, Literal
+"""Wire-value mappings for the GPT Image taxonomy family.
 
-from openai import Omit, omit
+Keyed by `AspectRatioTaxonomy.GPT_IMAGE_LEGACY` / `GPT_IMAGE_2` and the sibling moderation
+and input-fidelity taxonomies — all `cogt`-owned enums — so this lives beside the args
+factory that consumes it rather than in the OpenAI adapter. The GPT Image models are served
+by three different SDKs (OpenAI, Azure REST, the Pipelex gateway), which is why the mapping
+cannot belong to any one of them.
+
+Reference: https://platform.openai.com/docs/guides/image-generation
+"""
+
+from typing import ClassVar, Literal
 
 from pipelex import log
 from pipelex.cogt.exceptions import ImgGenParameterError
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, InputFidelity, SizeTier
 
-OpenAIImageLegacySizeType = Literal["1024x1024", "1536x1024", "1024x1536"]
-OpenAIImageModerationType = Literal["low", "auto"] | Omit
-OpenAIImageInputFidelityType = Literal["low", "high"]
+GptImageLegacySizeType = Literal["1024x1024", "1536x1024", "1024x1536"]
+GptImageModerationType = Literal["low", "auto"]
+GptImageInputFidelityType = Literal["low", "high"]
 
 
-class OpenAIImgGenFactory:
-    LEGACY_ASPECT_RATIO_TO_SIZE: ClassVar[dict[AspectRatio, tuple[OpenAIImageLegacySizeType, int, int]]] = {
+class ImgGenGptMapping:
+    """Size, moderation and input-fidelity mappings for the GPT Image models.
+
+    Two geometry regimes, keyed by the model's deck-rules `AspectRatioTaxonomy` value: the
+    legacy fixed grid (gpt_image_legacy — three sizes, 1K class only) and the validated
+    free-form range (gpt_image_2 — exact sizes checked against the published caps, with the
+    portable tiers derived by scaling the 1K preset).
+    """
+
+    LEGACY_ASPECT_RATIO_TO_SIZE: ClassVar[dict[AspectRatio, tuple[GptImageLegacySizeType, int, int]]] = {
         AspectRatio.SQUARE: ("1024x1024", 1024, 1024),
         AspectRatio.LANDSCAPE_3_2: ("1536x1024", 1536, 1024),
         AspectRatio.PORTRAIT_2_3: ("1024x1536", 1024, 1536),
     }
-    LEGACY_SIZE_TO_DIMENSIONS: ClassVar[dict[str, tuple[OpenAIImageLegacySizeType, int, int]]] = {
+    LEGACY_SIZE_TO_DIMENSIONS: ClassVar[dict[str, tuple[GptImageLegacySizeType, int, int]]] = {
         size: (size, width, height) for size, width, height in LEGACY_ASPECT_RATIO_TO_SIZE.values()
     }
 
@@ -41,13 +58,13 @@ class OpenAIImgGenFactory:
     GPT_IMAGE_2_RELIABILITY_PIXELS: ClassVar[int] = 2560 * 1440
 
     @classmethod
-    def size_for_legacy_openai_image(
+    def size_for_legacy_gpt_image(
         cls,
         *,
         model_name: str,
         aspect_ratio: AspectRatio,
         size: SizeTier | ImageSize | None,
-    ) -> tuple[OpenAIImageLegacySizeType, int, int]:
+    ) -> tuple[GptImageLegacySizeType, int, int]:
         if isinstance(size, SizeTier):
             match size:
                 case SizeTier.ONE_K:
@@ -174,16 +191,21 @@ class OpenAIImgGenFactory:
                 log.warning(msg)
 
     @classmethod
-    def moderation_for_openai_image(cls, *, is_moderated: bool | None) -> OpenAIImageModerationType:
-        """Map the is_moderated flag to OpenAI's moderation parameter: "auto" is standard filtering, "low" is less restrictive."""
+    def moderation_literal(cls, *, is_moderated: bool | None) -> GptImageModerationType | None:
+        """Map the is_moderated flag to the GPT Image moderation value: "auto" is standard filtering, "low" is less restrictive.
+
+        None means "send nothing" so the provider applies its own default — the caller omits
+        the argument rather than forwarding a sentinel, which is what keeps this mapping free
+        of any provider SDK.
+        """
         if is_moderated is None:
-            return omit
+            return None
         if is_moderated:
             return "auto"
         return "low"
 
     @classmethod
-    def input_fidelity_for_openai_image(cls, input_fidelity: InputFidelity) -> OpenAIImageInputFidelityType:
+    def input_fidelity_literal(cls, input_fidelity: InputFidelity) -> GptImageInputFidelityType:
         match input_fidelity:
             case InputFidelity.LOW:
                 return "low"

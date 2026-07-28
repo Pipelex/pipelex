@@ -2,7 +2,7 @@
 
 **Design doc:** [`wip/refactoring/modularity-refactors.md`](wip/refactoring/modularity-refactors.md) — the *why*, the rulings, the measurement snippets. This file is the *how*: ordered work, checkboxes, hard checkpoints.
 
-**Worktree:** `_hub/` · **Branch:** `refactor/Modularity-3` · **Base:** `refactor/Hub-2` (PR #1064, still open — see [Gating](#gating)) · **Status:** **M2 complete — at CHECKPOINT M2, awaiting review verdicts.** M3, M1 and M2 all committed on one branch; M3 and M1 reviewed and their fixes committed. Only follow-up F1 and Phase 5 remain.
+**Worktree:** `_hub/` · **Branch:** `refactor/Modularity-3` · **Base:** `refactor/Hub-2` (PR #1064, still open — see [Gating](#gating)) · **Status:** **F1 complete — at CHECKPOINT F1, awaiting review verdicts.** M3, M1, M2 and F1 all committed on one branch; M3, M1 and M2 reviewed and their fixes committed. Only Phase 5 remains.
 
 **Reviewed 2026-07-27** (`/plan-eng-review`, 8 issues, all ruled). The review reversed **D-M1-2**, ruled **D-M1-4**/**D-M1-5**/**D-M1-6**, re-scoped **F1**, and corrected the cross-repo blast radius in both directions. The changes are folded in below; see [Review findings](#review-findings) for what moved and why.
 
@@ -380,17 +380,39 @@ Deliberately **not** inside the 127-file M2 move: this is a behavior change and 
 
 **Ruled: move the helpers, do not dispatch them.** Extract the OpenAI/Google taxonomy and geometry helpers into a **neutral mapping module under `cogt/img_gen/`**, then have both `ImgGenArgsFactory` and the provider workers import *inward*. These are taxonomy utilities keyed by a `cogt`-owned enum — they were never independently dispatched workers.
 
-- [ ] Extract the taxonomy/geometry helpers from `providers/google/google_img_gen_factory.py` and `providers/openai/openai_img_gen_factory.py` into a neutral `cogt/img_gen/` mapping module. (Both re-pathed by M2 — F1 is unstarted work, so its paths must name the current tree.)
-- [ ] Re-point `img_gen_args_factory.py:37-38` (currently **module-level**, not deferred) and the provider workers to import inward from it. Net import-cost improvement: removes two eager vendor imports from a `cogt` module.
-- [ ] Tests covering each taxonomy branch, including the unmapped-taxonomy path.
-- [ ] Changelog entry.
-- [ ] Leave `backend_factory.py:53` alone; re-check after VertexAI removal lands.
+- [x] Extract the taxonomy/geometry helpers from `providers/google/google_img_gen_factory.py` and `providers/openai/openai_img_gen_factory.py` into a neutral `cogt/img_gen/` mapping module. (Both re-pathed by M2 — F1 is unstarted work, so its paths must name the current tree.) — **two** modules, not one (D-F1-1): `cogt/img_gen/img_gen_gemini_mapping.py` + `cogt/img_gen/img_gen_gpt_mapping.py`.
+- [x] Re-point `img_gen_args_factory.py:37-38` (currently **module-level**, not deferred) and the provider workers to import inward from it. Net import-cost improvement: removes two eager vendor imports from a `cogt` module. — done; the inward importers are `providers/google/google_img_gen_worker.py` and `providers/gateway/gateway_factory.py`.
+- [x] Tests covering each taxonomy branch, including the unmapped-taxonomy path. — the branch coverage already existed and moved with the module (`test_img_gen_gemini_mapping.py`, incl. the non-Gemini-taxonomy rejection; the GPT-Image branches are covered from the args-factory side). What was **missing** is the invariant F1 actually buys, added as `test_img_gen_mapping_neutrality.py` (D-F1-4).
+- [x] Changelog entry.
+- [x] Leave `backend_factory.py:53` alone; re-check after VertexAI removal lands. — untouched; it is now the *only* remaining `cogt → specific vendor` edge of this kind.
 
 **Why this beats the registry**, recorded so it is not re-litigated: no hub wiring, no registrar menu entry, and therefore **no plugin-API version bump**. `plugins/contract.py:5-19` uses strict coarse API equality and explicitly versions registrar changes, so adding a menu capability would force a coordinated plugin wave — for two import sites. It also fixes the dependency *direction* rather than routing it through machinery, and it leaves `pipelex.plugins.contract` untouched, which is what M2's changelog promises.
+
+### Exit criteria
+
+| | baseline | target | **actual** |
+| --- | --- | --- | --- |
+| `cogt → specific vendor` import statements | 7 | **5** (4 config + 1 deferred VertexAI) | ✅ **5** |
+| source files outside `providers/` naming a vendor module | 3 | **2** | ✅ **2** (`config_cogt.py`, `backend_factory.py`) |
+| eager vendor imports in `cogt/img_gen/` | 2 | **0** | ✅ **0** |
+| third-party imports in the mapping modules | 1 (`openai`) | **0** | ✅ **0**, and pinned by a test |
+| tests pinning the neutrality of the new home | 0 | **1** | ✅ **1** module / 2 tests, both mutation-checked red |
 
 ### 🛑 CHECKPOINT F1 — HARD STOP
 
 Gates as above (this one *does* change behavior, so `make agent-test` is the real gate, not a formality). Reviews: `correctness-and-boot` + `over-engineering`. Then stop.
+
+#### Checkpoint record — reached 2026-07-28
+
+**All gates green**: `cko`, `cleanderived` + fixture regen, `agent-check` (ruff / pyright 0 / mypy 0 / cko / chl), full `agent-test`, `drift-check`, `chl`, `gep` (diff reviewed — empty, and *verified* empty rather than assumed: no error class moved, and `cogt` already had its `_SUBSYSTEM_SECTIONS` row, so the M1/M2 regression shape could not repeat here), `tb`.
+
+**Scale:** 2 source modules + 1 test module moved, 127 substitutions across 11 files plus the durations file. Same rewrite method as M1/M2 (ordered longest-first substitutions over `git ls-files`, `CHANGELOG.md` / `TODOS.md` / `wip/` / `docs/errors/` excluded, then a whole-tree `git grep` completion check asserting the only survivors are in those excluded files). ⚠ `.test_durations` is **not** an exclusion — M1 and M2 both rewrote it, and it carries test node ids that a test move invalidates.
+
+**One near-miss the completion sweep caught by construction:** `OpenAIImageURL` is a live local alias for the OpenAI SDK's `ImageURL` in four completions factories. A substitution keyed on `OpenAIImage` would have corrupted all four; the list keys on the full type names (`OpenAIImageLegacySizeType`, `OpenAIImageModerationType`, `OpenAIImageInputFidelityType`), so none matched. Verified after the fact — the four sites are untouched.
+
+**Decisions taken during implementation** — see [Decisions](#decisions) for D-F1-1 … D-F1-4.
+
+**Deferred, not fixed** — `subject_grants.toml` is no longer sorted by key, which its own documentation calls an invariant (`docs/contribute/keyword-only-arguments.md:37`: *"machine-written and sorted by key, so diffs stay stable and merge conflicts resolve trivially"*). Measured 11 out-of-order pairs; F1 contributes 2 of them and **M1 and M2 contribute the rest** — a bulk path rewrite re-paths a grant key without re-sorting, and `check-keyword-only` does not gate order. It is branch debt, not F1 debt, so it lands as its own mechanical commit (key set provably unchanged) rather than inside F1's diff.
 
 ---
 
@@ -414,7 +436,7 @@ Gates as above (this one *does* change behavior, so `make agent-test` is the rea
 
   **The four wire-string consumers are the dangerous ones**: they branch on the error class name as an `error_type` value, so the rename does not break their build — they silently fall through to a generic error branch. No Python grep or type checker finds them.
 
-  Verified clean for the M1 module set: `pipelex-cookbook`, `cocode`, `pipelex-mistralai-workflows`, `pipelex-worker`, `pipelex-starter-python`, `pipelex-relay`, `sandbox`, `pipelex-daytona-sandbox` (it imports `pipelex.plugins.contract` / `registrar`, which do not move). **M2 contributes nothing to this sweep** — zero external consumers import `pipelex.plugins.<vendor>`. No kajson-registered class moves, so serialized payloads are untouched.
+  Verified clean for the M1 module set: `pipelex-cookbook`, `cocode`, `pipelex-mistralai-workflows`, `pipelex-worker`, `pipelex-starter-python`, `pipelex-relay`, `sandbox`, `pipelex-daytona-sandbox` (it imports `pipelex.plugins.contract` / `registrar`, which do not move). **M2 and F1 contribute nothing to this sweep** — zero external consumers import `pipelex.plugins.<vendor>`, and zero import either img-gen mapping under any name (re-measured across every repo at F1 time; the only hit anywhere is the released `pipelex/` checkout itself). No kajson-registered class moves, so serialized payloads are untouched.
 
 - [ ] **Fix the workspace repo table first.** `pipelex-transport` and `pipelex-daytona-sandbox` are real consumer repos missing from the workspace-root `CLAUDE.md` table — which is the table every cross-repo sweep is built from, and the reason `pipelex-transport` was missed here. Add both (and audit for others) before the sweep runs.
 - [ ] Archive this tracker to `wip/refactoring/` when the track completes (repo convention — see how `wip/hub/hub-split-tracker.md` was handled).
@@ -473,6 +495,10 @@ Ruled during the **2026-07-27 review**:
 | **D-M1-8** | **`PipelexBundleBlueprintValidationErrorData` moved to `pipelex.core.exceptions`**, not into `mthds_parsing/` with the parser that raises it | Ruled during M1a under the authority M1c's plan granted ("if the closure test *does* fail on it, move the data class to a runtime-layer home instead"). It does fail: `core.memory.working_memory_factory` reaches it, and the closure test's `INTERPRETER_CORE_EXCLUDED` existed for exactly that. `core/exceptions.py` already holds the two sibling structured error-data models keyed on the same `PipeValidationErrorType`. Moving the leaf is what let the exclusion be deleted outright rather than carried forward |
 | **D-M2-4** | **M2 is stacked on M1 on one branch**, not a parallel branch off #1064 rebased afterwards | The plan's own [Gating](#gating) already prescribed the landing order M3 → M1 → M2 and warned that the three shared files make them non-parallel. Stacking satisfies the order, removes the conflict, and removes the mandatory post-rebase drift re-ack — the ack recorded at CHECKPOINT M2 is against the final tree rather than a tree that will move |
 | **D-R-1** | **No third layer** between runtime and interpreter | A layer encodes a forbidden arrow; there is only one (`runtime_hub ↛ interpreter_hub`). The shared kernel a third layer would hold already exists as `core/`'s value model, which both layers use. The pipe vocabulary fails the entry test — only the interpreter needs it |
+| **D-F1-1** | **Two mapping modules, not one.** `cogt/img_gen/img_gen_gemini_mapping.py` + `cogt/img_gen/img_gen_gpt_mapping.py` | The plan said "a neutral `cogt/img_gen/` mapping module", singular. The two taxonomy families share **zero** code, come to ~500 lines together, and cover disjoint `AspectRatioTaxonomy` members; the repo files one topic per module, and the existing tests were already split per family. Named on the package's own `img_gen_*` prefix convention, with classes `ImgGen<Family>Mapping` to match `ImgGenArgsFactory` / `ImgGenParamSupport` |
+| **D-F1-2** | **Rename the classes and the vendor-suffixed methods**, rather than carrying `GoogleImgGenFactory` / `OpenAIImgGenFactory` into `cogt/` | Two things were wrong in the new home, and both are the defect this track keeps finding — a name that describes where the code used to live. (a) The **vendor** is not what the mapping is keyed by: dispatch is by model *family*, and the gateway resolves Gemini geometry through a Portkey SDK, so "Google" names a party that is not always involved. (b) "Factory" contradicts the repo's own convention (`make_from_*`); these are lookup tables and validators. Renames measured in-tree only: **zero** consumers in any sibling repo |
+| **D-F1-3** | **`moderation_literal` returns `None` instead of the OpenAI `omit` sentinel** | Load-bearing for the move, not a drive-by simplification: `Omit`/`omit` come from `from openai import …`, so keeping the sentinel would have put a hard vendor-SDK import in the neutral layer — exactly what F1 exists to remove. Verified equivalent rather than assumed: the sole caller already collapsed the non-`str` case to "emit no key" (`img_gen_args_factory.make_args_from_safety_checker`), and `openai_img_gen_worker.py:78` only ever pops a `str`. The emitted API arguments are identical on every path |
+| **D-F1-4** | **Add a neutrality test** (`tests/unit/pipelex/cogt/img_gen/test_img_gen_mapping_neutrality.py`) | Nothing in the repo can catch a regression here. `pipelex.cogt` and `pipelex.providers` are **both** runtime-layer, so the hub-layering guard and the import-closure test are blind to an edge between them *by construction* — the property F1 buys would otherwise be unguarded from the moment it landed, which is the shape of the M2 finding Codex #5 caught. Two complementary checks because the coupling has two routes back: an AST read of the modules' own imports (catches a fresh `from openai import omit`) and a subprocess closure measurement (catches a `pipelex.cogt.*` import that drags an adapter in behind it). The module list is globbed from disk so a third family is covered the day it lands, with a non-emptiness assertion so a glob that stops matching cannot pass vacuously |
 
 ---
 
@@ -559,6 +585,19 @@ The move: **17** vendor packages + `builtins.py` from `pipelex/plugins/` to `pip
 
 `INTERPRETER_PACKAGES` is **unchanged** — M2 adds a runtime-layer package, so the matched triple (guard tuple / closure predicate / hub-layering snippet / design-doc snippet) is undisturbed, and the design doc needed no edit. Verified by script rather than assumed: the closure predicate and the doc snippet still name the same set.
 
+### Post-F1, measured 2026-07-28
+
+| | before | after |
+| --- | --- | --- |
+| `cogt → specific vendor` import statements | 7 | **5** — the four `config_cogt.py` config classes (documented, D-M2-2) + the deferred `VertexAIFactory` |
+| source files outside `providers/` naming a vendor module | 3 | **2** (`cogt/config_cogt.py`, `cogt/model_backends/backend_factory.py`) |
+| third-party packages imported by the img-gen mapping modules | 1 (`openai`) | **0** |
+| `pipelex.providers.*` modules in the mapping modules' import closure | — | **0**, measured in a fresh interpreter |
+
+⚠ The vendor-segment character class matters here too (the M2 trap): `[a-z0-9_]+`, not `[a-z_]*`. The measurement above is the whole verdict for F1 — the rewrite itself was keyed on literal module paths and was never at risk.
+
+The mutation that proves the closure check discriminates: adding one `pipelex.providers.google.google_factory` import to a mapping module makes it report **10** provider modules, not one — `google_factory` reaches `pipelex.config`, which reaches `config_cogt`, which names the four vendor configs. The documented `cogt → config` inversion is therefore also the shortest path back to full vendor coupling, which is worth knowing before anyone calls it harmless.
+
 *(Append post-phase re-measurements here as each checkpoint clears.)*
 
 ---
@@ -614,9 +653,9 @@ Not in this wave. Captured with their evidence so they are not re-derived.
 **Read this first in a new session.** Keep it true at every checkpoint.
 
 - **Where:** worktree `_hub/`, branch `refactor/Modularity-3`, based on `refactor/Hub-2` (PR #1064). Related memory: `project_modularity_refactors.md`, `project_hub_split_refactor.md`.
-- **What:** three refactors continuing the hub split — M3 (split the boot manifest, seed `pipe_machinery/`), M1 (hoist core's interpreter half into `mthds_parsing/` + `pipe_machinery/`, collapse the guard declaration), M2 (split `plugins/` into mechanism + `providers/`), then follow-up F1 (two img-gen factory imports behind a new registry slot).
-- **Why now:** **M3 and M1** break external imports, and the repo already owes a release-gated cross-repo sweep for the hub split — landing them first means consumers absorb one breaking wave instead of several. **M2 does not** (measured zero external consumers) and can land on its own schedule.
-- **State:** **M3, M1 and M2 all done and committed on one branch — sitting at CHECKPOINT M2.** M1 is three commits: `0f0309b8f` (M1a, parser → `mthds_parsing/`), `c9c45c475` (M1b, Pipe machinery → `pipe_machinery/`), `10080cf26` (M1c, declaration collapse + guards + docs), plus `7beda698f` for the review fixes. M2 is one commit on top (D-M2-4 — stacked, not parallel). All gates green at every checkpoint, all exit criteria met. **M3's and M1's review rounds are done and their fixes committed**; see [Review round](#review-round--done-2026-07-28-fixes-applied) — the moves cleared, every defect was docs/fixture/test-quality drift, and three placement items are deferred to `wip/refactoring/deferred-placement-follow-ups.md`. **M2's review round has not run yet** — that is the next action. Only F1 and Phase 5 remain after it.
+- **What:** three refactors continuing the hub split — M3 (split the boot manifest, seed `pipe_machinery/`), M1 (hoist core's interpreter half into `mthds_parsing/` + `pipe_machinery/`, collapse the guard declaration), M2 (split `plugins/` into mechanism + `providers/`), then follow-up F1 (the two img-gen factory imports, fixed by moving the mappings inward — **no registry**, see D-M2-2).
+- **Why now:** **M3 and M1** break external imports, and the repo already owes a release-gated cross-repo sweep for the hub split — landing them first means consumers absorb one breaking wave instead of several. **M2 and F1 do not** (measured zero external consumers for both) and can land on their own schedule.
+- **State:** **M3, M1, M2 and F1 all done and committed on one branch — sitting at CHECKPOINT F1.** M1 is three commits: `0f0309b8f` (M1a, parser → `mthds_parsing/`), `c9c45c475` (M1b, Pipe machinery → `pipe_machinery/`), `10080cf26` (M1c, declaration collapse + guards + docs), plus `7beda698f` for the review fixes. M2 is one commit on top (D-M2-4 — stacked, not parallel) plus `fa6f4fae9` for its review fixes, then F1. All gates green at every checkpoint, all exit criteria met. **M3's, M1's and M2's review rounds are all done and their fixes committed** — the moves cleared every time, every defect was docs/fixture/test-quality drift, and three placement items are deferred to `wip/refactoring/deferred-placement-follow-ups.md`. **F1's review round has not run yet** — that is the next action. Only Phase 5 remains after it.
 - **Blocking:** PR #1064 must merge before this branch opens a PR against `dev`. **No open decisions.**
 - **⚠ Two cross-repo edits are uncommitted in sibling repos** — `conformance/tests/pipelex_transport/test_data.py` and workspace-root `docs/specs/pipelex-transport-boundary.md`, one line each, repointing `PipeAbstract` to `pipelex.pipe_machinery`. They are release-gated with the rest of the sweep and must not be lost.
 - **What M3 actually changed:** no module moved paths and no class was renamed — only the six pipe lists moved from `CoreRegistryModels` to `pipelex.pipe_machinery.registry_models.PipeRegistryModels`. M3 contributes **nothing** to the cross-repo sweep. **M1 is where the sweep debt is incurred**, and it is bigger than the module moves: `PipelexInterpreterError` → `MthdsParserError` is the `error_type` **wire string** four TypeScript consumers branch on, and the docs redirect does nothing for them.
@@ -630,6 +669,7 @@ Not in this wave. Captured with their evidence so they are not re-derived.
 - **The four things that will bite you:** (1) re-path `subject_grants.toml` *before* `make agent-check`, or `fix-keyword-only` silently rewrites your subjects — note that a whole-tree textual rewrite re-paths them for free, including qualnames embedded in the key, which is how M1a's `PipelexInterpreter.make_pipelex_bundle_blueprint` fixed itself; (2) `pipelex.plugins.secrets` is a vendor dir but `pipelex.plugins.secrets_provider_registry` is a mechanism module — no prefix `sed`; (3) the guard tuple, the closure-test predicate, the hub-layering snippet and the design-doc snippet are a matched set — **the first three are now mechanically bound by tests** (M1c), the design doc's is not; (4) **string literals are module references too** — 189 in M2, invisible to every import tool.
 - **What the rewrite method looked like, since M2 is the same shape at larger scale:** one Python script over `git ls-files`, an ordered longest-first substitution list (dotted paths, then filesystem paths, then test paths, then the class rename), excluding `CHANGELOG.md` / `TODOS.md` / `wip/` / `docs/errors/` — history and generated pages must not be rewritten. Then `grep` the whole tree for the old paths and assert the only survivors are in those excluded files. That completion check is what makes "did I get them all?" answerable.
 - **The measurement trap that already caught this plan once:** the classification snippet counts *outbound* imports. It tells you whether a module is a leaf, **not** which layer owns it. Use the [inbound test](#the-inbound-test--added-2026-07-27-and-it-is-the-one-that-decides-layer) for layer decisions.
+- **What F1 adds, and it generalizes past this track:** a placement fix *inside one layer* has no gate. Both `pipelex.cogt` and `pipelex.providers` are runtime-layer, so the hub guard and the closure test cannot see an edge between them by construction — every `cogt → vendor` inversion on this page is invisible to both. Whenever you fix one, the invariant you just bought is unguarded from that moment on unless you write the test yourself (D-F1-4). The same is true of the four `config_cogt` edges that stay, which is why they are documented rather than merely tolerated.
 
 ---
 
@@ -665,7 +705,7 @@ Synthesized from the review's findings. Each derives from a specific finding abo
   - Surfaced by: Issue 7 — invisible to import rewrites and pyright; 189 in M2, 15 in M1
   - Files: `tests/unit/pipelex/plugins/`, `pipelex/plugins/`
   - Verify: `make agent-test`; zero surviving `pipelex.plugins.<vendor>` literals
-- [ ] **T8 (P2, human: ~1d / CC: ~30min)** — F1 — Extract the taxonomy/geometry helpers into a neutral `cogt/img_gen/` mapping module; both sides import inward
+- [x] **T8 (P2, human: ~1d / CC: ~30min)** — F1 — Extract the taxonomy/geometry helpers into a neutral `cogt/img_gen/` mapping module; both sides import inward
   - Surfaced by: Issue 8 + Codex #14/#15 — `make_args_for_model` takes no sdk, dispatch is by `AspectRatioTaxonomy`, gateway is one SDK spanning both; a registry slot would force a plugin-API bump
   - Files: `pipelex/cogt/img_gen/img_gen_args_factory.py`, `pipelex/providers/{google,openai}/*_img_gen_factory.py`
   - Verify: a test per taxonomy branch incl. the unmapped-taxonomy path; `pipelex.plugins.contract` untouched

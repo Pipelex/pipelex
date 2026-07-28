@@ -76,11 +76,11 @@ def _make_google_img_gen_worker(mocker: MockerFixture) -> GoogleImgGenWorker:
 
     # Mock the factory static methods so they don't fail before the API call
     mocker.patch(
-        "pipelex.providers.google.google_img_gen_worker.GoogleImgGenFactory.aspect_ratio_literal",
+        "pipelex.providers.google.google_img_gen_worker.ImgGenGeminiMapping.aspect_ratio_literal",
         return_value="1:1",
     )
     mocker.patch(
-        "pipelex.providers.google.google_img_gen_worker.GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size",
+        "pipelex.providers.google.google_img_gen_worker.ImgGenGeminiMapping.dimensions_for_aspect_ratio_and_size",
         return_value=(1024, 1024),
     )
 

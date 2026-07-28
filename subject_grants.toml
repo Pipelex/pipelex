@@ -4844,35 +4844,35 @@ rationale = "Transforms the prompt_image into provider parts; single operand."
 param = "llm_prompt"
 rationale = "Transforms the llm_prompt into provider parts; single operand."
 
-["pipelex/providers/google/google_img_gen_factory.py::GoogleImgGenFactory.aspect_ratio_literal"]
+["pipelex/cogt/img_gen/img_gen_gemini_mapping.py::ImgGenGeminiMapping.aspect_ratio_literal"]
 param = "aspect_ratio"
 rationale = "Converts the aspect ratio to its provider literal; single operand."
 
-["pipelex/providers/google/google_img_gen_factory.py::GoogleImgGenFactory.derive_ratio_and_size_from_exact_size"]
+["pipelex/cogt/img_gen/img_gen_gemini_mapping.py::ImgGenGeminiMapping.derive_ratio_and_size_from_exact_size"]
 param = "taxonomy"
 rationale = "Operates on the aspect-ratio taxonomy; the lookup keys stay keyword-only."
 
-["pipelex/providers/google/google_img_gen_factory.py::GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size"]
+["pipelex/cogt/img_gen/img_gen_gemini_mapping.py::ImgGenGeminiMapping.dimensions_for_aspect_ratio_and_size"]
 param = "taxonomy"
 rationale = "Operates on the aspect-ratio taxonomy; the lookup keys stay keyword-only."
 
-["pipelex/providers/google/google_img_gen_factory.py::GoogleImgGenFactory.grids_for_taxonomy"]
+["pipelex/cogt/img_gen/img_gen_gemini_mapping.py::ImgGenGeminiMapping.grids_for_taxonomy"]
 param = "taxonomy"
 rationale = "Operates on the aspect-ratio taxonomy; the lookup keys stay keyword-only."
 
-["pipelex/providers/google/google_img_gen_factory.py::GoogleImgGenFactory.image_size_for_tier"]
+["pipelex/cogt/img_gen/img_gen_gemini_mapping.py::ImgGenGeminiMapping.image_size_for_tier"]
 param = "tier"
 rationale = "Derives the image size for the size tier; single operand."
 
-["pipelex/providers/google/google_img_gen_factory.py::GoogleImgGenFactory.img_gen_taxonomy"]
+["pipelex/cogt/img_gen/img_gen_gemini_mapping.py::ImgGenGeminiMapping.img_gen_taxonomy"]
 param = "inference_model"
 rationale = "Operates on the aspect-ratio taxonomy; the lookup keys stay keyword-only."
 
-["pipelex/providers/google/google_img_gen_factory.py::GoogleImgGenFactory.optional_img_gen_taxonomy"]
+["pipelex/cogt/img_gen/img_gen_gemini_mapping.py::ImgGenGeminiMapping.optional_img_gen_taxonomy"]
 param = "inference_model"
 rationale = "Operates on the aspect-ratio taxonomy; the lookup keys stay keyword-only."
 
-["pipelex/providers/google/google_img_gen_factory.py::GoogleImgGenFactory.resolve_image_config"]
+["pipelex/cogt/img_gen/img_gen_gemini_mapping.py::ImgGenGeminiMapping.resolve_image_config"]
 param = "taxonomy"
 rationale = "Operates on the aspect-ratio taxonomy; the lookup keys stay keyword-only."
 
@@ -5032,11 +5032,11 @@ rationale = "Factory from source: builds the pydantic model from the function; s
 param = "openai_message"
 rationale = "Derives the tool-call list from the OpenAI message; single operand."
 
-["pipelex/providers/openai/openai_img_gen_factory.py::OpenAIImgGenFactory._size_to_string"]
+["pipelex/cogt/img_gen/img_gen_gpt_mapping.py::ImgGenGptMapping._size_to_string"]
 param = "size"
 rationale = "Converts the image size to its provider string; single operand."
 
-["pipelex/providers/openai/openai_img_gen_factory.py::OpenAIImgGenFactory.input_fidelity_for_openai_image"]
+["pipelex/cogt/img_gen/img_gen_gpt_mapping.py::ImgGenGptMapping.input_fidelity_literal"]
 param = "input_fidelity"
 rationale = "Derives the OpenAI fidelity literal from the input fidelity; single operand."
 

@@ -17,9 +17,9 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, InferenceErrorCategory
+from pipelex.cogt.img_gen.img_gen_gemini_mapping import ResolvedGeminiImageConfig
 from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy, ImgGenArgTopic
 from pipelex.cogt.inference.error_classification import UserActionKind
-from pipelex.providers.google.google_img_gen_factory import ResolvedGoogleImageConfig
 from pipelex.providers.google.google_img_gen_worker import GoogleImgGenWorker
 
 
@@ -47,8 +47,8 @@ def _make_worker(mocker: MockerFixture) -> GoogleImgGenWorker:
     worker.genai_async_client = mock_async_client
 
     mocker.patch(
-        "pipelex.providers.google.google_img_gen_worker.GoogleImgGenFactory.resolve_image_config",
-        return_value=ResolvedGoogleImageConfig(aspect_ratio="1:1", image_size=None, width=1024, height=1024),
+        "pipelex.providers.google.google_img_gen_worker.ImgGenGeminiMapping.resolve_image_config",
+        return_value=ResolvedGeminiImageConfig(aspect_ratio="1:1", image_size=None, width=1024, height=1024),
     )
     return worker
 

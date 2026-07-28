@@ -83,7 +83,7 @@ class TestImgGenArgsOpenAISizes:
 
     def test_tier_derived_reliability_note_is_verbose(self, mocker: MockerFixture) -> None:
         """A tier-derived size above the reliability boundary logs verbose, not a loud warning."""
-        mock_log = mocker.patch("pipelex.providers.openai.openai_img_gen_factory.log")
+        mock_log = mocker.patch("pipelex.cogt.img_gen.img_gen_gpt_mapping.log")
 
         ImgGenArgsFactory.make_args_from_aspect_ratio(
             aspect_ratio_taxonomy=AspectRatioTaxonomy.GPT_IMAGE_2,
@@ -97,7 +97,7 @@ class TestImgGenArgsOpenAISizes:
 
     def test_user_exact_size_reliability_warning_stays_loud(self, mocker: MockerFixture) -> None:
         """A user-supplied exact size above the reliability boundary keeps the loud warning."""
-        mock_log = mocker.patch("pipelex.providers.openai.openai_img_gen_factory.log")
+        mock_log = mocker.patch("pipelex.cogt.img_gen.img_gen_gpt_mapping.log")
 
         ImgGenArgsFactory.make_args_from_aspect_ratio(
             aspect_ratio_taxonomy=AspectRatioTaxonomy.GPT_IMAGE_2,
@@ -110,7 +110,7 @@ class TestImgGenArgsOpenAISizes:
         mock_log.verbose.assert_not_called()
 
     def test_exact_size_below_reliability_boundary_logs_nothing(self, mocker: MockerFixture) -> None:
-        mock_log = mocker.patch("pipelex.providers.openai.openai_img_gen_factory.log")
+        mock_log = mocker.patch("pipelex.cogt.img_gen.img_gen_gpt_mapping.log")
 
         ImgGenArgsFactory.make_args_from_aspect_ratio(
             aspect_ratio_taxonomy=AspectRatioTaxonomy.GPT_IMAGE_2,

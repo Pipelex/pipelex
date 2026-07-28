@@ -15,6 +15,8 @@ from pipelex.cogt.exceptions import ImgGenParameterError
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
+from pipelex.cogt.img_gen.img_gen_gemini_mapping import ImgGenGeminiMapping
+from pipelex.cogt.img_gen.img_gen_gpt_mapping import ImgGenGptMapping
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, InputFidelity, Quality, SizeTier
 from pipelex.cogt.img_gen.img_gen_model_rules import (
@@ -34,8 +36,6 @@ from pipelex.cogt.img_gen.img_gen_model_rules import (
     SpecificTaxonomy,
 )
 from pipelex.config import get_config
-from pipelex.providers.google.google_img_gen_factory import GoogleImgGenFactory
-from pipelex.providers.openai.openai_img_gen_factory import OpenAIImgGenFactory
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl
 
@@ -366,14 +366,14 @@ class ImgGenArgsFactory:
                         raise ImgGenParameterError(msg)
             case AspectRatioTaxonomy.GPT_IMAGE_LEGACY:
                 key = "size"
-                value = OpenAIImgGenFactory.size_for_legacy_openai_image(
+                value = ImgGenGptMapping.size_for_legacy_gpt_image(
                     model_name=model_name,
                     aspect_ratio=aspect_ratio,
                     size=size,
                 )[0]
             case AspectRatioTaxonomy.GPT_IMAGE_2:
                 key = "size"
-                value = OpenAIImgGenFactory.size_for_gpt_image_2(
+                value = ImgGenGptMapping.size_for_gpt_image_2(
                     model_name=model_name,
                     aspect_ratio=aspect_ratio,
                     size=size,
@@ -387,7 +387,7 @@ class ImgGenArgsFactory:
                 # The Google native worker and the gateway build their own `image_config`
                 # from the job params; this path validates the (aspect_ratio, size) pair
                 # against the taxonomy's published grids and exposes the ratio literal.
-                resolved = GoogleImgGenFactory.resolve_image_config(
+                resolved = ImgGenGeminiMapping.resolve_image_config(
                     aspect_ratio_taxonomy,
                     aspect_ratio=aspect_ratio,
                     size=size,
@@ -503,8 +503,8 @@ class ImgGenArgsFactory:
             case SafetyCheckerTaxonomy.UNAVAILABLE:
                 pass
             case SafetyCheckerTaxonomy.OPENAI_MODERATION:
-                moderation = OpenAIImgGenFactory.moderation_for_openai_image(is_moderated=is_moderated)
-                if not isinstance(moderation, str):
+                moderation = ImgGenGptMapping.moderation_literal(is_moderated=is_moderated)
+                if moderation is None:
                     return args_dict
                 args_dict["moderation"] = moderation
             case SafetyCheckerTaxonomy.AVAILABLE:
@@ -661,7 +661,7 @@ class ImgGenArgsFactory:
         match input_fidelity_taxonomy:
             case InputFidelityTaxonomy.GPT_IMAGE_LEGACY:
                 return {
-                    "input_fidelity": OpenAIImgGenFactory.input_fidelity_for_openai_image(input_fidelity=input_fidelity),
+                    "input_fidelity": ImgGenGptMapping.input_fidelity_literal(input_fidelity=input_fidelity),
                 }
             case InputFidelityTaxonomy.UNAVAILABLE:
                 msg = f"Model '{model_name}' does not support input_fidelity"

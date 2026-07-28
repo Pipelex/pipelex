@@ -2,13 +2,13 @@ import pytest
 
 from pipelex.cogt.exceptions import ImgGenParameterError
 from pipelex.cogt.image.image_size import ImageSize
+from pipelex.cogt.img_gen.img_gen_gemini_mapping import (
+    GeminiAspectRatioType,
+    GeminiImageSize,
+    ImgGenGeminiMapping,
+)
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, SizeTier
 from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy
-from pipelex.providers.google.google_img_gen_factory import (
-    GoogleAspectRatioType,
-    GoogleImageSize,
-    GoogleImgGenFactory,
-)
 
 BANNER_ASPECT_RATIOS = [
     AspectRatio.LANDSCAPE_4_1,
@@ -17,7 +17,7 @@ BANNER_ASPECT_RATIOS = [
     AspectRatio.PORTRAIT_1_8,
 ]
 
-GOOGLE_TAXONOMIES = [
+GEMINI_TAXONOMIES = [
     AspectRatioTaxonomy.GEMINI_2_5,
     AspectRatioTaxonomy.GEMINI_3_PRO,
     AspectRatioTaxonomy.GEMINI_3_FLASH,
@@ -25,7 +25,7 @@ GOOGLE_TAXONOMIES = [
 ]
 
 
-class TestGoogleImgGenFactory:
+class TestImgGenGeminiMapping:
     @pytest.mark.parametrize(
         ("aspect_ratio", "expected_literal"),
         [
@@ -37,21 +37,21 @@ class TestGoogleImgGenFactory:
             (AspectRatio.PORTRAIT_1_8, "1:8"),
         ],
     )
-    def test_aspect_ratio_literal_mapping(self, aspect_ratio: AspectRatio, expected_literal: GoogleAspectRatioType) -> None:
+    def test_aspect_ratio_literal_mapping(self, aspect_ratio: AspectRatio, expected_literal: GeminiAspectRatioType) -> None:
         """The enum maps to Google's ratio string format, including the banner ratios."""
-        assert GoogleImgGenFactory.aspect_ratio_literal(aspect_ratio) == expected_literal
+        assert ImgGenGeminiMapping.aspect_ratio_literal(aspect_ratio) == expected_literal
 
     def test_aspect_ratio_literal_rejects_portrait_9_21(self) -> None:
         """9:21 is not offered by any Google Gemini Image model."""
         with pytest.raises(ImgGenParameterError, match="not supported by Google Gemini Image models"):
-            GoogleImgGenFactory.aspect_ratio_literal(AspectRatio.PORTRAIT_9_21)
+            ImgGenGeminiMapping.aspect_ratio_literal(AspectRatio.PORTRAIT_9_21)
 
     def test_gemini_3_grids_are_consistent(self) -> None:
         """All Gemini 3 size grids cover the same ratio set, and the Pro subset is contained in it."""
-        ratio_sets = [set(grid) for grid in GoogleImgGenFactory.SIZE_TO_ASPECT_RATIO_TO_DIMENSIONS_GEMINI_3.values()]
+        ratio_sets = [set(grid) for grid in ImgGenGeminiMapping.SIZE_TO_ASPECT_RATIO_TO_DIMENSIONS_GEMINI_3.values()]
         assert all(ratio_set == ratio_sets[0] for ratio_set in ratio_sets)
-        assert ratio_sets[0] >= GoogleImgGenFactory.GEMINI_3_PRO_ASPECT_RATIOS
-        assert set(GoogleImgGenFactory.ASPECT_RATIO_TO_DIMENSIONS_GEMINI_2_5_1K) == GoogleImgGenFactory.GEMINI_3_PRO_ASPECT_RATIOS
+        assert ratio_sets[0] >= ImgGenGeminiMapping.GEMINI_3_PRO_ASPECT_RATIOS
+        assert set(ImgGenGeminiMapping.ASPECT_RATIO_TO_DIMENSIONS_GEMINI_2_5_1K) == ImgGenGeminiMapping.GEMINI_3_PRO_ASPECT_RATIOS
 
     @pytest.mark.parametrize(
         ("tier", "expected_image_size"),
@@ -61,14 +61,14 @@ class TestGoogleImgGenFactory:
             (SizeTier.FOUR_K, "4K"),
         ],
     )
-    def test_image_size_for_tier(self, tier: SizeTier, expected_image_size: GoogleImageSize) -> None:
+    def test_image_size_for_tier(self, tier: SizeTier, expected_image_size: GeminiImageSize) -> None:
         """Portable size tiers map to Google's wire tokens."""
-        assert GoogleImgGenFactory.image_size_for_tier(tier) == expected_image_size
+        assert ImgGenGeminiMapping.image_size_for_tier(tier) == expected_image_size
 
     def test_image_size_for_tier_rejects_half_k(self) -> None:
         """The 0.5k wire token is unverified — rejected until Google opens it."""
         with pytest.raises(ImgGenParameterError, match=r"0\.5k"):
-            GoogleImgGenFactory.image_size_for_tier(SizeTier.HALF_K)
+            ImgGenGeminiMapping.image_size_for_tier(SizeTier.HALF_K)
 
     @pytest.mark.parametrize(
         ("aspect_ratio", "size", "expected_dimensions"),
@@ -92,11 +92,11 @@ class TestGoogleImgGenFactory:
     def test_gemini_3_flash_dimensions(
         self,
         aspect_ratio: AspectRatio,
-        size: GoogleImageSize,
+        size: GeminiImageSize,
         expected_dimensions: tuple[int, int],
     ) -> None:
         """gemini_3_flash supports the full Gemini 3 grid, banners included, at every size."""
-        dimensions = GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
+        dimensions = ImgGenGeminiMapping.dimensions_for_aspect_ratio_and_size(
             AspectRatioTaxonomy.GEMINI_3_FLASH,
             aspect_ratio=aspect_ratio,
             size=size,
@@ -108,7 +108,7 @@ class TestGoogleImgGenFactory:
     def test_gemini_3_pro_rejects_banner_ratios(self, aspect_ratio: AspectRatio) -> None:
         """Gemini 3 Pro publishes no banner ratios, so its taxonomy rejects them cleanly."""
         with pytest.raises(ImgGenParameterError, match="not supported by model"):
-            GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
+            ImgGenGeminiMapping.dimensions_for_aspect_ratio_and_size(
                 AspectRatioTaxonomy.GEMINI_3_PRO,
                 aspect_ratio=aspect_ratio,
                 size="1K",
@@ -126,10 +126,10 @@ class TestGoogleImgGenFactory:
     def test_gemini_3_pro_standard_ratios_work_at_every_size(
         self,
         aspect_ratio: AspectRatio,
-        size: GoogleImageSize,
+        size: GeminiImageSize,
         expected_dimensions: tuple[int, int],
     ) -> None:
-        dimensions = GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
+        dimensions = ImgGenGeminiMapping.dimensions_for_aspect_ratio_and_size(
             AspectRatioTaxonomy.GEMINI_3_PRO,
             aspect_ratio=aspect_ratio,
             size=size,
@@ -141,7 +141,7 @@ class TestGoogleImgGenFactory:
     def test_gemini_2_5_rejects_banner_ratios(self, aspect_ratio: AspectRatio) -> None:
         """The Gemini 2.5 grid has no banner ratios."""
         with pytest.raises(ImgGenParameterError, match="not supported by model"):
-            GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
+            ImgGenGeminiMapping.dimensions_for_aspect_ratio_and_size(
                 AspectRatioTaxonomy.GEMINI_2_5,
                 aspect_ratio=aspect_ratio,
                 size="1K",
@@ -149,10 +149,10 @@ class TestGoogleImgGenFactory:
             )
 
     @pytest.mark.parametrize("size", ["2K", "4K"])
-    def test_gemini_2_5_rejects_non_1k_sizes(self, size: GoogleImageSize) -> None:
+    def test_gemini_2_5_rejects_non_1k_sizes(self, size: GeminiImageSize) -> None:
         """gemini_2_5 only offers the 1K size."""
         with pytest.raises(ImgGenParameterError, match="does not support image size"):
-            GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
+            ImgGenGeminiMapping.dimensions_for_aspect_ratio_and_size(
                 AspectRatioTaxonomy.GEMINI_2_5,
                 aspect_ratio=AspectRatio.SQUARE,
                 size=size,
@@ -160,10 +160,10 @@ class TestGoogleImgGenFactory:
             )
 
     @pytest.mark.parametrize("size", ["2K", "4K"])
-    def test_gemini_3_flash_lite_rejects_non_1k_sizes(self, size: GoogleImageSize) -> None:
+    def test_gemini_3_flash_lite_rejects_non_1k_sizes(self, size: GeminiImageSize) -> None:
         """gemini_3_flash_lite only offers the 1K size."""
         with pytest.raises(ImgGenParameterError, match="does not support image size"):
-            GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
+            ImgGenGeminiMapping.dimensions_for_aspect_ratio_and_size(
                 AspectRatioTaxonomy.GEMINI_3_FLASH_LITE,
                 aspect_ratio=AspectRatio.SQUARE,
                 size=size,
@@ -180,7 +180,7 @@ class TestGoogleImgGenFactory:
     )
     def test_gemini_3_flash_lite_full_ratio_set_at_1k(self, aspect_ratio: AspectRatio, expected_dimensions: tuple[int, int]) -> None:
         """gemini_3_flash_lite supports the full Gemini 3 ratio set, banners included, at 1K."""
-        dimensions = GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
+        dimensions = ImgGenGeminiMapping.dimensions_for_aspect_ratio_and_size(
             AspectRatioTaxonomy.GEMINI_3_FLASH_LITE,
             aspect_ratio=aspect_ratio,
             size="1K",
@@ -188,11 +188,11 @@ class TestGoogleImgGenFactory:
         )
         assert dimensions == expected_dimensions
 
-    @pytest.mark.parametrize("taxonomy", GOOGLE_TAXONOMIES)
+    @pytest.mark.parametrize("taxonomy", GEMINI_TAXONOMIES)
     def test_portrait_9_21_rejected_for_every_taxonomy(self, taxonomy: AspectRatioTaxonomy) -> None:
         """9:21 is rejected before any per-taxonomy gating."""
         with pytest.raises(ImgGenParameterError, match="not supported by Google Gemini Image models"):
-            GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
+            ImgGenGeminiMapping.dimensions_for_aspect_ratio_and_size(
                 taxonomy,
                 aspect_ratio=AspectRatio.PORTRAIT_9_21,
                 size="1K",
@@ -202,7 +202,7 @@ class TestGoogleImgGenFactory:
     def test_non_google_taxonomy_rejected(self) -> None:
         """A non-Gemini taxonomy value has no Google resolution grids."""
         with pytest.raises(ImgGenParameterError, match="not a Google Gemini image generation taxonomy"):
-            GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
+            ImgGenGeminiMapping.dimensions_for_aspect_ratio_and_size(
                 AspectRatioTaxonomy.FLUX,
                 aspect_ratio=AspectRatio.SQUARE,
                 size="1K",
@@ -225,11 +225,11 @@ class TestGoogleImgGenFactory:
         self,
         taxonomy: AspectRatioTaxonomy,
         exact_size: ImageSize,
-        expected_ratio: GoogleAspectRatioType,
-        expected_image_size: GoogleImageSize,
+        expected_ratio: GeminiAspectRatioType,
+        expected_image_size: GeminiImageSize,
     ) -> None:
         """An exact WxH equal to a grid cell derives the (ratio, size) pair."""
-        derived = GoogleImgGenFactory.derive_ratio_and_size_from_exact_size(
+        derived = ImgGenGeminiMapping.derive_ratio_and_size_from_exact_size(
             taxonomy,
             exact_size=exact_size,
             model_name="some-gemini-model",
@@ -239,7 +239,7 @@ class TestGoogleImgGenFactory:
     def test_exact_grid_miss_suggests_nearest_cells(self) -> None:
         """A near-miss errors out naming the nearest valid cells — never silently snaps."""
         with pytest.raises(ImgGenParameterError) as exc_info:
-            GoogleImgGenFactory.derive_ratio_and_size_from_exact_size(
+            ImgGenGeminiMapping.derive_ratio_and_size_from_exact_size(
                 AspectRatioTaxonomy.GEMINI_3_FLASH,
                 exact_size=ImageSize(width=2000, height=2000),
                 model_name="nano-banana-2",
@@ -252,7 +252,7 @@ class TestGoogleImgGenFactory:
     def test_exact_grid_respects_taxonomy_size_gating(self) -> None:
         """A 2K cell of the Gemini 3 grid is not a hit on a 1K-only taxonomy."""
         with pytest.raises(ImgGenParameterError) as exc_info:
-            GoogleImgGenFactory.derive_ratio_and_size_from_exact_size(
+            ImgGenGeminiMapping.derive_ratio_and_size_from_exact_size(
                 AspectRatioTaxonomy.GEMINI_3_FLASH_LITE,
                 exact_size=ImageSize(width=2048, height=2048),
                 model_name="nano-banana-2-lite",
@@ -263,7 +263,7 @@ class TestGoogleImgGenFactory:
     def test_exact_grid_respects_taxonomy_ratio_gating(self) -> None:
         """A banner cell of the Gemini 3 grid is not a hit on the Pro taxonomy (no banners)."""
         with pytest.raises(ImgGenParameterError):
-            GoogleImgGenFactory.derive_ratio_and_size_from_exact_size(
+            ImgGenGeminiMapping.derive_ratio_and_size_from_exact_size(
                 AspectRatioTaxonomy.GEMINI_3_PRO,
                 exact_size=ImageSize(width=2048, height=512),
                 model_name="nano-banana-pro",
@@ -282,10 +282,10 @@ class TestGoogleImgGenFactory:
         taxonomy: AspectRatioTaxonomy,
         aspect_ratio: AspectRatio,
         tier: SizeTier,
-        expected: tuple[GoogleAspectRatioType, GoogleImageSize, int, int],
+        expected: tuple[GeminiAspectRatioType, GeminiImageSize, int, int],
     ) -> None:
         """A tier resolves to Google's `image_size` token plus the matching grid dimensions."""
-        resolved = GoogleImgGenFactory.resolve_image_config(
+        resolved = ImgGenGeminiMapping.resolve_image_config(
             taxonomy,
             aspect_ratio=aspect_ratio,
             size=tier,
@@ -295,7 +295,7 @@ class TestGoogleImgGenFactory:
 
     def test_resolve_image_config_unset_size_omits_wire_param(self) -> None:
         """No size set -> `image_size` stays None (param omitted on the wire), dims come from the 1K grid."""
-        resolved = GoogleImgGenFactory.resolve_image_config(
+        resolved = ImgGenGeminiMapping.resolve_image_config(
             AspectRatioTaxonomy.GEMINI_3_FLASH,
             aspect_ratio=AspectRatio.SQUARE,
             size=None,
@@ -307,7 +307,7 @@ class TestGoogleImgGenFactory:
 
     def test_resolve_image_config_from_exact_size(self) -> None:
         """An exact size resolves through the grid derivation, ignoring the aspect_ratio argument."""
-        resolved = GoogleImgGenFactory.resolve_image_config(
+        resolved = ImgGenGeminiMapping.resolve_image_config(
             AspectRatioTaxonomy.GEMINI_3_FLASH,
             aspect_ratio=AspectRatio.SQUARE,
             size=ImageSize(width=2752, height=1536),
@@ -318,7 +318,7 @@ class TestGoogleImgGenFactory:
     def test_resolve_image_config_rejects_tier_beyond_taxonomy(self) -> None:
         """A tier outside the taxonomy's grids is a validation error, not a silent downgrade."""
         with pytest.raises(ImgGenParameterError, match="does not support image size"):
-            GoogleImgGenFactory.resolve_image_config(
+            ImgGenGeminiMapping.resolve_image_config(
                 AspectRatioTaxonomy.GEMINI_2_5,
                 aspect_ratio=AspectRatio.SQUARE,
                 size=SizeTier.TWO_K,
@@ -327,7 +327,7 @@ class TestGoogleImgGenFactory:
 
     def test_resolve_image_config_rejects_half_k(self) -> None:
         with pytest.raises(ImgGenParameterError, match=r"0\.5k"):
-            GoogleImgGenFactory.resolve_image_config(
+            ImgGenGeminiMapping.resolve_image_config(
                 AspectRatioTaxonomy.GEMINI_3_FLASH,
                 aspect_ratio=AspectRatio.SQUARE,
                 size=SizeTier.HALF_K,

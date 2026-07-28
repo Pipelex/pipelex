@@ -10,13 +10,13 @@ from portkey_ai import (
 
 from pipelex import log
 from pipelex.cogt.extract.extract_job import ExtractJob
+from pipelex.cogt.img_gen.img_gen_gemini_mapping import ImgGenGeminiMapping
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.providers.gateway.gateway_exceptions import GatewayCredentialsError
 from pipelex.providers.gateway.gateway_protocols import GatewayExtractProtocol
 from pipelex.providers.gateway.gateway_schemas import GatewayExtractRequestParams
-from pipelex.providers.google.google_img_gen_factory import GoogleImgGenFactory
 from pipelex.providers.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.runtime_hub import get_telemetry_manager
 from pipelex.system.telemetry.otel_constants import OTelConstants
@@ -74,12 +74,12 @@ class GatewayFactory:
         ratio-only mapping.
         """
         if job_params.size is None:
-            taxonomy = GoogleImgGenFactory.optional_img_gen_taxonomy(inference_model)
+            taxonomy = ImgGenGeminiMapping.optional_img_gen_taxonomy(inference_model)
             if taxonomy is None:
-                return {"aspect_ratio": GoogleImgGenFactory.aspect_ratio_literal(job_params.aspect_ratio)}
+                return {"aspect_ratio": ImgGenGeminiMapping.aspect_ratio_literal(job_params.aspect_ratio)}
         else:
-            taxonomy = GoogleImgGenFactory.img_gen_taxonomy(inference_model)
-        resolved = GoogleImgGenFactory.resolve_image_config(
+            taxonomy = ImgGenGeminiMapping.img_gen_taxonomy(inference_model)
+        resolved = ImgGenGeminiMapping.resolve_image_config(
             taxonomy,
             aspect_ratio=job_params.aspect_ratio,
             size=job_params.size,
