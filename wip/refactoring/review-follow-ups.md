@@ -1,0 +1,205 @@
+# Review follow-ups — assessed and ready to implement
+
+The three items the modularity track's review rounds recorded but did not fix. Each was **re-verified against the tree on 2026-07-28 at `7ddb77f87`** before being written down here; every claim below is measured, and the commands that produced it are inline so a new session can re-take them rather than trust them.
+
+**Where to implement:** `refactor/Hub-2`, after PR #1067 merges into it. All three are independent of each other and of the release-gated cross-repo sweep — except **FU-1**, which should land *before* the sweep ships the `MthdsParserError` rename to its consumers.
+
+**Stable IDs:** cite these as **FU-1**, **FU-2**, **FU-3**. They supersede the unnumbered bullets in the tracker's "Follow-ups from the review" section, which points here.
+
+| id | one line | verdict | size |
+| --- | --- | --- | --- |
+| [FU-1](#fu-1--nothing-flags-an-error-class-rename-and-it-is-a-wire-break) | Nothing flags an error-class rename, and it is a wire break | still true — **do this first** | small |
+| [FU-2](#fu-2--the-img-gen-neutrality-guard-is-weaker-than-its-comment-and-its-recorded-remedy-is-wrong) | The img-gen neutrality guard overclaims; its recorded remedy rests on a false measurement | still true, **remedy corrected here** | two small edits |
+| [FU-3](#fu-3--the-bookkeeping-files-a-bulk-rewrite-breaks-are-still-ungated) | The bookkeeping files a bulk rewrite breaks are still ungated | gate absent, artifacts currently clean | small, do half |
+
+---
+
+## FU-1 — Nothing flags an error-class rename, and it is a wire break
+
+### Verified still true
+
+`pipelex/base_exceptions.py:595` builds the report identity straight off the class:
+
+```python
+report = ErrorReport(
+    error_type=type(self).__name__,
+    ...
+)
+```
+
+`error_type` **is** the Python class name, with no indirection. Consumers branch on that string, so a rename does not break their build — they silently fall through to a generic error branch. All four consumer sites confirmed live and still switching on the **retired** name:
+
+| repo | site | shape |
+| --- | --- | --- |
+| `mthds-starter-js` | `src/lib/errors.ts:176` | `case "PipelexInterpreterError":` |
+| `pipelex-starter-js` | `src/lib/errors.ts:257` | `case "PipelexInterpreterError":` |
+| `vscode-pipelex` | `editors/vscode/src/pipelex/__tests__/cliValidationBackend.test.ts:99` | `error_type: 'PipelexInterpreterError'` |
+| `playroom` | `src/app/api/graph/route.ts:119` | `message.includes("PipelexInterpreterError")` |
+
+The `redirect_maps` workaround is at `mkdocs.yml:60`, with a comment naming this exact rename. It fixes the docs URI; it does nothing for the four sites above.
+
+### What the original item did not say, and it changes the cost
+
+**`title` and `type_uri` are already decoupled.** Both read a `_declared_*` class attribute via `cls.__dict__` (inheritance deliberately bypassed) — `base_exceptions.py:532` and `:547`, added during M1's review round to fix the `"Mthds parser"` brand defect. Measured today: error classes discoverable through `iter_pipelex_error_subclasses()` = **294**; carrying a `_declared_title` = **31**; carrying a `_declared_type_uri` = **0**.
+
+So of the three identity fields on every `ErrorReport`, the two that are *presentation* have an override hatch, and the one that is the **machine contract** does not. That asymmetry is backwards, and it is also why the fix is cheap.
+
+### Recommendation — do the cheap half now, defer the design change
+
+**Do: a golden snapshot of `(error_type, title, type_uri)` for every `PipelexError` subclass.**
+
+The complaint is *"nothing in the repo flags it"*. A snapshot closes exactly that, needs no change to the error model, and needs no matching spec/conformance edit. Every future rename then lands as a reviewable diff on a committed file instead of a silent fallthrough in four TypeScript repos.
+
+Everything needed already exists:
+
+- **The enumerator:** `iter_pipelex_error_subclasses()` in `pipelex/errors/error_pages_generator.py:130`. It force-loads deferred-import error modules first and filters synthetic/fixture subclasses, so it is the population the docs and the wire agree on. Do **not** hand-roll a `__subclasses__()` walk — `tests/unit/pipelex/errors/test_error_class_location_convention.py:141` documents why (a naked walk is green for the wrong reason).
+- **The precedent and the home:** `tests/unit/pipelex/errors/`, alongside the location-convention test that already consumes the same helper.
+- **The one-class version to generalize:** `test_mthds_parser_error_identity_is_pinned` (added in M1's review round for `MthdsParserError`).
+
+Shape it as a committed golden file plus a regeneration command, in the style the repo already uses for generated artifacts — not as an inline literal in the test body. A 294-row inline list is the *inventory* shape this track spent four review rounds deleting; a golden file diff is a review artifact, which is the point.
+
+⚠ **Anti-vacuity:** assert the enumerated set is non-empty, in a **non-parametrized** test. If you parametrize over the class list, pytest reports `SKIPPED [1] got empty parameter set` and exits 0 for an empty list — an assertion at the top of a parametrized body is unreachable by construction. This is the F1 defect; see `tests/unit/pipelex/cogt/img_gen/test_img_gen_mapping_neutrality.py` for the worked fix.
+
+**Defer: the `_declared_error_type` refactor.** Mirroring the existing `_declared_title` / `_declared_type_uri` pattern for `error_type` is ~10 lines against code that already exists. But it buys less than it looks like here: the workspace forbids backward compatibility, so it cannot be used to keep `"PipelexInterpreterError"` alive for the four consumers — they must be updated in the sweep either way. Its value is purely forward, making the *next* rename free. Worth doing when a rename is actually wanted; it touches the error model and the agent-CLI JSON envelope, so it needs a matching `docs/specs/` + `conformance/` change (`error_type` appears in `docs/specs/pipelex-mthds-protocol.md`, `pipelex-hosted-envelope.md`, `mthds-agent-cli.md`, `hook-lint-pipeline.md`).
+
+### Ordering
+
+Land the snapshot **before** the release-gated cross-repo sweep. The sweep is what actually ships `MthdsParserError` to those four consumers, and the snapshot is what makes the next such rename visible at the moment it is made rather than at the moment something breaks in a different repo.
+
+---
+
+## FU-2 — The img-gen neutrality guard is weaker than its comment, and its recorded remedy is wrong
+
+### Verified still true
+
+Both holes are real, in `tests/unit/pipelex/cogt/img_gen/test_img_gen_mapping_neutrality.py`:
+
+- **(a) Transitive vendor SDKs are unguarded.** `_import_roots` AST-parses only each mapping module's *own* file, and `_CLOSURE_SCRIPT` counts only names starting with `pipelex.providers`. A vendor SDK reached through some other `pipelex.cogt` module passes both checks.
+- **(b) The glob under-claims its own coverage.** `_MAPPING_DIR.glob("img_gen_*_mapping.py")` is non-recursive and suffix-keyed, while its comment reads *"so a third taxonomy family is covered the day it lands"*. That holds only for a family landing in that exact directory under that exact name.
+
+### ⚠ The recorded remedy rests on a claim that is false
+
+The tracker's version of this item says:
+
+> Measured clean today — **zero** vendor-SDK imports anywhere in `pipelex/` outside `providers/` — and *that* is the stronger invariant, unguarded and worth a repo-wide test of its own rather than a denylist bolted onto this one.
+
+**That measurement does not hold.** Re-taken 2026-07-28 with an AST walk over `pipelex/` excluding `pipelex/providers/`:
+
+| module | SDK | form |
+| --- | --- | --- |
+| `pipelex/tools/pdf/pypdfium2_renderer.py:8-10` | `pypdfium2`, `pypdfium2.raw` | **module-level** |
+| `pipelex/tools/storage/s3_storage_provider.py` | `botocore.config`, `botocore.exceptions` | deferred |
+| `pipelex/tools/storage/gcp_storage_provider.py` | `google.cloud`, `google.api_core.exceptions` | deferred |
+| `pipelex/tracing/dynamodb_event_log.py` | `boto3`, `boto3.dynamodb.conditions`, `botocore.exceptions` | deferred |
+| `pipelex/reporting/reporting_manager.py:28-29` | `botocore.exceptions` | deferred |
+
+These are legitimate — they are *infrastructure* SDKs, not inference-provider SDKs, and they are exactly the split M2's own review recorded: `providers/storage/` is a registration shim while the implementations live under `pipelex/tools/`. But **a repo-wide "no vendor SDK outside `providers/`" test would be red on day one.** Do not write it.
+
+Reproduce with:
+
+```bash
+.venv/bin/python - <<'PY'
+import ast, os, sys
+VENDOR={"openai","anthropic","google","mistralai","boto3","botocore","fal_client","docling",
+        "linkup","huggingface_hub","transformers","azure","portkey_ai","pypdfium2","vertexai"}
+for dp,dn,fs in os.walk("pipelex"):
+    dn[:]=[d for d in dn if d!="__pycache__"]
+    if dp.startswith("pipelex/providers"): continue
+    for f in sorted(fs):
+        if not f.endswith(".py"): continue
+        p=os.path.join(dp,f)
+        for n in ast.walk(ast.parse(open(p,encoding="utf-8").read())):
+            if isinstance(n,ast.Import): rs=[(a.name.split(".")[0],a.name) for a in n.names]
+            elif isinstance(n,ast.ImportFrom) and n.level==0 and n.module: rs=[(n.module.split(".")[0],n.module)]
+            else: continue
+            for r,full in rs:
+                if r in VENDOR: print(f"{p}:{n.lineno}  {full}")
+PY
+```
+
+### The invariant that *is* true and worth pinning
+
+Measured the same day: **`pipelex/cogt/**` imports zero vendor SDKs.** Its only third-party import roots are framework and infrastructure deps — `pydantic`, `httpx`, `instructor`, `opentelemetry`, `polyfactory`, `tenacity`, `rich`, `PIL`, `typing_extensions`, `datamodel_code_generator`. And `cogt → pipelex.providers` is exactly the documented set:
+
+```
+pipelex/cogt/config_cogt.py:7-10          → providers.{anthropic,google,mistral,openai}.*_config   (4, documented — D-M2-2)
+pipelex/cogt/model_backends/backend_factory.py:53 → providers.openai.vertexai_factory              (1, deferred, known)
+```
+
+### Recommendation — two small edits, no machinery
+
+1. **Soften the glob comment (b)** to what it proves: the glob covers a new family only if it lands in `pipelex/cogt/img_gen/` under the `img_gen_*_mapping.py` name. One line. Do not bind the convention with a test — this track's whole argument was placement over indirection, and F1 is not the place to grow machinery.
+
+2. **Replace the proposed repo-wide test (a) with a golden set of the `cogt → pipelex.providers` statements.** Pin the five above; any new edge fails. It is true today, it is the invariant `docs/contribute/hub-layering.md` → "Known inversions" already documents in prose, and it catches the realistic regression (someone adds a sixth `cogt → vendor` import) — which is precisely the class of defect F1 existed to remove and which **no other gate in the repo can see**, since `pipelex.cogt` and `pipelex.providers` are both runtime-layer and the hub guard is blind to an edge between them by construction.
+
+3. **Correct the false claim** wherever it is recorded, so nobody builds the wrong test later on the strength of it.
+
+The transitive hole (a) is then still technically open — a vendor SDK reached through a third `cogt` module would pass — but it is unreachable while `cogt/` imports no vendor SDK at all, which item 2 pins directly. That is a better trade than a denylist.
+
+---
+
+## FU-3 — The bookkeeping files a bulk rewrite breaks are still ungated
+
+### Verified: the gate is absent, the artifacts are clean
+
+No sort check and no durations check exist anywhere in `Makefile`, `scripts/` or `tests/` — confirmed by grep across all three. Neither `make check` nor `make agent-check` covers either file.
+
+But both artifacts are healthy right now, so there is no fire:
+
+| artifact | measured 2026-07-28 | verdict |
+| --- | --- | --- |
+| `subject_grants.toml` | grants present, **0 out-of-order pairs** | the `bc22ba934` re-sort holds |
+| `.test_durations` | entries vs live tests collected with `-m ""`; **2 orphan node ids**, **0 dead file paths** | clean |
+
+The two orphans are the `pipe_img_gen` parametrizations keyed on the generated model-set fixture — profile-dependent, already identified as such during F1's third review round, not stale. Live tests carrying no duration entry are expected (tests added since the last `--store-durations` run); pytest-split treats an unknown id as average duration.
+
+So the issue as stated is precisely: **nothing would tell us if it drifted again.** Three instances on the modularity branch, each found by hand well after the fact.
+
+### Recommendation — do the sort check; reshape the durations check before writing it
+
+**Do: the `subject_grants.toml` sort assertion.** It is the one of the three that broke silently and stayed broken across three commits, and it is genuinely trivial — `pipelex/cli/dev_cli/commands/keyword_only_guard.py` already parses the file (`SUBJECT_GRANTS_FILE`, `load_subject_grants()` at `:261`). Add the key-order assertion inside the existing guard so it rides `make check-keyword-only` → `make agent-check` → CI. No new Make target. The invariant is already written down as one in `docs/contribute/keyword-only-arguments.md:37` (*"machine-written and sorted by key"*) — this just enforces what the docs claim.
+
+Note `load_subject_grants()` returns a `dict`, which does not preserve evidence of file order; read the raw text for the key sequence.
+
+**Reshape: gate `.test_durations` on the file path, not the node id.**
+
+A bulk path rewrite breaks **file paths**. Parametrization churn breaks **node ids** and is benign. Asserting `{k.split("::")[0] for k in durations}` all exist on disk is:
+
+- unambiguous — no tolerance policy, no explaining away legitimately-stale parametrizations,
+- **green today** (0 dead paths out of 907 distinct files),
+- cheap — pure filesystem check, no pytest collection run at all.
+
+Whereas a strict node-id check needs a full unfiltered collection *and* a policy for both current false positives.
+
+⚠ **Two traps for whoever writes it**, both of which cost real time already:
+
+- If you do collect node ids for any reason, run with **`-m ""`**. The marker filter in `addopts` hides a large slice of the suite (mostly `tests/e2e/`), so a naive `--collect-only` reports every e2e entry as an orphan.
+- Parse a collect dump with `.splitlines()`, **never `.split()`**. Parametrized ids contain spaces (`[CV Batch-tests/data/graphs/cv_batch.json]`), so whitespace-splitting shreds them into tokens and manufactures hundreds of phantom orphans. I hit this while measuring for this doc — same family as M2's `[a-z_]*` character class, and worse than a rewrite bug, because the verification is what licenses "done".
+
+**Skip the third instance.** The matched triple (guard tuple / closure predicate / `hub-layering.md` snippet) is already mechanically bound by tests as of M1c; only the design doc's fourth copy is unasserted, and that lives in `wip/`, which is archived at track end.
+
+---
+
+## Re-verify before starting
+
+Numbers above are dated, not eternal. Re-take them first — the *shape* (zero vs non-zero, present vs absent) is the criterion, not the absolute count.
+
+```bash
+# FU-1 — is error_type still the bare class name? are the four consumers still on the old string?
+git grep -n "error_type=type(self).__name__" -- pipelex/base_exceptions.py
+cd .. && /usr/bin/grep -rn "PipelexInterpreterError" \
+  mthds-starter-js/src pipelex-starter-js/src vscode-pipelex/editors playroom/src 2>/dev/null
+
+# FU-2 — the vendor-SDK scan above, plus the cogt edges
+git grep -n "pipelex\.providers" -- pipelex/cogt/
+
+# FU-3 — do the gates exist? are the artifacts still clean?
+git grep -n "test_durations\|sorted" -- Makefile | head
+.venv/bin/python -c "
+import json,pathlib
+d=json.load(open('.test_durations'))
+dead=[f for f in {k.split('::')[0] for k in d} if not pathlib.Path(f).exists()]
+print('dead duration file paths:',len(dead))"
+```
+
+⚠ Use `git grep` or `/usr/bin/grep` for any completeness sweep — this shell's `grep` is a ugrep wrapper that honours `.gitignore`, so from the workspace root it silently skips every sibling repo and returns a false clean.
