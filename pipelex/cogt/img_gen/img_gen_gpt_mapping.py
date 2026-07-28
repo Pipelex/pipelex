@@ -2,9 +2,10 @@
 
 Keyed by `AspectRatioTaxonomy.GPT_IMAGE_LEGACY` / `GPT_IMAGE_2` and the sibling moderation
 and input-fidelity taxonomies — all `cogt`-owned enums — so this lives beside the args
-factory that consumes it rather than in the OpenAI adapter. The GPT Image models are served
-by three different SDKs (OpenAI, Azure REST, the Pipelex gateway), which is why the mapping
-cannot belong to any one of them.
+factory that consumes it rather than in the OpenAI adapter. More than one adapter serves
+these models: the `openai` and `azure_openai` decks both ship models carrying these
+taxonomies, and the gateway worker routes any model whose rules name one through the same
+args factory. No single adapter owns the mapping.
 
 Reference: https://platform.openai.com/docs/guides/image-generation
 """

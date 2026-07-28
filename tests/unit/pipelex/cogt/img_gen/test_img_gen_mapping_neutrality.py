@@ -26,8 +26,13 @@ import pytest
 _TESTS_ROOT = next(parent for parent in Path(__file__).resolve().parents if parent.name == "tests")
 _MAPPING_DIR = _TESTS_ROOT.parent / "pipelex" / "cogt" / "img_gen"
 
-#: Derived from disk rather than listed, so a third taxonomy family is covered the day it lands. The
-#: non-emptiness assertion below is what keeps a glob that stops matching from passing vacuously.
+#: Derived from disk rather than listed, so a third taxonomy family is covered the day it lands.
+#:
+#: A glob that stops matching is the failure mode that buys, and it is guarded in exactly one place —
+#: the non-parametrized test below. It cannot be guarded in the parametrized one: pytest never calls a
+#: test body for an empty parameter set, it reports `SKIPPED [1] got empty parameter set` and exits 0,
+#: so an assertion at the top of that body is unreachable by construction. Both lists derive from this
+#: one glob, so the single reachable check covers the module.
 MAPPING_MODULE_PATHS: list[Path] = sorted(_MAPPING_DIR.glob("img_gen_*_mapping.py"))
 
 MAPPING_MODULE_QNAMES: list[str] = [f"pipelex.cogt.img_gen.{path.stem}" for path in MAPPING_MODULE_PATHS]
@@ -40,12 +45,7 @@ _CLOSURE_SCRIPT = textwrap.dedent(
     import importlib
     import sys
 
-    targets = sys.argv[1:]
-    # No targets would make the check pass while measuring nothing.
-    if not targets:
-        print("no mapping modules passed — the closure would measure nothing")
-        raise SystemExit(2)
-    for target in targets:
+    for target in sys.argv[1:]:
         importlib.import_module(target)
 
     offenders = sorted(name for name in sys.modules if name.startswith("pipelex.providers"))
@@ -74,8 +74,6 @@ class TestImgGenMappingNeutrality:
     @pytest.mark.parametrize("module_path", MAPPING_MODULE_PATHS, ids=lambda path: path.stem)
     def test_mapping_module_imports_only_pipelex_and_stdlib(self, module_path: Path) -> None:
         """A mapping table has no business importing a vendor SDK: every import root is stdlib or `pipelex`."""
-        assert MAPPING_MODULE_PATHS, f"no img_gen_*_mapping.py found under {_MAPPING_DIR} — this check measures nothing"
-
         offenders = sorted(root for root in _import_roots(module_path=module_path) if root != "pipelex" and root not in sys.stdlib_module_names)
 
         assert not offenders, (
@@ -87,6 +85,8 @@ class TestImgGenMappingNeutrality:
 
     def test_mapping_modules_load_no_provider_adapter(self) -> None:
         """Importing every mapping module in a fresh interpreter pulls in zero `pipelex.providers` modules."""
+        # The module's one reachable anti-vacuity guard — see the note on MAPPING_MODULE_PATHS. Both this
+        # check and its parametrized sibling would otherwise measure nothing if the glob stopped matching.
         assert MAPPING_MODULE_QNAMES, f"no img_gen_*_mapping.py found under {_MAPPING_DIR} — this check measures nothing"
 
         try:

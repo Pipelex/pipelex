@@ -1650,7 +1650,7 @@ rationale = "Converts the image size to its provider string; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_gpt_mapping.py::ImgGenGptMapping.input_fidelity_literal"]
 param = "input_fidelity"
-rationale = "Derives the OpenAI fidelity literal from the input fidelity; single operand."
+rationale = "Derives the GPT Image fidelity literal from the input fidelity; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_job.py::ImgGenJob.img_gen_job_before_start"]
 param = "inference_model"
