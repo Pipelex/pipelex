@@ -22,7 +22,7 @@ from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, SizeTier
 from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy
 
 
-class TestImgGenArgsOpenAISizes:
+class TestImgGenArgsGptSizes:
     @pytest.mark.parametrize(
         ("aspect_ratio", "size", "expected_size_string"),
         [

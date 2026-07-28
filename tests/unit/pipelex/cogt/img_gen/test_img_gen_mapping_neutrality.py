@@ -1,8 +1,9 @@
 # The img-gen taxonomy mapping modules are the neutral home the vendor img-gen factories moved into,
 # and neutrality is the whole reason the move happened: their dispatch key is `AspectRatioTaxonomy`, a
-# `cogt`-owned enum that names model families and no providers, and each family is served by several
-# SDKs at once (GPT Image by the OpenAI, Azure REST and gateway workers; Gemini by the Google and
-# gateway workers). Nothing else in the repo can catch a regression here: `pipelex.cogt` and
+# `cogt`-owned enum that names model families and no providers, and no family is served by a single
+# adapter (the `openai` and `azure_openai` decks both ship GPT Image models; the gateway worker
+# resolves Gemini geometry through the same mapping the native Google worker uses).
+# Nothing else in the repo can catch a regression here: `pipelex.cogt` and
 # `pipelex.providers` are BOTH runtime-layer, so the hub-layering guard and the import-closure test are
 # blind to an edge between them by construction — see docs/contribute/hub-layering.md, "Known inversions".
 #

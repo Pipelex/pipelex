@@ -86,7 +86,7 @@ class ImgGenGptMapping:
         if legacy_size := cls.LEGACY_ASPECT_RATIO_TO_SIZE.get(aspect_ratio):
             return legacy_size
 
-        supported_aspect_ratios = ", ".join(aspect_ratio.value for aspect_ratio in cls.LEGACY_ASPECT_RATIO_TO_SIZE)
+        supported_aspect_ratios = ", ".join(supported_ratio.value for supported_ratio in cls.LEGACY_ASPECT_RATIO_TO_SIZE)
         msg = (
             f"Aspect ratio '{aspect_ratio}' is not supported by OpenAI image model '{model_name}'. "
             f"Supported aspect ratios are: {supported_aspect_ratios}"

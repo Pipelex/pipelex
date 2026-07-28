@@ -1634,11 +1634,11 @@ rationale = "Derives the image size for the size tier; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_gemini_mapping.py::ImgGenGeminiMapping.img_gen_taxonomy"]
 param = "inference_model"
-rationale = "Operates on the aspect-ratio taxonomy; the lookup keys stay keyword-only."
+rationale = "Reads the aspect-ratio taxonomy off the inference model; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_gemini_mapping.py::ImgGenGeminiMapping.optional_img_gen_taxonomy"]
 param = "inference_model"
-rationale = "Operates on the aspect-ratio taxonomy; the lookup keys stay keyword-only."
+rationale = "Reads the aspect-ratio taxonomy off the inference model, None when it declares none; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_gemini_mapping.py::ImgGenGeminiMapping.resolve_image_config"]
 param = "taxonomy"
