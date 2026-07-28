@@ -40,6 +40,9 @@ class TestCheckKeywordOnlyCmdFix:
         mocker.patch.object(cmd_mod, "SOURCE_ROOT", tmp_path)
         # The registry is loaded before any scan; these tests drive the scanners directly, so keep it empty.
         mocker.patch.object(cmd_mod, "load_subject_grants", return_value={})
+        # Order is the one violation kind read from the registry file rather than from a def — mocked here
+        # too, so no test in this module depends on the real `subject_grants.toml` or on the cwd it lives in.
+        mocker.patch.object(cmd_mod, "find_unsorted_grants", return_value=[])
         return buffer
 
     def test_fix_only_exits_zero_and_reports_fixed(self, mocker: MockerFixture, console_buffer: io.StringIO) -> None:
@@ -73,6 +76,27 @@ class TestCheckKeywordOnlyCmdFix:
         assert "1 violation(s) need a manual fix" in output  # ...and the rest is reported for a manual fix
         assert "fixed_func" in output
         assert "unfixable_func" in output
+
+    def test_unsorted_registry_is_reported_instead_of_nothing_to_fix(self, mocker: MockerFixture, console_buffer: io.StringIO) -> None:
+        """An out-of-order registry is a violation the read-only gate fails on, so `--fix` must not call it clean.
+
+        The fixer rewrites signatures and never the registry, so it sees nothing to do — but reporting
+        "nothing to fix" while `make check-keyword-only` is about to fail is a false all-clear.
+        """
+        mocker.patch.object(cmd_mod, "fix_all_violations", return_value=([], []))
+        unsorted = Violation(
+            relative_path="pipelex/sample/module.py",
+            qualified_name="render",
+            lineno=0,
+            kind=ViolationKind.UNSORTED_GRANT,
+            detail="subject_grants.toml:7 sorts before the preceding entry 'pipelex/sample/other.py::build'",
+        )
+        mocker.patch.object(cmd_mod, "find_unsorted_grants", return_value=[unsorted])
+        check_keyword_only_cmd(fix=True, quiet=True)  # still non-gating: reports, exits 0
+        output = console_buffer.getvalue()
+        assert "1 violation(s) need a manual fix" in output
+        assert "subject_grants.toml:7" in output
+        assert "nothing to fix" not in output
 
     def test_nothing_to_fix_quiet_is_one_line_and_exits_zero(self, mocker: MockerFixture, console_buffer: io.StringIO) -> None:
         """No violations + quiet: the happy path trims to the single 'nothing to fix' line."""

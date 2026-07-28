@@ -2,19 +2,21 @@
 
 The three items the modularity track's review rounds recorded but did not fix. Each was **re-verified against the tree on 2026-07-28 at `7ddb77f87`** before being written down here; every claim below is measured, and the commands that produced it are inline so a new session can re-take them rather than trust them.
 
-**Where to implement:** `refactor/Hub-2`, after PR #1067 merges into it. All three are independent of each other and of the release-gated cross-repo sweep — except **FU-1**, which should land *before* the sweep ships the `MthdsParserError` rename to its consumers.
+**Where implemented:** branch `refactor/Modularity-4`, on top of the merged PR #1067. All three are independent of each other and of the release-gated cross-repo sweep — except **FU-1**, which had to land *before* the sweep ships the `MthdsParserError` rename to its consumers.
 
 **Stable IDs:** cite these as **FU-1**, **FU-2**, **FU-3**. They supersede the unnumbered bullets in the tracker's "Follow-ups from the review" section, which points here.
 
-| id | one line | verdict | size |
-| --- | --- | --- | --- |
-| [FU-1](#fu-1--nothing-flags-an-error-class-rename-and-it-is-a-wire-break) | Nothing flags an error-class rename, and it is a wire break | still true — **do this first** | small |
-| [FU-2](#fu-2--the-img-gen-neutrality-guard-is-weaker-than-its-comment-and-its-recorded-remedy-is-wrong) | The img-gen neutrality guard overclaims; its recorded remedy rests on a false measurement | still true, **remedy corrected here** | two small edits |
-| [FU-3](#fu-3--the-bookkeeping-files-a-bulk-rewrite-breaks-are-still-ungated) | The bookkeeping files a bulk rewrite breaks are still ungated | gate absent, artifacts currently clean | small, do half |
+| id | one line | verdict | size | status |
+| --- | --- | --- | --- | --- |
+| [FU-1](#fu-1--nothing-flags-an-error-class-rename-and-it-is-a-wire-break) | Nothing flags an error-class rename, and it is a wire break | still true — **do this first** | small | ✅ **DONE** |
+| [FU-2](#fu-2--the-img-gen-neutrality-guard-is-weaker-than-its-comment-and-its-recorded-remedy-is-wrong) | The img-gen neutrality guard overclaims; its recorded remedy rests on a false measurement | still true, **remedy corrected here** | two small edits | ✅ **DONE** |
+| [FU-3](#fu-3--the-bookkeeping-files-a-bulk-rewrite-breaks-are-still-ungated) | The bookkeeping files a bulk rewrite breaks are still ungated | gate absent, artifacts currently clean | small, do half | ✅ **DONE** |
 
 ---
 
 ## FU-1 — Nothing flags an error-class rename, and it is a wire break
+
+> ✅ **DONE** — see [what shipped](#what-shipped) at the end of this section.
 
 ### Verified still true
 
@@ -66,9 +68,38 @@ Shape it as a committed golden file plus a regeneration command, in the style th
 
 Land the snapshot **before** the release-gated cross-repo sweep. The sweep is what actually ships `MthdsParserError` to those four consumers, and the snapshot is what makes the next such rename visible at the moment it is made rather than at the moment something breaks in a different repo.
 
+### What shipped
+
+Re-verification held on both counts before starting: `error_type=type(self).__name__` is still at `base_exceptions.py:595`, and all four consumer sites still switch on `"PipelexInterpreterError"` (plus two test files in the starter repos that the original survey did not list — `mthds-starter-js/src/lib/errors.test.ts:145` and `pipelex-starter-js/src/lib/errors.test.ts:170`). The cheap half was done as recommended; the `_declared_error_type` refactor stays deferred.
+
+| file | role |
+| --- | --- |
+| `pipelex/errors/error_identity_snapshot.py` | pure renderer — `iter_error_identity_rows()` + `render_error_identity_snapshot()`, population from `iter_pipelex_error_subclasses()` |
+| `pipelex/cli/dev_cli/commands/generate_error_identity_cmd.py` | `pipelex-dev generate-error-identity`, owns the repo-relative output path |
+| `tests/data/errors/error_identity.txt` | the committed golden — a preamble, then one `error_type \| title \| type_uri` row per class |
+| `tests/unit/pipelex/errors/test_error_identity_snapshot.py` | the gate |
+| `Makefile` | `make generate-error-identity`, alias `make gei` |
+
+Decisions taken, and why:
+
+- **Pytest is the gate; there is no `check-error-identity` command.** The doc asked for "a committed golden file plus a regeneration command"; a second freshness command wired into `make check` would duplicate what the test already does. The regeneration command exists, the *checking* lives in one place.
+- **The renderer takes no Pipelex bootstrap.** `title()` / `type_uri()` read class attributes and a module-level URL constant, and discovery imports error modules by filename — so unlike `generate-error-pages` this runs anywhere, including an environment with no configured backend.
+- **The anti-vacuity guard is honoured.** `test_enumerated_identity_set_is_not_empty` is non-parametrized and additionally asserts `PipelexError` itself is present, so the guard is count-free and cannot be skipped into a green run.
+- **A third test pins format integrity** — no identity field may contain the `" | "` column separator, which is what keeps the rendering unambiguous.
+
+Negative-tested: rewriting the `MthdsParserError` row to `PipelexInterpreterError` fails the gate with the diff shown inline and the "this is a WIRE BREAK" framing, which is exactly the review artifact the item asked for.
+
+Docs updated in the same change: [Error Model](../../docs/under-the-hood/error-model.md) gains an "identity triple" subsection explaining why `error_type` has no declaration hatch and what the snapshot is for; the kit agent-rules sources (`commands.md`, `codex_commands.md` — `CLAUDE.md` / `AGENTS.md` are *generated* from these, via `make rules`) list the new dev CLI command; `docs/contribute/drift-contracts.md` adds the artifact to the Derived tier and to the never-review-generated-output corollary; CHANGELOG under `[Unreleased] / Added`.
+
+**Still open, deliberately:** the four (six, counting the starter test files) consumer sites are untouched — they are the release-gated cross-repo sweep's job, and the workspace forbids backward compatibility, so there is nothing to ship them early. The snapshot is what makes the *next* rename visible; this one still needs the sweep.
+
+Gates: `make agent-check`, `make drift-check`, and the errors / CLI / kit test slice all green.
+
 ---
 
 ## FU-2 — The img-gen neutrality guard is weaker than its comment, and its recorded remedy is wrong
+
+> ✅ **DONE** — see [what shipped](#what-shipped-1) at the end of this section.
 
 ### Verified still true
 
@@ -136,9 +167,35 @@ pipelex/cogt/model_backends/backend_factory.py:53 → providers.openai.vertexai_
 
 The transitive hole (a) is then still technically open — a vendor SDK reached through a third `cogt` module would pass — but it is unreachable while `cogt/` imports no vendor SDK at all, which item 2 pins directly. That is a better trade than a denylist.
 
+### What shipped
+
+Both measurements re-taken before starting, and both held: the vendor-SDK scan still returns the same five infrastructure-SDK modules outside `providers/` (so the recorded remedy is still false), and `cogt`'s third-party roots are still exactly the ten framework/infrastructure packages with the same five `cogt → pipelex.providers` statements.
+
+| file | change |
+| --- | --- |
+| `tests/unit/pipelex/cogt/test_cogt_dependency_boundaries.py` | new — the two golden sets |
+| `tests/unit/pipelex/cogt/img_gen/test_img_gen_mapping_neutrality.py` | glob comment softened to what it proves; header notes where the transitive hole is closed |
+| `docs/contribute/hub-layering.md` | "Known inversions" gains the bullet binding the prose list to the test, and the refutation of the repo-wide generalization |
+| `CHANGELOG.md` | `[Unreleased] / Added` |
+
+Decisions taken, and why:
+
+- **Two golden sets, not one.** Item 2 asked for the `cogt → pipelex.providers` edges, but that set alone does not close its own closing argument: a bare `import openai` inside a `cogt` module is not a providers edge, so it would pass. The vendor-free claim is pinned as its own assertion — as an **allowlist of third-party import roots**, not a vendor denylist. Same golden-set shape as the edges, no list of vendor names to keep current, and a new framework dependency surfaces for review as one line rather than slipping through a denylist's gaps.
+- **Edges are addressed by `source -> target [form]`, never by line number.** Line numbers are pure churn. The **form** (`module-level` / `deferred` / `type-checking`) is carried on purpose: promoting the deferred `vertexai_factory` import to module level is a real change — it is what would put the target in every closure touching `backend_factory` — and a set keyed on the statement alone would not see it.
+- **Relative imports are resolved, not skipped.** The sibling neutrality test's helper skips `level > 0`, which is safe there (one directory) but would be a hole here: `from ...providers.openai import x` inside `pipelex/cogt/llm/` resolves to a real edge. Negative-tested with a probe at that exact shape.
+- **The glob convention stays unbound by a test.** Item 1 said one line; softening the comment is the whole fix. A naming rule enforced by machinery is the shape this track spent four review rounds deleting, and the unglobbed-mapping worry is answered by the vendor-free assertion instead — an uncovered mapping module still cannot carry an SDK.
+
+Negative-tested by planting a probe module under `pipelex/cogt/` carrying `import openai`, a module-level provider import, a `TYPE_CHECKING` one and a deferred one: both tests fail, all three forms are classified correctly, and the messages name added/removed rows. A second probe under `pipelex/cogt/llm/` confirmed the relative-import resolution.
+
+**On item 3 (correct the false claim).** The tracker section that carried it no longer exists — the claim survives only in the quote block above, where it is already refuted in place. So the correction was put somewhere durable instead: `docs/contribute/hub-layering.md` now states, in the section whose stated job is keeping the document honest, that the repo-wide generalization is false and why. That is where someone would reason their way to the wrong test; `wip/` is archived at track end.
+
+Gates: `make agent-check`, `make drift-check`, `make agent-test` all green.
+
 ---
 
 ## FU-3 — The bookkeeping files a bulk rewrite breaks are still ungated
+
+> ✅ **DONE** — see [what shipped](#what-shipped-2) at the end of this section.
 
 ### Verified: the gate is absent, the artifacts are clean
 
@@ -177,6 +234,32 @@ Whereas a strict node-id check needs a full unfiltered collection *and* a policy
 - Parse a collect dump with `.splitlines()`, **never `.split()`**. Parametrized ids contain spaces (`[CV Batch-tests/data/graphs/cv_batch.json]`), so whitespace-splitting shreds them into tokens and manufactures hundreds of phantom orphans. I hit this while measuring for this doc — same family as M2's `[a-z_]*` character class, and worse than a rewrite bug, because the verification is what licenses "done".
 
 **Skip the third instance.** The matched triple (guard tuple / closure predicate / `hub-layering.md` snippet) is already mechanically bound by tests as of M1c; only the design doc's fourth copy is unasserted, and that lives in `wip/`, which is archived at track end.
+
+### What shipped
+
+Both measurements re-taken before starting, and both held: no sort or durations check exists in `Makefile` / `scripts/` / `tests/` (the only `.test_durations` mentions are the regeneration target's own comment and two CI workflow comments), and both artifacts are still clean — 1757 grants with **0 out-of-order pairs**, 9242 duration entries across 907 distinct files with **0 dead paths**. Both halves were done, the durations one in the reshaped form the item prescribed.
+
+| file | role |
+| --- | --- |
+| `pipelex/cli/dev_cli/commands/keyword_only_guard.py` | `ViolationKind.UNSORTED_GRANT` + `find_unsorted_grants()` — the registry-order rule |
+| `pipelex/cli/dev_cli/commands/check_keyword_only_cmd.py` | folds the registry-order violations into the full-scan gate |
+| `tests/unit/pipelex/cli/dev/test_subject_grant_registry.py` | `TestSubjectGrantRegistryOrder` |
+| `tests/unit/repo/test_test_durations_paths.py` | the `.test_durations` file-path gate |
+| `docs/contribute/keyword-only-arguments.md`, `Makefile`, `CHANGELOG.md` | docs |
+
+Decisions taken, and why:
+
+- **The order rule reads the raw text, and cross-checks the scan against the parser.** The item warned that `load_subject_grants()` returns a `dict`, which is not evidence of file order. It is worth being precise about *why*, because the shortcut is tempting: CPython dicts do preserve insertion order and `tomllib` does insert in document order, so reading order off the parsed dict would in fact work today — it would just be resting on undocumented behaviour of a parser for a format that declares table order insignificant. So the scan is a line-anchored regex over table headers. That opens its own hole (a multi-line rationale can carry a line that looks like a header), closed by asserting the scanned key set equals the parsed key set and raising `SubjectGrantRegistryError` when it does not. An entry the scan cannot see must fail loudly, not silently drop out of the rule's domain — the FU-1 anti-vacuity concern in a different costume.
+- **Registry order is a full-scan rule, wired at the command layer, not in `collect_all_violations`.** Two reasons. It is a whole-file property, so the per-file `PostToolUse` hook cannot see it — exactly the boundary `dead-grant` already sits on. And `collect_all_violations` is filesystem-pure with respect to the registry (its callers pass `grants` in, and its tests run from a `tmp_path` with no `subject_grants.toml` at all); making it read the registry off disk would have broken four existing tests for no gain.
+- **No re-sorting fixer.** `--fix` rewrites signatures; the registry has exactly one writer, the `subject-grant` command, and the guard module is stdlib-only by design (the writer needs tomlkit). The remedy is stated instead: re-record any grant, which rewrites the whole file sorted.
+- **The durations gate is on the file path only, and not parametrized.** Per the item. The two known orphan node ids are profile-dependent parametrizations, and a node-id gate would need a full unfiltered collection plus a tolerance policy for them; the path gate needs neither, and it is the one that catches a bulk rewrite. Anti-vacuity is a non-parametrized "the file is committed and not empty" test, plus a shape assertion that every key really is `<path.py>::<test>` — without which "every extracted path exists" could pass over keys that are not paths at all.
+- **Both traps in the item were avoided by not collecting node ids at all** — no `-m ""` run, no collect dump to parse, so neither the marker-filter nor the `.split()` trap is reachable. That is a third argument for the path gate the item did not make: the cheap check is also the one with no way to mis-measure.
+
+Negative-tested, all four: swapping two adjacent registry entries fails with the offending key, the registry line number, and the entry it sorts before; a multi-line rationale carrying a phantom `["…"]` header fails with the scan/parser count mismatch; a `.test_durations` entry under a moved-away path fails naming the dead path; a non-node-id key fails the shape assertion. Both real artifacts restored clean afterwards (`git diff --stat` empty).
+
+Docs updated in the same change: `docs/contribute/keyword-only-arguments.md` in five places (the kinds table, the order paragraph under "Staleness is symmetric", the hook bullet, the auto-fix paragraph — which listed only `grant-param-mismatch` as never-rewritten and silently omitted `dead-grant` — and a pointer after the top-of-page rule list, since that list is scoped to *signatures* and registry order is not a signature property); the `store-test-durations` comment in the `Makefile` names its new gate; CHANGELOG under `[Unreleased] / Added`. The `keyword-only-convention` drift contract was reviewed and acked, with its dogfood-log entry.
+
+**Noticed, not fixed:** `make check-test-badge` is red on this branch — badge 9146 vs 9241 collected. It was already off by 88 before this change (7 tests added here), the badge is refreshed at release time by the release skill, and its CI job only runs on PRs into `main`. Bumping it mid-branch would just make it stale differently before the release.
 
 ---
 

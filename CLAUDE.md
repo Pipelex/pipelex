@@ -129,6 +129,12 @@
      .venv/bin/pipelex-dev generate-error-pages
      ```
 
+   - **`generate-error-identity`**: Regenerate the committed `(error_type, title, type_uri)` snapshot of every `PipelexError` subclass at `tests/data/errors/error_identity.txt`. `error_type` is the bare class name and consumers outside this repo branch on it, so a rename is a silent wire break — the snapshot turns it into a reviewable diff, gated by `tests/unit/pipelex/errors/test_error_identity_snapshot.py`. Run after adding, renaming or removing an error class. Also available as `make generate-error-identity` (alias `make gei`).
+
+     ```bash
+     .venv/bin/pipelex-dev generate-error-identity
+     ```
+
    - **`refresh-graph-ui-sri`**: Refetch the pinned graph viewer assets from jsDelivr (`@pipelex/mthds-ui` standalone JS+CSS, `elkjs`) and rewrite `pipelex/graph/reactflow/standalone_assets.py` with new `sha384` Subresource Integrity hashes. Use when bumping the pinned mthds-ui or elkjs version.
 
      ```bash

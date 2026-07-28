@@ -11,6 +11,10 @@
 # `from openai import omit` in the module's own source (which is what the GPT mapping carried before the
 # move); the transitive one is an innocuous-looking `pipelex.cogt.*` import that drags an adapter in
 # behind it. The first check reads the source, the second measures the import closure.
+#
+# Both are scoped to `pipelex.providers`: a vendor SDK reached through some *other* `cogt` module would pass
+# them. That hole is unreachable rather than guarded here — `pipelex/cogt/**` imports no vendor SDK at all,
+# which is pinned directly by tests/unit/pipelex/cogt/test_cogt_dependency_boundaries.py.
 
 from __future__ import annotations
 
@@ -27,7 +31,12 @@ import pytest
 _TESTS_ROOT = next(parent for parent in Path(__file__).resolve().parents if parent.name == "tests")
 _MAPPING_DIR = _TESTS_ROOT.parent / "pipelex" / "cogt" / "img_gen"
 
-#: Derived from disk rather than listed, so a third taxonomy family is covered the day it lands.
+#: Derived from disk rather than listed, so a third taxonomy family is covered the day it lands — within the
+#: convention, and no further. The glob is non-recursive and suffix-keyed: it covers a new family only if
+#: that family lands in this directory under the `img_gen_*_mapping.py` name. A mapping placed in a
+#: subdirectory or named otherwise is simply not checked here. The convention is deliberately left unbound
+#: by any test — this track's argument throughout was placement over indirection, and a naming rule enforced
+#: by machinery is the shape it spent four review rounds deleting.
 #:
 #: A glob that stops matching is the failure mode that buys, and it is guarded in exactly one place —
 #: the non-parametrized test below. It cannot be guarded in the parametrized one: pytest never calls a

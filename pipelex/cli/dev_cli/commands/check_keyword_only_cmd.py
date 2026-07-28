@@ -3,7 +3,9 @@
 Non-subject function parameters must be keyword-only so call sites are self-documenting:
 ``do_thing(retries=3, timeout=30)`` is forced over the opaque ``do_thing(3, 30)``. A positional
 subject is legal only under an explicit grant recorded in ``subject_grants.toml`` (see the
-``subject-grant`` command), and a ``bool``/``int``/``float`` subject is banned outright.
+``subject-grant`` command), and a ``bool``/``int``/``float`` subject is banned outright. This is
+also where the registry's own bookkeeping invariant — entries in sorted key order — is enforced;
+the single-file hook path cannot see it, since it is a property of the whole file.
 
 The canonical human-readable specification lives in ``docs/contribute/keyword-only-arguments.md``.
 The pure-AST collection logic lives in the stdlib-only ``keyword_only_guard`` module; this module
@@ -31,6 +33,7 @@ from pipelex.cli.dev_cli.commands.keyword_only_guard import (
     SubjectGrantRegistryError,
     Violation,
     collect_all_violations,
+    find_unsorted_grants,
     fix_all_violations,
     load_subject_grants,
 )
@@ -101,6 +104,16 @@ def _load_grants_or_exit() -> dict[str, SubjectGrant]:
         sys.exit(1)
 
 
+def _unsorted_grants_or_exit(*, grants: dict[str, SubjectGrant]) -> list[Violation]:
+    """Check the registry's file order, or exit 1 with the explicit error (never a silently narrowed scan)."""
+    try:
+        return find_unsorted_grants(grants=grants)
+    except SubjectGrantRegistryError as exc:
+        console = get_console()
+        console.print(f"[red]✗ Keyword-only check: FAILED[/red] - {escape(str(exc))}")
+        sys.exit(1)
+
+
 def check_keyword_only_cmd(*, report: bool = False, fix: bool = False, quiet: bool = False) -> None:
     """Enforce the keyword-only-arguments convention across ``pipelex/`` source.
 
@@ -133,7 +146,12 @@ def check_keyword_only_cmd(*, report: bool = False, fix: bool = False, quiet: bo
         _run_fix(quiet=quiet, grants=grants)
         return
 
-    violations = collect_all_violations(SOURCE_ROOT, grants=grants)
+    # Registry order is a full-scan concern (the single-file hook path cannot see it), so it joins the
+    # def-level violations here rather than inside `collect_all_violations`, which stays filesystem-pure.
+    violations = sorted(
+        [*collect_all_violations(SOURCE_ROOT, grants=grants), *_unsorted_grants_or_exit(grants=grants)],
+        key=lambda violation: violation.key,
+    )
 
     if report:
         _print_report(violations, grants=grants)
@@ -163,11 +181,17 @@ def _run_fix(*, quiet: bool, grants: dict[str, SubjectGrant]) -> None:
     violations. That lets it run early in ``make agent-check`` — fixing before ``ruff format`` without
     aborting the pipeline mid-mutation or masking the ``pyright``/``mypy`` phase. The read-only
     ``check-keyword-only`` gate (run last in ``agent-check``, and in ``make check`` / CI) is what
-    enforces compliance and fails on the unfixable ones. A genuine error (e.g. a missing source root)
-    still exits non-zero — that is handled by the caller, not here.
+    enforces compliance and fails on the unfixable ones. A genuine error still exits non-zero — a missing
+    source root from the caller, a registry the order check cannot read from here.
     """
     console = get_console()
-    fixed, unfixable = fix_all_violations(SOURCE_ROOT, grants=grants)
+    fixed, fixer_unfixable = fix_all_violations(SOURCE_ROOT, grants=grants)
+
+    # The fixer rewrites signatures, never the registry, so it cannot see an out-of-order entry — but that
+    # is a violation the read-only gate fails on, and reporting "nothing to fix" while `check-keyword-only`
+    # is about to fail would be a false all-clear. It joins the other registry-level kinds it is reported
+    # beside (`dead-grant`, `grant-param-mismatch`), which reach here through `fix_all_violations`.
+    unfixable = sorted([*fixer_unfixable, *_unsorted_grants_or_exit(grants=grants)], key=lambda violation: violation.key)
 
     if fixed:
         # Files changed — always surface this, even in quiet mode.
@@ -186,7 +210,8 @@ def _run_fix(*, quiet: bool, grants: dict[str, SubjectGrant]) -> None:
         # Reported, not gated here — the read-only `check-keyword-only` (last in agent-check / CI) fails on these.
         console.print(
             f"[red]✗ {len(unfixable)} violation(s) need a manual fix[/red] "
-            "(e.g. `*args` present, an existing keyword-only section, two+ positional-only params, or a stale grant):"
+            "(e.g. `*args` present, an existing keyword-only section, two+ positional-only params, a stale grant, "
+            "or an out-of-order registry entry):"
         )
         _print_violation_lines(violations=unfixable)
         console.print(
