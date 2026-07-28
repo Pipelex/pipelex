@@ -181,11 +181,17 @@ def _run_fix(*, quiet: bool, grants: dict[str, SubjectGrant]) -> None:
     violations. That lets it run early in ``make agent-check`` — fixing before ``ruff format`` without
     aborting the pipeline mid-mutation or masking the ``pyright``/``mypy`` phase. The read-only
     ``check-keyword-only`` gate (run last in ``agent-check``, and in ``make check`` / CI) is what
-    enforces compliance and fails on the unfixable ones. A genuine error (e.g. a missing source root)
-    still exits non-zero — that is handled by the caller, not here.
+    enforces compliance and fails on the unfixable ones. A genuine error still exits non-zero — a missing
+    source root from the caller, a registry the order check cannot read from here.
     """
     console = get_console()
-    fixed, unfixable = fix_all_violations(SOURCE_ROOT, grants=grants)
+    fixed, fixer_unfixable = fix_all_violations(SOURCE_ROOT, grants=grants)
+
+    # The fixer rewrites signatures, never the registry, so it cannot see an out-of-order entry — but that
+    # is a violation the read-only gate fails on, and reporting "nothing to fix" while `check-keyword-only`
+    # is about to fail would be a false all-clear. It joins the other registry-level kinds it is reported
+    # beside (`dead-grant`, `grant-param-mismatch`), which reach here through `fix_all_violations`.
+    unfixable = sorted([*fixer_unfixable, *_unsorted_grants_or_exit(grants=grants)], key=lambda violation: violation.key)
 
     if fixed:
         # Files changed — always surface this, even in quiet mode.
@@ -204,7 +210,8 @@ def _run_fix(*, quiet: bool, grants: dict[str, SubjectGrant]) -> None:
         # Reported, not gated here — the read-only `check-keyword-only` (last in agent-check / CI) fails on these.
         console.print(
             f"[red]✗ {len(unfixable)} violation(s) need a manual fix[/red] "
-            "(e.g. `*args` present, an existing keyword-only section, two+ positional-only params, or a stale grant):"
+            "(e.g. `*args` present, an existing keyword-only section, two+ positional-only params, a stale grant, "
+            "or an out-of-order registry entry):"
         )
         _print_violation_lines(violations=unfixable)
         console.print(

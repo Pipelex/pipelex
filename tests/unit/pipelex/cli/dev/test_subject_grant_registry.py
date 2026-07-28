@@ -162,11 +162,9 @@ class TestSubjectGrantRegistry:
         violations = collect_all_violations(Path("pipelex"), grants=grants)
         assert [violation.kind for violation in violations] == [ViolationKind.MISSING_STAR]
 
-
-class TestSubjectGrantRegistryOrder:
-    """The registry is rewritten sorted by key on every write, so file order is an invariant — one a bulk
-    path rewrite breaks silently, since an unsorted registry parses and grants exactly the same subjects.
-    """
+    # File order, below. The registry is rewritten sorted by key on every write, so order is an invariant —
+    # one a bulk path rewrite breaks silently, since an unsorted registry parses and grants exactly the
+    # same subjects.
 
     def test_sorted_registry_has_no_order_violation(self, tmp_path: Path) -> None:
         _write_registry(tmp_path, content=_SORTED_REGISTRY)
@@ -182,7 +180,7 @@ class TestSubjectGrantRegistryOrder:
         assert "subject_grants.toml:7" in violations[0].detail
         assert "pipelex/sample/module.py::render" in violations[0].detail
 
-    def test_missing_registry_is_an_explicit_error(self, tmp_path: Path) -> None:
+    def test_order_check_missing_registry_is_an_explicit_error(self, tmp_path: Path) -> None:
         with pytest.raises(SubjectGrantRegistryError, match="not found"):
             find_unsorted_grants(grants={}, root=tmp_path)
 

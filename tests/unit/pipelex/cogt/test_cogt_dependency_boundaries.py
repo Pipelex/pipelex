@@ -29,6 +29,8 @@ import sys
 from pathlib import Path
 from typing import NamedTuple
 
+import pytest
+
 #: Anchored on `tests/` by name rather than by a parent count — a depth index resolves silently to the
 #: wrong directory when a module moves, and this repo has been bitten by exactly that.
 _TESTS_ROOT = next(parent for parent in Path(__file__).resolve().parents if parent.name == "tests")
@@ -119,18 +121,35 @@ def _collect_imports(*, node: ast.AST, form: str, collected: list[tuple[ast.Impo
         _collect_imports(node=child, form=child_form, collected=collected)
 
 
+def _resolve_imported_name(*, base_module: str, name: str) -> str:
+    """`base_module.name` when that names a module of this repo, else `base_module` — the name was a symbol.
+
+    `from pipelex import providers` and `from pipelex.providers.anthropic.anthropic_config import AnthropicConfig`
+    are the same syntax carrying two different dependencies: the first is an edge on `pipelex.providers`, the
+    second an edge on the module that defines the symbol. Resolving both to `base_module` lets a submodule
+    import slip past the edge assertion; resolving both to `base_module.name` would grow every pinned row a
+    symbol suffix and make a second import from an already-sanctioned module read as a brand-new edge.
+    """
+    candidate = _REPO_ROOT.joinpath(*base_module.split("."), name)
+    return f"{base_module}.{name}" if candidate.is_dir() or candidate.with_suffix(".py").is_file() else base_module
+
+
 def _import_targets(*, node: ast.Import | ast.ImportFrom, package_parts: tuple[str, ...]) -> list[str]:
     """The absolute dotted target(s) of an import, resolving relative forms against the importing package."""
     if isinstance(node, ast.Import):
         return [alias.name for alias in node.names]
 
     if node.level == 0:
-        return [node.module] if node.module else []
+        base_module = node.module or ""
+    else:
+        # `from .x import y` in pipelex/cogt/llm/foo.py resolves against pipelex.cogt.llm; each extra dot climbs one.
+        base = package_parts[: len(package_parts) - (node.level - 1)]
+        parts = (*base, node.module) if node.module else base
+        base_module = ".".join(parts)
 
-    # `from .x import y` in pipelex/cogt/llm/foo.py resolves against pipelex.cogt.llm; each extra dot climbs one.
-    base = package_parts[: len(package_parts) - (node.level - 1)]
-    parts = (*base, node.module) if node.module else base
-    return [".".join(parts)]
+    if not base_module:
+        return []
+    return sorted({_resolve_imported_name(base_module=base_module, name=alias.name) for alias in node.names})
 
 
 def _import_sites(*, module_path: Path) -> list[ImportSite]:
@@ -154,6 +173,28 @@ IMPORT_SITES: list[ImportSite] = sorted(site for module_path in COGT_MODULE_PATH
 
 
 class TestCogtDependencyBoundaries:
+    @pytest.mark.parametrize(
+        ("source", "expected"),
+        [
+            # The form the edge assertion used to miss entirely: the dependency is on the submodule,
+            # but `from X import Y` records only `X`, so a `cogt -> providers` edge could land unseen.
+            ("from pipelex import providers", ["pipelex.providers"]),
+            ("from pipelex import providers as vendors", ["pipelex.providers"]),
+            ("from .. import providers", ["pipelex.providers"]),
+            # A symbol keeps its module as the target — resolving it would grow every pinned row a suffix,
+            # and make a second import from an already-sanctioned module read as a brand-new edge.
+            ("from pipelex.providers.anthropic.anthropic_config import AnthropicConfig", ["pipelex.providers.anthropic.anthropic_config"]),
+            ("from pipelex import log", ["pipelex"]),
+            ("from pydantic import BaseModel", ["pydantic"]),
+            ("import pipelex.providers.openai.openai_config", ["pipelex.providers.openai.openai_config"]),
+        ],
+    )
+    def test_import_target_resolves_a_submodule_but_not_a_symbol(self, source: str, expected: list[str]) -> None:
+        """`from X import Y` names a submodule as often as a symbol, and only the first is a real edge."""
+        node = ast.parse(source).body[0]
+        assert isinstance(node, (ast.Import, ast.ImportFrom))
+        assert _import_targets(node=node, package_parts=("pipelex", "cogt")) == expected
+
     def test_cogt_imports_no_vendor_sdk(self) -> None:
         """`pipelex/cogt/**` reaches exactly the pinned framework/infrastructure packages, and no vendor SDK."""
         # Anti-vacuity: both checks read one walk, and an empty walk would make both pass for free. This test
