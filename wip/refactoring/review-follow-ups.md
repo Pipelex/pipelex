@@ -9,8 +9,8 @@ The three items the modularity track's review rounds recorded but did not fix. E
 | id | one line | verdict | size | status |
 | --- | --- | --- | --- | --- |
 | [FU-1](#fu-1--nothing-flags-an-error-class-rename-and-it-is-a-wire-break) | Nothing flags an error-class rename, and it is a wire break | still true — **do this first** | small | ✅ **DONE** |
-| [FU-2](#fu-2--the-img-gen-neutrality-guard-is-weaker-than-its-comment-and-its-recorded-remedy-is-wrong) | The img-gen neutrality guard overclaims; its recorded remedy rests on a false measurement | still true, **remedy corrected here** | two small edits | ⬜ next |
-| [FU-3](#fu-3--the-bookkeeping-files-a-bulk-rewrite-breaks-are-still-ungated) | The bookkeeping files a bulk rewrite breaks are still ungated | gate absent, artifacts currently clean | small, do half | ⬜ |
+| [FU-2](#fu-2--the-img-gen-neutrality-guard-is-weaker-than-its-comment-and-its-recorded-remedy-is-wrong) | The img-gen neutrality guard overclaims; its recorded remedy rests on a false measurement | still true, **remedy corrected here** | two small edits | ✅ **DONE** |
+| [FU-3](#fu-3--the-bookkeeping-files-a-bulk-rewrite-breaks-are-still-ungated) | The bookkeeping files a bulk rewrite breaks are still ungated | gate absent, artifacts currently clean | small, do half | ⬜ next |
 
 ---
 
@@ -99,6 +99,8 @@ Gates: `make agent-check`, `make drift-check`, and the errors / CLI / kit test s
 
 ## FU-2 — The img-gen neutrality guard is weaker than its comment, and its recorded remedy is wrong
 
+> ✅ **DONE** — see [what shipped](#what-shipped-1) at the end of this section.
+
 ### Verified still true
 
 Both holes are real, in `tests/unit/pipelex/cogt/img_gen/test_img_gen_mapping_neutrality.py`:
@@ -164,6 +166,30 @@ pipelex/cogt/model_backends/backend_factory.py:53 → providers.openai.vertexai_
 3. **Correct the false claim** wherever it is recorded, so nobody builds the wrong test later on the strength of it.
 
 The transitive hole (a) is then still technically open — a vendor SDK reached through a third `cogt` module would pass — but it is unreachable while `cogt/` imports no vendor SDK at all, which item 2 pins directly. That is a better trade than a denylist.
+
+### What shipped
+
+Both measurements re-taken before starting, and both held: the vendor-SDK scan still returns the same five infrastructure-SDK modules outside `providers/` (so the recorded remedy is still false), and `cogt`'s third-party roots are still exactly the ten framework/infrastructure packages with the same five `cogt → pipelex.providers` statements.
+
+| file | change |
+| --- | --- |
+| `tests/unit/pipelex/cogt/test_cogt_dependency_boundaries.py` | new — the two golden sets |
+| `tests/unit/pipelex/cogt/img_gen/test_img_gen_mapping_neutrality.py` | glob comment softened to what it proves; header notes where the transitive hole is closed |
+| `docs/contribute/hub-layering.md` | "Known inversions" gains the bullet binding the prose list to the test, and the refutation of the repo-wide generalization |
+| `CHANGELOG.md` | `[Unreleased] / Added` |
+
+Decisions taken, and why:
+
+- **Two golden sets, not one.** Item 2 asked for the `cogt → pipelex.providers` edges, but that set alone does not close its own closing argument: a bare `import openai` inside a `cogt` module is not a providers edge, so it would pass. The vendor-free claim is pinned as its own assertion — as an **allowlist of third-party import roots**, not a vendor denylist. Same golden-set shape as the edges, no list of vendor names to keep current, and a new framework dependency surfaces for review as one line rather than slipping through a denylist's gaps.
+- **Edges are addressed by `source -> target [form]`, never by line number.** Line numbers are pure churn. The **form** (`module-level` / `deferred` / `type-checking`) is carried on purpose: promoting the deferred `vertexai_factory` import to module level is a real change — it is what would put the target in every closure touching `backend_factory` — and a set keyed on the statement alone would not see it.
+- **Relative imports are resolved, not skipped.** The sibling neutrality test's helper skips `level > 0`, which is safe there (one directory) but would be a hole here: `from ...providers.openai import x` inside `pipelex/cogt/llm/` resolves to a real edge. Negative-tested with a probe at that exact shape.
+- **The glob convention stays unbound by a test.** Item 1 said one line; softening the comment is the whole fix. A naming rule enforced by machinery is the shape this track spent four review rounds deleting, and the unglobbed-mapping worry is answered by the vendor-free assertion instead — an uncovered mapping module still cannot carry an SDK.
+
+Negative-tested by planting a probe module under `pipelex/cogt/` carrying `import openai`, a module-level provider import, a `TYPE_CHECKING` one and a deferred one: both tests fail, all three forms are classified correctly, and the messages name added/removed rows. A second probe under `pipelex/cogt/llm/` confirmed the relative-import resolution.
+
+**On item 3 (correct the false claim).** The tracker section that carried it no longer exists — the claim survives only in the quote block above, where it is already refuted in place. So the correction was put somewhere durable instead: `docs/contribute/hub-layering.md` now states, in the section whose stated job is keeping the document honest, that the repo-wide generalization is false and why. That is where someone would reason their way to the wrong test; `wip/` is archived at track end.
+
+Gates: `make agent-check`, `make drift-check`, `make agent-test` all green.
 
 ---
 
