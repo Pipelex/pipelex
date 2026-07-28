@@ -2,19 +2,21 @@
 
 The three items the modularity track's review rounds recorded but did not fix. Each was **re-verified against the tree on 2026-07-28 at `7ddb77f87`** before being written down here; every claim below is measured, and the commands that produced it are inline so a new session can re-take them rather than trust them.
 
-**Where to implement:** `refactor/Hub-2`, after PR #1067 merges into it. All three are independent of each other and of the release-gated cross-repo sweep — except **FU-1**, which should land *before* the sweep ships the `MthdsParserError` rename to its consumers.
+**Where implemented:** branch `refactor/Modularity-4`, on top of the merged PR #1067. All three are independent of each other and of the release-gated cross-repo sweep — except **FU-1**, which had to land *before* the sweep ships the `MthdsParserError` rename to its consumers.
 
 **Stable IDs:** cite these as **FU-1**, **FU-2**, **FU-3**. They supersede the unnumbered bullets in the tracker's "Follow-ups from the review" section, which points here.
 
-| id | one line | verdict | size |
-| --- | --- | --- | --- |
-| [FU-1](#fu-1--nothing-flags-an-error-class-rename-and-it-is-a-wire-break) | Nothing flags an error-class rename, and it is a wire break | still true — **do this first** | small |
-| [FU-2](#fu-2--the-img-gen-neutrality-guard-is-weaker-than-its-comment-and-its-recorded-remedy-is-wrong) | The img-gen neutrality guard overclaims; its recorded remedy rests on a false measurement | still true, **remedy corrected here** | two small edits |
-| [FU-3](#fu-3--the-bookkeeping-files-a-bulk-rewrite-breaks-are-still-ungated) | The bookkeeping files a bulk rewrite breaks are still ungated | gate absent, artifacts currently clean | small, do half |
+| id | one line | verdict | size | status |
+| --- | --- | --- | --- | --- |
+| [FU-1](#fu-1--nothing-flags-an-error-class-rename-and-it-is-a-wire-break) | Nothing flags an error-class rename, and it is a wire break | still true — **do this first** | small | ✅ **DONE** |
+| [FU-2](#fu-2--the-img-gen-neutrality-guard-is-weaker-than-its-comment-and-its-recorded-remedy-is-wrong) | The img-gen neutrality guard overclaims; its recorded remedy rests on a false measurement | still true, **remedy corrected here** | two small edits | ⬜ next |
+| [FU-3](#fu-3--the-bookkeeping-files-a-bulk-rewrite-breaks-are-still-ungated) | The bookkeeping files a bulk rewrite breaks are still ungated | gate absent, artifacts currently clean | small, do half | ⬜ |
 
 ---
 
 ## FU-1 — Nothing flags an error-class rename, and it is a wire break
+
+> ✅ **DONE** — see [what shipped](#what-shipped) at the end of this section.
 
 ### Verified still true
 
@@ -65,6 +67,33 @@ Shape it as a committed golden file plus a regeneration command, in the style th
 ### Ordering
 
 Land the snapshot **before** the release-gated cross-repo sweep. The sweep is what actually ships `MthdsParserError` to those four consumers, and the snapshot is what makes the next such rename visible at the moment it is made rather than at the moment something breaks in a different repo.
+
+### What shipped
+
+Re-verification held on both counts before starting: `error_type=type(self).__name__` is still at `base_exceptions.py:595`, and all four consumer sites still switch on `"PipelexInterpreterError"` (plus two test files in the starter repos that the original survey did not list — `mthds-starter-js/src/lib/errors.test.ts:145` and `pipelex-starter-js/src/lib/errors.test.ts:170`). The cheap half was done as recommended; the `_declared_error_type` refactor stays deferred.
+
+| file | role |
+| --- | --- |
+| `pipelex/errors/error_identity_snapshot.py` | pure renderer — `iter_error_identity_rows()` + `render_error_identity_snapshot()`, population from `iter_pipelex_error_subclasses()` |
+| `pipelex/cli/dev_cli/commands/generate_error_identity_cmd.py` | `pipelex-dev generate-error-identity`, owns the repo-relative output path |
+| `tests/data/errors/error_identity.txt` | the committed golden — a preamble, then one `error_type \| title \| type_uri` row per class |
+| `tests/unit/pipelex/errors/test_error_identity_snapshot.py` | the gate |
+| `Makefile` | `make generate-error-identity`, alias `make gei` |
+
+Decisions taken, and why:
+
+- **Pytest is the gate; there is no `check-error-identity` command.** The doc asked for "a committed golden file plus a regeneration command"; a second freshness command wired into `make check` would duplicate what the test already does. The regeneration command exists, the *checking* lives in one place.
+- **The renderer takes no Pipelex bootstrap.** `title()` / `type_uri()` read class attributes and a module-level URL constant, and discovery imports error modules by filename — so unlike `generate-error-pages` this runs anywhere, including an environment with no configured backend.
+- **The anti-vacuity guard is honoured.** `test_enumerated_identity_set_is_not_empty` is non-parametrized and additionally asserts `PipelexError` itself is present, so the guard is count-free and cannot be skipped into a green run.
+- **A third test pins format integrity** — no identity field may contain the `" | "` column separator, which is what keeps the rendering unambiguous.
+
+Negative-tested: rewriting the `MthdsParserError` row to `PipelexInterpreterError` fails the gate with the diff shown inline and the "this is a WIRE BREAK" framing, which is exactly the review artifact the item asked for.
+
+Docs updated in the same change: [Error Model](../../docs/under-the-hood/error-model.md) gains an "identity triple" subsection explaining why `error_type` has no declaration hatch and what the snapshot is for; the kit agent-rules sources (`commands.md`, `codex_commands.md` — `CLAUDE.md` / `AGENTS.md` are *generated* from these, via `make rules`) list the new dev CLI command; `docs/contribute/drift-contracts.md` adds the artifact to the Derived tier and to the never-review-generated-output corollary; CHANGELOG under `[Unreleased] / Added`.
+
+**Still open, deliberately:** the four (six, counting the starter test files) consumer sites are untouched — they are the release-gated cross-repo sweep's job, and the workspace forbids backward compatibility, so there is nothing to ship them early. The snapshot is what makes the *next* rename visible; this one still needs the sweep.
+
+Gates: `make agent-check`, `make drift-check`, and the errors / CLI / kit test slice all green.
 
 ---
 
