@@ -1,23 +1,35 @@
 """Process-global access to the active class registry, with an optional library-scoping resolver.
 
 This module deliberately sits *below* both hubs and imports nothing from ``pipelex``, so any layer
-can import it directly. That is not stylistic: several modules that need the active class registry
-are themselves inside ``runtime_hub``'s import closure, so they cannot import ``runtime_hub`` at
-module level without forming a cycle. Hosting the accessor here is what lets them use a plain
-top-level import instead of a lazy ``importlib`` shim. The two live cases:
+can import it directly. That is not stylistic: a module that needs the active class registry may be
+one ``runtime_hub`` cannot be imported *from*, and hosting the accessor here is what lets it use a
+plain top-level import instead of a lazy ``importlib`` shim.
 
-- ``core.concepts.concept_factory`` and ``core.concepts.structure_generation.generator``, the
-  **materialization write side** — they generate structure classes and register them at
-  library-load time (reached via ``runtime_hub`` -> ``cogt.llm.llm_worker_abstract`` ->
-  ``system.telemetry.otel_factory`` -> ``core.pipes.pipe_output`` -> ``core.stuffs.stuff`` ->
-  ``core.concepts.concept``).
-- ``pipe_machinery.pipe_abstract``, which decorates graph-registry entries with a concept's JSON
-  Schema (reached via ``runtime_hub`` -> ``plugins.orchestrator_registry`` -> ``pipe_run.pipe_job``).
+Exactly one module needs that today, and the constraint is a **static-analysis** cycle rather than a
+runtime one — measure before restating it. ``pipe_machinery.pipe_abstract`` decorates graph-registry
+entries with a concept's JSON Schema. It is *not* in ``runtime_hub``'s runtime import closure (a
+clean-interpreter probe after ``import pipelex.runtime_hub`` shows it, ``pipe_run.pipe_job`` and
+``plugins.orchestrator_registry`` all absent — those edges are ``TYPE_CHECKING``-only). But pyright's
+``reportImportCycles`` counts ``TYPE_CHECKING`` edges, so importing **either** hub there is a hard
+type-check failure via ``runtime_hub`` -> ``plugins.orchestrator_registry`` -> ``pipe_run.pipe_job``
+-> ``pipe_machinery.pipe_abstract``, and a deferred import does not dodge it — the error is reported
+at ``interpreter_hub.py``, where no line-level ignore can reach.
 
-The *read* side does not appear here and must not: resolving a concept's declared
+``core.concepts.concept_factory`` and ``core.concepts.structure_generation.generator`` — the
+**materialization write side**, which generates structure classes and registers them at library-load
+time — also import from here, but by convention rather than necessity: both are outside
+``runtime_hub``'s closure and pyright accepts the public accessor in either. Historically the binding
+case was ``core.concepts.concept`` itself, which *is* in the closure (``runtime_hub`` ->
+``cogt.llm.llm_worker_abstract`` -> ``system.telemetry.otel_factory`` -> ``core.pipes.pipe_output``
+-> ``core.stuffs.stuff`` -> ``core.concepts.concept``) and no longer reads any registry at all.
+
+The concept **read** side belongs behind the provider seam, not here: resolving a concept's declared
 ``structure_class_name`` into a class goes through a ``ConceptProviderAbstract`` implementation
-(``ConceptLibrary.get_structure_class``), so the whole tree has exactly one implementation of it.
-``Concept`` itself reads no registry at all — pinned by
+(``ConceptLibrary.get_structure_class``), which is the only place that applies the ``StuffContent``
+bound and raises ``ConceptStructureClassNotFoundError``. ``pipe_abstract`` above is the one sanctioned
+exception, and it deliberately uses the *lenient* ``get_class`` — no bound, ``None`` rather than a
+raise — because the schema it produces is optional decoration on a graph-registry entry. ``Concept``
+itself reads no registry at all, pinned by
 ``tests/unit/pipelex/core/concepts/test_concept_registry_boundary.py``.
 
 Note what that seam does **not** yet buy. `ConceptLibrary.get_structure_class` calls

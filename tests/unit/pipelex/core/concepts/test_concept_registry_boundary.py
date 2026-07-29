@@ -27,10 +27,18 @@ _TESTS_ROOT = next(parent for parent in Path(__file__).resolve().parents if pare
 _REPO_ROOT = _TESTS_ROOT.parent
 _CONCEPTS_DIR = _REPO_ROOT / "pipelex" / "core" / "concepts"
 
-#: The module that hosts the accessor, below both hubs. Matched alongside the accessor *name* so the
-#: `pipelex.runtime_hub` re-export (the public spelling everywhere else) is caught by the same check.
+#: The module that hosts the accessor, below both hubs. Importing it *at all* is registry access —
+#: it exports nothing else. `pipelex.runtime_hub` is deliberately NOT listed: it re-exports the
+#: accessor among many unrelated ones, so the module is not the signal, the name and the call are.
 _ACCESSOR_MODULE = "pipelex.system.registries.class_registry_access"
 _ACCESSOR_NAME = "get_class_registry"
+
+#: Reaching the registry without naming the accessor. `KajsonManager.get_class_registry()` returns the
+#: process-global registry directly, bypassing library scoping entirely — there is a live precedent for
+#: it at `runtime_bridge/primitives/rehydration.py`. `ClassRegistryUtils` calls the accessor internally,
+#: so importing it is reaching the registry by proxy. An import-name-only walk misses both, which would
+#: make this a check on one import spelling rather than on the property it claims to pin.
+_INDIRECT_ACCESS_ROOTS = ("KajsonManager", "ClassRegistryUtils")
 
 #: The materialization write side: the only two modules under `pipelex/core/concepts/` that may touch the
 #: class registry. `concept_factory` registers generated structure classes and decides whether one already
@@ -51,11 +59,13 @@ CONCEPT_MODULE_PATHS: list[Path] = sorted(_CONCEPTS_DIR.rglob("*.py"))
 
 
 def _reaches_the_class_registry(*, module_path: Path) -> bool:
-    """Whether a module names the class-registry accessor in any import, under either spelling.
+    """Whether a module reaches the class registry at all — by import, by module path, or by proxy.
 
-    Both `from pipelex.system.registries.class_registry_access import get_class_registry` (the form used
-    inside `runtime_hub`'s own import closure) and `from pipelex.runtime_hub import get_class_registry`
-    (the public accessor) count: they are the same dependency reached two ways.
+    Deliberately wider than "imports `get_class_registry` by name". A check that only matched the
+    import name would pass a module doing `import pipelex.runtime_hub` followed by
+    `pipelex.runtime_hub.get_class_registry()`, or one calling `KajsonManager.get_class_registry()`
+    (which skips library scoping outright), and this is the gate that is supposed to catch a read-side
+    leak growing back — so it matches the attribute call and the two indirect roots as well.
     """
     tree = ast.parse(module_path.read_text(encoding="utf-8"), filename=str(module_path))
     for node in ast.walk(tree):
@@ -65,8 +75,12 @@ def _reaches_the_class_registry(*, module_path: Path) -> bool:
         elif isinstance(node, ast.ImportFrom):
             if node.module == _ACCESSOR_MODULE:
                 return True
-            if any(alias.name == _ACCESSOR_NAME for alias in node.names):
+            if any(alias.name == _ACCESSOR_NAME or alias.name in _INDIRECT_ACCESS_ROOTS for alias in node.names):
                 return True
+        elif isinstance(node, ast.Attribute) and node.attr == _ACCESSOR_NAME:
+            # `pipelex.runtime_hub.get_class_registry()` / `KajsonManager.get_class_registry()` —
+            # the call reaches the registry whether or not the name was imported.
+            return True
     return False
 
 
@@ -96,16 +110,21 @@ class TestConceptRegistryBoundary:
     @pytest.mark.parametrize(
         ("source", "expected"),
         [
-            (f"from {_ACCESSOR_MODULE} import {_ACCESSOR_NAME}", True),
-            (f"from pipelex.runtime_hub import {_ACCESSOR_NAME}", True),
-            (f"import {_ACCESSOR_MODULE}", True),
-            (f"from pipelex.runtime_hub import get_console, {_ACCESSOR_NAME}", True),
+            ("from pipelex.system.registries.class_registry_access import get_class_registry", True),
+            ("from pipelex.runtime_hub import get_class_registry", True),
+            ("import pipelex.system.registries.class_registry_access", True),
+            ("from pipelex.runtime_hub import get_console, get_class_registry", True),
+            # The spellings an import-name-only walk would wave through.
+            ("def f():\n    return pipelex.runtime_hub.get_class_registry()", True),
+            ("from kajson.kajson_manager import KajsonManager", True),
+            ("def f():\n    return KajsonManager.get_class_registry()", True),
+            ("from pipelex.system.registries.class_registry_utils import ClassRegistryUtils", True),
             ("from pipelex.runtime_hub import get_console", False),
             ("from pipelex.core.stuffs.stuff_content import StuffContent", False),
         ],
     )
-    def test_both_accessor_spellings_are_detected(self, source: str, expected: bool, tmp_path: Path) -> None:
-        """The public `runtime_hub` re-export is the same dependency as the below-both-hubs module."""
+    def test_every_way_of_reaching_the_registry_is_detected(self, source: str, expected: bool, tmp_path: Path) -> None:
+        """Import name, module path, attribute call, and the two indirect roots all count."""
         module_path = tmp_path / "probe.py"
         module_path.write_text(source, encoding="utf-8")
         assert _reaches_the_class_registry(module_path=module_path) is expected

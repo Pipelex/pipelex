@@ -35,3 +35,15 @@ The branch asserted a scoping property in three places. Two were docstrings writ
 ## The shape of the fix, if it ever lands
 
 Give `ConceptProviderAbstract` a way to name its registry and have `ConceptLibrary` carry the one from its parent `Library`, falling back to `get_class_registry()` when it has no parent — which keeps `make_empty()` and the `--save-csv` path working. One place changes (`ConceptLibrary.get_structure_class`), which is the property the single-seam refactor bought even though it did not use it.
+
+## Related, from the same PR's finalize review
+
+Four items surfaced alongside this one. All are design tradeoffs or pre-existing asymmetries rather than defects, and all share the same reachability gate as the note above.
+
+**The `StuffContent` bound changed the compatibility verdict path too, not just `get_structure_class`.** `ConceptLibrary` resolves with `get_required_subclass(base_class=StuffContent)`, where the old class tier used an unbounded `get_class`. A name registered as a *non*-`StuffContent` class used to flow into `are_classes_equivalent` / `issubclass` and could answer `True`; it now raises. That tightening is deliberate and pinned for `get_structure_class` (`test_get_structure_class_rejects_a_class_that_is_not_stuff_content`), but only the `get_structure_class` half was written down — the compatibility half rides along undocumented. Same unreachability argument applies (the factory refuses to build such a concept), which is why it was recorded rather than reverted.
+
+**`StuffSpec.render_stuff_spec` does not consult `declares_a_structure_class`.** An input declared `native.Anything` raises on the render/template paths while `is_compatible` answers `False` for it. Not a regression — the base commit raised `ConceptValueError` at the same point — but the new property makes the asymmetry visible for the first time. Whether rendering *should* have an `Anything` arm is a real question; it is not this branch's.
+
+**`template_image_analyzer`'s dotted-path branch resolves unconditionally** while the two single-variable branches now answer for `Anything`. So `{{ anything_var }}` is fine and `{{ anything_var.field }}` fails bundle load. Pre-existing in kind, surfaced by the same property.
+
+**`pipe_abstract` is a second read-side resolution, with a weaker bound.** It uses the lenient `get_class` (no `StuffContent` bound, `None` rather than a raise) rather than the provider seam, because importing either hub there is a pyright cycle. Deliberate — the schema is optional decoration on a graph-registry entry — and the honest resolution was to say so in `class_registry_access.py`'s docstring rather than change the code. Worth revisiting only if that module ever escapes the cycle.

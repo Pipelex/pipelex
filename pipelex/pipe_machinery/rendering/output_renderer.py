@@ -46,11 +46,15 @@ def _collect_possible_outputs(
                 return []
 
             possible_outputs: list[dict[str, Any]] = []
+            # Resolved once, and OUTSIDE the try below: a failure to reach the loaded method's library
+            # is a lifecycle fault, not "this concept's structure cannot be rendered", and the except
+            # there would quietly turn it into the placeholder.
+            concept_provider = get_concept_library()
             # pipe_dependencies() is a set — sort so the user-facing output_option_N numbering is deterministic
             for mapped_pipe_code in sorted(mapped_pipe_codes):
                 mapped_pipe = get_required_pipe(pipe_code=mapped_pipe_code)
                 try:
-                    output_dict = mapped_pipe.output.render_stuff_spec(concept_provider=get_concept_library(), output_format=output_format)
+                    output_dict = mapped_pipe.output.render_stuff_spec(concept_provider=concept_provider, output_format=output_format)
                     content = output_dict.get("content", output_dict)
                     possible_outputs.append(
                         {
@@ -87,9 +91,11 @@ def _collect_possible_outputs(
             if last_pipe.output.concept.code == NativeConceptCode.ANYTHING:
                 return _collect_possible_outputs(last_pipe, output_format=output_format)
 
-            # Otherwise render the last pipe's output
+            # Otherwise render the last pipe's output. The library lookup sits outside the try for
+            # the same reason as the condition branch above.
+            concept_provider = get_concept_library()
             try:
-                output_dict = last_pipe.output.render_stuff_spec(concept_provider=get_concept_library(), output_format=output_format)
+                output_dict = last_pipe.output.render_stuff_spec(concept_provider=concept_provider, output_format=output_format)
                 content = output_dict.get("content", output_dict)
                 return [
                     {

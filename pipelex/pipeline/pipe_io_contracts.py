@@ -7,13 +7,16 @@ declared inputs and the concept/multiplicity of its output — keyed by the name
 `pipe_ref` (`domain.code`), the one identity convention shared by every validate artifact
 (`validated_pipes`, `pending_signatures`).
 
-The JSON-Schema rendering resolves each concept's structure class through the GLOBAL
-class registry. Bundle-defined structure classes are registered there during library
-load and are NOT unregistered at teardown (the registry has no unregister mechanism) —
-so a call after teardown does not fail loudly: it silently renders against whatever
-classes the registry last held, which may be stale or belong to a different bundle.
-Callers must therefore invoke the builder against loaded pipes INSIDE the validation
-library's window, before teardown. (Registry teardown hygiene is tracked in the
+Callers must invoke the builder against loaded pipes INSIDE the validation library's
+window, before teardown — the builder now says so itself rather than degrading. It asks
+the interpreter hub for the loaded method's concept library up front, so a post-teardown
+call raises instead of quietly rendering against whatever the class registry last held.
+
+That silent-stale reading used to be the hazard this note warned about: bundle-defined
+structure classes are registered in the process-global registry during library load and
+are never unregistered (the registry has no unregister mechanism), so the classes outlive
+the library that defined them. They still do — what changed is that this builder no longer
+reaches them behind the library's back. (Registry teardown hygiene is tracked in the
 workspace-root `wip/library-lifecycle-hygiene.md`.)
 """
 
@@ -73,9 +76,9 @@ def build_pipe_io_contracts(pipes: Sequence[PipeAbstract]) -> dict[str, PipeIOCo
 
     Works on any loaded `PipeAbstract` — including `PipeSignature` placeholders, whose
     declared contract is exactly what a top-down build needs to see. Must run while the
-    validation library is still loaded: bundle-defined structure classes resolve through
-    the global class registry and a post-teardown call silently uses stale classes
-    instead of failing (see the module docstring).
+    validation library is still loaded: the concept library is resolved from the current
+    library up front, so a post-teardown call raises rather than rendering against stale
+    classes (see the module docstring).
 
     Args:
         pipes: The loaded pipes to project (typically `ValidateBundleResult.pipes`).

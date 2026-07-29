@@ -175,11 +175,14 @@ class PipeAbstract(ABC, BaseModel):
             source = library_crate.source_map.get(concept.concept_ref)
             if source:
                 concept_dict["source"] = source
-        # Reads the active class registry directly rather than asking a concept provider: this module
-        # sits inside `runtime_hub`'s import closure (runtime_hub -> orchestrator_registry -> pipe_job
-        # -> here), so importing either hub would close a cycle — which is precisely what
-        # `class_registry_access` sits below both hubs for. The schema is best-effort decoration on a
-        # graph-registry entry, so an unresolvable class yields `None` rather than failing the run.
+        # Reads the active class registry directly rather than asking a concept provider. Importing
+        # either hub here is a pyright `reportImportCycles` failure via runtime_hub ->
+        # orchestrator_registry -> pipe_job -> here; those edges are TYPE_CHECKING-only, so there is no
+        # runtime cycle, but pyright counts them and reports at `interpreter_hub.py`, out of reach of a
+        # line-level ignore. Deferring the import does not help either. `class_registry_access` sits
+        # below both hubs for exactly this. The lenient `get_class` (no StuffContent bound) is
+        # deliberate: the schema is optional decoration on a graph-registry entry, so an unresolvable
+        # class yields `None` rather than failing the run.
         structure_class = get_class_registry().get_class(name=concept.structure_class_name)
         try:
             concept_dict["json_schema"] = structure_class.model_json_schema() if structure_class is not None else None
