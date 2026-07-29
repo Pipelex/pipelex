@@ -16,9 +16,19 @@ top-level import instead of a lazy ``importlib`` shim. The two live cases:
 
 The *read* side does not appear here and must not: resolving a concept's declared
 ``structure_class_name`` into a class goes through a ``ConceptProviderAbstract`` implementation
-(``ConceptLibrary.get_structure_class``), so the answer is scoped to the library you asked rather
-than to whatever the ambient registry happens to hold. ``Concept`` itself reads no registry at all —
-pinned by ``tests/unit/pipelex/core/concepts/test_concept_registry_boundary.py``.
+(``ConceptLibrary.get_structure_class``), so the whole tree has exactly one implementation of it.
+``Concept`` itself reads no registry at all — pinned by
+``tests/unit/pipelex/core/concepts/test_concept_registry_boundary.py``.
+
+Note what that seam does **not** yet buy. `ConceptLibrary.get_structure_class` calls
+``get_class_registry()``, so the class is resolved against whichever registry the *current async
+context* selects, not against one the provider carries — a `ConceptLibrary` holds no registry of its
+own (the per-library `ClassRegistry` lives on `Library`). Today the two cannot disagree: the
+interpreter hub resolves both the current library and the scoped registry from the same
+``_library_id`` ContextVar, and the one place that installs a per-library registry sets it and the
+ContextVar on the same library in adjacent statements. Scoping resolution to the provider's own
+library is therefore a one-place change if it is ever needed; see
+``wip/inputs/provider-scoped-class-resolution.md`` for the trip-wires that would make it needed.
 
 ``pipelex.runtime_hub.get_class_registry`` is the public accessor and delegates here; prefer it
 everywhere except inside this module's own import closure.

@@ -44,8 +44,8 @@ class StuffSpec(BaseModel):
 
         Args:
             concept_provider: Resolves this spec's concept into its structure class. This is the one
-                place in the render chain that resolves, so a caller passes the library it means and
-                the rendering can no longer read whatever the ambient registry last held.
+                place in the whole render chain that resolves a class, so a caller states which
+                library it means instead of every renderer reaching for one.
             output_format: The format to generate (JSON or PYTHON)
 
         Returns:
