@@ -137,10 +137,17 @@ Two are whole tiny modules that move as-is. Two are single symbols inside larger
 
 ### Phase 1 — declare the clean packages, and evict the one tenant that isn't
 
-- [ ] 1.1 Split `graph/graph_rendering.py` per D-3: bundle-driven helpers to `pipelex/pipeline/graph_rendering.py` (name it for what it does there), pure renderer stays. Update the two CLI import sites.
-- [ ] 1.2 Add `pipelex.graph`, `pipelex.tracing`, `pipelex.observer`, `pipelex.errors` to `RUNTIME_LAYER_PACKAGES` in `pipelex/cli/dev_cli/commands/hub_layering_guard.py`, and extend the tuple's note to say why each is there (the note is the declaration's rationale of record, and the existing entries all carry one).
-- [ ] 1.3 Run `make check-hub-layering`. It must pass — and it must now have `graph_rendering`'s successor **in** its domain, which is the whole point of 1.1 landing first. Confirm by temporarily reverting 1.1 and watching the guard fail; that is the negative control for this phase.
-- [ ] 1.4 Re-run measurement command 3 over the four newly-declared packages. Expected: no output.
+- [x] 1.1 Split `graph/graph_rendering.py` per D-3: bundle-driven helpers to `pipelex/pipeline/bundle_graph_rendering.py`, pure renderer stays. Updated the one affected CLI import site (`bundle_cmd.py`; `graph_cmd.py` only wanted `render_graph_from_spec`, which stayed) and moved the four bundle-half test modules from `tests/unit/pipelex/graph/` to `tests/unit/pipelex/pipeline/`.
+- [x] 1.2 Add `pipelex.graph`, `pipelex.tracing`, `pipelex.observer`, `pipelex.errors` to `RUNTIME_LAYER_PACKAGES` in `pipelex/cli/dev_cli/commands/hub_layering_guard.py`, and extend the tuple's note to say why each is there.
+- [x] 1.3 `make check-hub-layering` passes. **Negative control run and recorded**: re-adding the `pipeline.dry_run_pipeline` import to `graph/graph_rendering.py` makes the guard fail with `interpreter-hub-transitive` at `pipelex/graph/graph_rendering.py:14`, chain `pipelex.pipeline.dry_run_pipeline → pipelex.pipeline.runner → pipelex.interpreter_hub`. Before 1.2 that same file produced no finding at all.
+- [x] 1.4 Re-ran measurement command 3 over the four newly-declared packages: no output.
+
+**Deviation from D-3, recorded.** `_sanitize_graph_name` moved with the bundle half rather than staying in `graph/`. It is a private helper whose only caller is `generate_graph_for_bundle`; leaving it behind would have meant either dead code in `graph/` or promoting it to a public cross-module symbol to buy nothing. The layer argument for keeping it is untouched — it needs no loaded method — it just has no reason to live apart from its caller.
+
+**Added at review, beyond the plan.** Two findings from the checkpoint review, both accepted:
+
+- **The four new declarations are now pinned by a test.** `test_the_measured_clean_packages_stay_declared` asserts their membership in `RUNTIME_LAYER_PACKAGES`. Without it, deleting an entry left the whole suite green — which is precisely the failure this track exists to close, and the guard's own note already claimed the declaration "is asserted by a test". Mirrors the existing `test_the_plugin_split_left_both_halves_declared`; negative control run (dropping `pipelex.tracing` fails it).
+- **Test placement follow-through.** `tests/CLAUDE.md`'s `pipelex/pipeline/` row listed no unit path, so the four relocated modules landed outside the documented targeted-test route; the row now names `tests/unit/pipelex/pipeline/`. And `test_graph_rendering.py` — which tests `pipelex.graph.graph_rendering` — moved from `tests/unit/pipelex/cli/` to `tests/unit/pipelex/graph/`, where the mapping says it belongs and where the name is now free. It became load-bearing in this change: the bundle-side test stopped asserting the inclusion-flag mapping (that is the renderer's business, not the dispatcher's), so it is the only place that covers it.
 
 **🛑 CHECKPOINT 1** — the four packages are declared, policed, and clean; nothing in `pipeline`/`pipe_run` has moved yet. Gates: `make agent-check`, `make check-hub-layering`, full `make agent-test`. This is a coherent unit and a natural handoff: it is defensible on its own (it closes a live unpoliced breach), and it is the half with no cross-repo consequences at all — `graph_rendering`'s only importers are in this repo. Land it before opening Part 2.
 

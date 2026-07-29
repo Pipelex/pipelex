@@ -6,7 +6,8 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from pipelex.graph.graph_rendering import GraphFormat, generate_graph_for_bundle
+from pipelex.graph.graph_rendering import GraphFormat
+from pipelex.pipeline.bundle_graph_rendering import generate_graph_for_bundle
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 
 if TYPE_CHECKING:
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
 
     from pytest_mock import MockerFixture
 
-GRAPH_RENDERING_MODULE = "pipelex.graph.graph_rendering"
+BUNDLE_GRAPH_RENDERING_MODULE = "pipelex.pipeline.bundle_graph_rendering"
 
 BUNDLE_CONTENT = 'domain = "test_domain"\nmain_pipe = "test_pipe"\n'
 
@@ -29,13 +30,19 @@ class TestGenerateGraphForBundle:
         tmp_path: Path,
         saved_files: dict[str, Path],
     ) -> dict[str, Any]:
-        """Create the bundle file and patch the graph_rendering collaborators."""
+        """Create the bundle file and patch the bundle_graph_rendering collaborators.
+
+        The renderer is patched as a whole: since the split, `render_graph_from_spec` lives in the
+        runtime-layer `pipelex.graph.graph_rendering` and is this module's collaborator, not its
+        internals. How it maps the inclusion flags onto the graph config is its own test's business
+        (`tests/unit/pipelex/graph/test_graph_rendering.py`); what belongs here is the dispatch.
+        """
         bundle_path = tmp_path / "bundle.mthds"
         bundle_path.write_text(BUNDLE_CONTENT, encoding="utf-8")
 
         graph_spec_mock = mocker.MagicMock()
         mock_dry_run = mocker.patch(
-            f"{GRAPH_RENDERING_MODULE}.dry_run_pipeline",
+            f"{BUNDLE_GRAPH_RENDERING_MODULE}.dry_run_pipeline",
             new_callable=mocker.AsyncMock,
             return_value=(graph_spec_mock, "pipe_code"),
         )
@@ -43,15 +50,11 @@ class TestGenerateGraphForBundle:
         execution_config_mock = mocker.MagicMock()
         config_mock = mocker.MagicMock()
         config_mock.pipelex.pipeline_execution_config.with_execution_overrides.return_value = execution_config_mock
-        mocker.patch(f"{GRAPH_RENDERING_MODULE}.get_config", return_value=config_mock)
+        mocker.patch(f"{BUNDLE_GRAPH_RENDERING_MODULE}.get_config", return_value=config_mock)
 
-        mock_generate = mocker.patch(
-            f"{GRAPH_RENDERING_MODULE}.generate_graph_outputs",
+        mock_render = mocker.patch(
+            f"{BUNDLE_GRAPH_RENDERING_MODULE}.render_graph_from_spec",
             new_callable=mocker.AsyncMock,
-            return_value=mocker.MagicMock(),
-        )
-        mock_save = mocker.patch(
-            f"{GRAPH_RENDERING_MODULE}.save_graph_outputs_to_dir",
             return_value=saved_files,
         )
 
@@ -61,8 +64,7 @@ class TestGenerateGraphForBundle:
             "mock_dry_run": mock_dry_run,
             "config_mock": config_mock,
             "execution_config_mock": execution_config_mock,
-            "mock_generate": mock_generate,
-            "mock_save": mock_save,
+            "mock_render": mock_render,
         }
 
     @pytest.mark.parametrize(
@@ -89,10 +91,10 @@ class TestGenerateGraphForBundle:
             graph_format=graph_format,
         )
 
-        execution_config_mock = mocks["execution_config_mock"]
-        graphs_inclusion_update = execution_config_mock.graph_config.graphs_inclusion.model_copy.call_args.kwargs["update"]
-        assert graphs_inclusion_update["mermaidflow_html"] is expected_mermaidflow
-        assert graphs_inclusion_update["reactflow_html"] is expected_reactflow
+        render_kwargs = mocks["mock_render"].call_args.kwargs
+        assert render_kwargs["include_mermaidflow"] is expected_mermaidflow
+        assert render_kwargs["include_reactflow"] is expected_reactflow
+        assert render_kwargs["graph_config"] is mocks["execution_config_mock"].graph_config
         overrides_kwargs = mocks["config_mock"].pipelex.pipeline_execution_config.with_execution_overrides.call_args.kwargs
         assert overrides_kwargs == {"generate_graph": True, "mock_inputs": True}
 

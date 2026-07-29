@@ -113,19 +113,34 @@ SCAN_ROOTS: tuple[Path, ...] = (SOURCE_ROOT, TESTS_ROOT)
 #: both are runtime-layer: `plugins` is the plugin *mechanism* (the contract, the registrar, the
 #: capability registries), `providers` the built-in vendor *adapters* that register through it.
 #: Splitting them did not move the boundary — it made the one-way dependency legible — so leaving
-#: `pipelex.providers` undeclared would silently un-declare the largest runtime-layer package. Note
-#: that omitting an entry makes this guard **quieter**, not louder: the transitive rule below filters
-#: its candidates through :func:`is_runtime_layer`, so an undeclared package is excluded from the
-#: rule's domain rather than reported by it. That is why the declaration is asserted by a test.
+#: `pipelex.providers` undeclared would silently un-declare the largest runtime-layer package.
+#:
+#: `pipelex.graph`, `pipelex.tracing`, `pipelex.observer` and `pipelex.errors` are the four packages
+#: that were measured clean and left undeclared anyway, and the omission cost something: **an
+#: undeclared package is not neutral, it is unpoliced.** Omitting an entry makes this guard
+#: **quieter**, not louder — the transitive rule below filters its candidates through
+#: :func:`is_runtime_layer`, so an undeclared package is excluded from the rule's domain rather than
+#: reported by it. That is exactly how `graph.graph_rendering` came to reach `interpreter_hub`
+#: through `pipeline.dry_run_pipeline` with every gate green; the bundle-driven half of that module
+#: is now `pipelex.pipeline.bundle_graph_rendering`, and `graph` is declared. What each entry is:
+#: `graph` is the run-graph data model, tracer and renderers, `tracing` the trace-event assembler
+#: feeding them, `observer` the run-observation hooks, `errors` the error taxonomy — all machinery
+#: present at execution time whatever is loaded, which is the runtime layer's own definition.
+#: `pipelex.kit` is data files and `pipelex.language` has interpreter edges, so both stay out.
+#: That the declaration is a claim rather than a hope is why it is asserted by a test.
 #: See the "Where core splits" section of ``docs/contribute/hub-layering.md``.
 RUNTIME_LAYER_PACKAGES: tuple[str, ...] = (
     "pipelex.cogt",
     "pipelex.core",
+    "pipelex.errors",
+    "pipelex.graph",
+    "pipelex.observer",
     "pipelex.plugins",
     "pipelex.providers",
     "pipelex.reporting",
     "pipelex.system",
     "pipelex.tools",
+    "pipelex.tracing",
     # the runtime layer's own hub — a module, not a package; see the note above
     "pipelex.runtime_hub",
 )

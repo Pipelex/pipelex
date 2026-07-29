@@ -1,4 +1,4 @@
-"""Unit tests for the bundle dry-run helper in graph rendering."""
+"""Unit tests for the bundle dry-run helper behind bundle graph rendering."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipelex.graph.graph_rendering import (
+from pipelex.pipeline.bundle_graph_rendering import (
     _dry_run_bundle,  # noqa: PLC2701 # pyright: ignore[reportPrivateUsage]
 )
 
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
     from pytest_mock import MockerFixture
 
-GRAPH_RENDERING_MODULE = "pipelex.graph.graph_rendering"
+BUNDLE_GRAPH_RENDERING_MODULE = "pipelex.pipeline.bundle_graph_rendering"
 
 BUNDLE_CONTENT = 'domain = "test_domain"\nmain_pipe = "test_pipe"\n'
 
@@ -35,7 +35,7 @@ class TestDryRunBundle:
 
         graph_spec_mock = mocker.MagicMock()
         mock_dry_run = mocker.patch(
-            f"{GRAPH_RENDERING_MODULE}.dry_run_pipeline",
+            f"{BUNDLE_GRAPH_RENDERING_MODULE}.dry_run_pipeline",
             new_callable=mocker.AsyncMock,
             return_value=(graph_spec_mock, "pipe_code"),
         )
@@ -58,7 +58,7 @@ class TestDryRunBundle:
         bundle_path.write_text(BUNDLE_CONTENT, encoding="utf-8")
 
         mock_dry_run = mocker.patch(
-            f"{GRAPH_RENDERING_MODULE}.dry_run_pipeline",
+            f"{BUNDLE_GRAPH_RENDERING_MODULE}.dry_run_pipeline",
             new_callable=mocker.AsyncMock,
             return_value=(mocker.MagicMock(), "pipe_code"),
         )
@@ -80,7 +80,7 @@ class TestDryRunBundle:
         bundle_path.write_text(BUNDLE_CONTENT, encoding="utf-8")
 
         mock_dry_run = mocker.patch(
-            f"{GRAPH_RENDERING_MODULE}.dry_run_pipeline",
+            f"{BUNDLE_GRAPH_RENDERING_MODULE}.dry_run_pipeline",
             new_callable=mocker.AsyncMock,
             return_value=(mocker.MagicMock(), "pipe_code"),
         )

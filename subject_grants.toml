@@ -3172,22 +3172,6 @@ rationale = "Verb-object: generates outputs from the graph spec; rendering optio
 param = "graph_outputs"
 rationale = "Verb-object: saves the graph outputs; destination stays keyword."
 
-["pipelex/graph/graph_rendering.py::_dry_run_bundle"]
-param = "bundle_path"
-rationale = "Verb-object: dry-runs the bundle at the path; options stay keyword."
-
-["pipelex/graph/graph_rendering.py::_sanitize_graph_name"]
-param = "graph_name"
-rationale = "Transforms the graph name; single operand."
-
-["pipelex/graph/graph_rendering.py::generate_graph_for_bundle"]
-param = "bundle_path"
-rationale = "Verb-object: generates the graph for the bundle at the path; options stay keyword."
-
-["pipelex/graph/graph_rendering.py::generate_view_for_bundle"]
-param = "bundle_path"
-rationale = "Verb-object: generates the view for the bundle at the path; options stay keyword."
-
 ["pipelex/graph/graph_rendering.py::render_graph_from_spec"]
 param = "graph_spec"
 rationale = "Verb-object: renders from the graph spec; options stay keyword."
@@ -4379,6 +4363,22 @@ rationale = "Verb-object: walks from the root pipe; visited set stays keyword."
 ["pipelex/pipeline/blueprint_selection.py::select_primary_blueprint"]
 param = "blueprints"
 rationale = "Verb-object: selects among the blueprints; single operand."
+
+["pipelex/pipeline/bundle_graph_rendering.py::_dry_run_bundle"]
+param = "bundle_path"
+rationale = "Verb-object: dry-runs the bundle at the path; options stay keyword."
+
+["pipelex/pipeline/bundle_graph_rendering.py::_sanitize_graph_name"]
+param = "graph_name"
+rationale = "Transforms the graph name; single operand."
+
+["pipelex/pipeline/bundle_graph_rendering.py::generate_graph_for_bundle"]
+param = "bundle_path"
+rationale = "Verb-object: generates the graph for the bundle at the path; options stay keyword."
+
+["pipelex/pipeline/bundle_graph_rendering.py::generate_view_for_bundle"]
+param = "bundle_path"
+rationale = "Verb-object: generates the view for the bundle at the path; options stay keyword."
 
 ["pipelex/pipeline/bundle_validator.py::BundleValidator.validate_pipes"]
 param = "pipes"

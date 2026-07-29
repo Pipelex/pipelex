@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from pipelex.graph.graph_rendering import generate_view_for_bundle
+from pipelex.pipeline.bundle_graph_rendering import generate_view_for_bundle
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 
 if TYPE_CHECKING:
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
     from pytest_mock import MockerFixture
 
-GRAPH_RENDERING_MODULE = "pipelex.graph.graph_rendering"
+BUNDLE_GRAPH_RENDERING_MODULE = "pipelex.pipeline.bundle_graph_rendering"
 
 BUNDLE_CONTENT = 'domain = "test_domain"\nmain_pipe = "test_pipe"\n'
 
@@ -36,7 +36,7 @@ class TestGenerateViewForBundle:
         graph_spec_mock = mocker.MagicMock()
         graph_spec_mock.model_dump.return_value = {"nodes": "node_payload", "edges": "edge_payload"}
         dry_run_mock = mocker.patch(
-            f"{GRAPH_RENDERING_MODULE}.dry_run_pipeline",
+            f"{BUNDLE_GRAPH_RENDERING_MODULE}.dry_run_pipeline",
             new_callable=mocker.AsyncMock,
             return_value=(graph_spec_mock, "pipe_code"),
         )
@@ -45,7 +45,7 @@ class TestGenerateViewForBundle:
         execution_config_mock.graph_config.reactflow_config.layout_direction = config_layout_direction
         config_mock = mocker.MagicMock()
         config_mock.pipelex.pipeline_execution_config.with_execution_overrides.return_value = execution_config_mock
-        mocker.patch(f"{GRAPH_RENDERING_MODULE}.get_config", return_value=config_mock)
+        mocker.patch(f"{BUNDLE_GRAPH_RENDERING_MODULE}.get_config", return_value=config_mock)
 
         return bundle_path, graph_spec_mock, dry_run_mock
 

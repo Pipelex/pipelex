@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:31a113f803c7dc57bc5254534627de1539237c78bef1a55cb5d88e7c9469830c"
-reviewed_by = "Claude (Opus 5 1M context)"
-reviewed_at = "2026-07-29T01:41:51Z"
-rationale = "Merge-induced reopening: merging dev into refactor/Hub-2 reset this contract's baseline to dev's 2026-07-28 ack, so the whole modularity-track sweep across pipelex/cli/** re-presents as unreviewed even though three prior acks on this branch already covered it. Reviewed anyway rather than rubber-stamping. Mechanical check first: diffing all 26 triggers against dev and filtering out every changed import line leaves exactly three non-import changes, all already-reviewed branch work — the PipelexInterpreter to MthdsParser class rename, the matching PipelexInterpreterError to MthdsParserError rename (which also re-keys one AGENT_ERROR_HINTS entry), and build_registrar gaining builtin_plugins/core_unconditional_plugin_names. Both review targets carry zero references to any of those symbols or to any Python import path, so the sweep is structurally invisible to them; agent_cli/CLAUDE.md points at the AGENT_ERROR_HINTS dict by name instead of copying its keys, which is why an error-class rename cannot make it stale. Verified both sides live rather than by reading. Dev's side: 'pipelex build output --help' and the build group listing both now read 'JSON, Python, or JSON Schema', matching the docs/tools/cli/build/index.md line dev fixed in the same change. Branch side: 'pipelex-agent validate bundle <broken>.mthds --format json --error-format json' still emits error_type ValidateBundleError with MthdsParserError appearing only in error_source, exactly as agent_cli/CLAUDE.md line 24 describes that array — so the renamed class stays off the documented wire field on this channel. Nothing stale on either target."
+digest = "sha256:852b4bbd1814d0740a38d529a7b9da5826c6ce3f4ca9482f768ac8c60752b13f"
+reviewed_by = "Claude (Opus 5)"
+reviewed_at = "2026-07-29T11:53:30Z"
+rationale = "Trigger is one file, bundle_cmd.py, and the whole diff is two import lines: generate_graph_for_bundle / generate_view_for_bundle moved from pipelex.graph.graph_rendering to the new pipelex.pipeline.bundle_graph_rendering when the module was split along the hub layer boundary; GraphFormat still comes from graph_rendering. No option, default, enum member, output shape or error class moved. Opened both targets and grepped them for every moved symbol and both module paths: zero hits in docs/tools/cli/ and in agent_cli/CLAUDE.md, which is expected — neither target documents Python import paths. Verified the surface live rather than by reading: 'pipelex-agent validate bundle --help' still lists --graph-format with choices mermaidflow|reactflow|both and default reactflow, matching docs/tools/cli/agent-cli.md line 72 and the agent_cli/CLAUDE.md validate row verbatim, and --view is unchanged. Nothing stale."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -48,7 +48,7 @@ rationale = "Merge-induced reopening: merging dev into refactor/Hub-2 reset this
 "pipelex/cli/agent_cli/commands/validate/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/validate/_validate_core.py" = "blob:c07252202265806ebe3512370152d2ebce8a7e78"
 "pipelex/cli/agent_cli/commands/validate/app.py" = "blob:d2d0ed19288c2d1c25be1650dd962189fcdb3b86"
-"pipelex/cli/agent_cli/commands/validate/bundle_cmd.py" = "blob:e6a85eb8920188c3eda4a9d8781d8f4194a9ec63"
+"pipelex/cli/agent_cli/commands/validate/bundle_cmd.py" = "blob:fd751a2176bc9d62f164b293ec83006d22947d89"
 "pipelex/cli/agent_cli/commands/validate/method_cmd.py" = "blob:24ddeef224fa2d88781141467ef80c414d34f77a"
 "pipelex/cli/agent_cli/commands/validate/pipe_cmd.py" = "blob:8f9aa91cdfa9a1688ce500c07dc00801737ea626"
 "pipelex/cli/bundle_target_resolution.py" = "blob:8dccc50b700b877968ed1b2c1c3652ab1c32e956"
