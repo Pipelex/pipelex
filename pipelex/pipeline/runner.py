@@ -46,10 +46,10 @@ if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
     from pipelex.pipe_run.pipe_job import PipeJob
-    from pipelex.pipe_run.pipe_run_mode import PipeRunMode
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
     from pipelex.pipeline.validation_report import PipelexValidationReport
     from pipelex.system.configuration.configs import PipelineExecutionConfig
+    from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 class PipelexModelDeck(MthdsModelDeck):

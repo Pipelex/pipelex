@@ -123,6 +123,30 @@ class TestHubLayeringGuard:
                 "runtime-layer. Undeclared means unchecked, not flagged — add the covering entry."
             )
 
+    def test_the_measured_clean_packages_stay_declared(self) -> None:
+        """The four packages that were clean but undeclared must stay declared.
+
+        `graph`, `tracing`, `observer` and `errors` load zero interpreter modules and always did —
+        yet leaving them out of the tuple is what let `graph.graph_rendering` reach `interpreter_hub`
+        through `pipeline.dry_run_pipeline` for a whole release with every gate green. Both the layer
+        rule and the transitive rule filter their candidates through `is_runtime_layer`, so an
+        undeclared package sits outside the rules' domain rather than being reported by them: **an
+        undeclared package is not neutral, it is unpoliced.**
+
+        That makes deletion the silent regression to guard, and nothing else in the suite catches it.
+        The neighbouring checks all *iterate* the tuple — every entry resolves on disk, no entry is
+        also an interpreter package — so they say nothing about a name that is simply gone. Same
+        shape and same reasoning as `test_the_plugin_split_left_both_halves_declared` above, and
+        membership is likewise the whole assertion: `is_runtime_layer` matches by dotted prefix, so
+        the entry's presence is the one bit that matters.
+        """
+        for package in ("pipelex.graph", "pipelex.tracing", "pipelex.observer", "pipelex.errors"):
+            assert package in RUNTIME_LAYER_PACKAGES, (
+                f"{package} was measured clean and declared runtime-layer, and is no longer in the "
+                "declaration. Undeclared means unchecked, not flagged — restore the entry, or move "
+                "whatever made it dirty to the layer it belongs to."
+            )
+
     def test_runtime_layer_may_import_runtime_hub(self) -> None:
         """The permitted direction is never flagged — the runtime layer lives on `runtime_hub`."""
         violations = _violate(

@@ -23,8 +23,8 @@ from pipelex.core.domains.domain import SpecialDomain
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
-from pipelex.pipe_run.pipe_run_params import PipeRunParamKey
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.system.pipe_run_param_key import PipeRunParamKey
 
 
 def _make_pipe(domain_code: str, pipe_code: str, output: str) -> PipeLLM:

@@ -20,12 +20,14 @@ The package is named for what most of it does, but three tenants do something el
 
 It resolves fine — this is filing, not breakage. Moving it means rewriting the nested `from tests.unit.pipelex.core.test_data.…` imports throughout the subtree and renaming `interpreter_test_cases` / `InterpreterTestCases` to match the `MthdsParser` rename, which is exactly the kind of churn that should ride along with the next commit that touches those tests rather than land on its own.
 
-## 3. The `pipeline` / `pipe_run` leak is now referenced from four places
+## 3. ~~The `pipeline` / `pipe_run` leak is now referenced from four places~~ — RESOLVED
 
 `core.pipes.pipe_output` reaches `pipeline.pipeline_models` for a single leaf constant, and `runtime_hub` reaches `pipe_run.pipe_run_mode`. Because of that, neither package can be named in the closure test's `INTERPRETER_PACKAGES` — naming them would fail every entry point on a placement wart rather than on a broken hub arrow.
 
 The M1 review round found that the *statement* of the property had quietly dropped this qualification in three places (the guard's `RUNTIME_LAYER_PACKAGES` note, and two spots in `hub-layering.md`), which is fixed. The underlying wart is not, and the qualification now has to be repeated wherever the property is stated: `runtime_hub`'s docstring, the guard note, `hub-layering.md` "Why the boundary exists", and `hub-layering.md` "Where core splits".
 
 **The remedy is known and is the one `mthds_parsing` already used** (D-M1-8): move the leaf models to a runtime-layer home, *then* widen the predicate. `SpecialPipelineId` and `PipeRunMode` are the two leaves. Doing it would let all four qualifications collapse back to the unqualified claim — which is the real argument for doing it, since a caveat repeated in four places is a caveat that will go stale in at least one.
+
+> **Resolved 2026-07-29** by `refactor/Layer-boundary` ([`../layer-placement-completion.md`](../layer-placement-completion.md)), which took exactly the remedy named above. Everything in this section is now historical and describes a state that no longer exists. The leaves went to runtime-layer homes — `SpecialPipelineId` to `system.job_metadata`, `PipeRunMode` to `system.pipe_run_mode`, plus two the count above missed, `PipeRunParamKey` to `system.pipe_run_param_key` and `PipeRunError` to `core.pipes.exceptions` — `INTERPRETER_PACKAGES` now names both packages, and the qualification is deleted everywhere. The estimate of *four* sites was also low: it was **six**, which is the section's own point about a repeated caveat proving itself.
 
 See also `wip/pr-1062-review-notes.md`, where this leak was first recorded.

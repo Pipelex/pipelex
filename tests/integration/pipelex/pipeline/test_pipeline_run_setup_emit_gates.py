@@ -19,10 +19,10 @@ from pytest_mock import MockerFixture
 from pipelex.config import get_config
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import clear_current_library, get_library_manager
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.runtime_hub import get_report_delegate
 from pipelex.system.configuration.configs import NdjsonTracingConfig, PipelineExecutionConfig, TracingBackend
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 _GATE_DOMAIN = "prs_emit_gates"
 _GATE_MTHDS = f"""

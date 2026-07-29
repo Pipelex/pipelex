@@ -14,7 +14,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
-from pipelex.pipe_run.exceptions import PipeJobError, PipeRouterError, PipeRunError
+from pipelex.core.pipes.exceptions import PipeRunError
+from pipelex.pipe_run.exceptions import PipeJobError, PipeRouterError
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
 from pipelex.runtime_bridge.payloads import PipelexPipeRunOutput
 

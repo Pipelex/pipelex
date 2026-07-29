@@ -7,18 +7,16 @@ execution time whatever is loaded — hence *runtime*, in the language-implement
 
 **The one rule:** ``interpreter_hub`` imports ``runtime_hub``; ``runtime_hub`` must never import
 ``interpreter_hub``. Nothing here may name ``libraries``, ``pipe_operators``, ``pipe_controllers``,
-``codegen``, ``builder``, ``interpreter_plugins``, ``pipe_machinery``, ``pipe_signature`` or
-``mthds_parsing`` at module level — that is what makes importing the Pipelex runtime load zero
-modules from any of them. That list is the interpreter's top-level packages; it used to have to
-trail "…or the Pipe-touching modules of ``core.pipes``", because some of what it forbids lived under
-a runtime-named package. ``pipelex.core`` is *not* on it at all any more — the whole package is
-declared runtime-layer, and this module's own closure runs straight through it.
-
-Two interpreter-named packages are deliberately absent, and their absence is a known wart: leaf
-models from ``pipeline`` and ``pipe_run`` (``SpecialPipelineId``, ``PipeRunMode``) already land in
-this module's closure. So the property is "zero modules from the packages named above", not "zero
-interpreter modules" outright — the remedy is to move those leaves to a runtime-layer home, then
-widen the list. See ``docs/contribute/hub-layering.md``.
+``codegen``, ``builder``, ``interpreter_plugins``, ``pipe_machinery``, ``pipe_signature``,
+``mthds_parsing``, ``pipeline`` or ``pipe_run`` at module level. That list is the interpreter's
+top-level packages — all of them, with no qualification — so the property it buys is stated
+outright: **importing the Pipelex runtime loads zero interpreter modules.** It used to have to trail
+"…or the Pipe-touching modules of ``core.pipes``", because some of what it forbids lived under a
+runtime-named package, and it had to leave out ``pipeline`` and ``pipe_run``, because four leaf
+models of theirs landed in this module's closure. Both qualifications are gone the same way — the
+misfiled code moved. ``pipelex.core`` is *not* on the list at all: the whole package is declared
+runtime-layer, and this module's own closure runs straight through it. See
+``docs/contribute/hub-layering.md``.
 """
 
 import sys

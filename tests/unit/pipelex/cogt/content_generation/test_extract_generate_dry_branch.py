@@ -15,8 +15,8 @@ from pipelex.cogt.content_generation.extract_generate import extract_gen_pages_a
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.config import get_config
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 class TestExtractGenerateDryBranch:

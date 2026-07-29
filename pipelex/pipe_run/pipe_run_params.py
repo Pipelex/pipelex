@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from enum import StrEnum
 from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -9,18 +8,9 @@ from pipelex import log
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams, check_mock_usage_requires_dry
 from pipelex.core.memory.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF_NAME
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, VariableMultiplicityResolution
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.exceptions import PipeStackOverflowError
-
-
-class PipeRunParamKey(StrEnum):
-    DYNAMIC_OUTPUT_CONCEPT = "_dynamic_output_concept"
-    NB_OUTPUT = "_nb_output"
-
-    @classmethod
-    def value_list(cls) -> list[str]:
-        return [member.value for member in cls]
-
+from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.system.pipe_run_param_key import PipeRunParamKey
 
 FORCE_DRY_RUN_MODE_ENV_KEY = "PIPELEX_FORCE_DRY_RUN_MODE"
 

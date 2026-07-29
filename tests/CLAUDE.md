@@ -32,7 +32,7 @@ Replace `<paths>` with the test directories from the mapping below. Concatenate 
 | `pipelex/pipe_operators/` | `tests/unit/pipelex/pipe_operators/ tests/integration/pipelex/pipes/` |
 | `pipelex/pipe_run/` | `tests/unit/pipelex/pipe_run/ tests/integration/pipelex/pipes/` |
 | `pipelex/pipe_signature/` | `tests/unit/pipelex/pipe_signature/ tests/integration/pipelex/pipe_signature/` |
-| `pipelex/pipeline/` | `tests/integration/pipelex/pipeline/` |
+| `pipelex/pipeline/` | `tests/unit/pipelex/pipeline/ tests/integration/pipelex/pipeline/` |
 | `pipelex/plugins/` | `tests/unit/pipelex/plugins/ tests/integration/pipelex/plugins/` |
 | `pipelex/providers/` | `tests/unit/pipelex/providers/ tests/integration/pipelex/providers/` |
 | `pipelex/system/` | `tests/unit/pipelex/system/ tests/integration/pipelex/system/` |

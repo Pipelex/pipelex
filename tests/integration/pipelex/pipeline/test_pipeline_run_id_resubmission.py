@@ -30,12 +30,12 @@ from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_pipeline_manager
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_run.exceptions import PipeRouterError
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture

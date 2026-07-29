@@ -697,6 +697,43 @@ Two notes on that list: `get_pipelex_hub` splits into two accessors, so every ex
 
 **Phase 3 added a second wave of breakage to the same sweep** — the moved types, not the hub accessors. The per-repo counts and the complete old→new import table are in [Cross-repo impact added by Phase 3](#cross-repo-impact-added-by-phase-3). Do both waves in one pass per repo.
 
+### Third wave — the layer-placement track (`refactor/Layer-boundary`)
+
+Folded in here deliberately rather than opened as a second sweep: it is the same shape, the same repos, and it must go out on the same release. Plan and rationale: [`../layer-placement-completion.md`](../layer-placement-completion.md).
+
+| old | new |
+| --- | --- |
+| `from pipelex.pipe_run.pipe_run_mode import PipeRunMode` | `from pipelex.system.pipe_run_mode import PipeRunMode` |
+| `from pipelex.pipeline.pipeline_models import SpecialPipelineId` | `from pipelex.system.job_metadata import SpecialPipelineId` |
+| `from pipelex.pipe_run.pipe_run_params import PipeRunParamKey` | `from pipelex.system.pipe_run_param_key import PipeRunParamKey` |
+| `from pipelex.pipe_run.exceptions import PipeRunError` | `from pipelex.core.pipes.exceptions import PipeRunError` |
+| `from pipelex.graph.graph_rendering import generate_graph_for_bundle, generate_view_for_bundle` | `from pipelex.pipeline.bundle_graph_rendering import …` |
+
+`pipelex.pipeline.pipeline_models` is **deleted**, not aliased. `GraphFormat` and `render_graph_from_spec` stay in `pipelex.graph.graph_rendering` — only the two bundle-driven helpers moved.
+
+Measured 2026-07-29 (re-run at sweep time — `grep -rn --include='*.py' -E 'pipe_run\.pipe_run_mode|pipeline\.pipeline_models|PipeRunParamKey|pipe_run\.exceptions import.*PipeRunError|graph\.graph_rendering' <repo>`):
+
+| repo | sites | what |
+| --- | --- | --- |
+| `pipelex-temporal/` (private) | 37 | `PipeRunMode` throughout tests + `test_extras`; one `SpecialPipelineId` in `tests/integration/fixtures/pipe_job_helpers.py`. Also two copies of the same `.claude` / `.agents` skill script. |
+| `cocode/` | 6 | `PipeRunMode` in five CLI modules + one test |
+| `pipelex-cookbook/` | 2 | `PipeRunMode` in two tests |
+| `pipelex-mistralai-workflows/` | 1 | `PipeRunMode` in `tests/e2e/conftest.py` |
+| `test-bed/` | 1 | `PipeRunMode` in `tests/e2e/conftest.py` |
+| `pipelex-workshop/` | 1 | `PipeRunMode` in `tests/e2e/conftest.py` |
+| `pipelex-demos/` | 1 | `PipeRunMode` in `tests/e2e/conftest.py` |
+| `pipelex-demo-frostbeam/` | 1 | `PipeRunMode` in `tests/e2e/conftest.py` |
+| `pipelex-demo-mistral/` | 1 | `PipeRunMode` in `tests/e2e/conftest.py` |
+| `pipelex-demo-vibe/` | 1 | `PipeRunMode` in `tests/e2e/conftest.py` |
+
+Clean for this wave: `pipelex-api/`, `pipelex-transport/`, `pipelex-daytona-sandbox/`, `pipelex-worker/`, `pipelex-starter-python/`, `pipelex-relay/`, `n8n-nodes-pipelex/`, `sandbox/`.
+
+> **Enumerate the workspace, do not hand-list it.** The first pass at this table iterated a *hardcoded* repo list and silently missed the last six rows — every one of them a real breaking site, and every one invisible because a repo absent from both columns reads exactly like a repo that was checked and cleared. Re-measure with `for repo in $(ls -d */ | tr -d '/')`, and note that the `_*` directories are worktrees of `pipelex/` itself, not consumers.
+
+**`conformance/` and `docs/specs/pipelex-transport-boundary.md` need no edit for *this* wave** — none of the four moved leaves is on `ALLOWED_SURFACE`. They are stale for the **hub track's** wave and were already so before this one: both still pin `pipelex.pipeline.job_metadata` and `pipelex.graph.trace_context`, which moved to `pipelex/system/` when the hub split landed. That is the standing evidence this sweep is still open.
+
+**All of it is `pipe_run` / `pipeline` → runtime-layer homes, none of it is a behavior change.** Every site is a one-line import swap and a missed one is an `ImportError`, never a silent wrong resolution.
+
 ## Known inversions — not fixed here
 
 Named so the docs stay honest, not scheduled.

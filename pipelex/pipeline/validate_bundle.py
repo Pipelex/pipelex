@@ -12,7 +12,7 @@ from typing_extensions import TypedDict
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
-from pipelex.core.pipes.exceptions import PipeFactoryError, PipeValidationError
+from pipelex.core.pipes.exceptions import PipeFactoryError, PipeRunError, PipeValidationError
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.validation import report_validation_error
 from pipelex.interpreter_hub import (
@@ -34,7 +34,7 @@ from pipelex.mthds_parsing.handle_pipe_errors import (
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
-from pipelex.pipe_run.exceptions import DryRunError, PipeRunError
+from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunOutput, DryRunStatus
 from pipelex.pipeline.exceptions import ValidateBundleError
 

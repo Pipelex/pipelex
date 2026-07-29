@@ -26,11 +26,11 @@ from pipelex.graph.graph_tracer_manager import GraphTracerManager, IOSpec, NodeK
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_machinery.pipe_blueprint import PipeCategory, PipeType, valid_pipe_type_tags
 from pipelex.pipe_machinery.validation import is_variable_satisfied_by_inputs
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.system.job_metadata import JobMetadata, OtelContext
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.telemetry.otel_constants import (
     LangfuseSpanAttr,
     OTelConstants,

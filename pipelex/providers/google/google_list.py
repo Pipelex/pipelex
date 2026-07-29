@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any
 from rich import box
 from rich.table import Table
 
-from pipelex.exceptions import MissingDependencyError
 from pipelex.runtime_hub import get_console
+from pipelex.system.exceptions import MissingDependencyError
 
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.backend import InferenceBackend
