@@ -9,6 +9,6 @@ build_app = typer.Typer(help="Build working pipelines from natural language requ
 
 # inputs, output, runner are now Typer groups with method/pipe subcommands
 build_app.add_typer(build_inputs_app, name="inputs", help="Generate example input JSON for a pipe")
-build_app.add_typer(build_output_app, name="output", help="Generate example output representation for a pipe (JSON, Python, or TypeScript)")
+build_app.add_typer(build_output_app, name="output", help="Generate example output representation for a pipe (JSON, Python, or JSON Schema)")
 build_app.add_typer(build_runner_app, name="runner", help="Build the Python code to run a pipe with the necessary inputs")
 build_app.command("structures", help="Generate Python structure files from concept definitions in MTHDS files")(build_structures_command)

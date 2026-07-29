@@ -36,7 +36,7 @@ def build_output_method_cmd(
         typer.Option(
             "--format",
             "-f",
-            help="Output format: 'json' for JSON example, 'python' for Python code, 'schema' for JSON Schema",
+            help="Output format: 'json' for JSON example, 'python' for Python code, 'schema' for JSON Schema (useful for TypeScript/Zod generation)",
         ),
     ] = "json",
 ) -> None:
