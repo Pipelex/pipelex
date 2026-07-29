@@ -40,9 +40,10 @@ def emit_python_structures(library: ResolvedLibrary) -> list[EmittedFile]:
     in_module = {concept.concept_ref for concept in emitted}
     ordered = order_by_base(emitted, in_module=in_module)
 
-    has_opaque = any(concept.structureless for concept in emitted)
-    pydantic_import = "from pydantic import ConfigDict, Field" if has_opaque else "from pydantic import Field"
-    imports: set[str] = {pydantic_import, "from pipelex.core.stuffs.structured_content import StructuredContent"}
+    # Every import is demand-driven — registered by the renderer that writes the name it imports.
+    # Seeding the set up front would emit an unused import for the crate shapes that use neither
+    # (all-opaque, or every concept refining a native), and `ruff check --fix` deletes those.
+    imports: set[str] = set()
     blocks = [_render_class(concept, by_ref=by_ref, imports=imports) for concept in ordered]
 
     body = python_module_body(header=python_header(target="python-structures"), imports=imports, blocks=blocks)
@@ -58,6 +59,7 @@ def _render_class(concept: ResolvedConcept, *, by_ref: dict[str, ResolvedConcept
     if concept.structureless:
         # Opaque = pass-through, never lossy (B1-1): the runtime base inherits pydantic's default
         # extra="ignore", which would silently strip every field on model_validate.
+        imports.add("from pydantic import ConfigDict")
         return f'{header}\n{docstring}\n\n    model_config = ConfigDict(extra="allow")'
     if not concept.fields:
         return f"{header}\n{docstring}"
@@ -67,13 +69,19 @@ def _render_class(concept: ResolvedConcept, *, by_ref: dict[str, ResolvedConcept
 
 def _base_class(concept: ResolvedConcept, *, by_ref: dict[str, ResolvedConcept], imports: set[str]) -> str:
     if concept.base_ref is None:
-        return "StructuredContent"
+        return _structured_content(imports=imports)
     if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept.base_ref):
         return _native_class(concept.base_ref, imports=imports)
     base = by_ref.get(concept.base_ref)
     if base is not None:
         return python_class_name(domain=base.domain, code=base.code, needs_qualification=base.needs_qualification)
     # Cross-package / unknown base is not resolvable in-crate: fall back to a structurally valid root.
+    return _structured_content(imports=imports)
+
+
+def _structured_content(*, imports: set[str]) -> str:
+    """The runtime root base, registering its import — every concept refining a native uses `_native_class` instead."""
+    imports.add("from pipelex.core.stuffs.structured_content import StructuredContent")
     return "StructuredContent"
 
 
@@ -81,7 +89,7 @@ def _render_field(concept_field: ResolvedField, *, by_ref: dict[str, ResolvedCon
     annotation = _annotation(concept_field.resolved_type, by_ref=by_ref, imports=imports)
     if not concept_field.required:
         annotation = f"{annotation} | None"
-    return field_line(concept_field, annotation=annotation)
+    return field_line(concept_field, annotation=annotation, imports=imports)
 
 
 def _annotation(resolved_type: ResolvedType, *, by_ref: dict[str, ResolvedConcept], imports: set[str]) -> str:

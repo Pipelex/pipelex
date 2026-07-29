@@ -10,10 +10,21 @@ generated models) differs.
 import sys
 from collections import defaultdict
 from datetime import date, datetime, time
+from inspect import cleandoc
 from typing import Any, cast
 
 from pipelex.codegen.resolved_concepts import ResolvedConcept
 from pipelex.core.concepts.resolved_fields import ResolvedField, iter_imprecision_reasons
+
+# Ruff's own default `line-length`, and deliberately not this repo's 150. It is the *tightest* width a
+# consumer is likely to lint at, and the threshold has to be the tightest one to be safe: anything we
+# leave flat must fit under every config we claim to support. Past it we emit an already-exploded form
+# with a magic trailing comma, which the formatter pins at any width — so the only shapes still at the
+# mercy of a consumer's setting are flat lines under 88 columns, which a narrower config would rewrap.
+PY_EXPLODE_WIDTH = 88
+
+# One level of the generated class body. Emitted code is always 4-space indented.
+_PY_INDENT = "    "
 
 
 def python_header(*, target: str) -> str:
@@ -72,57 +83,85 @@ def format_default_value(value: Any) -> str:
     return repr(value)
 
 
-def _breaks_out_of_docstring(text: str) -> bool:
-    """Whether `text` cannot sit verbatim between triple quotes.
+def normalized_docstring_text(text: str) -> str:
+    """The authored text as it reads back out of `inspect.getdoc` once rendered as a docstring.
 
-    Two families. The delimiter hazards — an embedded triple quote, or a trailing quote or backslash that
-    would glue onto the closing delimiter. And any character that would not survive verbatim in a source
-    file: a carriage return (line-ending normalization would rewrite it) or another control character. A
-    real newline and a tab both round-trip exactly, so neither is a hazard.
+    Two normalizations compose, neither of them chosen. Per-line trailing whitespace goes because
+    `ruff format` strips it inside docstrings (and `D210` trims the edges), both as auto-applied fixes
+    that would otherwise rewrite the stamped bytes. Then `cleandoc` — the same call `inspect.getdoc`
+    makes — expands tabs, drops the common indentation, and trims blank edges. Composing them here is
+    what makes the contract exact rather than approximate: the emitter indents continuation lines to the
+    class body, and `cleandoc` takes that indentation straight back off.
 
-    Never normalize such text — the emitted docstring is asserted to equal the authored description
-    byte for byte, so a hazard routes to the fully-escaped branch, which reproduces it exactly.
+    This is the emitter's half of the fidelity contract, and the exact expression tests assert against:
+    `inspect.getdoc(cls) == normalized_docstring_text(description)`.
     """
-    if '"""' in text or text.endswith(('"', "\\")):
-        return True
-    return any(char not in {"\n", "\t"} and not char.isprintable() for char in text)
+    return cleandoc("\n".join(line.rstrip() for line in text.splitlines()))
+
+
+def _docstring_delimiter(text: str) -> str | None:
+    """The triple-quote delimiter `text` can sit inside verbatim, or `None` when it must be escaped.
+
+    Falling back to `'''` for a description containing `\"\"\"` is what keeps the docstring **backslash-free**,
+    and that is the whole point: any backslash trips ruff's `D301` ("use `r\"\"\"`"), and the `r` prefix it asks
+    for would then render the escapes literally, corrupting the text. `ruff format` rewrites `'''` to `\"\"\"`
+    only when that needs no escaping, so a `'''` chosen here is left alone.
+
+    `None` means no verbatim rendering exists — the text carries both triple-quote styles, a control
+    character, or a trailing backslash that would glue onto the closing delimiter.
+    """
+    if text.endswith("\\") or any(char not in {"\n", "\t"} and not char.isprintable() for char in text):
+        return None
+    return next((delimiter for delimiter in ('"""', "'''") if delimiter not in text and not text.endswith(delimiter[0])), None)
 
 
 def class_docstring(description: str, *, extra_line: str | None = None, indent: str = "    ") -> str:
-    """Render a triple-quoted class docstring; append `extra_line` (e.g. an imprecision caveat) as a second paragraph.
+    """Render a class docstring; append `extra_line` (e.g. an imprecision caveat) as a second paragraph.
 
-    Escaping is deliberately minimal. Between triple quotes a lone `"` needs no escape and a real newline is
-    fine, so pushing the text through `escape_py_string` (the *single-line literal* escaper) would put
-    backslashes in the docstring for an input as ordinary as `The "primary" thing`. Ruff's `D301` then
-    rewrites the docstring to an `r` prefix — which changes the bytes, invalidating the codegen stamp, and
-    corrupts the text, because the escapes start rendering literally. Hence three modes:
+    Shaped the way a human writes one — summary on the first line, continuation lines indented to the class
+    body, closing delimiter on its own line — because that is the only shape the pydocstyle rules and
+    `ruff format` both leave untouched. Every rewrite they would otherwise apply (`D207` under-indented,
+    `D209` closing quotes, `D210` edge whitespace) is an auto-applied fix, and each one changes the body
+    bytes the codegen stamp hashes, which is precisely the drift this module exists to prevent.
 
-    - **plain** — nothing hazardous: emitted verbatim, quotes and newlines untouched;
-    - **raw** — contains a backslash: emitted with an `r` prefix, which is both faithful and what D301 asks for;
-    - **escaped** — the hazards named in `_breaks_out_of_docstring`: fully escaped. No description written in
-      practice reaches this branch, and the fallback keeps the emitted file valid, which is what matters.
+    So `__doc__` is deliberately *not* byte-identical to the authored description: it carries the
+    indentation every hand-written docstring carries. The invariant that does hold is the one consumers
+    read through — `inspect.getdoc(cls) == normalized_docstring_text(description)`. Exact bytes survive
+    where they are consumed programmatically: `Field(description=...)`, and the crate itself.
     """
-    parts = [part for part in (description or "", extra_line or "") if part]
+    parts = [normalized_docstring_text(part) for part in (description or "", extra_line or "") if part.strip()]
     if not parts:
         return f'{indent}""""""'
 
-    if any(_breaks_out_of_docstring(part) for part in parts):
-        escaped_break = "\\n\\n"
-        escaped = escaped_break.join(escape_py_string(part)[1:-1] for part in parts)
+    body = "\n\n".join(parts)
+    delimiter = _docstring_delimiter(body)
+    if delimiter is None:
+        # No verbatim rendering exists, so escape. This trips `D301`, but ruff classes that fix as *unsafe*,
+        # so a consumer's `ruff check --fix` still leaves the bytes — and the stamp — alone.
+        # Each rendered break carries the body indent, exactly as the verbatim branches do, so `cleandoc`
+        # takes the same margin back off either way and the fidelity contract holds across both.
+        escaped = f"\\n\\n{indent}".join(f"\\n{indent}".join(escape_py_string(line)[1:-1] for line in part.split("\n")) for part in parts)
         return f'{indent}"""{escaped}"""'
 
-    prefix = "r" if any("\\" in part for part in parts) else ""
-    if len(parts) == 1:
-        return f'{indent}{prefix}"""{parts[0]}"""'
-    body, caveat = parts
-    return f'{indent}{prefix}"""{body}\n\n{indent}{caveat}\n{indent}"""'
+    prefix = "r" if "\\" in body else ""
+    lines = body.split("\n")
+    if len(lines) == 1:
+        return f"{indent}{prefix}{delimiter}{lines[0]}{delimiter}"
+    continuation = "\n".join(f"{indent}{line}" if line else "" for line in lines[1:])
+    return f"{indent}{prefix}{delimiter}{lines[0]}\n{continuation}\n{indent}{delimiter}"
 
 
-def field_line(field: ResolvedField, *, annotation: str) -> str:
+def field_line(field: ResolvedField, *, annotation: str, imports: set[str]) -> str:
     """Render one `name: <annotation> = Field(...)` line, surfacing any type-tree imprecision inline.
 
     `annotation` must already carry optionality in the emitter's own idiom (`Optional[...]` or `... | None`).
+
+    Registers its own `Field` import, like every other renderer here: an import nobody uses is an `F401`
+    that `ruff check --fix` deletes, which rewrites the body bytes and breaks the stamp. Demand-driven
+    is the only way that stays true for every crate shape — a crate of only opaque concepts, or only
+    concepts refining a native, emits no field line at all.
     """
+    imports.add("from pydantic import Field")
     params: list[str]
     if field.required and field.default_value is None:
         params = ["..."]
@@ -132,11 +171,72 @@ def field_line(field: ResolvedField, *, annotation: str) -> str:
         params = ["default=None"]
     params.append(f"description={escape_py_string(field.description)}")
 
-    line = f"    {field.name}: {annotation} = Field({', '.join(params)})"
     reasons = list(dict.fromkeys(iter_imprecision_reasons(field.resolved_type)))
-    if reasons:
-        line += f"  # imprecise: {'; '.join(reasons)}"
-    return line
+    comment = f"  # imprecise: {'; '.join(reasons)}" if reasons else ""
+
+    flat = f"    {field.name}: {annotation} = Field({', '.join(params)})"
+    # The trailing comment counts toward the width: ruff splits the call to fit `)  # imprecise: …` too.
+    if len(flat) + len(comment) <= PY_EXPLODE_WIDTH:
+        return flat + comment
+
+    # Too long to be left alone: hand the formatter an already-exploded call with a magic trailing comma,
+    # which pins the shape at *any* line-length (verified 60..200). A long authored description or choice
+    # list has no width-independent flat form, so this is the only rendering a consumer's `ruff format`
+    # cannot rewrite. The annotation gets the same treatment when the head line alone is still too long.
+    opening = f"    {field.name}: "
+    head_overhead = len(opening) + len(" = Field(")
+    head = f"{opening}{explode_bracket(annotation, budget=PY_EXPLODE_WIDTH - head_overhead)} = Field("
+    body = "".join(f"        {param},\n" for param in params)
+    return f"{head}\n{body}    ){comment}"
+
+
+def _split_top_level(inner: str) -> list[str]:
+    """Split `a, b[c, d], e` on its top-level commas only."""
+    members: list[str] = []
+    depth = 0
+    current = ""
+    for char in inner:
+        if char == "," and depth == 0:
+            members.append(current.strip())
+            current = ""
+            continue
+        depth += {"[": 1, "]": -1}.get(char, 0)
+        current += char
+    members.append(current.strip())
+    return members
+
+
+def explode_bracket(text: str, *, budget: int) -> str:
+    """Split a `Name[a, b, c]` annotation (optionally `| None`) across lines, if it exceeds `budget`.
+
+    Only the outermost bracket, and only when splitting it actually helps — that mirrors `ruff format`,
+    which breaks at the outermost bracket first and stops as soon as the result fits, so the emitted shape
+    is the one the formatter would have produced and therefore the one it leaves alone. The magic trailing
+    comma is what pins it: with it, no line-length setting can rejoin the members.
+
+    An optional annotation needs the parenthesized union form ruff wraps it in, one indent level deeper —
+    `X[…] | None` is not a bracket at its tail, so the flat spelling would otherwise be left too long.
+    """
+    if len(text) <= budget:
+        return text
+    optional_suffix = " | None"
+    base, is_optional = (text[: -len(optional_suffix)], True) if text.endswith(optional_suffix) else (text, False)
+    if not base.endswith("]"):
+        return text
+    name, _, inner = base.partition("[")
+    if not name or not inner:
+        return text
+
+    members = _split_top_level(inner[:-1])
+    if len(members) < 2:
+        return text
+
+    depth = 3 if is_optional else 2
+    rendered = "".join(f"{_PY_INDENT * depth}{member},\n" for member in members)
+    exploded = f"{name}[\n{rendered}{_PY_INDENT * (depth - 1)}]"
+    if not is_optional:
+        return exploded
+    return f"(\n{_PY_INDENT * 2}{exploded}\n{_PY_INDENT * 2}| None\n{_PY_INDENT})"
 
 
 def any_annotation(*, imports: set[str]) -> str:

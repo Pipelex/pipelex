@@ -95,7 +95,37 @@ The emitters therefore emit exactly what the formatter would write. Generated Py
 
 **You should not need to exclude generated paths from your linter.** If you carry such an exclusion from an older version, drop it.
 
+Every import is registered by whoever writes the name it imports, never seeded up front. That matters for crate shapes which use fewer of them than you would expect: a method declaring only structureless concepts emits no `Field(...)` at all, and one whose concepts all refine a native never reaches the runtime root base. An import left unused is an `F401` — a fix ruff applies automatically, so the line would simply vanish and take the stamp with it.
+
 A projection with nothing to emit for a target is its **header alone** — no imports, no trailing blank lines. That case is ordinary rather than degenerate: `python-structures` skips native concepts, since they already exist in the runtime, so a method that declares no concepts of its own leaves that target with no class to write. The header is inert under any formatter, whereas an import block with nothing left to use it is an unused-import finding sitting above a collapsible blank-line run — both of which a formatter would rewrite, breaking the stamp.
+
+#### Line width, which is your setting and not ours
+
+A description or choice list is authored text with no length bound, so a generated line can exceed whatever `line-length` you lint at — and your formatter would then wrap the call, rewriting the bytes.
+
+Because we cannot know your width, anything too long is emitted **already wrapped, with a trailing comma**. That comma is load-bearing: Black and ruff both read it as a deliberate choice to keep the construct exploded, and will not rejoin it at any width. Short lines stay on one line, so ordinary artifacts read exactly as before.
+
+The threshold is 88 columns — ruff's own default, chosen because it is the *tightest* width you are likely to use, and only the tightest threshold is safe. If you lint Python at **fewer than 88 columns**, short generated lines can still be rewrapped; either raise `line-length` for the generated path or keep an exclusion there.
+
+`E501` is the one finding that can survive on a generated file, on a line holding a single long string literal — an authored description or choice value. There is no wrapped form: breaking a string would alter the author's text. It has no automatic fix, so it never changes bytes and never breaks a stamp, and it is not in ruff's default rule set, so most consumers never see it.
+
+#### Docstrings
+
+A concept description becomes the generated class's docstring, rendered the way a human writes one: summary on the first line, continuation lines indented to the class body, closing delimiter on its own line. That shape is not cosmetic — it is the only one that `ruff format` and the pydocstyle rules both leave alone. Rendered flat, a multi-line description trips `D207`/`D209` and edge whitespace trips `D210`, all of which ruff fixes automatically, rewriting the bytes.
+
+So `__doc__` carries the class-body indentation, exactly as a hand-written docstring does. What holds exactly is the value you actually read:
+
+```python
+inspect.getdoc(GeneratedClass) == inspect.cleandoc(authored_description)
+```
+
+Exact bytes survive wherever they are consumed programmatically rather than read as prose — `Field(description=...)` keeps the description verbatim, and so does the crate.
+
+#### TypeScript assumes Prettier's defaults
+
+The `ts-zod` target is emitted to match Prettier's **default** configuration: 80-column print width, double quotes, semicolons. A long concept name or choice list is pre-wrapped the way Prettier would wrap it, for the same reason the Python side pre-explodes long calls.
+
+If your Prettier config changes `printWidth`, `singleQuote`, or `semi`, the generated files will not match it, and `prettier --write` will rewrite them. Either run codegen output through your own Prettier before stamping, or keep an exclusion for the generated path.
 
 One ruff setting is required, because it cannot be fixed in the emitted bytes:
 
@@ -109,9 +139,11 @@ runtime-evaluated-base-classes = [
 
 Without it, `TC003` asks you to move `from datetime import date` into an `if TYPE_CHECKING:` block. Applying that **breaks** the generated models — pydantic resolves annotations at runtime to build validators, so the import must stay at runtime. The setting tells ruff these classes are runtime-evaluated, and the finding goes away.
 
-Two remaining findings are artifacts of *how* you lint, not of file content:
+The remaining findings are artifacts of *how* you lint, not of file content. None of them has an automatically-applied fix, so none can change bytes:
 
 - `INP001` ("implicit namespace package") fires when you point ruff at a bare directory with no `__init__.py`. Add one, or lint the package that contains it.
+- `E501` on a single long string literal, as described above.
+- `D301` ("use `r\"\"\"`") on the rare description that carries both `\"\"\"` and `'''`, or a control character — the only inputs with no verbatim rendering, which therefore have to be escaped. Ruff classes that fix as *unsafe*, so `ruff check --fix` leaves it alone.
 - Import grouping for the `python-structures` target assumes `pipelex` is a third-party dependency — which it is in your tree. The Pipelex repo itself, where `pipelex` is first-party, is the one place ruff wants the opposite order; no generated artifact is committed there, so the consumer's grouping is the one the emitter targets.
 
 ## Serving the engine over HTTP

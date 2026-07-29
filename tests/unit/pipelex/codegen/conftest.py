@@ -242,10 +242,74 @@ def every_type_kind_crate() -> LibraryCrate:
                     "items": ConceptStructureBlueprint(description="Untyped items", type=ConceptStructureBlueprintFieldType.LIST, required=True),
                     # an optional field, so the `X | None` path is emitted too
                     "note": ConceptStructureBlueprint(description="Optional note", type=ConceptStructureBlueprintFieldType.TEXT, required=False),
+                    # A description with no width bound. Emitted flat it exceeds any line-length, and
+                    # `ruff format` then wraps the `Field(...)` call — a byte rewrite that breaks the stamp.
+                    "narrative": ConceptStructureBlueprint(
+                        description=(
+                            "A thoroughly explained field whose description the method author wrote at length "
+                            "because the domain genuinely requires that much nuance to be unambiguous"
+                        ),
+                        type=ConceptStructureBlueprintFieldType.TEXT,
+                        required=True,
+                    ),
+                    # A choice list with no width bound, in both the required and optional spellings —
+                    # the optional one is the `Literal[...] | None` union, which ruff wraps in parentheses.
+                    "workflow_state": ConceptStructureBlueprint(
+                        description="Workflow state",
+                        choices=["awaiting_triage", "in_progress_with_owner", "blocked_on_dependency", "ready_for_review"],
+                        required=True,
+                    ),
+                    "prior_state": ConceptStructureBlueprint(
+                        description="Prior workflow state",
+                        choices=["awaiting_triage", "in_progress_with_owner", "blocked_on_dependency", "ready_for_review"],
+                        required=False,
+                    ),
                 },
             ),
+            # A multi-line description, and one padded with edge whitespace. Rendered naively the first
+            # trips D207/D209 and the second D210 — all three auto-applied fixes that rewrite the bytes.
+            "lintcheck.Spanning": ConceptBlueprint(
+                description="A description that spans lines.\n\nAs a TOML multi-line string naturally does.",
+                structure={
+                    "padded": ConceptStructureBlueprint(
+                        description="  Padded with edge whitespace  ", type=ConceptStructureBlueprintFieldType.TEXT, required=True
+                    )
+                },
+            ),
+            # A description that cannot sit between `\"\"\"` at all, so the renderer has to fall back to
+            # `'''` — the only delimiter swap that keeps the docstring backslash-free and thus D301-clean.
+            "lintcheck.TripleQuoted": ConceptBlueprint(description='A description containing """ inside it'),
         },
         domains={"lintcheck": DomainBlueprint(code="lintcheck", description="Lint check domain")},
+    )
+    return normalize_crate(authored, mthds_version=CRATE_TEST_VERSION)
+
+
+@pytest.fixture
+def all_opaque_crate() -> LibraryCrate:
+    """Every concept structureless — the shape of an ordinary `Question -> Answer` method.
+
+    No field line is emitted, so a `Field` import seeded up front would be unused: an `F401` that
+    `ruff check --fix` deletes, rewriting the body and breaking the stamp.
+    """
+    authored = LibraryCrate(
+        concepts={
+            "qa.Question": ConceptBlueprint(description="A question asked by the user"),
+            "qa.Answer": ConceptBlueprint(description="An answer to the question"),
+        },
+        domains={"qa": DomainBlueprint(code="qa", description="Question answering")},
+    )
+    return normalize_crate(authored, mthds_version=CRATE_TEST_VERSION)
+
+
+@pytest.fixture
+def refines_native_only_crate() -> LibraryCrate:
+    """Every concept refines a native, so `python-structures` reaches its runtime root base for none of
+    them — a seeded `StructuredContent` import would be unused, and so would `Field`.
+    """
+    authored = LibraryCrate(
+        concepts={"digest.Summary": ConceptBlueprint(description="A summary", refines="Text")},
+        domains={"digest": DomainBlueprint(code="digest", description="Digesting")},
     )
     return normalize_crate(authored, mthds_version=CRATE_TEST_VERSION)
 

@@ -1,6 +1,8 @@
 # Emit lint-clean codegen artifacts
 
-**Status: PR [#1070](https://github.com/Pipelex/pipelex/pull/1070) → `dev`, OPEN.** Branch `fix/Codegen-lint-clean` off `dev` at `8c0b99b3a`, two commits: `13295b5af` (the implementation) and `c9a7238e4` (the review-round-1 fix). Phases 1–5 done except the release-gated cross-repo sweep (5.4). Local `make agent-check` + full `make agent-test` + `make drift-check` green; CI green on the pushed head (lint, drift, hub-layering, keyword-only, typecheck, all 8 test shards, doc-check).
+**Status: PR [#1070](https://github.com/Pipelex/pipelex/pull/1070) → `dev`, OPEN.** Branch `fix/Codegen-lint-clean` off `dev` at `8c0b99b3a`. Phases 1–5 done except the release-gated cross-repo sweep (5.4). Local `make agent-check` + full `make agent-test` + `make drift-check` green.
+
+⚠ **Round 2 (2026-07-29) found the lint-clean claim did not hold, and the fixes are not yet committed.** Five input shapes still broke the stamp, one of them a regression this branch introduced. All are fixed and guarded; see [Review rounds](#review-rounds). The two claims that changed shape as a result — `__doc__` is no longer byte-identical to the description, and long lines are now pre-exploded — are ruled decisions (D2, D3 below), not incidental.
 
 ## Review guide
 
@@ -23,7 +25,7 @@ Everything above the `---` divider is the record of what shipped. The original p
 1. **The emitted `python-structures` import order fails *this repo's* own ruff (`I001`) — and running this repo's `ruff --fix` over a generated `structures.py` therefore still breaks its stamp.** That is expected, not a surviving bug. It imports both `pydantic` and `pipelex`, and isort wants opposite orders depending on whether `pipelex` is first-party (here) or a dependency (a consumer's tree) — the two cannot both be satisfied. The emitter targets the consumer, who is the only one who lints these files; this repo commits no generated artifact. The test passes `lint.isort.known-third-party=['pipelex']` for exactly this reason, and so must any manual check — see [Verify it locally](#verify-it-locally). `python-pydantic` imports no `pipelex` and so is config-independent. Full reasoning in finding 1.
 2. **`TC003` is answered by consumer configuration, not by emitted bytes.** Moving `from datetime import date` into `if TYPE_CHECKING:` would break the generated models — pydantic resolves annotations at runtime. See ["`TC003` must not be satisfied by the emitter"](#tc003-must-not-be-satisfied-by-the-emitter).
 3. **`INP001` is suppressed in the test's ruff invocation, not in the bytes.** It is an artifact of pointing ruff at a bare directory, not of file content.
-4. **`class_docstring`'s third (fully-escaped) branch is unreachable by any description written in practice.** It is a correctness fallback that keeps the emitted file valid for a hostile description; the two live branches are plain and raw. See finding 2.
+4. **`class_docstring`'s fully-escaped branch is now reached only by genuinely pathological input** — a description carrying *both* `"""` and `'''`, a control character, or a trailing backslash. A description containing only `"""` falls back to `'''` instead, which keeps it backslash-free and therefore `D301`-clean (see [D2](#d2--docstring-rendering)). The escaped branch does trip `D301`, and that is accepted: ruff classes the fix as unsafe, so `ruff check --fix` never applies it and the stamp holds.
 5. **The empty projection carries no imports at all**, not even `from __future__ import annotations`. A header is the only shape inert under every formatter. See finding 7.
 6. **Emitted bytes change for all three targets — that is the point, and it is breaking.** Anyone holding a committed projection sees drift until they regenerate; the changelog says so and gives the command. See [Blast radius](#blast-radius).
 
@@ -37,14 +39,45 @@ Everything above the `---` divider is the record of what shipped. The original p
 | The *reachable* empty case — natives-only crate through `python-structures` — is a bare header | `…::test_natives_only_crate_emits_a_lint_clean_structures_module` |
 | TS has no collapsible blank runs (config-independent, always runs) | `…::test_emitted_ts_has_no_collapsible_blank_runs` |
 | An empty TS projection is a bare header (config-independent, always runs) | `…::test_empty_ts_projection_is_a_bare_header` |
-| TS is genuinely prettier-clean | `…::test_emitted_ts_is_prettier_clean` — **skipped unless `prettier` is on PATH, which CI does not have** (Python repo, no node toolchain). The two always-on invariants above are what actually hold the TS line in CI; the prettier assertion is a local-run confirmation. Worth knowing before trusting the TS side. |
-| Description ↔ `__doc__` byte fidelity survives the escaping rework | `test_description_escaping.py` |
+| No emitted TS code line exceeds the print width (config-independent, always runs) | `…::test_emitted_ts_lines_fit_the_print_width` — the guard that actually holds the TS width line in CI. Comment lines are exempt: prettier reflows code, never `//` or `/** … */` contents. |
+| TS is genuinely prettier-clean | `…::test_emitted_ts_is_prettier_clean` — **skipped unless `prettier` is on PATH, which CI does not have** (Python repo, no node toolchain). The three always-on invariants above are what actually hold the TS line in CI; the prettier assertion is a local-run confirmation. Worth knowing before trusting the TS side. |
+| Python stays formatter-stable across the consumer's `line-length`, not just ours | `…::test_emitted_artifact_is_stable_at_every_consumer_line_length` (88–200) |
+| Crate shapes that use no seeded import stay lint-clean | `…::test_crates_that_use_no_seeded_import_are_lint_clean` (all-opaque, refines-native-only) |
+| `inspect.getdoc(cls)` round-trips the authored description | `test_description_escaping.py` |
 | Concept cycle detection still sees optional refs | `test_concept_to_concept_references.py` (this is what caught finding 5) |
 | The runtime generator's new spelling | `tests/unit/pipelex/core/concepts/structure_generation/test_structure_generator*.py` |
 
 ### Review rounds
 
 - **Round 1 — greptile, resolved in `c9a7238e4`.** One finding, on `ts_zod.py`: the empty binder stayed formatter-unstable. Confirmed, and wider than reported — all four artifacts degenerate the same way, and the case is reachable from an ordinary method rather than only a degenerate crate. Written up as finding 7. Thread answered and resolved; no other thread was open.
+
+- **Round 2 — `/review` (Claude) + `codex exec`, 2026-07-29.** The central claim did not hold. Reproduced end to end from an ordinary `.mthds` file: `codegen check` reported `[hand-edited]` on a projection nobody had touched. Five shapes, each verified against the real `ruff` / `prettier` binaries rather than argued:
+
+    1. **A multi-line description — a regression this branch introduced.** `_breaks_out_of_docstring` treated a real newline as safe, which is true of the Python *parser* and false of the *formatter*. One-part docstrings tripped `D209`, two-part `D207`; both are safe fixes, and `ruff format` rewrote them too. The previous escaping put the description on one physical line, which trips only `D301` — an *unsafe* fix ruff never applies. So the bytes now changed where they previously survived.
+    2. **A description with edge whitespace** → `D210`, a safe fix. Pre-existing.
+    3. **An all-opaque or refines-native-only crate** → an unused `Field` / `StructuredContent` import, `F401`, a safe fix. Both are ordinary method shapes. (Found by codex; the fixture mixed opaque with fielded concepts, hiding it.)
+    4. **A long description or choice list** → exceeds any `line-length`, and `ruff format` wraps the call. Fires even at this repo's generous 150 columns. (Found by codex.)
+    5. **A long concept code in `ts-zod`** → prettier wraps the `z.infer` alias and the binder signatures; a long choice list expands `z.enum([...])`. Unguarded in CI, since the prettier test skips without a node toolchain.
+
+    Fixed on all five, with the rulings recorded as [D2](#d2--docstring-rendering) and [D3](#d3--line-width) below. Verified by sweep rather than by example: 800 Python combinations (crate shape × description shape × target × `line-length` 88–200) and 44 TypeScript files against the real prettier, all clean; the docstring fidelity contract holds across every description shape including the malicious fixture, carriage returns and trailing backslashes.
+
+    The two codex bot threads on the PR (`python_common.py:116` P1, `ts_zod.py:311` P2) are both confirmed-and-fixed by this round and still need answering.
+
+### D2 — docstring rendering
+
+For a description with a real newline you can have any two of {exact `__doc__` bytes, no `D301`, stable under `ruff format`}, never all three. **Ruled: render an idiomatic indented docstring**, and move the fidelity contract to the value consumers actually read:
+
+```python
+inspect.getdoc(cls) == inspect.cleandoc(description)
+```
+
+`__doc__` therefore carries the class-body indentation every hand-written docstring carries. Exact bytes still survive in `Field(description=...)` and the crate. A description that cannot sit between `"""` falls back to `'''` rather than backslash-escaping — that is what keeps it `D301`-clean, and `ruff format` rewrites `'''` to `"""` only when doing so needs no escaping, so the choice is stable. Only genuinely pathological input (both triple-quote styles, a control character, a trailing backslash) still escapes, and `D301`'s fix being unsafe means the stamp holds anyway.
+
+### D3 — line width
+
+The consumer's `line-length` is theirs, and we cannot know it. **Ruled: emit anything past 88 columns already exploded, with a magic trailing comma** — the one construct Black and ruff refuse to rejoin at any width (verified 60–200). 88 is ruff's default and therefore the tightest width a consumer is likely to use, and only the tightest threshold is safe. Short lines stay flat, so ordinary artifacts read unchanged and the "ejectable, human-maintainable" bar the plan argues for is preserved.
+
+Below 88 columns a consumer can still rewrap short lines. That is the accepted, documented limit. `E501` on a single long string literal is unavoidable — you cannot wrap a string without altering the author's text — but it has no fix and is not in ruff's default rule set, so it can never break a stamp.
 
 ### Verify it locally
 
@@ -77,7 +110,7 @@ A header-only artifact has no imports for isort to reorder, so this one is clean
 ## What the plan did not anticipate (found while implementing)
 
 1. **The isort grouping for `python-structures` cannot satisfy both contexts.** It imports from *both* `pydantic` and `pipelex`. In a consumer's tree `pipelex` is an installed dependency (third-party — merged group, `pipelex` before `pydantic`); in this repo it is first-party (separate group, after `pydantic`). Verified empirically both ways. **Resolution: emit for the consumer** — they are the only ones who lint generated artifacts, and this repo commits none. The regression test lints with `lint.isort.known-third-party=['pipelex']` for that reason, and `render_import_block` carries the rationale.
-2. **`D301` is auto-fixed and byte-changing, and a plain double quote in a description triggered it.** `escape_py_string` backslash-escaped `"` into the docstring, so a description as ordinary as `The "primary" thing` produced `"""The \"primary\" thing"""` → `ruff check --fix` rewrites to `r"""` → stamp broken *and* text corrupted. Fixed with minimal, mode-aware docstring escaping (plain / raw / escaped). Exact description↔`__doc__` fidelity is preserved — `test_description_escaping.py` asserts it, and normalizing `\r` broke it once before being reverted in favour of routing hazards to the escaped branch.
+2. **`D301` is auto-fixed and byte-changing, and a plain double quote in a description triggered it.** `escape_py_string` backslash-escaped `"` into the docstring, so a description as ordinary as `The "primary" thing` produced `"""The \"primary\" thing"""` → `ruff check --fix` rewrites to `r"""` → stamp broken *and* text corrupted. Fixed with minimal, mode-aware docstring escaping. ⚠ **Superseded by [D2](#d2--docstring-rendering) in round 2** — the fidelity claim originally recorded here (exact description↔`__doc__` bytes) turned out to be incompatible with formatter stability for a multi-line description, and the contract is now `inspect.getdoc(cls) == inspect.cleandoc(description)`.
 3. **The imprecision caveat was emitted as a literal `\n`**, not a paragraph break — the multi-line docstring intent was defeated.
 4. **`"Foo" | None` is a `TypeError`** in the runtime generator: it has no `from __future__ import annotations`, so concept refs are *quoted* forward references and `str` has no `|`. The union is folded inside the quotes. Only a bare quoted ref is affected; `list["Foo"] | None` is a real `GenericAlias`.
 5. **The respelling silently disabled concept cycle detection.** `_detect_concept_cycles` walks the generated model's annotations and branched on `__origin__`, which a PEP 604 `X | None` (`types.UnionType`) does not have — so every optional concept reference vanished from the graph. The pre-existing TODO on that function warned about exactly this coupling. Fixed by branching on `__args__`; the 6 integration tests in `test_concept_to_concept_references.py` are what caught it.

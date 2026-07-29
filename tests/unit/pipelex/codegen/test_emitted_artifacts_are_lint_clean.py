@@ -5,9 +5,16 @@ A stamped artifact's hash is a raw SHA-256 over its body bytes, so any reformatt
 report the file as hand-edited — accusing the user of the one thing they did not do. The emitters are
 therefore required to emit exactly what ruff wants; this test is the guard on that property.
 
-Two rules are deliberately suppressed *in the invocation* rather than satisfied in the emitted bytes:
+Three rules are deliberately suppressed *in the invocation* rather than satisfied in the emitted bytes.
+The test for whether a rule may be suppressed here is whether ruff can **auto-apply** its fix: only an
+applied fix rewrites bytes, and only rewritten bytes break a stamp. A rule that merely reports is a
+config-level caveat for the consumer to make, not a defect in what we emit.
 
 - `INP001` is an artifact of linting a loose directory (no `__init__.py`), not of file content.
+- `E501` fires on a single long string literal — an authored description or choice value that has no
+  wrappable form, because you cannot break a string without altering the author's text. It has no fix,
+  and it is not in ruff's default rule set, so it neither breaks a stamp nor affects most consumers.
+  The *surrounding* call is a different matter, and is wrapped: see `PY_EXPLODE_WIDTH`.
 - `TC003` wants `from datetime import date` moved into an `if TYPE_CHECKING:` block, which would
   **break** the generated code — pydantic resolves annotations at runtime to build validators. Ruff's
   `runtime-evaluated-base-classes` exists for exactly this, so the test passes it, exercising the
@@ -25,6 +32,7 @@ import subprocess  # noqa: S404
 import sys
 from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -32,7 +40,7 @@ from pipelex.codegen.emitters.python_common import python_header
 from pipelex.codegen.emitters.python_pydantic import emit_python_pydantic
 from pipelex.codegen.emitters.python_structures import emit_python_structures
 from pipelex.codegen.emitters.target import EmittedFile
-from pipelex.codegen.emitters.ts_zod import emit_ts_zod
+from pipelex.codegen.emitters.ts_zod import TS_PRINT_WIDTH, emit_ts_zod
 from pipelex.codegen.resolved_concepts import ResolvedLibrary, resolve_concepts_from_crate
 from pipelex.core.concepts.resolved_fields import ResolvedType, ResolvedTypeKind
 from pipelex.libraries.library_crate import LibraryCrate
@@ -48,7 +56,7 @@ _CONSUMER_LINT_CONFIG = [
     "--config",
     "lint.isort.known-third-party=['pipelex']",
     "--config",
-    "lint.per-file-ignores={'*'=['INP001']}",
+    "lint.per-file-ignores={'*'=['INP001','E501']}",
     "--config",
     f"lint.flake8-type-checking.runtime-evaluated-base-classes={_RUNTIME_EVALUATED_BASES}",
 ]
@@ -72,7 +80,7 @@ def _collect_kinds(resolved_type: ResolvedType) -> set[ResolvedTypeKind]:
     return kinds
 
 
-def _assert_ruff_clean(*, emitted: list[EmittedFile], tmp_path: Path, target: str) -> None:
+def _assert_ruff_clean(*, emitted: list[EmittedFile], tmp_path: Path, target: str, line_length: int | None = None) -> None:
     """Write the artifacts out and require both `ruff check` and `ruff format --check` to find nothing."""
     try:
         subprocess.run([sys.executable, "-m", "ruff", "--version"], check=True, capture_output=True)  # noqa: S603
@@ -82,21 +90,24 @@ def _assert_ruff_clean(*, emitted: list[EmittedFile], tmp_path: Path, target: st
     for emitted_file in emitted:
         (tmp_path / emitted_file.filename).write_text(emitted_file.content, encoding="utf-8")
 
+    width_config = ["--config", f"line-length={line_length}"] if line_length is not None else []
+    label = f"[{target}]" if line_length is None else f"[{target} @ line-length={line_length}]"
+
     check = subprocess.run(  # noqa: S603
-        [sys.executable, "-m", "ruff", "check", str(tmp_path), *_CONSUMER_LINT_CONFIG],
+        [sys.executable, "-m", "ruff", "check", str(tmp_path), *_CONSUMER_LINT_CONFIG, *width_config],
         capture_output=True,
         text=True,
         check=False,
     )
-    assert check.returncode == 0, f"[{target}] emitted artifact is not lint-clean:\n{check.stdout}{check.stderr}"
+    assert check.returncode == 0, f"{label} emitted artifact is not lint-clean:\n{check.stdout}{check.stderr}"
 
     formatted = subprocess.run(  # noqa: S603
-        [sys.executable, "-m", "ruff", "format", "--check", str(tmp_path), "--config", str(_PYPROJECT)],
+        [sys.executable, "-m", "ruff", "format", "--check", str(tmp_path), "--config", str(_PYPROJECT), *width_config],
         capture_output=True,
         text=True,
         check=False,
     )
-    assert formatted.returncode == 0, f"[{target}] emitted artifact is not `ruff format` clean:\n{formatted.stdout}{formatted.stderr}"
+    assert formatted.returncode == 0, f"{label} emitted artifact is not `ruff format` clean:\n{formatted.stdout}{formatted.stderr}"
 
 
 class TestEmittedArtifactsAreLintClean:
@@ -137,6 +148,47 @@ class TestEmittedArtifactsAreLintClean:
         """
         _assert_ruff_clean(emitted=emit(_EMPTY_LIBRARY), tmp_path=tmp_path, target=target)
 
+    @pytest.mark.parametrize("line_length", [88, 100, 120, 150, 200])
+    @pytest.mark.parametrize(("target", "emit"), _EMITTERS)
+    def test_emitted_artifact_is_stable_at_every_consumer_line_length(
+        self,
+        every_type_kind_crate: LibraryCrate,
+        tmp_path: Path,
+        target: str,
+        emit: Callable[[ResolvedLibrary], list[EmittedFile]],
+        line_length: int,
+    ):
+        """The consumer's `line-length` is theirs, not ours, and it decides what their formatter rewrites.
+
+        A long authored description or choice list has no flat form that survives every width, so the
+        emitter hands over an already-exploded call carrying a magic trailing comma — the one construct
+        Black and ruff both refuse to rejoin at any width. `PY_EXPLODE_WIDTH` is the floor of the range
+        guarded here: ruff's own default, and so the tightest setting a consumer is likely to lint at.
+        """
+        _assert_ruff_clean(
+            emitted=emit(resolve_concepts_from_crate(every_type_kind_crate)), tmp_path=tmp_path, target=target, line_length=line_length
+        )
+
+    @pytest.mark.parametrize("crate_fixture", ["all_opaque_crate", "refines_native_only_crate"])
+    @pytest.mark.parametrize(("target", "emit"), _EMITTERS)
+    def test_crates_that_use_no_seeded_import_are_lint_clean(
+        self,
+        request: pytest.FixtureRequest,
+        tmp_path: Path,
+        target: str,
+        emit: Callable[[ResolvedLibrary], list[EmittedFile]],
+        crate_fixture: str,
+    ):
+        """Every import has to be registered by whoever writes the name, not seeded up front.
+
+        Both crate shapes are ordinary — a `Question -> Answer` method declares only structureless
+        concepts, and a summarizer may declare only refinements of a native — and each leaves one of the
+        formerly-seeded imports unused. `F401` is a *safe* fix, so `ruff check --fix` deletes the line,
+        rewrites the body, and `codegen check` then reports a file nobody touched as hand-edited.
+        """
+        crate = cast("LibraryCrate", request.getfixturevalue(crate_fixture))
+        _assert_ruff_clean(emitted=emit(resolve_concepts_from_crate(crate)), tmp_path=tmp_path, target=target)
+
     def test_natives_only_crate_emits_a_lint_clean_structures_module(self, natives_only_crate: LibraryCrate, tmp_path: Path):
         """The reachable route to an empty projection, and the reason the case is not academic.
 
@@ -171,6 +223,22 @@ class TestEmittedArtifactsAreLintClean:
         for emitted_file in emit_ts_zod(resolve_concepts_from_crate(every_type_kind_crate)):
             offenders = re.findall(r"\n[ \t]*\n[ \t]*\n", emitted_file.content)
             assert not offenders, f"{emitted_file.filename} contains {len(offenders)} collapsible blank-line run(s)"
+
+    def test_emitted_ts_lines_fit_the_print_width(self, every_type_kind_crate: LibraryCrate):
+        """No emitted code line may exceed prettier's print width — it would be wrapped, breaking the stamp.
+
+        This is the guard that actually holds the TypeScript line in CI, where there is no node toolchain
+        for `test_emitted_ts_is_prettier_clean` to use. It needs no prettier binary, and it is what turns
+        an unmodelled overflow (a long concept name, a long choice list) into a failing test.
+
+        Comment lines are exempt on purpose: prettier reflows code, never the contents of a `//` line or a
+        `/** … */` block, so a long JSDoc line is stable at any width.
+        """
+        for emitted_file in emit_ts_zod(resolve_concepts_from_crate(every_type_kind_crate)):
+            overlong = [
+                line for line in emitted_file.content.splitlines() if len(line) > TS_PRINT_WIDTH and not line.lstrip().startswith(("//", "/*", "*"))
+            ]
+            assert not overlong, f"{emitted_file.filename} has lines past prettier's print width:\n" + "\n".join(overlong)
 
     def test_emitted_ts_is_prettier_clean(self, every_type_kind_crate: LibraryCrate, tmp_path: Path):
         """`prettier --check` must find nothing to change in the emitted TypeScript.

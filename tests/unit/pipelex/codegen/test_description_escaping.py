@@ -1,8 +1,10 @@
 from collections.abc import Callable
+from inspect import getdoc
 from pathlib import Path
 
 import pytest
 
+from pipelex.codegen.emitters.python_common import normalized_docstring_text
 from pipelex.codegen.emitters.python_pydantic import emit_python_pydantic
 from pipelex.codegen.emitters.python_structures import emit_python_structures
 from pipelex.codegen.emitters.target import EmittedFile
@@ -35,8 +37,14 @@ class TestDescriptionEscaping:
         content = emitter(library)[0].content
         module = load_generated_module(content, tmp_path=tmp_path, name=module_name)
 
-        assert module.Payload.__doc__ == description
+        # The docstring is rendered the way a human writes one, so `__doc__` carries the class-body
+        # indentation — the shape that survives `ruff format` and the pydocstyle rules, and therefore the
+        # only shape that keeps the stamp valid. `inspect.getdoc` takes that indentation straight back
+        # off, which is what `normalized_docstring_text` describes and what consumers actually read.
+        assert getdoc(module.Payload) == normalized_docstring_text(description)
         assert not hasattr(module.Payload, "injected")
+        # The field description is a plain single-line literal, so it stays byte-identical — exact bytes
+        # survive wherever they are consumed programmatically rather than read as documentation.
         assert module.Payload.model_fields["value"].description == description
 
     def test_typescript_descriptions_cannot_escape_jsdoc(self):
