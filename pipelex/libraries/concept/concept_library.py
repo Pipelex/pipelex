@@ -1,17 +1,21 @@
-from typing import Any, Callable, Self
+from typing import Any, Callable, Self, cast
 
+from kajson.exceptions import ClassRegistryInheritanceError, ClassRegistryNotFoundError
 from pydantic import Field, RootModel, model_validator
 from typing_extensions import override
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError, ConceptStringError
+from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError, ConceptStringError, ConceptStructureClassNotFoundError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import is_concept_ref_valid, validate_concept_ref_or_code
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
+from pipelex.runtime_hub import get_class_registry
+from pipelex.tools.typing.class_utils import are_structure_classes_compatible
 
 ConceptLibraryRoot = dict[str, Concept]
 
@@ -96,12 +100,43 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
 
     @override
     def is_compatible(self, *, tested_concept: Concept, wanted_concept: Concept, strict: bool = False) -> bool:
-        return Concept.are_concept_compatible(
+        """Compose the two compatibility tiers, in the one place that owns resolution.
+
+        The declaration tier decides on its own whenever it can — and when it does, no class is ever
+        looked up, so concepts whose structure classes were never materialized still get an answer.
+        Only when the declarations are inconclusive does the class tier run, and that needs both
+        classes: a name that does not resolve makes the question unanswerable, so it raises rather
+        than returning the `False` that would read as "incompatible".
+        """
+        if Concept.are_compatible_by_declaration(
             concept_1=tested_concept,
             concept_2=wanted_concept,
-            strict=strict,
             concept_resolver=self._concept_resolver,
+        ):
+            return True
+
+        if not (tested_concept.declares_a_structure_class and wanted_concept.declares_a_structure_class):
+            # `native.Anything` has no structure class, so there is no structural comparison left to
+            # make: the declaration tier's silence is the whole answer.
+            return False
+
+        return are_structure_classes_compatible(
+            class_1=self.get_structure_class(concept=tested_concept),
+            class_2=self.get_structure_class(concept=wanted_concept),
+            strict=strict,
         )
+
+    @override
+    def get_structure_class(self, *, concept: Concept) -> type[StuffContent]:
+        try:
+            structure_class = get_class_registry().get_required_subclass(name=concept.structure_class_name, base_class=StuffContent)
+        except (ClassRegistryNotFoundError, ClassRegistryInheritanceError) as exc:
+            msg = (
+                f"Concept '{concept.concept_ref}' declares structure class '{concept.structure_class_name}', "
+                f"which is not a registered subclass of StuffContent: {exc}"
+            )
+            raise ConceptStructureClassNotFoundError(msg) from exc
+        return cast("type[StuffContent]", structure_class)
 
     def get_optional_concept(self, concept_ref: str) -> Concept | None:
         return self.root.get(concept_ref)

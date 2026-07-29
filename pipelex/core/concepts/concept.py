@@ -20,7 +20,6 @@ from pipelex.core.stuffs.image_field_search import search_for_nested_image_field
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.system.registries.class_registry_access import get_class_registry
 from pipelex.tools.misc.string_utils import pascal_case_to_sentence
-from pipelex.tools.typing.class_utils import are_classes_equivalent, has_compatible_field
 
 
 class Concept(ConceptAbstract):
@@ -82,15 +81,41 @@ class Concept(ConceptAbstract):
     def is_native_concept(cls, concept: "Concept") -> bool:
         return NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept.concept_ref)
 
+    @property
+    def declares_a_structure_class(self) -> bool:
+        """Whether `structure_class_name` names a class that can be resolved at all.
+
+        True for every concept but `native.Anything`, whose content class deliberately does not
+        exist — so the name derived mechanically from its code never resolves, and asking a provider
+        for it is a category error rather than a missing registration.
+        """
+        if not SpecialDomain.is_native(domain_code=self.domain_code):
+            return True
+        return not NativeConceptCode.is_structureless_concept(self.code)
+
     @classmethod
-    def are_concept_compatible(
+    def are_compatible_by_declaration(
         cls,
         *,
         concept_1: "Concept",
         concept_2: "Concept",
-        strict: bool = False,
         concept_resolver: Callable[[str], "Concept | None"] | None = None,
     ) -> bool:
+        """Whether the two concepts' *declarations* establish that `concept_1` satisfies `concept_2`.
+
+        This is the string tier of compatibility: dynamic short-circuits, ref equality, declared
+        structure-class-name equality, and `refines` chains — the last resolved through
+        `concept_resolver` when a refinement crosses a package boundary (`dep->domain.Code`).
+
+        The two verdicts are asymmetric, deliberately. `True` means "established by the
+        declarations". `False` means "*not established at this tier*" — NOT "incompatible": two
+        concepts whose declarations say nothing about each other may still be compatible through
+        their structure classes. Composing the two tiers is `ConceptLibrary.is_compatible`'s job,
+        because resolving a `structure_class_name` into a class is a library's business, not a
+        wire model's.
+
+        Pure over the model's own fields (plus the injected resolver): no registry, no ambient state.
+        """
         if NativeConceptCode.is_dynamic_concept(concept_code=concept_1.code):
             return True
         if NativeConceptCode.is_dynamic_concept(concept_code=concept_2.code):
@@ -127,33 +152,7 @@ class Concept(ConceptAbstract):
             if refines_1 == refines_2:
                 return True
 
-        # Check class-based compatibility
-        # This now works even when one or both concepts have refines, since we generate
-        # structure classes that inherit from the refined concept's class
-        concept_1_class = get_class_registry().get_class(name=concept_1.structure_class_name)
-        concept_2_class = get_class_registry().get_class(name=concept_2.structure_class_name)
-
-        if concept_1_class is None or concept_2_class is None:
-            return False
-
-        # Check if classes are structurally equivalent (same fields, types)
-        if are_classes_equivalent(concept_1_class, class_2=concept_2_class):
-            return True
-
-        if strict:
-            # In strict mode, only structural equivalence is accepted
-            return False
-
-        # Check if concept_1 is a subclass of concept_2
-        # This handles inheritance from refined concepts (e.g., RefusalEmail inherits from TextContent)
-        try:
-            if issubclass(concept_1_class, concept_2_class):
-                return True
-        except TypeError:
-            pass
-
-        # Check if concept_1 has compatible fields with concept_2
-        return has_compatible_field(concept_1_class, target_type=concept_2_class)
+        return False
 
     @classmethod
     def is_valid_structure_class(cls, structure_class_name: str) -> bool:

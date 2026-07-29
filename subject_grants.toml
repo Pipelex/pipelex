@@ -2508,6 +2508,10 @@ rationale = "Predicate on the ref-or-code; single operand."
 param = "class_name"
 rationale = "Predicate on the class name; single operand."
 
+["pipelex/core/concepts/native/concept_native.py::NativeConceptCode.is_structureless_concept"]
+param = "concept_code"
+rationale = "Predicate on the concept code; single operand — same shape as its is_dynamic_concept sibling."
+
 ["pipelex/core/concepts/native/concept_native.py::NativeConceptCode.is_text_concept"]
 param = "concept_code"
 rationale = "Predicate on the concept code; single operand."

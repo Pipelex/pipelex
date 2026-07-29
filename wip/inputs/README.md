@@ -61,3 +61,7 @@ Unlike the notes above, this one is **not a tradeoff — it is a live regression
 **Deferred design notes** (triage outcomes above): `case1-bare-date-arm-gap.md`, `bare-file-path-cli-resolution-gap.md`, `scalar-envelope-arm-asymmetry.md`, `loader-vs-factory-date-split-duplication.md`, `input-shaper-multiplicity-gaps.md`, `d4-hint-still-envelope.md`, `container-default-temporal-codegen-gap.md`, `structure-field-fidelity-guard.md`, `uri-scheme-classification-stopgap.md`, `refines-hint-native-list-drift.md`.
 
 **Open regression** (section above): `envelope-chaining-vs-d8.md` — the one item here that is a bug rather than a tradeoff.
+
+**From other tracks, landing on shaper code:**
+
+- `unresolvable-structure-class-escapes-the-validate-sweep.md` — from the `refactor/Concept-purity` branch. `ConceptLibrary.is_compatible` now raises instead of silently answering `False` when a structure class does not resolve; `resolve_input_kind` is one of its unguarded callers. Not reachable today (the concept factory refuses to build such a concept), so no guards were added — but if it ever becomes reachable, the fix belongs at the `bundle_validator` sweep boundary, not scattered across call sites. Also flags an overstated comment in `input_shaper.py` for that branch's Phase 2.

@@ -12,7 +12,6 @@ from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingC
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
 from pipelex.config import get_config
-from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
@@ -243,7 +242,11 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         rendered_llm_prompt: LLMPrompt | None = None
 
         if (
-            Concept.are_concept_compatible(concept_1=output_stuff_spec.concept, concept_2=get_native_concept(NativeConceptCode.TEXT), strict=True)
+            get_concept_library().is_compatible(
+                tested_concept=output_stuff_spec.concept,
+                wanted_concept=get_native_concept(NativeConceptCode.TEXT),
+                strict=True,
+            )
             and not is_multiple_output
         ):
             llm_prompt_1_for_text = await self.llm_prompt_spec.make_llm_prompt(
@@ -331,8 +334,10 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         if is_multiple_output:
             execution_data_dict["structuring_path"] = "object_list"
         else:
-            output_is_text = Concept.are_concept_compatible(
-                concept_1=output_stuff_spec.concept, concept_2=get_native_concept(NativeConceptCode.TEXT), strict=True
+            output_is_text = get_concept_library().is_compatible(
+                tested_concept=output_stuff_spec.concept,
+                wanted_concept=get_native_concept(NativeConceptCode.TEXT),
+                strict=True,
             )
             execution_data_dict["structuring_path"] = "text" if output_is_text else "object_direct"
 

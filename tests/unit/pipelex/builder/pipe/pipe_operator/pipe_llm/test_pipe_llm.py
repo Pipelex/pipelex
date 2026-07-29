@@ -21,10 +21,14 @@ class TestPipeLLMBlueprintConversion:
         self, test_name: str, pipe_spec: PipeLLMSpec, expected_blueprint: PipeLLMBlueprint, load_empty_library: Callable[[], str]
     ):
         load_empty_library()
-        item_concept = ConceptFactory.make(concept_code="Item", domain_code="test_domain", description="Item", structure_class_name="Item")
-        data_concept = ConceptFactory.make(concept_code="Data", domain_code="test_domain", description="Data", structure_class_name="Data")
-        analysis_concept = ConceptFactory.make(
-            concept_code="Analysis", domain_code="test_domain", description="Analysis", structure_class_name="Analysis"
+        # Built from blueprints, not `ConceptFactory.make`: the blueprint path materializes and
+        # registers each structure class, so the library reaches a state the loader could actually
+        # produce. Naming a structure class that no registry holds is not a state a real library
+        # can be in, and compatibility questions about it have no answer.
+        item_concept = ConceptFactory.make_from_blueprint(concept_code="Item", domain_code="test_domain", blueprint_or_string_description="Item")
+        data_concept = ConceptFactory.make_from_blueprint(concept_code="Data", domain_code="test_domain", blueprint_or_string_description="Data")
+        analysis_concept = ConceptFactory.make_from_blueprint(
+            concept_code="Analysis", domain_code="test_domain", blueprint_or_string_description="Analysis"
         )
         concept_library = get_concept_library()
         concept_library.add_new_concept(concept=item_concept)

@@ -10,7 +10,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.interpreter_hub import get_native_concept, get_required_concept
+from pipelex.interpreter_hub import get_concept_library, get_native_concept, get_required_concept
 from pipelex.pipe_operators.shared.exceptions import UnusedInputError, WithImagesFilterError
 from pipelex.pipe_operators.shared.image_reference import ImageReference, ImageReferenceKind
 from pipelex.tools.jinja2.jinja2_models import Jinja2FilterName
@@ -215,18 +215,18 @@ class TemplateImageAnalyzer:
         # For simple variable references (no dots after root)
         if var_path == root_var:
             # Check if it's directly an ImageContent
-            is_image = Concept.are_concept_compatible(
-                concept_1=root_concept,
-                concept_2=native_image_concept,
+            is_image = get_concept_library().is_compatible(
+                tested_concept=root_concept,
+                wanted_concept=native_image_concept,
                 strict=True,
             )
             if is_image:
                 return (True, False, False, None)
 
             # Check if it has nested images (loose compatibility)
-            has_nested = Concept.are_concept_compatible(
-                concept_1=root_concept,
-                concept_2=native_image_concept,
+            has_nested = get_concept_library().is_compatible(
+                tested_concept=root_concept,
+                wanted_concept=native_image_concept,
                 strict=False,
             )
             nested_paths: list[str] | None = None

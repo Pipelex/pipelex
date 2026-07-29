@@ -3,7 +3,6 @@
 from collections.abc import Callable
 from pathlib import Path
 
-from pipelex.core.concepts.concept import Concept
 from pipelex.interpreter_hub import get_library_manager
 
 
@@ -88,7 +87,7 @@ class TestRefinesCustomConcept:
         assert vip_customer_instance.email == "john@example.com"  # type: ignore[attr-defined]
 
     def test_concepts_are_compatible(self, load_test_library: Callable[[list[Path]], None]):
-        """Test that Concept.are_concept_compatible returns True for refined concept."""
+        """Test that the library reports a refined concept as compatible with what it refines."""
         test_dir = Path(__file__).parent
         load_test_library([test_dir])
 
@@ -100,4 +99,4 @@ class TestRefinesCustomConcept:
         vip_customer_concept = library.concept_library.get_required_concept("refines_custom_test.VIPCustomer")
 
         # VIPCustomer should be compatible with Customer (it refines Customer)
-        assert Concept.are_concept_compatible(concept_1=vip_customer_concept, concept_2=customer_concept)
+        assert library.concept_library.is_compatible(tested_concept=vip_customer_concept, wanted_concept=customer_concept)
