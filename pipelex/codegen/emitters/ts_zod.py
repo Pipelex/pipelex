@@ -31,6 +31,12 @@ from pipelex.tools.misc.json_utils import clean_json_content
 _FILENAME = "types.ts"
 _BINDER_FILENAME = "binder.ts"
 
+# Prettier's default `printWidth`. The emitted files must be prettier-clean on arrival, or a consumer's
+# formatter run rewrites the bytes and invalidates the codegen stamp (`pipelex codegen check` would then
+# report the file as hand-edited). Two prettier behaviors drive the emitted shape: it collapses runs of
+# blank lines to a single one, and it keeps an import on one line while it fits within this width.
+TS_PRINT_WIDTH = 80
+
 
 def emit_ts_zod(library: ResolvedLibrary) -> list[EmittedFile]:
     """Emit the pure `types.ts` file and its `binder.ts` companion (wire<->domain parse/serialize)."""
@@ -40,7 +46,12 @@ def emit_ts_zod(library: ResolvedLibrary) -> list[EmittedFile]:
     recursive_refs = _find_recursive_concept_refs(concepts)
     header = _ts_header()
     blocks = [_render_schema(concept, by_ref=by_ref, type_name_by_ref=type_name_by_ref, recursive_refs=recursive_refs) for concept in concepts]
-    body = f'{header}import {{ z }} from "zod";\n\n\n' + "\n\n\n".join(blocks) + "\n"
+    if blocks:
+        body = f'{header}import {{ z }} from "zod";\n\n' + "\n\n".join(blocks) + "\n"
+    else:
+        # Nothing to project: the header alone. Keeping the import would leave `z` unused above a trailing
+        # blank-line run prettier collapses — a reformat, and a broken stamp. See `_emit_binder`.
+        body = header
     return [EmittedFile(filename=_FILENAME, content=body), _emit_binder(concepts, type_name_by_ref=type_name_by_ref)]
 
 
@@ -74,7 +85,13 @@ def _render_schema(
     if concept.concept_ref in recursive_refs:
         type_expr = _concept_type_expr(concept, by_ref=by_ref, type_name_by_ref=type_name_by_ref)
         return f"{doc}export type {type_name} = {type_expr};\nexport const {type_name}Schema: z.ZodType<{type_name}> = {schema_expr};"
-    return f"{doc}export const {type_name}Schema = {schema_expr};\nexport type {type_name} = z.infer<typeof {type_name}Schema>;"
+
+    # A long enough concept name pushes the alias past prettier's print width, and prettier then breaks
+    # the generic — rewriting the bytes and invalidating the stamp. Emit the broken form ourselves.
+    alias = f"export type {type_name} = z.infer<typeof {type_name}Schema>;"
+    if len(alias) > TS_PRINT_WIDTH:
+        alias = f"export type {type_name} = z.infer<\n  typeof {type_name}Schema\n>;"
+    return f"{doc}export const {type_name}Schema = {schema_expr};\n{alias}"
 
 
 def _schema_expr(
@@ -110,11 +127,39 @@ def _render_field(
     reasons = list(dict.fromkeys(iter_imprecision_reasons(concept_field.resolved_type)))
     doc = _jsdoc(concept_field.description, imprecise="; ".join(reasons) if reasons else None, indent="  ")
     expr = _zod_type(concept_field.resolved_type, by_ref=by_ref, type_name_by_ref=type_name_by_ref)
+    modifier = ""
     if concept_field.default_value is not None:
-        expr = f"{expr}.default({_format_default_value(concept_field.default_value)})"
+        modifier = f".default({_format_default_value(concept_field.default_value)})"
     elif not concept_field.required:
-        expr = f"{expr}.optional()"
-    return f"{doc}  {key}: {expr},"
+        modifier = ".optional()"
+
+    flat = f"  {key}: {expr}{modifier},"
+    if len(flat) <= TS_PRINT_WIDTH or "\n" in expr:
+        return f"{doc}{flat}"
+    return f"{doc}  {key}: {_break_zod_expr(expr, modifier=modifier)},"
+
+
+def _break_zod_expr(expr: str, *, modifier: str) -> str:
+    """Prettier's rendering of a field expression too long to sit on one line.
+
+    Only `z.enum([...])` can genuinely overflow — its members are authored choices with no length bound,
+    while every other emitted expression is a short fixed form or a `z.lazy(() => XSchema)` whose width is
+    the concept name's. Two shapes, and prettier picks between them: bare, it breaks the array in place;
+    with a modifier attached it breaks the whole member chain, pulling `.enum(` onto its own line.
+
+    Anything we do not model stays flat — `test_emitted_ts_lines_fit_the_print_width` is the guard that
+    turns an unmodelled overflow into a failing test rather than a silently broken stamp.
+    """
+    prefix, _, members_text = expr.partition("([")
+    if prefix != "z.enum" or not members_text.endswith("])"):
+        return f"{expr}{modifier}"
+    members = [member.strip() for member in members_text[:-2].split(",")]
+
+    if not modifier:
+        rendered = "".join(f"    {member},\n" for member in members)
+        return f"z.enum([\n{rendered}  ])"
+    rendered = "".join(f"      {member},\n" for member in members)
+    return f"z\n    .enum([\n{rendered}    ])\n    {modifier}"
 
 
 def _format_default_value(value: Any) -> str:
@@ -280,24 +325,50 @@ def _emit_binder(concepts: list[ResolvedConcept], *, type_name_by_ref: dict[str,
     thus no risk of corrupting arbitrary keys inside a `z.record()` / `z.unknown()` value.
     """
     type_names = [type_name_by_ref[concept.concept_ref] for concept in concepts]
-    import_lines = "\n".join(f"  {name}Schema,\n  type {name}," for name in type_names)
+    if not type_names:
+        # No pair to bind: the header alone is the canonical empty binder. The populated shape degenerates
+        # into `import {  } from "./types";` (prettier rewrites the empty brace pair) above a trailing
+        # blank-line run (prettier collapses it) — either reformat breaks the stamped body hash.
+        return EmittedFile(filename=_BINDER_FILENAME, content=_binder_header())
+
+    specifiers = [specifier for name in type_names for specifier in (f"{name}Schema", f"type {name}")]
     pairs = "\n\n".join(_binder_pair(name) for name in type_names)
-    prelude = f'import {{\n{import_lines}\n}} from "./types";'
-    return EmittedFile(filename=_BINDER_FILENAME, content=f"{_binder_header()}{prelude}\n\n\n{pairs}\n")
+
+    # Match prettier: one line while it fits, otherwise one specifier per line.
+    single_line = f'import {{ {", ".join(specifiers)} }} from "./types";'
+    if len(single_line) <= TS_PRINT_WIDTH:
+        prelude = single_line
+    else:
+        import_lines = "\n".join(f"  {specifier}," for specifier in specifiers)
+        prelude = f'import {{\n{import_lines}\n}} from "./types";'
+
+    return EmittedFile(filename=_BINDER_FILENAME, content=f"{_binder_header()}{prelude}\n\n{pairs}\n")
 
 
 def _binder_pair(type_name: str) -> str:
     """The `parse<Name>` / `serialize<Name>` pair for one concept type (wire-native, so `Schema.parse`)."""
     return (
         f"/** Parse a wire payload into a validated `{type_name}`. */\n"
-        f"export function parse{type_name}(wire: unknown): {type_name} {{\n"
+        f"{_ts_signature(f'parse{type_name}', param='wire: unknown', returns=type_name)}\n"
         f"  return {type_name}Schema.parse(wire);\n"
         f"}}\n\n"
         f"/** Validate a `{type_name}` for the wire (keys are already wire-native). */\n"
-        f"export function serialize{type_name}(value: {type_name}): {type_name} {{\n"
+        f"{_ts_signature(f'serialize{type_name}', param=f'value: {type_name}', returns=type_name)}\n"
         f"  return {type_name}Schema.parse(value);\n"
         f"}}"
     )
+
+
+def _ts_signature(name: str, *, param: str, returns: str) -> str:
+    """A `export function name(param): Returns {` header, wrapped the way prettier wraps it past the print width.
+
+    A concept code long enough to push the signature over the width is perfectly valid MTHDS, and prettier
+    breaks the parameter list onto its own line when it does not fit — a byte rewrite that breaks the stamp.
+    """
+    flat = f"export function {name}({param}): {returns} {{"
+    if len(flat) <= TS_PRINT_WIDTH:
+        return flat
+    return f"export function {name}(\n  {param},\n): {returns} {{"
 
 
 def _binder_header() -> str:

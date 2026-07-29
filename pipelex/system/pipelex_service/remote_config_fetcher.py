@@ -30,7 +30,7 @@ Behaviour:
 from __future__ import annotations
 
 import json
-from datetime import datetime  # noqa: TC003 — Pydantic v2 resolves this annotation at runtime
+from datetime import datetime
 from typing import Any
 
 import httpx

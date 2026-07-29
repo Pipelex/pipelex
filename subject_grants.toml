@@ -952,6 +952,14 @@ rationale = "Single-operand transformation: derives the class-name mapping over 
 param = "name"
 rationale = "Single-operand conversion of the name."
 
+["pipelex/codegen/emitters/python_common.py::_docstring_delimiter"]
+param = "text"
+rationale = "Single-operand derivation: picks the delimiter that fits the text."
+
+["pipelex/codegen/emitters/python_common.py::_split_top_level"]
+param = "inner"
+rationale = "Verb-object: splits the bracket inner text; single operand."
+
 ["pipelex/codegen/emitters/python_common.py::class_docstring"]
 param = "description"
 rationale = "Noun-named derivation: builds the docstring from the description; extras stay keyword."
@@ -959,6 +967,10 @@ rationale = "Noun-named derivation: builds the docstring from the description; e
 ["pipelex/codegen/emitters/python_common.py::escape_py_string"]
 param = "value"
 rationale = "Single-operand conversion of the value."
+
+["pipelex/codegen/emitters/python_common.py::explode_bracket"]
+param = "text"
+rationale = "Verb-object: explodes the bracketed annotation text; the budget is context."
 
 ["pipelex/codegen/emitters/python_common.py::field_line"]
 param = "field"
@@ -968,6 +980,10 @@ rationale = "Noun-named derivation: the source line for the field; annotation st
 param = "value"
 rationale = "Single-operand formatting of the value."
 
+["pipelex/codegen/emitters/python_common.py::normalized_docstring_text"]
+param = "text"
+rationale = "Single-operand normalization of the text into its docstring-canonical form."
+
 ["pipelex/codegen/emitters/python_common.py::order_by_base"]
 param = "concepts"
 rationale = "Verb-object: orders the concepts; in_module is context."
@@ -975,6 +991,10 @@ rationale = "Verb-object: orders the concepts; in_module is context."
 ["pipelex/codegen/emitters/python_common.py::order_by_base.visit"]
 param = "concept"
 rationale = "Visitor: visits the concept; single operand."
+
+["pipelex/codegen/emitters/python_common.py::render_import_block"]
+param = "imports"
+rationale = "Verb-object: renders the collected imports into a source block; single operand."
 
 ["pipelex/codegen/emitters/python_pydantic.py::_annotation"]
 param = "resolved_type"
@@ -1032,6 +1052,10 @@ rationale = "Verb-object: emits from the resolved library; single operand."
 param = "type_name"
 rationale = "Noun-named derivation: encodes the type name into its parse/serialize pair."
 
+["pipelex/codegen/emitters/ts_zod.py::_break_zod_expr"]
+param = "expr"
+rationale = "Verb-object: breaks the zod expression across lines; the modifier is context."
+
 ["pipelex/codegen/emitters/ts_zod.py::_concept_dependencies"]
 param = "concept"
 rationale = "Noun-named derivation: the dependency refs of the concept; single operand."
@@ -1087,6 +1111,10 @@ rationale = "Single-operand sanitization of the text."
 ["pipelex/codegen/emitters/ts_zod.py::_schema_expr"]
 param = "concept"
 rationale = "Noun-named derivation: the schema expr for the concept; context stays keyword."
+
+["pipelex/codegen/emitters/ts_zod.py::_ts_signature"]
+param = "name"
+rationale = "Verb-object: renders the signature for the named function; param and return type are context."
 
 ["pipelex/codegen/emitters/ts_zod.py::_ts_type"]
 param = "resolved_type"

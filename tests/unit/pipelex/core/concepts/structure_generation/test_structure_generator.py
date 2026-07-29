@@ -44,15 +44,15 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class TestModel(StructuredContent):
     """Generated TestModel class"""
 
     name: str = Field(..., description="Name field")
-    age: Optional[int] = Field(default=None, description="Age field")
-    active: Optional[bool] = Field(default=True, description="Active status")
+    age: int | None = Field(default=None, description="Age field")
+    active: bool | None = Field(default=True, description="Active status")
 '''
 
         assert result == expected_code
@@ -102,15 +102,15 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class ComplexModel(StructuredContent):
     """Generated ComplexModel class"""
 
-    tags: Optional[List[str]] = Field(default=None, description="List of tags")
-    metadata: Optional[Dict[str, str]] = Field(default=None, description="Metadata dictionary")
-    scores: List[float] = Field(..., description="List of scores")
+    tags: list[str] | None = Field(default=None, description="List of tags")
+    metadata: dict[str, str] | None = Field(default=None, description="Metadata dictionary")
+    scores: list[float] = Field(..., description="List of scores")
 '''
 
         assert result == expected_code
@@ -146,15 +146,15 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class Product(StructuredContent):
     """Generated Product class"""
 
-    name: Optional[str] = Field(default=None, description="Product name")
-    category: Literal['electronics', 'clothing', 'food', 'books'] = Field(..., description="Product category")
-    size: Optional[Literal['XS', 'S', 'M', 'L', 'XL']] = Field(default=None, description="Size of the product")
+    name: str | None = Field(default=None, description="Product name")
+    category: Literal["electronics", "clothing", "food", "books"] = Field(..., description="Product category")
+    size: Literal["XS", "S", "M", "L", "XL"] | None = Field(default=None, description="Size of the product")
 '''
 
         assert result == expected_code
@@ -200,15 +200,15 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class Order(StructuredContent):
     """Generated Order class"""
 
-    status: Literal['pending', 'processing', 'shipped', 'delivered'] = Field(..., description="Order status")
-    story_points: Literal['1', '3', '5', '8', '13'] = Field(..., description="Fibonacci story points")
-    price_tier: Optional[Literal['0.25', '0.5', '1', '2', '5']] = Field(default=None, description="Price tier multiplier")
+    status: Literal["pending", "processing", "shipped", "delivered"] = Field(..., description="Order status")
+    story_points: Literal["1", "3", "5", "8", "13"] = Field(..., description="Fibonacci story points")
+    price_tier: Literal["0.25", "0.5", "1", "2", "5"] | None = Field(default=None, description="Price tier multiplier")
 '''
 
         assert result == expected_code
@@ -238,7 +238,7 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class EmptyModel(StructuredContent):
@@ -276,14 +276,14 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class DocumentInfo(StructuredContent):
     """Generated DocumentInfo class"""
 
     title: str = Field(..., description="Document title")
-    page_count: Optional[int] = Field(default=None, description="Number of pages")
+    page_count: int | None = Field(default=None, description="Number of pages")
 '''
 
         assert result == expected_code
@@ -315,7 +315,7 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class ConvenienceTest(StructuredContent):
@@ -369,18 +369,18 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class TypeMappingTest(StructuredContent):
     """Generated TypeMappingTest class"""
 
-    text_field: Optional[str] = Field(default=None, description="Text field")
-    number_field: Optional[float] = Field(default=None, description="Number field")
-    integer_field: Optional[int] = Field(default=None, description="Integer field")
-    boolean_field: Optional[bool] = Field(default=None, description="Boolean field")
-    list_field: Optional[List[str]] = Field(default=None, description="List field")
-    dict_field: Optional[Dict[str, int]] = Field(default=None, description="Dict field")
+    text_field: str | None = Field(default=None, description="Text field")
+    number_field: float | None = Field(default=None, description="Number field")
+    integer_field: int | None = Field(default=None, description="Integer field")
+    boolean_field: bool | None = Field(default=None, description="Boolean field")
+    list_field: list[str] | None = Field(default=None, description="List field")
+    dict_field: dict[str, int] | None = Field(default=None, description="Dict field")
 '''
 
         assert result == expected_code
@@ -484,7 +484,7 @@ class TypeMappingTest(StructuredContent):
         assert cast("type[StructuredContent]", generated_class).model_fields["starts_at"].default == time_default
 
     def test_list_of_date_field_maps_to_list_of_calendar_date(self):
-        """`type = "list", item_type = "date"` generates a `List[date]` field with the bare-class import, and exec-validates."""
+        """`type = "list", item_type = "date"` generates a `list[date]` field with the bare-class import, and exec-validates."""
         structure_blueprint = {
             "deadlines": ConceptStructureBlueprint(
                 description="Deadlines", type=ConceptStructureBlueprintFieldType.LIST, item_type="date", required=True
@@ -496,11 +496,11 @@ class TypeMappingTest(StructuredContent):
         )
 
         assert "from datetime import date" in result
-        assert 'deadlines: List[date] = Field(..., description="Deadlines")' in result
+        assert 'deadlines: list[date] = Field(..., description="Deadlines")' in result
         assert issubclass(cast("type[StructuredContent]", generated_class), StructuredContent)
 
     def test_list_of_datetime_field_maps_to_list_of_timestamp(self):
-        """`type = "list", item_type = "datetime"` generates a `List[datetime]` field with the bare-class import, and exec-validates."""
+        """`type = "list", item_type = "datetime"` generates a `list[datetime]` field with the bare-class import, and exec-validates."""
         structure_blueprint = {
             "logged_at": ConceptStructureBlueprint(
                 description="Log timestamps", type=ConceptStructureBlueprintFieldType.LIST, item_type="datetime", required=True
@@ -512,7 +512,7 @@ class TypeMappingTest(StructuredContent):
         )
 
         assert "from datetime import datetime" in result
-        assert 'logged_at: List[datetime] = Field(..., description="Log timestamps")' in result
+        assert 'logged_at: list[datetime] = Field(..., description="Log timestamps")' in result
         assert issubclass(cast("type[StructuredContent]", generated_class), StructuredContent)
 
     def test_list_of_datetime_field_with_default_round_trips(self):
@@ -581,14 +581,14 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class RequiredFieldsModel(StructuredContent):
     """Generated RequiredFieldsModel class"""
 
     title: str = Field(..., description="Required title")
-    optional_field: Optional[str] = Field(default=None, description="Optional field")
+    optional_field: str | None = Field(default=None, description="Optional field")
 '''
 
         assert result == expected_code
@@ -637,15 +637,15 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class PersonWithDefaults(StructuredContent):
     """Generated PersonWithDefaults class"""
 
-    name: Optional[str] = Field(default="Anonymous", description="Person name")
-    age: Optional[int] = Field(default=0, description="Person age")
-    active: Optional[bool] = Field(default=True, description="Is active")
+    name: str | None = Field(default="Anonymous", description="Person name")
+    age: int | None = Field(default=0, description="Person age")
+    active: bool | None = Field(default=True, description="Is active")
 '''
 
         assert result == expected_code
@@ -694,15 +694,15 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class ListTypesModel(StructuredContent):
     """Generated ListTypesModel class"""
 
-    text_list: Optional[List[str]] = Field(default=None, description="List of text items")
-    number_list: List[float] = Field(..., description="List of numbers")
-    integer_list: Optional[List[int]] = Field(default=None, description="List of integers")
+    text_list: list[str] | None = Field(default=None, description="List of text items")
+    number_list: list[float] = Field(..., description="List of numbers")
+    integer_list: list[int] | None = Field(default=None, description="List of integers")
 '''
 
         assert result == expected_code
@@ -754,15 +754,15 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class DictTypesModel(StructuredContent):
     """Generated DictTypesModel class"""
 
-    string_to_string: Optional[Dict[str, str]] = Field(default=None, description="String to string mapping")
-    string_to_number: Dict[str, float] = Field(..., description="String to number mapping")
-    string_to_integer: Optional[Dict[str, int]] = Field(default=None, description="String to integer mapping")
+    string_to_string: dict[str, str] | None = Field(default=None, description="String to string mapping")
+    string_to_number: dict[str, float] = Field(..., description="String to number mapping")
+    string_to_integer: dict[str, int] | None = Field(default=None, description="String to integer mapping")
 '''
 
         assert result == expected_code
@@ -820,7 +820,7 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class ComplexItem(StructuredContent):
@@ -828,10 +828,10 @@ class ComplexItem(StructuredContent):
 
     id: int = Field(..., description="Unique identifier")
     name: str = Field(..., description="Display name")
-    tags: Optional[List[str]] = Field(default=None, description="Associated tags")
-    metadata: Optional[Dict[str, str]] = Field(default=None, description="Additional metadata")
-    active: Optional[bool] = Field(default=True, description="Whether item is active")
-    priority: Optional[Literal['low', 'medium', 'high', 'urgent']] = Field(default="medium", description="Priority level")
+    tags: list[str] | None = Field(default=None, description="Associated tags")
+    metadata: dict[str, str] | None = Field(default=None, description="Additional metadata")
+    active: bool | None = Field(default=True, description="Whether item is active")
+    priority: Literal["low", "medium", "high", "urgent"] | None = Field(default="medium", description="Priority level")
 '''
 
         assert result == expected_code
@@ -873,7 +873,7 @@ from datetime import date
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class PersonInfo(StructuredContent):
@@ -918,7 +918,7 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class ValidTestModel(StructuredContent):
@@ -996,13 +996,13 @@ from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class Question(TextContent):
     """Generated Question class"""
 
-    author: Optional[str] = Field(default=None, description="The author of the question")
+    author: str | None = Field(default=None, description="The author of the question")
 '''
 
         assert generated_code == expected_code
@@ -1058,14 +1058,14 @@ from enum import Enum
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class TableScreenshot(ImageContent):
     """Generated TableScreenshot class"""
 
-    table_name: Optional[str] = Field(default=None, description="Name of the table in the screenshot")
-    row_count: Optional[int] = Field(default=None, description="Number of rows in the table")
+    table_name: str | None = Field(default=None, description="Name of the table in the screenshot")
+    row_count: int | None = Field(default=None, description="Number of rows in the table")
 '''
 
         assert generated_code == expected_code
@@ -1112,13 +1112,13 @@ from enum import Enum
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class Temperature(NumberContent):
     """Generated Temperature class"""
 
-    unit: Optional[str] = Field(default=None, description="Unit of measurement")
+    unit: str | None = Field(default=None, description="Unit of measurement")
 '''
 
         assert generated_code == expected_code
@@ -1165,13 +1165,13 @@ from enum import Enum
 from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class ConfigData(JSONContent):
     """Generated ConfigData class"""
 
-    schema_version: Optional[str] = Field(default=None, description="Version of the schema")
+    schema_version: str | None = Field(default=None, description="Version of the schema")
 '''
 
         assert generated_code == expected_code
@@ -1212,7 +1212,7 @@ from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class EnhancedText(TextContent):
@@ -1268,13 +1268,13 @@ from enum import Enum
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class Invoice(DocumentContent):
     """Generated Invoice class"""
 
-    document_type: Optional[str] = Field(default=None, description="Type of document")
+    document_type: str | None = Field(default=None, description="Type of document")
 '''
 
         assert generated_code == expected_code

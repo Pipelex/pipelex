@@ -464,6 +464,16 @@ ignore = [
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+[tool.ruff.lint.flake8-type-checking]
+# Pydantic resolves annotations at runtime to build validators, so an annotation-only import that
+# TC00x moves into an `if TYPE_CHECKING:` block breaks the model. These bases mark the classes whose
+# annotations are runtime-evaluated. This is also the setting consumers of `pipelex codegen types`
+# need for the generated artifacts — see docs/under-the-hood/codegen-projections.md.
+runtime-evaluated-base-classes = [
+  "pydantic.BaseModel",
+  "pipelex.core.stuffs.structured_content.StructuredContent",
+]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = [
   "INP001", # Allow test files to not have __init__.py in their directories (avoids namespace collisions)

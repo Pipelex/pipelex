@@ -157,6 +157,18 @@ def materialized_image_crate() -> LibraryCrate:
 
 
 @pytest.fixture
+def natives_only_crate() -> LibraryCrate:
+    """A crate holding nothing but natives — what an ordinary method that declares no concepts of its
+    own normalizes to (a `Text -> Text` pipe materializes `native.Text` and nothing else).
+
+    `python-structures` skips natives, so this is the *reachable* route to an empty projection: the
+    library is non-empty, yet that emitter has no class to write.
+    """
+    authored = LibraryCrate(concepts={"native.Text": ConceptBlueprint(description="A text")})
+    return normalize_crate(authored, mthds_version=CRATE_TEST_VERSION)
+
+
+@pytest.fixture
 def refines_crate() -> LibraryCrate:
     """A concept refining a structureless native keeps its refines link, so the emitter renders inheritance."""
     return LibraryCrate(
@@ -166,6 +178,140 @@ def refines_crate() -> LibraryCrate:
             "media.Thumbnail": ConceptBlueprint(description="A small image", refines="native.Image"),
         },
     )
+
+
+@pytest.fixture
+def every_type_kind_crate() -> LibraryCrate:
+    """A normalized crate whose fields cover **every** `ResolvedTypeKind`, plus an optional field and a
+    structureless (opaque) concept.
+
+    This is the single source of type-kind coverage for the lint-clean regression test:
+    `test_emitted_artifacts_are_lint_clean` asserts the resolved trees reach every enum member, so a
+    newly added `ResolvedTypeKind` that nobody wires in here fails loudly instead of going unlinted.
+    """
+    authored = LibraryCrate(
+        concepts={
+            "lintcheck.Detail": ConceptBlueprint(
+                description="A nested detail",
+                structure={"note": ConceptStructureBlueprint(description="A note", type=ConceptStructureBlueprintFieldType.TEXT, required=True)},
+            ),
+            # A structureless concept: emits the two-paragraph docstring (description + imprecision caveat).
+            "lintcheck.Opaque": ConceptBlueprint(description="A structureless concept"),
+            # Descriptions carrying characters the docstring renderer must not backslash-escape: a
+            # double quote and a backslash both put a `\` in the docstring under naive escaping, which
+            # ruff's D301 then auto-rewrites to an `r` prefix — changing the bytes and breaking the stamp.
+            "lintcheck.Quoted": ConceptBlueprint(
+                description='The "primary" thing',
+                structure={
+                    "pattern": ConceptStructureBlueprint(
+                        description=r"Matches the \d regex", type=ConceptStructureBlueprintFieldType.TEXT, required=True
+                    )
+                },
+            ),
+            "lintcheck.Record": ConceptBlueprint(
+                description="A record touching every resolved type kind",
+                structure={
+                    # scalars
+                    "title": ConceptStructureBlueprint(description="Title", type=ConceptStructureBlueprintFieldType.TEXT, required=True),
+                    "ratio": ConceptStructureBlueprint(description="Ratio", type=ConceptStructureBlueprintFieldType.NUMBER, required=True),
+                    "count": ConceptStructureBlueprint(description="Count", type=ConceptStructureBlueprintFieldType.INTEGER, required=True),
+                    "is_active": ConceptStructureBlueprint(description="Active", type=ConceptStructureBlueprintFieldType.BOOLEAN, required=True),
+                    "published_on": ConceptStructureBlueprint(description="Date", type=ConceptStructureBlueprintFieldType.DATE, required=True),
+                    "recorded_at": ConceptStructureBlueprint(
+                        description="Timestamp", type=ConceptStructureBlueprintFieldType.DATETIME, required=True
+                    ),
+                    "starts_at": ConceptStructureBlueprint(description="Start time", type=ConceptStructureBlueprintFieldType.TIME, required=True),
+                    # literal — the double-quoting path
+                    "status": ConceptStructureBlueprint(description="Status", choices=["draft", "final"], required=True),
+                    # concept refs: one in-module, one native (exercises the native content-class import)
+                    "detail": ConceptStructureBlueprint(
+                        description="Detail", type=ConceptStructureBlueprintFieldType.CONCEPT, concept_ref="Detail", required=True
+                    ),
+                    "label": ConceptStructureBlueprint(
+                        description="Label", type=ConceptStructureBlueprintFieldType.CONCEPT, concept_ref="Text", required=True
+                    ),
+                    # containers
+                    "tags": ConceptStructureBlueprint(
+                        description="Tags", type=ConceptStructureBlueprintFieldType.LIST, item_type="text", required=True
+                    ),
+                    "counts": ConceptStructureBlueprint(
+                        description="Counts", type=ConceptStructureBlueprintFieldType.DICT, key_type="text", value_type="integer", required=True
+                    ),
+                    # ANY — only reachable nested, from genuine source imprecision. An untyped list also
+                    # emits the trailing `# imprecise:` comment, so that shape gets linted too.
+                    "items": ConceptStructureBlueprint(description="Untyped items", type=ConceptStructureBlueprintFieldType.LIST, required=True),
+                    # an optional field, so the `X | None` path is emitted too
+                    "note": ConceptStructureBlueprint(description="Optional note", type=ConceptStructureBlueprintFieldType.TEXT, required=False),
+                    # A description with no width bound. Emitted flat it exceeds any line-length, and
+                    # `ruff format` then wraps the `Field(...)` call — a byte rewrite that breaks the stamp.
+                    "narrative": ConceptStructureBlueprint(
+                        description=(
+                            "A thoroughly explained field whose description the method author wrote at length "
+                            "because the domain genuinely requires that much nuance to be unambiguous"
+                        ),
+                        type=ConceptStructureBlueprintFieldType.TEXT,
+                        required=True,
+                    ),
+                    # A choice list with no width bound, in both the required and optional spellings —
+                    # the optional one is the `Literal[...] | None` union, which ruff wraps in parentheses.
+                    "workflow_state": ConceptStructureBlueprint(
+                        description="Workflow state",
+                        choices=["awaiting_triage", "in_progress_with_owner", "blocked_on_dependency", "ready_for_review"],
+                        required=True,
+                    ),
+                    "prior_state": ConceptStructureBlueprint(
+                        description="Prior workflow state",
+                        choices=["awaiting_triage", "in_progress_with_owner", "blocked_on_dependency", "ready_for_review"],
+                        required=False,
+                    ),
+                },
+            ),
+            # A multi-line description, and one padded with edge whitespace. Rendered naively the first
+            # trips D207/D209 and the second D210 — all three auto-applied fixes that rewrite the bytes.
+            "lintcheck.Spanning": ConceptBlueprint(
+                description="A description that spans lines.\n\nAs a TOML multi-line string naturally does.",
+                structure={
+                    "padded": ConceptStructureBlueprint(
+                        description="  Padded with edge whitespace  ", type=ConceptStructureBlueprintFieldType.TEXT, required=True
+                    )
+                },
+            ),
+            # A description that cannot sit between `\"\"\"` at all, so the renderer has to fall back to
+            # `'''` — the only delimiter swap that keeps the docstring backslash-free and thus D301-clean.
+            "lintcheck.TripleQuoted": ConceptBlueprint(description='A description containing """ inside it'),
+        },
+        domains={"lintcheck": DomainBlueprint(code="lintcheck", description="Lint check domain")},
+    )
+    return normalize_crate(authored, mthds_version=CRATE_TEST_VERSION)
+
+
+@pytest.fixture
+def all_opaque_crate() -> LibraryCrate:
+    """Every concept structureless — the shape of an ordinary `Question -> Answer` method.
+
+    No field line is emitted, so a `Field` import seeded up front would be unused: an `F401` that
+    `ruff check --fix` deletes, rewriting the body and breaking the stamp.
+    """
+    authored = LibraryCrate(
+        concepts={
+            "qa.Question": ConceptBlueprint(description="A question asked by the user"),
+            "qa.Answer": ConceptBlueprint(description="An answer to the question"),
+        },
+        domains={"qa": DomainBlueprint(code="qa", description="Question answering")},
+    )
+    return normalize_crate(authored, mthds_version=CRATE_TEST_VERSION)
+
+
+@pytest.fixture
+def refines_native_only_crate() -> LibraryCrate:
+    """Every concept refines a native, so `python-structures` reaches its runtime root base for none of
+    them — a seeded `StructuredContent` import would be unused, and so would `Field`.
+    """
+    authored = LibraryCrate(
+        concepts={"digest.Summary": ConceptBlueprint(description="A summary", refines="Text")},
+        domains={"digest": DomainBlueprint(code="digest", description="Digesting")},
+    )
+    return normalize_crate(authored, mthds_version=CRATE_TEST_VERSION)
 
 
 def load_generated_module(content: str, *, tmp_path: Path, name: str) -> Any:

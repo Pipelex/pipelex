@@ -9,7 +9,7 @@ from pipelex import log
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams, check_mock_usage_requires_dry
 from pipelex.core.memory.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF_NAME
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, VariableMultiplicityResolution
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode  # noqa: TC001 — pydantic resolves the field annotation at runtime
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.exceptions import PipeStackOverflowError
 
 
