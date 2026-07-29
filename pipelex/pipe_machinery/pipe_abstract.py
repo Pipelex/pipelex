@@ -31,6 +31,7 @@ from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.system.job_metadata import JobMetadata, OtelContext
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.system.registries.class_registry_access import get_class_registry
 from pipelex.system.telemetry.otel_constants import (
     LangfuseSpanAttr,
     OTelConstants,
@@ -174,8 +175,14 @@ class PipeAbstract(ABC, BaseModel):
             source = library_crate.source_map.get(concept.concept_ref)
             if source:
                 concept_dict["source"] = source
+        # Reads the active class registry directly rather than asking a concept provider: this module
+        # sits inside `runtime_hub`'s import closure (runtime_hub -> orchestrator_registry -> pipe_job
+        # -> here), so importing either hub would close a cycle — which is precisely what
+        # `class_registry_access` sits below both hubs for. The schema is best-effort decoration on a
+        # graph-registry entry, so an unresolvable class yields `None` rather than failing the run.
+        structure_class = get_class_registry().get_class(name=concept.structure_class_name)
         try:
-            concept_dict["json_schema"] = concept.get_structure_class().model_json_schema()
+            concept_dict["json_schema"] = structure_class.model_json_schema() if structure_class is not None else None
         except (TypeError, ValueError):
             concept_dict["json_schema"] = None
         return concept_dict

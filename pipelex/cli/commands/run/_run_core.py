@@ -27,6 +27,7 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
+from pipelex.libraries.concept.concept_library import ConceptLibrary
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
@@ -341,9 +342,14 @@ async def _execute_run(
         # ConceptValueError (a ValueError) and CsvError would otherwise escape execute_run's generic
         # `except PipelexError` and read as "Failed to execute pipeline" (or as a raw traceback).
         try:
-            # get_structure_class() can raise ConceptValueError if the output concept has no registered
-            # structure class; keep it inside the guard so that, too, is framed as a save-csv failure.
-            csv_row_model = csv_main_stuff.concept.get_structure_class()
+            # An empty library, not the loaded method's: `runner.execute` tore the run library down on
+            # its way out, so by here there is no current library to ask. `ConceptLibrary.make_empty()`
+            # resolves against the process class registry, which still holds the generated structure
+            # classes — the same place this lookup has always landed — while keeping the one typed
+            # "name -> StuffContent subclass, or ConceptStructureClassNotFoundError" implementation.
+            # That error is a ConceptValueError, so an unresolvable class is framed as a save-csv
+            # failure by the guard below rather than escaping as a pipeline failure.
+            csv_row_model = ConceptLibrary.make_empty().get_structure_class(concept=csv_main_stuff.concept)
             # Validate the row flatness BEFORE touching the filesystem, so a non-flat output leaves no
             # directory behind (the suffix was already validated up front).
             flat_field_names(csv_row_model)

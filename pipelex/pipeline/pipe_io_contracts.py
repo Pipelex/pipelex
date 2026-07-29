@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field, PydanticUndefinedAnnotation, PydanticUser
 
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.concepts.exceptions import ConceptValueError
+from pipelex.interpreter_hub import get_concept_library
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipeline.exceptions import PipeIOContractError
 
@@ -93,6 +94,7 @@ def build_pipe_io_contracts(pipes: Sequence[PipeAbstract]) -> dict[str, PipeIOCo
     # occurrence. Deliberately NOT a module-level cache — bundle-defined structure classes
     # vary per loaded library, so a cross-call cache would serve stale schemas.
     schema_memo: dict[tuple[str, bool], dict[str, Any]] = {}
+    concept_provider = get_concept_library()
     io_contracts: dict[str, PipeIOContract] = {}
     for pipe in pipes:
         pipe_inputs: dict[str, PipeInputContract] = {}
@@ -104,7 +106,9 @@ def build_pipe_io_contracts(pipes: Sequence[PipeAbstract]) -> dict[str, PipeIOCo
                     # Indexing (not .get with a default) is deliberate: a render-shape drift
                     # must surface as the structured error below, never ship a silently
                     # empty schema on the wire.
-                    json_schema = stuff_spec.render_stuff_spec(output_format=ConceptRepresentationFormat.SCHEMA)["content"]
+                    json_schema = stuff_spec.render_stuff_spec(concept_provider=concept_provider, output_format=ConceptRepresentationFormat.SCHEMA)[
+                        "content"
+                    ]
                 except (ConceptValueError, KeyError, PydanticUserError, PydanticUndefinedAnnotation) as exc:
                     msg = (
                         f"Failed to render the JSON Schema for input '{var_name}' of pipe "

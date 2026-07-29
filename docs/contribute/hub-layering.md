@@ -122,7 +122,16 @@ The dividing line is worth stating as a rule of thumb: **if it names a `Pipe`, i
 
 ### Injected providers, not ambient lookups
 
-The data-model half used to reach for `get_concept_library()` / `get_native_concept()` / `get_required_concept()` — ambient lookups into a loaded method, which is exactly what made `core/` inseparable from the interpreter. It now takes what it needs as a parameter, through one read-side contract: `ConceptProviderAbstract` (`pipelex/core/concepts/concept_provider_abstract.py`) — resolve a ref, a code, or a native code into a `Concept`, and answer compatibility questions.
+The data-model half used to reach for `get_concept_library()` / `get_native_concept()` / `get_required_concept()` — ambient lookups into a loaded method, which is exactly what made `core/` inseparable from the interpreter. It now takes what it needs as a parameter, through one read-side contract: `ConceptProviderAbstract` (`pipelex/core/concepts/concept_provider_abstract.py`) — resolve a ref, a code, or a native code into a `Concept`, answer compatibility questions about two of them, and resolve a concept's declared `structure_class_name` into the class itself.
+
+**Class resolution is part of that contract, and it took a second pass to get there.** The hub split moved *concept* resolution onto the provider but left *class* resolution ambient one level down, inside `Concept` itself: the model reached `get_class_registry()` to answer "what is my structure class?" and to run the structural half of a compatibility check. A `Concept` is a subclass of the MTHDS-protocol wire model `ConceptAbstract` — pure serializable data — so that coupled a standard-owned wire model to a Pipelex process-global, and made the same two `Concept` values answer differently depending on which async context asked (the registry resolves through per-library scoping). `ConceptProviderAbstract.get_structure_class` closes it: a `Concept` carries the class *name* as a plain protocol string, and turning a name into a type is the provider's business, never the model's.
+
+Two shapes fall out of that, and they are the ones to copy:
+
+- **Compatibility is two tiers, composed by the thing that owns resolution.** `Concept.are_compatible_by_declaration` is pure over the model's fields (plus an injected `concept_resolver`): dynamic short-circuits, ref equality, declared-class-name equality, `refines` chains. `ConceptLibrary.is_compatible` asks that first and only resolves classes when it is inconclusive. A name that should have resolved and didn't now raises `ConceptStructureClassNotFoundError` instead of answering `False` — "unknown" and "incompatible" are different answers, and conflating them was a latent wrong-verdict bug.
+- **Rendering takes the resolved class, not the name.** `Concept.render_concept_representation` receives a `structure_class`; `StuffSpec.render_stuff_spec` takes the `concept_provider`, resolves once, and passes the class down. Interpreter-layer callers (`output_renderer`, `input_renderer`, `pipe_io_contracts`, `builder/runner_code`) supply `get_concept_library()`.
+
+The **write side** stays ambient on purpose: `concept_factory` and `structure_generation/generator.py` generate structure classes and register them at library-load time, which is genuinely the registry's business. That those two are the only modules under `pipelex/core/concepts/` touching the registry is pinned as a golden set by `tests/unit/pipelex/core/concepts/test_concept_registry_boundary.py` — nothing else can see it, since both the accessor and its users are runtime-layer.
 
 It is **read-side only**. Managing a library — adding, removing, listing, setup/teardown — stays in the interpreter layer: `ConceptLibraryAbstract` *extends* it, keeping its management half in `libraries/`. Splitting read from write is what lets a core module state its dependency honestly ("I need something that can resolve concepts") without inheriting a library lifecycle it has no business touching.
 
@@ -130,7 +139,9 @@ It is **read-side only**. Managing a library — adding, removing, listing, setu
 
 The injection point is the interpreter layer. `pipe_factory`, `input_renderer` and `output_renderer` — already interpreter-bound, so nothing is lost — resolve the concept library themselves and pass it down; `pipeline/execution_seams.py` does the same for `WorkingMemoryFactory`. That is the one-way arrow the whole design rests on, applied inside `core/`: **the half that knows about a loaded method resolves the collaborator and hands it downward.**
 
-When you add a core data-model function that needs a concept, add a `concept_provider` parameter. Do not add a hub import — the guard will reject it, and the closure test will tell you which entry point you broke.
+When you add a core data-model function that needs a concept — or a concept's structure class — add a `concept_provider` parameter. Do not add a hub import, and do not reach for `get_class_registry()`: the guard will reject the first, and the second is the coupling this section exists to describe.
+
+One module outside `core/` sits inside `runtime_hub`'s own import closure and so cannot import either hub at module level: `pipe_machinery/pipe_abstract.py` (reached via `plugins.orchestrator_registry` → `pipe_run.pipe_job`) reads `class_registry_access` directly to decorate graph-registry entries with a JSON Schema. A deferred import is not the workaround it looks like — pyright's `reportImportCycles` reports the cycle at `interpreter_hub.py`, where no line-level ignore can reach it. The below-both-hubs accessor is what that case is for; its docstring names every live one.
 
 ## Where the built-in plugins split
 

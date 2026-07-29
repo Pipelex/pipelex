@@ -1,12 +1,24 @@
 """Process-global access to the active class registry, with an optional library-scoping resolver.
 
 This module deliberately sits *below* both hubs and imports nothing from ``pipelex``, so any layer
-can import it directly. That is not stylistic: ``pipelex.core.concepts.concept`` needs the active
-class registry and is itself inside ``runtime_hub``'s import closure
-(``runtime_hub`` -> ``cogt.llm.llm_worker_abstract`` -> ``system.telemetry.otel_factory`` ->
-``core.pipes.pipe_output`` -> ``core.stuffs.stuff`` -> ``core.concepts.concept``), so it cannot
-import ``runtime_hub`` at module level without forming a cycle. Hosting the accessor here is what
-lets those modules use a plain top-level import instead of a lazy ``importlib`` shim.
+can import it directly. That is not stylistic: several modules that need the active class registry
+are themselves inside ``runtime_hub``'s import closure, so they cannot import ``runtime_hub`` at
+module level without forming a cycle. Hosting the accessor here is what lets them use a plain
+top-level import instead of a lazy ``importlib`` shim. The two live cases:
+
+- ``core.concepts.concept_factory`` and ``core.concepts.structure_generation.generator``, the
+  **materialization write side** — they generate structure classes and register them at
+  library-load time (reached via ``runtime_hub`` -> ``cogt.llm.llm_worker_abstract`` ->
+  ``system.telemetry.otel_factory`` -> ``core.pipes.pipe_output`` -> ``core.stuffs.stuff`` ->
+  ``core.concepts.concept``).
+- ``pipe_machinery.pipe_abstract``, which decorates graph-registry entries with a concept's JSON
+  Schema (reached via ``runtime_hub`` -> ``plugins.orchestrator_registry`` -> ``pipe_run.pipe_job``).
+
+The *read* side does not appear here and must not: resolving a concept's declared
+``structure_class_name`` into a class goes through a ``ConceptProviderAbstract`` implementation
+(``ConceptLibrary.get_structure_class``), so the answer is scoped to the library you asked rather
+than to whatever the ambient registry happens to hold. ``Concept`` itself reads no registry at all —
+pinned by ``tests/unit/pipelex/core/concepts/test_concept_registry_boundary.py``.
 
 ``pipelex.runtime_hub.get_class_registry`` is the public accessor and delegates here; prefer it
 everywhere except inside this module's own import closure.

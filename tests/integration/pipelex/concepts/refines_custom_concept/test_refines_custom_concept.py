@@ -3,7 +3,7 @@
 from collections.abc import Callable
 from pathlib import Path
 
-from pipelex.interpreter_hub import get_library_manager
+from pipelex.interpreter_hub import get_concept_library, get_library_manager
 
 
 class TestRefinesCustomConcept:
@@ -44,8 +44,8 @@ class TestRefinesCustomConcept:
         vip_customer_concept = library.concept_library.get_required_concept("refines_custom_test.VIPCustomer")
 
         # Get the structure classes
-        customer_class = customer_concept.get_structure_class()
-        vip_customer_class = vip_customer_concept.get_structure_class()
+        customer_class = get_concept_library().get_structure_class(concept=customer_concept)
+        vip_customer_class = get_concept_library().get_structure_class(concept=vip_customer_concept)
 
         # Verify VIPCustomer is a subclass of Customer's structure class
         assert issubclass(vip_customer_class, customer_class)
@@ -70,8 +70,8 @@ class TestRefinesCustomConcept:
         vip_customer_concept = library.concept_library.get_required_concept("refines_custom_test.VIPCustomer")
 
         # Get the structure classes
-        customer_class = customer_concept.get_structure_class()
-        vip_customer_class = vip_customer_concept.get_structure_class()
+        customer_class = get_concept_library().get_structure_class(concept=customer_concept)
+        vip_customer_class = get_concept_library().get_structure_class(concept=vip_customer_concept)
 
         # Create a VIPCustomer instance with Customer fields
         vip_customer_instance = vip_customer_class(

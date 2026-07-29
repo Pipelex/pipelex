@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.interpreter_hub import get_library_manager
+from pipelex.interpreter_hub import get_concept_library, get_library_manager
 
 
 class TestConceptToConceptReferences:
@@ -51,7 +51,7 @@ total = { type = "number", description = "Invoice total" }
             assert invoice_concept is not None
 
             # Verify the Invoice structure class has a customer field typed to Customer
-            invoice_class = invoice_concept.get_structure_class()
+            invoice_class = get_concept_library().get_structure_class(concept=invoice_concept)
             assert invoice_class is not None
 
             # The customer field should reference the Customer class
@@ -97,7 +97,7 @@ total = { type = "number", description = "Invoice total" }
             assert invoice_concept is not None
 
             # Verify the Invoice structure class has an items field that's a list
-            invoice_class = invoice_concept.get_structure_class()
+            invoice_class = get_concept_library().get_structure_class(concept=invoice_concept)
             items_field = invoice_class.model_fields.get("items")
             assert items_field is not None
 

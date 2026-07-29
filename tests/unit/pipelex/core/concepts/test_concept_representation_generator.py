@@ -517,12 +517,6 @@ class TestSchemaRepresentationWithMultiple:
 
     def test_schema_single_item(self) -> None:
         """Schema for single item returns the JSON schema directly."""
-        from kajson.kajson_manager import KajsonManager  # noqa: PLC0415
-
-        # Register the test class
-        KajsonManager.get_class_registry().register_class(SimpleContent)
-
-        # Create a concept with the registered class
         concept = Concept(
             code="SimpleContent",
             domain_code="test",
@@ -531,6 +525,7 @@ class TestSchemaRepresentationWithMultiple:
         )
 
         result, imports = concept.render_concept_representation(
+            structure_class=SimpleContent,
             output_format=ConceptRepresentationFormat.SCHEMA,
             is_multiple=False,
         )
@@ -544,12 +539,6 @@ class TestSchemaRepresentationWithMultiple:
 
     def test_schema_multiple_items_wraps_in_array(self) -> None:
         """Schema for multiple items wraps the schema in an array type."""
-        from kajson.kajson_manager import KajsonManager  # noqa: PLC0415
-
-        # Register the test class
-        KajsonManager.get_class_registry().register_class(SimpleContent)
-
-        # Create a concept with the registered class
         concept = Concept(
             code="SimpleContent",
             domain_code="test",
@@ -558,6 +547,7 @@ class TestSchemaRepresentationWithMultiple:
         )
 
         result, imports = concept.render_concept_representation(
+            structure_class=SimpleContent,
             output_format=ConceptRepresentationFormat.SCHEMA,
             is_multiple=True,
         )
@@ -575,13 +565,6 @@ class TestSchemaRepresentationWithMultiple:
 
     def test_schema_nested_content_multiple(self) -> None:
         """Schema for nested content with multiple items wraps correctly."""
-        from kajson.kajson_manager import KajsonManager  # noqa: PLC0415
-
-        # Register the test classes
-        KajsonManager.get_class_registry().register_class(NestedChild)
-        KajsonManager.get_class_registry().register_class(ContentWithNestedClass)
-
-        # Create a concept with the registered class
         concept = Concept(
             code="ContentWithNestedClass",
             domain_code="test",
@@ -590,6 +573,7 @@ class TestSchemaRepresentationWithMultiple:
         )
 
         result, _ = concept.render_concept_representation(
+            structure_class=ContentWithNestedClass,
             output_format=ConceptRepresentationFormat.SCHEMA,
             is_multiple=True,
         )

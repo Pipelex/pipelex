@@ -27,7 +27,6 @@ from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
-from pipelex.core.concepts.exceptions import ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.exceptions import (
     ExplicitConceptIncompatibleError,
@@ -176,7 +175,7 @@ class InputShaper:
             raise NullInputError.make(
                 variable_name=variable_name,
                 declared_concept_ref=declared_concept.concept_ref,
-                expected_shape=cls._render_expected_shape(stuff_spec=stuff_spec),
+                expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
             )
 
         # (D5) Bare value: dispatch on the declared concept's nature.
@@ -238,14 +237,9 @@ class InputShaper:
 
         # A user (non-native) concept whose structure is StructuredContent dispatches its dict
         # top-down. Everything else — the out-of-matrix natives (Html/JSON/Page/TextAndImages/
-        # SearchResult/Composite/Anything) and any concept whose class is unregistered — falls back
-        # to bottom-up building.
+        # SearchResult/Composite/Anything) — falls back to bottom-up building.
         if not Concept.is_native_concept(concept=concept):
-            try:
-                structure_class = concept.get_structure_class()
-            except ConceptValueError:
-                return InputKind.DYNAMIC
-            if issubclass(structure_class, StructuredContent):
+            if issubclass(concept_provider.get_structure_class(concept=concept), StructuredContent):
                 return InputKind.STRUCTURED
         return InputKind.DYNAMIC
 
@@ -281,7 +275,9 @@ class InputShaper:
         # string or the exact {"url": <tabular path>} wrapper — read row-wise into the declared
         # concept, tried BEFORE element-wise shaping so the bare string is not misread as one item.
         if is_list and input_kind.is_structured:
-            csv_list_content = cls._try_shape_csv(value, stuff_spec=stuff_spec, variable_name=variable_name, inputs_base_dir=inputs_base_dir)
+            csv_list_content = cls._try_shape_csv(
+                value, concept_provider=concept_provider, stuff_spec=stuff_spec, variable_name=variable_name, inputs_base_dir=inputs_base_dir
+            )
             if csv_list_content is not None:
                 if fixed_count is not None and len(csv_list_content.items) != fixed_count:
                     raise MultiplicityCountMismatchError.make(
@@ -289,7 +285,7 @@ class InputShaper:
                         declared_concept_ref=stuff_spec.concept.concept_ref,
                         expected_count=fixed_count,
                         provided_count=len(csv_list_content.items),
-                        expected_shape=cls._render_expected_shape(stuff_spec=stuff_spec),
+                        expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
                     )
                 return csv_list_content
 
@@ -311,7 +307,7 @@ class InputShaper:
                 variable_name=variable_name,
                 declared_concept_ref=stuff_spec.concept.concept_ref,
                 provided_description=cls._describe_value(value),
-                expected_shape=cls._render_expected_shape(stuff_spec=stuff_spec),
+                expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
             )
         return cls._build_item_content(
             value,
@@ -328,6 +324,7 @@ class InputShaper:
         cls,
         value: Any,
         *,
+        concept_provider: ConceptProviderAbstract,
         stuff_spec: StuffSpec,
         variable_name: str,
         inputs_base_dir: Path | None,
@@ -352,7 +349,7 @@ class InputShaper:
         else:
             return None
         url = cls._resolve_local_path(url, inputs_base_dir=inputs_base_dir)
-        return StuffFactory.try_make_csv_list_content(stuff_spec.concept, content={"url": url}, name=variable_name)
+        return StuffFactory.try_make_csv_list_content(stuff_spec.concept, concept_provider=concept_provider, content={"url": url}, name=variable_name)
 
     @classmethod
     def _resolve_local_path(cls, url: str, *, inputs_base_dir: Path | None) -> str:
@@ -386,7 +383,7 @@ class InputShaper:
                 declared_concept_ref=stuff_spec.concept.concept_ref,
                 expected_count=fixed_count,
                 provided_count=len(item_values),
-                expected_shape=cls._render_expected_shape(stuff_spec=stuff_spec),
+                expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
             )
         items = [
             cls._build_item_content(
@@ -433,41 +430,61 @@ class InputShaper:
                     variable_name=variable_name,
                     declared_concept_ref=concept.concept_ref,
                     provided_concept_ref=built.concept.concept_ref,
-                    expected_shape=cls._render_expected_shape(stuff_spec=stuff_spec),
+                    expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
                 )
             return built.content
         match input_kind:
             case InputKind.TEXT:
                 if not isinstance(value, str):
-                    raise cls._wrong_kind(stuff_spec=stuff_spec, variable_name=variable_name, expected_kind="a string (text)", value=value)
-                return cls._make_content(concept, value={"text": value}, stuff_spec=stuff_spec, variable_name=variable_name)
+                    raise cls._wrong_kind(
+                        concept_provider=concept_provider,
+                        stuff_spec=stuff_spec,
+                        variable_name=variable_name,
+                        expected_kind="a string (text)",
+                        value=value,
+                    )
+                return cls._make_content(
+                    concept, concept_provider=concept_provider, value={"text": value}, stuff_spec=stuff_spec, variable_name=variable_name
+                )
             case InputKind.NUMBER:
                 # bool is a subclass of int — exclude it explicitly so a boolean never becomes a number.
                 if isinstance(value, bool) or not isinstance(value, (int, float)):
-                    raise cls._wrong_kind(stuff_spec=stuff_spec, variable_name=variable_name, expected_kind="a number", value=value)
-                return cls._make_content(concept, value={"number": value}, stuff_spec=stuff_spec, variable_name=variable_name)
+                    raise cls._wrong_kind(
+                        concept_provider=concept_provider, stuff_spec=stuff_spec, variable_name=variable_name, expected_kind="a number", value=value
+                    )
+                return cls._make_content(
+                    concept, concept_provider=concept_provider, value={"number": value}, stuff_spec=stuff_spec, variable_name=variable_name
+                )
             case InputKind.YES_NO:
                 if not isinstance(value, bool):
-                    raise cls._wrong_kind(stuff_spec=stuff_spec, variable_name=variable_name, expected_kind="a boolean (true/false)", value=value)
-                return cls._make_content(concept, value=value, stuff_spec=stuff_spec, variable_name=variable_name)
+                    raise cls._wrong_kind(
+                        concept_provider=concept_provider,
+                        stuff_spec=stuff_spec,
+                        variable_name=variable_name,
+                        expected_kind="a boolean (true/false)",
+                        value=value,
+                    )
+                return cls._make_content(concept, concept_provider=concept_provider, value=value, stuff_spec=stuff_spec, variable_name=variable_name)
             case InputKind.DATE:
                 if not isinstance(value, (datetime.date, str)):
                     raise cls._wrong_kind(
+                        concept_provider=concept_provider,
                         stuff_spec=stuff_spec,
                         variable_name=variable_name,
                         expected_kind="an ISO date/datetime string or a date object",
                         value=value,
                     )
-                return cls._make_content(concept, value=value, stuff_spec=stuff_spec, variable_name=variable_name)
+                return cls._make_content(concept, concept_provider=concept_provider, value=value, stuff_spec=stuff_spec, variable_name=variable_name)
             case InputKind.TIME:
                 if not isinstance(value, (datetime.time, str)):
                     raise cls._wrong_kind(
+                        concept_provider=concept_provider,
                         stuff_spec=stuff_spec,
                         variable_name=variable_name,
                         expected_kind="an ISO time-of-day string or a time object",
                         value=value,
                     )
-                return cls._make_content(concept, value=value, stuff_spec=stuff_spec, variable_name=variable_name)
+                return cls._make_content(concept, concept_provider=concept_provider, value=value, stuff_spec=stuff_spec, variable_name=variable_name)
             case InputKind.IMAGE | InputKind.DOCUMENT:
                 canonical: dict[str, Any]
                 if isinstance(value, str):
@@ -478,18 +495,31 @@ class InputShaper:
                     canonical = cast("dict[str, Any]", value)
                 else:
                     raise cls._wrong_kind(
+                        concept_provider=concept_provider,
                         stuff_spec=stuff_spec,
                         variable_name=variable_name,
                         expected_kind='a URL/path string or a {"url": ...} object',
                         value=value,
                     )
-                return cls._make_content(concept, value=canonical, stuff_spec=stuff_spec, variable_name=variable_name)
+                return cls._make_content(
+                    concept, concept_provider=concept_provider, value=canonical, stuff_spec=stuff_spec, variable_name=variable_name
+                )
             case InputKind.STRUCTURED:
                 if not isinstance(value, dict):
                     raise cls._wrong_kind(
-                        stuff_spec=stuff_spec, variable_name=variable_name, expected_kind="an object (structured value)", value=value
+                        concept_provider=concept_provider,
+                        stuff_spec=stuff_spec,
+                        variable_name=variable_name,
+                        expected_kind="an object (structured value)",
+                        value=value,
                     )
-                return cls._make_content(concept, value=cast("dict[str, Any]", value), stuff_spec=stuff_spec, variable_name=variable_name)
+                return cls._make_content(
+                    concept,
+                    concept_provider=concept_provider,
+                    value=cast("dict[str, Any]", value),
+                    stuff_spec=stuff_spec,
+                    variable_name=variable_name,
+                )
             case InputKind.DYNAMIC:
                 # Unreachable: DYNAMIC short-circuits in `_shape_one` before multiplicity peeling.
                 # Kept so the match over InputKind stays exhaustive.
@@ -501,6 +531,7 @@ class InputShaper:
         cls,
         concept: Concept,
         *,
+        concept_provider: ConceptProviderAbstract,
         value: dict[str, Any] | str | bool | datetime.date | datetime.time,
         stuff_spec: StuffSpec,
         variable_name: str,
@@ -513,7 +544,7 @@ class InputShaper:
                 variable_name=variable_name,
                 declared_concept_ref=concept.concept_ref,
                 reason=str(exc),
-                expected_shape=cls._render_expected_shape(stuff_spec=stuff_spec),
+                expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
             ) from exc
 
     @classmethod
@@ -545,16 +576,18 @@ class InputShaper:
                 variable_name=variable_name,
                 declared_concept_ref=declared_concept.concept_ref,
                 provided_concept_ref=stuff.concept.concept_ref,
-                expected_shape=cls._render_expected_shape(stuff_spec=stuff_spec),
+                expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
             )
         if NativeConceptCode.is_dynamic_concept(concept_code=declared_concept.code):
             # Match the bare-value Dynamic path: the signature cannot guide list-vs-single shape here.
             return stuff
-        cls._reconcile_explicit_multiplicity(stuff, stuff_spec=stuff_spec, variable_name=variable_name)
+        cls._reconcile_explicit_multiplicity(stuff, concept_provider=concept_provider, stuff_spec=stuff_spec, variable_name=variable_name)
         return stuff
 
     @classmethod
-    def _reconcile_explicit_multiplicity(cls, stuff: Stuff, *, stuff_spec: StuffSpec, variable_name: str) -> None:
+    def _reconcile_explicit_multiplicity(
+        cls, stuff: Stuff, *, concept_provider: ConceptProviderAbstract, stuff_spec: StuffSpec, variable_name: str
+    ) -> None:
         """Enforce the unambiguous D2 shape rules on an explicit form (D6 governs only its concept).
 
         An explicit form whose built content is a ``ListContent`` must not fill a singular slot, and must
@@ -575,7 +608,7 @@ class InputShaper:
                 variable_name=variable_name,
                 declared_concept_ref=stuff_spec.concept.concept_ref,
                 provided_description=f"a list of {len(list_content.items)} item(s)",
-                expected_shape=cls._render_expected_shape(stuff_spec=stuff_spec),
+                expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
             )
         if fixed_count is not None and len(list_content.items) != fixed_count:
             raise MultiplicityCountMismatchError.make(
@@ -583,7 +616,7 @@ class InputShaper:
                 declared_concept_ref=stuff_spec.concept.concept_ref,
                 expected_count=fixed_count,
                 provided_count=len(list_content.items),
-                expected_shape=cls._render_expected_shape(stuff_spec=stuff_spec),
+                expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
             )
 
     @classmethod
@@ -600,19 +633,22 @@ class InputShaper:
         return isinstance(value, dict) and set(cast("dict[Any, Any]", value).keys()) == {"concept", "content"}
 
     @classmethod
-    def _wrong_kind(cls, *, stuff_spec: StuffSpec, variable_name: str, expected_kind: str, value: Any) -> WrongScalarKindError:
+    def _wrong_kind(
+        cls, *, concept_provider: ConceptProviderAbstract, stuff_spec: StuffSpec, variable_name: str, expected_kind: str, value: Any
+    ) -> WrongScalarKindError:
         return WrongScalarKindError.make(
             variable_name=variable_name,
             declared_concept_ref=stuff_spec.concept.concept_ref,
             expected_kind=expected_kind,
             provided_description=cls._describe_value(value),
-            expected_shape=cls._render_expected_shape(stuff_spec=stuff_spec),
+            expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
         )
 
     @classmethod
-    def _render_expected_shape(cls, *, stuff_spec: StuffSpec) -> str:
+    def _render_expected_shape(cls, *, concept_provider: ConceptProviderAbstract, stuff_spec: StuffSpec) -> str:
         """Render the expected input shape from the signature, reused verbatim in D4 error hints."""
-        return json.dumps(stuff_spec.render_stuff_spec(output_format=ConceptRepresentationFormat.JSON), ensure_ascii=False)
+        rendered = stuff_spec.render_stuff_spec(concept_provider=concept_provider, output_format=ConceptRepresentationFormat.JSON)
+        return json.dumps(rendered, ensure_ascii=False)
 
     @classmethod
     def _describe_value(cls, value: Any) -> str:

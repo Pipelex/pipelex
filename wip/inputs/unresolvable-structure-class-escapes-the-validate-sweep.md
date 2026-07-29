@@ -29,6 +29,23 @@ This is not a hypothesis about the codebase's opinion — `pipe_controllers/para
 
 The right shape, if it ever needs doing, is **not** eight scattered `except` blocks. It is one decision at the sweep boundary: `bundle_validator` catching `ConceptValueError` alongside `PipeNotFoundError` and recording the pipe as failed — one place, matching the granularity contract the sweep already implements for unresolved dependencies.
 
-## Related, for Phase 2
+## Resolved in Phase 2: the `input_shaper` fallback arm
 
-`input_shaper.py:239-241` carries a comment listing "any concept whose class is unregistered" among the cases that fall back to bottom-up building, guarded by an `except ConceptValueError` around `concept.get_structure_class()`. Given the factory guard above, that arm looks unreachable and the comment overstates it. Phase 2 migrates this exact call site to the provider — re-read the comment against reality then rather than editing it in isolation now.
+`input_shaper.resolve_input_kind` carried an `except ConceptValueError: return InputKind.DYNAMIC` around `concept.get_structure_class()`, and a comment listing "any concept whose class is unregistered" among the cases that fall back to bottom-up building. Given the factory guard above, that arm was unreachable and the comment overstated it. Phase 2 migrated the call site to `concept_provider.get_structure_class(...)` and **dropped the guard**: keeping it would have converted the loud raise straight back into the silent fallback fix (b) exists to remove, for a state the factory refuses to produce. The comment now names only the cases that actually reach it.
+
+## Also declined in Phase 2: guarding the two run-path lookups
+
+The branch's own inventory flagged `pipe_parallel.py` (the combine step) and `pipe_search.py` (the structured-output step) as pre-existing bugs — they call `get_structure_class()` unguarded on run paths where their *validation* siblings convert to `PipeValidationError`. Phase 2 migrated all three onto the library but **did not add a third guard**, for two reasons:
+
+- Same reachability argument as above. A concept sitting in a loaded library always has a resolvable structure class, and both sites run mid-execution with that library loaded.
+- The complaint has partly aged out. It was written against `ConceptValueError("Concept class 'X' not found")`, which named neither the concept nor the pipe. Phase 1 replaced that with `ConceptStructureClassNotFoundError`, whose message carries the concept ref *and* the declared class name — so a raw escape is already self-describing. What a `PipeRunError` wrapper would add is `pipe_code` and `run_mode`.
+
+The asymmetry with the guarded validation siblings is deliberate and already explained in place: the `/validate` sweep needs per-pipe granularity or one bad pipe aborts the whole bundle, and a run has no sweep. If the conversion is ever wanted, it is a few lines at each site — but it should be motivated by a reachable failure, not by symmetry.
+
+## Discovered in Phase 2: `--save-csv` runs outside the library window
+
+Migrating `_run_core.py`'s `--save-csv` step to `get_concept_library()` broke `tests/e2e/pipelex/cli/test_csv_run.py` with `RuntimeError: No current library set` — `PipelexMTHDSProtocol.execute` tears the run library down on its way out (`runner.py:298-310`), so **everything** after it in `_execute_run` (the CSV save, the pretty print, the working-memory dump) runs with no current library.
+
+The old code did not notice because `concept.get_structure_class()` read the process-global class registry, which is never unregistered at teardown — the exact wart `pipe_io_contracts.py`'s module docstring documents for its own rendering. Phase 2 resolves through `ConceptLibrary.make_empty()` instead, which reads the same process-global registry but keeps the single typed "name → `StuffContent` subclass, or `ConceptStructureClassNotFoundError`" implementation.
+
+That is correct for the CLI (direct execution puts generated classes in the process-global registry) but it is a lifecycle smell, not a design: a post-run step that needs the method's *declarations* is running after the method is gone. The real fix is to give `_execute_run` a result object that carries what the post-run steps need, or to hold the library window open across them — both larger than this branch. Tracked in the workspace-root `wip/library-lifecycle-hygiene.md` alongside the registry-teardown question.

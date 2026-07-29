@@ -3,8 +3,6 @@ from typing import Any, Callable
 from mthds.protocol.concept import ConceptAbstract
 from pydantic import field_validator
 
-from pipelex import log
-from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.concepts.concept_representation_generator import (
     ConceptRepresentationFormat,
     ConceptRepresentationGenerator,
@@ -16,9 +14,7 @@ from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
 from pipelex.core.qualified_ref import QualifiedRef
-from pipelex.core.stuffs.image_field_search import search_for_nested_image_fields
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.system.registries.class_registry_access import get_class_registry
 from pipelex.tools.misc.string_utils import pascal_case_to_sentence
 
 
@@ -154,37 +150,10 @@ class Concept(ConceptAbstract):
 
         return False
 
-    @classmethod
-    def is_valid_structure_class(cls, structure_class_name: str) -> bool:
-        if get_class_registry().has_subclass(name=structure_class_name, base_class=StuffContent):
-            return True
-        if get_class_registry().has_class(name=structure_class_name):
-            log.warning(f"Concept class '{structure_class_name}' is registered but it's not a subclass of StuffContent")
-        return False
-
-    def get_structure_class(self) -> type[StuffContent]:
-        """Get the structure class for this concept.
-
-        Returns:
-            The StuffContent subclass, or None if not found
-        """
-        structure_class = get_class_registry().get_class(name=self.structure_class_name)
-        if structure_class is None:
-            msg = f"Concept class '{self.structure_class_name}' not found"
-            raise ConceptValueError(msg)
-        return structure_class
-
-    def search_for_nested_image_fields_in_structure_class(self) -> list[str]:
-        """Recursively search for image fields in a structure class."""
-        structure_class = get_class_registry().get_required_subclass(name=self.structure_class_name, base_class=StuffContent)
-        if not issubclass(structure_class, StuffContent):
-            msg = f"Concept class '{self.structure_class_name}' is not a subclass of StuffContent"
-            raise PipelexUnexpectedError(msg)
-        return search_for_nested_image_fields(content_class=structure_class)
-
     def render_concept_representation(
         self,
         *,
+        structure_class: type[StuffContent],
         output_format: ConceptRepresentationFormat,
         is_multiple: bool = False,
         class_name_overrides: dict[str, str] | None = None,
@@ -192,6 +161,9 @@ class Concept(ConceptAbstract):
         """Render a representation for this concept.
 
         Args:
+            structure_class: This concept's already-resolved structure class. Passed in rather than
+                looked up: turning `structure_class_name` into a type is a registry read, and the
+                caller's provider is the only thing that knows *which* registry to read.
             output_format: The format to generate (JSON, PYTHON, or SCHEMA)
             is_multiple: If True, wrap content in a list/array schema
             class_name_overrides: Optional runtime-class-name -> rendered-name mapping applied to
@@ -205,11 +177,11 @@ class Concept(ConceptAbstract):
         """
         match output_format:
             case ConceptRepresentationFormat.SCHEMA:
-                return self._render_schema_representation(is_multiple=is_multiple)
+                return self._render_schema_representation(structure_class=structure_class, is_multiple=is_multiple)
             case ConceptRepresentationFormat.JSON | ConceptRepresentationFormat.PYTHON:
                 generator = ConceptRepresentationGenerator(output_format, class_name_overrides=class_name_overrides)
                 # For inputs, we only want required fields (not optional ones)
-                result = generator.generate_representation(self.concept_ref, structure_class=self.get_structure_class(), include_optional=False)
+                result = generator.generate_representation(self.concept_ref, structure_class=structure_class, include_optional=False)
 
                 # If multiple and JSON format, wrap content in a list
                 # For Python format, the caller handles wrapping since content is a string
@@ -218,17 +190,17 @@ class Concept(ConceptAbstract):
 
                 return result, generator.imports_needed
 
-    def _render_schema_representation(self, *, is_multiple: bool = False) -> tuple[dict[str, Any], set[str]]:
+    def _render_schema_representation(self, *, structure_class: type[StuffContent], is_multiple: bool = False) -> tuple[dict[str, Any], set[str]]:
         """Render JSON Schema for this concept.
 
         Args:
+            structure_class: This concept's already-resolved structure class.
             is_multiple: If True, wrap the schema in an array type
 
         Returns:
             Tuple of (representation dict with JSON Schema content, empty set)
             The dict has "concept" and "content" keys where content is the JSON Schema.
         """
-        structure_class = self.get_structure_class()
         json_schema = structure_class.model_json_schema()
 
         if is_multiple:

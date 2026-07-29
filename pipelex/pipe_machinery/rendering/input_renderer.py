@@ -41,7 +41,7 @@ def build_inputs_template(the_pipe: PipeAbstract, *, explicit: bool = False) -> 
         msg = f"No inputs required for pipe '{the_pipe.code}'."
         raise NoInputsRequiredError(msg)
 
-    envelope_template = the_pipe.inputs.build_inputs_template()
+    envelope_template = the_pipe.inputs.build_inputs_template(concept_provider=get_concept_library())
     if explicit:
         return envelope_template
     return _delighten_template(envelope_template, input_specs=the_pipe.inputs)

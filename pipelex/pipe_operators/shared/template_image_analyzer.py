@@ -10,6 +10,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
+from pipelex.core.stuffs.image_field_search import search_for_nested_image_fields
 from pipelex.interpreter_hub import get_concept_library, get_native_concept, get_required_concept
 from pipelex.pipe_operators.shared.exceptions import UnusedInputError, WithImagesFilterError
 from pipelex.pipe_operators.shared.image_reference import ImageReference, ImageReferenceKind
@@ -231,7 +232,7 @@ class TemplateImageAnalyzer:
             )
             nested_paths: list[str] | None = None
             if has_nested:
-                nested_paths = root_concept.search_for_nested_image_fields_in_structure_class()
+                nested_paths = search_for_nested_image_fields(content_class=get_concept_library().get_structure_class(concept=root_concept))
                 if not nested_paths:
                     has_nested = False
 
@@ -240,7 +241,7 @@ class TemplateImageAnalyzer:
         # For dotted paths (e.g., "doc.cover"), we need to traverse the structure
         # This is more complex - for now we'll check if the path ends with an image field
         # by examining the nested image paths of the root concept
-        nested_paths = root_concept.search_for_nested_image_fields_in_structure_class()
+        nested_paths = search_for_nested_image_fields(content_class=get_concept_library().get_structure_class(concept=root_concept))
 
         # Check if the relative path (after root) matches any nested image path
         relative_path = var_path[len(root_var) + 1 :] if var_path.startswith(f"{root_var}.") else None
