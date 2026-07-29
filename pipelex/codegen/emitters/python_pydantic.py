@@ -10,7 +10,15 @@ Modern typing throughout: builtin generics (`list` / `dict`), `X | None` for opt
 """
 
 from pipelex.codegen.emitters.naming import python_class_name
-from pipelex.codegen.emitters.python_common import any_annotation, class_docstring, field_line, order_by_base, python_header
+from pipelex.codegen.emitters.python_common import (
+    any_annotation,
+    class_docstring,
+    field_line,
+    literal_annotation,
+    order_by_base,
+    python_header,
+    render_import_block,
+)
 from pipelex.codegen.emitters.target import EmittedFile
 from pipelex.codegen.resolved_concepts import ResolvedConcept, ResolvedLibrary
 from pipelex.core.concepts.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind
@@ -29,7 +37,7 @@ def emit_python_pydantic(library: ResolvedLibrary) -> list[EmittedFile]:
     blocks = [_render_class(concept, by_ref=by_ref, imports=imports) for concept in ordered]
 
     header = python_header(target="python-pydantic")
-    import_block = "\n".join(sorted(imports))
+    import_block = render_import_block(imports)
     body = f"{header}from __future__ import annotations\n\n{import_block}\n\n\n" + "\n\n\n".join(blocks) + "\n"
     return [EmittedFile(filename=_FILENAME, content=body)]
 
@@ -87,8 +95,7 @@ def _annotation(resolved_type: ResolvedType, *, by_ref: dict[str, ResolvedConcep
             imports.add("from datetime import time")
             return "time"
         case ResolvedTypeKind.LITERAL:
-            imports.add("from typing import Literal")
-            return f"Literal[{', '.join(repr(choice) for choice in resolved_type.choices or [])}]"
+            return literal_annotation(choices=resolved_type.choices, imports=imports)
         case ResolvedTypeKind.CONCEPT:
             return _concept_annotation(resolved_type, by_ref=by_ref, imports=imports)
         case ResolvedTypeKind.LIST:

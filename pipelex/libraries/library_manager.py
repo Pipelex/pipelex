@@ -1246,8 +1246,9 @@ class LibraryManager(LibraryManagerAbstract):
             concepts: List of concepts to check for cycles
         """
         # TODO: Refactor to inspect ConceptStructureBlueprint directly (concept_ref and item_concept_ref fields)
-        # instead of the generated Python types. This would be more direct and wouldn't depend on
-        # how types are generated (e.g., Optional wrappers for non-required fields).
+        # instead of the generated Python types. This would be more direct and wouldn't depend on how types
+        # are generated — a coupling that has already bitten once: respelling the generator's optional fields
+        # from `Optional[X]` to `X | None` silently disabled cycle detection entirely.
         class_registry = get_class_registry()
 
         # Build mappings from class names to concept refs
@@ -1269,19 +1270,21 @@ class LibraryManager(LibraryManagerAbstract):
                     return []
 
                 type_names: list[str] = []
-                origin = getattr(annotation, "__origin__", None)
+                # Branch on `__args__`, not `__origin__`: a PEP 604 union (`X | None`, a `types.UnionType`)
+                # carries its members in `__args__` but has **no** `__origin__`, unlike `typing.Optional[X]`.
+                # Keying off the origin sent every `X | None` annotation down the simple-type branch, where
+                # it has no `__name__` either — so the reference vanished and no cycle was ever found.
                 args = getattr(annotation, "__args__", ())
 
-                if origin is None:
+                if args:
+                    # Generic or union (Optional[X], X | None, list[X], Union[X, Y], ...): recurse into members.
+                    for arg in args:
+                        type_names.extend(extract_type_names(arg))
+                else:
                     # Simple type, get its name
                     type_name = getattr(annotation, "__name__", None)
                     if type_name:
                         type_names.append(type_name)
-                else:
-                    # Generic type (like Optional[X], list[X], Union[X, Y], etc.)
-                    # Recursively extract from all type arguments
-                    for arg in args:
-                        type_names.extend(extract_type_names(arg))
 
                 return type_names
 

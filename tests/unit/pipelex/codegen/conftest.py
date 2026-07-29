@@ -168,6 +168,76 @@ def refines_crate() -> LibraryCrate:
     )
 
 
+@pytest.fixture
+def every_type_kind_crate() -> LibraryCrate:
+    """A normalized crate whose fields cover **every** `ResolvedTypeKind`, plus an optional field and a
+    structureless (opaque) concept.
+
+    This is the single source of type-kind coverage for the lint-clean regression test:
+    `test_emitted_artifacts_are_lint_clean` asserts the resolved trees reach every enum member, so a
+    newly added `ResolvedTypeKind` that nobody wires in here fails loudly instead of going unlinted.
+    """
+    authored = LibraryCrate(
+        concepts={
+            "lintcheck.Detail": ConceptBlueprint(
+                description="A nested detail",
+                structure={"note": ConceptStructureBlueprint(description="A note", type=ConceptStructureBlueprintFieldType.TEXT, required=True)},
+            ),
+            # A structureless concept: emits the two-paragraph docstring (description + imprecision caveat).
+            "lintcheck.Opaque": ConceptBlueprint(description="A structureless concept"),
+            # Descriptions carrying characters the docstring renderer must not backslash-escape: a
+            # double quote and a backslash both put a `\` in the docstring under naive escaping, which
+            # ruff's D301 then auto-rewrites to an `r` prefix — changing the bytes and breaking the stamp.
+            "lintcheck.Quoted": ConceptBlueprint(
+                description='The "primary" thing',
+                structure={
+                    "pattern": ConceptStructureBlueprint(
+                        description=r"Matches the \d regex", type=ConceptStructureBlueprintFieldType.TEXT, required=True
+                    )
+                },
+            ),
+            "lintcheck.Record": ConceptBlueprint(
+                description="A record touching every resolved type kind",
+                structure={
+                    # scalars
+                    "title": ConceptStructureBlueprint(description="Title", type=ConceptStructureBlueprintFieldType.TEXT, required=True),
+                    "ratio": ConceptStructureBlueprint(description="Ratio", type=ConceptStructureBlueprintFieldType.NUMBER, required=True),
+                    "count": ConceptStructureBlueprint(description="Count", type=ConceptStructureBlueprintFieldType.INTEGER, required=True),
+                    "is_active": ConceptStructureBlueprint(description="Active", type=ConceptStructureBlueprintFieldType.BOOLEAN, required=True),
+                    "published_on": ConceptStructureBlueprint(description="Date", type=ConceptStructureBlueprintFieldType.DATE, required=True),
+                    "recorded_at": ConceptStructureBlueprint(
+                        description="Timestamp", type=ConceptStructureBlueprintFieldType.DATETIME, required=True
+                    ),
+                    "starts_at": ConceptStructureBlueprint(description="Start time", type=ConceptStructureBlueprintFieldType.TIME, required=True),
+                    # literal — the double-quoting path
+                    "status": ConceptStructureBlueprint(description="Status", choices=["draft", "final"], required=True),
+                    # concept refs: one in-module, one native (exercises the native content-class import)
+                    "detail": ConceptStructureBlueprint(
+                        description="Detail", type=ConceptStructureBlueprintFieldType.CONCEPT, concept_ref="Detail", required=True
+                    ),
+                    "label": ConceptStructureBlueprint(
+                        description="Label", type=ConceptStructureBlueprintFieldType.CONCEPT, concept_ref="Text", required=True
+                    ),
+                    # containers
+                    "tags": ConceptStructureBlueprint(
+                        description="Tags", type=ConceptStructureBlueprintFieldType.LIST, item_type="text", required=True
+                    ),
+                    "counts": ConceptStructureBlueprint(
+                        description="Counts", type=ConceptStructureBlueprintFieldType.DICT, key_type="text", value_type="integer", required=True
+                    ),
+                    # ANY — only reachable nested, from genuine source imprecision. An untyped list also
+                    # emits the trailing `# imprecise:` comment, so that shape gets linted too.
+                    "items": ConceptStructureBlueprint(description="Untyped items", type=ConceptStructureBlueprintFieldType.LIST, required=True),
+                    # an optional field, so the `X | None` path is emitted too
+                    "note": ConceptStructureBlueprint(description="Optional note", type=ConceptStructureBlueprintFieldType.TEXT, required=False),
+                },
+            ),
+        },
+        domains={"lintcheck": DomainBlueprint(code="lintcheck", description="Lint check domain")},
+    )
+    return normalize_crate(authored, mthds_version=CRATE_TEST_VERSION)
+
+
 def load_generated_module(content: str, *, tmp_path: Path, name: str) -> Any:
     """Write generated Python to disk, import it, and return it (proves compile + exec).
 

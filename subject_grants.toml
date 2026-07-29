@@ -952,6 +952,10 @@ rationale = "Single-operand transformation: derives the class-name mapping over 
 param = "name"
 rationale = "Single-operand conversion of the name."
 
+["pipelex/codegen/emitters/python_common.py::_breaks_out_of_docstring"]
+param = "text"
+rationale = "Single-operand predicate over the text."
+
 ["pipelex/codegen/emitters/python_common.py::class_docstring"]
 param = "description"
 rationale = "Noun-named derivation: builds the docstring from the description; extras stay keyword."
@@ -975,6 +979,10 @@ rationale = "Verb-object: orders the concepts; in_module is context."
 ["pipelex/codegen/emitters/python_common.py::order_by_base.visit"]
 param = "concept"
 rationale = "Visitor: visits the concept; single operand."
+
+["pipelex/codegen/emitters/python_common.py::render_import_block"]
+param = "imports"
+rationale = "Verb-object: renders the collected imports into a source block; single operand."
 
 ["pipelex/codegen/emitters/python_pydantic.py::_annotation"]
 param = "resolved_type"

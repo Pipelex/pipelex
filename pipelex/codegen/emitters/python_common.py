@@ -1,12 +1,14 @@
 """Rendering helpers shared by the two Python types emitters (structures + plain pydantic).
 
 Only the target-agnostic pieces live here: string / default-value escaping, the generated-file
-header (carrying the extension-file subclassing story), the class docstring, and the `= Field(...)`
-assignment. Each Python emitter keeps its own resolved-type -> annotation walker, because the
-container spelling (`typing.List`/`Optional` for the runtime idiom vs. builtin generics + `| None`
-for plain pydantic) and the concept spelling (runtime content classes vs. generated models) differ.
+header (carrying the extension-file subclassing story), the class docstring, the `= Field(...)`
+assignment, the `Literal[...]` annotation, and the import block. Each Python emitter keeps its own
+resolved-type -> annotation walker, because the concept spelling (runtime content classes vs.
+generated models) differs.
 """
 
+import sys
+from collections import defaultdict
 from datetime import date, datetime, time
 from typing import Any, cast
 
@@ -70,17 +72,50 @@ def format_default_value(value: Any) -> str:
     return repr(value)
 
 
-def class_docstring(description: str, *, extra_line: str | None = None, indent: str = "    ") -> str:
-    """Render a triple-quoted class docstring; append `extra_line` (e.g. an imprecision caveat) on its own line.
+def _breaks_out_of_docstring(text: str) -> bool:
+    """Whether `text` cannot sit verbatim between triple quotes.
 
-    The body goes through `escape_py_string`, which escapes every `"` (and backslashes, newlines, control
-    chars), so a hostile description can never form a bare `\"\"\"` and break out of the docstring.
+    Two families. The delimiter hazards — an embedded triple quote, or a trailing quote or backslash that
+    would glue onto the closing delimiter. And any character that would not survive verbatim in a source
+    file: a carriage return (line-ending normalization would rewrite it) or another control character. A
+    real newline and a tab both round-trip exactly, so neither is a hazard.
+
+    Never normalize such text — the emitted docstring is asserted to equal the authored description
+    byte for byte, so a hazard routes to the fully-escaped branch, which reproduces it exactly.
     """
-    text = description or ""
-    if extra_line:
-        text = f"{text}\n\n{indent}{extra_line}" if text else extra_line
-    quoted = escape_py_string(text)
-    return f'{indent}"""{quoted[1:-1]}"""'
+    if '"""' in text or text.endswith(('"', "\\")):
+        return True
+    return any(char not in {"\n", "\t"} and not char.isprintable() for char in text)
+
+
+def class_docstring(description: str, *, extra_line: str | None = None, indent: str = "    ") -> str:
+    """Render a triple-quoted class docstring; append `extra_line` (e.g. an imprecision caveat) as a second paragraph.
+
+    Escaping is deliberately minimal. Between triple quotes a lone `"` needs no escape and a real newline is
+    fine, so pushing the text through `escape_py_string` (the *single-line literal* escaper) would put
+    backslashes in the docstring for an input as ordinary as `The "primary" thing`. Ruff's `D301` then
+    rewrites the docstring to an `r` prefix — which changes the bytes, invalidating the codegen stamp, and
+    corrupts the text, because the escapes start rendering literally. Hence three modes:
+
+    - **plain** — nothing hazardous: emitted verbatim, quotes and newlines untouched;
+    - **raw** — contains a backslash: emitted with an `r` prefix, which is both faithful and what D301 asks for;
+    - **escaped** — the hazards named in `_breaks_out_of_docstring`: fully escaped. No description written in
+      practice reaches this branch, and the fallback keeps the emitted file valid, which is what matters.
+    """
+    parts = [part for part in (description or "", extra_line or "") if part]
+    if not parts:
+        return f'{indent}""""""'
+
+    if any(_breaks_out_of_docstring(part) for part in parts):
+        escaped_break = "\\n\\n"
+        escaped = escaped_break.join(escape_py_string(part)[1:-1] for part in parts)
+        return f'{indent}"""{escaped}"""'
+
+    prefix = "r" if any("\\" in part for part in parts) else ""
+    if len(parts) == 1:
+        return f'{indent}{prefix}"""{parts[0]}"""'
+    body, caveat = parts
+    return f'{indent}{prefix}"""{body}\n\n{indent}{caveat}\n{indent}"""'
 
 
 def field_line(field: ResolvedField, *, annotation: str) -> str:
@@ -108,6 +143,41 @@ def any_annotation(*, imports: set[str]) -> str:
     """The `Any` annotation, registering its import — the honest spelling for an imprecise type."""
     imports.add("from typing import Any")
     return "Any"
+
+
+def literal_annotation(*, choices: list[str] | None, imports: set[str]) -> str:
+    """The `Literal[...]` annotation, with double-quoted members (`repr()` would pick single quotes)."""
+    imports.add("from typing import Literal")
+    members = ", ".join(escape_py_string(choice) for choice in choices or [])
+    return f"Literal[{members}]"
+
+
+def render_import_block(imports: set[str]) -> str:
+    """Render the collected imports the way isort would, so the artifact is lint-clean on arrival.
+
+    A flat `sorted()` over the raw statements is not isort order. Two things it misses: `from X import a`
+    and `from X import b` have to merge into one line, and stdlib has to be separated from third-party by
+    a blank line.
+
+    Grouping targets the **consumer's** tree, where `pipelex` is an installed dependency and therefore
+    third-party. In this repo `pipelex` is first-party, so ruff here wants the opposite order — but no
+    generated artifact is ever committed to this repo, and the consumer is the only one who lints these
+    files. `tests/unit/pipelex/codegen/test_emitted_artifacts_are_lint_clean.py` lints them as a consumer
+    would, for that reason.
+    """
+    names_by_module: dict[str, set[str]] = defaultdict(set)
+    for statement in imports:
+        module, _, names = statement.removeprefix("from ").partition(" import ")
+        names_by_module[module].update(name.strip() for name in names.split(","))
+
+    stdlib: list[str] = []
+    third_party: list[str] = []
+    for module in sorted(names_by_module):
+        line = f"from {module} import {', '.join(sorted(names_by_module[module]))}"
+        group = stdlib if module.partition(".")[0] in sys.stdlib_module_names else third_party
+        group.append(line)
+
+    return "\n\n".join("\n".join(group) for group in (stdlib, third_party) if group)
 
 
 def order_by_base(concepts: list[ResolvedConcept], *, in_module: set[str]) -> list[ResolvedConcept]:

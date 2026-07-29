@@ -8,10 +8,22 @@ class. Native concepts themselves are not re-emitted — they already exist in t
 Field annotations use `from __future__ import annotations`, so concept references are plain forward
 names resolved from the module namespace (no explicit string quoting, no ordering constraint beyond
 class inheritance).
+
+Modern typing throughout — builtin generics (`list` / `dict`) and `X | None` — matching both the
+runtime `StructureGenerator` and the repo's Python standards. The emitted bytes are lint-clean on
+arrival so a consumer's `ruff` run cannot invalidate the codegen stamp; see `render_import_block`.
 """
 
 from pipelex.codegen.emitters.naming import python_class_name
-from pipelex.codegen.emitters.python_common import any_annotation, class_docstring, field_line, order_by_base, python_header
+from pipelex.codegen.emitters.python_common import (
+    any_annotation,
+    class_docstring,
+    field_line,
+    literal_annotation,
+    order_by_base,
+    python_header,
+    render_import_block,
+)
 from pipelex.codegen.emitters.target import EmittedFile
 from pipelex.codegen.resolved_concepts import ResolvedConcept, ResolvedLibrary
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -34,7 +46,7 @@ def emit_python_structures(library: ResolvedLibrary) -> list[EmittedFile]:
     blocks = [_render_class(concept, by_ref=by_ref, imports=imports) for concept in ordered]
 
     header = python_header(target="python-structures")
-    import_block = "\n".join(sorted(imports))
+    import_block = render_import_block(imports)
     body = f"{header}from __future__ import annotations\n\n{import_block}\n\n\n" + "\n\n\n".join(blocks) + "\n"
     return [EmittedFile(filename=_FILENAME, content=body)]
 
@@ -70,8 +82,7 @@ def _base_class(concept: ResolvedConcept, *, by_ref: dict[str, ResolvedConcept],
 def _render_field(concept_field: ResolvedField, *, by_ref: dict[str, ResolvedConcept], imports: set[str]) -> str:
     annotation = _annotation(concept_field.resolved_type, by_ref=by_ref, imports=imports)
     if not concept_field.required:
-        imports.add("from typing import Optional")
-        annotation = f"Optional[{annotation}]"
+        annotation = f"{annotation} | None"
     return field_line(concept_field, annotation=annotation)
 
 
@@ -95,18 +106,15 @@ def _annotation(resolved_type: ResolvedType, *, by_ref: dict[str, ResolvedConcep
             imports.add("from datetime import time")
             return "time"
         case ResolvedTypeKind.LITERAL:
-            imports.add("from typing import Literal")
-            return f"Literal[{', '.join(repr(choice) for choice in resolved_type.choices or [])}]"
+            return literal_annotation(choices=resolved_type.choices, imports=imports)
         case ResolvedTypeKind.CONCEPT:
             return _concept_annotation(resolved_type, by_ref=by_ref, imports=imports)
         case ResolvedTypeKind.LIST:
-            imports.add("from typing import List")
             item = _annotation(resolved_type.item, by_ref=by_ref, imports=imports) if resolved_type.item else any_annotation(imports=imports)
-            return f"List[{item}]"
+            return f"list[{item}]"
         case ResolvedTypeKind.DICT:
-            imports.add("from typing import Dict")
             value = _annotation(resolved_type.value, by_ref=by_ref, imports=imports) if resolved_type.value else any_annotation(imports=imports)
-            return f"Dict[str, {value}]"
+            return f"dict[str, {value}]"
         case ResolvedTypeKind.ANY:
             return any_annotation(imports=imports)
 

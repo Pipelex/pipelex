@@ -2,7 +2,7 @@ import ast
 import textwrap
 from datetime import date, datetime, time
 from enum import Enum
-from typing import Any, List, Literal, Optional, cast
+from typing import Any, Literal, cast
 
 from pydantic import Field
 
@@ -33,7 +33,7 @@ class StructureGenerator:
                 domain-qualified structure class name.
         """
         self.imports = {
-            "from typing import Optional, List, Dict, Any, Literal",
+            "from typing import Any, Literal",
             "from enum import Enum",
             "from pipelex.core.stuffs.structured_content import StructuredContent",
             "from pydantic import Field",
@@ -291,9 +291,16 @@ class StructureGenerator:
         """Render one Python field definition from a neutral resolved field."""
         python_type = self._python_type_from_resolved(resolved_field.resolved_type)
 
-        # Make optional if not required
+        # Make optional if not required. A concept ref renders as a *quoted* forward reference (this
+        # module, unlike the codegen emitters, has no `from __future__ import annotations`), and
+        # `"Foo" | None` is a TypeError at runtime — str doesn't implement `|`. Fold the union inside
+        # the quotes so the whole annotation stays one deferred expression for model_rebuild to eval.
+        # Only a *bare* quoted ref needs this: `list["Foo"] | None` is a real GenericAlias and works.
         if not resolved_field.required:
-            python_type = f"Optional[{python_type}]"
+            if python_type.startswith('"') and python_type.endswith('"'):
+                python_type = f'"{python_type[1:-1]} | None"'
+            else:
+                python_type = f"{python_type} | None"
 
         # Generate Field parameters (default/... first, then description)
         field_params = [self._format_field_description(resolved_field.description)]
@@ -330,16 +337,16 @@ class StructureGenerator:
                 return "time"
             case ResolvedTypeKind.LITERAL:
                 choices = resolved_type.choices or []
-                return f"Literal[{', '.join(repr(choice) for choice in choices)}]"
+                return f"Literal[{', '.join(self._escape_string_for_python(choice) for choice in choices)}]"
             case ResolvedTypeKind.CONCEPT:
                 return self._python_type_for_concept(resolved_type)
             case ResolvedTypeKind.LIST:
                 item_type = self._python_type_from_resolved(resolved_type.item) if resolved_type.item else "Any"
-                return f"List[{item_type}]"
+                return f"list[{item_type}]"
             case ResolvedTypeKind.DICT:
                 key_type = self._python_type_from_resolved(resolved_type.key) if resolved_type.key else "str"
                 value_type = self._python_type_from_resolved(resolved_type.value) if resolved_type.value else "Any"
-                return f"Dict[{key_type}, {value_type}]"
+                return f"dict[{key_type}, {value_type}]"
             case ResolvedTypeKind.ANY:
                 return "Any"
 
@@ -391,9 +398,6 @@ class StructureGenerator:
             "datetime": datetime,
             "time": time,
             "Enum": Enum,
-            "Optional": Optional,
-            "List": List,  # noqa: UP006
-            "Dict": dict,
             "Any": Any,
             "Literal": Literal,
             "Field": Field,

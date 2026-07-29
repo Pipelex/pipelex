@@ -31,6 +31,12 @@ from pipelex.tools.misc.json_utils import clean_json_content
 _FILENAME = "types.ts"
 _BINDER_FILENAME = "binder.ts"
 
+# Prettier's default `printWidth`. The emitted files must be prettier-clean on arrival, or a consumer's
+# formatter run rewrites the bytes and invalidates the codegen stamp (`pipelex codegen check` would then
+# report the file as hand-edited). Two prettier behaviors drive the emitted shape: it collapses runs of
+# blank lines to a single one, and it keeps an import on one line while it fits within this width.
+_TS_PRINT_WIDTH = 80
+
 
 def emit_ts_zod(library: ResolvedLibrary) -> list[EmittedFile]:
     """Emit the pure `types.ts` file and its `binder.ts` companion (wire<->domain parse/serialize)."""
@@ -40,7 +46,7 @@ def emit_ts_zod(library: ResolvedLibrary) -> list[EmittedFile]:
     recursive_refs = _find_recursive_concept_refs(concepts)
     header = _ts_header()
     blocks = [_render_schema(concept, by_ref=by_ref, type_name_by_ref=type_name_by_ref, recursive_refs=recursive_refs) for concept in concepts]
-    body = f'{header}import {{ z }} from "zod";\n\n\n' + "\n\n\n".join(blocks) + "\n"
+    body = f'{header}import {{ z }} from "zod";\n\n' + "\n\n".join(blocks) + "\n"
     return [EmittedFile(filename=_FILENAME, content=body), _emit_binder(concepts, type_name_by_ref=type_name_by_ref)]
 
 
@@ -280,10 +286,18 @@ def _emit_binder(concepts: list[ResolvedConcept], *, type_name_by_ref: dict[str,
     thus no risk of corrupting arbitrary keys inside a `z.record()` / `z.unknown()` value.
     """
     type_names = [type_name_by_ref[concept.concept_ref] for concept in concepts]
-    import_lines = "\n".join(f"  {name}Schema,\n  type {name}," for name in type_names)
+    specifiers = [specifier for name in type_names for specifier in (f"{name}Schema", f"type {name}")]
     pairs = "\n\n".join(_binder_pair(name) for name in type_names)
-    prelude = f'import {{\n{import_lines}\n}} from "./types";'
-    return EmittedFile(filename=_BINDER_FILENAME, content=f"{_binder_header()}{prelude}\n\n\n{pairs}\n")
+
+    # Match prettier: one line while it fits, otherwise one specifier per line.
+    single_line = f'import {{ {", ".join(specifiers)} }} from "./types";'
+    if len(single_line) <= _TS_PRINT_WIDTH:
+        prelude = single_line
+    else:
+        import_lines = "\n".join(f"  {specifier}," for specifier in specifiers)
+        prelude = f'import {{\n{import_lines}\n}} from "./types";'
+
+    return EmittedFile(filename=_BINDER_FILENAME, content=f"{_binder_header()}{prelude}\n\n{pairs}\n")
 
 
 def _binder_pair(type_name: str) -> str:

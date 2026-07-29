@@ -87,6 +87,31 @@ The verdict rides the exit code (mirroring `resolve` / `validate`): `0` current,
 
 `pipelex/codegen/emission.py` ties it together in two layers. `build_stamped_projection` is the **pure** core: it stamps each emitted body and assembles the matching `codegen.lock` content — no filesystem access — so it is the single source of truth for what a projection *is* on disk. `write_stamped_projection` rides it to materialize locally: it writes each file only when its content changed (write-if-changed — no mtime churn, clean diffs, watch-mode friendly), removes any previously-tracked stamped file that dropped out of the set, and rewrites the lock. Only files the tool itself stamped are ever removed, so a hand-authored file sharing the output directory is never touched. `codegen inputs` applies the same write-if-changed rule to its single (unstamped) template file, so a full regeneration pass over a committed consumer is a true no-op when everything is current.
 
+### Lint-clean by construction
+
+A stamp's `content_hash` is a raw SHA-256 over the body bytes. So if the emitted code is not already what your formatter wants, the first `ruff check --fix` / `ruff format` (or `prettier --write`) over your tree rewrites those bytes and `pipelex codegen check` reports the file as **hand-edited** — accusing you of the one thing you did not do.
+
+The emitters therefore emit exactly what the formatter would write. Generated Python uses builtin generics (`list[str]`, `dict[str, int]`), `X | None` over `Optional[X]`, double-quoted `Literal` members, and isort-grouped imports; generated TypeScript matches Prettier's blank-line and import-wrapping behavior. Running your formatter over a generated tree is a no-op, and the stamp stays valid.
+
+**You should not need to exclude generated paths from your linter.** If you carry such an exclusion from an older version, drop it.
+
+One ruff setting is required, because it cannot be fixed in the emitted bytes:
+
+```toml
+[tool.ruff.lint.flake8-type-checking]
+runtime-evaluated-base-classes = [
+  "pydantic.BaseModel",
+  "pipelex.core.stuffs.structured_content.StructuredContent",
+]
+```
+
+Without it, `TC003` asks you to move `from datetime import date` into an `if TYPE_CHECKING:` block. Applying that **breaks** the generated models — pydantic resolves annotations at runtime to build validators, so the import must stay at runtime. The setting tells ruff these classes are runtime-evaluated, and the finding goes away.
+
+Two remaining findings are artifacts of *how* you lint, not of file content:
+
+- `INP001` ("implicit namespace package") fires when you point ruff at a bare directory with no `__init__.py`. Add one, or lint the package that contains it.
+- Import grouping for the `python-structures` target assumes `pipelex` is a third-party dependency — which it is in your tree. The Pipelex repo itself, where `pipelex` is first-party, is the one place ruff wants the opposite order; no generated artifact is committed there, so the consumer's grouping is the one the emitter targets.
+
 ## Serving the engine over HTTP
 
 The same engine backs the `pipelex-api` routes (`POST /v1/resolve`, `POST /v1/codegen`, and the re-pointed `/v1/build/*` — the route envelopes are documented in `pipelex-api`'s `docs/codegen.md`). Two host-facing cores make that possible without any CLI plumbing:
