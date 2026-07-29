@@ -1,6 +1,78 @@
 # Emit lint-clean codegen artifacts
 
-**Status: IMPLEMENTED 2026-07-29** on `fix/Codegen-lint-clean` (off `dev` at `8c0b99b3a`). Phases 1–5 done except the release-gated cross-repo sweep (5.4). `make agent-check` + full `make agent-test` green.
+**Status: PR [#1070](https://github.com/Pipelex/pipelex/pull/1070) → `dev`, OPEN.** Branch `fix/Codegen-lint-clean` off `dev` at `8c0b99b3a`, two commits: `13295b5af` (the implementation) and `c9a7238e4` (the review-round-1 fix). Phases 1–5 done except the release-gated cross-repo sweep (5.4). Local `make agent-check` + full `make agent-test` + `make drift-check` green; CI green on the pushed head (lint, drift, hub-layering, keyword-only, typecheck, all 8 test shards, doc-check).
+
+## Review guide
+
+Everything above the `---` divider is the record of what shipped. The original plan below it is kept for its reasoning and rejected alternatives — read it for *why the approach is what it is*, not for current state.
+
+### What is in the diff, and why each file belongs
+
+| Area | Files | What changed |
+| --- | --- | --- |
+| **The fix** | `codegen/emitters/python_common.py`, `python_pydantic.py`, `python_structures.py`, `ts_zod.py` | Emit what the formatter wants: builtin generics, `X \| None`, double-quoted `Literal` members, isort-grouped imports (`render_import_block`), mode-aware docstring escaping, prettier-shaped blank lines and import wrapping, and the header-only empty projection (`python_module_body`). |
+| **Runtime generator (D1)** | `core/concepts/structure_generation/generator.py` | Same respelling, so the two paths that render the same resolved-type tree agree. Its output is `exec()`d, never written to disk, so no linter ever saw it — this is a consistency change, not a lint fix. |
+| **A real bug the respelling exposed** | `libraries/library_manager.py` | Concept cycle detection branched on `__origin__`, which a PEP 604 union does not have. **Not scope creep** — see finding 5. |
+| **Repo-side lint config** | `pyproject.toml`, `pipe_run/pipe_run_params.py`, `system/pipelex_service/remote_config_fetcher.py` | Sets `runtime-evaluated-base-classes` (phase 5.1), which retires two hand-written `# noqa: TC001` / `TC003` that were working around the same rule one file at a time. |
+| **Convention gate** | `subject_grants.toml` | Positional-subject grants for the new `_breaks_out_of_docstring` and `render_import_block`. Mechanically required by `make check-keyword-only`. |
+| **Tests** | `tests/unit/pipelex/codegen/*`, `.../structure_generation/test_structure_generator*.py` | The new guard plus the expectation churn from the respelling. |
+| **Docs** | `CHANGELOG.md`, `docs/under-the-hood/codegen-projections.md` | The breaking-bytes notice + the consumer contract. |
+
+### Deliberate — do not flag these
+
+1. **The emitted `python-structures` import order fails *this repo's* own ruff (`I001`) — and running this repo's `ruff --fix` over a generated `structures.py` therefore still breaks its stamp.** That is expected, not a surviving bug. It imports both `pydantic` and `pipelex`, and isort wants opposite orders depending on whether `pipelex` is first-party (here) or a dependency (a consumer's tree) — the two cannot both be satisfied. The emitter targets the consumer, who is the only one who lints these files; this repo commits no generated artifact. The test passes `lint.isort.known-third-party=['pipelex']` for exactly this reason, and so must any manual check — see [Verify it locally](#verify-it-locally). `python-pydantic` imports no `pipelex` and so is config-independent. Full reasoning in finding 1.
+2. **`TC003` is answered by consumer configuration, not by emitted bytes.** Moving `from datetime import date` into `if TYPE_CHECKING:` would break the generated models — pydantic resolves annotations at runtime. See ["`TC003` must not be satisfied by the emitter"](#tc003-must-not-be-satisfied-by-the-emitter).
+3. **`INP001` is suppressed in the test's ruff invocation, not in the bytes.** It is an artifact of pointing ruff at a bare directory, not of file content.
+4. **`class_docstring`'s third (fully-escaped) branch is unreachable by any description written in practice.** It is a correctness fallback that keeps the emitted file valid for a hostile description; the two live branches are plain and raw. See finding 2.
+5. **The empty projection carries no imports at all**, not even `from __future__ import annotations`. A header is the only shape inert under every formatter. See finding 7.
+6. **Emitted bytes change for all three targets — that is the point, and it is breaking.** Anyone holding a committed projection sees drift until they regenerate; the changelog says so and gives the command. See [Blast radius](#blast-radius).
+
+### Where each property is guarded
+
+| Property | Guard |
+| --- | --- |
+| Both Python targets are ruff-clean (`check` + `format --check`) | `test_emitted_artifacts_are_lint_clean.py::test_emitted_artifact_passes_ruff` |
+| The fixture reaches **every** `ResolvedTypeKind`, so a new kind cannot go unlinted | `…::test_fixture_covers_every_resolved_type_kind` |
+| An **empty** projection is ruff-clean for both Python targets | `…::test_empty_projection_is_lint_clean` |
+| The *reachable* empty case — natives-only crate through `python-structures` — is a bare header | `…::test_natives_only_crate_emits_a_lint_clean_structures_module` |
+| TS has no collapsible blank runs (config-independent, always runs) | `…::test_emitted_ts_has_no_collapsible_blank_runs` |
+| An empty TS projection is a bare header (config-independent, always runs) | `…::test_empty_ts_projection_is_a_bare_header` |
+| TS is genuinely prettier-clean | `…::test_emitted_ts_is_prettier_clean` — **skipped unless `prettier` is on PATH, which CI does not have** (Python repo, no node toolchain). The two always-on invariants above are what actually hold the TS line in CI; the prettier assertion is a local-run confirmation. Worth knowing before trusting the TS side. |
+| Description ↔ `__doc__` byte fidelity survives the escaping rework | `test_description_escaping.py` |
+| Concept cycle detection still sees optional refs | `test_concept_to_concept_references.py` (this is what caught finding 5) |
+| The runtime generator's new spelling | `tests/unit/pipelex/core/concepts/structure_generation/test_structure_generator*.py` |
+
+### Review rounds
+
+- **Round 1 — greptile, resolved in `c9a7238e4`.** One finding, on `ts_zod.py`: the empty binder stayed formatter-unstable. Confirmed, and wider than reported — all four artifacts degenerate the same way, and the case is reachable from an ordinary method rather than only a degenerate crate. Written up as finding 7. Thread answered and resolved; no other thread was open.
+
+### Verify it locally
+
+Build the rich method from the [reproduction](#reproduce-it-2-minutes-from-this-worktree) below, then lint it **the way a consumer would** — that isort override is not optional, see the trap right after:
+
+```bash
+CONSUMER=(--config pyproject.toml --config "lint.isort.known-third-party=['pipelex']" --config "lint.per-file-ignores={'*'=['INP001']}")
+for t in python-structures python-pydantic; do
+  .venv/bin/pipelex codegen types --target $t -o /tmp/lintcheck/$t /tmp/lintcheck/method
+  .venv/bin/ruff check /tmp/lintcheck/$t "${CONSUMER[@]}"          # → All checks passed!
+  .venv/bin/ruff format --check /tmp/lintcheck/$t --config pyproject.toml   # → already formatted
+  .venv/bin/ruff check /tmp/lintcheck/$t --fix "${CONSUMER[@]}" && .venv/bin/ruff format /tmp/lintcheck/$t --config pyproject.toml
+  .venv/bin/pipelex codegen check /tmp/lintcheck/$t                # → up to date  (the stamp survived)
+done
+```
+
+⚠ **Do not drop the `known-third-party` override when checking `python-structures`.** Under *this repo's* bare config `pipelex` is first-party, so ruff reorders the generated imports, the bytes change, and `codegen check` reports `[hand-edited]` — which looks exactly like the bug still being live. It is not: it is the both-trees isort tension of deliberate item 1, and the emitter deliberately targets the consumer. Verified both ways. `python-pydantic` imports no `pipelex`, so it is config-independent and its stamp survives even under the bare config.
+
+For the empty case, point it at any bundle that declares no concepts of its own:
+
+```bash
+.venv/bin/pipelex codegen types --target python-structures -o /tmp/emptycheck tests/data/packages/standalone_bundle
+cat /tmp/emptycheck/structures.py     # stamp + header, nothing else
+.venv/bin/ruff check /tmp/emptycheck --fix --config pyproject.toml && .venv/bin/ruff format /tmp/emptycheck --config pyproject.toml
+.venv/bin/pipelex codegen check /tmp/emptycheck   # → up to date
+```
+
+A header-only artifact has no imports for isort to reorder, so this one is clean under any config. All commands above were run against `c9a7238e4` and produce the stated output.
 
 ## What the plan did not anticipate (found while implementing)
 
