@@ -46,7 +46,12 @@ def emit_ts_zod(library: ResolvedLibrary) -> list[EmittedFile]:
     recursive_refs = _find_recursive_concept_refs(concepts)
     header = _ts_header()
     blocks = [_render_schema(concept, by_ref=by_ref, type_name_by_ref=type_name_by_ref, recursive_refs=recursive_refs) for concept in concepts]
-    body = f'{header}import {{ z }} from "zod";\n\n' + "\n\n".join(blocks) + "\n"
+    if blocks:
+        body = f'{header}import {{ z }} from "zod";\n\n' + "\n\n".join(blocks) + "\n"
+    else:
+        # Nothing to project: the header alone. Keeping the import would leave `z` unused above a trailing
+        # blank-line run prettier collapses — a reformat, and a broken stamp. See `_emit_binder`.
+        body = header
     return [EmittedFile(filename=_FILENAME, content=body), _emit_binder(concepts, type_name_by_ref=type_name_by_ref)]
 
 
@@ -286,6 +291,12 @@ def _emit_binder(concepts: list[ResolvedConcept], *, type_name_by_ref: dict[str,
     thus no risk of corrupting arbitrary keys inside a `z.record()` / `z.unknown()` value.
     """
     type_names = [type_name_by_ref[concept.concept_ref] for concept in concepts]
+    if not type_names:
+        # No pair to bind: the header alone is the canonical empty binder. The populated shape degenerates
+        # into `import {  } from "./types";` (prettier rewrites the empty brace pair) above a trailing
+        # blank-line run (prettier collapses it) — either reformat breaks the stamped body hash.
+        return EmittedFile(filename=_BINDER_FILENAME, content=_binder_header())
+
     specifiers = [specifier for name in type_names for specifier in (f"{name}Schema", f"type {name}")]
     pairs = "\n\n".join(_binder_pair(name) for name in type_names)
 

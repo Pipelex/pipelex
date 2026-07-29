@@ -28,6 +28,7 @@ from pathlib import Path
 
 import pytest
 
+from pipelex.codegen.emitters.python_common import python_header
 from pipelex.codegen.emitters.python_pydantic import emit_python_pydantic
 from pipelex.codegen.emitters.python_structures import emit_python_structures
 from pipelex.codegen.emitters.target import EmittedFile
@@ -58,6 +59,10 @@ _EMITTERS: list[tuple[str, Callable[[ResolvedLibrary], list[EmittedFile]]]] = [
 ]
 
 
+_EMPTY_LIBRARY = ResolvedLibrary(mthds_version="1.0.0-test", concepts=[])
+"""A crate with no concepts at all — reachable from a bundle that declares only a domain."""
+
+
 def _collect_kinds(resolved_type: ResolvedType) -> set[ResolvedTypeKind]:
     """Every kind reachable in a resolved-type tree, depth-first."""
     kinds = {resolved_type.kind}
@@ -65,6 +70,33 @@ def _collect_kinds(resolved_type: ResolvedType) -> set[ResolvedTypeKind]:
         if child is not None:
             kinds |= _collect_kinds(child)
     return kinds
+
+
+def _assert_ruff_clean(*, emitted: list[EmittedFile], tmp_path: Path, target: str) -> None:
+    """Write the artifacts out and require both `ruff check` and `ruff format --check` to find nothing."""
+    try:
+        subprocess.run([sys.executable, "-m", "ruff", "--version"], check=True, capture_output=True)  # noqa: S603
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pytest.skip("ruff not available in current interpreter")
+
+    for emitted_file in emitted:
+        (tmp_path / emitted_file.filename).write_text(emitted_file.content, encoding="utf-8")
+
+    check = subprocess.run(  # noqa: S603
+        [sys.executable, "-m", "ruff", "check", str(tmp_path), *_CONSUMER_LINT_CONFIG],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert check.returncode == 0, f"[{target}] emitted artifact is not lint-clean:\n{check.stdout}{check.stderr}"
+
+    formatted = subprocess.run(  # noqa: S603
+        [sys.executable, "-m", "ruff", "format", "--check", str(tmp_path), "--config", str(_PYPROJECT)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert formatted.returncode == 0, f"[{target}] emitted artifact is not `ruff format` clean:\n{formatted.stdout}{formatted.stderr}"
 
 
 class TestEmittedArtifactsAreLintClean:
@@ -88,29 +120,47 @@ class TestEmittedArtifactsAreLintClean:
         emit: Callable[[ResolvedLibrary], list[EmittedFile]],
     ):
         """`ruff check` and `ruff format --check` must both find nothing to change."""
-        try:
-            subprocess.run([sys.executable, "-m", "ruff", "--version"], check=True, capture_output=True)  # noqa: S603
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            pytest.skip("ruff not available in current interpreter")
+        _assert_ruff_clean(emitted=emit(resolve_concepts_from_crate(every_type_kind_crate)), tmp_path=tmp_path, target=target)
 
-        for emitted_file in emit(resolve_concepts_from_crate(every_type_kind_crate)):
-            (tmp_path / emitted_file.filename).write_text(emitted_file.content, encoding="utf-8")
+    @pytest.mark.parametrize(("target", "emit"), _EMITTERS)
+    def test_empty_projection_is_lint_clean(
+        self,
+        tmp_path: Path,
+        target: str,
+        emit: Callable[[ResolvedLibrary], list[EmittedFile]],
+    ):
+        """A projection with nothing to emit still has to arrive lint-clean.
 
-        check = subprocess.run(  # noqa: S603
-            [sys.executable, "-m", "ruff", "check", str(tmp_path), *_CONSUMER_LINT_CONFIG],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        assert check.returncode == 0, f"[{target}] emitted artifact is not lint-clean:\n{check.stdout}{check.stderr}"
+        Emitting the import block with no class to use it is an `F401`, and the block separator leaves a
+        trailing blank-line run `ruff format` collapses — either one rewrites the body bytes and breaks
+        the stamp, which is exactly the accusation this module exists to prevent.
+        """
+        _assert_ruff_clean(emitted=emit(_EMPTY_LIBRARY), tmp_path=tmp_path, target=target)
 
-        formatted = subprocess.run(  # noqa: S603
-            [sys.executable, "-m", "ruff", "format", "--check", str(tmp_path), "--config", str(_PYPROJECT)],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        assert formatted.returncode == 0, f"[{target}] emitted artifact is not `ruff format` clean:\n{formatted.stdout}{formatted.stderr}"
+    def test_natives_only_crate_emits_a_lint_clean_structures_module(self, natives_only_crate: LibraryCrate, tmp_path: Path):
+        """The reachable route to an empty projection, and the reason the case is not academic.
+
+        `python-structures` skips natives (they already exist in the runtime), so an ordinary method that
+        declares no concepts of its own — a `Text -> Text` pipe — leaves that emitter with nothing to
+        write, even though the library itself is not empty.
+        """
+        emitted = emit_python_structures(resolve_concepts_from_crate(natives_only_crate))
+        assert [emitted_file.content for emitted_file in emitted] == [python_header(target="python-structures")]
+        _assert_ruff_clean(emitted=emitted, tmp_path=tmp_path, target="python-structures")
+
+    def test_empty_ts_projection_is_a_bare_header(self):
+        """Both TypeScript artifacts collapse to their header alone when there is nothing to project.
+
+        The alternative — keeping the import line — emits `import {  } from "./types";` (which prettier
+        rewrites to `import {} …`) above a trailing blank-line run (which it collapses). Needs no prettier
+        binary, so like the invariant above it always runs.
+        """
+        for emitted_file in emit_ts_zod(_EMPTY_LIBRARY):
+            body = emitted_file.content
+            # Comments and nothing else: no import to go unused, and no blank line to collapse (a blank
+            # line does not start with `//`, so this rules out the trailing run too).
+            assert all(line.startswith("//") for line in body.splitlines()), f"{emitted_file.filename} is not a bare header:\n{body}"
+            assert body.endswith("\n")
 
     def test_emitted_ts_has_no_collapsible_blank_runs(self, every_type_kind_crate: LibraryCrate):
         """Prettier collapses a run of blank lines to one under *every* config — so emitting two (the

@@ -180,6 +180,23 @@ def render_import_block(imports: set[str]) -> str:
     return "\n\n".join("\n".join(group) for group in (stdlib, third_party) if group)
 
 
+def python_module_body(*, header: str, imports: set[str], blocks: list[str]) -> str:
+    """Assemble a generated module; a projection with nothing to emit is its header alone.
+
+    The empty artifact needs an explicit canonical form, because the populated one degenerates into
+    something no formatter leaves alone: the import block has no class left to use it (`F401`, which
+    `ruff check --fix` deletes) and the block separator becomes a trailing blank-line run (which
+    `ruff format` collapses). Either rewrite changes the body bytes the stamp hashes, so `codegen
+    check` reports the file as hand-edited. A header is inert under both.
+
+    This is reachable without a degenerate crate: `python-structures` skips natives, so an ordinary
+    method that declares no concepts of its own leaves that emitter with nothing to write.
+    """
+    if not blocks:
+        return header
+    return f"{header}from __future__ import annotations\n\n{render_import_block(imports)}\n\n\n" + "\n\n\n".join(blocks) + "\n"
+
+
 def order_by_base(concepts: list[ResolvedConcept], *, in_module: set[str]) -> list[ResolvedConcept]:
     """Order concepts so an in-module refinement base is defined before its subclass (inheritance is eager)."""
     by_ref = {concept.concept_ref: concept for concept in concepts}

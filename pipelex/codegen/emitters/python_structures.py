@@ -22,7 +22,7 @@ from pipelex.codegen.emitters.python_common import (
     literal_annotation,
     order_by_base,
     python_header,
-    render_import_block,
+    python_module_body,
 )
 from pipelex.codegen.emitters.target import EmittedFile
 from pipelex.codegen.resolved_concepts import ResolvedConcept, ResolvedLibrary
@@ -45,9 +45,7 @@ def emit_python_structures(library: ResolvedLibrary) -> list[EmittedFile]:
     imports: set[str] = {pydantic_import, "from pipelex.core.stuffs.structured_content import StructuredContent"}
     blocks = [_render_class(concept, by_ref=by_ref, imports=imports) for concept in ordered]
 
-    header = python_header(target="python-structures")
-    import_block = render_import_block(imports)
-    body = f"{header}from __future__ import annotations\n\n{import_block}\n\n\n" + "\n\n\n".join(blocks) + "\n"
+    body = python_module_body(header=python_header(target="python-structures"), imports=imports, blocks=blocks)
     return [EmittedFile(filename=_FILENAME, content=body)]
 
 

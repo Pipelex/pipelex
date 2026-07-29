@@ -157,6 +157,18 @@ def materialized_image_crate() -> LibraryCrate:
 
 
 @pytest.fixture
+def natives_only_crate() -> LibraryCrate:
+    """A crate holding nothing but natives — what an ordinary method that declares no concepts of its
+    own normalizes to (a `Text -> Text` pipe materializes `native.Text` and nothing else).
+
+    `python-structures` skips natives, so this is the *reachable* route to an empty projection: the
+    library is non-empty, yet that emitter has no class to write.
+    """
+    authored = LibraryCrate(concepts={"native.Text": ConceptBlueprint(description="A text")})
+    return normalize_crate(authored, mthds_version=CRATE_TEST_VERSION)
+
+
+@pytest.fixture
 def refines_crate() -> LibraryCrate:
     """A concept refining a structureless native keeps its refines link, so the emitter renders inheritance."""
     return LibraryCrate(

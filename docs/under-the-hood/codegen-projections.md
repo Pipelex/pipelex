@@ -95,6 +95,8 @@ The emitters therefore emit exactly what the formatter would write. Generated Py
 
 **You should not need to exclude generated paths from your linter.** If you carry such an exclusion from an older version, drop it.
 
+A projection with nothing to emit for a target is its **header alone** — no imports, no trailing blank lines. That case is ordinary rather than degenerate: `python-structures` skips native concepts, since they already exist in the runtime, so a method that declares no concepts of its own leaves that target with no class to write. The header is inert under any formatter, whereas an import block with nothing left to use it is an unused-import finding sitting above a collapsible blank-line run — both of which a formatter would rewrite, breaking the stamp.
+
 One ruff setting is required, because it cannot be fixed in the emitted bytes:
 
 ```toml
