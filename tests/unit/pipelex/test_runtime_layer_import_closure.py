@@ -54,6 +54,15 @@ import pytest
 #: so importing it pulls in every one of them — the broadest single entry point into `pipelex.providers`,
 #: which is where those adapters now live. The plugin *mechanism* it registers through stayed behind
 #: in `pipelex.plugins` and is reached from here, so one entry point still covers both halves.
+#:
+#: `providers.anthropic.anthropic_list` is here because `providers.builtins` turned out **not** to cover
+#: it: the vendor plugins import their `*_list` modules inside a function (`# noqa: PLC0415`), so a
+#: deferred import hides them from the static graph *and* from the aggregator's own closure. Five of
+#: them imported `MissingDependencyError` from the top-level `pipelex.exceptions` aggregate rather than
+#: from its definition site in `pipelex.system.exceptions`, and since that aggregate re-exports every
+#: interpreter package's errors, each one loaded 15 interpreter modules — inside a package this tuple's
+#: sibling declaration already claimed was clean. The import now points at the definition site, per this
+#: repo's "direct full-path imports everywhere" rule, and this entry point is what keeps it there.
 RUNTIME_LAYER_ENTRY_POINTS = [
     "pipelex.cogt.content_generation.content_generator",
     "pipelex.runtime_hub",
@@ -64,6 +73,7 @@ RUNTIME_LAYER_ENTRY_POINTS = [
     "pipelex.core.pipes.inputs.input_stuff_specs_factory",
     "pipelex.core.pipes.stuff_spec.stuff_spec_factory",
     "pipelex.core.stuffs.stuff_factory",
+    "pipelex.providers.anthropic.anthropic_list",
 ]
 
 #: The negative control, and the reason it is needed: the detector below is a `textwrap.dedent`

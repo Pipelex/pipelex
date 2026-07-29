@@ -2,8 +2,8 @@ from typing import Any, cast
 
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.config import get_config
-from pipelex.exceptions import MissingDependencyError
 from pipelex.plugins.model_handle import ModelHandle
+from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tools.aws.exceptions import AwsCredentialsError
 
 

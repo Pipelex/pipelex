@@ -87,8 +87,8 @@ __all__ = [
     "PipeRunParamsError",
     "BatchParamsError",
     "PipeRouterError",
-    "PipeRunError",
     # from pipelex.core.pipes.exceptions
+    "PipeRunError",
     "InputStuffSpecNotFoundError",
     "PipeFactoryError",
     "PipeOperatorModelChoiceError",

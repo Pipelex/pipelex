@@ -124,7 +124,10 @@ SCAN_ROOTS: tuple[Path, ...] = (SOURCE_ROOT, TESTS_ROOT)
 #: `graph` is the run-graph data model, tracer and renderers, `tracing` the trace-event assembler
 #: feeding them, `observer` the run-observation hooks, `errors` the error taxonomy — all machinery
 #: present at execution time whatever is loaded, which is the runtime layer's own definition.
-#: `pipelex.kit` is data files and `pipelex.language` has interpreter edges, so both stay out.
+#: `pipelex.test_extras` is here for the same reason: it ships, `pipelex.py` imports it at boot, and it
+#: measures clean — leaving it out would repeat the omission this entry documents. `pipelex.kit` is data
+#: files with no module to police; `pipelex.language`, `pipelex.runtime_bridge` and `pipelex.cli` all
+#: measure dirty and are interpreter-side by construction. That is every top-level package accounted for.
 #: That the declaration is a claim rather than a hope is why it is asserted by a test.
 #: See the "Where core splits" section of ``docs/contribute/hub-layering.md``.
 RUNTIME_LAYER_PACKAGES: tuple[str, ...] = (
@@ -137,6 +140,7 @@ RUNTIME_LAYER_PACKAGES: tuple[str, ...] = (
     "pipelex.providers",
     "pipelex.reporting",
     "pipelex.system",
+    "pipelex.test_extras",
     "pipelex.tools",
     "pipelex.tracing",
     # the runtime layer's own hub — a module, not a package; see the note above

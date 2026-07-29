@@ -719,8 +719,16 @@ Measured 2026-07-29 (re-run at sweep time — `grep -rn --include='*.py' -E 'pip
 | `cocode/` | 6 | `PipeRunMode` in five CLI modules + one test |
 | `pipelex-cookbook/` | 2 | `PipeRunMode` in two tests |
 | `pipelex-mistralai-workflows/` | 1 | `PipeRunMode` in `tests/e2e/conftest.py` |
+| `test-bed/` | 1 | `PipeRunMode` in `tests/e2e/conftest.py` |
+| `pipelex-workshop/` | 1 | `PipeRunMode` in `tests/e2e/conftest.py` |
+| `pipelex-demos/` | 1 | `PipeRunMode` in `tests/e2e/conftest.py` |
+| `pipelex-demo-frostbeam/` | 1 | `PipeRunMode` in `tests/e2e/conftest.py` |
+| `pipelex-demo-mistral/` | 1 | `PipeRunMode` in `tests/e2e/conftest.py` |
+| `pipelex-demo-vibe/` | 1 | `PipeRunMode` in `tests/e2e/conftest.py` |
 
 Clean for this wave: `pipelex-api/`, `pipelex-transport/`, `pipelex-daytona-sandbox/`, `pipelex-worker/`, `pipelex-starter-python/`, `pipelex-relay/`, `n8n-nodes-pipelex/`, `sandbox/`.
+
+> **Enumerate the workspace, do not hand-list it.** The first pass at this table iterated a *hardcoded* repo list and silently missed the last six rows — every one of them a real breaking site, and every one invisible because a repo absent from both columns reads exactly like a repo that was checked and cleared. Re-measure with `for repo in $(ls -d */ | tr -d '/')`, and note that the `_*` directories are worktrees of `pipelex/` itself, not consumers.
 
 **`conformance/` and `docs/specs/pipelex-transport-boundary.md` need no edit for *this* wave** — none of the four moved leaves is on `ALLOWED_SURFACE`. They are stale for the **hub track's** wave and were already so before this one: both still pin `pipelex.pipeline.job_metadata` and `pipelex.graph.trace_context`, which moved to `pipelex/system/` when the hub split landed. That is the standing evidence this sweep is still open.
 

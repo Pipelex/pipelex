@@ -269,7 +269,7 @@ ROOT = os.getcwd()
 SNIP = '''
 import sys, importlib
 importlib.import_module(%r)
-I = {"libraries", "pipe_operators", "pipe_controllers", "codegen", "builder", "interpreter_plugins", "pipe_signature", "pipe_machinery", "mthds_parsing"}
+I = {"libraries", "pipe_operators", "pipe_controllers", "codegen", "builder", "interpreter_plugins", "pipe_signature", "pipe_machinery", "mthds_parsing", "pipeline", "pipe_run"}
 bad = sorted(n for n in sys.modules if n.startswith("pipelex.") and len(n.split(".")) > 1 and n.split(".")[1] in I)
 print(len(bad), int("pipelex.interpreter_hub" in sys.modules))
 '''
