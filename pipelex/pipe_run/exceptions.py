@@ -1,18 +1,17 @@
 from pipelex.base_exceptions import ErrorDomain, PipelexError
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 class AsyncExecutionNotEnabledError(PipelexError):
     """Raised when a route that depends on asynchronous execution is hit on a
     deployment that does not have an async execution backend enabled.
 
-    Backend-neutral on purpose, and it lives in core precisely because it is the
-    shared contract between the runner API — which maps it to an HTTP status (501)
-    — and any async-execution backend plugin that raises it: the Temporal plugin
-    today, other async backends (e.g. Mistral Workflows) as support lands. Core
-    itself never raises it. The class name, title, and detail therefore talk about
-    *async execution* as a capability of the deployment, not about any specific
-    backend brand.
+    Backend-neutral on purpose, because it is the shared contract between the
+    runner API — which maps it to an HTTP status (501) — and any async-execution
+    backend plugin that raises it: the Temporal plugin today, other async backends
+    (e.g. Mistral Workflows) as support lands. Nothing in this repo raises it. The
+    class name, title, and detail therefore talk about *async execution* as a
+    capability of the deployment, not about any specific backend brand.
 
     ``error_domain = CONFIG`` because the caller's request is well-formed; what
     is missing is server-side configuration. The pipelex-api layer maps this
@@ -48,13 +47,6 @@ class PipeRunParamsError(PipelexError):
 
 class BatchParamsError(PipelexError):
     pass
-
-
-class PipeRunError(PipelexError):
-    def __init__(self, message: str, run_mode: PipeRunMode, pipe_code: str):
-        self.run_mode = run_mode
-        self.pipe_code = pipe_code
-        super().__init__(message)
 
 
 class PipeJobError(PipelexError):

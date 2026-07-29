@@ -16,10 +16,10 @@ from pipelex.graph.graphspec import GraphSpec
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_run.exceptions import DryRunGraphNotProducedError
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.runtime_hub import scoped_event_log
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 
 

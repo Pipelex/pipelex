@@ -14,8 +14,8 @@ import pytest
 from pipelex import log
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.cases.documents import DocumentTestCases
 from tests.e2e.pipelex.cv_batch_screening.test_data import CvBatchScreeningTemporalTestData
 

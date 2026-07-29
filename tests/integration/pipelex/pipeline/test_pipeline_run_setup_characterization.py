@@ -60,12 +60,12 @@ from pipelex.interpreter_hub import (
     set_current_library,
 )
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.runtime_hub import get_report_delegate, get_telemetry_manager
 from pipelex.system.configuration.configs import NdjsonTracingConfig, PipelineExecutionConfig, TracingBackend
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.telemetry.events import EventName
 
 _CHAR_DOMAIN = "prs_char"

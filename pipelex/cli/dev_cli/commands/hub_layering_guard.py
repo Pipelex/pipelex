@@ -103,11 +103,9 @@ SCAN_ROOTS: tuple[Path, ...] = (SOURCE_ROOT, TESTS_ROOT)
 #: `pipe_blueprint`, `pipe_factory`, `validation`, `template_guard_lint`, `rendering/`) is
 #: `pipelex.pipe_machinery`. What is left in `core/` describes what a method's *values* are, and
 #: nothing in it needs a loaded method — measured: no `pipelex.core.*` module reaches `interpreter_hub`
-#: or loads a module from any of the packages above. (`core.pipes.pipe_output` does still pull in
-#: `pipeline.pipeline_models` for one leaf constant — the known `pipeline` / `pipe_run` placement wart,
-#: which is why the claim is scoped to those packages rather than to "zero interpreter modules".)
-#: A package-granular declaration is only honest when the packages match the layers; naming
-#: `pipelex.core` wholesale is now a claim the measurement supports rather than contradicts.
+#: or loads a single interpreter module. A package-granular declaration is only honest when the
+#: packages match the layers; naming `pipelex.core` wholesale is now a claim the measurement supports
+#: rather than contradicts.
 #:
 #: `pipelex.plugins` and `pipelex.providers` are two entries for what used to be one package, and
 #: both are runtime-layer: `plugins` is the plugin *mechanism* (the contract, the registrar, the

@@ -6,8 +6,8 @@ from pipelex import pretty_print
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.cases.documents import DocumentTestCases
 from tests.e2e.pipelex.pipes.pipe_operators.pipe_llm.pipe_llm_document_inputs import (
     DocumentListAnalysisE2E,

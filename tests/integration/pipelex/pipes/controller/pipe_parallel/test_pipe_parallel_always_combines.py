@@ -14,8 +14,8 @@ import pytest
 
 from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 _LIBRARY_DIR = "tests/integration/pipelex/pipes/controller/pipe_parallel"
 

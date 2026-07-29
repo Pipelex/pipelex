@@ -2,9 +2,10 @@ from abc import abstractmethod
 from typing import Protocol
 
 from pipelex.cogt.exceptions import CogtError
+from pipelex.core.pipes.exceptions import PipeRunError
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.observer.observer_protocol import ObserverProtocol, PayloadKey, PayloadType
-from pipelex.pipe_run.exceptions import PipeRouterError, PipeRunError
+from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_job import PipeJob
 
 

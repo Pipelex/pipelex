@@ -4,7 +4,7 @@ from pytest_mock import MockerFixture
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, StorageTarget
 from pipelex.pipe_run.exceptions import PipeRouterError, WebhookDeliveryError
 from pipelex.pipe_run.pipe_run import PipeRun
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 @pytest.mark.asyncio(loop_scope="class")

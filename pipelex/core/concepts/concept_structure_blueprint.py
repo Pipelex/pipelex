@@ -5,7 +5,7 @@ from typing import Any, Self
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
-from pipelex.pipe_run.pipe_run_params import PipeRunParamKey
+from pipelex.system.pipe_run_param_key import PipeRunParamKey
 
 # Reserved field names that cannot be used in concept structures
 # These are either Pydantic BaseModel reserved attributes or internal metadata fields

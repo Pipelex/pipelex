@@ -26,8 +26,8 @@ from mthds.protocol.pipeline_inputs import PipelineInputs
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.interpreter_hub import get_concept_library, get_library_manager
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.tabular.csv_codec import csv_from_list_content
 
 if TYPE_CHECKING:

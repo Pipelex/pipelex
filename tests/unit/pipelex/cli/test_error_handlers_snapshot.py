@@ -17,7 +17,7 @@ from pipelex.cli.error_handlers import ErrorContext, handle_model_availability_e
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture

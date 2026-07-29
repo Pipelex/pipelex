@@ -13,8 +13,8 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.e2e.pipelex.concepts.nested_concepts.generated_models.nested_concepts_test__customer import Customer
 from tests.e2e.pipelex.concepts.nested_concepts.generated_models.nested_concepts_test__invoice import Invoice
 from tests.e2e.pipelex.concepts.nested_concepts.generated_models.nested_concepts_test__line_item import LineItem

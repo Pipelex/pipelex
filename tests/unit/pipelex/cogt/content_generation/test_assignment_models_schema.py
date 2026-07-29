@@ -6,8 +6,8 @@ from pipelex.cogt.content_generation.assignment_models import LLMAssignment, Obj
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 class SampleOutputModel(BaseModel):

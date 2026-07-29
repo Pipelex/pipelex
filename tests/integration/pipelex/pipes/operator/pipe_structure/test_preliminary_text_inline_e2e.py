@@ -15,10 +15,10 @@ from pipelex.interpreter_hub import get_native_concept, get_pipe_router, get_req
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_operators.structure.pipe_structure import PipeStructure
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.runtime_hub import get_report_delegate
 from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 def _count_llm_report_calls(report_spy: MockType) -> int:

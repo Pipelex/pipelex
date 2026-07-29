@@ -16,7 +16,6 @@ from pipelex.interpreter_hub import (
     set_current_library,
 )
 from pipelex.pipe_run.pipe_job import PipeJob
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import (
     FORCE_DRY_RUN_MODE_ENV_KEY,
     VariableMultiplicity,
@@ -27,6 +26,7 @@ from pipelex.runtime_hub import get_event_log_override, get_otel_tracer, get_rep
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.environment import get_optional_env
 from pipelex.system.job_metadata import OtelContext
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.otel_factory import OtelFactory

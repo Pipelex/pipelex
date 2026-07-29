@@ -1,9 +1,10 @@
 from pipelex.base_exceptions import ErrorDomain
 from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
-from pipelex.pipe_run.exceptions import PipeRouterError, PipeRunError
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.core.pipes.exceptions import PipeRunError
+from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipeline.exceptions import PipelineExecutionError
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 def _make_pipeline_execution_error(cause: BaseException | None) -> PipelineExecutionError:

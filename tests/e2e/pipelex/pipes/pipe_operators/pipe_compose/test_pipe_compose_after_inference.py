@@ -4,8 +4,8 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.core.stuffs.document_content import DocumentContent
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.cases import DocumentTestCases
 from tests.e2e.pipelex.pipes.pipe_operators.pipe_compose.cv_job_matching_itvw_sheet import InterviewSheet
 

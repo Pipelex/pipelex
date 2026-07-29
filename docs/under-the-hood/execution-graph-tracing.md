@@ -62,7 +62,7 @@ pipelex run pipe my_pipe --dry-run --graph --mock-inputs
 
 ```python
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 # Execute with graph tracing via config
 runner = PipelexMTHDSProtocol(

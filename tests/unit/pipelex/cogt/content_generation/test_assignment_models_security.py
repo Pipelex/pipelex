@@ -13,8 +13,8 @@ from pipelex.cogt.content_generation.exceptions import UnsafeSchemaError
 from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 def _make_stub_job_metadata() -> JobMetadata:

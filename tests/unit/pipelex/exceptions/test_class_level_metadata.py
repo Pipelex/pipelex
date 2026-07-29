@@ -18,10 +18,10 @@ from pipelex.cogt.exceptions import (
 )
 from pipelex.core.stuffs.exceptions import DateContentError
 from pipelex.mthds_parsing.exceptions import MthdsParserError
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError, ValidateBundleError
 from pipelex.plugins.exceptions import UnknownSecretsMethodError, UnknownStorageMethodError
 from pipelex.system.exceptions import EnvVarNotFoundError
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.pipelex_service.exceptions import (
     GatewayTermsNotAcceptedError,
     PipelexServiceConfigValidationError,

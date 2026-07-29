@@ -5,8 +5,8 @@ import pytest
 from pipelex import pretty_print
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.e2e.pipelex.pipes.pipe_operators.pipe_search.test_data import PipeSearchTestCases
 
 LIBRARY_DIRS = ["tests/e2e/pipelex/pipes/pipe_operators/pipe_search"]

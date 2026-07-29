@@ -153,25 +153,27 @@ Two are whole tiny modules that move as-is. Two are single symbols inside larger
 
 ### Phase 2 — relocate the four leaves
 
-- [ ] 2.1 Move `pipeline/pipeline_models.py` → `pipelex/system/` (D-1). Whole module, one enum. Update `core/pipes/pipe_output.py`.
-- [ ] 2.2 Move `pipe_run/pipe_run_mode.py` → `pipelex/system/`. Whole module. Its `GraphSpecMode` import is fine post-Phase-1 (runtime → runtime). Update `cogt/content_generation/cogt_run_params.py` and `core/pipes/inputs/exceptions.py`, plus every in-repo import site — this is the widest one.
-- [ ] 2.3 Extract `PipeRunParamKey` out of `pipe_run/pipe_run_params.py` into its own module under `pipelex/system/`. Update `concept_structure_blueprint.py`, `pipe_run_params.py` itself, and `pipe_operators/llm/pipe_llm.py`.
-- [ ] 2.4 Move `PipeRunError` out of `pipe_run/exceptions.py` (D-2 says the leaf, not the module). Decide whether its siblings that subclass it travel with it or import back up — check `PipeJobError`, `DeliveryError` and the rest before splitting. Update `core/pipes/inputs/exceptions.py`. Fix `AsyncExecutionNotEnabledError`'s stale "it lives in core" docstring while you are in the file.
-- [ ] 2.5 Re-run measurement command 1 for every entry point in `RUNTIME_LAYER_ENTRY_POINTS`. Expected: the empty list, for all of them.
+- [x] 2.1 `SpecialPipelineId` → `pipelex/system/job_metadata.py`; `pipeline/pipeline_models.py` deleted.
+- [x] 2.2 `pipe_run/pipe_run_mode.py` → `pipelex/system/pipe_run_mode.py`, whole module, every in-repo import site rewritten (the widest one).
+- [x] 2.3 `PipeRunParamKey` extracted to `pipelex/system/pipe_run_param_key.py`.
+- [x] 2.4 `PipeRunError` → `pipelex/core/pipes/exceptions.py`. **No sibling in `pipe_run/exceptions.py` subclasses it** — `PipeJobError`, `DeliveryError`, `PipeRouterError` and the rest all derive from `PipelexError` directly — so nothing travels with it and no import back up is needed. `AsyncExecutionNotEnabledError`'s stale "it lives in core" docstring corrected.
+- [x] 2.5 Measurement command 1 re-run for every entry point in `RUNTIME_LAYER_ENTRY_POINTS`: **zero `pipeline` and zero `pipe_run` modules in all nine.** The residue is `pipelex.graph.*`, which Phase 1 made runtime-layer — exactly what exit criterion 2 predicts. Measurement command 2 is down from nine edges to five, all into `graph`.
+
+**Deviation from D-1, recorded.** D-1 recommended `pipelex/system/` for all four leaves; three went there, `PipeRunError` did not. Consistency of destination is not the criterion — what the symbol *is* decides. Three are run-scope directives and enums, which is the `JobMetadata` / `TraceContext` precedent D-1 cites. The fourth is the base class of two runtime-layer errors (`PipeRunInputsError`, `OptionalValueAbsentError` in `core.pipes.inputs.exceptions`), so it belongs with the pipe-error family in `core/pipes/exceptions.py` — and filing it there also lands it in the same error-reference section as those two subclasses, where `system/` would have put the base one section away from them. (A `system/exceptions.py` placement was first argued against on the grounds that the config bootstrap would then load `pipe_run_mode` → `graph.graphspec` for nothing. **That argument is false and was dropped**: measured, `import pipelex.config` already loads both, through `runtime_hub` → `content_generator_protocol` → `assignment_models` → `cogt_run_params`. The subclass relationship is the whole reason.) `SpecialPipelineId` likewise folded into `system/job_metadata.py` rather than getting a module of its own: it is the vocabulary of `pipeline_run_id`, which is `JobMetadata`'s field, and that module already hosts two sibling enums.
 
 ### Phase 3 — widen the predicate and delete the caveat
 
-- [ ] 3.1 Add `pipeline` and `pipe_run` to `INTERPRETER_PACKAGES` in `tests/unit/pipelex/test_runtime_layer_import_closure.py`. Do this **after** 2.5 measures clean, not before — a red test here is the confirmation, not the goal.
-- [ ] 3.2 Update the module docstring on that test: the "two documented interpreter homes are absent, and their absence is a known wart" note goes away entirely.
-- [ ] 3.3 Delete the caveat at all **six** sites. The deferred-placement note said four; it is six, and missing one leaves a doc claiming a wart that no longer exists:
+- [x] 3.1 `pipeline` and `pipe_run` added to `INTERPRETER_PACKAGES`, after 2.5 measured clean.
+- [x] 3.2 The closure test's module docstring now states the property unqualified, and records where each leaf went.
+- [x] 3.3 Caveat deleted at all **six** sites (the doc's machine-checked `INTERPRETER = {…}` snippet was a seventh edit, forced by `test_the_interpreter_package_set_matches_the_documented_one`). The deferred-placement note said four; it is six, and missing one leaves a doc claiming a wart that no longer exists:
     - `pipelex/runtime_hub.py` — module docstring ("Two interpreter-named packages are deliberately absent…").
     - `pipelex/cli/dev_cli/commands/hub_layering_guard.py` — the `RUNTIME_LAYER_PACKAGES` note ("`core.pipes.pipe_output` does still pull in `pipeline.pipeline_models`…").
     - `tests/unit/pipelex/test_runtime_layer_import_closure.py` — the `INTERPRETER_PACKAGES` note (3.2 above).
     - `docs/contribute/hub-layering.md` — "Two interpreter-named packages are deliberately **not** on the list".
     - `docs/contribute/hub-layering.md` — "Where core splits", the parenthetical on `core.pipes.pipe_output`.
     - `docs/contribute/hub-layering.md` — "The property — the import-closure test", "What the predicate still cannot name is `pipeline` and `pipe_run`".
-- [ ] 3.4 `docs/contribute/hub-layering.md` gains the positive statements this track earned: `graph`/`tracing`/`observer`/`errors` are runtime-layer and why; the `graph_rendering` eviction goes in "Known inversions" as a *fixed* one, next to the `pipelex.plugins` worked example it rhymes with — including the lesson, which is the sharpest one this track produced: **an undeclared package is not neutral, it is unpoliced.**
-- [ ] 3.5 CHANGELOG: breaking. Public import paths move for `SpecialPipelineId`, `PipeRunMode`, `PipeRunParamKey`, `PipeRunError`, and for `graph_rendering`'s bundle helpers. Give the old → new table.
+- [x] 3.4 `docs/contribute/hub-layering.md` gains the positive statements this track earned: `graph`/`tracing`/`observer`/`errors` are runtime-layer and why; the `graph_rendering` eviction goes in "Known inversions" as a *fixed* one, next to the `pipelex.plugins` worked example it rhymes with — including the lesson, which is the sharpest one this track produced: **an undeclared package is not neutral, it is unpoliced.**
+- [x] 3.5 CHANGELOG: breaking. Public import paths move for `SpecialPipelineId`, `PipeRunMode`, `PipeRunParamKey`, `PipeRunError`, and for `graph_rendering`'s bundle helpers. Give the old → new table.
 
 **🛑 CHECKPOINT 2** — the property is unqualified: every runtime entry point loads zero modules from any interpreter package, stated by a predicate that names them all. Gates: `make agent-check`, `make check-hub-layering`, full `make agent-test`, `make drift-check`.
 

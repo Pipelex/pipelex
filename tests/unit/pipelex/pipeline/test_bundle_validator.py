@@ -13,10 +13,11 @@ from pydantic import BaseModel, ValidationError
 from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexError
+from pipelex.core.pipes.exceptions import PipeRunError
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
-from pipelex.pipe_run.exceptions import DryRunError, PipeRunError
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunStatus
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 
 

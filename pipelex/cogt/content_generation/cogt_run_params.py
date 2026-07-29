@@ -23,7 +23,7 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 def check_mock_usage_requires_dry(*, run_mode: PipeRunMode, is_mock_usage: bool) -> None:

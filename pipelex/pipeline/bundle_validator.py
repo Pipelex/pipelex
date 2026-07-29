@@ -52,11 +52,11 @@ from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_run import PipeRun
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.runtime_hub import get_telemetry_manager, scoped_content_generator
 from pipelex.system.configuration.configs import PipelineExecutionConfig
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error

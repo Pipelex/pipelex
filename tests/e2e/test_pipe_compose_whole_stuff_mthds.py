@@ -8,10 +8,10 @@ import pytest
 from pipelex import pretty_print
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.bundle_validator import DryRunStatus
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 _FIXTURE_DIR = Path(__file__).parent / "fixtures" / "compose_whole_stuff"
 _BUNDLE = _FIXTURE_DIR / "compose_whole_stuff.mthds"

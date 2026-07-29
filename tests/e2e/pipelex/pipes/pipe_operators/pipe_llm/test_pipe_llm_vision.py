@@ -4,8 +4,8 @@ import pytest
 
 from pipelex import pretty_print, pretty_print_md
 from pipelex.core.stuffs.image_content import ImageContent
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.e2e.pipelex.pipes.pipe_operators.pipe_llm.pipe_llm_vision import VisionAnalysisE2E
 from tests.integration.pipelex.cogt.test_data import LLMVisionTestCases
 from tests.integration.pipelex.test_data import PipeTestCases

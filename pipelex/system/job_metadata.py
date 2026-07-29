@@ -8,6 +8,17 @@ from pipelex.system.telemetry.otel_context import OtelContext
 from pipelex.system.trace_context import TraceContext
 
 
+class SpecialPipelineId(StrEnum):
+    """The reserved `pipeline_run_id` values, for runs that have no id of their own.
+
+    Lives beside `JobMetadata` because `pipeline_run_id` is its field: this enum is that field's
+    vocabulary, and `PipeOutput.pipeline_run_id` defaults to `UNTITLED` from here.
+    """
+
+    UNTITLED = "untitled"
+    DRY_RUN_UNTITLED = "dry_run_untitled"
+
+
 class JobCategory(StrEnum):
     MOCK_JOB = "mock_job"
     LLM_JOB = "llm_job"

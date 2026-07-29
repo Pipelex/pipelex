@@ -77,9 +77,7 @@ Placement is decided by *kind*, not by who currently imports it. Several accesso
 
 ## Why the boundary exists
 
-`runtime_hub` must not name anything from `libraries`, `pipe_operators`, `pipe_controllers`, `codegen`, `builder`, `interpreter_plugins`, `pipe_machinery`, `pipe_signature` or `mthds_parsing` at module level. That list is now stated in whole top-level packages, which is the point of the modularity moves: it used to have to trail "…or the Pipe-touching modules of `core.pipes`", because some of what it forbids lived under a runtime-named package. Those module-level imports exist only to type the getters, but they are what made a single hub drag the entire method interpreter into every consumer that just wanted `get_console()`.
-
-Two interpreter-named packages are deliberately **not** on the list — `pipeline` and `pipe_run` — because leaf models of theirs already land in every runtime closure. That is a placement wart, not a broken arrow, and it is the one qualification the property below carries; see [The property — the import-closure test](#the-property-the-import-closure-test) for the remedy.
+`runtime_hub` must not name anything from `libraries`, `pipe_operators`, `pipe_controllers`, `codegen`, `builder`, `interpreter_plugins`, `pipe_machinery`, `pipe_signature`, `mthds_parsing`, `pipeline` or `pipe_run` at module level. That list is now stated in whole top-level packages, which is the point of the modularity moves: it used to have to trail "…or the Pipe-touching modules of `core.pipes`", because some of what it forbids lived under a runtime-named package. Those module-level imports exist only to type the getters, but they are what made a single hub drag the entire method interpreter into every consumer that just wanted `get_console()`.
 
 The property that matters is measurable: **importing the Pipelex runtime loads zero modules from any of the packages named above.** That is both the assertion the closure test pins and the outward-facing claim — the inference engine does not know the MTHDS language exists, so you can embed it without loading a line of the parser, the pipe machinery, or a single pipe kind. Verify it from the repo root on a synced venv:
 
@@ -90,7 +88,7 @@ from pathlib import Path
 
 import pipelex.cogt.content_generation.content_generator  # noqa: F401
 
-INTERPRETER = {"libraries", "pipe_operators", "pipe_controllers", "codegen", "builder", "interpreter_plugins", "pipe_machinery", "pipe_signature", "mthds_parsing"}
+INTERPRETER = {"libraries", "pipe_operators", "pipe_controllers", "codegen", "builder", "interpreter_plugins", "pipe_machinery", "pipe_signature", "mthds_parsing", "pipeline", "pipe_run"}
 loaded = {name: mod for name, mod in sys.modules.items() if name.startswith("pipelex.")}
 interpreter = sorted(n for n in loaded if n.split(".")[1] in INTERPRETER)
 sloc = 0
@@ -118,7 +116,7 @@ For a long time `core/` held two different kinds of thing:
 
 One model stayed behind on purpose, and it is the interesting case. `PipelexBundleBlueprintValidationErrorData` is raised by the parser but imported by `pipeline/` and `libraries/`, which carry it into every runtime-layer import closure. Filing it with the parser would have made the boundary unenforceable for `mthds_parsing` — the closure predicate would have needed a permanent exclusion for it. It lives in `core.exceptions` instead, beside the two sibling structured error-data models it shares `PipeValidationErrorType` with. **Moving the leaf is what buys the clean predicate**; excluding it would only have recorded the problem.
 
-So the declaration names `pipelex.core` wholesale, which is a claim the measurement now supports: every `pipelex.core.*` module loads zero modules from the interpreter packages the predicate names, and none reaches `interpreter_hub`. (`core.pipes.pipe_output` still pulls in `pipeline.pipeline_models` for one leaf constant — the `pipeline` / `pipe_run` wart, unchanged by this and tracked below.) It once listed core's data-model packages one by one, and that enumeration was the shape of the problem — a package-granular declaration is only honest when the packages match the layers.
+So the declaration names `pipelex.core` wholesale, which is a claim the measurement now supports: every `pipelex.core.*` module loads zero modules from the interpreter packages the predicate names, and none reaches `interpreter_hub`. It once listed core's data-model packages one by one, and that enumeration was the shape of the problem — a package-granular declaration is only honest when the packages match the layers.
 
 The dividing line is worth stating as a rule of thumb: **if it names a `Pipe`, it belongs to the interpreter layer.**
 
@@ -235,7 +233,16 @@ The entry points are the inference layer, `runtime_hub` itself, `providers.built
 
 Its predicate is now a single membership test over whole top-level packages — no per-module list and no exclusions. It used to need both: core's Pipe-machinery modules had to be named one by one (most were caught only *transitively*, through the `pipe_operators` / `libraries` they pull in, and `pipe_blueprint` pulled in none of it, so a runtime-layer import of it would have passed a package-only predicate), and `core.bundles.exceptions` had to be excluded by exact match because its validation-error data landed in every runtime closure. Both disappeared when the modules moved: the machinery to `pipe_machinery`, the parser to `mthds_parsing`, and the one leaf model to `core.exceptions`. **A package-granular predicate is honest only once the packages match the layers** — that is the whole argument for the moves, stated as a check.
 
-What the predicate still cannot name is `pipeline` and `pipe_run`: interpreter-named homes whose leaf models already land in every runtime closure — `core.pipes.pipe_output` reaches `pipeline.pipeline_models` for a single leaf constant, for instance. Naming them today would fail every entry point on a placement wart rather than a broken arrow. The remedy is the one `mthds_parsing` used: move the leaves to a runtime-layer home first, then widen the predicate.
+The predicate now names **every** interpreter package. `pipeline` and `pipe_run` were the last two absent, and the reason was placement, not a broken arrow: four leaf models of theirs landed in every runtime closure, so naming them would have failed every entry point over an address. The remedy was the one `mthds_parsing` used — move the leaves first, then widen the predicate — and where each leaf went is decided by what it *is*, not by which package used to hold it:
+
+| leaf | was | is now | why there |
+| --- | --- | --- | --- |
+| `SpecialPipelineId` | `pipeline.pipeline_models` | `system.job_metadata` | it is the vocabulary of `pipeline_run_id`, and that is `JobMetadata`'s field |
+| `PipeRunMode` | `pipe_run.pipe_run_mode` | `system.pipe_run_mode` | a run-scope directive, not one of a method's values |
+| `PipeRunParamKey` | inside `pipe_run.pipe_run_params` | `system.pipe_run_param_key` | same, and `core.concepts` needs it as its reserved-names list |
+| `PipeRunError` | `pipe_run.exceptions` | `core.pipes.exceptions` | the runtime layer *subclasses* it — `PipeRunInputsError` and `OptionalValueAbsentError` derive from it in `core.pipes.inputs` |
+
+Note the last row does not follow the first three into `system/`. Consistency of destination is not the criterion — what the symbol *is* decides. Three are run-scope directives and enums; the fourth is the base of a pipe-error family whose other members already live in `core/pipes/`, and filing it with them also lands it in the same error-reference section as the two subclasses that derive from it.
 
 The detector runs in a subprocess, so its logic lives in a `textwrap.dedent` string that no linter or type checker sees — and a predicate that has quietly stopped detecting would make every entry point pass *vacuously*. Three guards close that, each covering what the others cannot:
 

@@ -10,8 +10,8 @@ from PIL import Image
 
 from pipelex import pretty_print
 from pipelex.core.stuffs.image_content import ImageContent
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
 from tests.cases import ImageTestCases
 

@@ -19,6 +19,7 @@ from pipelex.core.memory.exceptions import (
 from pipelex.core.pipes.exceptions import (
     PipeFactoryError,
     PipeOperatorModelChoiceError,
+    PipeRunError,
     PipeValidationError,
 )
 from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
@@ -39,7 +40,7 @@ from pipelex.libraries.exceptions import (
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_controllers.exceptions import PipeControllerError, PipeControllerOutputConceptMismatchError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
-from pipelex.pipe_run.exceptions import BatchParamsError, PipeRouterError, PipeRunError, PipeRunParamsError
+from pipelex.pipe_run.exceptions import BatchParamsError, PipeRouterError, PipeRunParamsError
 from pipelex.pipeline.exceptions import (
     PipeExecutionError,
     PipelineExecutionError,

@@ -42,6 +42,7 @@ own page. Classes are grouped by subsystem.
 - [`PipeInputError`](pipe-input-error.md) — Pipe input
 - [`PipeInputsFactoryError`](pipe-inputs-factory-error.md) — Pipe inputs factory
 - [`PipeOperatorModelChoiceError`](pipe-operator-model-choice-error.md) — Pipe operator model choice
+- [`PipeRunError`](pipe-run-error.md) — Pipe run
 - [`PipeRunInputsError`](pipe-run-inputs-error.md) — Pipe run inputs
 - [`StructureClassError`](structure-class-error.md) — Structure class
 - [`StructureValidationError`](structure-validation-error.md) — Structure validation

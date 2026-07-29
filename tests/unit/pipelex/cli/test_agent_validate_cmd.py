@@ -10,8 +10,8 @@ import typer
 
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.validate.bundle_cmd import validate_bundle_cmd
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.exceptions import PipelineExecutionError
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 if TYPE_CHECKING:
     from pathlib import Path

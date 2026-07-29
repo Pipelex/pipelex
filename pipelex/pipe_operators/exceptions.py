@@ -1,5 +1,5 @@
 from pipelex.base_exceptions import PipelexError
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 class PipeOperatorModelAvailabilityError(PipelexError):

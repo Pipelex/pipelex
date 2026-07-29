@@ -59,7 +59,7 @@ From Python, the same knobs live on the runner — the backend comes from config
 ```python
 from pathlib import Path
 
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 runner = PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY)

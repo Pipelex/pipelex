@@ -13,12 +13,15 @@ It does not any more: every one of those modules now lives under `pipe_machinery
 so the top-level package set says exactly what it means, with no per-module list and no exclusion. A
 package-granular predicate is only honest once the packages match the layers, which is what M1 bought.
 
-Two documented interpreter homes are deliberately absent, and their absence is a known wart rather than
-an oversight: `pipeline` and `pipe_run` already leak leaf models into every runtime closure —
-`SpecialPipelineId`, `PipeRunMode`. Naming them here would fail the test over a *placement* problem,
-not a broken hub arrow. See `wip/pr-1062-review-notes.md`. The third leak of that family is gone:
-the bundle validation-error data that `pipeline/` carries into every closure now lives in
-`core.exceptions`, beside the two sibling error-data models, so `mthds_parsing` needs no exclusion.
+The set below now names every interpreter package, with no exclusion and no qualification. `pipeline`
+and `pipe_run` were the last two absent, and their absence was a *placement* problem rather than a
+broken hub arrow: four leaf models of theirs landed in every runtime closure, so naming them here
+would have failed every entry point over an address. The remedy was the one `mthds_parsing` used —
+move the leaves to a runtime-layer home, then widen the predicate. `SpecialPipelineId` is now in
+`system.job_metadata` beside the `pipeline_run_id` it names, `PipeRunMode` and `PipeRunParamKey` are
+`system.pipe_run_mode` / `system.pipe_run_param_key`, and `PipeRunError` sits in
+`core.pipes.exceptions` with the runtime-layer subclasses that derive from it. Moving the leaf is
+what buys the clean predicate; excluding it would only have recorded the problem.
 
 Run in a subprocess so the closure is exactly what the entry point pulls in: an in-process
 `sys.modules` check would see everything the test session already imported.
@@ -82,9 +85,9 @@ SUBPROCESS_TIMEOUT_SECONDS = 300
 #:
 #: A real module-level constant, handed to the subprocess as argv rather than baked into the script
 #: string below. That is deliberate: while these names lived *inside* the `textwrap.dedent` string,
-#: nothing type-checked, linted or grepped them, and reading them back out took a regex. Two
-#: documented interpreter homes are absent, and their absence is a known wart rather than an
-#: oversight — see this module's docstring.
+#: nothing type-checked, linted or grepped them, and reading them back out took a regex. The set is
+#: complete — every interpreter package is named — which is what makes the property unqualified;
+#: see this module's docstring for the two that were absent longest and why.
 INTERPRETER_PACKAGES: tuple[str, ...] = (
     "libraries",
     "pipe_operators",
@@ -99,6 +102,9 @@ INTERPRETER_PACKAGES: tuple[str, ...] = (
     "pipe_signature",
     # The MTHDS parser and its blueprint, hoisted out of `core/`.
     "mthds_parsing",
+    # The two interpreter homes the predicate could not name until their leaf models moved out.
+    "pipeline",
+    "pipe_run",
 )
 
 _CLOSURE_SCRIPT = textwrap.dedent(

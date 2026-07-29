@@ -23,10 +23,10 @@ from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.exceptions import DryRunGraphNotProducedError
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_run import PipeRun
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.execution_seams import prepare_pipe_job
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.runtime_hub import scoped_content_generator, scoped_event_log
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 

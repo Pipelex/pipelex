@@ -20,9 +20,9 @@ from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.graph.graphspec import GraphSpecMode
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.configuration.configs import NdjsonTracingConfig, PipelineExecutionConfig, TracingBackend
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 _DIRECT_DOMAIN = "direct_tracing_assembly"
 _DIRECT_MTHDS = f"""

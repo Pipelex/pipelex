@@ -1,8 +1,8 @@
 from pipelex.base_exceptions import ErrorDomain, PipelexError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.memory.absence import AbsenceRecord
-from pipelex.pipe_run.exceptions import PipeRunError
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.core.pipes.exceptions import PipeRunError
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 class InputStuffSpecsError(PipelexError):
