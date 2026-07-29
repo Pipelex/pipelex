@@ -1,19 +1,36 @@
 # Complete the layer boundary — placement, so the predicate can say what it means
 
-**Status:** plan, drafted 2026-07-29 against `dev` at `8c0b99b3a` (the base of `fix/Codegen-lint-clean`). Nothing implemented. Every number below was measured on that tree, and the recipe to reproduce each one is inline — no external tooling required.
+**Status: DONE — this is the PR's guide, not an open plan.** Implemented on `refactor/Layer-boundary`, off `dev` at `123d81f3b`, in three commits (one per phase boundary). Every number below was measured on that tree, and every measurement was re-run after each phase; the recipes are inline so a reviewer can reproduce any claim in two minutes without external tooling. The one remaining open item is [Phase 4](#phase-4--cross-repo-release-gated), which is release-gated by construction and folded into a sweep that was already open.
 
-**Where to work:** the `pipelex/` worktree, on a branch off `dev` (e.g. `refactor/Layer-placement`), normal PR back to `dev`. **Do not start before PR [#1070](https://github.com/Pipelex/pipelex/pull/1070) merges** — it touches `codegen/emitters/` and `core/concepts/structure_generation/`, and this track touches `core/concepts/concept_structure_blueprint.py`; the overlap is small but the branch bases should be linear.
+## For a reviewer, in one screen
 
-**What this finishes.** The hub split drew the boundary and made it enforceable. It left one thing undone, and the track recorded it honestly rather than fixing it: three top-level packages could not be named in the closure test's `INTERPRETER_PACKAGES`, so the property the whole track exists to state — *importing the runtime loads zero interpreter modules* — still ships with a caveat. The caveat is not repeated in four places, as [`../refactoring/deferred-placement-follow-ups.md`](../refactoring/deferred-placement-follow-ups.md) §3 estimated; it is repeated in **six**, and a caveat repeated six times is a caveat that will go stale in at least one. This plan removes it.
+The hub split drew the runtime/interpreter boundary and made it enforceable. It shipped with a caveat repeated in **six** places: two interpreter packages could not be named in the closure test's predicate, so *"importing the runtime loads zero interpreter modules"* was really *"zero modules from the packages we can name"*. This PR removes the caveat by fixing what caused it, and the measurement turned up one thing the deferral did not know.
+
+**Two findings, two commits, one theme — placement, not indirection.**
+
+1. **`graph` was never an interpreter package, and being undeclared was hiding a live breach** (commit 1). `graph/graph_rendering.py` reached `interpreter_hub` through `pipeline.dry_run_pipeline` — 77 interpreter modules — with every gate green, because both the layer rule and the transitive rule filter candidates through `is_runtime_layer` and `pipelex.graph` was not declared. **An undeclared package is not neutral, it is unpoliced.** Fixed by splitting the module along the boundary's own question ("do I need a loaded method?") and declaring the four packages that measure clean.
+2. **Four leaf models were filed in the wrong package** (commit 2). They are what put `pipeline` and `pipe_run` in every runtime closure. Moved to runtime-layer homes, then the predicate widened — the same remedy `mthds_parsing` used, and the reason the fix is a move rather than an exclusion.
+
+**What to check hardest, if you only check three things:**
+
+- **The declaration additions are claims, and they are pinned.** `test_the_measured_clean_packages_stay_declared` fails if any of the four names is dropped; negative control run. Without it, deleting an entry left the whole suite green — the exact regression this PR exists to close.
+- **The property is now unqualified.** `INTERPRETER_PACKAGES` names every interpreter package with no exclusion; measurement command 1 returns zero `pipeline` / `pipe_run` modules for all nine runtime entry points. The negative control (`pipelex.interpreter_hub` as an entry point) still fails with an offender list, so the test is not passing vacuously.
+- **`PipeRunError` deliberately does not follow the other three leaves into `system/`.** That is a judgement call, argued in the [D-1 deviation](#deviation-from-d-1-recorded), and one earlier justification for it was **measured false and removed** — see that note.
+
+**Roughly 170 files, but almost all of it is mechanical.** The substantive diff is: `pipelex/graph/graph_rendering.py`, `pipelex/pipeline/bundle_graph_rendering.py` (new), `pipelex/cli/dev_cli/commands/hub_layering_guard.py`, `pipelex/system/pipe_run_mode.py` + `pipe_run_param_key.py` (new/moved), the `PipeRunError` hunk in `pipelex/core/pipes/exceptions.py`, `tests/unit/pipelex/test_runtime_layer_import_closure.py`, and `docs/contribute/hub-layering.md`. Everything else is a one-line import swap, and a missed one is an `ImportError`, never a silent wrong resolution.
+
+**No behavior changes.** Nothing in this PR changes what any code does — only where it lives and what the guard is allowed to see.
+
+**What this finishes.** The hub split drew the boundary and made it enforceable. It left one thing undone, and the track recorded it honestly rather than fixing it: three top-level packages could not be named in the closure test's `INTERPRETER_PACKAGES`, so the property the whole track exists to state — *importing the runtime loads zero interpreter modules* — still ships with a caveat. The caveat is not repeated in four places, as [`../refactoring/deferred-placement-follow-ups.md`](refactoring/deferred-placement-follow-ups.md) §3 estimated; it is repeated in **six**, and a caveat repeated six times is a caveat that will go stale in at least one. This plan removes it.
 
 The measurement also turned up something the deferral did not know: one of those three packages is not an interpreter package at all, and it is hiding a module that loads the entire interpreter.
 
 ## Related documents
 
-- [`pr-1062-review-notes.md`](../pr-1062-review-notes.md) §1 — where the leak was first recorded, from the Codex thread on the closure test. **Partly stale**: it names `core.bundles.exceptions` as the awkward case, and that module no longer exists — the modularity refactors moved it to `core.exceptions`, and it is no longer part of the problem.
-- [`../refactoring/deferred-placement-follow-ups.md`](../refactoring/deferred-placement-follow-ups.md) §3 — the same leak, restated after M1, with the remedy named ("move the leaf models to a runtime-layer home, *then* widen the predicate"). This plan is that remedy, measured.
-- [`hub-split-tracker.md`](hub-split-tracker.md) → [Cross-repo sweep](hub-split-tracker.md#cross-repo-sweep) — **still open and release-gated.** This track's cross-repo work is the same shape and must merge into that sweep rather than open a second one. See [Cross-repo](#cross-repo--fold-into-the-pending-hub-sweep).
-- [`docs/contribute/hub-layering.md`](../../docs/contribute/hub-layering.md) — the shipped specification. It is the thing this plan edits at the end, not the thing it works around.
+- [`pr-1062-review-notes.md`](pr-1062-review-notes.md) §1 — where the leak was first recorded, from the Codex thread on the closure test. **Partly stale**: it names `core.bundles.exceptions` as the awkward case, and that module no longer exists — the modularity refactors moved it to `core.exceptions`, and it is no longer part of the problem.
+- [`../refactoring/deferred-placement-follow-ups.md`](refactoring/deferred-placement-follow-ups.md) §3 — the same leak, restated after M1, with the remedy named ("move the leaf models to a runtime-layer home, *then* widen the predicate"). This plan is that remedy, measured.
+- [`hub-split-tracker.md`](hub/hub-split-tracker.md) → [Cross-repo sweep](hub/hub-split-tracker.md#cross-repo-sweep) — **still open and release-gated.** This track's cross-repo work is the same shape and must merge into that sweep rather than open a second one. See [Cross-repo](#cross-repo--fold-into-the-pending-hub-sweep).
+- [`docs/contribute/hub-layering.md`](../docs/contribute/hub-layering.md) — the shipped specification. It is the thing this plan edits at the end, not the thing it works around.
 
 ## The measurement — reproduce it in two minutes
 
@@ -59,7 +76,7 @@ EOF
 
 Command 3 is the one that changed this plan's shape. Run it before trusting anything below.
 
-## What actually leaks
+## What actually leaked
 
 Command 2 returns exactly nine edges, from eight files. This is the complete surface — there is no long tail:
 
@@ -125,13 +142,16 @@ Two are whole tiny modules that move as-is. Two are single symbols inside larger
 
 **A note on `pipe_run/exceptions.py`.** `AsyncExecutionNotEnabledError`'s docstring, in that same file, says *"it lives in core precisely because it is the shared contract between the runner API … and any async-execution backend plugin"*. It does not live in core. That docstring is evidence the module's placement was already thought to be wrong once, and it is a free doc fix whichever way D-2 goes.
 
-## Decisions to settle before coding
+## Decisions — settled, with the two that moved
+
+Recorded as drafted. Two were revised during implementation and both revisions are noted inline at the phase that made them: **D-3** (`_sanitize_graph_name` moved with its only caller rather than staying behind) and **D-1** (`PipeRunError` did not follow the other three leaves into `system/`). D-2, D-4 and D-5 landed exactly as recommended.
+
 
 - **D-1 — destination for the relocated leaves.** Recommended: **`pipelex/system/`**. This is not a new judgment call, it is the precedent the hub track already set — `JobMetadata` moved to `system/job_metadata.py`, `TraceContext` to `system/trace_context.py`, `DataInclusionConfig` to `system/data_inclusion_config.py`, all for exactly this reason. The alternative, `pipelex/core/`, reads worse: `core/` is documented as describing *what a method's values are*, and a run mode is not a value.
 - **D-2 — `pipe_run`: move the leaves, or split the package the way `core/` was split?** Recommended: **move the leaves.** The split is superficially attractive (only 3 of 15 modules touch the interpreter, and `core/` → `pipe_machinery` is the precedent), but the measurement kills it: declaring `pipe_run` runtime-layer would put `pipe_run_params.py` inside the declaration, and it imports `PipeStackOverflowError` from `pipeline.exceptions` — so the split *also* requires relocating the `pipeline.exceptions` → `validation_errors` → `fixes.planner` chain, which the leaf-move approach removes from the closure for free. The split is strictly more work and strictly more cross-repo churn (`pipe_job` is on the `pipelex-transport` `ALLOWED_SURFACE` and is imported by four sibling repos). Take the leaves.
 - **D-3 — where `graph_rendering.py`'s two halves go.** Recommended: **split it.** The pure half (`GraphFormat`, `render_graph_from_spec`, `_sanitize_graph_name`) stays in `graph/`; the bundle-driven half (`_dry_run_bundle`, `generate_graph_for_bundle`, `generate_view_for_bundle`) moves to `pipelex/pipeline/`, next to the `dry_run_pipeline` it exists to wrap. The alternative — move the whole file to `cli/` because both importers are CLI — is worse: it would strand `render_graph_from_spec`, which is a genuine runtime-layer renderer, behind a CLI import path.
 - **D-4 — how far to extend the declaration.** `graph` and `tracing` are required by this plan. `observer` and `errors` are measured equally clean and are cheap to add in the same commit; `kit` is data files and `language` has interpreter edges, so both stay out. Recommended: declare `graph`, `tracing`, `observer`, `errors` — a partial declaration is what let `graph_rendering` hide, and the fix is to stop leaving measured-clean packages unpoliced.
-- **D-5 — does the closure test name `graph` in `INTERPRETER_PACKAGES`?** No — that is the point of Part 1. `graph` moves into `RUNTIME_LAYER_PACKAGES`; only `pipeline` and `pipe_run` get added to `INTERPRETER_PACKAGES`. Recorded as a decision because [`pr-1062-review-notes.md`](../pr-1062-review-notes.md) and the deferred-placement note both list `graph` alongside the other two, and a reader coming from those docs will expect it on the wrong side.
+- **D-5 — does the closure test name `graph` in `INTERPRETER_PACKAGES`?** No — that is the point of Part 1. `graph` moves into `RUNTIME_LAYER_PACKAGES`; only `pipeline` and `pipe_run` get added to `INTERPRETER_PACKAGES`. Recorded as a decision because [`pr-1062-review-notes.md`](pr-1062-review-notes.md) and the deferred-placement note both list `graph` alongside the other two, and a reader coming from those docs will expect it on the wrong side.
 
 ## Phases
 
@@ -159,6 +179,8 @@ Two are whole tiny modules that move as-is. Two are single symbols inside larger
 - [x] 2.4 `PipeRunError` → `pipelex/core/pipes/exceptions.py`. **No sibling in `pipe_run/exceptions.py` subclasses it** — `PipeJobError`, `DeliveryError`, `PipeRouterError` and the rest all derive from `PipelexError` directly — so nothing travels with it and no import back up is needed. `AsyncExecutionNotEnabledError`'s stale "it lives in core" docstring corrected.
 - [x] 2.5 Measurement command 1 re-run for every entry point in `RUNTIME_LAYER_ENTRY_POINTS`: **zero `pipeline` and zero `pipe_run` modules in all nine.** The residue is `pipelex.graph.*`, which Phase 1 made runtime-layer — exactly what exit criterion 2 predicts. Measurement command 2 is down from nine edges to five, all into `graph`.
 
+<a id="deviation-from-d-1-recorded"></a>
+
 **Deviation from D-1, recorded.** D-1 recommended `pipelex/system/` for all four leaves; three went there, `PipeRunError` did not. Consistency of destination is not the criterion — what the symbol *is* decides. Three are run-scope directives and enums, which is the `JobMetadata` / `TraceContext` precedent D-1 cites. The fourth is the base class of two runtime-layer errors (`PipeRunInputsError`, `OptionalValueAbsentError` in `core.pipes.inputs.exceptions`), so it belongs with the pipe-error family in `core/pipes/exceptions.py` — and filing it there also lands it in the same error-reference section as those two subclasses, where `system/` would have put the base one section away from them. (A `system/exceptions.py` placement was first argued against on the grounds that the config bootstrap would then load `pipe_run_mode` → `graph.graphspec` for nothing. **That argument is false and was dropped**: measured, `import pipelex.config` already loads both, through `runtime_hub` → `content_generator_protocol` → `assignment_models` → `cogt_run_params`. The subclass relationship is the whole reason.) `SpecialPipelineId` likewise folded into `system/job_metadata.py` rather than getting a module of its own: it is the vocabulary of `pipeline_run_id`, which is `JobMetadata`'s field, and that module already hosts two sibling enums.
 
 ### Phase 3 — widen the predicate and delete the caveat
@@ -179,13 +201,14 @@ Two are whole tiny modules that move as-is. Two are single symbols inside larger
 
 ### Phase 4 — cross-repo, release-gated
 
-- [ ] 4.1 Fold this track's moves into the pending hub cross-repo sweep rather than opening a second one. See below.
+- [x] 4.1 Folded into the pending hub cross-repo sweep rather than opening a second one: [`hub/hub-split-tracker.md` → Third wave](hub/hub-split-tracker.md#third-wave--the-layer-placement-track-refactorlayer-boundary) carries the old→new table and the per-repo counts, re-measured 2026-07-29.
+- [ ] 4.2 **Open, and gated on a release** — execute that sweep. Nothing to do until a `pipelex` version carrying these moves is published; until then every consumer is correct on its pinned version.
 
-**🛑 CHECKPOINT 3 = done** — no consumer is on a stale import path, and the sweep table in `hub-split-tracker.md` is closed.
+**🛑 CHECKPOINT 3 — not reached, by design.** The sweep is the hub track's, it was already open before this PR, and it closes when both waves ship together. This PR does not and cannot close it.
 
 ## Cross-repo — fold into the pending hub sweep
 
-The hub track's own [cross-repo sweep](hub-split-tracker.md#cross-repo-sweep) is **still open and release-gated**, and the evidence is easy to see: `conformance/tests/pipelex_transport/test_data.py`'s `ALLOWED_SURFACE` still pins `pipelex.pipeline.job_metadata` and `pipelex.graph.trace_context` — both of which moved to `pipelex/system/` when the hub split landed. Several sibling repos are on the same stale paths.
+The hub track's own [cross-repo sweep](hub/hub-split-tracker.md#cross-repo-sweep) is **still open and release-gated**, and the evidence is easy to see: `conformance/tests/pipelex_transport/test_data.py`'s `ALLOWED_SURFACE` still pins `pipelex.pipeline.job_metadata` and `pipelex.graph.trace_context` — both of which moved to `pipelex/system/` when the hub split landed. Several sibling repos are on the same stale paths.
 
 So this track must not open a second sweep. Its moves get added to the existing one, and both go out on the same release.
 
@@ -205,20 +228,32 @@ Worth stating plainly, because it is the main reason D-2 recommends the leaf mov
 
 ## Exit criteria — measured, not asserted
 
-1. Measurement command 1 returns `[]` for every entry point in `RUNTIME_LAYER_ENTRY_POINTS`.
-2. Measurement command 2 returns only edges into `graph` (which is by then runtime-layer), or nothing.
-3. Measurement command 3 returns no output over `graph/`, `tracing/`, `observer/`, `errors/`.
-4. `INTERPRETER_PACKAGES` names `pipeline` and `pipe_run`; the closure test is green; its negative control (`pipelex.interpreter_hub` as an entry point) still fails with an offender list.
-5. `make check-hub-layering` passes with the four new packages in `RUNTIME_LAYER_PACKAGES`.
-6. `grep -rn 'wart' pipelex/runtime_hub.py pipelex/cli/dev_cli/commands/hub_layering_guard.py tests/unit/pipelex/test_runtime_layer_import_closure.py docs/contribute/hub-layering.md` returns nothing about placement.
+All six re-measured on the final tree. A reviewer can re-run any of them from the repo root.
 
-## Cold-start brief
+1. ✅ Measurement command 1 returns zero `pipeline` / `pipe_run` modules for every entry point in `RUNTIME_LAYER_ENTRY_POINTS`. (The literal `[]` the draft asked for was the wrong bar: the command's prefix filter also matches `pipelex.graph`, which Part 1 made runtime-layer, so `graph.graphspec` legitimately remains in eight of the nine closures.)
+2. ✅ Measurement command 2 is down from nine edges to five, all into `graph`.
+3. ✅ Measurement command 3 returns no output over `graph/`, `tracing/`, `observer/`, `errors/`.
+4. ✅ `INTERPRETER_PACKAGES` names `pipeline` and `pipe_run`; the closure test is green; its negative control (`pipelex.interpreter_hub` as an entry point) still fails with an offender list.
+5. ✅ `make check-hub-layering` passes with the four new packages in `RUNTIME_LAYER_PACKAGES` — and, unlike before, *fails* when the evicted import is put back (negative control, recorded under 1.3).
+6. ✅ That grep returns one hit, and it is a *different*, still-live inversion (`get_pipe_func_executor_registry`, documented as unfixed). Nothing about the `pipeline` / `pipe_run` placement caveat survives anywhere.
 
-Read this file top to bottom, then:
+## What the review found, and what it changed
 
-1. `cd` to the `pipelex/` worktree, `git pull`, confirm #1070 is merged, `make install` if the venv is stale.
-2. Run all three [measurement commands](#the-measurement--reproduce-it-in-two-minutes) and check the numbers still match. If command 3 returns something other than `pipelex.graph.graph_rendering`, a new breach landed and Part 1 needs re-scoping before anything else.
-3. Settle D-1 … D-5 with Louis if they are not already recorded here, then branch off `dev` and start at Phase 1.
-4. Read `docs/contribute/hub-layering.md` before editing any of it — particularly "Where core splits" and "Known inversions", which are where this track's outcome gets written down.
+Each phase was reviewed by an agent given only the diff — no plan, no rationale. Both rounds found real things, and both are worth a reviewer's attention because they are the kind of gap the plan itself could not have caught.
 
-The two files that carry the boundary's machinery are `pipelex/cli/dev_cli/commands/hub_layering_guard.py` (the guard, and the `RUNTIME_LAYER_PACKAGES` declaration) and `tests/unit/pipelex/test_runtime_layer_import_closure.py` (the closure test, and the `INTERPRETER_PACKAGES` declaration). They state the two halves of one boundary and they are edited together; read both before touching either.
+**Round 1 (commit 1).** The four new declarations were pinned by nothing: dropping any of them left the entire suite green, while the guard's own note claimed "the declaration is asserted by a test". That is the same failure mode this PR exists to close, one level up — so it earned a test rather than a note. Second finding: the four relocated test modules landed in `tests/unit/pipelex/pipeline/`, which `tests/CLAUDE.md` did not list, so the documented targeted-test route stopped covering them.
+
+**Round 2 (commit 2).** Two published doc snippets still carried `from pipelex.pipe_run.pipe_run_mode import PipeRunMode` and would now raise `ImportError` for a reader copy-pasting them; the generated error-reference pages were stale after `PipeRunError` changed module (`make gep`); and — the one that mattered — **a justification stated in the CHANGELOG, in `hub-layering.md` and in a drift ack was measured false.** The claim was that filing `PipeRunError` in `system/exceptions.py` would make the config bootstrap load a run mode and `graph.graphspec` for nothing. Measured: `import pipelex.config` already loads both, via `runtime_hub → content_generator_protocol → assignment_models → cogt_run_params`. The alternative's stated cost was zero. The clause was removed from all three places and the drift ack re-recorded, because an ack arguing from a measurement nobody took is precisely what that system exists to prevent. The placement is unchanged and never needed the argument — the subclass relationship is the whole reason.
+
+One question was deliberately **not** answered, and is deferred: [`inputs/error-reference-grouping-axis.md`](inputs/error-reference-grouping-axis.md). Moving `PipeRunError` to `core.pipes.exceptions` refiles it from "Execution & runtime" to "Authoring & language" in the public error reference, because the generator keys on the module's second dotted segment. That is *consistent* — its two subclasses were already filed there, so the base now sits beside them instead of a section away — but whether that section is right for any of the three is a pre-existing product question, and every fix for it is bigger than the problem.
+
+## Reproducing the whole thing
+
+```bash
+make agent-check          # ruff, pyright, mypy, keyword-only, hub-layering
+make check-hub-layering   # the guard on its own
+make agent-test           # full suite
+make drift-check          # the two review obligations this PR discharges
+```
+
+All green on the final tree. The two drift acks (`cli-docs`, `hub-layering-convention`) are committed alongside the change they cover, with their dogfood-log entries in [`drift-contracts/dogfood-log.md`](drift-contracts/dogfood-log.md).
