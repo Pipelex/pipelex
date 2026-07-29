@@ -155,6 +155,8 @@ Friction: near zero (the drift subpackage changed twice in the last month, both 
 
 - [ ] **DECISION E3 (Louis):** confirm the three policy positions.
 
+**Related, ruled separately:** `ack-record-gaps.md` carries two findings about the ack record as a data model (DECISION M1 — the ack has no merge semantics, so a long-lived branch re-pays every contract's review cost at every merge; DECISION M2 — `--by`'s git-user default silently clobbered deliberate reviewer identities on all four contracts). M1 is not independent of this doc: it resolves into the content-aware-digest narrowing the `config-docs` and `cli-docs` log entries propose, so rule the two together. Both worsen as Phase V1 grows the manifest.
+
 ## F — Execution plan (once rulings are in)
 
 **Phase V1 — manifest wave (one PR).** Apply B1 + B3 trigger repairs and add the E1 + E2 contracts to `drift.toml`; perform the initial reviews *for real* (the Phase-2-seeds precedent — note the make-targets pages were just swept and fixed by the campaign, so the first reviews should be fast but must still be genuine); record the initial acks + dogfood-log entries; update `docs/contribute/drift-contracts.md`'s contract roster and the changelog.
