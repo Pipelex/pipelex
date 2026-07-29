@@ -6,8 +6,8 @@ import json
 from typing import Any
 
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
-from pipelex.core.pipes.rendering.output_renderer import render_output
 from pipelex.interpreter_hub import get_required_pipe
+from pipelex.pipe_machinery.rendering.output_renderer import render_output
 from pipelex.pipeline.validate_bundle import validate_bundle
 
 

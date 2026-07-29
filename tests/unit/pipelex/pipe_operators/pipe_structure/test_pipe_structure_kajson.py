@@ -1,7 +1,7 @@
 from kajson import kajson
 
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.interpreter.bundle_elaborator import BundleElaborator
+from pipelex.mthds_parsing.bundle_elaborator import BundleElaborator
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
 from pipelex.pipe_operators.structure.pipe_structure_blueprint import PipeStructureBlueprint

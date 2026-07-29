@@ -4,6 +4,7 @@
 """
 
 from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexConfigError, PipelexError, SecurityError
+from pipelex.mthds_parsing.exceptions import BundleElaboratorError, MthdsParserError
 
 
 class TestPipelexErrorTitleAndTypeUri:
@@ -59,6 +60,24 @@ class TestPipelexErrorTitleAndTypeUri:
         """The curated ``_declared_title`` overrides shipped with Item A."""
         assert PipelexError.title() == "Pipelex error"
         assert SecurityError.title() == "Security policy violation"
+
+    def test_mthds_parser_error_identity_is_pinned(self) -> None:
+        """The parser error's wire-visible identity triple, pinned against silent drift.
+
+        ``error_type`` (the class name), ``title`` and ``type_uri`` all travel on every
+        ``ErrorReport``, and clients branch on them. Nothing asserted the trio before, which is
+        how a rename left the repo's own fixtures carrying a shape the class cannot produce.
+        The title is *declared* rather than auto-derived because ``_humanize_class_name`` would
+        render the standard's name as "Mthds parser" — see ``mthds_parsing/exceptions.py``.
+        """
+        report = MthdsParserError("bad .mthds").to_error_report()
+        assert report.error_type == "MthdsParserError"
+        assert report.title == "MTHDS parser"
+        assert report.type_uri == "https://docs.pipelex.com/latest/errors/mthds-parser-error/"
+
+        # The declared title must not capture the subclass — it derives from its own name.
+        assert BundleElaboratorError.title() == "Bundle elaborator"
+        assert BundleElaboratorError.type_uri() == "https://docs.pipelex.com/latest/errors/bundle-elaborator-error/"
 
     def test_round_trip_preserves_title_and_type_uri(self) -> None:
         """``ErrorReport.from_dict(report.to_dict())`` preserves the new fields."""

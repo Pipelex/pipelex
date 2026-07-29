@@ -34,7 +34,6 @@ are not yet applied here, mirroring the spec's own "Specification Status" callou
 from typing import NamedTuple
 
 from pipelex.codegen.native_expansion import collect_native_refs_from_structure, materialize_native_concept
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
@@ -44,6 +43,7 @@ from pipelex.core.pipes.variable_multiplicity import MultiplicityParseResult, pa
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.libraries.exceptions import CrateNormalizationError
 from pipelex.libraries.library_crate import LibraryCrate
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipeBlueprintUnion
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome

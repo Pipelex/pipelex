@@ -7,8 +7,8 @@ import typer
 
 from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
 from pipelex.cli.commands.build.inputs._inputs_core import execute_generate_inputs
-from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
-from pipelex.core.pipes.rendering.input_renderer import InputsTemplateFormat
+from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
+from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat
 
 
 def build_inputs_bundle_cmd(

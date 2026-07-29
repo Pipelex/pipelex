@@ -80,7 +80,7 @@ Defects the hunt surfaced whose fix belongs in **code**, not docs (Louis' Checkp
 
 **Found:** Stage 2, batch S2-2, by the adversarial verifier while refuting a fix-time candidate against `docs/building-methods/configure-ai-llm-to-optimize-methods.md` (the doc's multi-line inline tables turned out to be VALID under the shipped loader — this is the code-side residue of that refutation).
 
-**Behavior:** all deck/bundle TOML goes through `load_toml_from_path` → `tomli` (`pipelex/tools/misc/toml_utils.py:40`, `pipelex/core/interpreter/interpreter.py:43,46`). The installed tomli 2.4.1 accepts TOML 1.1 features (newlines and trailing commas in inline tables), and both the docs' snippets and real `.mthds` content use them. But the pin is `tomli>=2.3.0` (`pyproject.toml:55`), and tomli 2.3.0 empirically REJECTS the same content ("Invalid initial character for a key part") — 2.4.0 is the first version that accepts it.
+**Behavior:** all deck/bundle TOML goes through `load_toml_from_path` → `tomli` (`pipelex/tools/misc/toml_utils.py:40`, `pipelex/mthds_parsing/parser.py:43,46`). The installed tomli 2.4.1 accepts TOML 1.1 features (newlines and trailing commas in inline tables), and both the docs' snippets and real `.mthds` content use them. But the pin is `tomli>=2.3.0` (`pyproject.toml:55`), and tomli 2.3.0 empirically REJECTS the same content ("Invalid initial character for a key part") — 2.4.0 is the first version that accepts it.
 
 **Why it matters:** any environment resolving tomli to exactly 2.3.0 (permitted by the constraint) fails to parse documented deck syntax and multi-line inline tables in `.mthds` bundles generally — a version-dependent parse surface for the language itself.
 

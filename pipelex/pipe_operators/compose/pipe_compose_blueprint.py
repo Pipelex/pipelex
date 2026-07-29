@@ -6,8 +6,8 @@ from typing_extensions import override
 from pipelex.cogt.templating.exceptions import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
+from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing

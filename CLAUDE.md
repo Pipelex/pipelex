@@ -129,6 +129,12 @@
      .venv/bin/pipelex-dev generate-error-pages
      ```
 
+   - **`generate-error-identity`**: Regenerate the committed `(error_type, title, type_uri)` snapshot of every `PipelexError` subclass at `tests/data/errors/error_identity.txt`. `error_type` is the bare class name and consumers outside this repo branch on it, so a rename is a silent wire break — the snapshot turns it into a reviewable diff, gated by `tests/unit/pipelex/errors/test_error_identity_snapshot.py`. Run after adding, renaming or removing an error class. Also available as `make generate-error-identity` (alias `make gei`).
+
+     ```bash
+     .venv/bin/pipelex-dev generate-error-identity
+     ```
+
    - **`refresh-graph-ui-sri`**: Refetch the pinned graph viewer assets from jsDelivr (`@pipelex/mthds-ui` standalone JS+CSS, `elkjs`) and rewrite `pipelex/graph/reactflow/standalone_assets.py` with new `sha384` Subresource Integrity hashes. Use when bumping the pinned mthds-ui or elkjs version.
 
      ```bash
@@ -148,7 +154,7 @@
 
 ### Spec vs Blueprint Architecture
 
-- **Blueprints** (`pipelex/pipe_operators/`, `pipelex/pipe_controllers/`, `pipelex/core/`) are the MTHDS language reference — what `.mthds` files parse into.
+- **Blueprints** (`pipelex/pipe_operators/`, `pipelex/pipe_controllers/`, `pipelex/pipe_machinery/`, `pipelex/mthds_parsing/`, `pipelex/core/`) are the MTHDS language reference — what `.mthds` files parse into. The base `PipeBlueprint` lives in `pipe_machinery/`, the bundle blueprint the parser produces in `mthds_parsing/`, and the concept/domain blueprints in `core/`.
 - **Specs** (`pipelex/builder/pipe/`) are a convenience authoring format for AI agents. Each spec has `to_blueprint()` that transforms it into the corresponding blueprint. Spec-level fields may differ from blueprint-level fields.
 
 When adding validation or fields, decide which layer they belong to. Language rules go on blueprints; authoring convenience goes on specs. See `pipelex/builder/CLAUDE.md` for details.

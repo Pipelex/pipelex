@@ -4,9 +4,9 @@ import pytest
 
 from pipelex import log
 from pipelex.core.pipes.exceptions import PipeValidationError
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from tests.unit.pipelex.pipe_controllers.condition.data import PipeConditionInputTestCases
 
 

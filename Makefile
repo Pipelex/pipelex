@@ -104,6 +104,8 @@ make check-mthds-schema       - Check MTHDS JSON Schema is up-to-date
 make cms                      - Shorthand -> check-mthds-schema
 make generate-error-pages     - Generate one docs page per PipelexError subclass under docs/errors/
 make gep                      - Shorthand -> generate-error-pages
+make generate-error-identity  - Regenerate the committed PipelexError wire-identity snapshot
+make gei                      - Shorthand -> generate-error-identity
 make update-gateway-models    - Update gateway models reference
 make ugm                      - Shorthand -> update-gateway-models
 make check-gateway-models     - Check gateway models reference is up-to-date
@@ -210,6 +212,7 @@ export HELP
 	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-specific-version docs-delete \
 	generate-mthds-schema generate-mthds-schema-quiet gms check-mthds-schema cms \
 	generate-error-pages generate-error-pages-quiet gep \
+	generate-error-identity generate-error-identity-quiet gei \
 	update-gateway-models update-gateway-models-quiet ugm check-gateway-models cgm up \
 	test-count check-test-badge \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
@@ -416,6 +419,16 @@ generate-error-pages-quiet: env
 gep: generate-error-pages
 	@echo "> done: gep = generate-error-pages"
 
+generate-error-identity: env
+	$(call PRINT_TITLE,"Regenerating the PipelexError wire-identity snapshot")
+	$(VENV_PIPELEX_DEV) generate-error-identity
+
+generate-error-identity-quiet: env
+	$(VENV_PIPELEX_DEV) generate-error-identity --quiet
+
+gei: generate-error-identity
+	@echo "> done: gei = generate-error-identity"
+
 update-gateway-models: env
 	$(call PRINT_TITLE,"Updating gateway models reference")
 	$(VENV_PIPELEX_DEV) update-gateway-models
@@ -526,6 +539,10 @@ codex-tests: env
 # balance the 8 CI shards. Runs the same selection as gha-tests but records how
 # long each test takes instead of sharding. Run at release time (see the release
 # skill) so the shards stay balanced; a stale file silently unbalances them.
+# tests/unit/repo/test_test_durations_paths.py gates the one kind of staleness
+# that is never benign: an entry whose test FILE no longer exists (a bulk path
+# rewrite). Drifting parametrization ids are left alone — pytest-split treats an
+# unknown id as average duration.
 store-test-durations: env
 	$(call PRINT_TITLE,"Storing test durations for pytest-split shard balancing")
 	@echo "• Regenerating test model fixtures with ci profile"

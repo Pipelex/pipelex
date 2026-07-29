@@ -18,8 +18,8 @@ from mthds.protocol.models import ValidationReport
 from pydantic import Field
 
 from pipelex.base_exceptions import ValidationErrorItem
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.graph.graphspec import GraphSpec
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.bundle_validator import DryRunOutput
 from pipelex.pipeline.liftable_pipes import LiftablePipeEntry

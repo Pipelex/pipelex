@@ -92,7 +92,7 @@ Mike (`mike deploy X.Y.Z latest`) creates two directories on gh-pages: `X.Y.Z/` 
 
 The `docs/building-methods/` section documents the MTHDS language — what users write in `.mthds` files. This corresponds to the **blueprint** layer, NOT the spec layer.
 
-- **Blueprints** define the MTHDS language — what `.mthds` files parse into via `PipelexInterpreter`.
+- **Blueprints** define the MTHDS language — what `.mthds` files parse into via `MthdsParser`.
 - **Specs** (in `pipelex/builder/pipe/`) are a simplified authoring format for AI agents with convenience fields that get transformed into blueprint fields via `to_blueprint()`. Specs are NOT the language definition.
 
 Documentation under `docs/building-methods/` must describe blueprint-level fields, not spec-level convenience fields. For example, `PipeComposeSpec.target_format` is a spec convenience — the MTHDS language uses `category` + `templating_style` on the `TemplateBlueprint` instead.

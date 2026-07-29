@@ -397,6 +397,7 @@ _FALLBACK_MACRO_SLUG = "platform-and-tooling"
 # label wording, macro placement, and ordering, never completeness.
 _SUBSYSTEM_SECTIONS: tuple[tuple[str, str, str], ...] = (
     # Authoring & language
+    ("mthds_parsing", "authoring-and-language", "MTHDS parsing"),
     ("core", "authoring-and-language", "Core language"),
     ("pipe_operators", "authoring-and-language", "Pipe operators"),
     ("pipe_controllers", "authoring-and-language", "Pipe controllers"),
@@ -411,7 +412,11 @@ _SUBSYSTEM_SECTIONS: tuple[tuple[str, str, str], ...] = (
     ("tracing", "execution-and-runtime", "Tracing"),
     # Inference & providers
     ("cogt", "inference-and-providers", "Inference (Cogt)"),
-    ("plugins", "inference-and-providers", "Provider plugins"),
+    # Two rows, because the vendor adapters and the plugin mechanism they register through are
+    # two packages. `providers` is the one a method author hits (a vendor SDK rejected the call);
+    # `plugins` is the one an integrator hits (a plugin failed to load or claimed a taken slot).
+    ("providers", "inference-and-providers", "Provider adapters"),
+    ("plugins", "inference-and-providers", "Plugin system"),
     # Platform & tooling
     ("base_exceptions", "platform-and-tooling", "Base & root errors"),
     ("tools", "platform-and-tooling", "Tools"),

@@ -27,7 +27,7 @@ from pipelex.builder.pipe.pipe_signature_spec import PipeSignatureSpec
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 from pipelex.builder.pipe.pipe_structure_spec import PipeStructureSpec
-from pipelex.core.pipes.pipe_blueprint import (
+from pipelex.pipe_machinery.pipe_blueprint import (
     PIPE_SIGNATURE_TYPE_TAG,
     explicit_signature_tag_migration_message,
     normalize_typeless_signature_section,

@@ -4,9 +4,9 @@ import pytest
 from mthds.package.exceptions import ManifestError
 from pytest_mock import MockerFixture
 
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.libraries.library_manager import LibraryManager
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 
 
 class TestStandaloneReservedDomains:

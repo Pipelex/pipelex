@@ -3,9 +3,9 @@ from typing import Literal
 from typing_extensions import override
 
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
+from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 
 
 class PipeParallelBlueprint(PipeBlueprint):

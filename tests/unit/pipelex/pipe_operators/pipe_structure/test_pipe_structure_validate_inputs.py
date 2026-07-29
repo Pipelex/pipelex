@@ -4,8 +4,8 @@ from typing import Callable
 import pytest
 
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.interpreter_hub import get_library_manager
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.structure.pipe_structure import PipeStructure
 from pipelex.pipe_operators.structure.pipe_structure_blueprint import PipeStructureBlueprint
 

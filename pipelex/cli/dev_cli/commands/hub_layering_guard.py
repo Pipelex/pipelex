@@ -7,7 +7,7 @@ whole architecture, and the property it buys is measurable: importing the Pipele
 interpreter modules. The canonical human-readable specification lives in
 ``docs/contribute/hub-layering.md``.
 
-This module holds the AST collection logic that mechanically enforces two rules:
+This module holds the AST collection logic that mechanically enforces three rules:
 
 1. **The layer rule.** A module in the declared runtime layer (:data:`RUNTIME_LAYER_PACKAGES`) may not
    import ``pipelex.interpreter_hub``. Since `runtime_hub`'s own closure is what the runtime layer is,
@@ -15,10 +15,21 @@ This module holds the AST collection logic that mechanically enforces two rules:
 2. **The dead-module rule.** *No* scanned module may reference ``pipelex.hub``. That module was
    deleted rather than kept as an alias for either half, precisely so a stale import fails loudly —
    this rule closes the one hole in that guarantee (see below).
+3. **The transitive rule.** No runtime-layer module may *reach* ``pipelex.interpreter_hub`` through
+   any chain of module-level imports either. Rules 1 and 2 are per-file and see one hop; this one
+   resolves the whole module-level import graph of ``pipelex/`` and does reachability over it. It
+   exists because the one-hop rules missed a live breach: four modules under the declared
+   runtime-layer ``pipelex.plugins`` package loaded ``interpreter_hub`` (and ~67 interpreter modules)
+   through ``runtime_bridge``, ``pipeline`` and ``pipe_operators`` while both gates stayed green. The
+   remedy relocated those plugins, and this rule is what stops the next one recurring. The graph
+   models the ancestor ``__init__.py`` files an import executes on the way to its target, so a breach
+   in a package init is reached by every importer of anything beneath it.
 
-Both rules match **imports and bare string literals**. The string form is not a nicety: a missed
+All three rules match **imports and bare string literals**. The string form is not a nicety: a missed
 *import* of a deleted module is an immediate ``ImportError``, but a missed *string* is not, and it is
-invisible to every import-graph tool and to pyright's module graph. The two forms that actually
+invisible to every import-graph tool and to pyright's module graph. Rule 3 matches the narrower set —
+only a string naming the interpreter hub, which is a dynamic import in all but name — because an
+arbitrary ``pipelex.*`` string is as likely a plugin name as an import target. The two forms that actually
 occurred in this repo are ``importlib.import_module("pipelex.hub")`` (three of them, hiding a cycle
 from every lint) and ``mocker.patch("pipelex.hub.get_console", ...)`` (which broke a whole CLI test
 suite with an ``AttributeError`` raised nowhere near a hub). Matching is exact-or-dotted-prefix
@@ -29,9 +40,9 @@ concatenation is out of reach of any AST scan; nothing in the tree does that tod
 Note that ``runtime_hub`` is unrelated to the ``pipelex.runtime_bridge`` package despite the shared
 word: the hub is the runtime layer's service container, while ``runtime_bridge`` is a transport.
 
-Two deliberate carve-outs:
+Two deliberate carve-outs, applying to every rule that is about what *loads*:
 
-- **``if TYPE_CHECKING:`` blocks are exempt from the layer rule** (but not from the dead-module rule).
+- **``if TYPE_CHECKING:`` blocks are exempt from the layer rules** (but not from the dead-module rule).
   The rule is about what *loads*, and a type-only import loads nothing — deferring a type-only need
   under ``TYPE_CHECKING`` is this repo's sanctioned pattern for it (see the ``pipe_func_executor_registry``
   note in ``docs/contribute/hub-layering.md``). Only ``TYPE_CHECKING`` and ``typing.TYPE_CHECKING``
@@ -52,6 +63,7 @@ presentation layer wired into the ``pipelex-dev`` Typer app lives in ``check_hub
 from __future__ import annotations
 
 import ast
+from collections import deque
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
@@ -82,34 +94,51 @@ SCAN_ROOTS: tuple[Path, ...] = (SOURCE_ROOT, TESTS_ROOT)
 #: since nothing in the tuple is a prefix of it. Its closure *is* what the runtime layer means, so an
 #: `interpreter_hub` import there is the one that would break the property outright.
 #:
-#: `pipelex/core/**` is listed **package by package**, not wholesale, because `core/` is genuinely two
-#: layers. Its data model — concepts, domains, stuffs, working memory, the input/output *specs* — is
-#: runtime: it describes what a method's values are, and nothing in it needs a loaded method. The
-#: remainder names a `Pipe`, and a pipe is the interpreter's own object: `pipe_abstract`,
-#: `pipe_blueprint`, `pipe_factory`, `registry_models`, `bundles/` (a discriminated union over every
-#: pipe blueprint), `interpreter/`, and `pipes/rendering/` all import the interpreter *directly*, so
-#: declaring them runtime would be a claim the measurement contradicts. Those modules resolve their
-#: collaborators from the hub and inject them downward into the runtime half — the one-way arrow the
-#: whole design rests on. See the "Where core splits" section of ``docs/contribute/hub-layering.md``.
+#: `pipelex.core` is a single entry, and getting it there was the point of the modularity work. `core/`
+#: used to be genuinely two layers, so this tuple had to name its data-model packages one by one —
+#: concepts, domains, memory, stuffs, and the input/output *specs* under `pipes/` — while excluding the
+#: remainder, which named a `Pipe` and imported the interpreter *directly*. That remainder has left:
+#: the pipe-kind registration manifest is `pipelex.pipe_machinery.registry_models`, the parser and its
+#: bundle blueprint are `pipelex.mthds_parsing`, and the Pipe machinery proper (`pipe_abstract`,
+#: `pipe_blueprint`, `pipe_factory`, `validation`, `template_guard_lint`, `rendering/`) is
+#: `pipelex.pipe_machinery`. What is left in `core/` describes what a method's *values* are, and
+#: nothing in it needs a loaded method — measured: no `pipelex.core.*` module reaches `interpreter_hub`
+#: or loads a module from any of the packages above. (`core.pipes.pipe_output` does still pull in
+#: `pipeline.pipeline_models` for one leaf constant — the known `pipeline` / `pipe_run` placement wart,
+#: which is why the claim is scoped to those packages rather than to "zero interpreter modules".)
+#: A package-granular declaration is only honest when the packages match the layers; naming
+#: `pipelex.core` wholesale is now a claim the measurement supports rather than contradicts.
+#:
+#: `pipelex.plugins` and `pipelex.providers` are two entries for what used to be one package, and
+#: both are runtime-layer: `plugins` is the plugin *mechanism* (the contract, the registrar, the
+#: capability registries), `providers` the built-in vendor *adapters* that register through it.
+#: Splitting them did not move the boundary — it made the one-way dependency legible — so leaving
+#: `pipelex.providers` undeclared would silently un-declare the largest runtime-layer package. Note
+#: that omitting an entry makes this guard **quieter**, not louder: the transitive rule below filters
+#: its candidates through :func:`is_runtime_layer`, so an undeclared package is excluded from the
+#: rule's domain rather than reported by it. That is why the declaration is asserted by a test.
+#: See the "Where core splits" section of ``docs/contribute/hub-layering.md``.
 RUNTIME_LAYER_PACKAGES: tuple[str, ...] = (
     "pipelex.cogt",
+    "pipelex.core",
     "pipelex.plugins",
+    "pipelex.providers",
     "pipelex.reporting",
     "pipelex.system",
     "pipelex.tools",
     # the runtime layer's own hub — a module, not a package; see the note above
     "pipelex.runtime_hub",
-    # core's data model; the Pipe-touching remainder of `core/` stays in the interpreter layer
-    "pipelex.core.concepts",
-    "pipelex.core.domains",
-    "pipelex.core.memory",
-    "pipelex.core.pipes.inputs",
-    "pipelex.core.pipes.stuff_spec",
-    "pipelex.core.stuffs",
 )
 
-#: The interpreter layer's hub, which no runtime-layer module may import.
-INTERPRETER_HUB_MODULE = "pipelex.interpreter_hub"
+#: The interpreter layer's hub, which no runtime-layer module may import — directly or transitively.
+#: Marked like :data:`DELETED_HUB_MODULE` below, for the same reason and against a different rule:
+#: this line *declares* the path rather than importing it, so without the marker rule 3 would read the
+#: guard's own configuration as a dynamic import and give the module a phantom edge to the hub.
+INTERPRETER_HUB_MODULE = "pipelex.interpreter_hub"  # hub-layering: ignore
+
+#: The root package the transitive rule builds its import graph over. Imports of anything else
+#: (stdlib, third-party) cannot lead back to a `pipelex` module, so they are not edges.
+ROOT_PACKAGE = "pipelex"
 
 #: The single hub that was split and deleted. Every reference to it is dead, in every layer.
 #: The marker below is the escape hatch dogfooding itself: this line *declares* the forbidden path,
@@ -126,11 +155,21 @@ TYPE_CHECKING_NAME = "TYPE_CHECKING"
 TYPING_MODULE_NAME = "typing"
 
 
+class HubLayeringGuardError(Exception):
+    """The guard cannot run as configured — a self-check failure, never a violation of the boundary.
+
+    Kept local to this stdlib-only module rather than derived from ``PipelexError``: importing the
+    package's exception chain here would defeat the point of the module (see the note in
+    ``keyword_only_guard``, which holds its registry error the same way).
+    """
+
+
 class HubLayeringViolationKind(StrEnum):
     """The distinct hub-layering violation kinds — each names its own remedy."""
 
     INTERPRETER_HUB_IMPORT = "interpreter-hub-import"
     INTERPRETER_HUB_REFERENCE = "interpreter-hub-reference"
+    INTERPRETER_HUB_TRANSITIVE = "interpreter-hub-transitive"
     DEAD_HUB_REFERENCE = "dead-hub-reference"
 
     @property
@@ -141,6 +180,12 @@ class HubLayeringViolationKind(StrEnum):
                 return (
                     "a runtime-layer module may not import `pipelex.interpreter_hub` — take the value as an argument, "
                     "or have the interpreter layer install it downward at boot (the `class_registry_scoping` pattern)"
+                )
+            case HubLayeringViolationKind.INTERPRETER_HUB_TRANSITIVE:
+                return (
+                    "a runtime-layer module may not *reach* `pipelex.interpreter_hub` through its module-level imports "
+                    "either — take the collaborator as an argument, or move the module to the layer it actually belongs "
+                    "to (the `interpreter_plugins` relocation)"
                 )
             case HubLayeringViolationKind.INTERPRETER_HUB_REFERENCE:
                 return (
@@ -193,6 +238,26 @@ def targets_for(*, module_qname: str) -> frozenset[str]:
     if is_runtime_layer(module_qname=module_qname):
         return frozenset({DELETED_HUB_MODULE, INTERPRETER_HUB_MODULE})
     return frozenset({DELETED_HUB_MODULE})
+
+
+def absolute_module_for(*, node: ast.ImportFrom, package_qname: str) -> str | None:
+    """Resolve an ``ImportFrom``'s module to an absolute dotted path, walking up for relative levels.
+
+    Args:
+        node: The ``from … import …`` statement.
+        package_qname: The dotted name of the *package* holding the importing module, which is what a
+            relative level counts up from.
+    """
+    if node.level == 0:
+        return node.module
+    parts = package_qname.split(".") if package_qname else []
+    climb = node.level - 1
+    if climb > len(parts):
+        return None
+    base_parts = parts[: len(parts) - climb]
+    if node.module:
+        base_parts = [*base_parts, *node.module.split(".")]
+    return ".".join(base_parts) or None
 
 
 def _is_type_checking_test(*, test: ast.expr) -> bool:
@@ -257,19 +322,6 @@ class _Collector(ast.NodeVisitor):
         kind = HubLayeringViolationKind.DEAD_HUB_REFERENCE if target == DELETED_HUB_MODULE else import_kind
         self.violations.append(HubLayeringViolation(relative_path=self.relative_path, lineno=lineno, kind=kind, detail=detail))
 
-    def _absolute_module_for(self, *, node: ast.ImportFrom) -> str | None:
-        """Resolve an ``ImportFrom``'s module to an absolute dotted path, walking up for relative levels."""
-        if node.level == 0:
-            return node.module
-        parts = self.package_qname.split(".") if self.package_qname else []
-        climb = node.level - 1
-        if climb > len(parts):
-            return None
-        base_parts = parts[: len(parts) - climb]
-        if node.module:
-            base_parts = [*base_parts, *node.module.split(".")]
-        return ".".join(base_parts) or None
-
     @override
     def visit_Import(self, node: ast.Import) -> None:  # pylint: disable=invalid-name  # ast.NodeVisitor dispatch name
         """``import pipelex.interpreter_hub`` / ``import pipelex.interpreter_hub as hub``."""
@@ -282,7 +334,7 @@ class _Collector(ast.NodeVisitor):
     @override
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:  # pylint: disable=invalid-name  # ast.NodeVisitor dispatch name
         """``from pipelex.interpreter_hub import x``, ``from pipelex import interpreter_hub``, and the relative forms."""
-        base = self._absolute_module_for(node=node)
+        base = absolute_module_for(node=node, package_qname=self.package_qname)
         if base is None:
             return
         for candidate in [base, *(f"{base}.{alias.name}" for alias in node.names)]:
@@ -365,4 +417,284 @@ def collect_all_violations(*, roots: Sequence[Path]) -> list[HubLayeringViolatio
     for root in roots:
         for path in iter_source_files(root=root):
             violations.extend(find_violations_in_source(source=path.read_text(encoding="utf-8"), relative_path=path.as_posix()))
+    return sorted(violations, key=lambda violation: violation.key)
+
+
+# --------------------------------------------------------------------------------------
+# The module-level import graph (the transitive rule)
+# --------------------------------------------------------------------------------------
+
+
+class _ImportGraphCollector(ast.NodeVisitor):
+    """Collects one module's **module-level** ``pipelex`` imports, each with the line it sits on.
+
+    Scope is deliberately "what an ``import`` of this module actually loads", which is what the
+    closure property is about:
+
+    - **Function bodies are skipped.** A deferred import inside a function loads nothing at import
+      time. (The one-hop layer rule *does* flag a deferred ``interpreter_hub`` import, and rightly so
+      — that is a named dependency on the forbidden module, not an incidental edge.)
+    - **``if TYPE_CHECKING:`` blocks are skipped**, for the same reason and per the carve-out the
+      whole guard shares. Class bodies are *not* skipped: they execute at import time.
+    - **A statement carrying ``# hub-layering: ignore`` is skipped**, per the guard's other shared
+      carve-out. A suppressed import is a reviewed, sanctioned dependency, so it is not an edge here
+      either — otherwise one marker on a direct import would leave the edge in the graph while the
+      finding it explains disappears, silently exempting the module from this rule and flagging every
+      innocent importer of it in its place.
+
+    One thing beyond imports *is* collected: a module-level **string literal naming the interpreter
+    hub**, because a dynamic import is the same edge with the AST filed off — and the two references
+    that actually occurred in this repo were strings, not imports. Only that one target is matched,
+    exactly as rules 1 and 2 match only their forbidden targets: an arbitrary ``pipelex.*`` string is
+    as likely a plugin name or a config value, but a string that *is* the hub path is an
+    ``import_module`` or patch target in all but name. Rule 1 already catches such a string in a
+    runtime-layer module; what this closes is the same string in an *intermediary*, which sits in no
+    declared layer and so is rule 1's business for the dead hub only.
+    """
+
+    def __init__(self, *, package_qname: str, source_lines: list[str]) -> None:
+        self.package_qname = package_qname
+        self.source_lines = source_lines
+        self.imports: dict[str, int] = {}
+
+    def _is_suppressed(self, *, lineno: int, end_lineno: int | None) -> bool:
+        """Whether the escape-hatch marker sits anywhere on the offending node's lines."""
+        for line_number in range(lineno, (end_lineno or lineno) + 1):
+            index = line_number - 1
+            if 0 <= index < len(self.source_lines) and ESCAPE_HATCH_MARKER in self.source_lines[index]:
+                return True
+        return False
+
+    def _record(self, *, candidate: str, lineno: int) -> None:
+        """Keep an in-package candidate, at the first line that names it."""
+        if references_module(candidate=candidate, target=ROOT_PACKAGE) and candidate not in self.imports:
+            self.imports[candidate] = lineno
+
+    @override
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:  # pylint: disable=invalid-name  # ast.NodeVisitor dispatch name
+        """A function body is not part of the import closure — do not descend into it."""
+
+    @override
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:  # pylint: disable=invalid-name  # ast.NodeVisitor dispatch name
+        """A coroutine body is not part of the import closure — do not descend into it."""
+
+    @override
+    def visit_If(self, node: ast.If) -> None:  # pylint: disable=invalid-name  # ast.NodeVisitor dispatch name
+        """Skip the body of ``if TYPE_CHECKING:``; its ``else`` branch is ordinary runtime code."""
+        if not _is_type_checking_test(test=node.test):
+            self.generic_visit(node)
+            return
+        for statement in node.orelse:
+            self.visit(statement)
+
+    @override
+    def visit_Import(self, node: ast.Import) -> None:  # pylint: disable=invalid-name  # ast.NodeVisitor dispatch name
+        """``import pipelex.x`` / ``import pipelex.x as y``."""
+        if self._is_suppressed(lineno=node.lineno, end_lineno=node.end_lineno):
+            return
+        for alias in node.names:
+            self._record(candidate=alias.name, lineno=node.lineno)
+
+    @override
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:  # pylint: disable=invalid-name  # ast.NodeVisitor dispatch name
+        """``from pipelex.x import y`` and the relative forms — both the module and each name are candidates."""
+        if self._is_suppressed(lineno=node.lineno, end_lineno=node.end_lineno):
+            return
+        base = absolute_module_for(node=node, package_qname=self.package_qname)
+        if base is None:
+            return
+        self._record(candidate=base, lineno=node.lineno)
+        for alias in node.names:
+            self._record(candidate=f"{base}.{alias.name}", lineno=node.lineno)
+
+    @override
+    def visit_Constant(self, node: ast.Constant) -> None:  # pylint: disable=invalid-name  # ast.NodeVisitor dispatch name
+        """A module-level string naming the interpreter hub — a dynamic import is the same edge.
+
+        Matched against the hub alone, never against any ``pipelex.*`` string: see the class
+        docstring for why the narrow target is the point rather than a shortcut.
+        """
+        value = node.value
+        if not isinstance(value, str) or not references_module(candidate=value, target=INTERPRETER_HUB_MODULE):
+            return
+        if self._is_suppressed(lineno=node.lineno, end_lineno=node.end_lineno):
+            return
+        self._record(candidate=value, lineno=node.lineno)
+
+
+class ImportGraph(NamedTuple):
+    """The module-level import graph of one source tree.
+
+    Attributes:
+        paths: Every scanned module's dotted name, mapped to its repo-root-relative path.
+        edges: Each module's imports, mapped to the line the import sits on. Only edges to modules
+            present in ``paths`` are kept — an unresolvable target cannot lead back to the hub.
+    """
+
+    paths: dict[str, Path]
+    edges: dict[str, dict[str, int]]
+
+
+def _resolve_candidate(*, candidate: str, known_modules: dict[str, Path]) -> str | None:
+    """The scanned module a dotted candidate names, walking up so ``pkg.mod.Symbol`` resolves to ``pkg.mod``."""
+    current = candidate
+    while current:
+        if current in known_modules:
+            return current
+        if "." not in current:
+            return None
+        current = current.rsplit(".", 1)[0]
+    return None
+
+
+def _target_with_ancestors(*, target: str, known_modules: dict[str, Path]) -> list[str]:
+    """``target`` plus every ancestor package importing it also executes.
+
+    ``import pkg.sub.mod`` runs ``pkg/__init__.py`` and ``pkg/sub/__init__.py`` **before** ``mod``, so
+    a package init that reaches the hub is reached by every importer of anything beneath it. Modelling
+    only the literal target would leave that whole class of breach invisible to the reachability walk.
+    Ancestors without an ``__init__.py`` are not scanned modules and execute nothing, so they are
+    skipped. The target comes first, so its own import line wins over an ancestor's.
+    """
+    modules = [target]
+    parts = target.split(".")
+    for depth in range(1, len(parts)):
+        ancestor = ".".join(parts[:depth])
+        if ancestor in known_modules:
+            modules.append(ancestor)
+    return modules
+
+
+def build_import_graph(*, root: Path) -> ImportGraph:
+    """Parse every module under ``root`` and resolve its module-level imports into a graph.
+
+    Args:
+        root: The source root to scan, **relative to the repo root**. Module names are derived from
+            the scanned path verbatim, so an absolute root yields qnames like ``Users.you.repo.pipelex.x``
+            that match no ``pipelex`` candidate and produce a graph with no edges at all.
+            :func:`collect_transitive_violations` turns that silent degradation into a hard failure.
+
+    Raises:
+        SyntaxError: If a module does not parse — never swallowed, for the reason
+            :func:`find_violations_in_source` gives.
+    """
+    paths: dict[str, Path] = {}
+    candidates: dict[str, dict[str, int]] = {}
+    for path in iter_source_files(root=root):
+        qname = module_qname_for(path=path)
+        paths[qname] = path
+        source = path.read_text(encoding="utf-8")
+        collector = _ImportGraphCollector(package_qname=".".join(path.parent.parts), source_lines=source.splitlines())
+        collector.visit(ast.parse(source))
+        candidates[qname] = collector.imports
+
+    edges: dict[str, dict[str, int]] = {}
+    for qname, imported in candidates.items():
+        resolved: dict[str, int] = {}
+        for candidate, lineno in imported.items():
+            target = _resolve_candidate(candidate=candidate, known_modules=paths)
+            if target is None:
+                continue
+            for module in _target_with_ancestors(target=target, known_modules=paths):
+                if module != qname:
+                    resolved.setdefault(module, lineno)
+        edges[qname] = resolved
+    return ImportGraph(paths=paths, edges=edges)
+
+
+def modules_reaching(*, graph: ImportGraph, target: str) -> set[str]:
+    """Every module with a module-level import path to ``target``.
+
+    One reverse breadth-first walk over the whole graph rather than a search per module, so the cost
+    is linear in the tree rather than quadratic.
+    """
+    importers: dict[str, set[str]] = {}
+    for source, imported in graph.edges.items():
+        for module in imported:
+            importers.setdefault(module, set()).add(source)
+
+    reaching: set[str] = set()
+    queue = deque([target])
+    while queue:
+        current = queue.popleft()
+        for importer in importers.get(current, set()):
+            if importer not in reaching:
+                reaching.add(importer)
+                queue.append(importer)
+    return reaching
+
+
+def shortest_import_path(*, graph: ImportGraph, start: str, target: str) -> list[str]:
+    """The shortest module-level import chain from ``start`` to ``target``, or ``[]`` if there is none.
+
+    Shortest rather than any: the first hop is what gets reported as the offending line, so it must be
+    the one that most directly explains the breach. Among chains of equal length the first hop is
+    picked in module-name order — deterministic, but arbitrary: a module reaching the hub by two
+    equally short routes reports one of them, and cutting it leaves the other, which the next run
+    reports in turn.
+    """
+    if start == target:
+        return [start]
+    previous: dict[str, str] = {}
+    seen = {start}
+    queue = deque([start])
+    while queue:
+        current = queue.popleft()
+        for module in sorted(graph.edges.get(current, {})):
+            if module in seen:
+                continue
+            previous[module] = current
+            if module == target:
+                chain = [target]
+                while chain[-1] != start:
+                    chain.append(previous[chain[-1]])
+                return list(reversed(chain))
+            seen.add(module)
+            queue.append(module)
+    return []
+
+
+def collect_transitive_violations(*, root: Path) -> list[HubLayeringViolation]:
+    """Every runtime-layer module that *reaches* the interpreter hub through its module-level imports.
+
+    A **direct** import is reported by the one-hop layer rule instead, with its own remedy, so a chain
+    of one hop is skipped here rather than double-reported. A finding cannot be silenced where it is
+    reported: the escape hatch marks a single *import* as reviewed (which removes that edge from the
+    graph, exactly as a ``TYPE_CHECKING`` deferral does), never a module's transitive reach. This rule
+    fires when the declaration claims a module is runtime-layer while the import graph says otherwise,
+    and the fix is to move the module or invert the dependency.
+
+    Args:
+        root: The source root to scan, relative to the repo root — see :func:`build_import_graph`.
+
+    Raises:
+        HubLayeringGuardError: If the interpreter hub is not among the scanned modules. Reverse
+            reachability from a module the graph does not contain is vacuously empty, so without this
+            check a renamed hub — or a ``root`` the qnames cannot be derived from — would turn the
+            whole rule into a silent no-op that still reports PASSED.
+    """
+    graph = build_import_graph(root=root)
+    if INTERPRETER_HUB_MODULE not in graph.paths:
+        msg = (
+            f"the transitive rule scanned {len(graph.paths)} module(s) under `{root}` but found no "
+            f"`{INTERPRETER_HUB_MODULE}` among them, so it would check nothing. Either the hub module moved "
+            f"(update INTERPRETER_HUB_MODULE) or the scan root is not the repo-root-relative `{SOURCE_ROOT}`."
+        )
+        raise HubLayeringGuardError(msg)
+    reaching = modules_reaching(graph=graph, target=INTERPRETER_HUB_MODULE)
+
+    violations: list[HubLayeringViolation] = []
+    for qname in sorted(module for module in reaching if is_runtime_layer(module_qname=module)):
+        chain = shortest_import_path(graph=graph, start=qname, target=INTERPRETER_HUB_MODULE)
+        if len(chain) < 3:
+            continue
+        first_hop = chain[1]
+        violations.append(
+            HubLayeringViolation(
+                relative_path=graph.paths[qname].as_posix(),
+                lineno=graph.edges[qname][first_hop],
+                kind=HubLayeringViolationKind.INTERPRETER_HUB_TRANSITIVE,
+                detail=f"reaches `{INTERPRETER_HUB_MODULE}` via {' → '.join(chain[1:])}",
+            )
+        )
     return sorted(violations, key=lambda violation: violation.key)

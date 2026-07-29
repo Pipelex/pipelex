@@ -28,10 +28,10 @@ from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_native_concept, get_pipe_router
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose, PipeComposeOutput
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen

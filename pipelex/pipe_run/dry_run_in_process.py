@@ -15,11 +15,11 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.config import get_config
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.graphspec import GraphSpec, GraphSpecMode
 from pipelex.interpreter_hub import get_library_manager, scoped_pipe_router
 from pipelex.observer.observer_protocol import ObserverNoOp
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.exceptions import DryRunGraphNotProducedError
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_run import PipeRun

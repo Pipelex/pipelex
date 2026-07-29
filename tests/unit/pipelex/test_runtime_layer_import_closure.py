@@ -6,17 +6,19 @@ itself, must pull in zero interpreter modules. The distinction matters because a
 else entirely — a runtime-layer module reaching into `pipe_operators` directly, without touching a hub —
 would break the property while the lint stays green.
 
-"Interpreter module" is spelled out twice below, because the five interpreter top-level packages alone
-under-state it: core's Pipe-machinery modules are interpreter-layer too, and most of them only get
-caught *transitively*, through the `pipe_operators` / `libraries` they happen to pull in.
-`core.pipes.pipe_blueprint` pulls in none of it, so a runtime-layer import of it would pass a
-package-only predicate. Naming them makes the predicate state the boundary instead of approximating it.
+"Interpreter module" used to need spelling out twice, because core's Pipe-machinery modules were
+interpreter-layer while living under a runtime-named package — so the predicate carried a second tuple
+naming them one by one, plus an exclusion for the one leaf model that landed in every runtime closure.
+It does not any more: every one of those modules now lives under `pipe_machinery` or `mthds_parsing`,
+so the top-level package set says exactly what it means, with no per-module list and no exclusion. A
+package-granular predicate is only honest once the packages match the layers, which is what M1 bought.
 
 Two documented interpreter homes are deliberately absent, and their absence is a known wart rather than
-an oversight: `pipeline` and `pipe_run` (plus `core.bundles.exceptions`) already leak leaf models into
-every runtime closure — `SpecialPipelineId`, `PipeRunMode`, the bundle validation-error data. Naming
-them here would fail the test over a *placement* problem, not a broken hub arrow. See
-`wip/pr-1062-review-notes.md`.
+an oversight: `pipeline` and `pipe_run` already leak leaf models into every runtime closure —
+`SpecialPipelineId`, `PipeRunMode`. Naming them here would fail the test over a *placement* problem,
+not a broken hub arrow. See `wip/pr-1062-review-notes.md`. The third leak of that family is gone:
+the bundle validation-error data that `pipeline/` carries into every closure now lives in
+`core.exceptions`, beside the two sibling error-data models, so `mthds_parsing` needs no exclusion.
 
 Run in a subprocess so the closure is exactly what the entry point pulls in: an in-process
 `sys.modules` check would see everything the test session already imported.
@@ -24,20 +26,35 @@ Run in a subprocess so the closure is exactly what the entry point pulls in: an 
 
 from __future__ import annotations
 
+import ast
+import re
 import subprocess  # noqa: S404
 import sys
 import textwrap
+from pathlib import Path
 
 import pytest
 
-#: Entry points that must never load the interpreter: the inference layer, the runtime hub itself, and the
-#: heaviest module of each runtime-layer `core/` package — the ones that historically reached for a library
-#: and now take a `ConceptProviderAbstract` instead. `core/`'s Pipe-touching remainder is deliberately
-#: absent; it names the interpreter's own object and belongs to the interpreter layer by construction (see
-#: the guard's `RUNTIME_LAYER_PACKAGES` note).
+#: Entry points that must never load the interpreter: the inference layer, the runtime hub itself, the
+#: built-in plugin aggregator, and the heaviest module of each runtime-layer `core/` package — the ones
+#: that historically reached for a library and now take a `ConceptProviderAbstract` instead. There is no
+#: longer a Pipe-touching remainder of `core/` to leave out: all of it moved to `pipe_machinery` and
+#: `mthds_parsing`, which is what let `pipelex.core` be declared wholesale (see the guard's
+#: `RUNTIME_LAYER_PACKAGES` note).
+#:
+#: `providers.builtins` earns its place by history, under its former name `plugins.builtins`: it and
+#: three neighbours reached `interpreter_hub` transitively — through `runtime_bridge`, `pipeline` and
+#: `pipe_operators` — while both gates stayed green, because the guard was one hop deep and
+#: `pipelex.plugins`, the largest declared runtime-layer package, had no entry point here. The guard
+#: now follows the import graph, but that is *static* analysis: it cannot see a dynamic import, so the
+#: package that bit us gets a runtime-truth check too. It instantiates every built-in vendor adapter,
+#: so importing it pulls in every one of them — the broadest single entry point into `pipelex.providers`,
+#: which is where those adapters now live. The plugin *mechanism* it registers through stayed behind
+#: in `pipelex.plugins` and is reached from here, so one entry point still covers both halves.
 RUNTIME_LAYER_ENTRY_POINTS = [
     "pipelex.cogt.content_generation.content_generator",
     "pipelex.runtime_hub",
+    "pipelex.providers.builtins",
     "pipelex.core.concepts.structure_generation.generator",
     "pipelex.core.memory.input_shaper",
     "pipelex.core.memory.working_memory_factory",
@@ -47,10 +64,11 @@ RUNTIME_LAYER_ENTRY_POINTS = [
 ]
 
 #: The negative control, and the reason it is needed: the detector below is a `textwrap.dedent`
-#: string, so nothing type-checks or lints the names inside it. A typo in `INTERPRETER_PACKAGES` or
-#: `is_interpreter` would make every entry point above pass *vacuously*, forever, and the suite would
-#: stay green while guarding nothing. This entry point is dirty by definition — the interpreter hub
-#: is the interpreter — so it must come back a failure, *reported as offending modules*, whatever
+#: string, so nothing type-checks or lints the *logic* inside it. The package names are no longer at
+#: risk — they are a real module-level constant, passed in as argv — but a broken predicate or a
+#: mis-built offenders comprehension would still make every entry point above pass *vacuously*,
+#: forever, while the suite stayed green. This entry point is dirty by definition — the interpreter
+#: hub is the interpreter — so it must come back a failure, *reported as offending modules*, whatever
 #: else changes. Asserting the offender message and not merely the exit code is what pins the
 #: predicate: the `sys.modules` check below would exit 1 for this entry point either way.
 DIRTY_ENTRY_POINT = "pipelex.interpreter_hub"
@@ -60,38 +78,45 @@ DIRTY_ENTRY_POINT = "pipelex.interpreter_hub"
 #: repo has a documented history of (`docs/agents/debugging-hanging-pytest-runs.md`).
 SUBPROCESS_TIMEOUT_SECONDS = 300
 
+#: The interpreter layer's top-level packages — the set the detector treats as "interpreter module".
+#:
+#: A real module-level constant, handed to the subprocess as argv rather than baked into the script
+#: string below. That is deliberate: while these names lived *inside* the `textwrap.dedent` string,
+#: nothing type-checked, linted or grepped them, and reading them back out took a regex. Two
+#: documented interpreter homes are absent, and their absence is a known wart rather than an
+#: oversight — see this module's docstring.
+INTERPRETER_PACKAGES: tuple[str, ...] = (
+    "libraries",
+    "pipe_operators",
+    "pipe_controllers",
+    "codegen",
+    "builder",
+    # The built-ins that adapt interpreter-layer ports; they construct interpreter-layer objects.
+    "interpreter_plugins",
+    # Core's Pipe machinery and the pipe-kind registration manifest, hoisted out of `core/`.
+    "pipe_machinery",
+    # Signature resolution: `signature_walk` imports `interpreter_hub` to resolve pipes by code.
+    "pipe_signature",
+    # The MTHDS parser and its blueprint, hoisted out of `core/`.
+    "mthds_parsing",
+)
+
 _CLOSURE_SCRIPT = textwrap.dedent(
     """
     import importlib
     import sys
 
     target = sys.argv[1]
+    interpreter_packages = frozenset(sys.argv[2:])
+    # An empty set would make every entry point pass while flagging nothing — the exact vacuity this
+    # module exists to prevent. Fail loudly instead, so a caller that drops the argv splat is caught.
+    if not interpreter_packages:
+        print("no interpreter packages passed — the detector would match nothing")
+        raise SystemExit(2)
     importlib.import_module(target)
 
-    INTERPRETER_PACKAGES = ("libraries", "pipe_operators", "pipe_controllers", "codegen", "builder")
-
-    # Core's Pipe machinery: interpreter-layer by construction, but not under a top-level package of its own.
-    INTERPRETER_CORE = (
-        "pipelex.core.bundles",
-        "pipelex.core.interpreter",
-        "pipelex.core.registry_models",
-        "pipelex.core.pipes.pipe_abstract",
-        "pipelex.core.pipes.pipe_blueprint",
-        "pipelex.core.pipes.pipe_factory",
-        "pipelex.core.pipes.rendering",
-    )
-    # The one straddler: structured bundle validation-error data that `pipeline/` imports, so it lands in
-    # every runtime closure -- dragging the empty `core.bundles` package placeholder in with it. A placement
-    # wart, not a hub violation -- see wip/pr-1062-review-notes.md. Matched exactly, never as a prefix, so
-    # the rest of `core.bundles` stays flagged.
-    INTERPRETER_CORE_EXCLUDED = ("pipelex.core.bundles", "pipelex.core.bundles.exceptions")
-
     def is_interpreter(name):
-        if name.split(".")[1] in INTERPRETER_PACKAGES:
-            return True
-        if name in INTERPRETER_CORE_EXCLUDED:
-            return False
-        return any(name == module or name.startswith(module + ".") for module in INTERPRETER_CORE)
+        return name.split(".")[1] in interpreter_packages
 
     offenders = sorted(name for name in sys.modules if name.startswith("pipelex.") and is_interpreter(name))
     if offenders:
@@ -108,11 +133,18 @@ _CLOSURE_SCRIPT = textwrap.dedent(
 )
 
 
+#: Anchored on `tests/` by name rather than by a parent count — a depth index resolves silently to the
+#: wrong directory when a module moves, which is exactly the failure this whole track kept hitting.
+_TESTS_ROOT = next(parent for parent in Path(__file__).resolve().parents if parent.name == "tests")
+_REPO_ROOT = _TESTS_ROOT.parent
+_HUB_LAYERING_PAGE = _REPO_ROOT / "docs" / "contribute" / "hub-layering.md"
+
+
 def _run_closure(*, entry_point: str) -> subprocess.CompletedProcess[str]:
     """Import one entry point in a fresh interpreter and return the detector's verdict."""
     try:
         return subprocess.run(  # noqa: S603
-            [sys.executable, "-c", _CLOSURE_SCRIPT, entry_point],
+            [sys.executable, "-c", _CLOSURE_SCRIPT, entry_point, *INTERPRETER_PACKAGES],
             capture_output=True,
             text=True,
             check=False,
@@ -147,3 +179,39 @@ class TestHubImportClosure:
         else:
             assert "closure OK" not in result.stdout
             assert "interpreter module(s)" in result.stdout
+
+    def test_every_configured_interpreter_package_is_real(self) -> None:
+        """Each name in `INTERPRETER_PACKAGES` is a real top-level package under `pipelex/`.
+
+        `DIRTY_ENTRY_POINT` proves that *at least one* configured name matches — it imports the
+        interpreter hub, whose closure contains several of them. It cannot prove that each one does.
+        A typo'd or retired name matches nothing and guards nothing, forever, while the suite stays
+        green; and since the predicate is a membership test, a dead name is invisible rather than loud.
+        Being a real constant makes the names lint-visible, but no tool checks a string against disk.
+        """
+        source_root = _REPO_ROOT / "pipelex"
+        for package in INTERPRETER_PACKAGES:
+            assert (source_root / package).is_dir(), (
+                f"INTERPRETER_PACKAGES names {package!r}, which is not a package directory under "
+                f"{source_root}. The predicate is a membership test, so this name silently matches "
+                f"nothing rather than failing — every module it was meant to flag now passes."
+            )
+
+    def test_the_interpreter_package_set_matches_the_documented_one(self) -> None:
+        """The closure predicate and `hub-layering.md`'s verification snippet name the same packages.
+
+        The page publishes a runnable snippet with its own copy of this set, and a reader who runs it
+        with a stale copy measures zero interpreter modules and believes it. The two copies had in fact
+        silently disagreed on `pipe_signature` before anyone compared them by machine.
+        """
+        page = _HUB_LAYERING_PAGE.read_text(encoding="utf-8")
+        match = re.search(r"^INTERPRETER = (\{.*\})$", page, re.MULTILINE)
+        assert match is not None, f"could not locate the INTERPRETER set in {_HUB_LAYERING_PAGE}"
+        documented = set(ast.literal_eval(match.group(1)))
+        configured = set(INTERPRETER_PACKAGES)
+        assert configured == documented, (
+            f"the closure predicate and {_HUB_LAYERING_PAGE.name} disagree on the interpreter packages.\n"
+            f"  only in the closure test: {sorted(configured - documented)}\n"
+            f"  only in the doc snippet:  {sorted(documented - configured)}\n"
+            "Both must gain a new interpreter package together, or one of the two checks passes vacuously."
+        )

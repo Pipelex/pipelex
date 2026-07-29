@@ -3,12 +3,12 @@ from typing import TYPE_CHECKING, Any
 from typing_extensions import override
 
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
-from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.pipe_controllers.parallel.exceptions import PipeParallelFactoryError
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sub_pipe_factory import SubPipeFactory
+from pipelex.pipe_machinery.pipe_factory import PipeFactoryProtocol
 
 if TYPE_CHECKING:
     from pipelex.pipe_controllers.sub_pipe import SubPipe

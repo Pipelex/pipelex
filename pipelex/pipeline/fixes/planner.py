@@ -5,8 +5,7 @@ The planner runs inside report assembly (``build_validation_error_items``), so e
 of the validation report — CLI, API, MCP — sees fixes with zero extra plumbing.
 """
 
-from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
-from pipelex.core.exceptions import PipesAndConceptValidationErrorData
+from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.suggested_fix import FixOp, FixOpKind, FixSafety, SuggestedFix
 
 MATCH_SEQUENCE_OUTPUT_FIX_CODE = "match-sequence-output"

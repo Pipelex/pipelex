@@ -4,9 +4,9 @@ from typing_extensions import override
 
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
-from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
+from pipelex.pipe_machinery.pipe_factory import PipeFactoryProtocol
 from pipelex.pipe_operators.img_gen.img_gen_prompt_blueprint import ImgGenPromptBlueprint
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint

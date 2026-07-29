@@ -4,9 +4,9 @@ import pytest
 import tomlkit
 from pytest_mock import MockerFixture
 
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.language.mthds_config import MthdsConfig, MthdsConfigForConcepts, MthdsConfigForPipes, MthdsConfigInlineTables, MthdsConfigStrings
 from pipelex.language.mthds_factory import PIPE_CATEGORY_FIELD_KEY, MthdsFactory
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 
 

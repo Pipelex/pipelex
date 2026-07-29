@@ -10,7 +10,7 @@ Pure unit test (no Pipelex boot): blueprints from the interpreter, hand-built st
 """
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipeline.bundle_validator import DryRunOutput, DryRunStatus
 from pipelex.pipeline.pipe_io_contracts import IOMultiplicity, PipeIOContract, PipeOutputContract
 from pipelex.pipeline.validation_report import build_validation_report
@@ -40,8 +40,8 @@ prompt = "Do it with $doc"
 class TestBuildValidationReport:
     def test_assembles_canonical_report_from_ingredients(self) -> None:
         blueprints = [
-            PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=_NO_MAIN_PIPE_MTHDS),
-            PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=_MAIN_PIPE_MTHDS),
+            MthdsParser.make_pipelex_bundle_blueprint(mthds_content=_NO_MAIN_PIPE_MTHDS),
+            MthdsParser.make_pipelex_bundle_blueprint(mthds_content=_MAIN_PIPE_MTHDS),
         ]
         pipe_io_contracts = {
             "beta.do_it": PipeIOContract(
@@ -71,7 +71,7 @@ class TestBuildValidationReport:
         assert report.graph_spec is None
 
     def test_runnable_when_nothing_pending(self) -> None:
-        blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=_MAIN_PIPE_MTHDS)]
+        blueprints = [MthdsParser.make_pipelex_bundle_blueprint(mthds_content=_MAIN_PIPE_MTHDS)]
 
         report = build_validation_report(
             blueprints=blueprints,
@@ -88,7 +88,7 @@ class TestBuildValidationReport:
 
     def test_warnings_ride_the_report_without_flipping_the_verdict(self) -> None:
         """Warnings share the error item shape but the report stays the valid arm (is_valid True)."""
-        blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=_MAIN_PIPE_MTHDS)]
+        blueprints = [MthdsParser.make_pipelex_bundle_blueprint(mthds_content=_MAIN_PIPE_MTHDS)]
         warning_item = ValidationErrorItem(
             category=ValidationErrorCategory.PIPE_VALIDATION,
             error_type="optional_force_redundant",

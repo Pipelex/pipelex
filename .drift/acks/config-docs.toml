@@ -1,11 +1,11 @@
 contract = "config-docs"
-digest = "sha256:821341693eb86945913565bae7d9689c023cb0c6d60992aade1711b8c295a188"
-reviewed_by = "Claude (Opus 5)"
-reviewed_at = "2026-07-26T09:35:13Z"
-rationale = "Trigger diff is import-path-only: config_check.py and aws_config.py each changed exactly one line, 'from pipelex.service_hub import' -> 'from pipelex.runtime_hub import', from the runtime/interpreter hub rename. Verified by diffing both files and filtering out every line naming a hub — nothing remained. No config field, default, validator, or TOML key moved. Opened and read docs/configuration/: its only reference to either trigger is aws-config.md, which documents the TOML section '[pipelex.aws_config]' and cites no Python import path anywhere in the tree. Nothing to update."
+digest = "sha256:084ae3c3afbaaa6568ef8eefab258059268c202f3fb5eb4c64d1ab96fcb67b1e"
+reviewed_by = "Louis Choquel"
+reviewed_at = "2026-07-27T17:00:55Z"
+rationale = "M2 mechanism/adapter split. Trigger diff on config_cogt.py is import-path-only: exactly four lines, pipelex.plugins.<vendor>.<vendor>_config -> pipelex.providers.<vendor>.<vendor>_config, from moving the seventeen built-in vendor adapters out of pipelex/plugins/ into pipelex/providers/. Verified by reading the staged diff in full — no config field, default, validator, TOML key, or section name changed, and the four config classes themselves were moved intact, not edited. The structural sync between configs.py and the pipelex.toml files is therefore untouched, which make tb confirms. Reviewed docs/configuration/ against the change: grepped the whole tree for pipelex.plugins, pipelex.providers, pipelex/plugins, pipelex/providers and each of the four config class names — zero hits. Those pages document TOML sections and keys ([pipelex.cogt], [pipelex.aws_config], etc.) and cite no Python import path anywhere, so an import-path move is invisible to them by construction. Nothing to update."
 
 [trigger_files]
-"pipelex/cogt/config_cogt.py" = "blob:fca7b96f9147122b6b8300471cac637b05fed1ee"
+"pipelex/cogt/config_cogt.py" = "blob:3c10f6a2b809e38b9a1112ce24ffb8ea4c32b04b"
 "pipelex/cogt/img_gen/img_gen_job_components.py" = "blob:084985080413fd8d6c3b1b9b0747020cb0161858"
 "pipelex/pipelex.toml" = "blob:e646e431b5db2e467bc962b738be7bc9f3b3ffb8"
 "pipelex/system/configuration/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"

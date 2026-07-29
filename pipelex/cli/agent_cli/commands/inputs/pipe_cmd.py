@@ -12,10 +12,10 @@ from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_ag
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, extract_validation_errors
 from pipelex.cli.agent_cli.commands.inputs._inputs_core import emit_inputs_result, emit_no_inputs_result, inputs_core
 from pipelex.cli.method_resolver import resolve_pipe_from_exports
-from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
-from pipelex.core.pipes.rendering.input_renderer import InputsTemplateFormat
+from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
+from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import ValidateBundleError

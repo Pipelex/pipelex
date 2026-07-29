@@ -4,7 +4,7 @@ from typing import Callable
 import pytest
 
 from pipelex import log
-from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from tests.unit.pipelex.pipe_operators.pipe_func.data import PipeFuncInputTestCases

@@ -166,7 +166,7 @@ class TestRunCoreExecution:
         bundle_file = tmp_path / "demo.mthds"
         bundle_file.write_text("# bundle content\n", encoding="utf-8")
         mocker.patch(
-            "pipelex.cli.commands.run._run_core.PipelexInterpreter.make_pipelex_bundle_blueprint",
+            "pipelex.cli.commands.run._run_core.MthdsParser.make_pipelex_bundle_blueprint",
             return_value=SimpleNamespace(main_pipe="bundle_main"),
         )
         pipe_output = self._make_pipe_output(mocker)
@@ -184,7 +184,7 @@ class TestRunCoreExecution:
         bundle_file = tmp_path / "demo.mthds"
         bundle_file.write_text("# bundle content\n", encoding="utf-8")
         mocker.patch(
-            "pipelex.cli.commands.run._run_core.PipelexInterpreter.make_pipelex_bundle_blueprint",
+            "pipelex.cli.commands.run._run_core.MthdsParser.make_pipelex_bundle_blueprint",
             return_value=SimpleNamespace(main_pipe=None),
         )
 

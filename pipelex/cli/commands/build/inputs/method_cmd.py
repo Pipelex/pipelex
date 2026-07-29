@@ -8,7 +8,7 @@ import typer
 from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME, DEFAULT_INPUTS_TOML_FILE_NAME
 from pipelex.cli.commands.build.inputs._inputs_core import execute_generate_inputs
 from pipelex.cli.method_resolver import resolve_method_target
-from pipelex.core.pipes.rendering.input_renderer import InputsTemplateFormat
+from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat
 
 
 def build_inputs_method_cmd(

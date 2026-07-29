@@ -13,10 +13,10 @@ the hub.
 from collections.abc import Sequence
 from typing import TypeAlias
 
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.pipe_controllers.absence_taint import ParallelTaintAnalysis, SequenceTaintAnalysis
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
 ControllerTaintAnalysis: TypeAlias = SequenceTaintAnalysis | ParallelTaintAnalysis
 

@@ -15,8 +15,8 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.config import get_config
-from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.graph.graphspec import GraphSpecMode
+from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.pipeline.dry_run_pipeline import dry_run_pipeline
 from pipelex.system.configuration.configs import NdjsonTracingConfig, TracingBackend
 
@@ -97,7 +97,7 @@ class TestDryRunPipelineGraphTransport:
 
     async def test_blank_explicit_pipe_code_is_rejected(self) -> None:
         """A blank explicit target must not silently fall back to main_pipe."""
-        with pytest.raises(PipelexInterpreterError) as exc_info:
+        with pytest.raises(MthdsParserError) as exc_info:
             await dry_run_pipeline(
                 mthds_contents=[_DRY_RUN_GRAPH_MTHDS],
                 pipe_code="   ",

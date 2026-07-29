@@ -166,7 +166,7 @@ async def generate_graph_for_bundle(
         Dictionary with graph_files, graph_output_dir, and direction.
 
     Raises:
-        PipelexInterpreterError: If bundle parsing fails or main_pipe is missing.
+        MthdsParserError: If bundle parsing fails or main_pipe is missing.
         PipelexError: If pipeline execution does not produce a graph spec.
         PipelineExecutionError: If dry-run execution fails.
     """
@@ -239,7 +239,7 @@ async def generate_view_for_bundle(
         Dictionary with graphspec (JSON-serializable dict), pipe_code, and direction.
 
     Raises:
-        PipelexInterpreterError: If bundle parsing fails or main_pipe is missing.
+        MthdsParserError: If bundle parsing fails or main_pipe is missing.
         PipelexError: If pipeline execution does not produce a graph spec.
         PipelineExecutionError: If dry-run execution fails.
     """

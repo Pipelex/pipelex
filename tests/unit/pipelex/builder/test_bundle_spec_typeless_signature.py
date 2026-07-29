@@ -14,7 +14,7 @@ from pydantic import ValidationError
 from pipelex.builder.bundle_spec import PipelexBundleSpec
 from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.builder.pipe.pipe_signature_spec import PipeSignatureSpec
-from pipelex.core.pipes.pipe_blueprint import PipeType
+from pipelex.pipe_machinery.pipe_blueprint import PipeType
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
 
 

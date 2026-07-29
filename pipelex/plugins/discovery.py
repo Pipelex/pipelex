@@ -2,7 +2,6 @@ import importlib.metadata
 from typing import TYPE_CHECKING, cast
 
 from pipelex import log
-from pipelex.plugins.builtins import BUILTIN_PLUGINS, CORE_UNCONDITIONAL_PLUGIN_NAMES
 from pipelex.plugins.contract import PLUGIN_API_VERSION, PipelexPlugin
 from pipelex.plugins.exceptions import (
     BrokenPluginError,
@@ -13,6 +12,8 @@ from pipelex.plugins.exceptions import (
 from pipelex.plugins.registrar import PluginDiscovery, PluginOrigin, PluginRegistrar, PluginStatus
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from pipelex.system.configuration.configs import PipelexConfig
 
 # External plugins advertise themselves under this entry-point group:
@@ -21,24 +22,48 @@ if TYPE_CHECKING:
 ENTRY_POINT_GROUP = "pipelex.plugins"
 
 
-def build_registrar(*, config: "PipelexConfig") -> PluginRegistrar:
+def build_registrar(
+    *,
+    config: "PipelexConfig",
+    builtin_plugins: "Sequence[PipelexPlugin]",
+    core_unconditional_plugin_names: frozenset[str],
+) -> PluginRegistrar:
     """Discover every plugin and let each register itself into a fresh registrar.
 
     A **pure function**: it touches no global state and constructs no client/SDK,
     so it is safe to call more than once (it runs at boot and again in the
-    ``pipelex plugins list`` diagnostic command). Iterates ``BUILTIN_PLUGINS`` first, then external
+    ``pipelex plugins list`` diagnostic command). Iterates ``builtin_plugins`` first, then external
     ``pipelex.plugins`` entry points; version-checks each; skips (and logs) any
     plugin named in ``config.plugins.disabled`` — externals are denylisted by their
     entry-point name *before* ``load()`` so a broken installed plugin can still be
     disabled; and is fail-loud on every conflict (duplicate backend/mode/slot,
     version mismatch, broken plugin).
+
+    Args:
+        config: The fully-resolved config; supplies the ``plugins.disabled`` denylist and is handed
+            to the registrar for the plugins that read it.
+        builtin_plugins: The built-ins to discover, in order. Injected rather than imported: some
+            built-ins adapt interpreter-layer ports, and this module is runtime-layer, so importing
+            the list here would put the method interpreter back into every runtime closure. The
+            composed list lives in ``pipelex.interpreter_plugins.builtins`` — the layer allowed to
+            weld the two halves.
+        core_unconditional_plugin_names: The built-in names that may not be denylisted. Injected for
+            the same reason and from the same module, so the constant never splits away from the
+            plugins it describes.
     """
     registrar = PluginRegistrar(config=config)
     disabled = set(config.plugins.disabled)
 
     # Built-ins are already instantiated, so their name is known up front.
-    for plugin in BUILTIN_PLUGINS:
-        if _skip_if_disabled(registrar=registrar, name=plugin.name, origin=PluginOrigin.BUILTIN, targets_api=plugin.targets_api, disabled=disabled):
+    for plugin in builtin_plugins:
+        if _skip_if_disabled(
+            registrar=registrar,
+            name=plugin.name,
+            origin=PluginOrigin.BUILTIN,
+            targets_api=plugin.targets_api,
+            disabled=disabled,
+            core_unconditional_plugin_names=core_unconditional_plugin_names,
+        ):
             continue
         _register_plugin(registrar=registrar, plugin=plugin, origin=PluginOrigin.BUILTIN)
 
@@ -48,17 +73,39 @@ def build_registrar(*, config: "PipelexConfig") -> PluginRegistrar:
     # entry-point name; the post-load check honors the denylist on that too, so
     # either name disables it.
     for entry_point in _external_entry_points():
-        if _skip_if_disabled(registrar=registrar, name=entry_point.name, origin=PluginOrigin.EXTERNAL, targets_api=None, disabled=disabled):
+        if _skip_if_disabled(
+            registrar=registrar,
+            name=entry_point.name,
+            origin=PluginOrigin.EXTERNAL,
+            targets_api=None,
+            disabled=disabled,
+            core_unconditional_plugin_names=core_unconditional_plugin_names,
+        ):
             continue
         plugin = _load_external_plugin(entry_point)
-        if _skip_if_disabled(registrar=registrar, name=plugin.name, origin=PluginOrigin.EXTERNAL, targets_api=plugin.targets_api, disabled=disabled):
+        if _skip_if_disabled(
+            registrar=registrar,
+            name=plugin.name,
+            origin=PluginOrigin.EXTERNAL,
+            targets_api=plugin.targets_api,
+            disabled=disabled,
+            core_unconditional_plugin_names=core_unconditional_plugin_names,
+        ):
             continue
         _register_plugin(registrar=registrar, plugin=plugin, origin=PluginOrigin.EXTERNAL)
 
     return registrar
 
 
-def _skip_if_disabled(*, registrar: PluginRegistrar, name: str, origin: PluginOrigin, targets_api: int | None, disabled: set[str]) -> bool:
+def _skip_if_disabled(
+    *,
+    registrar: PluginRegistrar,
+    name: str,
+    origin: PluginOrigin,
+    targets_api: int | None,
+    disabled: set[str],
+    core_unconditional_plugin_names: frozenset[str],
+) -> bool:
     """Record and skip a denylisted plugin; return ``True`` if it was skipped.
 
     Fail-loud when a core-unconditional plugin is denylisted — that is a
@@ -66,7 +113,7 @@ def _skip_if_disabled(*, registrar: PluginRegistrar, name: str, origin: PluginOr
     """
     if name not in disabled:
         return False
-    if name in CORE_UNCONDITIONAL_PLUGIN_NAMES:
+    if name in core_unconditional_plugin_names:
         raise CoreUnconditionalPluginDisabledError(plugin_name=name)
     log.info(f"Plugin '{name}' is disabled via plugins.disabled; skipping.")
     registrar.discoveries.append(

@@ -1,4 +1,4 @@
-"""Unit tests for the subject-grants registry: loading/validation and symmetric staleness (dead grants)."""
+"""Unit tests for the subject-grants registry: loading/validation, symmetric staleness (dead grants), file order."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from pipelex.cli.dev_cli.commands.keyword_only_guard import (
     SubjectGrantRegistryError,
     ViolationKind,
     collect_all_violations,
+    find_unsorted_grants,
     load_subject_grants,
 )
 
@@ -25,6 +26,31 @@ rationale = "Verb-object; single operand."
 param = "spec"
 rationale = "Factory from source: builds from the spec."
 """
+
+#: The same two entries in the order the writer emits them.
+_SORTED_REGISTRY = """\
+version = 1
+
+["pipelex/sample/module.py::Builder.build"]
+param = "spec"
+rationale = "Factory from source: builds from the spec."
+
+["pipelex/sample/module.py::render"]
+param = "node"
+rationale = "Verb-object; single operand."
+"""
+
+#: A multi-line rationale whose body carries a line that LOOKS like a table header — valid TOML the
+#: text scan would read as one entry more than the parser found.
+_PHANTOM_HEADER_REGISTRY = '''\
+version = 1
+
+["pipelex/sample/module.py::render"]
+param = "node"
+rationale = """Verb-object.
+["pipelex/sample/module.py::ghost"]
+"""
+'''
 
 
 def _write_registry(root: Path, *, content: str) -> None:
@@ -135,3 +161,33 @@ class TestSubjectGrantRegistry:
         grants = {"pipelex/sample/module.py::render": SubjectGrant(param="node", rationale="ok")}
         violations = collect_all_violations(Path("pipelex"), grants=grants)
         assert [violation.kind for violation in violations] == [ViolationKind.MISSING_STAR]
+
+    # File order, below. The registry is rewritten sorted by key on every write, so order is an invariant —
+    # one a bulk path rewrite breaks silently, since an unsorted registry parses and grants exactly the
+    # same subjects.
+
+    def test_sorted_registry_has_no_order_violation(self, tmp_path: Path) -> None:
+        _write_registry(tmp_path, content=_SORTED_REGISTRY)
+        assert find_unsorted_grants(grants=load_subject_grants(root=tmp_path), root=tmp_path) == []
+
+    def test_out_of_order_entry_flagged(self, tmp_path: Path) -> None:
+        """The two entries of `_VALID_REGISTRY` are written in the reverse of their sorted order."""
+        _write_registry(tmp_path, content=_VALID_REGISTRY)
+        violations = find_unsorted_grants(grants=load_subject_grants(root=tmp_path), root=tmp_path)
+        assert [violation.kind for violation in violations] == [ViolationKind.UNSORTED_GRANT]
+        assert violations[0].key == "pipelex/sample/module.py::Builder.build"
+        assert violations[0].lineno == 0, "the line belongs to the registry, not to a def — it travels in `detail`"
+        assert "subject_grants.toml:7" in violations[0].detail
+        assert "pipelex/sample/module.py::render" in violations[0].detail
+
+    def test_order_check_missing_registry_is_an_explicit_error(self, tmp_path: Path) -> None:
+        with pytest.raises(SubjectGrantRegistryError, match="not found"):
+            find_unsorted_grants(grants={}, root=tmp_path)
+
+    def test_entry_the_scan_cannot_read_is_an_explicit_error(self, tmp_path: Path) -> None:
+        """A multi-line rationale can carry a line that looks like a table header — the scan must not
+        silently disagree with the parser about which entries exist, or the order rule quietly narrows.
+        """
+        _write_registry(tmp_path, content=_PHANTOM_HEADER_REGISTRY)
+        with pytest.raises(SubjectGrantRegistryError, match="the order check cannot read"):
+            find_unsorted_grants(grants=load_subject_grants(root=tmp_path), root=tmp_path)

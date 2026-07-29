@@ -1,5 +1,5 @@
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 
 CONCEPTS_WITH_REFINES = (
     "concepts_with_refines",

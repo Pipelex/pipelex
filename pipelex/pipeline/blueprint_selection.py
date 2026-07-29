@@ -11,8 +11,8 @@ without an import cycle through ``bundle_validator``.
 
 from typing import NamedTuple, Sequence
 
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipeline.exceptions import ValidateBundleError
 
 

@@ -3,8 +3,8 @@ from typing import Any
 from typing_extensions import override
 
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
-from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+from pipelex.pipe_machinery.pipe_factory import PipeFactoryProtocol
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 

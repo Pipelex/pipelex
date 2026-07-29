@@ -8,7 +8,7 @@ from mthds.package.bundle_metadata import BundleMetadata
 from mthds.package.manifest.schema import MethodsManifest
 from mthds.package.visibility import PackageVisibilityChecker, VisibilityError
 
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 
 
 def _blueprint_to_metadata(blueprint: PipelexBundleBlueprint) -> BundleMetadata:
