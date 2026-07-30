@@ -147,6 +147,34 @@ class TestHubLayeringGuard:
                 "whatever made it dirty to the layer it belongs to."
             )
 
+    def test_the_boot_split_left_the_runtime_half_declared(self) -> None:
+        """The runtime composition root must stay declared — and its interpreter half must not be.
+
+        `pipelex.py` was carved in half the way the plugin manifests were: the runtime boot became
+        `pipelex/runtime_boot.py`, and `Pipelex` became the interpreter boot that subclasses it. Only
+        the runtime half is declarable, and declaring it is the entire reason the rule reaches it:
+        both halves were undeclared before the split, which made the composition root — the one module
+        that constructs *both* layers — the single largest unpoliced surface in the tree.
+
+        The negative half of the assertion matters just as much. `pipelex.pipelex` imports
+        `interpreter_hub` by construction, so declaring it would make the layer rule fail by design;
+        a well-meaning "the boot should be runtime-layer, surely" edit is a plausible future mistake
+        and this is what catches it.
+
+        Membership is the whole assertion, for the same reason as the two tests above: `is_runtime_layer`
+        matches by dotted prefix, so presence is the one bit that matters.
+        """
+        assert "pipelex.runtime_boot" in RUNTIME_LAYER_PACKAGES, (
+            "pipelex.runtime_boot is the runtime layer's composition root and is not declared "
+            "runtime-layer. Undeclared means unchecked, not flagged — restore the entry, or move "
+            "whatever made it dirty to the layer it belongs to."
+        )
+        assert "pipelex.pipelex" not in RUNTIME_LAYER_PACKAGES, (
+            "pipelex.pipelex is the *interpreter* half of the boot — it installs the InterpreterHub "
+            "and constructs the method machinery — so declaring it runtime-layer makes the layer rule "
+            "fail by design. Declare pipelex.runtime_boot instead; that is the half that stays clean."
+        )
+
     def test_runtime_layer_may_import_runtime_hub(self) -> None:
         """The permitted direction is never flagged — the runtime layer lives on `runtime_hub`."""
         violations = _violate(

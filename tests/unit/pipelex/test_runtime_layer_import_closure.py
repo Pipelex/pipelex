@@ -66,6 +66,7 @@ import pytest
 RUNTIME_LAYER_ENTRY_POINTS = [
     "pipelex.cogt.content_generation.content_generator",
     "pipelex.runtime_hub",
+    "pipelex.runtime_boot",
     "pipelex.providers.builtins",
     "pipelex.core.concepts.structure_generation.generator",
     "pipelex.core.memory.input_shaper",

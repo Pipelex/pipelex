@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:084ae3c3afbaaa6568ef8eefab258059268c202f3fb5eb4c64d1ab96fcb67b1e"
+digest = "sha256:6559e8b12f68cc9b7edbb82cfcb78191add1fa8a555e58552a731d40da7ce4a1"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-07-27T17:00:55Z"
-rationale = "M2 mechanism/adapter split. Trigger diff on config_cogt.py is import-path-only: exactly four lines, pipelex.plugins.<vendor>.<vendor>_config -> pipelex.providers.<vendor>.<vendor>_config, from moving the seventeen built-in vendor adapters out of pipelex/plugins/ into pipelex/providers/. Verified by reading the staged diff in full — no config field, default, validator, TOML key, or section name changed, and the four config classes themselves were moved intact, not edited. The structural sync between configs.py and the pipelex.toml files is therefore untouched, which make tb confirms. Reviewed docs/configuration/ against the change: grepped the whole tree for pipelex.plugins, pipelex.providers, pipelex/plugins, pipelex/providers and each of the four config class names — zero hits. Those pages document TOML sections and keys ([pipelex.cogt], [pipelex.aws_config], etc.) and cite no Python import path anywhere, so an import-path move is invisible to them by construction. Nothing to update."
+reviewed_at = "2026-07-30T06:58:11Z"
+rationale = "Trigger is a docstring-only correction in config_loader.load_config: the config_dir Args entry still said 'project/global layering is bypassed and only this directory is read', which contradicts the same docstring's own summary six lines above and the body at line 313, where list_of_configs is seeded unconditionally with the package pipelex.toml. It is the exact wording this branch already corrected one file over in RuntimeHub.setup_config, and the sibling was missed. No config field, default, validator, TOML key, section name or loading behaviour changed — only prose. Reviewed docs/configuration/ against it: grepped every page for config_dir, 'only this directory', layering and --global. config_dir is not a user-facing concept and appears nowhere; the one layering hit (config-practical/telemetry-config.md:39) is about global-vs-project TOML precedence and is unaffected and correct. configuration/index.md:64-71 documents the default loading sequence and its step 1 ('Base configuration from the installed Pipelex package') is precisely the package-defaults-always-apply fact the corrected docstring now states, so the page already agreed with the truth the docstring was contradicting. Nothing to update."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:3c10f6a2b809e38b9a1112ce24ffb8ea4c32b04b"
@@ -10,7 +10,7 @@ rationale = "M2 mechanism/adapter split. Trigger diff on config_cogt.py is impor
 "pipelex/pipelex.toml" = "blob:e646e431b5db2e467bc962b738be7bc9f3b3ffb8"
 "pipelex/system/configuration/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
 "pipelex/system/configuration/config_check.py" = "blob:efa78599c08e5e003d975cc54978ea5d267214a0"
-"pipelex/system/configuration/config_loader.py" = "blob:af3ba71ed4e589cec42cb197d7d11539cea50ecd"
+"pipelex/system/configuration/config_loader.py" = "blob:29fb321ef003c0fd725c87f560a791e8573b82f5"
 "pipelex/system/configuration/config_model.py" = "blob:83b29dc6e93393c9b98c4353636caf0135c80339"
 "pipelex/system/configuration/config_root.py" = "blob:c7d43851270912d17413cfc6a511247d3c7cc160"
 "pipelex/system/configuration/configs.py" = "blob:99c936343aab7bcd4dee78631164ef10a32ebfe9"

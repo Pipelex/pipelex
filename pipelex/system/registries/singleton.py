@@ -30,8 +30,13 @@ class MetaSingleton(type):
 
         This is useful when the base class is abstract and only concrete
         subclasses are instantiated.
+
+        Iterates a *copy*, as ``clear_subclass_instances`` above already does: ``instances`` is a
+        process-global dict that grows at run time (``GraphTracerManager`` registers itself during a
+        pipeline run), and this lookup sits on the boot hot path ``ensure_pipelex_booted`` reaches from
+        concurrent activities. A dict that gains a key mid-iteration raises ``RuntimeError``.
         """
-        for subclass, instance in cls.instances.items():
+        for subclass, instance in list(cls.instances.items()):
             if issubclass(subclass, base_cls) and isinstance(instance, base_cls):
                 return instance
         return None

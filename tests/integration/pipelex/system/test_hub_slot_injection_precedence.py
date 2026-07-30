@@ -52,7 +52,7 @@ def _fake_registrar(mocker: MockerFixture) -> PluginRegistrar:
     registrar = PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(temporal=SimpleNamespace(is_enabled=False))))
     registrar.begin_plugin(name="pipe_func", origin=PluginOrigin.BUILTIN, targets_api=PLUGIN_API_VERSION)
     PipeFuncPlugin().register(registrar)
-    mocker.patch("pipelex.pipelex.build_registrar", return_value=registrar)
+    mocker.patch("pipelex.runtime_boot.build_registrar", return_value=registrar)
     return registrar
 
 
@@ -129,3 +129,67 @@ class TestHubSlotInjectionPrecedence:
         Pipelex.teardown_if_needed()
 
         assert order == ["third", "second", "first"]
+
+    def test_one_raising_teardown_callback_does_not_skip_the_others(self, mocker: MockerFixture) -> None:
+        """Teardown is best-effort *per callback*, so a bad plugin cannot strand a good one's resources.
+
+        Catching around the loop rather than inside it looks equivalent and is not: by the time an
+        exception reaches the caller the loop has already exited, so every remaining callback is
+        skipped — and with two plugins registered, the second one's runtime stays live. The raiser is
+        registered *last* so LIFO reaches it *first*, which is the ordering that strands the others.
+        """
+        order: list[str] = []
+        registrar = _fake_registrar(mocker)
+
+        def _boom() -> None:
+            order.append("raiser")
+            msg = "plugin teardown exploded"
+            raise RuntimeError(msg)
+
+        registrar.teardown_callbacks.extend([lambda: order.append("survivor"), _boom])
+
+        Pipelex.make(
+            integration_mode=_test_integration_mode(),
+            needs_inference=False,
+            storage_provider=InMemoryStorageProvider(),
+            secrets_provider=EnvSecretsProvider(),
+        )
+        # Must not propagate: no caller of a teardown can act on "plugin B failed to release".
+        Pipelex.teardown_if_needed()
+
+        assert order == ["raiser", "survivor"], "a raising callback skipped the remaining teardown callbacks"
+
+    def test_a_failed_interpreter_tail_still_runs_plugin_teardown_callbacks(self, mocker: MockerFixture) -> None:
+        """A boot that dies after the TASK_MANAGER thunk must not leak the runtime it started.
+
+        The thunk starts a live plugin runtime — for a Temporal worker, threads and a client
+        connection — and it runs in the runtime half of the boot, so every interpreter-tail step
+        happens after it. `make()` handles a failure with `_release_after_failed_boot()`, which
+        releases process-global *state*; without the plugin callbacks it would leave the started
+        runtime running, and nothing else on that path calls them.
+
+        The boot split is what made this reachable in more than one place: the thunk used to run
+        *after* the pipe-func executor resolution, `pipeline_manager.setup()` and the pipe-class
+        registration, and now runs before all three. An injected `PipelineManager` whose `setup()`
+        raises stands in for any of them.
+        """
+        order: list[str] = []
+        registrar = _fake_registrar(mocker)
+        registrar.slot_claims[HubSlot.TASK_MANAGER] = lambda: order.append("task_manager_started")
+        registrar.teardown_callbacks.append(lambda: order.append("plugin_torn_down"))
+
+        exploding_pipeline_manager = mocker.Mock()
+        exploding_pipeline_manager.setup.side_effect = RuntimeError("interpreter tail failed")
+
+        with pytest.raises(RuntimeError, match="interpreter tail failed"):
+            Pipelex.make(
+                integration_mode=_test_integration_mode(),
+                needs_inference=False,
+                pipeline_manager=exploding_pipeline_manager,
+                storage_provider=InMemoryStorageProvider(),
+                secrets_provider=EnvSecretsProvider(),
+            )
+
+        # Asserting the start too, so this cannot pass by the thunk simply never having run —
+        # which would make the leak window imaginary and the test vacuous.
+        assert order == ["task_manager_started", "plugin_torn_down"]

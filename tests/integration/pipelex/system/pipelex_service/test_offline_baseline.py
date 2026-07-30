@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
     from pytest_mock import MockerFixture
 
-PIPELEX_MODULE = "pipelex.pipelex"
+RUNTIME_BOOT_MODULE = "pipelex.runtime_boot"
 
 # Capture the original classmethod at module import — the session-scoped fixture in the root
 # conftest replaces ``RemoteConfigFetcher.fetch_remote_config`` with a wrapper that caches the
@@ -60,7 +60,7 @@ class TestOfflineBaseline:
         """
         Pipelex.teardown_if_needed()
 
-        mocker.patch(f"{PIPELEX_MODULE}.is_pipelex_gateway_enabled", return_value=False)
+        mocker.patch(f"{RUNTIME_BOOT_MODULE}.is_pipelex_gateway_enabled", return_value=False)
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
             new_callable=mocker.PropertyMock,
@@ -108,9 +108,9 @@ class TestOfflineBaseline:
             agreement=PipelexServiceAgreement(terms_accepted=True),
             onboarding=PipelexServiceOnboarding(inference_setup_completed=True),
         )
-        mocker.patch(f"{PIPELEX_MODULE}.is_pipelex_gateway_enabled", return_value=True)
+        mocker.patch(f"{RUNTIME_BOOT_MODULE}.is_pipelex_gateway_enabled", return_value=True)
         mocker.patch(
-            f"{PIPELEX_MODULE}.load_pipelex_service_config_if_exists",
+            f"{RUNTIME_BOOT_MODULE}.load_pipelex_service_config_if_exists",
             return_value=service_config,
         )
         mocker.patch(
