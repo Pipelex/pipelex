@@ -1,6 +1,6 @@
 # Concept purity — evicting the ambient class-registry reads from the core concept model
 
-**Reviewer's guide.** Branch `refactor/Concept-purity`, cut from `dev` at `ed7435a7c`. Two functional commits: `e94b2a4c9` (compatibility) and `89cf2158d` (class access, purity lock, docs). This document is what the branch is *for* — read it before the diff.
+**Reviewer's guide**, archived from the repo-root `TODOS.md` once PR [#1072](https://github.com/Pipelex/pipelex/pull/1072) was finalized. Branch `refactor/Concept-purity`, cut from `dev` at `ed7435a7c`. Two functional commits: `e94b2a4c9` (compatibility) and `89cf2158d` (class access, purity lock, docs); the rest are review-round corrections. This document is what the branch is *for* — read it before the diff.
 
 **Lineage:** continues the hub-split / layer-placement line of work (#1062, #1064, #1070, #1071) — same doctrine, applied to the last ambient lookup left inside the core concept model.
 
