@@ -15,6 +15,16 @@ It stops there. `models_manager.setup(...)` is called without path arguments, an
 
 Each resolves from the *detected* project or global config dir. So a boot pointed at an alternate `config_dir` combines that directory's main settings with whatever inference tree happens to be detected — cross-contamination between two config trees, silently.
 
+There is a **fifth** unscoped read, and it is not an inference path at all: the gateway consent/onboarding state.
+
+```python
+pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
+```
+
+That is hardcoded to the global dir, so a `config_dir`-scoped boot still reads `~/.pipelex/` for terms acceptance and `inference_setup_completed` — the two whose absence raises `GatewayTermsNotAcceptedError` / `InferenceSetupRequiredError`. Compounding it, the `config_dir` branch of `load_config` skips `ensure_global_config_exists()`, so a scoped boot never materialises the tree that this line then reads.
+
+Unlike the four inference paths, it is **not obvious that scoping this one is correct**: terms acceptance is per-user consent, and per-user global state is arguably where it belongs no matter which config directory a given boot reads. That is the question to settle first — the fix here may be "document it as intentional" rather than "propagate `config_dir`". It is listed with the others because the *documented limit* had omitted it, not because the behaviour is known to be wrong.
+
 `ModelManager.setup`'s own comment already says this is the intended remedy: *"Override paths let the doctor scope --global properly; default None falls back to layered config_manager paths for all other callers."* The doctor's `--global` path does exactly that, pinning all four with the comment *"so layered config_manager.X resolution doesn't silently fall back to the project-local files."*
 
 ## Why it was not fixed on PR #1073

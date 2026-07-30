@@ -87,9 +87,12 @@ _BOOTED_RUNTIME_SCRIPT = textwrap.dedent(
 #: The negative control, and the reason it is needed: the sweep below lives inside a `textwrap.dedent`
 #: string, so nothing type-checks or lints the *logic* in it. A broken predicate would make the real
 #: case pass **forever** while flagging nothing — verified, not theorised: changing the sweep's
-#: `name.split(".")[1]` to `[0]` makes this module green with no other edit. The `interpreter_hub in
-#: sys.modules` check is not a backstop either, since a runtime module importing `pipe_operators`
-#: directly never touches the hub — which is the whole case this test exists for.
+#: `name.split(".")[1]` to `[0]` leaves the real case green (it matches nothing, so it finds nothing)
+#: and this control is the only thing that goes red. That asymmetry is the point — the real case cannot
+#: detect its own blindness, so deleting the control would make every other case in this module
+#: unfalsifiable. The `interpreter_hub in sys.modules` check is not a backstop either, since a runtime
+#: module importing `pipe_operators` directly never touches the hub — which is the whole case this test
+#: exists for.
 #:
 #: `cogt` is the control package: the runtime boot loads it by definition, so calling it an
 #: "interpreter package" must come back a failure, *reported as offending modules*. The sibling

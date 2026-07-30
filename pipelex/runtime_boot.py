@@ -153,21 +153,18 @@ class RuntimeBoot(metaclass=MetaSingleton):
         # Readiness gate: flipped True only at the very end of make(), after setup() and the optional
         # validate_model_deck() both succeed. Readers (ensure_pipelex_booted) must gate on this, NOT on
         # mere registry presence -- MetaSingleton registers the instance before setup() configures the hub.
-        # The process globals are single-owner (``set_runtime_hub``, ``KajsonManager`` and
-        # ``log.configure`` are all once-per-process), so exactly one boot may exist. Asked of the *base*
-        # class, which is what makes a bare ``RuntimeBoot`` and a full ``Pipelex`` exclude each other in
-        # both directions, and the message names whichever one actually holds them.
+        # The process globals are single-owner, so exactly one boot may exist. Note *why* that needs a
+        # guard rather than falling out of the code: of the three, only ``log.configure`` refuses a
+        # second call. ``set_runtime_hub`` and ``KajsonManager`` overwrite unconditionally, so without
+        # this check a second boot would silently replace them and the first boot would keep running
+        # against objects nothing else resolves to.
         #
-        # Checked here rather than only in ``make()`` because ``__init__`` is where the damage would be
+        # Checked here *as well as* in ``make()`` — see the guard's docstring for why neither site covers
+        # the other's case. Here it catches a direct construction, which is where the damage would be
         # done: ``set_runtime_hub`` below overwrites ``RuntimeHub._instance`` unconditionally, so a direct
         # construction while another boot is live would orphan that boot from the global hub and only then
-        # fail, at ``log.configure``. ``MetaSingleton`` used to make that unreachable by accident — a
-        # second ``Pipelex(...)`` short-circuits on the registry and never re-runs ``__init__`` — but a
-        # subclass is a different registry key, so the accident no longer covers it.
-        existing_boot = RuntimeBoot.get_optional_instance()
-        if existing_boot is not None:
-            msg = f"{type(existing_boot).__name__} is already initialized"
-            raise PipelexSetupError(msg)
+        # fail, at ``log.configure``.
+        self.raise_if_a_boot_already_holds_the_process_globals()
 
         self.is_ready: bool = False
         # ``config_dir`` is deliberately not stored on the instance. Its predecessor
@@ -635,33 +632,56 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 log.error(f"A plugin teardown callback failed and was skipped: {teardown_exc}")
 
     def _teardown_runtime(self) -> None:
-        """Release everything the runtime boot acquired, and the process globals with it."""
-        if self.telemetry_manager:
-            self.telemetry_manager.teardown()
+        """Release what the runtime boot acquired, and the process-global *state* with it.
 
-        # cogt
-        self.inference_manager.teardown()
-        if self.reporting_delegate:
-            self.reporting_delegate.teardown()
-        self.sdk_client_manager.teardown()
+        Not the hub *instances*: ``set_runtime_hub`` (and, on the interpreter half,
+        ``set_interpreter_hub``) overwrite a ``ClassVar`` with no reset counterpart, so after this runs
+        ``get_runtime_hub()`` still hands out the torn-down hub rather than raising "not initialized".
+        Harmless in practice — the next boot replaces it — but worth not claiming otherwise.
 
-        # tools
-        self.kajson_manager.teardown()
-        if self.class_registry:
-            self.class_registry.teardown()
-        func_registry.teardown()
-        TemplateLoader.reset()
-        TemplateRegistry.clear()
+        The releases in the ``finally`` are what make the process *re-bootable*, so they must not be
+        skipped by a raising step above them — and several of those steps are reached through an
+        injectable abstract type (``telemetry_manager``, ``reporting_delegate``, ``class_registry`` are
+        all public ``make()`` injection points), so the built-in implementations' "teardown never
+        raises" guarantee does not cover them. Unguarded, a raiser would strand this instance in
+        ``MetaSingleton.instances`` and leave the process **permanently** unbootable: the next ``make()``
+        dies on "already initialized", and ``teardown_if_needed`` cannot rescue it because it resolves
+        the same instance and re-enters the same raiser. ``finally`` and no ``except``: the failure still
+        propagates — a teardown that half-failed must not look successful.
 
-        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done (except config & logs)")
-        # The runtime hub releases its process-global config. ``class_registry_scoping`` is reset here
-        # too: the interpreter half installs the resolver at boot, so releasing it belongs to whichever
-        # teardown runs — and on a runtime-only boot nothing installed it, where the reset is a no-op.
-        self.runtime_hub.reset_config()
-        class_registry_scoping.reset()
-        # Clear the singleton instance from metaclass
-        if self.__class__ in MetaSingleton.instances:
-            del MetaSingleton.instances[self.__class__]
+        What a raising step *does* still skip is the releases before it in the sequence. Those leave
+        resources dangling or a stale ``KajsonManager`` registry rather than wedging the process, and
+        fixing them means collapsing this path and ``_release_after_failed_boot`` into one list —
+        ``wip/inputs/failed-boot-does-not-release-every-resource.md``.
+        """
+        try:
+            if self.telemetry_manager:
+                self.telemetry_manager.teardown()
+
+            # cogt
+            self.inference_manager.teardown()
+            if self.reporting_delegate:
+                self.reporting_delegate.teardown()
+            self.sdk_client_manager.teardown()
+
+            # tools
+            self.kajson_manager.teardown()
+            if self.class_registry:
+                self.class_registry.teardown()
+            func_registry.teardown()
+            TemplateLoader.reset()
+            TemplateRegistry.clear()
+
+            log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done (except config & logs)")
+        finally:
+            # The runtime hub releases its process-global config. ``class_registry_scoping`` is reset here
+            # too: the interpreter half installs the resolver at boot, so releasing it belongs to whichever
+            # teardown runs — and on a runtime-only boot nothing installed it, where the reset is a no-op.
+            self.runtime_hub.reset_config()
+            class_registry_scoping.reset()
+            # Clear the singleton instance from metaclass
+            if self.__class__ in MetaSingleton.instances:
+                del MetaSingleton.instances[self.__class__]
 
     def teardown(self) -> None:
         self._teardown_plugin_callbacks()
@@ -669,6 +689,13 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
     def _release_after_failed_boot(self) -> None:
         """Release the process globals a partial boot acquired. Called from every ``make()``'s handler.
+
+        Covers a failure in ``setup()`` only. Both ``make()``s construct *outside* their ``try``, so a
+        raise inside ``__init__`` itself — ``log.configure`` hitting "LogConfig is already set" because
+        an embedding host configured pipelex logging first is the realistic one — never reaches this
+        handler, and leaves nothing in ``MetaSingleton`` for ``teardown_if_needed`` to find either.
+        Widening the ``try`` is not the fix: this method reads attributes ``__init__`` assigns, so it
+        would fault on a half-constructed instance and hide the original error.
 
         A failed boot must release the process-global singletons it acquired, not just the singleton
         registration — otherwise they leak and poison the next boot in the same process. ``setup()``
@@ -789,7 +816,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         Returns the initialized runtime boot instance, and raises ``PipelexSetupError`` if a boot
         already holds the process globals or if setup fails.
         """
-        # No exclusivity check here: ``__init__`` owns it, so it holds for a direct construction too.
+        # Checked here and not left to ``__init__``: on a second ``make()`` for an already-registered
+        # class, ``MetaSingleton`` hands back the live instance without re-running ``__init__``, so the
+        # only guard that can see this case is one that runs *before* the construction.
+        cls.raise_if_a_boot_already_holds_the_process_globals()
+
         runtime_boot = cls(config_dir=config_dir, config_overrides=config_overrides)
         try:
             runtime_boot.setup(
@@ -819,6 +850,29 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         runtime_boot.is_ready = True
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} runtime ready")
         return runtime_boot
+
+    @classmethod
+    def raise_if_a_boot_already_holds_the_process_globals(cls) -> None:
+        """Refuse to stand up a second boot. Called from ``__init__`` **and** from every ``make()``.
+
+        Both call sites are load-bearing, and neither subsumes the other:
+
+        - ``__init__`` covers a **direct construction** of a class that is not yet registered — the one
+          that would do real damage, since ``set_runtime_hub`` overwrites ``RuntimeHub._instance``
+          unconditionally and would orphan the live boot before failing at ``log.configure``.
+        - ``make()`` covers a **second call on an already-registered class**, which ``__init__`` cannot
+          see: ``MetaSingleton.__call__`` returns the registered instance without re-running
+          ``__init__``, so ``make()`` would sail past the guard and re-run the whole ``setup()`` on the
+          live boot — silently, returning the same object, and rebinding ``inference_manager`` and
+          ``reporting_delegate`` so the previous ones are dropped without ever being torn down.
+
+        Asked of the *base* class, which is what makes a bare ``RuntimeBoot`` and a full ``Pipelex``
+        exclude each other in both directions; the message names whichever one actually holds them.
+        """
+        existing_boot = RuntimeBoot.get_optional_instance()
+        if existing_boot is not None:
+            msg = f"{type(existing_boot).__name__} is already initialized"
+            raise PipelexSetupError(msg)
 
     @classmethod
     def get_optional_instance(cls) -> Self | None:

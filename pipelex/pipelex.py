@@ -213,8 +213,14 @@ class Pipelex(RuntimeBoot):
         # be reporting on. Sequenced explicitly here rather than through a template hook, because that
         # order is the whole reason the runtime teardown is split into phases.
         self._teardown_plugin_callbacks()
-        self.pipeline_manager.teardown()
-        self._teardown_runtime()
+        # ``try``/``finally`` and not a bare sequence: ``pipeline_manager`` is a public ``make()``
+        # injection point typed as ``PipelineManagerAbstract``, so its ``teardown`` can raise, and
+        # ``_teardown_runtime`` is what leaves the process re-bootable. Skipping it would wedge the
+        # process for good — see its docstring. No ``except``: the failure still propagates.
+        try:
+            self.pipeline_manager.teardown()
+        finally:
+            self._teardown_runtime()
 
     @classmethod
     @override
@@ -284,10 +290,11 @@ class Pipelex(RuntimeBoot):
                 Per-call library_dirs in execute/start will override this default.
             config_dir: Optional explicit config dir. When provided, the **main TOML load** is scoped
                 to this directory (package defaults + this directory) instead of following
-                project/global layering. Note the limit: the inference files — backends, routing
-                profiles and the model deck — still resolve through the layered paths, so this does not
-                fully isolate a boot from the surrounding project. See
-                ``wip/inputs/config-dir-does-not-scope-inference-paths.md``.
+                project/global layering. Note the limit: it scopes *that load* and nothing else. The
+                inference files — backends, routing profiles and the model deck — still resolve through
+                the layered paths, and the gateway consent/onboarding state is read from the global
+                config dir outright. So this does not fully isolate a boot from the surrounding
+                project. See ``wip/inputs/config-dir-does-not-scope-inference-paths.md``.
             config_overrides: Optional dict deep-merged on top of all TOML config layers
                 as the highest-priority override. Useful for tests that need specific
                 config without editing TOML files.
@@ -301,12 +308,10 @@ class Pipelex(RuntimeBoot):
                 ``RuntimeBoot``), or if setup fails.
 
         """
-        # Asked of ``RuntimeBoot``, so a bare runtime boot blocks this one too, and the message names
-        # whichever class actually holds the process globals.
-        existing_boot = RuntimeBoot.get_optional_instance()
-        if existing_boot is not None:
-            msg = f"{type(existing_boot).__name__} is already initialized"
-            raise PipelexSetupError(msg)
+        # Before the construction, not left to ``__init__``: a second ``make()`` on an already-registered
+        # class never re-runs ``__init__`` (see the guard's docstring). Asked of ``RuntimeBoot``, so a
+        # bare runtime boot blocks this one too.
+        cls.raise_if_a_boot_already_holds_the_process_globals()
 
         pipelex_instance = cls(config_dir=config_dir, config_overrides=config_overrides)
         try:

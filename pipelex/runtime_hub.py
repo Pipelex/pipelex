@@ -147,9 +147,10 @@ class RuntimeHub:
                 as the highest-priority override. Useful for tests that need
                 specific config without editing TOML files.
             config_dir: Optional explicit config dir. When provided, project/global
-                layering is bypassed and only this directory is read. Used by the
-                doctor ``--global`` path so the hub reflects exactly the directory
-                being reported on.
+                layering is bypassed and the load becomes package defaults + this
+                directory (the package layer always applies — it is what the TOML
+                overrides *are* overrides of). Used by the doctor ``--global`` path
+                so the hub reflects exactly the directory being reported on.
         """
         config_dict = config_manager.load_config(extra_overrides=config_overrides, config_dir=config_dir)
         self.set_config(config=config_cls.model_validate(config_dict))
