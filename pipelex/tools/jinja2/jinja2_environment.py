@@ -2,8 +2,8 @@ import inspect
 
 from jinja2 import BaseLoader, Environment
 
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
+from pipelex.tools.jinja2.template_category import TemplateCategory
 
 
 def make_jinja2_env_from_loader(

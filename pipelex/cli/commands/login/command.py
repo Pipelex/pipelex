@@ -11,7 +11,7 @@ from urllib.parse import parse_qs, urlparse
 from typing_extensions import override
 
 from pipelex.cli.commands.init.credentials import get_global_env_path, read_env_file, write_env_file
-from pipelex.hub import get_console
+from pipelex.runtime_hub import get_console
 from pipelex.urls import URLs
 
 LOGIN_TIMEOUT_SECONDS = 120

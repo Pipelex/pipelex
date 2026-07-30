@@ -8,11 +8,11 @@ Not every code↔doc relationship deserves a review contract. This repo distingu
 
 | Tier | Mechanism | Judgment needed |
 |---|---|---|
-| **Derived** | Regenerate and diff: `check-config-sync`, `check-mthds-schema`, `check-gateway-models`, `generate-error-pages` | None — the output is a pure function of its sources |
+| **Derived** | Regenerate and diff: `check-config-sync`, `check-mthds-schema`, `check-gateway-models`, `generate-error-pages`, `generate-error-identity` | None — the output is a pure function of its sources |
 | **Linkage** | Referential integrity of declared cross-references (the spec/conformance `check-spec-links` pair) | None — links either resolve or they don't |
 | **Review** | Drift contracts: "this changed → that must be looked at, and the look recorded" | Yes — someone must judge whether the prose still holds |
 
-The standing rule: **anything mechanizable becomes a derived check.** If a review contract keeps opening and the review is always the same mechanical comparison, delete the contract and write a derived check instead — it needs no judgment and can't be rubber-stamped. The best review contract is one you eventually mechanize out of existence. Corollary: generated artifacts (`docs/errors/`, `derived/`, gateway model docs) must never appear in a contract's `review` list — reviewing generator *output* is how you end up editing generated files.
+The standing rule: **anything mechanizable becomes a derived check.** If a review contract keeps opening and the review is always the same mechanical comparison, delete the contract and write a derived check instead — it needs no judgment and can't be rubber-stamped. The best review contract is one you eventually mechanize out of existence. Corollary: generated artifacts (`docs/errors/`, `derived/`, `tests/data/errors/error_identity.txt`, gateway model docs) must never appear in a contract's `review` list — reviewing generator *output* is how you end up editing generated files.
 
 ## How it works
 

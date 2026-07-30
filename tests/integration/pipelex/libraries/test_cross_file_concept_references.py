@@ -11,9 +11,9 @@ from collections.abc import Callable
 
 import pytest
 
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
-from pipelex.hub import get_library_manager
+from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
+from pipelex.mthds_parsing.parser import MthdsParser
 
 CONCEPT_MTHDS = """
 domain = "crossref"
@@ -55,8 +55,8 @@ class TestCrossFileConceptReferences:
         """A concept declared in batch 1 resolves when referenced by bare code from a separate batch 2."""
         library_id = load_empty_library()
         manager = get_library_manager()
-        concept_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=CONCEPT_MTHDS)
-        pipe_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=PIPE_BARE_REF_MTHDS)
+        concept_blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=CONCEPT_MTHDS)
+        pipe_blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=PIPE_BARE_REF_MTHDS)
 
         # Batch 1: declare the concept only.
         manager.load_from_blueprints(library_id=library_id, blueprints=[concept_blueprint])
@@ -71,8 +71,8 @@ class TestCrossFileConceptReferences:
         """The same concept + bare reference also resolve when loaded together in one batch."""
         library_id = load_empty_library()
         manager = get_library_manager()
-        concept_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=CONCEPT_MTHDS)
-        pipe_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=PIPE_BARE_REF_MTHDS)
+        concept_blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=CONCEPT_MTHDS)
+        pipe_blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=PIPE_BARE_REF_MTHDS)
 
         loaded_pipes = manager.load_from_blueprints(library_id=library_id, blueprints=[concept_blueprint, pipe_blueprint])
 
@@ -82,7 +82,7 @@ class TestCrossFileConceptReferences:
         """A bare reference to a concept declared in no batch raises ConceptLibraryError through the loader."""
         library_id = load_empty_library()
         manager = get_library_manager()
-        pipe_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=PIPE_UNDECLARED_REF_MTHDS)
+        pipe_blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=PIPE_UNDECLARED_REF_MTHDS)
 
         with pytest.raises(ConceptLibraryError) as exc_info:
             manager.load_from_blueprints(library_id=library_id, blueprints=[pipe_blueprint])

@@ -11,10 +11,10 @@ from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.graph.graphspec import GraphSpecMode
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.tracing_assembly import TracingAssembly, assemble_tracing, assemble_tracing_on_output
-from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.system.exceptions import MissingDependencyError
+from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.exceptions import EventLogReadError, EventLogSetupError
 from pipelex.tracing.trace_events import UsageReportEvent
 

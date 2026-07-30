@@ -13,7 +13,7 @@ from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
-from pipelex.hub import get_console
+from pipelex.runtime_hub import get_console
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.configs import ConfigPaths
 from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError, RemoteConfigValidationError

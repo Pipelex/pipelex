@@ -25,11 +25,11 @@ from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.exceptions import PipeValidationError
-from pipelex.core.pipes.pipe_factory import PipeFactory
-from pipelex.hub import get_console, get_model_deck
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 from pipelex.pipelex import Pipelex
+from pipelex.runtime_hub import get_console, get_model_deck
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path

@@ -24,7 +24,7 @@ from pipelex.pipe_run.delivery_assignment import (
 )
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
 from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, WebhookDeliveryError
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.network.exceptions import SsrfBlockedError
 
 
@@ -344,7 +344,7 @@ class TestDeliveryExecutor:
 
     async def test_try_local_hydrate_stuff_returns_typed_for_builtin(self) -> None:
         from pipelex.core.stuffs.text_content import TextContent  # noqa: PLC0415
-        from pipelex.hub import get_class_registry  # noqa: PLC0415
+        from pipelex.runtime_hub import get_class_registry  # noqa: PLC0415
 
         registry = get_class_registry()
         if not registry.has_class(name="TextContent"):

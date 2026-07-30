@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 import jsonschema
 import pytest
 
-from pipelex.core.pipes.pipe_blueprint import PipeType
 from pipelex.language.mthds_schema_generator import generate_mthds_schema
+from pipelex.pipe_machinery.pipe_blueprint import PipeType
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
 
 if TYPE_CHECKING:

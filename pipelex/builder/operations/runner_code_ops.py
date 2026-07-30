@@ -3,14 +3,8 @@
 from __future__ import annotations
 
 from pipelex.builder.runner_code import generate_runner_code
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
-from pipelex.hub import (
-    clear_current_library,
-    get_current_library_id_or_none,
-    get_library_manager,
-    get_required_pipe,
-    set_current_library,
-)
+from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_pipe, set_current_library
+from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipeline.bundle_validator import BundleValidator
 
 
@@ -32,7 +26,7 @@ async def build_runner_code_for_pipe(
         Generated Python runner code as a string.
 
     Raises:
-        PipelexInterpreterError: If MTHDS content fails to parse or validate.
+        MthdsParserError: If MTHDS content fails to parse or validate.
         PipeValidationError: If pipe validation fails.
         DryRunError: If dry-running the pipes fails.
     """
@@ -46,7 +40,7 @@ async def build_runner_code_for_pipe(
         set_current_library(library_id=library_id)
 
         # Parse PLX contents into bundle blueprints
-        blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
+        blueprints = [MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
 
         # Load pipes from the blueprints
         pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints)

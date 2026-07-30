@@ -13,4 +13,4 @@ Generate pipelines, runner code, Python structures, and JSON templates from natu
 | [**build runner**](runner.md) | Generate Python code to run a pipe |
 | [**build structures**](structures.md) | Generate the structures (Pydantic models) of your concepts |
 | [**build inputs**](inputs.md) | Generate example input JSON for a pipe |
-| [**build output**](output.md) | Generate example output JSON for a pipe |
+| [**build output**](output.md) | Generate example output representation for a pipe (JSON, Python, or JSON Schema) |

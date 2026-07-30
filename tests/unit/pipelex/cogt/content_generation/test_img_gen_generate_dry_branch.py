@@ -14,8 +14,8 @@ from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.img_gen_generate import img_gen_image_list_and_store, img_gen_single_image_and_store
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 class TestImgGenGenerateDryBranch:

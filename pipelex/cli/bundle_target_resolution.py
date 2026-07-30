@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
-from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
+from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
 
 
 class BundleTargetResolutionErrorKind(StrEnum):

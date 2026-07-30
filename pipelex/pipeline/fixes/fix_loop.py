@@ -35,9 +35,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.base_exceptions import ValidationErrorItem
 from pipelex.config import get_config
-from pipelex.core.pipes.pipe_blueprint import SIGNATURE_ONLY_KEYS
-from pipelex.hub import resolve_library_dirs
+from pipelex.interpreter_hub import resolve_library_dirs
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
+from pipelex.pipe_machinery.pipe_blueprint import SIGNATURE_ONLY_KEYS
 from pipelex.pipeline.exceptions import FixTransactionError, FixWriteConflictError, ValidateBundleError
 from pipelex.pipeline.fixes.applicability import is_safe_fix_for_load_scope, is_target_in_write_scope
 from pipelex.pipeline.fixes.applier import apply_fix_ops, serialize_and_format

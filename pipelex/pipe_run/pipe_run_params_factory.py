@@ -4,9 +4,9 @@ from pipelex import log
 from pipelex.cogt.content_generation.cogt_run_params import check_mock_usage_requires_dry
 from pipelex.config import get_config
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
-from pipelex.hub import is_dry_run_forced
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
+from pipelex.runtime_hub import is_dry_run_forced
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 class PipeRunParamsFactory:

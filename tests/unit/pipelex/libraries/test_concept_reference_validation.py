@@ -1,10 +1,10 @@
 import pytest
 
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.concept_reference_validation import validate_concept_references_in_blueprints
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from tests.unit.pipelex.libraries.test_library_crate_data import BlueprintSamples
 

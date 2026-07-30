@@ -16,20 +16,15 @@ import pipelex.builder as builder_pkg  # package import — used for __file__ pa
 from pipelex import log
 from pipelex.cli.installed_methods import find_method_by_full_address
 from pipelex.config import is_pipe_func_sandbox_hosted
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
-from pipelex.core.interpreter.exceptions import PipelexInterpreterError
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
-from pipelex.hub import get_class_registry, get_current_library, get_current_library_id_or_none, scoped_current_library
+from pipelex.interpreter_hub import get_current_library, get_current_library_id_or_none, scoped_current_library
 from pipelex.libraries.collision_messages import duplicate_ref_msg
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.concept_reference_validation import validate_concept_references_in_blueprints
@@ -47,6 +42,12 @@ from pipelex.libraries.library_utils import (
 )
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.libraries.visibility_utils import check_visibility_for_blueprints, make_visibility_checker
+from pipelex.mthds_parsing.exceptions import MthdsParserError
+from pipelex.mthds_parsing.parser import MthdsParser
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
+from pipelex.runtime_hub import get_class_registry
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 from pipelex.tools.misc.semver import SemVerError, parse_constraint, parse_version, version_satisfies
@@ -715,18 +716,18 @@ class LibraryManager(LibraryManagerAbstract):
         blueprints: list[PipelexBundleBlueprint] = []
         for mthds_file_path in valid_mthds_paths:
             try:
-                blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file_path)
+                blueprint = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=mthds_file_path)
                 blueprint.source = str(mthds_file_path)
             except FileNotFoundError as file_not_found_error:
                 msg = f"Could not find MTHDS bundle at '{mthds_file_path}'"
                 raise LibraryLoadingError(msg) from file_not_found_error
-            except PipelexInterpreterError as interpreter_error:
+            except MthdsParserError as parser_error:
                 # Forward BLUEPRINT validation errors from interpreter
-                msg = f"Could not load MTHDS bundle from '{mthds_file_path}' because of: {interpreter_error.message}"
+                msg = f"Could not load MTHDS bundle from '{mthds_file_path}' because of: {parser_error.message}"
                 raise LibraryLoadingError(
                     message=msg,
-                    blueprint_validation_errors=interpreter_error.validation_errors,
-                ) from interpreter_error
+                    blueprint_validation_errors=parser_error.validation_errors,
+                ) from parser_error
             blueprints.append(blueprint)
 
         # Find manifest and run package visibility validation
@@ -939,9 +940,9 @@ class LibraryManager(LibraryManagerAbstract):
         dep_blueprints: list[PipelexBundleBlueprint] = []
         for mthds_path in resolved_dep.mthds_files:
             try:
-                blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_path)
+                blueprint = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=mthds_path)
                 blueprint.source = str(mthds_path)
-            except (FileNotFoundError, PipelexInterpreterError) as exc:
+            except (FileNotFoundError, MthdsParserError) as exc:
                 log.warning(f"Could not parse dependency '{alias}' bundle '{mthds_path}': {exc}")
                 continue
             dep_blueprints.append(blueprint)
@@ -1245,8 +1246,9 @@ class LibraryManager(LibraryManagerAbstract):
             concepts: List of concepts to check for cycles
         """
         # TODO: Refactor to inspect ConceptStructureBlueprint directly (concept_ref and item_concept_ref fields)
-        # instead of the generated Python types. This would be more direct and wouldn't depend on
-        # how types are generated (e.g., Optional wrappers for non-required fields).
+        # instead of the generated Python types. This would be more direct and wouldn't depend on how types
+        # are generated — a coupling that has already bitten once: respelling the generator's optional fields
+        # from `Optional[X]` to `X | None` silently disabled cycle detection entirely.
         class_registry = get_class_registry()
 
         # Build mappings from class names to concept refs
@@ -1268,19 +1270,21 @@ class LibraryManager(LibraryManagerAbstract):
                     return []
 
                 type_names: list[str] = []
-                origin = getattr(annotation, "__origin__", None)
+                # Branch on `__args__`, not `__origin__`: a PEP 604 union (`X | None`, a `types.UnionType`)
+                # carries its members in `__args__` but has **no** `__origin__`, unlike `typing.Optional[X]`.
+                # Keying off the origin sent every `X | None` annotation down the simple-type branch, where
+                # it has no `__name__` either — so the reference vanished and no cycle was ever found.
                 args = getattr(annotation, "__args__", ())
 
-                if origin is None:
+                if args:
+                    # Generic or union (Optional[X], X | None, list[X], Union[X, Y], ...): recurse into members.
+                    for arg in args:
+                        type_names.extend(extract_type_names(arg))
+                else:
                     # Simple type, get its name
                     type_name = getattr(annotation, "__name__", None)
                     if type_name:
                         type_names.append(type_name)
-                else:
-                    # Generic type (like Optional[X], list[X], Union[X, Y], etc.)
-                    # Recursively extract from all type arguments
-                    for arg in args:
-                        type_names.extend(extract_type_names(arg))
 
                 return type_names
 

@@ -15,8 +15,8 @@ from pipelex.config import get_config
 from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.absence_render import build_absence_html, build_absence_json, build_absence_markdown, build_absence_payload
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.misc.json_utils import clean_json_dumps
 
 

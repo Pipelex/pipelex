@@ -1,11 +1,6 @@
 import pytest
 
-from pipelex.hub import (
-    get_pipe_router,
-    scoped_pipe_router,
-    set_pipe_router,
-    teardown_current_pipe_router,
-)
+from pipelex.interpreter_hub import get_pipe_router, scoped_pipe_router, set_pipe_router, teardown_current_pipe_router
 from pipelex.pipe_run.pipe_router import PipeRouter
 
 

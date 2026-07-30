@@ -3,11 +3,11 @@ from typing import Any
 from typing_extensions import override
 
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
-from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.pipe_controllers.condition.exceptions import PipeConditionFactoryError
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
+from pipelex.pipe_machinery.pipe_factory import PipeFactoryProtocol
 
 
 class PipeConditionFactory(PipeFactoryProtocol[PipeConditionBlueprint, PipeCondition]):

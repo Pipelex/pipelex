@@ -13,7 +13,7 @@ from pipelex.cli.commands.validate._validate_core import (
 )
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.cli.method_resolver import resolve_pipe_from_exports
-from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
+from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.pipelex import Pipelex
 
 

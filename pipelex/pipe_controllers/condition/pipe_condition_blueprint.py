@@ -3,8 +3,8 @@ from typing import Annotated, Literal, Self
 from pydantic import Field, WithJsonSchema, field_validator, model_validator
 from typing_extensions import override
 
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
+from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
 
 OutcomeMap = dict[str, str]

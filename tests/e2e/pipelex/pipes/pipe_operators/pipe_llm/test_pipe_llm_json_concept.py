@@ -13,8 +13,8 @@ import pytest
 from pipelex import pretty_print
 from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 @pytest.mark.llm

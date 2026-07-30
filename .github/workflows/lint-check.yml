@@ -132,7 +132,31 @@ jobs:
         run: make check-keyword-only
 
 # --------------------------------------------------------------------------
-# 5.  Drift contracts — single job, version-independent
+# 5.  Hub layering boundary — single job, version-independent
+# --------------------------------------------------------------------------
+  lint-hub-layering:
+    name: Lint (hub layering)
+    runs-on: ubuntu-latest
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install dependencies
+        run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
+
+      - name: Run hub layering check
+        run: make check-hub-layering
+
+# --------------------------------------------------------------------------
+# 6.  Drift contracts — single job, version-independent
 #     ADVISORY: deliberately NOT in lint-all's `needs`, so an open contract is
 #     visible on the PR but does not block merges. Promote it into lint-all's
 #     `needs` once the current open-PR backlog has landed.
@@ -159,12 +183,12 @@ jobs:
         run: make drift-check
 
 # --------------------------------------------------------------------------
-# 6.  Aggregator job — the *single* required status check
+# 7.  Aggregator job — the *single* required status check
 # --------------------------------------------------------------------------
   lint-all:
     name: Lint (all)
     runs-on: ubuntu-latest
-    needs: [lint-ruff-plxt, lint-typecheck, lint-config-sync, lint-keyword-only]
+    needs: [lint-ruff-plxt, lint-typecheck, lint-config-sync, lint-keyword-only, lint-hub-layering]
     if: always()
 
     steps:
@@ -173,7 +197,8 @@ jobs:
           if [ "${{ needs.lint-ruff-plxt.result }}" != "success" ] || \
              [ "${{ needs.lint-typecheck.result }}" != "success" ] || \
              [ "${{ needs.lint-config-sync.result }}" != "success" ] || \
-             [ "${{ needs.lint-keyword-only.result }}" != "success" ]; then
+             [ "${{ needs.lint-keyword-only.result }}" != "success" ] || \
+             [ "${{ needs.lint-hub-layering.result }}" != "success" ]; then
             echo "::error::At least one lint job failed."
             exit 1
           fi

@@ -1,8 +1,8 @@
-from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.stuffs.date_content import DateContent
+from pipelex.libraries.concept.concept_library import ConceptLibrary
 
 
 class TestDateRefinement:
@@ -16,8 +16,9 @@ class TestDateRefinement:
             blueprint_or_string_description=ConceptBlueprint(description="The date payment is due", refines="Date"),
         )
 
-        structure_class = concept.get_structure_class()
+        library = ConceptLibrary.make_empty()
+        structure_class = library.get_structure_class(concept=concept)
         assert issubclass(structure_class, DateContent)
 
         native_date = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DATE)
-        assert Concept.are_concept_compatible(concept_1=concept, concept_2=native_date, strict=True)
+        assert library.is_compatible(tested_concept=concept, wanted_concept=native_date, strict=True)

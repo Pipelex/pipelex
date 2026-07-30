@@ -26,6 +26,33 @@ class PipeFactoryErrorData(BaseModel):
     message: str = Field(description="Human-readable error message")
 
 
+class PipelexBundleBlueprintValidationErrorData(BaseModel):
+    """Structured validation error data for bundle blueprint validation errors.
+
+    This model captures information about validation errors that occur during
+    blueprint validation (before pipe instantiation).
+
+    Lives here rather than beside the parser that raises it: `pipeline/` and `libraries/`
+    carry it into every runtime-layer import closure, so an interpreter-layer home would
+    make the boundary the closure test guards unenforceable. It is the third of the three
+    structured error-data models in this module, all keyed on `PipeValidationErrorType`.
+    """
+
+    error_type: PipeValidationErrorType | None = None
+    domain_code: str | None = None
+    source: str | None = None
+    pipe_code: str | None = None
+    concept_code: str | None = None
+    message: str
+    variable_names: list[str] | None = None
+
+    # The namespace-stripped bare code for a strippable same-domain over-qualified pipe code
+    # (``strip-namespace`` enrichment). Present only when the fix planner can act; ``pipe_code``
+    # discriminates the two raise sites — set to the offending dotted code for a declaration-key
+    # rename, ``None`` for a ``main_pipe`` value strip (which is a root ``set_key``, not a rename).
+    stripped_pipe_code: str | None = None
+
+
 class PipesAndConceptValidationErrorData(BaseModel):
     """Structured validation error data for Pipe/Concept validation errors.
 

@@ -8,8 +8,8 @@ from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.pipeline.job_metadata import UnitJobId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.system.job_metadata import UnitJobId
 
 
 class ImgGenWorkerAbstract(InferenceWorkerAbstract):

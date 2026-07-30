@@ -3,9 +3,9 @@ from typing import Callable
 
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.pipe_operators.extract.pipe_extract import PipeExtract

@@ -18,8 +18,7 @@ import pytest
 import tomlkit
 from pytest_mock import MockerFixture
 
-from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
-from pipelex.core.exceptions import PipesAndConceptValidationErrorData
+from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.fixes.fix_loop import fix_bundle_file

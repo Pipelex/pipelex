@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pipelex.hub import scoped_pipe_router
+from pipelex.interpreter_hub import scoped_pipe_router
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.runtime_bridge.exceptions import PipelexBridgeDispatchError

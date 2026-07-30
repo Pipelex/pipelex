@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Callable
 
-from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.llm.document_reference import DocumentReferenceKind
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint

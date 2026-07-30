@@ -5,12 +5,12 @@ from rich.table import Table
 from rich.text import Text
 from typing_extensions import override
 
-from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.tools.templating.text_format import TextFormat
 
 
 class TextAndImagesContent(StuffContent):

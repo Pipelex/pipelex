@@ -5,7 +5,6 @@ from typing import Callable
 
 import pytest
 
-from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
@@ -14,8 +13,9 @@ from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_native_concept
+from pipelex.interpreter_hub import get_native_concept
 from pipelex.tools.jinja2.image_registry import ImageRegistry
+from pipelex.tools.templating.text_format import TextFormat
 from pipelex.urls import URLs
 
 

@@ -8,7 +8,7 @@ structurally. ``DELETE_KEY`` on ``["concept"]`` covers every authoring form (tab
 all normalize to a ``concept.<Code>`` key).
 """
 
-from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
+from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.pipeline.fixes.planner import plan_fix_for_blueprint_validation_error
 from pipelex.suggested_fix import FixOpKind, FixSafety

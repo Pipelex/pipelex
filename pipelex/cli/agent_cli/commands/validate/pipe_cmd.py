@@ -19,9 +19,9 @@ from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_pipe_core,
 )
 from pipelex.cli.method_resolver import resolve_pipe_from_exports
-from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
+from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipelex import Pipelex

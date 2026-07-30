@@ -10,11 +10,11 @@ from typing import Callable
 import pytest
 
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_required_concept
+from pipelex.interpreter_hub import get_required_concept
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.llm.document_reference import DocumentReferenceKind
 from pipelex.pipe_operators.llm.image_reference import ImageReferenceKind
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM

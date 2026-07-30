@@ -11,6 +11,7 @@ from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
+from pipelex.interpreter_hub import get_concept_library
 from tests.unit.pipelex.core.memory.input_shaper.data import (
     Deadline,
     Exhibit,
@@ -72,7 +73,7 @@ class TestInputShaperScalarArms:
         log.info(f"Testing scalar arm case: {test_name}")
         input_specs = build_input_specs([("my_input", concept_ref, None)])
 
-        working_memory = InputShaper.shape({"my_input": provided_value}, input_specs=input_specs)
+        working_memory = InputShaper.shape({"my_input": provided_value}, input_specs=input_specs, concept_provider=get_concept_library())
 
         stuff = working_memory.root["my_input"]
         pretty_print(stuff, title=f"Result for {test_name}")

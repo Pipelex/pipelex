@@ -9,16 +9,17 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.exceptions import PipeRunError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, TypedNamedStuffSpec
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_class_registry, get_pipe_func_executor
+from pipelex.interpreter_hub import get_pipe_func_executor
 from pipelex.pipe_operators.pipe_operator import PipeOperator
-from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.runtime_hub import get_class_registry
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.registries.func_registry import func_registry
 
 

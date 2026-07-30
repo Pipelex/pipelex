@@ -17,7 +17,7 @@ from pipelex.cli.agent_cli.commands.agent_output import AGENT_ERROR_DOMAINS, AGE
 _EXCEPTION_MODULES: tuple[str, ...] = (
     "pipelex.codegen.exceptions",
     "pipelex.cogt.exceptions",
-    "pipelex.core.interpreter.exceptions",
+    "pipelex.mthds_parsing.exceptions",
     "pipelex.core.pipes.exceptions",
     "pipelex.pipe_operators.exceptions",
     "pipelex.pipeline.exceptions",

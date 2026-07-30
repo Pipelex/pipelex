@@ -17,19 +17,14 @@ from pytest_mock import MockerFixture
 from typing_extensions import override
 
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.hub import (
-    clear_current_library,
-    get_library_manager,
-    get_pipelex_hub,
-    get_required_pipe,
-    get_telemetry_manager,
-)
+from pipelex.interpreter_hub import clear_current_library, get_interpreter_hub, get_library_manager, get_required_pipe
 from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipeline import bundle_validator
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunStatus
 from pipelex.pipeline.execution_seams import acquire_library
+from pipelex.runtime_hub import get_telemetry_manager
 from pipelex.system.telemetry.events import EventName
 
 
@@ -261,7 +256,7 @@ class TestBundleValidatorIntegration:
         # Temporal router (the leak that produced HTTP 422). We install a hub default that raises if its
         # run is ever reached, then assert the batch (and its branch leaf) classify SUCCESS without the
         # hub default ever being touched.
-        hub = get_pipelex_hub()
+        hub = get_interpreter_hub()
         original_router = hub.get_required_pipe_router()
         sentinel = _RaisingPipeRouter()
         library_manager = get_library_manager()

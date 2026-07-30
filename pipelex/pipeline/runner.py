@@ -18,14 +18,12 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.builder.operations.models_ops import ModelCategory, list_models
 from pipelex.config import get_config
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
-from pipelex.hub import (
+from pipelex.interpreter_hub import (
     clear_current_library,
     get_current_library_id_or_none,
     get_library_manager,
     get_pipe_run,
     get_pipeline_manager,
-    get_report_delegate,
-    get_telemetry_manager,
     set_current_library,
 )
 from pipelex.pipe_run.exceptions import PipeRouterError
@@ -33,6 +31,7 @@ from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionErr
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
+from pipelex.runtime_hub import get_report_delegate, get_telemetry_manager
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
@@ -47,10 +46,10 @@ if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
     from pipelex.pipe_run.pipe_job import PipeJob
-    from pipelex.pipe_run.pipe_run_mode import PipeRunMode
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
     from pipelex.pipeline.validation_report import PipelexValidationReport
     from pipelex.system.configuration.configs import PipelineExecutionConfig
+    from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 class PipelexModelDeck(MthdsModelDeck):

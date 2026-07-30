@@ -1,8 +1,8 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.language.mthds_factory import MthdsFactory
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from tests.unit.pipelex.core.test_data import InterpreterTestCases
 
 

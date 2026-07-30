@@ -19,17 +19,22 @@ Replace `<paths>` with the test directories from the mapping below. Concatenate 
 |---|---|
 | `pipelex/builder/` | `tests/unit/pipelex/builder/ tests/integration/pipelex/builder/` |
 | `pipelex/cli/` | `tests/unit/pipelex/cli/ tests/integration/pipelex/cli/ tests/e2e/pipelex/cli/` |
+| `pipelex/codegen/` | `tests/unit/pipelex/codegen/ tests/integration/pipelex/codegen/` |
 | `pipelex/cogt/` | `tests/unit/pipelex/cogt/ tests/integration/pipelex/cogt/` |
 | `pipelex/core/` | `tests/unit/pipelex/core/ tests/integration/pipelex/core/ tests/integration/pipelex/pipes/` |
 | `pipelex/graph/` | `tests/unit/pipelex/graph/ tests/e2e/pipelex/graph/` |
 | `pipelex/kit/` | `tests/unit/pipelex/kit/ tests/integration/pipelex/kit/` |
 | `pipelex/language/` | `tests/unit/pipelex/language/ tests/integration/pipelex/language/` |
 | `pipelex/libraries/` | `tests/unit/pipelex/libraries/ tests/integration/pipelex/libraries/` |
+| `pipelex/mthds_parsing/` | `tests/unit/pipelex/mthds_parsing/ tests/integration/pipelex/language/` |
 | `pipelex/pipe_controllers/` | `tests/unit/pipelex/pipe_controllers/ tests/integration/pipelex/pipes/` |
+| `pipelex/pipe_machinery/` | `tests/unit/pipelex/pipe_machinery/ tests/integration/pipelex/pipe_machinery/` |
 | `pipelex/pipe_operators/` | `tests/unit/pipelex/pipe_operators/ tests/integration/pipelex/pipes/` |
 | `pipelex/pipe_run/` | `tests/unit/pipelex/pipe_run/ tests/integration/pipelex/pipes/` |
-| `pipelex/pipeline/` | `tests/integration/pipelex/pipeline/` |
+| `pipelex/pipe_signature/` | `tests/unit/pipelex/pipe_signature/ tests/integration/pipelex/pipe_signature/` |
+| `pipelex/pipeline/` | `tests/unit/pipelex/pipeline/ tests/integration/pipelex/pipeline/` |
 | `pipelex/plugins/` | `tests/unit/pipelex/plugins/ tests/integration/pipelex/plugins/` |
+| `pipelex/providers/` | `tests/unit/pipelex/providers/ tests/integration/pipelex/providers/` |
 | `pipelex/system/` | `tests/unit/pipelex/system/ tests/integration/pipelex/system/` |
 | `pipelex/tools/` | `tests/unit/pipelex/tools/ tests/integration/pipelex/tools/` |
 
@@ -49,7 +54,7 @@ Fall back to the full suite when:
 
 - Changes span 3+ source areas from the mapping above
 - Changes touch `pyproject.toml`, `tests/conftest.py`, or `tests/helpers/`
-- Changes touch root-level modules: `pipelex/__init__.py`, `pipelex/hub.py`
+- Changes touch root-level modules: `pipelex/__init__.py`, `pipelex/runtime_hub.py`, `pipelex/interpreter_hub.py`
 - Changes touch `pipelex/system/configuration/` (config loading affects everything)
 - Refactors touching base exceptions or shared base classes
 - Preparing a release, a push, or a commit intended for remote (e.g. `/release`, `/commit-push`, `/ship`, or when the context makes it obvious the work is about to land)

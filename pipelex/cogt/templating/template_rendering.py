@@ -1,10 +1,10 @@
 from collections.abc import Callable
 from typing import Any
 
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
-from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async
+from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.templating.templating_style import TemplatingStyle
 
 
 async def render_template(

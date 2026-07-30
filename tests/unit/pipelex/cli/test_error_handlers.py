@@ -19,8 +19,8 @@ from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.pipelex_service.exceptions import InferenceSetupRequiredError
 
 if TYPE_CHECKING:

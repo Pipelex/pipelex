@@ -10,10 +10,18 @@ Modern typing throughout: builtin generics (`list` / `dict`), `X | None` for opt
 """
 
 from pipelex.codegen.emitters.naming import python_class_name
-from pipelex.codegen.emitters.python_common import any_annotation, class_docstring, field_line, order_by_base, python_header
+from pipelex.codegen.emitters.python_common import (
+    any_annotation,
+    class_docstring,
+    field_line,
+    literal_annotation,
+    order_by_base,
+    python_header,
+    python_module_body,
+)
 from pipelex.codegen.emitters.target import EmittedFile
 from pipelex.codegen.resolved_concepts import ResolvedConcept, ResolvedLibrary
-from pipelex.codegen.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind
+from pipelex.core.concepts.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind
 
 _FILENAME = "models.py"
 
@@ -24,25 +32,27 @@ def emit_python_pydantic(library: ResolvedLibrary) -> list[EmittedFile]:
     in_module = {concept.concept_ref for concept in library.concepts}
     ordered = order_by_base(library.concepts, in_module=in_module)
 
-    has_opaque = any(concept.structureless for concept in library.concepts)
-    imports: set[str] = {"from pydantic import BaseModel, ConfigDict, Field"} if has_opaque else {"from pydantic import BaseModel, Field"}
+    # Every import is demand-driven — registered by the renderer that writes the name it imports.
+    # Seeding the set up front would emit an unused import for the crate shapes that use neither
+    # (all-opaque emits no field line; a fully-refining crate never reaches the `BaseModel` root),
+    # and `ruff check --fix` deletes those, rewriting the body bytes and breaking the stamp.
+    imports: set[str] = set()
     blocks = [_render_class(concept, by_ref=by_ref, imports=imports) for concept in ordered]
 
-    header = python_header(target="python-pydantic")
-    import_block = "\n".join(sorted(imports))
-    body = f"{header}from __future__ import annotations\n\n{import_block}\n\n\n" + "\n\n\n".join(blocks) + "\n"
+    body = python_module_body(header=python_header(target="python-pydantic"), imports=imports, blocks=blocks)
     return [EmittedFile(filename=_FILENAME, content=body)]
 
 
 def _render_class(concept: ResolvedConcept, *, by_ref: dict[str, ResolvedConcept], imports: set[str]) -> str:
     class_name = python_class_name(domain=concept.domain, code=concept.code, needs_qualification=concept.needs_qualification)
-    base = _base_class(concept, by_ref=by_ref)
+    base = _base_class(concept, by_ref=by_ref, imports=imports)
     caveat = f"Imprecise: {concept.imprecision_reason}." if concept.structureless and concept.imprecision_reason else None
     docstring = class_docstring(concept.description, extra_line=caveat)
     header = f"class {class_name}({base}):"
     if concept.structureless:
         # Opaque = pass-through, never lossy (B1-1): pydantic's default extra="ignore" would
         # silently strip every field on model_validate, so the unknown shape is kept verbatim.
+        imports.add("from pydantic import ConfigDict")
         return f'{header}\n{docstring}\n\n    model_config = ConfigDict(extra="allow")'
     if not concept.fields:
         return f"{header}\n{docstring}"
@@ -50,13 +60,19 @@ def _render_class(concept: ResolvedConcept, *, by_ref: dict[str, ResolvedConcept
     return f"{header}\n{docstring}\n\n" + "\n".join(lines)
 
 
-def _base_class(concept: ResolvedConcept, *, by_ref: dict[str, ResolvedConcept]) -> str:
+def _base_class(concept: ResolvedConcept, *, by_ref: dict[str, ResolvedConcept], imports: set[str]) -> str:
     if concept.base_ref is None:
-        return "BaseModel"
+        return _base_model(imports=imports)
     base = by_ref.get(concept.base_ref)
     if base is not None:
         return python_class_name(domain=base.domain, code=base.code, needs_qualification=base.needs_qualification)
     # Cross-package / unknown base is not resolvable in-crate: fall back to a structurally valid root.
+    return _base_model(imports=imports)
+
+
+def _base_model(*, imports: set[str]) -> str:
+    """The pydantic root base, registering its import — a concept refining an in-module concept never reaches it."""
+    imports.add("from pydantic import BaseModel")
     return "BaseModel"
 
 
@@ -64,7 +80,7 @@ def _render_field(concept_field: ResolvedField, *, by_ref: dict[str, ResolvedCon
     annotation = _annotation(concept_field.resolved_type, by_ref=by_ref, imports=imports)
     if not concept_field.required:
         annotation = f"{annotation} | None"
-    return field_line(concept_field, annotation=annotation)
+    return field_line(concept_field, annotation=annotation, imports=imports)
 
 
 def _annotation(resolved_type: ResolvedType, *, by_ref: dict[str, ResolvedConcept], imports: set[str]) -> str:
@@ -87,8 +103,7 @@ def _annotation(resolved_type: ResolvedType, *, by_ref: dict[str, ResolvedConcep
             imports.add("from datetime import time")
             return "time"
         case ResolvedTypeKind.LITERAL:
-            imports.add("from typing import Literal")
-            return f"Literal[{', '.join(repr(choice) for choice in resolved_type.choices or [])}]"
+            return literal_annotation(choices=resolved_type.choices, imports=imports)
         case ResolvedTypeKind.CONCEPT:
             return _concept_annotation(resolved_type, by_ref=by_ref, imports=imports)
         case ResolvedTypeKind.LIST:

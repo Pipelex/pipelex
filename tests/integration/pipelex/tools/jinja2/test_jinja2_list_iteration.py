@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle
-from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
+from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
+from pipelex.tools.templating.text_format import TextFormat
 
 if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff_artefact import StuffArtefact

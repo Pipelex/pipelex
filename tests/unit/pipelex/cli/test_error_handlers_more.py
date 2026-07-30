@@ -30,8 +30,7 @@ from pipelex.cli.error_handlers import (
 from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelDeckPresetValidatonError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
-from pipelex.core.exceptions import PipesAndConceptValidationErrorData
+from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.system.pipelex_service.exceptions import (

@@ -9,19 +9,21 @@ from typing import cast
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.codegen.emitters.python_structures import emit_python_structures
+from pipelex.codegen.resolved_concepts import resolve_concepts_from_crate
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_library_manager
+from pipelex.interpreter_hub import get_library_manager
 from pipelex.pipe_operators.func.exceptions import PipeFuncExecutionError
 from pipelex.pipe_operators.func.pipe_func_execution_dtos import PipeFuncExecutionRequest, PipeFuncExecutionResponse
 from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutionResult, PipeFuncExecutorProtocol
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.runtime_bridge.primitives.rehydration import rehydrate_library_and_memory
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.registries.func_registry import func_registry
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
@@ -108,6 +110,30 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
             target = workdir / relpath
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(source, encoding="utf-8")
+
+        # Generate the method's concept structure classes from the crate — the .mthds is the single
+        # source of truth for them (`resolve_concepts_from_crate` reads the crate's ConceptBlueprints,
+        # `emit_python_structures` projects a `structures.py`). So a PipeFunc can
+        # `from structures import <domain>__<Concept>` without the method having to STORE or transport a
+        # hand-written copy that could drift from the .mthds. A file the method actually shipped at the
+        # same path wins (already materialized above) — never clobber customer source.
+        #
+        # Force domain-qualified class names (`atlas_devis__PricedQuote`): the runtime ALWAYS qualifies a
+        # concept's structure class (`concept.structure_class_name`), and that is the exact name a
+        # PipeFunc's return-type validation checks against — so the generated classes must match the
+        # runtime spelling, not the emitter's default collision-only qualification (which would emit a
+        # bare `PricedQuote` the validator rejects).
+        resolved_library = resolve_concepts_from_crate(request.crate)
+        qualified_library = resolved_library.model_copy(
+            update={"concepts": [concept.model_copy(update={"needs_qualification": True}) for concept in resolved_library.concepts]}
+        )
+        for emitted in emit_python_structures(qualified_library):
+            generated_target = workdir / emitted.filename
+            if generated_target.exists():
+                log.verbose(f"Structures file '{emitted.filename}' was shipped by the method; keeping the shipped copy over the generated one.")
+                continue
+            generated_target.parent.mkdir(parents=True, exist_ok=True)
+            generated_target.write_text(emitted.content, encoding="utf-8")
 
         # Put the bundle's directories on sys.path so a PipeFunc (or structure class) can import a sibling
         # file from the same bundle. This is only reached in-box (transported path): the crate is

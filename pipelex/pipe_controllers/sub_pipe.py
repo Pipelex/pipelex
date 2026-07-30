@@ -6,19 +6,19 @@ from pipelex import log
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError, PipeRunInputsError
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_pipe_router, get_required_pipe
+from pipelex.interpreter_hub import get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 if TYPE_CHECKING:

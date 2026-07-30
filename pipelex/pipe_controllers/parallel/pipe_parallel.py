@@ -11,18 +11,17 @@ from pipelex.core.concepts.exceptions import ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeRunError, PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
-from pipelex.core.pipes.pipe_abstract import CompanionSlot
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.graphspec import IOSpec
-from pipelex.hub import get_optional_pipe, get_required_pipe
+from pipelex.interpreter_hub import get_concept_library, get_optional_pipe, get_required_pipe
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_controllers.absence_taint import (
     ForceConsumptionInfo,
@@ -34,9 +33,9 @@ from pipelex.pipe_controllers.absence_taint import (
 )
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
-from pipelex.pipe_run.exceptions import PipeRunError
+from pipelex.pipe_machinery.pipe_abstract import CompanionSlot
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 if TYPE_CHECKING:
@@ -166,7 +165,7 @@ class PipeParallel(PipeController):
         runtime combine failure into an author-time error surfaced by `/validate`.
         """
         try:
-            structure_class = self.output.concept.get_structure_class()
+            structure_class = get_concept_library().get_structure_class(concept=self.output.concept)
         except ConceptValueError as exc:
             # A plain ValueError would escape the /validate sweep and abort the whole bundle;
             # convert it so this pipe alone is reported as failed.
@@ -384,7 +383,7 @@ class PipeParallel(PipeController):
                 # A list-producing branch combines as a ListContent, not as the item class.
                 continue
             try:
-                branch_structure_class = branch_pipe.output.concept.get_structure_class()
+                branch_structure_class = get_concept_library().get_structure_class(concept=branch_pipe.output.concept)
             except ConceptValueError as exc:
                 # Same conversion as the output lookup above: keep the failure per-pipe.
                 msg = (
@@ -457,7 +456,7 @@ class PipeParallel(PipeController):
 
         pipe_outputs = await asyncio.gather(*tasks)
 
-        structure_class = self.output.concept.get_structure_class()
+        structure_class = get_concept_library().get_structure_class(concept=self.output.concept)
         seen_output_names: set[str] = set()
         output_stuffs: dict[str, Stuff] = {}
         output_stuff_contents: dict[str, StuffContent] = {}

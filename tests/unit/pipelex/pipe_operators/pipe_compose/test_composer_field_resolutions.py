@@ -15,7 +15,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_native_concept
+from pipelex.interpreter_hub import get_native_concept
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint, ConstructFieldMethod
 from pipelex.pipe_operators.compose.structured_content_composer import StructuredContentComposer
 

@@ -18,10 +18,10 @@ from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.config import get_config
-from pipelex.graph.graph_config import DataInclusionConfig
-from pipelex.graph.trace_context import TraceContext
-from pipelex.pipeline.job_metadata import JobMetadata, UnitJobId
 from pipelex.reporting.reporting_manager import ReportingManager
+from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.job_metadata import JobMetadata, UnitJobId
+from pipelex.system.trace_context import TraceContext
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 from pipelex.tracing.trace_events import UsageReportEvent
 

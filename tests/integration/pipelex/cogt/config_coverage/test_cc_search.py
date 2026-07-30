@@ -5,8 +5,8 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.search.search_job_factory import SearchJobFactory
 from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.cogt.search.search_worker_factory import SearchWorkerFactory
-from pipelex.hub import get_model_deck
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.runtime_hub import get_model_deck
+from pipelex.system.job_metadata import JobMetadata
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 

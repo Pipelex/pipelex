@@ -14,12 +14,12 @@ from pydantic import ValidationError
 
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
-from pipelex.core.pipes.handle_pipe_errors import extract_wrapped_pipe_validation_error
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_pipe_library
+from pipelex.interpreter_hub import get_pipe_library
+from pipelex.mthds_parsing.handle_pipe_errors import extract_wrapped_pipe_validation_error
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.system.registries.func_registry import func_registry

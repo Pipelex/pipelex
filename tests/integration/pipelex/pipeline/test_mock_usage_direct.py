@@ -22,10 +22,10 @@ from pipelex.cogt.content_generation.dry_mock import MOCK_USAGE_MODEL_NAME
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.reporting.cost_report_renderer import render_run_cost_report
 from pipelex.system.configuration.configs import NdjsonTracingConfig, PipelineExecutionConfig, TracingBackend
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 _DOMAIN = "mock_usage_direct"
 _MTHDS = f"""

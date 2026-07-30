@@ -4,10 +4,10 @@ from pipelex.cogt.exceptions import LLMConfigError
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams, ImgGenJobParamsDefaults, Quality
 from pipelex.cogt.llm.llm_job_components import ReasoningEffort
 from pipelex.cogt.models.model_deck_config import ModelDeckConfig
-from pipelex.plugins.anthropic.anthropic_config import AnthropicConfig
-from pipelex.plugins.google.google_config import GoogleConfig
-from pipelex.plugins.mistral.mistral_config import MistralConfig
-from pipelex.plugins.openai.openai_config import OpenAIConfig
+from pipelex.providers.anthropic.anthropic_config import AnthropicConfig
+from pipelex.providers.google.google_config import GoogleConfig
+from pipelex.providers.mistral.mistral_config import MistralConfig
+from pipelex.providers.openai.openai_config import OpenAIConfig
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.exceptions import ConfigValidationError
 

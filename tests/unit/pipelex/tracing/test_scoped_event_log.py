@@ -1,4 +1,4 @@
-"""Unit tests for the `scoped_event_log` ContextVar scope in `pipelex.hub`.
+"""Unit tests for the `scoped_event_log` ContextVar scope in `pipelex.runtime_hub`.
 
 The scope lets a caller pin a specific `EventLogProtocol` instance for the duration
 of a run so the write side (tracer emission) and the read side (tracing assembly)
@@ -10,7 +10,7 @@ import asyncio
 
 import pytest
 
-from pipelex.hub import get_event_log_override, scoped_event_log
+from pipelex.runtime_hub import get_event_log_override, scoped_event_log
 from pipelex.tracing.event_log_protocol import EventLogProtocol
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 

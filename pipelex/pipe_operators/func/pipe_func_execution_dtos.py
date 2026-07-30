@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 
 # The serialization-only transport DTOs for out-of-process PipeFunc execution. Deliberately a LEAF
 # module — it imports only pure data types (no hub, no protocol, no builder), so the executor protocol

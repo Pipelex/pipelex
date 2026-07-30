@@ -1,39 +1,14 @@
 import pytest
-from kajson.kajson_manager import KajsonManager
-from pydantic import Field, ValidationError
+from pydantic import ValidationError
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.native.exceptions import NativeConceptDefinitionError
 from pipelex.core.concepts.validation import validate_concept_ref
 from pipelex.core.domains.domain import SpecialDomain
-from pipelex.core.stuffs.structured_content import StructuredContent
-
-
-# Custom StuffContent class with nested ImageContent-like field for testing
-class NestedImageInfo(StructuredContent):
-    """A nested structure that contains image-like data (same structure as ImageContent)."""
-
-    url: str
-    public_url: str | None = None
-    source_prompt: str | None = None
-    source_negative_prompt: str | None = None
-    caption: str | None = None
-    mime_type: str | None = None
-    width: int | None = Field(default=None, gt=0)
-    height: int | None = Field(default=None, gt=0)
-    filename: str | None = None
-
-
-class DocumentWithNestedImage(StructuredContent):
-    """A content class that has a nested field containing image info."""
-
-    title: str
-    metadata: NestedImageInfo
 
 
 class TestConcept:
@@ -270,144 +245,3 @@ class TestConcept:
                 description="Test concept",
                 structure_class_name="TextContent",
             )
-
-    def test_are_concept_compatible(self):
-        concept1 = ConceptFactory.make_from_blueprint(
-            concept_code="Code1",
-            domain_code="domain1",
-            blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum", refines=NativeConceptCode.TEXT),
-        )
-        concept2 = ConceptFactory.make_from_blueprint(
-            concept_code="Code2",
-            domain_code="domain1",
-            blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum", refines=NativeConceptCode.TEXT),
-        )
-        concept3 = ConceptFactory.make_from_blueprint(
-            concept_code="Code3",
-            domain_code="domain2",
-            blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum", structure="TextContent"),
-        )
-        concept4 = ConceptFactory.make_from_blueprint(
-            concept_code="Code4",
-            domain_code="domain1",
-            blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum", structure="ImageContent"),
-        )
-
-        concept_5 = ConceptFactory.make_native_concept(
-            native_concept_code=NativeConceptCode.PAGE,
-        )
-
-        concept_6 = ConceptFactory.make_native_concept(
-            native_concept_code=NativeConceptCode.IMAGE,
-        )
-
-        concept_7 = ConceptFactory.make_from_blueprint(
-            concept_code="VisualDescription",
-            domain_code="images",
-            blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum"),
-        )
-
-        assert Concept.are_concept_compatible(concept_1=concept_7, concept_2=concept_6, strict=True) is False
-        assert Concept.are_concept_compatible(concept_1=concept_7, concept_2=concept_6, strict=False) is False
-
-        # Test same code and domain
-        assert Concept.are_concept_compatible(concept_1=concept1, concept_2=concept2) is True
-
-        # Test different code and domain
-        assert Concept.are_concept_compatible(concept_1=concept1, concept_2=concept3) is True
-
-        # Test same structure class name
-        assert Concept.are_concept_compatible(concept_1=concept1, concept_2=concept4) is False
-
-        # Test same refines
-        assert Concept.are_concept_compatible(concept_1=concept_5, concept_2=concept_6, strict=False) is True
-        assert Concept.are_concept_compatible(concept_1=concept_5, concept_2=concept_6, strict=True) is False
-
-    def test_concept_refining_text_is_strictly_compatible(self):
-        """Test that a concept created with .make() that refines native.Text is strictly compatible with Text."""
-        # Create a concept that refines native.Text using ConceptFactory.make()
-        concept_not_native_text = ConceptFactory.make(
-            domain_code="test_domain",
-            concept_code="MyConceptNotNativeText",
-            description="Test concept for unit tests",
-            structure_class_name="TextContent",
-            refines="native.Text",
-        )
-
-        # Get the native Text concept
-        text_concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT)
-
-        # A concept that refines Text should be strictly compatible with Text
-        assert Concept.are_concept_compatible(concept_1=concept_not_native_text, concept_2=text_concept, strict=True) is True
-        assert Concept.are_concept_compatible(concept_1=concept_not_native_text, concept_2=text_concept, strict=False) is True
-
-    def test_concept_with_same_structure_as_text_content(self):
-        """Test: create a concept with a structure EXACTLY like TextContent (text: str) and compare with native Text."""
-        # Create a concept with a structure blueprint that has exactly the same field as TextContent: text: str
-        custom_text_like_concept = ConceptFactory.make_from_blueprint(
-            concept_code="MyTextLikeConcept",
-            domain_code="test_structure_equiv",
-            blueprint_or_string_description=ConceptBlueprint(
-                description="A concept with the exact same structure as TextContent",
-                structure={
-                    "text": ConceptStructureBlueprint(
-                        type=ConceptStructureBlueprintFieldType.TEXT,
-                        description="The text content",
-                        required=True,
-                    ),
-                },
-            ),
-        )
-
-        # Get the native Text concept
-        native_text_concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT)
-
-        # They have different structure_class_names but the same JSON structure
-        assert custom_text_like_concept.structure_class_name != native_text_concept.structure_class_name
-
-        # Concepts with the same JSON structure should be compatible
-        assert Concept.are_concept_compatible(concept_1=custom_text_like_concept, concept_2=native_text_concept, strict=True) is True
-        assert Concept.are_concept_compatible(concept_1=custom_text_like_concept, concept_2=native_text_concept, strict=False) is True
-
-    def test_nested_image_content_strict_false_nonstrict_true(self):
-        """Test: strict=True returns False, strict=False returns True for nested compatible field."""
-        # Register our custom classes with the class registry
-        KajsonManager.get_class_registry().register_class(NestedImageInfo)
-        KajsonManager.get_class_registry().register_class(DocumentWithNestedImage)
-
-        # Create a concept using our custom DocumentWithNestedImage class
-        concept_with_nested_image = ConceptFactory.make(
-            domain_code="test_nested",
-            concept_code="DocumentWithImage",
-            description="A document containing nested image info",
-            structure_class_name="DocumentWithNestedImage",
-        )
-
-        # Create a concept using the NestedImageInfo class (same structure as ImageContent)
-        concept_image_like = ConceptFactory.make(
-            domain_code="test_nested",
-            concept_code="ImageInfo",
-            description="Image-like info",
-            structure_class_name="NestedImageInfo",
-        )
-
-        # Get the native Image concept (uses ImageContent)
-        native_image_concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE)
-
-        # --- Test with NestedImageInfo (custom class with same structure as ImageContent) ---
-        # strict=True should be False: DocumentWithNestedImage is NOT structurally equivalent to NestedImageInfo
-        assert Concept.are_concept_compatible(concept_1=concept_with_nested_image, concept_2=concept_image_like, strict=True) is False
-        # strict=False should be True: DocumentWithNestedImage has a field (metadata) that is NestedImageInfo
-        assert Concept.are_concept_compatible(concept_1=concept_with_nested_image, concept_2=concept_image_like, strict=False) is True
-
-        # --- Test NestedImageInfo vs native Image (ImageContent) ---
-        # NestedImageInfo has the same structure as ImageContent, so should be strictly compatible
-        assert Concept.are_concept_compatible(concept_1=concept_image_like, concept_2=native_image_concept, strict=True) is True
-        assert Concept.are_concept_compatible(concept_1=concept_image_like, concept_2=native_image_concept, strict=False) is True
-
-        # --- Test DocumentWithNestedImage vs native Image (ImageContent) ---
-        # strict=True should be False: DocumentWithNestedImage is NOT structurally equivalent to ImageContent
-        assert Concept.are_concept_compatible(concept_1=concept_with_nested_image, concept_2=native_image_concept, strict=True) is False
-        # strict=False should be True: DocumentWithNestedImage has a nested field (metadata: NestedImageInfo)
-        # that is STRUCTURALLY EQUIVALENT to ImageContent
-        assert Concept.are_concept_compatible(concept_1=concept_with_nested_image, concept_2=native_image_concept, strict=False) is True

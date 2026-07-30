@@ -366,7 +366,7 @@ All writers explicitly target `config_manager.global_config_dir`:
 | Context | Module | How |
 |---------|--------|-----|
 | Doctor | `doctor_cmd.py` → `check_models()` | `load_pipelex_service_config_if_exists(config_dir=global_config_dir)` |
-| Runtime | `pipelex.py` setup | `load_pipelex_service_config_if_exists(config_dir=global_config_dir)` |
+| Runtime | `runtime_boot.py` setup | `load_pipelex_service_config_if_exists(config_dir=global_config_dir)` |
 
 ### Rules
 

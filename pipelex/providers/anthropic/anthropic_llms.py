@@ -1,0 +1,32 @@
+from anthropic import AsyncAnthropic
+from anthropic.types import ModelInfo
+
+from pipelex.cogt.model_backends.backend import InferenceBackend
+from pipelex.plugins.model_handle import ModelHandle
+from pipelex.providers.anthropic.anthropic_exceptions import AnthropicModelListingError, AnthropicSDKUnsupportedError
+from pipelex.providers.anthropic.anthropic_factory import AnthropicFactory
+
+
+async def anthropic_list_available_models(model_handle: ModelHandle, *, backend: InferenceBackend) -> list[ModelInfo]:
+    """List available Anthropic models.
+
+    Returns:
+        List[ModelInfo]: A list of Anthropic model information objects
+
+    """
+    anthropic_client = AnthropicFactory.make_anthropic_client(model_handle=model_handle, backend=backend)
+    if not hasattr(anthropic_client, "models"):
+        msg = f"{type(anthropic_client).__name__} does not support listing models"
+        raise AnthropicSDKUnsupportedError(msg)
+    if not isinstance(anthropic_client, AsyncAnthropic):
+        msg = "We only support the standard Anthropic client for listing models"
+        raise AnthropicSDKUnsupportedError(msg)
+    models_response = await anthropic_client.models.list()
+    if not models_response:
+        msg = "No models found"
+        raise AnthropicModelListingError(msg)
+    models_list = models_response.data
+    if not models_list:
+        msg = "No models found"
+        raise AnthropicModelListingError(msg)
+    return sorted(models_list, key=lambda model: model.created_at)

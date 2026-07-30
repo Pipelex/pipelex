@@ -3,25 +3,24 @@ from typing import TYPE_CHECKING, Any, Literal
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
-from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeRunError, PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.pipes.template_guard_lint import lint_optional_input_guards
-from pipelex.hub import get_optional_pipe, get_pipe_router, get_required_pipe
+from pipelex.interpreter_hub import get_optional_pipe, get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.pipe_controller import PipeController
-from pipelex.pipe_run.exceptions import PipeRunError
+from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 if TYPE_CHECKING:

@@ -18,12 +18,12 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from pipelex.core.pipes.inputs.input_renderer import render_inputs
-from pipelex.hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_pipe, set_current_library
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_pipe, set_current_library
+from pipelex.pipe_machinery.rendering.input_renderer import render_inputs
 from pipelex.pipeline.pipeline_response import RunState
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 if TYPE_CHECKING:
     from collections.abc import Callable

@@ -8,14 +8,26 @@ class. Native concepts themselves are not re-emitted — they already exist in t
 Field annotations use `from __future__ import annotations`, so concept references are plain forward
 names resolved from the module namespace (no explicit string quoting, no ordering constraint beyond
 class inheritance).
+
+Modern typing throughout — builtin generics (`list` / `dict`) and `X | None` — matching both the
+runtime `StructureGenerator` and the repo's Python standards. The emitted bytes are lint-clean on
+arrival so a consumer's `ruff` run cannot invalidate the codegen stamp; see `render_import_block`.
 """
 
 from pipelex.codegen.emitters.naming import python_class_name
-from pipelex.codegen.emitters.python_common import any_annotation, class_docstring, field_line, order_by_base, python_header
+from pipelex.codegen.emitters.python_common import (
+    any_annotation,
+    class_docstring,
+    field_line,
+    literal_annotation,
+    order_by_base,
+    python_header,
+    python_module_body,
+)
 from pipelex.codegen.emitters.target import EmittedFile
 from pipelex.codegen.resolved_concepts import ResolvedConcept, ResolvedLibrary
-from pipelex.codegen.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.concepts.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind
 from pipelex.core.qualified_ref import QualifiedRef
 
 _FILENAME = "structures.py"
@@ -28,14 +40,13 @@ def emit_python_structures(library: ResolvedLibrary) -> list[EmittedFile]:
     in_module = {concept.concept_ref for concept in emitted}
     ordered = order_by_base(emitted, in_module=in_module)
 
-    has_opaque = any(concept.structureless for concept in emitted)
-    pydantic_import = "from pydantic import ConfigDict, Field" if has_opaque else "from pydantic import Field"
-    imports: set[str] = {pydantic_import, "from pipelex.core.stuffs.structured_content import StructuredContent"}
+    # Every import is demand-driven — registered by the renderer that writes the name it imports.
+    # Seeding the set up front would emit an unused import for the crate shapes that use neither
+    # (all-opaque, or every concept refining a native), and `ruff check --fix` deletes those.
+    imports: set[str] = set()
     blocks = [_render_class(concept, by_ref=by_ref, imports=imports) for concept in ordered]
 
-    header = python_header(target="python-structures")
-    import_block = "\n".join(sorted(imports))
-    body = f"{header}from __future__ import annotations\n\n{import_block}\n\n\n" + "\n\n\n".join(blocks) + "\n"
+    body = python_module_body(header=python_header(target="python-structures"), imports=imports, blocks=blocks)
     return [EmittedFile(filename=_FILENAME, content=body)]
 
 
@@ -48,6 +59,7 @@ def _render_class(concept: ResolvedConcept, *, by_ref: dict[str, ResolvedConcept
     if concept.structureless:
         # Opaque = pass-through, never lossy (B1-1): the runtime base inherits pydantic's default
         # extra="ignore", which would silently strip every field on model_validate.
+        imports.add("from pydantic import ConfigDict")
         return f'{header}\n{docstring}\n\n    model_config = ConfigDict(extra="allow")'
     if not concept.fields:
         return f"{header}\n{docstring}"
@@ -57,22 +69,27 @@ def _render_class(concept: ResolvedConcept, *, by_ref: dict[str, ResolvedConcept
 
 def _base_class(concept: ResolvedConcept, *, by_ref: dict[str, ResolvedConcept], imports: set[str]) -> str:
     if concept.base_ref is None:
-        return "StructuredContent"
+        return _structured_content(imports=imports)
     if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept.base_ref):
         return _native_class(concept.base_ref, imports=imports)
     base = by_ref.get(concept.base_ref)
     if base is not None:
         return python_class_name(domain=base.domain, code=base.code, needs_qualification=base.needs_qualification)
     # Cross-package / unknown base is not resolvable in-crate: fall back to a structurally valid root.
+    return _structured_content(imports=imports)
+
+
+def _structured_content(*, imports: set[str]) -> str:
+    """The runtime root base, registering its import — every concept refining a native uses `_native_class` instead."""
+    imports.add("from pipelex.core.stuffs.structured_content import StructuredContent")
     return "StructuredContent"
 
 
 def _render_field(concept_field: ResolvedField, *, by_ref: dict[str, ResolvedConcept], imports: set[str]) -> str:
     annotation = _annotation(concept_field.resolved_type, by_ref=by_ref, imports=imports)
     if not concept_field.required:
-        imports.add("from typing import Optional")
-        annotation = f"Optional[{annotation}]"
-    return field_line(concept_field, annotation=annotation)
+        annotation = f"{annotation} | None"
+    return field_line(concept_field, annotation=annotation, imports=imports)
 
 
 def _annotation(resolved_type: ResolvedType, *, by_ref: dict[str, ResolvedConcept], imports: set[str]) -> str:
@@ -95,18 +112,15 @@ def _annotation(resolved_type: ResolvedType, *, by_ref: dict[str, ResolvedConcep
             imports.add("from datetime import time")
             return "time"
         case ResolvedTypeKind.LITERAL:
-            imports.add("from typing import Literal")
-            return f"Literal[{', '.join(repr(choice) for choice in resolved_type.choices or [])}]"
+            return literal_annotation(choices=resolved_type.choices, imports=imports)
         case ResolvedTypeKind.CONCEPT:
             return _concept_annotation(resolved_type, by_ref=by_ref, imports=imports)
         case ResolvedTypeKind.LIST:
-            imports.add("from typing import List")
             item = _annotation(resolved_type.item, by_ref=by_ref, imports=imports) if resolved_type.item else any_annotation(imports=imports)
-            return f"List[{item}]"
+            return f"list[{item}]"
         case ResolvedTypeKind.DICT:
-            imports.add("from typing import Dict")
             value = _annotation(resolved_type.value, by_ref=by_ref, imports=imports) if resolved_type.value else any_annotation(imports=imports)
-            return f"Dict[str, {value}]"
+            return f"dict[str, {value}]"
         case ResolvedTypeKind.ANY:
             return any_annotation(imports=imports)
 

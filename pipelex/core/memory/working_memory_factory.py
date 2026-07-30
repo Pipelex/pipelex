@@ -8,6 +8,7 @@ from pydantic import BaseModel, ValidationError
 from pipelex import log
 from pipelex.cogt.content_generation.dry_mock import stamp_mock_main_coordination
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
+from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.memory.exceptions import WorkingMemoryFactoryError
 from pipelex.core.memory.input_shaper import InputShaper
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
@@ -18,7 +19,7 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_class_registry
+from pipelex.runtime_hub import get_class_registry
 
 # Field names that require snake_case format for pipelex bundle specs
 # Note: main_pipe is NOT included here because BundleHeaderSpec.main_pipe has
@@ -72,6 +73,7 @@ class WorkingMemoryFactory(BaseModel):
         cls,
         pipeline_inputs: PipelineInputs,
         *,
+        concept_provider: ConceptProviderAbstract,
         input_specs: InputStuffSpecs | None = None,
         search_domain_codes: list[str] | None = None,
         inputs_base_dir: Path | None = None,
@@ -87,6 +89,9 @@ class WorkingMemoryFactory(BaseModel):
 
         Args:
             pipeline_inputs: Dictionary in the format from API serialization
+            concept_provider: Resolves concepts and answers compatibility questions. Injected rather
+                than looked up so this module stays out of the method interpreter's import closure
+                (see hub-layering); the caller holds the loaded method's library.
             input_specs: The entry pipe's declared inputs; ``None`` disables signature-driven shaping
             search_domain_codes: List of domain codes to search for concepts
             inputs_base_dir: Directory that bare *relative local* file paths resolve against (D3);
@@ -101,6 +106,7 @@ class WorkingMemoryFactory(BaseModel):
         if input_specs is not None:
             return InputShaper.shape(
                 pipeline_inputs,
+                concept_provider=concept_provider,
                 input_specs=input_specs,
                 search_domain_codes=search_domain_codes,
                 inputs_base_dir=inputs_base_dir,
@@ -112,6 +118,7 @@ class WorkingMemoryFactory(BaseModel):
             stuff = StuffFactory.make_stuff_from_stuff_content_or_data(
                 name=stuff_key,
                 stuff_content_or_data=stuff_content_or_data,
+                concept_provider=concept_provider,
                 search_domain_codes=search_domain_codes,
             )
             working_memory.add_new_stuff(name=stuff_key, stuff=stuff)

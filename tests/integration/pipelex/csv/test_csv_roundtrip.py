@@ -25,9 +25,9 @@ from mthds.protocol.pipeline_inputs import PipelineInputs
 
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.hub import get_library_manager
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.interpreter_hub import get_concept_library, get_library_manager
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.tabular.csv_codec import csv_from_list_content
 
 if TYPE_CHECKING:
@@ -52,7 +52,7 @@ class TestCsvRoundtrip:
 
     def test_csv_input_builds_typed_list(self, load_test_library: Callable[[list[Path]], None]) -> None:
         load_test_library([BUNDLE_DIR])
-        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(people_inputs())
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(people_inputs(), concept_provider=get_concept_library())
 
         people = working_memory.get_stuff("people").content
         assert isinstance(people, ListContent)
@@ -75,7 +75,7 @@ class TestCsvRoundtrip:
     def test_list_content_writes_to_csv(self, tmp_path: Path, load_test_library: Callable[[list[Path]], None]) -> None:
         load_test_library([BUNDLE_DIR])
         summary_concept = get_library_manager().get_current_library().concept_library.get_required_concept("csv_demo.PersonSummary")
-        summary_class = summary_concept.get_structure_class()
+        summary_class = get_concept_library().get_structure_class(concept=summary_concept)
 
         items = [
             summary_class.model_validate({"name": "Ada Lovelace", "country": "United Kingdom", "summary": "A visionary mathematician."}),

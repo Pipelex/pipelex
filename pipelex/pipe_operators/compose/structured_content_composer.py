@@ -5,7 +5,6 @@ from typing import Any, NamedTuple, TypeAlias, cast, get_args, get_origin
 from pydantic import ValidationError
 
 from pipelex import log
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.date_content import DateContent
@@ -21,6 +20,7 @@ from pipelex.pipe_operators.compose.exceptions import (
     StructuredContentComposerValueError,
 )
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
+from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.typing.annotation_utils import unwrap_optional
 from pipelex.tools.typing.class_utils import are_classes_equivalent
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error

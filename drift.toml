@@ -4,8 +4,8 @@
 # re-examined against the change, and the examination must be recorded with
 # `make drift-ack CONTRACT=<id> RATIONALE="…"`. `make drift-check` gates the local
 # `make check` aggregate and runs as an advisory CI job (to be promoted to a
-# required check — see TODOS.md). See docs/contribute/drift-contracts.md for the
-# full workflow.
+# required check — gated, see wip/drift-contracts/phase-3-verdict.md). See
+# docs/contribute/drift-contracts.md for the full workflow.
 #
 # Keep this manifest small: every contract here must earn its friction. Anything
 # mechanizable (regenerate-and-diff, referential integrity) belongs in a derived
@@ -52,5 +52,22 @@ triggers = [
 ]
 review = [
   "docs/contribute/keyword-only-arguments.md",
+]
+verify_commands = []
+
+[contracts.hub-layering-convention]
+description = "The hub-layering doc is the boundary's specification and must track the guard and the two hubs."
+# The guard owns the rule (declared runtime layer, violation kinds, carve-outs); the two hub
+# modules own the symbol partition the doc tabulates accessor by accessor. A symbol added to or
+# moved between them silently falsifies those tables, which is the staleness this contract exists
+# to catch. No verify command: `check-hub-layering` already gates `make check` and CI, so re-running
+# it here would only add the unstaged-file hard error without adding a guarantee.
+triggers = [
+  "pipelex/cli/dev_cli/commands/hub_layering_guard.py",
+  "pipelex/runtime_hub.py",
+  "pipelex/interpreter_hub.py",
+]
+review = [
+  "docs/contribute/hub-layering.md",
 ]
 verify_commands = []

@@ -2,8 +2,7 @@ from typing import Callable
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.pipe_factory import PipeFactory
-from pipelex.hub import get_concept_library
+from pipelex.interpreter_hub import get_concept_library
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
@@ -11,6 +10,7 @@ from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeCond
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 
 
 class TestBracketNotationInControllers:

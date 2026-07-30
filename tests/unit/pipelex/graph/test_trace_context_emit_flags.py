@@ -5,8 +5,8 @@ Pins that ``emit_graph_events`` / ``emit_usage_events`` default to True (backwar
 carried — so a costs-only or graph-only run keeps its gating as nested pipes spawn children.
 """
 
-from pipelex.graph.graph_config import DataInclusionConfig
-from pipelex.graph.trace_context import TraceContext
+from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.trace_context import TraceContext
 
 DATA_INCLUSION_OFF = DataInclusionConfig(
     pipe_and_concept_registry=False,

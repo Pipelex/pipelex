@@ -5,11 +5,11 @@ Non-subject function parameters must be keyword-only so call sites are self-docu
 human-readable specification lives in ``docs/contribute/keyword-only-arguments.md``.
 
 This module holds the AST collection logic that mechanically enforces the convention. It depends
-on **stdlib only** (``ast``/``re``/``pathlib``) — no ``rich``, ``pipelex.hub``, or ``typer`` — so it
+on **stdlib only** (``ast``/``re``/``pathlib``) — no ``rich``, ``pipelex.runtime_hub``, or ``typer`` — so it
 can be loaded in two cold-start budgets:
 
 - The full-tree command (``pipelex-dev check-keyword-only``) imports from here and adds the
-  ``rich``/``pipelex.hub`` presentation layer (see ``check_keyword_only_cmd.py``).
+  ``rich``/``pipelex.runtime_hub`` presentation layer (see ``check_keyword_only_cmd.py``).
 - The lean single-file entry below, invoked **by file path** (``python
   pipelex/cli/dev_cli/commands/keyword_only_guard.py <file>``), skips the whole Typer/hub import
   graph so a ``PostToolUse`` hook can check just the edited file in a few tens of milliseconds. Run
@@ -32,8 +32,10 @@ root (one entry per def, keyed ``<relative_path>::<qualified_name>``, recording 
 violation; a grant whose def no longer exists (or whose recorded ``param`` no longer matches) is a
 violation too — staleness is symmetric. A subject annotated ``bool``/``int``/``float`` (including
 their ``Optional``/union-with-``None`` forms) is banned outright, grant or not: ``f(True)`` call
-sites are never acceptable. The registry is READ here (``tomllib``, stdlib); it is only ever
-WRITTEN by the full ``pipelex-dev subject-grant`` command (tomlkit, via ``toml_utils``).
+sites are never acceptable. The registry's **file order** is an invariant too (it is rewritten sorted
+by key on every write), and an entry sitting out of order is a violation. The registry is READ here
+(``tomllib``, stdlib); it is only ever WRITTEN by the full ``pipelex-dev subject-grant`` command
+(tomlkit, via ``toml_utils``).
 """
 
 from __future__ import annotations
@@ -43,6 +45,7 @@ import re
 import sys
 import tomllib
 from enum import StrEnum
+from itertools import pairwise
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
@@ -126,6 +129,7 @@ class ViolationKind(StrEnum):
     LITERAL_SUBJECT = "literal-subject"
     GRANT_PARAM_MISMATCH = "grant-param-mismatch"
     DEAD_GRANT = "dead-grant"
+    UNSORTED_GRANT = "unsorted-grant"
 
     @property
     def remedy(self) -> str:
@@ -149,6 +153,11 @@ class ViolationKind(StrEnum):
                 return (
                     "no def with a positional subject matches this grant — remove the entry from subject_grants.toml (re-grant after a rename/move)"
                 )
+            case ViolationKind.UNSORTED_GRANT:
+                return (
+                    "subject_grants.toml is machine-written and sorted by key — re-record any grant with `make subject-grant` "
+                    "(it rewrites the whole file sorted), or move the entry back into key order by hand"
+                )
 
     @property
     def is_fixable_by_star_insert(self) -> bool:
@@ -156,7 +165,7 @@ class ViolationKind(StrEnum):
         match self:
             case ViolationKind.MISSING_STAR | ViolationKind.UNGRANTED_SUBJECT | ViolationKind.LITERAL_SUBJECT:
                 return True
-            case ViolationKind.GRANT_PARAM_MISMATCH | ViolationKind.DEAD_GRANT:
+            case ViolationKind.GRANT_PARAM_MISMATCH | ViolationKind.DEAD_GRANT | ViolationKind.UNSORTED_GRANT:
                 return False
 
 
@@ -257,6 +266,13 @@ class DefInfo(NamedTuple):
 #: The complete set of keys a registry entry may carry — anything else fails the check.
 _GRANT_ALLOWED_KEYS = frozenset({"param", "rationale"})
 
+#: A registry table header as the writer emits it: one quoted key alone on its line. Grant keys always
+#: contain ``/``, ``.`` and ``::``, none of which TOML permits in a bare key, so a valid entry is ALWAYS
+#: quoted — an unquoted header cannot be a grant. Both quote styles match; a trailing comment is tolerated
+#: (the writer never emits one, a hand-edit might). Anything else is caught by the cross-check in
+#: :func:`find_unsorted_grants` rather than silently narrowing what the order rule covers.
+_GRANT_TABLE_HEADER_RE = re.compile(r"^\[(?P<quote>[\"'])(?P<key>.*)(?P=quote)\]\s*(?:#.*)?$", re.MULTILINE)
+
 
 def load_subject_grants(*, root: Path | None = None) -> dict[str, SubjectGrant]:
     """Load and validate the subject-grants registry (``subject_grants.toml`` at the repo root).
@@ -308,6 +324,59 @@ def load_subject_grants(*, root: Path | None = None) -> dict[str, SubjectGrant]:
             raise SubjectGrantRegistryError(msg)
         grants[key] = SubjectGrant(param=param, rationale=rationale)
     return grants
+
+
+def find_unsorted_grants(*, grants: Mapping[str, SubjectGrant], root: Path | None = None) -> list[Violation]:
+    """Report every registry entry that sits out of key order in the file.
+
+    The registry is machine-written and rewritten sorted by key on every ``subject-grant`` run, so file
+    order is a real invariant — and one a bulk rewrite (a package move, a sed over paths) breaks
+    *silently*, since an unsorted registry still parses and still grants exactly the same subjects.
+
+    Order is read from the raw text on purpose: TOML declares table order insignificant, so the ``dict``
+    :func:`load_subject_grants` returns is not evidence of what the file looks like.
+
+    Args:
+        grants: The already-parsed registry content — the scanned headers must agree with it exactly.
+        root: The repo root; defaults to the current working directory (checks run from there).
+
+    Returns:
+        One violation per entry that sorts before the entry preceding it in the file.
+
+    Raises:
+        SubjectGrantRegistryError: When the registry is missing, or when the scanned table headers do not
+            match ``grants``. The scan is a text pass over a file the parser already accepted, so a
+            disagreement means an entry shape the scan cannot see — which must fail loudly rather than
+            quietly narrow the set of entries the order rule covers.
+    """
+    path = (root or Path.cwd()) / SUBJECT_GRANTS_FILE
+    if not path.is_file():
+        msg = f"Subject-grants registry not found at '{path}'. It is committed at the repo root; run the check from there."
+        raise SubjectGrantRegistryError(msg)
+    text = path.read_text(encoding="utf-8")
+    scanned = [(match.group("key"), text.count("\n", 0, match.start()) + 1) for match in _GRANT_TABLE_HEADER_RE.finditer(text)]
+    if sorted(key for key, _ in scanned) != sorted(grants):
+        msg = (
+            f"Subject-grants registry '{path}' holds entries the order check cannot read: scanned {len(scanned)} "
+            f"table header(s), the parser found {len(grants)} entry(ies). Every entry must be a single quoted key "
+            "alone on its line — the shape `make subject-grant` writes."
+        )
+        raise SubjectGrantRegistryError(msg)
+    violations: list[Violation] = []
+    for (previous_key, _), (key, lineno) in pairwise(scanned):
+        if key >= previous_key:
+            continue
+        relative_path, _, qualified_name = key.partition("::")
+        violations.append(
+            Violation(
+                relative_path=relative_path,
+                qualified_name=qualified_name,
+                lineno=0,
+                kind=ViolationKind.UNSORTED_GRANT,
+                detail=f"{SUBJECT_GRANTS_FILE}:{lineno} sorts before the preceding entry '{previous_key}'",
+            )
+        )
+    return violations
 
 
 # --------------------------------------------------------------------------------------

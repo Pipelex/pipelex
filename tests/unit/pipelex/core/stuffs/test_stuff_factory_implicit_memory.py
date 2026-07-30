@@ -9,7 +9,8 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_class_registry, get_concept_library
+from pipelex.interpreter_hub import get_concept_library
+from pipelex.runtime_hub import get_class_registry
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from tests.unit.pipelex.core.stuffs.data import ERROR_TEST_CASES, SEARCH_DOMAIN_TEST_CASES, TEST_CASES, DueDate, UrgencyFlag
 
@@ -132,9 +133,7 @@ class TestStuffFactoryImplicitMemory:
         log.verbose(f"setup_test_concept: {setup_test_concept}")
 
         result = StuffFactory.make_stuff_from_stuff_content_or_data(
-            name=stuff_name,
-            code=stuff_code,
-            stuff_content_or_data=stuff_content_or_data,
+            name=stuff_name, code=stuff_code, stuff_content_or_data=stuff_content_or_data, concept_provider=get_concept_library()
         )
         pretty_print(result, title=f"Result for test case: {test_name}")
         pretty_print(expected_stuff, title=f"Expected stuff for test case: {test_name}")
@@ -169,6 +168,7 @@ class TestStuffFactoryImplicitMemoryWithSearchDomains:
             code=stuff_code,
             stuff_content_or_data=stuff_content_or_data,
             search_domain_codes=search_domain_codes,
+            concept_provider=get_concept_library(),
         )
 
         pretty_print(result, title=f"Result for test case: {test_name}")
@@ -207,4 +207,5 @@ class TestStuffFactoryImplicitMemoryErrors:
                 code=stuff_code,
                 stuff_content_or_data=stuff_content_or_data,
                 search_domain_codes=search_domain_codes,
+                concept_provider=get_concept_library(),
             )

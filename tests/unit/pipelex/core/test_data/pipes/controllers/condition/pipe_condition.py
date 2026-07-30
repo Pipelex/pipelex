@@ -1,4 +1,4 @@
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 

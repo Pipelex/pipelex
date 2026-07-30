@@ -7,11 +7,11 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
-from pipelex.core.pipes.pipe_factory import PipeFactory
-from pipelex.hub import get_concept_library, get_pipe_library
+from pipelex.interpreter_hub import get_concept_library, get_pipe_library
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 

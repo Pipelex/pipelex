@@ -16,9 +16,9 @@ import re
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.variable_multiplicity import MULTIPLICITY_PATTERN
 from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 
 
 def _canonical_concept_spec(spec: str, *, domain_code: str) -> str:

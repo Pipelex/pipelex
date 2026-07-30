@@ -1,11 +1,9 @@
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.config import get_config
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.hub import (
-    get_class_registry,
-    get_required_concept,
-)
+from pipelex.interpreter_hub import get_required_concept
+from pipelex.runtime_hub import get_class_registry
+from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.typing.structure_printer import StructurePrinter
 
 

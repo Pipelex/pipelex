@@ -5,10 +5,8 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
 from pipelex.cogt.templating.template_rendering import render_template
-from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -16,20 +14,23 @@ from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErr
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.pipes.template_guard_lint import lint_optional_input_guards
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_class_registry, get_concept_library, get_native_concept
+from pipelex.interpreter_hub import get_concept_library, get_native_concept
+from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
 from pipelex.pipe_operators.compose.exceptions import PipeComposeError, StructuredContentComposerValueError
 from pipelex.pipe_operators.compose.structured_content_composer import StructuredContentComposer
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.runtime_hub import get_class_registry
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
+from pipelex.tools.templating.templating_style import TemplatingStyle
 
 
 class PipeComposeOutput(PipeOutput):

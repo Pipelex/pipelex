@@ -28,8 +28,8 @@ from pipelex.cli.commands.init.ui.general_ui import build_initialization_panel
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.models.deck_manifest import compute_kit_manifest, write_manifest
-from pipelex.hub import get_console
 from pipelex.kit.paths import get_kit_configs_dir
+from pipelex.runtime_hub import get_console
 from pipelex.system.configuration.config_loader import BACKENDS_FILE_NAME, INFERENCE_DIR_NAME, config_manager
 from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError
 from pipelex.system.pipelex_service.pipelex_service_agreement import update_service_terms_acceptance

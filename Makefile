@@ -104,6 +104,8 @@ make check-mthds-schema       - Check MTHDS JSON Schema is up-to-date
 make cms                      - Shorthand -> check-mthds-schema
 make generate-error-pages     - Generate one docs page per PipelexError subclass under docs/errors/
 make gep                      - Shorthand -> generate-error-pages
+make generate-error-identity  - Regenerate the committed PipelexError wire-identity snapshot
+make gei                      - Shorthand -> generate-error-identity
 make update-gateway-models    - Update gateway models reference
 make ugm                      - Shorthand -> update-gateway-models
 make check-gateway-models     - Check gateway models reference is up-to-date
@@ -156,6 +158,8 @@ make fix-keyword-only         - Auto-fix keyword-only-args violations (insert a 
 make fko                      - Shorthand -> fix-keyword-only
 make subject-grant            - Record a subject grant (FUNC="<path>::<qualname>" RATIONALE="…")
 make sgr                      - Shorthand -> subject-grant
+make check-hub-layering       - Enforce the runtime_hub / interpreter_hub layering boundary
+make chl                      - Shorthand -> check-hub-layering
 make check-TODOs              - Check for TODOs
 
 make docs                     - Serve documentation locally with mkdocs
@@ -195,7 +199,7 @@ export HELP
 .PHONY: \
 	all help env env-verbose check-uv check-uv-verbose lock install update build \
 	format lint ruff-format ruff-lint pyright mypy pylint plxt plxt-format plxt-lint \
-    rules rules-claude-standalone up-kit-configs ukc check-config-sync ccs check-keyword-only cko fix-keyword-only fko subject-grant sgr check-rules check-urls cu insert-skeleton \
+    rules rules-claude-standalone up-kit-configs ukc check-config-sync ccs check-keyword-only cko fix-keyword-only fko subject-grant sgr check-hub-layering chl check-rules check-urls cu insert-skeleton \
 	drift-plan dp drift-check dc drift-ack da \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
@@ -208,6 +212,7 @@ export HELP
 	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-specific-version docs-delete \
 	generate-mthds-schema generate-mthds-schema-quiet gms check-mthds-schema cms \
 	generate-error-pages generate-error-pages-quiet gep \
+	generate-error-identity generate-error-identity-quiet gei \
 	update-gateway-models update-gateway-models-quiet ugm check-gateway-models cgm up \
 	test-count check-test-badge \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
@@ -356,6 +361,13 @@ subject-grant: env
 sgr: subject-grant
 	@echo "> done: sgr = subject-grant"
 
+check-hub-layering: env
+	$(call PRINT_TITLE,"Enforcing the runtime_hub / interpreter_hub layering boundary")
+	$(VENV_PIPELEX_DEV) check-hub-layering --quiet
+
+chl: check-hub-layering
+	@echo "> done: chl = check-hub-layering"
+
 drift-plan: env
 	$(VENV_PIPELEX_DEV) drift plan $(CONTRACT)
 
@@ -406,6 +418,16 @@ generate-error-pages-quiet: env
 
 gep: generate-error-pages
 	@echo "> done: gep = generate-error-pages"
+
+generate-error-identity: env
+	$(call PRINT_TITLE,"Regenerating the PipelexError wire-identity snapshot")
+	$(VENV_PIPELEX_DEV) generate-error-identity
+
+generate-error-identity-quiet: env
+	$(VENV_PIPELEX_DEV) generate-error-identity --quiet
+
+gei: generate-error-identity
+	@echo "> done: gei = generate-error-identity"
 
 update-gateway-models: env
 	$(call PRINT_TITLE,"Updating gateway models reference")
@@ -517,6 +539,10 @@ codex-tests: env
 # balance the 8 CI shards. Runs the same selection as gha-tests but records how
 # long each test takes instead of sharding. Run at release time (see the release
 # skill) so the shards stay balanced; a stale file silently unbalances them.
+# tests/unit/repo/test_test_durations_paths.py gates the one kind of staleness
+# that is never benign: an entry whose test FILE no longer exists (a bulk path
+# rewrite). Drifting parametrization ids are left alone — pytest-split treats an
+# unknown id as average duration.
 store-test-durations: env
 	$(call PRINT_TITLE,"Storing test durations for pytest-split shard balancing")
 	@echo "• Regenerating test model fixtures with ci profile"
@@ -1133,10 +1159,10 @@ cc: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update
 up: generate-mthds-schema-quiet update-gateway-models-quiet up-kit-configs rules
 	@echo "> done: up = generate-mthds-schema update-gateway-models up-kit-configs rules"
 
-check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema check-keyword-only drift-check format lint pyright mypy pylint
+check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema check-keyword-only check-hub-layering drift-check format lint pyright mypy pylint
 	@echo "> done: check"
 
-agent-check: fix-unused-imports fix-keyword-only format lint pyright mypy check-keyword-only
+agent-check: fix-unused-imports fix-keyword-only format lint pyright mypy check-keyword-only check-hub-layering
 	@echo "> done: agent-check"
 
 v: validate

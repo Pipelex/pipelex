@@ -5,13 +5,13 @@ from rich.pretty import Pretty
 from rich.table import Table
 from typing_extensions import override
 
-from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.core.stuffs.html_rendering import render_value_html
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.image_renderable import ImageRenderable
 from pipelex.tools.misc.markdown_utils import convert_to_markdown
 from pipelex.tools.misc.pretty import MAX_RENDER_DEPTH, PrettyPrintable, PrettyPrinter
+from pipelex.tools.templating.text_format import TextFormat
 from pipelex.tools.typing.pydantic_utils import clean_model_to_dict
 
 

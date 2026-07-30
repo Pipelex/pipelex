@@ -22,8 +22,8 @@ from typing import NamedTuple
 from pydantic.dataclasses import dataclass
 
 from pipelex.core.pipes.inputs.input_stuff_specs import NamedStuffSpec
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.variable_multiplicity import PresenceMarker, VariableMultiplicity
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
 
 @dataclass(frozen=True)

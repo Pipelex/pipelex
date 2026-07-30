@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from tests.unit.pipelex.core.test_data.complex.multi_feature import COMPLEX_TEST_CASES
 from tests.unit.pipelex.core.test_data.concepts.refining_concepts import REFINING_CONCEPT_TEST_CASES
 from tests.unit.pipelex.core.test_data.concepts.simple_concepts import SIMPLE_CONCEPT_TEST_CASES
@@ -19,7 +19,7 @@ from tests.unit.pipelex.core.test_data.pipes.operators.llm.pipe_llm import PIPE_
 
 
 class InterpreterTestCases:
-    """Test cases for PipelexInterpreter with MTHDS content and expected blueprints."""
+    """Test cases for MthdsParser with MTHDS content and expected blueprints."""
 
     # Aggregate all valid test cases from organized modules
     VALID_TEST_CASES: ClassVar[list[tuple[str, str, PipelexBundleBlueprint]]] = [  # test_name,mthds_content,blueprint

@@ -19,7 +19,6 @@ own page. Classes are grouped by subsystem.
 - [`DryRunGraphNotProducedError`](dry-run-graph-not-produced-error.md) — Dry run graph not produced
 - [`PipeJobError`](pipe-job-error.md) — Pipe job
 - [`PipeRouterError`](pipe-router-error.md) — Pipe router
-- [`PipeRunError`](pipe-run-error.md) — Pipe run
 - [`PipeRunParamsError`](pipe-run-params-error.md) — Pipe run params
 - [`StorageDeliveryError`](storage-delivery-error.md) — Storage delivery
 - [`WebhookDeliveryError`](webhook-delivery-error.md) — Webhook delivery
@@ -28,7 +27,6 @@ own page. Classes are grouped by subsystem.
 
 - [`FixTransactionError`](fix-transaction-error.md) — Fix transaction
 - [`FixWriteConflictError`](fix-write-conflict-error.md) — Fix write conflict
-- [`JobMetadataError`](job-metadata-error.md) — Job metadata
 - [`PipeExecutionError`](pipe-execution-error.md) — Pipe execution
 - [`PipeIOContractError`](pipe-io-contract-error.md) — Pipe IO contract
 - [`PipeStackOverflowError`](pipe-stack-overflow-error.md) — Pipe stack overflow

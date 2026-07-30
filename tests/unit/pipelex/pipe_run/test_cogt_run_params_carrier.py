@@ -11,9 +11,9 @@ from pydantic import ValidationError
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 class TestCogtRunParamsCarrier:

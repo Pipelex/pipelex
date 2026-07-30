@@ -47,6 +47,10 @@ _GUARD_SCRIPT = textwrap.dedent(
     from types import SimpleNamespace
 
     import pipelex.plugins.discovery as discovery
+    # The composed built-in list, both layers' halves — the same one the boot entrypoint hands to
+    # discovery. Importing it loads the method interpreter, which is expected and is exactly why
+    # `discovery` takes the list as a parameter instead of importing it.
+    from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS, CORE_UNCONDITIONAL_PLUGIN_NAMES
 
     # Isolate to the built-ins: ignore any external entry points installed in this venv,
     # whose load() could legitimately import an optional SDK.
@@ -55,7 +59,11 @@ _GUARD_SCRIPT = textwrap.dedent(
     # Core's built-ins claim no hub slots; building the registrar must register them all
     # import-light, pulling none of the BLOCKED backend SDKs into sys.modules.
     config = SimpleNamespace(plugins=SimpleNamespace(disabled=[]))
-    registrar = discovery.build_registrar(config=config)
+    registrar = discovery.build_registrar(
+        config=config,
+        builtin_plugins=BUILTIN_PLUGINS,
+        core_unconditional_plugin_names=CORE_UNCONDITIONAL_PLUGIN_NAMES,
+    )
     assert registrar.inference_backends, "expected the built-in LLM backends to be registered"
     assert registrar.model_listers, "expected the built-in model listers to be registered import-light"
     assert registrar.orchestrators, "expected the built-in orchestrators to be registered"

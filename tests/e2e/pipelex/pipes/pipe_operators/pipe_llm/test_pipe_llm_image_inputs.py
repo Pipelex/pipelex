@@ -8,8 +8,8 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.cases import ImageTestCases
 from tests.e2e.pipelex.pipes.pipe_operators.pipe_llm.pipe_llm_image_inputs import (
     ImageDescriptionE2E,

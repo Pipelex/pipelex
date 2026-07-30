@@ -7,15 +7,15 @@ from pytest_mock import MockerFixture
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, LLMModelNotFoundError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.pipes.pipe_factory import PipeFactory
-from pipelex.hub import get_pipe_library, get_pipe_router
+from pipelex.interpreter_hub import get_pipe_library, get_pipe_router
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 @pytest.mark.asyncio(loop_scope="class")

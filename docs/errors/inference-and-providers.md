@@ -74,7 +74,7 @@ own page. Classes are grouped by subsystem.
 - [`TemplateSigilSyntaxError`](template-sigil-syntax-error.md) — Template sigil syntax
 - [`UnsafeSchemaError`](unsafe-schema-error.md) — Unsafe schema
 
-## Provider plugins
+## Provider adapters
 
 - [`AnthropicFactoryError`](anthropic-factory-error.md) — Anthropic factory
 - [`AnthropicModelListingError`](anthropic-model-listing-error.md) — Anthropic model listing
@@ -83,6 +83,27 @@ own page. Classes are grouped by subsystem.
 - [`AzureCredentialsError`](azure-credentials-error.md) — Azure credentials
 - [`BedrockFactoryError`](bedrock-factory-error.md) — Bedrock factory
 - [`BedrockWorkerConfigurationError`](bedrock-worker-configuration-error.md) — Bedrock worker configuration
+- [`GatewayCredentialsError`](gateway-credentials-error.md) — Gateway credentials
+- [`GatewayDeckError`](gateway-deck-error.md) — Gateway deck
+- [`GatewayError`](gateway-error.md) — Gateway
+- [`GatewayExtractResponseError`](gateway-extract-response-error.md) — Gateway extract response
+- [`GatewayFactoryError`](gateway-factory-error.md) — Gateway factory
+- [`GatewaySearchResponseError`](gateway-search-response-error.md) — Gateway search response
+- [`GoogleImgGenWorkerError`](google-img-gen-worker-error.md) — Google img gen worker
+- [`GoogleLLMWorkerError`](google-llm-worker-error.md) — Google LLM worker
+- [`MistralExtractResponseError`](mistral-extract-response-error.md) — Mistral extract response
+- [`MistralModelListingError`](mistral-model-listing-error.md) — Mistral model listing
+- [`MistralPluginError`](mistral-plugin-error.md) — Mistral plugin
+- [`MistralWorkerConfigurationError`](mistral-worker-configuration-error.md) — Mistral worker configuration
+- [`OpenAIClientFactoryError`](open-ai-client-factory-error.md) — OpenAI client factory error
+- [`PortkeyCredentialsError`](portkey-credentials-error.md) — Portkey credentials
+- [`PortkeyError`](portkey-error.md) — Portkey
+- [`PortkeyFactoryError`](portkey-factory-error.md) — Portkey factory
+- [`VertexAIConfigError`](vertex-ai-config-error.md) — VertexAI configuration error
+- [`VertexAICredentialsError`](vertex-ai-credentials-error.md) — VertexAI credentials error
+
+## Plugin system
+
 - [`BrokenPluginError`](broken-plugin-error.md) — Broken plugin
 - [`CoreUnconditionalPluginDisabledError`](core-unconditional-plugin-disabled-error.md) — Core unconditional plugin disabled
 - [`DuplicateBundleValidatorError`](duplicate-bundle-validator-error.md) — Duplicate bundle validator
@@ -93,31 +114,13 @@ own page. Classes are grouped by subsystem.
 - [`DuplicatePipeFuncExecutorError`](duplicate-pipe-func-executor-error.md) — Duplicate pipe func executor
 - [`DuplicateSecretsProviderError`](duplicate-secrets-provider-error.md) — Duplicate secrets provider
 - [`DuplicateStorageProviderError`](duplicate-storage-provider-error.md) — Duplicate storage provider
-- [`GatewayCredentialsError`](gateway-credentials-error.md) — Gateway credentials
-- [`GatewayDeckError`](gateway-deck-error.md) — Gateway deck
-- [`GatewayError`](gateway-error.md) — Gateway
-- [`GatewayExtractResponseError`](gateway-extract-response-error.md) — Gateway extract response
-- [`GatewayFactoryError`](gateway-factory-error.md) — Gateway factory
-- [`GatewaySearchResponseError`](gateway-search-response-error.md) — Gateway search response
-- [`GoogleImgGenWorkerError`](google-img-gen-worker-error.md) — Google img gen worker
-- [`GoogleLLMWorkerError`](google-llm-worker-error.md) — Google LLM worker
 - [`HubSlotAlreadyClaimedError`](hub-slot-already-claimed-error.md) — Hub slot already claimed
 - [`InferenceBackendNotFoundError`](inference-backend-not-found-error.md) — Inference backend not found
-- [`MistralExtractResponseError`](mistral-extract-response-error.md) — Mistral extract response
-- [`MistralModelListingError`](mistral-model-listing-error.md) — Mistral model listing
-- [`MistralPluginError`](mistral-plugin-error.md) — Mistral plugin
-- [`MistralWorkerConfigurationError`](mistral-worker-configuration-error.md) — Mistral worker configuration
-- [`OpenAIClientFactoryError`](open-ai-client-factory-error.md) — OpenAI client factory error
 - [`PluginApiVersionMismatchError`](plugin-api-version-mismatch-error.md) — Plugin api version mismatch
 - [`PluginError`](plugin-error.md) — Plugin error
-- [`PortkeyCredentialsError`](portkey-credentials-error.md) — Portkey credentials
-- [`PortkeyError`](portkey-error.md) — Portkey
-- [`PortkeyFactoryError`](portkey-factory-error.md) — Portkey factory
 - [`UnknownBootOrchestratorError`](unknown-boot-orchestrator-error.md) — Unknown boot orchestrator
 - [`UnknownPipeFuncExecutionModeError`](unknown-pipe-func-execution-mode-error.md) — Unknown pipe func execution mode
 - [`UnknownSecretsMethodError`](unknown-secrets-method-error.md) — Unknown secrets method
 - [`UnknownStorageMethodError`](unknown-storage-method-error.md) — Unknown storage method
-- [`VertexAIConfigError`](vertex-ai-config-error.md) — VertexAI configuration error
-- [`VertexAICredentialsError`](vertex-ai-credentials-error.md) — VertexAI credentials error
 
 [Back to Error Reference](index.md)

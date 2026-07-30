@@ -10,8 +10,8 @@ Pure parsing test (no Pipelex boot, no library): blueprints come straight from t
 
 import pytest
 
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.mthds_parsing.parser import MthdsParser
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.exceptions import ValidateBundleError
 
@@ -51,7 +51,7 @@ prompt = "Do something else with $doc"
 
 
 def _blueprint(mthds_content: str) -> PipelexBundleBlueprint:
-    return PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
+    return MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
 
 
 class TestSelectPrimaryBlueprint:

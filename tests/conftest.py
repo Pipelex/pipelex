@@ -7,9 +7,9 @@ import shortuuid
 from pytest_mock import MockerFixture
 
 from pipelex import log
-from pipelex.hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
+from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipelex_service.pipelex_service_config import (
     PipelexServiceConfig,
 )
@@ -94,7 +94,7 @@ def cache_configs_for_session(session_mocker: MockerFixture):
     session_mocker.patch.object(RemoteConfigFetcher, "fetch_remote_config", _cached_fetch_remote_config)
     # Cache pipelex service config to avoid flaky tests from concurrent file reads
     session_mocker.patch(
-        "pipelex.pipelex.load_pipelex_service_config_if_exists",
+        "pipelex.runtime_boot.load_pipelex_service_config_if_exists",
         _cached_load_pipelex_service_config,
     )
     # Skip expensive telemetry shutdown (OTel + PostHog flush) during tests

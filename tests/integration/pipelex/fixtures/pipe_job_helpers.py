@@ -2,18 +2,17 @@ import uuid
 from collections.abc import Callable, Generator
 from pathlib import Path
 
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.hub import clear_current_library, get_library_manager, get_required_pipe, set_current_library
+from pipelex.interpreter_hub import clear_current_library, get_library_manager, get_required_pipe, set_current_library
 from pipelex.libraries.library_crate import LibraryCrate
+from pipelex.mthds_parsing.parser import MthdsParser
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.pipeline.pipeline_models import SpecialPipelineId
+from pipelex.system.job_metadata import JobMetadata, SpecialPipelineId
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.telemetry.otel_constants import OTelConstants
 
 PIPE_JOB_HELPERS_PIPELINE_RUN_ID_PREFIX = "pipe_job_helpers_test"
@@ -103,7 +102,7 @@ def pipe_job_from_bundle(
 
     def _load(library_id: str) -> None:
         mthds_content = Path(bundle_file).read_text(encoding="utf-8")
-        blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
+        blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
         get_library_manager().load_from_blueprints(library_id=library_id, blueprints=[blueprint])
 
     yield from pipe_job_from_library(_load, pipe_code=pipe_code, pipe_run_mode=pipe_run_mode, isolated_registry=isolated_registry)

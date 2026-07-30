@@ -5,7 +5,6 @@ from typing import Any
 
 from typing_extensions import override
 
-from pipelex.graph.graph_config import DataInclusionConfig
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
 from pipelex.graph.graphspec import (
     EdgeKind,
@@ -23,7 +22,8 @@ from pipelex.graph.graphspec import (
     make_graphspec_meta,
     output_digest_is_optional,
 )
-from pipelex.graph.trace_context import TraceContext
+from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.trace_context import TraceContext
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in __init__ annotations
 from pipelex.tracing.trace_events import (
     BatchAggregateEvent,

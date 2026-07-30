@@ -9,8 +9,8 @@ from pathlib import Path
 from rich.markup import escape
 from rich.panel import Panel
 
-from pipelex.hub import get_console
 from pipelex.kit.paths import CONFIG_SYNC_EXCLUDED_FILES, GIT_IGNORED_CONFIG_DIRS
+from pipelex.runtime_hub import get_console
 from pipelex.tools.misc.diff import has_diff_dirs, make_diff_dirs_pretty
 
 

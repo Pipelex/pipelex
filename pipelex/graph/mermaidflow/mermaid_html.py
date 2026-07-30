@@ -8,10 +8,10 @@ from typing import Any
 
 from kajson import dumps
 
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.graph.csp import CSP_NONCE_SENTINEL
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_jinja2_sync
 from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
+from pipelex.tools.jinja2.template_category import TemplateCategory
 
 # Template registry keys
 _BASIC_TEMPLATE_KEY = "mermaid/basic.html.jinja2"

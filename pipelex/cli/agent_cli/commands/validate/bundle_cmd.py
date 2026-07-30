@@ -19,12 +19,13 @@ from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_bundle_core,
     validate_pipe_in_bundle_core,
 )
-from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
-from pipelex.graph.graph_rendering import GraphFormat, generate_graph_for_bundle, generate_view_for_bundle
+from pipelex.graph.graph_rendering import GraphFormat
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
+from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
+from pipelex.pipeline.bundle_graph_rendering import generate_graph_for_bundle, generate_view_for_bundle
 from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
 from pipelex.pipeline.validation_render import format_validate_markdown
 from pipelex.tools.misc.chart_utils import FlowchartDirection
@@ -133,7 +134,7 @@ def validate_bundle_cmd(
                     graph_extra["cause_type"] = type(exc.__cause__).__name__
                     graph_extra["cause_message"] = str(exc.__cause__)
                 agent_error(f"Graph generation failed: {exc.message}", error_type="PipelineExecutionError", cause=exc, exit_code=2, **graph_extra)
-            except PipelexInterpreterError as exc:
+            except MthdsParserError as exc:
                 agent_error(f"Graph generation failed: {exc}", error_type=type(exc).__name__, cause=exc, exit_code=2)
             except typer.Exit:
                 raise
@@ -162,7 +163,7 @@ def validate_bundle_cmd(
                     view_extra["cause_type"] = type(exc.__cause__).__name__
                     view_extra["cause_message"] = str(exc.__cause__)
                 agent_error(f"View generation failed: {exc.message}", error_type="PipelineExecutionError", cause=exc, exit_code=2, **view_extra)
-            except PipelexInterpreterError as exc:
+            except MthdsParserError as exc:
                 agent_error(f"View generation failed: {exc}", error_type=type(exc).__name__, cause=exc, exit_code=2)
             except typer.Exit:
                 raise

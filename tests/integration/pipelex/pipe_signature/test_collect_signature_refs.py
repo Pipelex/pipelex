@@ -1,7 +1,6 @@
 from typing import Callable
 
-from pipelex.core.pipes.pipe_factory import PipeFactory
-from pipelex.hub import get_pipe_library
+from pipelex.interpreter_hub import get_pipe_library
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
@@ -11,6 +10,7 @@ from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParall
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_signature.pipe_signature import PipeSignature

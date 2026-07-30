@@ -13,6 +13,7 @@ from pipelex.core.concepts.concept_representation_generator import ConceptRepres
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+from pipelex.libraries.concept.concept_library import ConceptLibrary
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture, MockType
@@ -24,7 +25,9 @@ class TestConceptGenerateInputRepresentationJson:
     def test_native_text_json(self) -> None:
         """Test JSON representation for native Text concept."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.TEXT)
-        result, _ = concept.render_concept_representation(output_format=ConceptRepresentationFormat.JSON)
+        result, _ = concept.render_concept_representation(
+            structure_class=ConceptLibrary.make_empty().get_structure_class(concept=concept), output_format=ConceptRepresentationFormat.JSON
+        )
         assert result["concept"] == "native.Text"
         assert "content" in result
         assert "text" in result["content"]
@@ -32,7 +35,9 @@ class TestConceptGenerateInputRepresentationJson:
     def test_native_image_json(self) -> None:
         """Test JSON representation for native Image concept."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.IMAGE)
-        result, _ = concept.render_concept_representation(output_format=ConceptRepresentationFormat.JSON)
+        result, _ = concept.render_concept_representation(
+            structure_class=ConceptLibrary.make_empty().get_structure_class(concept=concept), output_format=ConceptRepresentationFormat.JSON
+        )
         assert result["concept"] == "native.Image"
         assert "content" in result
         assert "url" in result["content"]
@@ -40,7 +45,9 @@ class TestConceptGenerateInputRepresentationJson:
     def test_native_number_json(self) -> None:
         """Test JSON representation for native Number concept."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.NUMBER)
-        result, _ = concept.render_concept_representation(output_format=ConceptRepresentationFormat.JSON)
+        result, _ = concept.render_concept_representation(
+            structure_class=ConceptLibrary.make_empty().get_structure_class(concept=concept), output_format=ConceptRepresentationFormat.JSON
+        )
         assert result["concept"] == "native.Number"
         assert "content" in result
         assert "number" in result["content"]
@@ -48,7 +55,11 @@ class TestConceptGenerateInputRepresentationJson:
     def test_native_document_json_with_multiplicity(self) -> None:
         """Test JSON representation for Document with multiplicity - content should be a list."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.DOCUMENT)
-        result, _ = concept.render_concept_representation(output_format=ConceptRepresentationFormat.JSON, is_multiple=True)
+        result, _ = concept.render_concept_representation(
+            structure_class=ConceptLibrary.make_empty().get_structure_class(concept=concept),
+            output_format=ConceptRepresentationFormat.JSON,
+            is_multiple=True,
+        )
         assert result["concept"] == "native.Document"
         assert "content" in result
         # Content should be a list
@@ -64,7 +75,9 @@ class TestConceptGenerateInputRepresentationPython:
     def test_native_text_python(self) -> None:
         """Test Python representation for native Text concept."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.TEXT)
-        result, imports = concept.render_concept_representation(output_format=ConceptRepresentationFormat.PYTHON)
+        result, imports = concept.render_concept_representation(
+            structure_class=ConceptLibrary.make_empty().get_structure_class(concept=concept), output_format=ConceptRepresentationFormat.PYTHON
+        )
         assert result["concept"] == "native.Text"
         assert "TextContent" in result["content"]
         assert "TextContent" in imports
@@ -72,7 +85,9 @@ class TestConceptGenerateInputRepresentationPython:
     def test_native_image_python(self) -> None:
         """Test Python representation for native Image concept."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.IMAGE)
-        result, imports = concept.render_concept_representation(output_format=ConceptRepresentationFormat.PYTHON)
+        result, imports = concept.render_concept_representation(
+            structure_class=ConceptLibrary.make_empty().get_structure_class(concept=concept), output_format=ConceptRepresentationFormat.PYTHON
+        )
         assert result["concept"] == "native.Image"
         assert "ImageContent" in result["content"]
         assert "ImageContent" in imports
@@ -86,7 +101,9 @@ class TestConceptGenerateInputRepresentationPython:
             structure_class_name="TextContent",
             refines="native.Text",
         )
-        result, imports = concept.render_concept_representation(output_format=ConceptRepresentationFormat.PYTHON)
+        result, imports = concept.render_concept_representation(
+            structure_class=ConceptLibrary.make_empty().get_structure_class(concept=concept), output_format=ConceptRepresentationFormat.PYTHON
+        )
         assert result["concept"] == "test_domain.Question"
         assert "TextContent" in result["content"]
         assert "TextContent" in imports
@@ -94,7 +111,11 @@ class TestConceptGenerateInputRepresentationPython:
     def test_native_document_python_with_multiplicity(self) -> None:
         """Test Python representation for Document with multiplicity - for Python format, wrapping is handled by caller."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.DOCUMENT)
-        result, imports = concept.render_concept_representation(output_format=ConceptRepresentationFormat.PYTHON, is_multiple=True)
+        result, imports = concept.render_concept_representation(
+            structure_class=ConceptLibrary.make_empty().get_structure_class(concept=concept),
+            output_format=ConceptRepresentationFormat.PYTHON,
+            is_multiple=True,
+        )
         # For Python format, is_multiple doesn't wrap content (caller handles it)
         assert result["concept"] == "native.Document"
         assert "DocumentContent" in result["content"]
@@ -107,14 +128,14 @@ class TestInputStuffSpecsRenderInputsRepresentation:
     def test_empty_inputs(self) -> None:
         """Test JSON generation with no inputs."""
         inputs = InputStuffSpecs(root={})
-        result = json.loads(inputs.render_inputs())
+        result = json.loads(inputs.render_inputs(concept_provider=ConceptLibrary.make_empty()))
         assert result == {}
 
     def test_single_input(self) -> None:
         """Test JSON generation with a single input."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.TEXT)
         inputs = InputStuffSpecs(root={"message": StuffSpec(concept=concept)})
-        result = json.loads(inputs.render_inputs())
+        result = json.loads(inputs.render_inputs(concept_provider=ConceptLibrary.make_empty()))
         assert "message" in result
         assert result["message"]["concept"] == "native.Text"
 
@@ -128,7 +149,7 @@ class TestInputStuffSpecsRenderInputsRepresentation:
                 "image_input": StuffSpec(concept=image_concept),
             }
         )
-        result = json.loads(inputs.render_inputs())
+        result = json.loads(inputs.render_inputs(concept_provider=ConceptLibrary.make_empty()))
         assert "text_input" in result
         assert "image_input" in result
         assert result["text_input"]["concept"] == "native.Text"
@@ -142,7 +163,7 @@ class TestInputStuffSpecsRenderWithMultiplicity:
         """Test that single item (no multiplicity) has content as dict, not list."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.DOCUMENT)
         inputs = InputStuffSpecs(root={"document": StuffSpec(concept=concept, multiplicity=None)})
-        result = json.loads(inputs.render_inputs())
+        result = json.loads(inputs.render_inputs(concept_provider=ConceptLibrary.make_empty()))
         assert "document" in result
         # concept should be present
         assert result["document"]["concept"] == "native.Document"
@@ -155,7 +176,7 @@ class TestInputStuffSpecsRenderWithMultiplicity:
         """Test that multiplicity=True wraps content in list."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.DOCUMENT)
         inputs = InputStuffSpecs(root={"documents": StuffSpec(concept=concept, multiplicity=True)})
-        result = json.loads(inputs.render_inputs())
+        result = json.loads(inputs.render_inputs(concept_provider=ConceptLibrary.make_empty()))
         assert "documents" in result
         # concept should be at the top level
         assert result["documents"]["concept"] == "native.Document"
@@ -169,7 +190,7 @@ class TestInputStuffSpecsRenderWithMultiplicity:
         """Test that multiplicity=N (int > 1) wraps content in list."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.IMAGE)
         inputs = InputStuffSpecs(root={"images": StuffSpec(concept=concept, multiplicity=3)})
-        result = json.loads(inputs.render_inputs())
+        result = json.loads(inputs.render_inputs(concept_provider=ConceptLibrary.make_empty()))
         assert "images" in result
         # concept should be at the top level
         assert result["images"]["concept"] == "native.Image"
@@ -188,7 +209,7 @@ class TestInputStuffSpecsRenderWithMultiplicity:
                 "multiple_documents": StuffSpec(concept=document_concept, multiplicity=True),
             }
         )
-        result = json.loads(inputs.render_inputs())
+        result = json.loads(inputs.render_inputs(concept_provider=ConceptLibrary.make_empty()))
         # single_document content should be a dict
         assert isinstance(result["single_document"]["content"], dict)
         # multiple_documents content should be a list
@@ -197,6 +218,16 @@ class TestInputStuffSpecsRenderWithMultiplicity:
 
 class TestGenerateRunnerCode:
     """Test generate_runner_code function."""
+
+    @pytest.fixture(autouse=True)
+    def stub_concept_library(self, mocker: MockerFixture) -> None:
+        """The generator resolves structure classes through the loaded method's library.
+
+        These tests drive it with mock pipes rather than a loaded method, so an empty
+        `ConceptLibrary` stands in: it holds no concepts but resolves any class the process
+        registry already has, which is all the code generation needs.
+        """
+        mocker.patch("pipelex.builder.runner_code.get_concept_library", return_value=ConceptLibrary.make_empty())
 
     @pytest.fixture
     def mock_pipe_single_output(self, mocker: MockerFixture) -> MockType:

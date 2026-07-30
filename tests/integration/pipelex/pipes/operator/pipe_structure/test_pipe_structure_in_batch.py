@@ -6,20 +6,20 @@ import pytest
 from pipelex import pretty_print
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_native_concept, get_pipe_library, get_pipe_router
+from pipelex.interpreter_hub import get_native_concept, get_pipe_library, get_pipe_router
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.structure.pipe_structure import PipeStructure
 from pipelex.pipe_operators.structure.pipe_structure_blueprint import PipeStructureBlueprint
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.integration.pipelex.pipes.operator.pipe_structure.test_structures_basic import RestaurantReview
 
 

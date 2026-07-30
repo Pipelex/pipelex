@@ -9,7 +9,6 @@ from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_rendering import render_template
-from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.pipe_operators.llm.document_reference import DocumentReference, DocumentReferenceKind
@@ -21,13 +20,13 @@ from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
 from pipelex.tools.misc.dict_utils import substitute_nested_in_context
 from pipelex.tools.misc.exceptions import ContextProviderError
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
+from pipelex.tools.templating.templating_style import TemplatingStyle
 
 if TYPE_CHECKING:
     from pipelex.cogt.image.prompt_image import PromptImage
 
 
 class LLMPromptBlueprint(BaseModel):
-    templating_style: TemplatingStyle | None = None
     system_prompt_blueprint: TemplateBlueprint | None = None
     prompt_blueprint: TemplateBlueprint | None = None
     user_image_references: list[ImageReference] | None = None
@@ -65,6 +64,7 @@ class LLMPromptBlueprint(BaseModel):
         context_provider: ContextProviderAbstract,
         output_structure_prompt: str | None = None,
         extra_params: dict[str, Any] | None = None,
+        templating_style: TemplatingStyle | None = None,
     ) -> LLMPrompt:
         ############################################################
         # Image Registry and Direct Image Extraction
@@ -232,6 +232,7 @@ class LLMPromptBlueprint(BaseModel):
                 jinja2_blueprint=self.system_prompt_blueprint,
                 extra_params=extra_params,
                 image_registry=image_registry,
+                templating_style=templating_style,
             )
 
         ############################################################
@@ -244,6 +245,7 @@ class LLMPromptBlueprint(BaseModel):
                 jinja2_blueprint=self.prompt_blueprint,
                 extra_params=extra_params,
                 image_registry=image_registry,
+                templating_style=templating_style,
             )
             if output_structure_prompt:
                 user_text += output_structure_prompt
@@ -354,10 +356,12 @@ class LLMPromptBlueprint(BaseModel):
         jinja2_blueprint: TemplateBlueprint,
         extra_params: dict[str, Any] | None = None,
         image_registry: ImageRegistry | None = None,
+        templating_style: TemplatingStyle | None = None,
     ) -> str:
-        if (templating_style := self.templating_style) and not jinja2_blueprint.templating_style:
-            jinja2_blueprint.templating_style = templating_style
-            log.verbose(f"Setting prompting style to {templating_style}")
+        # A style declared on the blueprint wins over the run-derived one. Kept as a local: writing
+        # it onto `jinja2_blueprint` would mutate an object the pipe library holds and hands out.
+        effective_style = jinja2_blueprint.templating_style or templating_style
+        log.verbose(f"Rendering with prompting style {effective_style}")
 
         context: dict[str, Any] = context_provider.generate_context()
         if extra_params:
@@ -375,7 +379,7 @@ class LLMPromptBlueprint(BaseModel):
             template=jinja2_blueprint.template,
             category=jinja2_blueprint.category,
             context=context,
-            templating_style=self.templating_style,
+            templating_style=effective_style,
             finalize=finalize,
         )
 

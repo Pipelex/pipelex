@@ -5,11 +5,11 @@ from typing_extensions import override
 
 from pipelex.cogt.exceptions import ModelNotFoundError, ModelWaterfallError
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 
 if TYPE_CHECKING:
     from pipelex.core.stuffs.list_content import ListContent

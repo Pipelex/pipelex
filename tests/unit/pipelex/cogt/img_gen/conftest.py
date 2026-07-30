@@ -15,7 +15,7 @@ from pipelex.cogt.img_gen.img_gen_job_components import (
     Quality,
 )
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.misc.image_utils import ImageFormat
 
 if TYPE_CHECKING:

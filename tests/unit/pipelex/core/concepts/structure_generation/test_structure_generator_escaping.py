@@ -48,7 +48,7 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class Animal(StructuredContent):
@@ -93,7 +93,7 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class TestClass(StructuredContent):
@@ -138,7 +138,7 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class Message(StructuredContent):
@@ -183,7 +183,7 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class FilePath(StructuredContent):
@@ -228,7 +228,7 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class MultiLine(StructuredContent):
@@ -273,7 +273,7 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class Columns(StructuredContent):
@@ -319,7 +319,7 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class ComplexType(StructuredContent):
@@ -365,13 +365,13 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class WithDefault(StructuredContent):
     """Generated WithDefault class"""
 
-    field_with_default: Optional[str] = Field(default="Example: \\"quoted text\\"", description="A field with quoted default")
+    field_with_default: str | None = Field(default="Example: \\"quoted text\\"", description="A field with quoted default")
 '''
 
         assert generated_code == expected_code
@@ -413,13 +413,13 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class DefaultPath(StructuredContent):
     """Generated DefaultPath class"""
 
-    path: Optional[str] = Field(default="C:\\\\Program Files\\\\App", description="Default path")
+    path: str | None = Field(default="C:\\\\Program Files\\\\App", description="Default path")
 '''
 
         assert generated_code == expected_code
@@ -458,7 +458,7 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class EmptyDesc(StructuredContent):
@@ -509,7 +509,7 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class LongDesc(StructuredContent):
@@ -558,7 +558,7 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class UnicodeTest(StructuredContent):
@@ -603,7 +603,7 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class CRLF(StructuredContent):
@@ -662,16 +662,16 @@ To regenerate: pipelex build structures <target_directory>
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 
 
 class AnimalRecord(StructuredContent):
     """Generated AnimalRecord class"""
 
     animal_type: str = Field(..., description="The species or type of animal (e.g., \\"fox\\", \\"penguin\\", \\"octopus\\")")
-    owner_name: Optional[str] = Field(default=None, description="The owner\'s full name")
-    file_path: Optional[str] = Field(default="C:\\\\default\\\\path", description="Location on disk (e.g., C:\\\\Animals\\\\data.txt)")
-    notes: Optional[str] = Field(default=None, description="Notes with \\"quotes\\" and\\nnewlines")
+    owner_name: str | None = Field(default=None, description="The owner\'s full name")
+    file_path: str | None = Field(default="C:\\\\default\\\\path", description="Location on disk (e.g., C:\\\\Animals\\\\data.txt)")
+    notes: str | None = Field(default=None, description="Notes with \\"quotes\\" and\\nnewlines")
 '''
 
         assert generated_code == expected_code

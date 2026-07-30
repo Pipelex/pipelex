@@ -4,8 +4,8 @@ import pytest
 
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.urls import URLs
 from tests.cases.documents import DocumentTestCases
 from tests.cases.images import ImageTestCases

@@ -77,18 +77,43 @@ The COGT layer abstracts AI provider details from business logic:
 
 ### Plugin System
 
-Located in [`pipelex/plugins/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/plugins)
+Two packages, one for the mechanism and one for the built-in adapters:
 
-Provider-specific integrations handle API specifics:
+- [`pipelex/plugins/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/plugins) — the plugin **mechanism**: the `PipelexPlugin` contract, the registrar every plugin registers into, and the capability registries. This is what an out-of-tree plugin imports, and what the `pipelex.plugins` entry point resolves against.
+- [`pipelex/providers/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/providers) — the built-in **provider adapters**, one directory per vendor, each handling that vendor's API specifics:
 
-- OpenAI
-- Anthropic
-- Google (Gemini)
-- Mistral
-- AWS Bedrock
-- And more...
+    - OpenAI
+    - Anthropic
+    - Google (Gemini)
+    - Mistral
+    - AWS Bedrock
+    - And more...
 
-Each plugin translates Pipelex's unified interface into provider-specific API calls.
+The dependency runs one way: adapters depend on the mechanism, never the reverse. Each adapter translates Pipelex's unified interface into provider-specific API calls.
+
+---
+
+## What Keeps The Layers Apart: The Two Hubs
+
+The two layers above would be a diagram rather than an architecture if nothing enforced the split. What enforces it is the **hub** — the mechanism every component uses to reach a shared dependency (the config, a model deck, the pipe library) without importing the module that owns it.
+
+There are two hubs, and the boundary between them *is* the boundary between the layers:
+
+- [**`pipelex/runtime_hub.py`**](https://github.com/Pipelex/pipelex/tree/main/pipelex/runtime_hub.py) — process-scoped infrastructure. Config, console, secrets, storage, telemetry, the model deck, the inference workers, the content generator, the plugin registries. Configured once at boot; identical for every method the process runs.
+- [**`pipelex/interpreter_hub.py`**](https://github.com/Pipelex/pipelex/tree/main/pipelex/interpreter_hub.py) — library-scoped method machinery. The library manager and the concept/domain/pipe libraries, the current-library binding, the pipe router, the pipeline manager, the PipeFunc executor. Tied to the method that is loaded.
+
+One rule governs them:
+
+!!! note "The one arrow"
+    `interpreter_hub` imports `runtime_hub`. **`runtime_hub` never imports `interpreter_hub`.**
+
+The practical consequence is that the runtime layer cannot reach the interpreter layer. Importing the inference stack loads no `libraries`, `pipe_operators`, `pipe_controllers`, or `codegen` module at all — so anything that just wants a secret, the console, or the model deck (a health check, `pipelex --version`, a plugin's registration module) does not pay for the method interpreter, and a change to a pipe blueprint structurally cannot perturb the import graph of `cogt`.
+
+That is not a convention held up by review: `make check-hub-layering` fails the build if a runtime-layer module imports — or merely names in a string — the interpreter hub, and an import-closure test pins the property itself in a subprocess.
+
+`pipelex/core/` sits on both sides of the line, deliberately. Its data model — concepts, domains, stuffs, working memory, the input/output specs — belongs to the runtime layer: it describes what a method's values *are*, needs no loaded method, and takes the concept or pipe it needs as an injected argument. Everything in `core/` that names a **`Pipe`** belongs to the interpreter layer, because a pipe is the interpreter's own object.
+
+Contributors: the full specification — what lives on each hub, how to place a new symbol, and how the boundary is enforced — is in [Hub Layering](../contribute/hub-layering.md).
 
 ---
 

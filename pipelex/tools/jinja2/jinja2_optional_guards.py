@@ -25,9 +25,9 @@ from jinja2 import nodes
 from jinja2.exceptions import TemplateSyntaxError
 from pydantic.dataclasses import dataclass
 
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
+from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 # Test names that safely probe presence on an undefined variable.

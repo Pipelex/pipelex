@@ -17,7 +17,7 @@ from pathlib import Path
 import typer
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
 
-from pipelex.hub import get_library_manager
+from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.libraries.library_crate import LibraryCrate

@@ -84,6 +84,12 @@
      .venv/bin/pipelex-dev generate-error-pages
      ```
 
+   - **`generate-error-identity`**: Regenerate the committed `(error_type, title, type_uri)` snapshot of every `PipelexError` subclass at `tests/data/errors/error_identity.txt`. `error_type` is the bare class name and consumers outside this repo branch on it, so a rename is a silent wire break — the snapshot turns it into a reviewable diff, gated by `tests/unit/pipelex/errors/test_error_identity_snapshot.py`. Run after adding, renaming or removing an error class. Also available as `make generate-error-identity` (alias `make gei`).
+
+     ```bash
+     .venv/bin/pipelex-dev generate-error-identity
+     ```
+
 ## Pipelex CLI Commands
 
    To run the Pipelex CLI commands without the logo, you can use the `--no-logo` flag, this will avoid useless tokens in the console output.

@@ -1,8 +1,8 @@
 contract = "keyword-only-convention"
-digest = "sha256:2d2a8228601e1fa98d483b5c1d162ddcb8037ac02391d1c0409f8bd48d203571"
+digest = "sha256:85a8ab8c560f91b16ecf54ff13835d3cc4a36e0d6a0ef17783fe5417ebbb2134"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-07-11T15:45:25Z"
-rationale = "Phase 5 closed the transitional door: --seed and the seeded field are deleted, the registry schema is strict (param + rationale only). Rewrote the doc's transitional-state section as the post-transitional Registry schema section and fixed the --report description."
+reviewed_at = "2026-07-28T16:26:27Z"
+rationale = "FU-3 adds an unsorted-grant violation kind: subject_grants.toml's sorted-by-key order is now enforced rather than only asserted in the doc's prose (line 37), which is the invariant the modularity track broke three times unnoticed. Reviewed docs/contribute/keyword-only-arguments.md in full and updated five places — the violation-kinds table under Enforcement, the registry-order paragraph under 'Staleness is symmetric' (order is read from the raw text, since TOML declares table order insignificant, and the text scan is cross-checked against the parsed keys so an unreadable entry shape fails loudly instead of narrowing the scan), the PostToolUse hook bullet (registry order is a whole-file property the per-file path cannot see, same as dead grants), the auto-fix paragraph (which listed only grant-param-mismatch as never-rewritten and silently omitted dead-grant — pre-existing gap, closed here), and a pointer line after the top-of-page rule list, because that list is scoped to signatures and registry order is not a signature property. No new Make target: the check rides check-keyword-only into agent-check and CI. Negative-tested both failure modes against the real registry (a swapped adjacent entry, and a multi-line rationale carrying a phantom table header)."
 
 [trigger_files]
-"pipelex/cli/dev_cli/commands/keyword_only_guard.py" = "blob:c998cfc324c7f1096e974133b75db59c6190c117"
+"pipelex/cli/dev_cli/commands/keyword_only_guard.py" = "blob:e0be8c72d545db425efab586f7be5cc7e98f1e13"

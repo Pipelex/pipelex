@@ -5,12 +5,12 @@ from pathlib import Path
 import pytest
 
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
 from pipelex.pipeline.bundle_validator import DryRunStatus
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 _FIXTURE_DIR = Path(__file__).parent / "fixtures" / "signature_bundles"
 _SIGNATURE_ONLY = _FIXTURE_DIR / "signature_only.mthds"

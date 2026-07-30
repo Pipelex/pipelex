@@ -5,8 +5,9 @@ import pytest
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.stuffs.image_field_search import search_for_nested_image_fields
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.hub import get_concept_library, get_native_concept, get_required_concept
+from pipelex.interpreter_hub import get_concept_library, get_native_concept, get_required_concept
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from tests.unit.pipelex.core.concepts import data
 from tests.unit.pipelex.core.concepts.data import TestData
@@ -81,7 +82,7 @@ def register_test_concepts(load_test_library: Callable[[list[Path]], None]):
 
 
 class TestConceptFindImageFieldPaths:
-    """Test Concept.search_for_nested_image_fields_in_structure_class() method."""
+    """Resolve a concept's structure class through the library, then search it for image fields."""
 
     @pytest.mark.parametrize(
         ("concept_code", "expected_paths"),
@@ -112,7 +113,7 @@ class TestConceptFindImageFieldPaths:
         concept = get_required_concept(f"{TestData.DOMAIN}.{concept_code}")
 
         # Find image paths
-        image_paths = concept.search_for_nested_image_fields_in_structure_class()
+        image_paths = search_for_nested_image_fields(content_class=get_concept_library().get_structure_class(concept=concept))
 
         # Assert exact match of paths (order-independent)
         assert sorted(image_paths) == sorted(expected_paths), f"Expected paths {sorted(expected_paths)}, but got {sorted(image_paths)}"
@@ -127,7 +128,7 @@ class TestConceptFindImageFieldPaths:
         concept = get_native_concept(NativeConceptCode.IMAGE)
 
         # Find image paths
-        image_paths = concept.search_for_nested_image_fields_in_structure_class()
+        image_paths = search_for_nested_image_fields(content_class=get_concept_library().get_structure_class(concept=concept))
 
         # Assert - should return empty because the concept itself is an image
         assert image_paths == []
@@ -141,7 +142,7 @@ class TestConceptFindImageFieldPaths:
         concept = get_native_concept(NativeConceptCode.TEXT_AND_IMAGES)
 
         # Find image paths
-        image_paths = concept.search_for_nested_image_fields_in_structure_class()
+        image_paths = search_for_nested_image_fields(content_class=get_concept_library().get_structure_class(concept=concept))
 
         # Assert - should find the images field which is list[ImageContent] | None
         assert image_paths == ["images"]

@@ -2,31 +2,23 @@ import ast
 import textwrap
 from datetime import date, datetime, time
 from enum import Enum
-from typing import Any, List, Literal, Optional, cast
+from typing import Any, Literal, cast
 
-from kajson.class_registry_abstract import ClassRegistryAbstract
 from pydantic import Field
 
-from pipelex.codegen.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind, resolve_structure_fields
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
 from pipelex.core.concepts.helpers import extract_concept_code_from_concept_ref_or_code, make_qualified_structure_class_name
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.concepts.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind, resolve_structure_fields
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError, ConceptStructureValidationError, SyntaxErrorData
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.system.registries.class_registry_access import get_class_registry
 
 # Target line length for emitted code (matches the project's ruff config).
 # Each emitted line stays under this so ruff E501 doesn't trigger on long descriptions.
 _MAX_LINE_LENGTH = 150
 _WRAP_WIDTH = 120  # conservative: leaves headroom for indentation and syntax overhead
-
-
-def _get_class_registry() -> ClassRegistryAbstract:
-    """Lazy import to break circular dependency with hub.py."""
-    import importlib  # noqa: PLC0415
-
-    hub = importlib.import_module("pipelex.hub")
-    return hub.get_class_registry()  # type: ignore[no-any-return]
 
 
 class StructureGenerator:
@@ -41,7 +33,7 @@ class StructureGenerator:
                 domain-qualified structure class name.
         """
         self.imports = {
-            "from typing import Optional, List, Dict, Any, Literal",
+            "from typing import Any, Literal",
             "from enum import Enum",
             "from pipelex.core.stuffs.structured_content import StructuredContent",
             "from pydantic import Field",
@@ -276,7 +268,7 @@ class StructureGenerator:
             self.imports.add(f"from {cls.__module__} import {cls.__name__}")
         elif base_class != "StructuredContent":
             # Cross-package refines: base class lives in another already-installed package — recover its module via the class registry.
-            registered_cls = _get_class_registry().get_class(name=base_class)
+            registered_cls = get_class_registry().get_class(name=base_class)
             if registered_cls is not None and registered_cls.__name__ == base_class and registered_cls.__module__ not in {"__main__", "builtins"}:
                 self.imports.add(f"from {registered_cls.__module__} import {base_class}")
 
@@ -299,9 +291,16 @@ class StructureGenerator:
         """Render one Python field definition from a neutral resolved field."""
         python_type = self._python_type_from_resolved(resolved_field.resolved_type)
 
-        # Make optional if not required
+        # Make optional if not required. A concept ref renders as a *quoted* forward reference (this
+        # module, unlike the codegen emitters, has no `from __future__ import annotations`), and
+        # `"Foo" | None` is a TypeError at runtime — str doesn't implement `|`. Fold the union inside
+        # the quotes so the whole annotation stays one deferred expression for model_rebuild to eval.
+        # Only a *bare* quoted ref needs this: `list["Foo"] | None` is a real GenericAlias and works.
         if not resolved_field.required:
-            python_type = f"Optional[{python_type}]"
+            if python_type.startswith('"') and python_type.endswith('"'):
+                python_type = f'"{python_type[1:-1]} | None"'
+            else:
+                python_type = f"{python_type} | None"
 
         # Generate Field parameters (default/... first, then description)
         field_params = [self._format_field_description(resolved_field.description)]
@@ -338,16 +337,16 @@ class StructureGenerator:
                 return "time"
             case ResolvedTypeKind.LITERAL:
                 choices = resolved_type.choices or []
-                return f"Literal[{', '.join(repr(choice) for choice in choices)}]"
+                return f"Literal[{', '.join(self._escape_string_for_python(choice) for choice in choices)}]"
             case ResolvedTypeKind.CONCEPT:
                 return self._python_type_for_concept(resolved_type)
             case ResolvedTypeKind.LIST:
                 item_type = self._python_type_from_resolved(resolved_type.item) if resolved_type.item else "Any"
-                return f"List[{item_type}]"
+                return f"list[{item_type}]"
             case ResolvedTypeKind.DICT:
                 key_type = self._python_type_from_resolved(resolved_type.key) if resolved_type.key else "str"
                 value_type = self._python_type_from_resolved(resolved_type.value) if resolved_type.value else "Any"
-                return f"Dict[{key_type}, {value_type}]"
+                return f"dict[{key_type}, {value_type}]"
             case ResolvedTypeKind.ANY:
                 return "Any"
 
@@ -399,9 +398,6 @@ class StructureGenerator:
             "datetime": datetime,
             "time": time,
             "Enum": Enum,
-            "Optional": Optional,
-            "List": List,  # noqa: UP006
-            "Dict": dict,
             "Any": Any,
             "Literal": Literal,
             "Field": Field,
@@ -421,7 +417,7 @@ class StructureGenerator:
         if base_class_name:
             if not NativeConceptCode.is_native_structure_class(base_class_name):
                 # Not a native class, provide it from registry
-                custom_base_class = _get_class_registry().get_class(name=base_class_name)
+                custom_base_class = get_class_registry().get_class(name=base_class_name)
                 if custom_base_class is None:
                     msg = f"Base class '{base_class_name}' not found in native classes or class registry"
                     raise ConceptStructureValidationError(msg)

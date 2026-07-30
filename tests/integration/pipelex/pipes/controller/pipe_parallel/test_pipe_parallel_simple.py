@@ -7,16 +7,16 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 @pytest.mark.dry_runnable

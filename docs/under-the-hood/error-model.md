@@ -36,7 +36,7 @@ An error rises through a series of layers. Each layer has exactly one job.
 | **4 — CLI factories** | `cli_factory.py`, `agent_cli_factory.py` | Catch setup errors, route to handlers |
 | **3 — Pipeline runner** | `PipelexMTHDSProtocol.execute()` | Catch + wrap as `PipelineExecutionError` |
 | **2 — Pipe router / operators** | `PipeRouter`, pipe operators | Catch + wrap with pipe context (`pipe_code`, `pipe_stack`) |
-| **1 — Workers / SDK calls** | `pipelex/plugins/*/` | **Catch the SDK exception → classify → raise `CogtError`** |
+| **1 — Workers / SDK calls** | `pipelex/providers/*/` | **Catch the SDK exception → classify → raise `CogtError`** |
 | **0 — Third-party SDKs** | OpenAI, Anthropic, Google, … | Raise raw, untyped provider exceptions |
 
 Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they attach context as they catch and re-raise, but the `error_category`, `error_domain`, `model`, and `provider` set at Layer 1 reach Layer 5 unchanged (see [Cause-Chain Enrichment](#cause-chain-enrichment)).
@@ -63,6 +63,14 @@ Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they att
 | `validation_errors` | `list[ValidationErrorItem] \| None` | Structured per-error diagnostics on a bundle-validation failure (`ValidateBundleError` only) |
 
 `PipelexError.to_error_report()` is the entry point. `to_dict()` serializes, dropping `None` fields; `from_dict()` is its strict inverse.
+
+### The identity triple, and why renaming an error class is a wire break
+
+`error_type`, `title` and `type_uri` are the three identity fields on every report. `title` and `type_uri` are *presentation*, and each has a declaration hatch — set `_declared_title` or `_declared_type_uri` directly in a subclass body and that value is used verbatim instead of the auto-derived one (inheritance is deliberately bypassed via `cls.__dict__`, so a parent's curated title never captures its subclasses).
+
+`error_type` has no such hatch: it is `type(self).__name__`, the Python class name with no indirection. That makes it the **machine contract** — consumers outside this repo `switch` on that string. Renaming an error class therefore breaks them *silently*: their build stays green and the branch simply stops matching, falling through to a generic error path.
+
+The guard against that is a committed snapshot of the full `(error_type, title, type_uri)` set at `tests/data/errors/error_identity.txt`, regenerated with `make generate-error-identity` (alias `make gei`) and gated by `tests/unit/pipelex/errors/test_error_identity_snapshot.py`. A rename cannot land without producing a reviewable one-line-pair diff on that file at the moment it is made — which is also the moment to plan the matching consumer updates.
 
 ### `validation_errors` — structured bundle-validation diagnostics
 
@@ -169,7 +177,7 @@ class PipelexConfigError(PipelexError):
 
 ## Worker Classification
 
-Layer 0 → Layer 1. Every inference worker under `pipelex/plugins/*/` catches its SDK's typed exceptions and re-raises a categorized `CogtError`.
+Layer 0 → Layer 1. Every inference worker under `pipelex/providers/*/` catches its SDK's typed exceptions and re-raises a categorized `CogtError`.
 
 ### The Uniform Shape — Extract / Classify / Render
 
@@ -418,7 +426,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
 | `pipelex/cogt/inference/error_classify.py` | Classify — `classify_inference_error()`, `ClassificationResult` |
 | `pipelex/cogt/inference/error_render.py` | Render — `render_inference_error()`, `InferenceErrorFamily` |
 | `pipelex/cogt/inference/provider_name.py` | `ProviderName` enum keying the extract-fn registry |
-| `pipelex/plugins/*/` | Per-provider inference workers — Layer 0 → 1 classification |
+| `pipelex/providers/*/` | Per-provider inference workers — Layer 0 → 1 classification |
 | `pipelex/pipeline/exceptions.py` | `PipelineExecutionError`, `PipeExecutionError` |
 | `pipelex/cli/error_handlers.py` | Human CLI Rich panels — `display_error_panel()` |
 | `pipelex/cli/agent_cli/commands/agent_output.py` | Agent CLI JSON / markdown delivery |

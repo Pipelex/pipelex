@@ -123,7 +123,7 @@ A single worker may process many concurrent jobs. If two jobs define a concept n
 3. **Lookup chain** — `hub.get_class_registry()` reads the `ContextVar`, returns the scoped library's registry, and falls back to the global registry when no library is set (e.g. a data converter running outside the job scope — which is exactly why output uses deferred hydration).
 4. **Cleanup** — `library_manager.teardown(library_id)` drops the library and its registry; the `ContextVar` is reset. No manual GC needed.
 
-The hub's class-registry and library scoping (`pipelex/hub.py`, `pipelex/libraries/library.py`, `pipelex/libraries/library_manager.py`) is open core — the same machinery serves direct execution, the open runner, and any host-runtime plugin.
+The class-registry accessor and its library scoping (`pipelex/runtime_hub.py`, `pipelex/system/registries/class_registry_access.py`, `pipelex/interpreter_hub.py`, `pipelex/libraries/library.py`, `pipelex/libraries/library_manager.py`) is open core — the same machinery serves direct execution, the open runner, and any host-runtime plugin.
 
 ---
 

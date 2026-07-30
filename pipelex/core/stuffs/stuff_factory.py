@@ -9,7 +9,8 @@ from pydantic import BaseModel, ValidationError, field_validator
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.exceptions import ConceptValueError
+from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
+from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError, ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import validate_concept_ref
 from pipelex.core.stuffs.exceptions import StuffFactoryError
@@ -18,8 +19,7 @@ from pipelex.core.stuffs.stuff import DictStuff, Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_content_factory import StuffContentFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_class_registry, get_concept_library, get_native_concept, get_required_concept
-from pipelex.libraries.concept.concept_library import ConceptLibraryConceptNotFoundError
+from pipelex.runtime_hub import get_class_registry
 from pipelex.tools.tabular.csv_codec import is_tabular_path, list_content_from_csv
 from pipelex.tools.tabular.exceptions import CsvError
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
@@ -57,9 +57,9 @@ class StuffFactory:
         )
 
     @classmethod
-    def make_from_concept_ref(cls, concept_ref: str, *, name: str, content: StuffContent) -> Stuff:
+    def make_from_concept_ref(cls, concept_ref: str, *, concept_provider: ConceptProviderAbstract, name: str, content: StuffContent) -> Stuff:
         validate_concept_ref(concept_ref)
-        concept = get_required_concept(concept_ref=concept_ref)
+        concept = concept_provider.get_required_concept(concept_ref=concept_ref)
         return cls.make_stuff(
             concept=concept,
             content=content,
@@ -89,24 +89,23 @@ class StuffFactory:
         )
 
     @classmethod
-    def make_from_blueprint(cls, blueprint: StuffBlueprint) -> "Stuff":
-        concept_library = get_concept_library()
-        if isinstance(blueprint.content, str) and concept_library.is_compatible(
-            tested_concept=concept_library.get_required_concept(concept_ref=blueprint.concept_ref),
-            wanted_concept=get_native_concept(native_concept=NativeConceptCode.TEXT),
+    def make_from_blueprint(cls, blueprint: StuffBlueprint, *, concept_provider: ConceptProviderAbstract) -> "Stuff":
+        if isinstance(blueprint.content, str) and concept_provider.is_compatible(
+            tested_concept=concept_provider.get_required_concept(concept_ref=blueprint.concept_ref),
+            wanted_concept=concept_provider.get_native_concept(native_concept=NativeConceptCode.TEXT),
         ):
             the_stuff = cls.make_stuff(
-                concept=get_native_concept(native_concept=NativeConceptCode.TEXT),
+                concept=concept_provider.get_native_concept(native_concept=NativeConceptCode.TEXT),
                 content=TextContent(text=blueprint.content),
                 name=blueprint.stuff_name,
             )
         else:
             the_stuff_content = StuffContentFactory.make_stuff_content_from_concept_required(
-                concept=concept_library.get_required_concept(concept_ref=blueprint.concept_ref),
+                concept=concept_provider.get_required_concept(concept_ref=blueprint.concept_ref),
                 value=blueprint.content,
             )
             the_stuff = cls.make_stuff(
-                concept=concept_library.get_required_concept(concept_ref=blueprint.concept_ref),
+                concept=concept_provider.get_required_concept(concept_ref=blueprint.concept_ref),
                 content=the_stuff_content,
                 name=blueprint.stuff_name,
             )
@@ -140,12 +139,13 @@ class StuffFactory:
         cls,
         concept: Concept,
         *,
+        concept_provider: ConceptProviderAbstract,
         content: dict[str, Any],
         name: str | None,
         code: str | None,
     ) -> Stuff | None:
         """Wrap :meth:`try_make_csv_list_content` into a ``Stuff`` (Case 2.5 envelope path)."""
-        list_content = cls.try_make_csv_list_content(concept, content=content, name=name)
+        list_content = cls.try_make_csv_list_content(concept, concept_provider=concept_provider, content=content, name=name)
         if list_content is None:
             return None
         return cls.make_stuff(concept=concept, content=list_content, name=name, code=code)
@@ -155,6 +155,7 @@ class StuffFactory:
         cls,
         concept: Concept,
         *,
+        concept_provider: ConceptProviderAbstract,
         content: dict[str, Any],
         name: str | None,
     ) -> ListContent[StuffContent] | None:
@@ -235,7 +236,7 @@ class StuffFactory:
             raise CsvError(msg)
 
         try:
-            row_model = concept.get_structure_class()
+            row_model = concept_provider.get_structure_class(concept=concept)
         except ConceptValueError as exc:
             # Keep the codec's typed-error boundary intact: an unregistered structure class is a
             # caller-fixable input problem, not a raw ValueError that escapes into core/runner.
@@ -248,6 +249,7 @@ class StuffFactory:
         cls,
         stuff_content_or_data: StuffContentOrData,
         *,
+        concept_provider: ConceptProviderAbstract,
         name: str | None = None,
         code: str | None = None,
         search_domain_codes: list[str] | None = None,
@@ -277,14 +279,12 @@ class StuffFactory:
             2.5: {"concept": "...", "content": dict} → Create StuffContent from dict
             2.6: {"concept": "...", "content": list[dict]} → ListContent[StuffContent] from dicts
         """
-        concept_library = get_concept_library()
-
         # ==================== CASE 1: Direct content (no concept key) ====================
         if not isinstance(stuff_content_or_data, dict):
             # Case 1.1: str → TextContent with Text concept
             if isinstance(stuff_content_or_data, str):
                 return cls.make_stuff(
-                    concept=get_native_concept(native_concept=NativeConceptCode.TEXT),
+                    concept=concept_provider.get_native_concept(native_concept=NativeConceptCode.TEXT),
                     content=TextContent(text=stuff_content_or_data),
                     name=name,
                     code=code,
@@ -327,10 +327,10 @@ class StuffFactory:
                 if "Content" in content_class_name and NativeConceptCode.is_native_concept_ref_or_code(
                     concept_ref_or_code=content_class_name.split("Content")[0]
                 ):
-                    concept = get_native_concept(native_concept=NativeConceptCode(content_class_name.split("Content")[0]))
+                    concept = concept_provider.get_native_concept(native_concept=NativeConceptCode(content_class_name.split("Content")[0]))
                 else:
                     try:
-                        concept = concept_library.get_required_concept_from_concept_ref_or_code(
+                        concept = concept_provider.get_required_concept_from_concept_ref_or_code(
                             concept_ref_or_code=content_class_name, search_domain_codes=search_domain_codes
                         )
                     except ConceptLibraryConceptNotFoundError as exc:
@@ -357,11 +357,11 @@ class StuffFactory:
                     concept_ref_or_code=content_class_name.split("Content")[0]
                 ):
                     # It's a native concept like TextContent, ImageContent, etc.
-                    concept = get_native_concept(native_concept=NativeConceptCode(content_class_name.split("Content")[0]))
+                    concept = concept_provider.get_native_concept(native_concept=NativeConceptCode(content_class_name.split("Content")[0]))
                 else:
                     # It's a StructuredContent, try to find the concept
                     try:
-                        concept = concept_library.get_required_concept_from_concept_ref_or_code(
+                        concept = concept_provider.get_required_concept_from_concept_ref_or_code(
                             concept_ref_or_code=content_class_name, search_domain_codes=search_domain_codes
                         )
                     except ConceptLibraryConceptNotFoundError as exc:
@@ -398,7 +398,7 @@ class StuffFactory:
 
                     items = [TextContent(text=item) for item in cast("list[str]", stuff_content_or_data)]
                     return cls.make_stuff(
-                        concept=get_native_concept(native_concept=NativeConceptCode.TEXT),
+                        concept=concept_provider.get_native_concept(native_concept=NativeConceptCode.TEXT),
                         content=ListContent(items=items),
                         name=name,
                         code=code,
@@ -423,10 +423,10 @@ class StuffFactory:
                     if "Content" in content_class_name and NativeConceptCode.is_native_concept_ref_or_code(
                         concept_ref_or_code=content_class_name.split("Content")[0]
                     ):
-                        concept = get_native_concept(native_concept=NativeConceptCode(content_class_name.split("Content")[0]))
+                        concept = concept_provider.get_native_concept(native_concept=NativeConceptCode(content_class_name.split("Content")[0]))
                     else:
                         try:
-                            concept = concept_library.get_required_concept_from_concept_ref_or_code(
+                            concept = concept_provider.get_required_concept_from_concept_ref_or_code(
                                 concept_ref_or_code=content_class_name, search_domain_codes=search_domain_codes
                             )
                         except ConceptLibraryConceptNotFoundError as exc:
@@ -477,7 +477,7 @@ class StuffFactory:
 
         # Get the concept from the library
         try:
-            concept = concept_library.get_required_concept_from_concept_ref_or_code(
+            concept = concept_provider.get_required_concept_from_concept_ref_or_code(
                 concept_ref_or_code=concept_ref, search_domain_codes=search_domain_codes
             )
         except ConceptLibraryConceptNotFoundError as exc:
@@ -491,8 +491,8 @@ class StuffFactory:
         # Checked BEFORE the str/int-ish arms (bool is a subclass of int) so a boolean never falls through to
         # the final "unexpected type" error. No string coercion: "yes"/"no" strings take the str path and fail there.
         if isinstance(content, bool):
-            yes_no_concept = get_native_concept(native_concept=NativeConceptCode.YES_NO)
-            if concept_library.is_compatible(tested_concept=concept, wanted_concept=yes_no_concept, strict=True):
+            yes_no_concept = concept_provider.get_native_concept(native_concept=NativeConceptCode.YES_NO)
+            if concept_provider.is_compatible(tested_concept=concept, wanted_concept=yes_no_concept, strict=True):
                 return cls.make_stuff(
                     concept=concept,
                     content=StuffContentFactory.make_stuff_content_from_concept_required(concept=concept, value=content),
@@ -508,8 +508,8 @@ class StuffFactory:
         # Case 2.1: content is a string
         if isinstance(content, str):
             # Check if concept is strictly compatible with Text (refinement = strict compatibility)
-            text_concept = get_native_concept(native_concept=NativeConceptCode.TEXT)
-            if concept_library.is_compatible(tested_concept=concept, wanted_concept=text_concept, strict=True):
+            text_concept = concept_provider.get_native_concept(native_concept=NativeConceptCode.TEXT)
+            if concept_provider.is_compatible(tested_concept=concept, wanted_concept=text_concept, strict=True):
                 return cls.make_stuff(
                     concept=concept,
                     content=TextContent(text=content),
@@ -518,8 +518,8 @@ class StuffFactory:
                 )
             # Case 2.1f: a strict-ISO date/datetime string under a Date-compatible concept builds a DateContent
             # (routed through the concept resolver so a refining subclass is honored, like the YesNo arm).
-            date_concept = get_native_concept(native_concept=NativeConceptCode.DATE)
-            if concept_library.is_compatible(tested_concept=concept, wanted_concept=date_concept, strict=True):
+            date_concept = concept_provider.get_native_concept(native_concept=NativeConceptCode.DATE)
+            if concept_provider.is_compatible(tested_concept=concept, wanted_concept=date_concept, strict=True):
                 return cls.make_stuff(
                     concept=concept,
                     content=StuffContentFactory.make_stuff_content_from_concept_required(concept=concept, value=content),
@@ -527,8 +527,8 @@ class StuffFactory:
                     code=code,
                 )
             # Case 2.1g: a strict-ISO time string under a Time-compatible concept builds a TimeContent.
-            time_concept = get_native_concept(native_concept=NativeConceptCode.TIME)
-            if concept_library.is_compatible(tested_concept=concept, wanted_concept=time_concept, strict=True):
+            time_concept = concept_provider.get_native_concept(native_concept=NativeConceptCode.TIME)
+            if concept_provider.is_compatible(tested_concept=concept, wanted_concept=time_concept, strict=True):
                 return cls.make_stuff(
                     concept=concept,
                     content=StuffContentFactory.make_stuff_content_from_concept_required(concept=concept, value=content),
@@ -544,8 +544,8 @@ class StuffFactory:
         # Case 2.1e: content is a bare date/datetime object (a TOML temporal literal used as envelope content)
         # → DateContent for a Date-compatible concept. isinstance(date) covers datetime (its subclass).
         if isinstance(content, datetime.date):
-            date_concept = get_native_concept(native_concept=NativeConceptCode.DATE)
-            if concept_library.is_compatible(tested_concept=concept, wanted_concept=date_concept, strict=True):
+            date_concept = concept_provider.get_native_concept(native_concept=NativeConceptCode.DATE)
+            if concept_provider.is_compatible(tested_concept=concept, wanted_concept=date_concept, strict=True):
                 return cls.make_stuff(
                     concept=concept,
                     content=StuffContentFactory.make_stuff_content_from_concept_required(concept=concept, value=content),
@@ -560,8 +560,8 @@ class StuffFactory:
 
         # Case 2.1g: content is a bare time object (a TOML time literal used as envelope content).
         if isinstance(content, datetime.time):
-            time_concept = get_native_concept(native_concept=NativeConceptCode.TIME)
-            if concept_library.is_compatible(tested_concept=concept, wanted_concept=time_concept, strict=True):
+            time_concept = concept_provider.get_native_concept(native_concept=NativeConceptCode.TIME)
+            if concept_provider.is_compatible(tested_concept=concept, wanted_concept=time_concept, strict=True):
                 return cls.make_stuff(
                     concept=concept,
                     content=StuffContentFactory.make_stuff_content_from_concept_required(concept=concept, value=content),
@@ -594,7 +594,7 @@ class StuffFactory:
         if isinstance(content, dict):
             content_dict = cast("dict[str, Any]", content)
             # CSV input: a {"url": "...csv"} under a structured row concept loads as ListContent[row-concept].
-            csv_stuff = cls._try_make_csv_list_stuff(concept=concept, content=content_dict, name=name, code=code)
+            csv_stuff = cls._try_make_csv_list_stuff(concept=concept, concept_provider=concept_provider, content=content_dict, name=name, code=code)
             if csv_stuff is not None:
                 return csv_stuff
 
@@ -632,8 +632,8 @@ class StuffFactory:
                         )
                         raise StuffFactoryError(msg)
 
-                text_concept = get_native_concept(native_concept=NativeConceptCode.TEXT)
-                if concept_library.is_compatible(tested_concept=concept, wanted_concept=text_concept, strict=True):
+                text_concept = concept_provider.get_native_concept(native_concept=NativeConceptCode.TEXT)
+                if concept_provider.is_compatible(tested_concept=concept, wanted_concept=text_concept, strict=True):
                     items = [TextContent(text=item) for item in list_content_2]
                     return cls.make_stuff(
                         concept=concept,

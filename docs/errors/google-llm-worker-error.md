@@ -15,7 +15,7 @@ Base exception for Google LLM Worker errors.
 | `title` | Google LLM worker |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/google-llm-worker-error/` |
 | `error_domain` | _(inherited from parent)_ |
-| Defined in | `pipelex.plugins.google.google_exceptions` |
+| Defined in | `pipelex.providers.google.google_exceptions` |
 | Parent class | [`CogtError`](cogt-error.md) |
 
 [Back to Error Reference](index.md)

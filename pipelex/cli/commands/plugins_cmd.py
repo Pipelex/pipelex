@@ -2,8 +2,9 @@ import typer
 from rich import box
 from rich.table import Table
 
-from pipelex.hub import get_console
+from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS, CORE_UNCONDITIONAL_PLUGIN_NAMES
 from pipelex.plugins.discovery import build_registrar
+from pipelex.runtime_hub import get_console
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.configs import PipelexConfig
 
@@ -20,7 +21,11 @@ def plugins_list_command() -> None:
     """
     console = get_console()
     config = PipelexConfig.model_validate(config_manager.load_config())
-    registrar = build_registrar(config=config)
+    registrar = build_registrar(
+        config=config,
+        builtin_plugins=BUILTIN_PLUGINS,
+        core_unconditional_plugin_names=CORE_UNCONDITIONAL_PLUGIN_NAMES,
+    )
 
     table = Table(title="Pipelex plugins", show_header=True, header_style="bold cyan", box=box.SQUARE_DOUBLE_HEAD)
     table.add_column("Name", style="green")

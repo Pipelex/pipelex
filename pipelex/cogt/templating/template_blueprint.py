@@ -2,12 +2,12 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
-from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.templating.templating_style import TemplatingStyle
 
 
 class TemplateBlueprint(BaseModel):

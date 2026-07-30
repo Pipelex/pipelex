@@ -17,18 +17,13 @@ from typing import Sequence
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
 
 from pipelex.base_exceptions import PipelexUnexpectedError
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.qualified_ref import QualifiedRef
-from pipelex.hub import (
-    clear_current_library,
-    get_current_library_id_or_none,
-    get_library_manager,
-    set_current_library,
-)
+from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
+from pipelex.mthds_parsing.parser import MthdsParser
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipeline.validate_bundle import translate_to_validate_bundle_error
 
 
@@ -74,7 +69,7 @@ def resolve_crate_from_contents(*, mthds_contents: list[str], mthds_sources: Seq
         content_sources: list[str | None] = list(mthds_sources) if mthds_sources is not None else [None] * len(mthds_contents)
         with translate_to_validate_bundle_error():
             blueprints = [
-                PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content, mthds_source=source)
+                MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content, mthds_source=source)
                 for content, source in zip(mthds_contents, content_sources, strict=True)
             ]
             _reject_address_based_dependencies(blueprints=blueprints)

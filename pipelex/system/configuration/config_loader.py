@@ -303,7 +303,9 @@ class ConfigLoader:
         Args:
             extra_overrides: Optional dict deep-merged on top as the final layer.
             config_dir: Optional explicit config dir. When given, project/global layering
-                is bypassed and only this directory is read.
+                is bypassed and the load becomes package defaults + this directory (the
+                package layer always applies — it is what the TOML overrides *are*
+                overrides of), plus the unit-testing layer below when it applies.
 
         Returns:
             dict[str, Any]: The merged configuration dictionary

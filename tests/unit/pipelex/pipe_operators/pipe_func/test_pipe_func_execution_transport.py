@@ -15,9 +15,9 @@ from pipelex.pipe_operators.func.pipe_func_execution_transport import (
     PipeFuncExecutionRequest,
     PipeFuncExecutionResponse,
 )
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 class TestPipeFuncExecutionTransport:

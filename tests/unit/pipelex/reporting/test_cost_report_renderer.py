@@ -15,8 +15,8 @@ from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.config import get_config
-from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.reporting.cost_report_renderer import render_run_cost_report
+from pipelex.system.job_metadata import JobMetadata
 
 _RUN_ID = "test-run"
 

@@ -18,7 +18,6 @@ import pytest
 from pipelex import pretty_print
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.number_content import NumberContent
@@ -26,14 +25,15 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
-from pipelex.hub import get_native_concept, get_pipe_router
+from pipelex.interpreter_hub import get_native_concept, get_pipe_router
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.compose.exceptions import PipeComposeError
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.integration.pipelex.pipes.operator.pipe_compose_structured.test_data import NativeScalarConversionTestData
 
 

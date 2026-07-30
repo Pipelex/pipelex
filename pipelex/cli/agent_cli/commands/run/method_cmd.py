@@ -18,8 +18,8 @@ from pipelex.cli.agent_cli.commands.run._run_core_api import run_pipeline_core_a
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
 from pipelex.cli.commands.run._inputs_file_loader import resolve_inputs_arg_against_dir
 from pipelex.cli.method_resolver import resolve_method_target
-from pipelex.core.interpreter.helpers import MTHDS_EXTENSION
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
+from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError

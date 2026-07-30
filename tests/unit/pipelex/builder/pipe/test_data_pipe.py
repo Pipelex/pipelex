@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 
 
 class PipeBlueprintTestCases:

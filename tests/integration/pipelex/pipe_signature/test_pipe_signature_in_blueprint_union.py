@@ -1,8 +1,8 @@
 import pytest
 from pydantic import ValidationError
 
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
 
 

@@ -2,10 +2,9 @@ from typing_extensions import override
 
 from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexError, PipelexUnexpectedError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
-from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
-from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.core.exceptions import PipeFactoryErrorData, PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.pipeline.validation_errors import build_validation_error_items
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 class PipeExecutionError(PipelexError):
@@ -55,10 +54,6 @@ class PipeStackOverflowError(PipelexError):
         self.limit = limit
         self.pipe_stack = list(pipe_stack)  # snapshot: the live stack unwinds after this error is raised
         super().__init__(message)
-
-
-class JobMetadataError(PipelexUnexpectedError):
-    pass
 
 
 class PipelineManagerNotFoundError(PipelexError):

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from pipelex.plugins.builtins import BUILTIN_PLUGINS
+from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS
 from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry, InferenceFamily
 from pipelex.plugins.registrar import PluginRegistrar
 

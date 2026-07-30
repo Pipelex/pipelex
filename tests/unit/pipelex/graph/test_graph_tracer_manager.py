@@ -3,9 +3,9 @@
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.graph.graph_config import DataInclusionConfig
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
+from pipelex.system.data_inclusion_config import DataInclusionConfig
 
 
 def _make_data_inclusion() -> DataInclusionConfig:

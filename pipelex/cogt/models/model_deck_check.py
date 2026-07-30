@@ -11,7 +11,7 @@ from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_reference import ModelReferenceKind, ensure_model_reference
 from pipelex.cogt.models.model_suggestion import suggest_model_alternatives
 from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
-from pipelex.hub import get_model_deck
+from pipelex.runtime_hub import get_model_deck
 
 
 def _raise_model_choice_not_found(

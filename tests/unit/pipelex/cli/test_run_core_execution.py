@@ -75,6 +75,15 @@ class TestRunCoreExecution:
         mocker.patch("pipelex.cli.commands.run._run_core.render_cost_report_for_output")
         return runner_class_mock
 
+    def _mock_structure_class(self, mocker: MockerFixture, *, resolves_to: Any = None, raises: Exception | None = None) -> None:
+        """Stand in for the concept library that resolves the CSV row class."""
+        concept_library_mock = mocker.MagicMock()
+        if raises is not None:
+            concept_library_mock.get_structure_class.side_effect = raises
+        else:
+            concept_library_mock.get_structure_class.return_value = resolves_to
+        mocker.patch("pipelex.cli.commands.run._run_core.ConceptLibrary.make_empty", return_value=concept_library_mock)
+
     def _make_pipe_output(
         self,
         mocker: MockerFixture,
@@ -166,7 +175,7 @@ class TestRunCoreExecution:
         bundle_file = tmp_path / "demo.mthds"
         bundle_file.write_text("# bundle content\n", encoding="utf-8")
         mocker.patch(
-            "pipelex.cli.commands.run._run_core.PipelexInterpreter.make_pipelex_bundle_blueprint",
+            "pipelex.cli.commands.run._run_core.MthdsParser.make_pipelex_bundle_blueprint",
             return_value=SimpleNamespace(main_pipe="bundle_main"),
         )
         pipe_output = self._make_pipe_output(mocker)
@@ -184,7 +193,7 @@ class TestRunCoreExecution:
         bundle_file = tmp_path / "demo.mthds"
         bundle_file.write_text("# bundle content\n", encoding="utf-8")
         mocker.patch(
-            "pipelex.cli.commands.run._run_core.PipelexInterpreter.make_pipelex_bundle_blueprint",
+            "pipelex.cli.commands.run._run_core.MthdsParser.make_pipelex_bundle_blueprint",
             return_value=SimpleNamespace(main_pipe=None),
         )
 
@@ -410,9 +419,9 @@ class TestRunCoreExecution:
         """A flat list output is written through the CSV codec to the literal path."""
         main_stuff = mocker.MagicMock()
         main_stuff.content = ListContent(items=[TextContent(text="row one")])
-        main_stuff.concept.get_structure_class.return_value = TextContent
         pipe_output = self._make_pipe_output(mocker, main_stuff=main_stuff)
         self._mock_runner(mocker, pipe_output)
+        self._mock_structure_class(mocker, resolves_to=TextContent)
         mocker.patch("pipelex.cli.commands.run._run_core.flat_field_names", return_value=["text"])
         csv_codec_mock = mocker.patch("pipelex.cli.commands.run._run_core.csv_from_list_content")
         csv_target = tmp_path / "reports" / "out.csv"
@@ -429,9 +438,9 @@ class TestRunCoreExecution:
         """A missing structure class on the output concept is a --save-csv failure."""
         main_stuff = mocker.MagicMock()
         main_stuff.content = ListContent(items=[TextContent(text="row one")])
-        main_stuff.concept.get_structure_class.side_effect = ConceptValueError("no structure class")
         pipe_output = self._make_pipe_output(mocker, main_stuff=main_stuff)
         self._mock_runner(mocker, pipe_output)
+        self._mock_structure_class(mocker, raises=ConceptValueError("no structure class"))
 
         with pytest.raises(typer.Exit) as exc_info:
             _run_async(_call_execute_run(save_csv=str(tmp_path / "out.csv")))

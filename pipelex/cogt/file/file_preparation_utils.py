@@ -7,7 +7,7 @@ instances that can be consumed by various APIs.
 import base64
 from pathlib import Path
 
-from pipelex.hub import get_storage_provider
+from pipelex.runtime_hub import get_storage_provider
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
 from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64, detect_file_type_from_bytes

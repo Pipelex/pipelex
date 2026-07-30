@@ -11,9 +11,9 @@ from pipelex import log
 from pipelex.cogt.content_generation.dry_run_factory import MockFormat
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import validate_concept_ref_or_code
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeCategory, PipeType, valid_pipe_type_tags
 from pipelex.core.pipes.variable_multiplicity import MULTIPLICITY_PATTERN, PresenceMarker, parse_concept_with_multiplicity
 from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint, PipeCategory, PipeType, valid_pipe_type_tags
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.misc.string_utils import is_snake_case, normalize_to_ascii
 

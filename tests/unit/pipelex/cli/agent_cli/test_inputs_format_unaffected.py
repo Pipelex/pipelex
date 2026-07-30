@@ -7,7 +7,7 @@ import inspect
 from pipelex.cli.agent_cli.commands.inputs.bundle_cmd import inputs_bundle_cmd
 from pipelex.cli.agent_cli.commands.inputs.method_cmd import inputs_method_cmd
 from pipelex.cli.agent_cli.commands.inputs.pipe_cmd import inputs_pipe_cmd
-from pipelex.core.pipes.inputs.input_renderer import InputsTemplateFormat
+from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat
 
 
 class TestInputsFormatUnaffected:

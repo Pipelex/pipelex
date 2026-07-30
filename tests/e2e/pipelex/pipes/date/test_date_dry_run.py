@@ -12,9 +12,9 @@ from pathlib import Path
 import pytest
 
 from pipelex.core.stuffs.date_content import DateContent
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.pipeline_response import RunState
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 _FIXTURE_DIR = Path(__file__).parent / "date_departure"
 

@@ -1,4 +1,4 @@
-from pipelex.core.interpreter.exceptions import PipelexInterpreterError
+from pipelex.mthds_parsing.exceptions import MthdsParserError
 
 INVALID_MTHDS_SYNTAX = (
     "invalid_mthds_syntax",
@@ -7,7 +7,7 @@ description = "Domain with invalid MTHDS syntax"
 
 [concept]
 InvalidConcept = "This is missing a closing quote""",
-    PipelexInterpreterError,
+    MthdsParserError,
 )
 
 MALFORMED_SECTION = (
@@ -18,7 +18,7 @@ description = "Domain with malformed section"
 [concept
 TestConcept = "Missing closing bracket"
 """,
-    PipelexInterpreterError,
+    MthdsParserError,
 )
 
 UNCLOSED_STRING = (
@@ -26,7 +26,7 @@ UNCLOSED_STRING = (
     """domain = "test_domain"
 description = "Domain with unclosed string
 """,
-    PipelexInterpreterError,
+    MthdsParserError,
 )
 
 DUPLICATE_KEYS = (
@@ -38,7 +38,7 @@ description = "Duplicate definition key"
 [concept]
 TestConcept = "A test concept"
 """,
-    PipelexInterpreterError,
+    MthdsParserError,
 )
 
 INVALID_ESCAPE_SEQUENCE = (
@@ -49,7 +49,7 @@ description = "Domain with invalid escape sequence \\z"
 [concept]
 TestConcept = "A test concept"
 """,
-    PipelexInterpreterError,
+    MthdsParserError,
 )
 
 # PipelexBundleBlueprint Structure Errors
@@ -61,7 +61,7 @@ description = "Domain without domain field"
 [concept]
 TestConcept = "A test concept"
 """,
-    PipelexInterpreterError,
+    MthdsParserError,
 )
 
 INVALID_DOMAIN_NAME = (
@@ -72,7 +72,7 @@ description = "Domain with invalid characters"
 [concept]
 TestConcept = "A test concept"
 """,
-    PipelexInterpreterError,
+    MthdsParserError,
 )
 
 EMPTY_DOMAIN = (
@@ -83,7 +83,7 @@ description = "Domain with empty string"
 [concept]
 TestConcept = "A test concept"
 """,
-    PipelexInterpreterError,
+    MthdsParserError,
 )
 
 INVALID_ROOT_KEY = (
@@ -95,7 +95,7 @@ invalid_root_key = "This key should not be allowed at root level"
 [concept]
 TestConcept = "A test concept"
 """,
-    PipelexInterpreterError,
+    MthdsParserError,
 )
 
 MULTIPLE_INVALID_ROOT_KEYS = (
@@ -109,7 +109,7 @@ unknown_field = "Another unknown field"
 [concept]
 TestConcept = "A test concept"
 """,
-    PipelexInterpreterError,
+    MthdsParserError,
 )
 
 WRONG_TYPE_FOR_DOMAIN = (
@@ -120,7 +120,7 @@ description = "Domain should be string, not number"
 [concept]
 TestConcept = "A test concept"
 """,
-    PipelexInterpreterError,
+    MthdsParserError,
 )
 
 WRONG_TYPE_FOR_DEFINITION = (
@@ -131,7 +131,7 @@ description = 456
 [concept]
 TestConcept = "A test concept"
 """,
-    PipelexInterpreterError,
+    MthdsParserError,
 )
 
 WRONG_TYPE_FOR_CONCEPT_SECTION = (
@@ -140,7 +140,7 @@ WRONG_TYPE_FOR_CONCEPT_SECTION = (
 description = "Domain with wrong type for concept"
 concept = "should_be_dict_not_string"
 """,
-    PipelexInterpreterError,
+    MthdsParserError,
 )
 
 WRONG_TYPE_FOR_PIPE_SECTION = (
@@ -149,7 +149,7 @@ WRONG_TYPE_FOR_PIPE_SECTION = (
 description = "Domain with wrong type for pipe"
 pipe = "should_be_dict_not_string"
 """,
-    PipelexInterpreterError,
+    MthdsParserError,
 )
 
 INVALID_NESTED_SECTION = (
@@ -163,7 +163,7 @@ some_key = "This section is not allowed"
 [concept]
 TestConcept = "A test concept"
 """,
-    PipelexInterpreterError,
+    MthdsParserError,
 )
 
 INVALID_TABLE_SYNTAX = (
@@ -174,7 +174,7 @@ description = "Domain with invalid table syntax"
 [concept.]
 InvalidName = "Empty table name"
 """,
-    PipelexInterpreterError,
+    MthdsParserError,
 )
 
 INVALID_ARRAY_SYNTAX = (
@@ -185,7 +185,7 @@ description = "Domain with invalid array syntax"
 [concept]
 TestConcept = ["Unclosed array"
 """,
-    PipelexInterpreterError,
+    MthdsParserError,
 )
 INVALID_ARRAY_SYNTAX2 = (
     "invalid_array_syntax",
@@ -195,7 +195,7 @@ description = "Domain with invalid array syntax"
 [concept]
 [concept]
 """,
-    PipelexInterpreterError,
+    MthdsParserError,
 )
 
 DOUBLE_DOT_DOMAIN = (
@@ -206,7 +206,7 @@ description = "Domain with double dots"
 [concept]
 TestConcept = "A test concept"
 """,
-    PipelexInterpreterError,
+    MthdsParserError,
 )
 
 LEADING_DOT_DOMAIN = (
@@ -217,7 +217,7 @@ description = "Domain with leading dot"
 [concept]
 TestConcept = "A test concept"
 """,
-    PipelexInterpreterError,
+    MthdsParserError,
 )
 
 # Export all error test cases

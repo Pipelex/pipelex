@@ -203,10 +203,13 @@ class FuncRegistryUtils:
             # Expected: file validation issues (directories with .py extension, etc.)
             # log.verbose(f"Skipping file {file_path}: {e}")
             pass
-        except ImportError:
-            # Common: missing dependencies, circular imports, relative imports
-            # log.verbose(f"Could not import {file_path}: {e}")
-            pass
+        except ImportError as exc:
+            # A module that fails to import (missing sibling module, circular import, bad relative
+            # import) cannot contribute its @pipe_func functions — they never register. Surfacing this
+            # is essential: the only downstream symptom is an opaque "Function '<name>' not found in
+            # registry" raised much later by the PipeFunc validator, with the real ImportError (the
+            # actual cause) otherwise swallowed here and invisible.
+            log.warning(f"Could not import '{file_path}' while registering PipeFuncs; its functions are unavailable: {exc}")
         except SyntaxError as exc:
             # Potentially problematic: invalid Python syntax may indicate broken code
             log.warning(f"Syntax error in {file_path}: {exc}")

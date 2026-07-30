@@ -11,9 +11,9 @@ from pipelex.config import get_config
 from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
 from pipelex.graph.graphspec import GraphSpec, GraphSpecMode, NodeStatus
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.pipeline_response import RunState
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 _FIXTURE_DIR = Path(__file__).parent / "lift_parity"
 

@@ -20,8 +20,8 @@ from pipelex.cli.error_handlers import ErrorContext
 from pipelex.codegen.emission import write_stamped_projection
 from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget
 from pipelex.codegen.emitters.types_emitter import emit_types
-from pipelex.hub import get_telemetry_manager
 from pipelex.pipelex import Pipelex
+from pipelex.runtime_hub import get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.package_utils import get_package_version

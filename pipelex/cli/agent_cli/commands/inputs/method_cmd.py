@@ -14,7 +14,7 @@ from pipelex.cli.agent_cli.commands.inputs._inputs_core import emit_inputs_resul
 from pipelex.cli.method_resolver import resolve_method_target
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
-from pipelex.core.pipes.inputs.input_renderer import InputsTemplateFormat
+from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import ValidateBundleError

@@ -6,14 +6,14 @@ visibility that makes implicit lifting acceptable.
 from typing import Callable
 
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_pipe_library
+from pipelex.interpreter_hub import get_pipe_library
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
+from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipeline.controller_taint import collect_controller_taint_analyses

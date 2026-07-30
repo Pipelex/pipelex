@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import ValidationError
 from typing_extensions import override
@@ -12,41 +12,36 @@ from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingC
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
 from pipelex.config import get_config
-from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeRunError, PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
-from pipelex.core.pipes.template_guard_lint import lint_optional_input_guards
-from pipelex.core.pipes.validation import is_input_used_by_variables, is_variable_satisfied_by_inputs
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import (
-    get_class_registry,
-    get_concept_library,
-    get_content_generator,
-    get_model_deck,
-    get_native_concept,
-    get_required_concept,
-)
+from pipelex.interpreter_hub import get_concept_library, get_native_concept, get_required_concept
+from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
+from pipelex.pipe_machinery.validation import is_input_used_by_variables, is_variable_satisfied_by_inputs
 from pipelex.pipe_operators.llm.helpers import get_output_structure_prompt
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.pipe_operator import PipeOperator
-from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import (
-    PipeRunParamKey,
     PipeRunParams,
     output_multiplicity_to_apply,
 )
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.runtime_hub import get_class_registry, get_content_generator, get_model_deck
+from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.pipe_run_param_key import PipeRunParamKey
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+
+if TYPE_CHECKING:
+    from pipelex.tools.templating.templating_style import TemplatingStyle
 
 
 class PipeLLMOutput(PipeOutput):
@@ -231,13 +226,15 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         )
         llm_setting_for_object: LLMSetting = model_deck.get_llm_setting(llm_choice=llm_setting_or_preset_id_for_object)
 
-        if (not self.llm_prompt_spec.templating_style) and (
-            inference_model := model_deck.get_optional_inference_model(model_handle=llm_setting_main.model, model_type=ModelType.LLM)
-        ):
+        # Derived per run into a local, never cached onto `self`: the pipe instance is the one the
+        # library holds and hands out, so a write-back here would make its serialized form depend on
+        # run order and would shadow any later config/deck change with the first run's value.
+        templating_style: TemplatingStyle | None = None
+        if inference_model := model_deck.get_optional_inference_model(model_handle=llm_setting_main.model, model_type=ModelType.LLM):
             # Note: the case where we don't get an inference model corresponds to the use of an external LLM plugin
             # TODO: improve this by making it possible to get the inference model for external LLM plugins
             prompting_target = llm_setting_main.prompting_target or inference_model.prompting_target
-            self.llm_prompt_spec.templating_style = get_config().pipelex.prompting_config.get_prompting_style(
+            templating_style = get_config().pipelex.prompting_config.get_prompting_style(
                 prompting_target=prompting_target,
             )
 
@@ -250,7 +247,11 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         rendered_llm_prompt: LLMPrompt | None = None
 
         if (
-            Concept.are_concept_compatible(concept_1=output_stuff_spec.concept, concept_2=get_native_concept(NativeConceptCode.TEXT), strict=True)
+            get_concept_library().is_compatible(
+                tested_concept=output_stuff_spec.concept,
+                wanted_concept=get_native_concept(NativeConceptCode.TEXT),
+                strict=True,
+            )
             and not is_multiple_output
         ):
             llm_prompt_1_for_text = await self.llm_prompt_spec.make_llm_prompt(
@@ -258,6 +259,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 context_provider=working_memory,
                 output_structure_prompt=None,
                 extra_params=llm_prompt_run_params.params,
+                templating_style=templating_style,
             )
             rendered_llm_prompt = llm_prompt_1_for_text
             try:
@@ -303,6 +305,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 context_provider=working_memory,
                 output_structure_prompt=output_structure_prompt,
                 extra_params=llm_prompt_run_params.params,
+                templating_style=templating_style,
             )
             rendered_llm_prompt = llm_prompt_for_object
             the_content = await self._llm_gen_object_stuff_content(
@@ -338,8 +341,10 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         if is_multiple_output:
             execution_data_dict["structuring_path"] = "object_list"
         else:
-            output_is_text = Concept.are_concept_compatible(
-                concept_1=output_stuff_spec.concept, concept_2=get_native_concept(NativeConceptCode.TEXT), strict=True
+            output_is_text = get_concept_library().is_compatible(
+                tested_concept=output_stuff_spec.concept,
+                wanted_concept=get_native_concept(NativeConceptCode.TEXT),
+                strict=True,
             )
             execution_data_dict["structuring_path"] = "text" if output_is_text else "object_direct"
 

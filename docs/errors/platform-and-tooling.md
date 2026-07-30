@@ -72,6 +72,7 @@ own page. Classes are grouped by subsystem.
 - [`GatewayTelemetryManagerInjectedError`](gateway-telemetry-manager-injected-error.md) — Gateway telemetry manager injected
 - [`GatewayTermsNotAcceptedError`](gateway-terms-not-accepted-error.md) — Gateway terms not accepted
 - [`InferenceSetupRequiredError`](inference-setup-required-error.md) — Inference setup required
+- [`JobMetadataError`](job-metadata-error.md) — Job metadata
 - [`LangfuseCredentialsError`](langfuse-credentials-error.md) — Langfuse credentials
 - [`MissingDependencyError`](missing-dependency-error.md) — Missing dependency
 - [`NestedKeyConflictError`](nested-key-conflict-error.md) — Nested key conflict

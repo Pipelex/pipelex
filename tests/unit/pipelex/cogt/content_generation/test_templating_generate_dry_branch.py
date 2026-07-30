@@ -11,10 +11,10 @@ from pytest_mock import MockerFixture
 from pipelex.cogt.content_generation.assignment_models import TemplatingAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.templating_generate import templating_gen_text
-from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
+from pipelex.tools.jinja2.template_category import TemplateCategory
 
 
 class TestTemplatingGenerateDryBranch:

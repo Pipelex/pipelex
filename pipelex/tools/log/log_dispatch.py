@@ -39,7 +39,7 @@ class LogDispatch:
 
         """
         if self._log_config_instance is None:
-            msg = "LogConfig is not set. You must call pipelex_hub.set_config()."
+            msg = "LogConfig is not set. You must call runtime_hub.set_config()."
             raise RuntimeError(msg)
         return self._log_config_instance
 

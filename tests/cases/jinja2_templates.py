@@ -2,8 +2,8 @@
 
 from typing import Any, ClassVar
 
-from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle
-from pipelex.cogt.templating.text_format import TextFormat
+from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
+from pipelex.tools.templating.text_format import TextFormat
 from tests.cases.registry import Fruit
 
 

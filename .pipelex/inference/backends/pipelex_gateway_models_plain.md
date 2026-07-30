@@ -37,6 +37,9 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **claude-4.8-opus**
   - inputs: text, images, pdf
   - outputs: text, structured
+- **claude-5-sonnet**
+  - inputs: text, images, pdf
+  - outputs: text, structured
 - **deepseek-v3.2**
   - inputs: text
   - outputs: text, structured
@@ -229,6 +232,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-07-06T14:28:01Z
+> Last updated: 2026-07-27T01:18:06Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.

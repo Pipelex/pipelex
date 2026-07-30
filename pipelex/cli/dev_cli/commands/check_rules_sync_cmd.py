@@ -9,9 +9,9 @@ from typing import TYPE_CHECKING
 from rich.markup import escape
 from rich.panel import Panel
 
-from pipelex.hub import get_console
 from pipelex.kit.index_loader import load_index
 from pipelex.kit.single_file_agent_rules import build_merged_rules, unified_diff
+from pipelex.runtime_hub import get_console
 from pipelex.system.configuration.configs import AgentTarget
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 

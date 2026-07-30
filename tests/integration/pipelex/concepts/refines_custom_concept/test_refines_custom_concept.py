@@ -3,8 +3,7 @@
 from collections.abc import Callable
 from pathlib import Path
 
-from pipelex.core.concepts.concept import Concept
-from pipelex.hub import get_library_manager
+from pipelex.interpreter_hub import get_concept_library, get_library_manager
 
 
 class TestRefinesCustomConcept:
@@ -45,8 +44,8 @@ class TestRefinesCustomConcept:
         vip_customer_concept = library.concept_library.get_required_concept("refines_custom_test.VIPCustomer")
 
         # Get the structure classes
-        customer_class = customer_concept.get_structure_class()
-        vip_customer_class = vip_customer_concept.get_structure_class()
+        customer_class = get_concept_library().get_structure_class(concept=customer_concept)
+        vip_customer_class = get_concept_library().get_structure_class(concept=vip_customer_concept)
 
         # Verify VIPCustomer is a subclass of Customer's structure class
         assert issubclass(vip_customer_class, customer_class)
@@ -71,8 +70,8 @@ class TestRefinesCustomConcept:
         vip_customer_concept = library.concept_library.get_required_concept("refines_custom_test.VIPCustomer")
 
         # Get the structure classes
-        customer_class = customer_concept.get_structure_class()
-        vip_customer_class = vip_customer_concept.get_structure_class()
+        customer_class = get_concept_library().get_structure_class(concept=customer_concept)
+        vip_customer_class = get_concept_library().get_structure_class(concept=vip_customer_concept)
 
         # Create a VIPCustomer instance with Customer fields
         vip_customer_instance = vip_customer_class(
@@ -88,7 +87,7 @@ class TestRefinesCustomConcept:
         assert vip_customer_instance.email == "john@example.com"  # type: ignore[attr-defined]
 
     def test_concepts_are_compatible(self, load_test_library: Callable[[list[Path]], None]):
-        """Test that Concept.are_concept_compatible returns True for refined concept."""
+        """Test that the library reports a refined concept as compatible with what it refines."""
         test_dir = Path(__file__).parent
         load_test_library([test_dir])
 
@@ -100,4 +99,4 @@ class TestRefinesCustomConcept:
         vip_customer_concept = library.concept_library.get_required_concept("refines_custom_test.VIPCustomer")
 
         # VIPCustomer should be compatible with Customer (it refines Customer)
-        assert Concept.are_concept_compatible(concept_1=vip_customer_concept, concept_2=customer_concept)
+        assert library.concept_library.is_compatible(tested_concept=vip_customer_concept, wanted_concept=customer_concept)

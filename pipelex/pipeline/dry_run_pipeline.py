@@ -12,14 +12,14 @@ cycle, which is why the two entrypoints are separate modules at separate altitud
 """
 
 from pipelex.config import get_config
-from pipelex.core.interpreter.exceptions import PipelexInterpreterError
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.graph.graphspec import GraphSpec
-from pipelex.hub import scoped_event_log
+from pipelex.mthds_parsing.exceptions import MthdsParserError
+from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_run.exceptions import DryRunGraphNotProducedError
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.runtime_hub import scoped_event_log
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 
 
@@ -50,7 +50,7 @@ async def dry_run_pipeline(
         Tuple of (GraphSpec, domain-qualified main-pipe ref).
 
     Raises:
-        PipelexInterpreterError: If content parsing fails or main_pipe is missing.
+        MthdsParserError: If content parsing fails or main_pipe is missing.
         DryRunGraphNotProducedError: If pipeline execution does not produce a graph spec.
         PipelineExecutionError: If dry-run execution fails.
     """
@@ -62,15 +62,15 @@ async def dry_run_pipeline(
     # shared selection rule. Note: pipeline_run_setup will re-parse these contents. The
     # double-parse is accepted because the runner interface requires the pipe ref upfront
     # and does not expose the internally-resolved pipe ref in its response.
-    blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
+    blueprints = [MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
     if pipe_code is not None and not pipe_code.strip():
         msg = "pipe_code must not be blank when provided"
-        raise PipelexInterpreterError(msg)
+        raise MthdsParserError(msg)
     pipe_ref = pipe_code if pipe_code is not None else select_primary_blueprint(blueprints).main_pipe_ref
 
     if not pipe_ref:
         msg = "Bundle does not declare a main_pipe, cannot generate graph"
-        raise PipelexInterpreterError(msg)
+        raise MthdsParserError(msg)
 
     execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=True,

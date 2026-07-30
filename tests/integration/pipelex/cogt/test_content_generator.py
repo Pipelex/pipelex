@@ -11,9 +11,9 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
-from pipelex.hub import get_model_deck
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.runtime_hub import get_model_deck
+from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.cases import DocumentTestCases, ImageTestCases
 from tests.integration.pipelex.cogt.test_data import Employee
 

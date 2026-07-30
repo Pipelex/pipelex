@@ -1,9 +1,9 @@
 from enum import StrEnum
 from typing import NamedTuple, cast
 
-from kajson.class_registry_abstract import ClassRegistryAbstract
 from pydantic import BaseModel
 
+from pipelex import log
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.exceptions import (
@@ -18,15 +18,25 @@ from pipelex.core.concepts.structure_generation.generator import StructureGenera
 from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.system.registries.class_registry_access import get_class_registry
 
 
-def _get_class_registry() -> ClassRegistryAbstract:
-    """Lazy import to break circular dependency with hub.py."""
-    import importlib  # noqa: PLC0415
+def _is_valid_structure_class(*, structure_class_name: str) -> bool:
+    """Whether a class name is already registered as a usable `StuffContent` subclass.
 
-    hub = importlib.import_module("pipelex.hub")
-    return hub.get_class_registry()  # type: ignore[no-any-return]
+    Materialization-time only, which is why it lives here rather than on `Concept`: the factory is
+    deciding whether to *reuse* an existing class or generate one, and that question is about the
+    registry the generated classes land in — not about a concept, which at this point does not exist
+    yet. A name registered as something other than a `StuffContent` subclass is a near-miss worth a
+    warning, since the author almost certainly meant it to be one.
+    """
+    if get_class_registry().has_subclass(name=structure_class_name, base_class=StuffContent):
+        return True
+    if get_class_registry().has_class(name=structure_class_name):
+        log.warning(f"Concept class '{structure_class_name}' is registered but it's not a subclass of StuffContent")
+    return False
 
 
 class StructureNameAndRefine(NamedTuple):
@@ -310,7 +320,7 @@ class ConceptFactory:
         if not isinstance(structure_class_name, str):
             msg = f"Expected structure to be a string, got {type(structure_class_name)}"
             raise ConceptFactoryError(msg)
-        if not Concept.is_valid_structure_class(structure_class_name=structure_class_name):
+        if not _is_valid_structure_class(structure_class_name=structure_class_name):
             msg = (
                 f"Structure class '{structure_class_name}' set for concept '{concept_code}' in domain '{domain_code}' "
                 "is not a registered subclass of StuffContent, or was not found in the library."
@@ -358,7 +368,7 @@ class ConceptFactory:
             raise ConceptFactoryError(msg) from exc
 
         # Register the generated class
-        _get_class_registry().register_class(the_generated_class)
+        get_class_registry().register_class(the_generated_class)
 
         return qualified_class_name
 
@@ -376,9 +386,9 @@ class ConceptFactory:
         # Check if a valid structure class already exists — first by bare concept_code
         # (for pre-existing Python classes registered under their own name), then by
         # qualified name (for previously generated dynamic classes)
-        if Concept.is_valid_structure_class(structure_class_name=concept_code):
+        if _is_valid_structure_class(structure_class_name=concept_code):
             return StructureNameAndRefine(structure_class_name=concept_code, refine_string=None)
-        if Concept.is_valid_structure_class(structure_class_name=qualified_class_name):
+        if _is_valid_structure_class(structure_class_name=qualified_class_name):
             return StructureNameAndRefine(structure_class_name=qualified_class_name, refine_string=None)
 
         # Because native concepts have structure class names diffrent than other (with "Content")
@@ -399,7 +409,7 @@ class ConceptFactory:
             msg = f"Error generating structure class for concept '{concept_code}' in domain '{domain_code}': {exc}"
             raise ConceptFactoryError(msg) from exc
         # Register the generated class
-        _get_class_registry().register_class(the_generated_class)
+        get_class_registry().register_class(the_generated_class)
 
         return StructureNameAndRefine(structure_class_name=qualified_class_name, refine_string=NativeConceptCode.TEXT.concept_ref)
 
@@ -445,7 +455,7 @@ class ConceptFactory:
                 )
                 raise ConceptFactoryError(msg) from exc
 
-            _get_class_registry().register_class(the_generated_class)
+            get_class_registry().register_class(the_generated_class)
             return StructureNameAndRefine(structure_class_name=qualified_class_name, refine_string=current_refine)
 
         # Get the refined concept's structure class name
@@ -476,7 +486,7 @@ class ConceptFactory:
             raise ConceptFactoryError(msg) from exc
 
         # Register the generated class
-        _get_class_registry().register_class(the_generated_class)
+        get_class_registry().register_class(the_generated_class)
 
         return StructureNameAndRefine(structure_class_name=qualified_class_name, refine_string=current_refine)
 

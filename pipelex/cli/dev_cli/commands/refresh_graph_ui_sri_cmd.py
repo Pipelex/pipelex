@@ -17,7 +17,7 @@ from urllib.request import urlopen
 
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.graph.reactflow import standalone_assets as current_pins
-from pipelex.hub import get_console
+from pipelex.runtime_hub import get_console
 
 _DEFAULT_OUTPUT_PATH = Path(current_pins.__file__)
 

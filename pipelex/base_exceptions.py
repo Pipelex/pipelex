@@ -123,7 +123,7 @@ class DisclosureMode(StrEnum):
       - A report flagged :attr:`ErrorReport.caller_facing_message` keeps its
         ``message`` and ``user_action``. The flag is set by error classes whose
         message is genuinely caller-facing copy — text describing the *caller's
-        own* input, e.g. ``PipelexInterpreterError`` (a ``.mthds`` syntax error)
+        own* input, e.g. ``MthdsParserError`` (a ``.mthds`` syntax error)
         or ``ValidateBundleError`` (a failed bundle validation).
       - Every other report has its ``message`` replaced with a generic
         placeholder and its ``user_action`` dropped, keeping only the stable

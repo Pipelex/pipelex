@@ -27,7 +27,7 @@ STANDARD_IMPORTS = """\
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Any, Literal
 """
 
 
@@ -96,7 +96,7 @@ class Invoice(StructuredContent):
 class Invoice(StructuredContent):
     """Generated Invoice class"""
 
-    line_items: List["myapp__LineItem"] = Field(..., description="List of line items")
+    line_items: list["myapp__LineItem"] = Field(..., description="List of line items")
     total: float = Field(..., description="Invoice total")
 '''
         )
@@ -132,7 +132,7 @@ class Invoice(StructuredContent):
 class CategoryNode(StructuredContent):
     """Generated CategoryNode class"""
 
-    parent: Optional["myapp__Category"] = Field(default=None, description="Optional parent reference")
+    parent: "myapp__Category | None" = Field(default=None, description="Optional parent reference")
     name: str = Field(..., description="Category name")
 '''
         )
@@ -162,7 +162,7 @@ class CategoryNode(StructuredContent):
 class Parent(StructuredContent):
     """Generated Parent class"""
 
-    children: Optional[List["myapp__Category"]] = Field(default=None, description="Optional child categories")
+    children: list["myapp__Category"] | None = Field(default=None, description="Optional child categories")
 '''
         )
         assert generated_code == expected_code
@@ -198,7 +198,7 @@ class Order(StructuredContent):
     """Generated Order class"""
 
     customer: "crm__Customer" = Field(..., description="Customer from CRM domain")
-    products: List["inventory__Product"] = Field(..., description="Products from inventory domain")
+    products: list["inventory__Product"] = Field(..., description="Products from inventory domain")
 '''
         )
         assert generated_code == expected_code
@@ -288,10 +288,10 @@ class ComplexEntity(StructuredContent):
 
     id: int = Field(..., description="Unique identifier")
     name: str = Field(..., description="Name")
-    owner: Optional["myapp__User"] = Field(default=None, description="Owner reference")
-    tags: Optional[List[str]] = Field(default=None, description="Tags")
-    related_items: Optional[List["myapp__Item"]] = Field(default=None, description="Related items")
-    metadata: Optional[Dict[str, str]] = Field(default=None, description="Metadata")
+    owner: "myapp__User | None" = Field(default=None, description="Owner reference")
+    tags: list[str] | None = Field(default=None, description="Tags")
+    related_items: list["myapp__Item"] | None = Field(default=None, description="Related items")
+    metadata: dict[str, str] | None = Field(default=None, description="Metadata")
 '''
         )
         assert generated_code == expected_code
@@ -358,5 +358,5 @@ class ComplexEntity(StructuredContent):
 
         # Native concepts in lists should also generate imports
         assert "from pipelex.core.stuffs.image_content import ImageContent" in generated_code
-        assert "images: List[ImageContent] = Field(...," in generated_code
+        assert "images: list[ImageContent] = Field(...," in generated_code
         assert issubclass(generated_class, StructuredContent)

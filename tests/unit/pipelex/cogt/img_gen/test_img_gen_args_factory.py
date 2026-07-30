@@ -45,8 +45,8 @@ from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.usage.cost_category import CostCategory
-from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.plugins.openai.openai_img_gen_worker import OpenAIImgGenWorker
+from pipelex.providers.openai.openai_img_gen_worker import OpenAIImgGenWorker
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.misc.filetype_utils import FileType
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.uri.prepared_file import PreparedFileBase64

@@ -4,9 +4,9 @@ from pydantic import Field, model_validator
 from rich.text import Text
 from typing_extensions import override
 
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
+from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.http_utils import validate_url_resource_exists
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.uri.uri_resolver import extract_filename_from_uri, resolve_uri

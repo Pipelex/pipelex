@@ -18,12 +18,13 @@ from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME, DEFAULT_INPUTS
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.crate_loading import load_normalized_crate_or_exit
 from pipelex.cli.error_handlers import ErrorContext
-from pipelex.core.pipes.inputs.input_renderer import InputsTemplateFormat, NoInputsRequiredError, render_inputs, render_inputs_toml
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.hub import get_required_pipe, get_telemetry_manager
+from pipelex.interpreter_hub import get_required_pipe
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
+from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat, NoInputsRequiredError, render_inputs, render_inputs_toml
 from pipelex.pipelex import Pipelex
+from pipelex.runtime_hub import get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.file_utils import ensure_directory_for_file_path, save_text_to_path
