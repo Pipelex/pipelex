@@ -130,6 +130,35 @@ class TestHubSlotInjectionPrecedence:
 
         assert order == ["third", "second", "first"]
 
+    def test_one_raising_teardown_callback_does_not_skip_the_others(self, mocker: MockerFixture) -> None:
+        """Teardown is best-effort *per callback*, so a bad plugin cannot strand a good one's resources.
+
+        Catching around the loop rather than inside it looks equivalent and is not: by the time an
+        exception reaches the caller the loop has already exited, so every remaining callback is
+        skipped — and with two plugins registered, the second one's runtime stays live. The raiser is
+        registered *last* so LIFO reaches it *first*, which is the ordering that strands the others.
+        """
+        order: list[str] = []
+        registrar = _fake_registrar(mocker)
+
+        def _boom() -> None:
+            order.append("raiser")
+            msg = "plugin teardown exploded"
+            raise RuntimeError(msg)
+
+        registrar.teardown_callbacks.extend([lambda: order.append("survivor"), _boom])
+
+        Pipelex.make(
+            integration_mode=_test_integration_mode(),
+            needs_inference=False,
+            storage_provider=InMemoryStorageProvider(),
+            secrets_provider=EnvSecretsProvider(),
+        )
+        # Must not propagate: no caller of a teardown can act on "plugin B failed to release".
+        Pipelex.teardown_if_needed()
+
+        assert order == ["raiser", "survivor"], "a raising callback skipped the remaining teardown callbacks"
+
     def test_a_failed_interpreter_tail_still_runs_plugin_teardown_callbacks(self, mocker: MockerFixture) -> None:
         """A boot that dies after the TASK_MANAGER thunk must not leak the runtime it started.
 

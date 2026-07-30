@@ -615,10 +615,24 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         Names no integration: the callbacks were registered by whichever boot-orchestrator plugin
         claimed the runtime.
+
+        **Best-effort, per callback.** Each is unbounded third-party code, and a failure in one must not
+        skip the rest: with two plugins registered, a raising first callback would otherwise leave the
+        second plugin's runtime live. Catching around the *loop* instead of inside it looks equivalent
+        and is not — the loop has already exited by then. Errors are logged rather than propagated,
+        because no caller of a teardown can act on "plugin B failed to release", whereas every caller is
+        harmed by B never being asked. Same shape as ``TelemetryManager.teardown``, which wraps each of
+        its own shutdown steps for the same reason.
         """
-        if self._plugin_registrar is not None:
-            for teardown_callback in reversed(self._plugin_registrar.teardown_callbacks):
+        if self._plugin_registrar is None:
+            return
+        for teardown_callback in reversed(self._plugin_registrar.teardown_callbacks):
+            try:
                 teardown_callback()
+            except Exception as teardown_exc:  # noqa: BLE001
+                # (2) a plugin-registered callback is unbounded third-party code; its exception surface
+                # cannot be enumerated, and the remaining callbacks still have resources to release.
+                log.error(f"A plugin teardown callback failed and was skipped: {teardown_exc}")
 
     def _teardown_runtime(self) -> None:
         """Release everything the runtime boot acquired, and the process globals with it."""
@@ -696,17 +710,15 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # registry, and this instance still registered as the singleton. It would also replace the
         # exception that actually killed the boot with a teardown error. The releases must therefore
         # happen on both paths, which is precisely what ``finally`` is for.
+        # ``try``/``finally`` with no ``except``: the callbacks swallow their own per-callback failures
+        # (see ``_teardown_plugin_callbacks``), so nothing ordinary escapes here — but ``except Exception``
+        # there does not cover ``BaseException``, and this method's whole job is to leave the process
+        # re-bootable. The releases below must therefore run even on a ``KeyboardInterrupt`` mid-teardown.
+        # They are also what a raising callback must never skip: without them, logging stays configured
+        # (every later boot dies on "LogConfig is already set") and the ``KajsonManager`` keeps a
+        # half-populated class registry.
         try:
             self._teardown_plugin_callbacks()
-        except Exception as teardown_exc:  # noqa: BLE001
-            # (2) plugin-registered teardown callbacks are unbounded third-party code, so their
-            # exception surface cannot be enumerated. Swallowed *and* logged rather than propagated:
-            # this method only ever runs while ``make()`` is already handling the exception that killed
-            # the boot, and letting a teardown error out of here would reach the caller in its place —
-            # the bare ``raise`` in ``make()``'s handler is never executed. The boot failure is the one
-            # the caller must see; this one is a diagnostic. Only this line is unbounded — everything in
-            # the ``finally`` below is our own code — which is why it alone is caught.
-            log.error(f"A plugin teardown callback failed while releasing a failed boot: {teardown_exc}")
         finally:
             # The telemetry manager is a *process-global singleton* (``ABCSingletonMeta``), not just an
             # attribute, so discarding this instance does not release it: the next boot in the process

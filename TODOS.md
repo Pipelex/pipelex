@@ -55,6 +55,7 @@ Each has a test; each is in the changelog.
 - **A second boot on top of an existing one fails loud.** `Pipelex.make()` refuses when a bare `RuntimeBoot` holds the process globals, and vice versa. The error message names the class that actually holds them, not a hardcoded "Pipelex".
 - **`config_dir` at boot reaches `setup_config`.**
 - **Breaking:** `Pipelex.__init__` takes keyword-only `config_dir` in place of the inert positional `config_dir_path`. Nothing in the workspace constructed `Pipelex` positionally.
+- **Breaking:** `teardown()` no longer propagates a plugin teardown callback's exception. The callbacks are attempted individually and failures are logged, so one bad plugin cannot strand another's resources.
 
 ## Pre-existing bugs fixed (flag-and-fix)
 
@@ -131,6 +132,16 @@ The fourth was the registration-order consequence above — verified inert, not 
 Codex then raised a fifth on the PR, **verified correct and deliberately deferred**: a runtime-only boot rejects an interpreter-layer orchestrator contributed by a *built-in* (it is never registered, since `builtin_plugins` defaults to the runtime half) but **not** one contributed by an *external* entry-point plugin, because `build_registrar` discovers externals unconditionally. Such a boot would apply the plugin's runtime claims — including `TASK_MANAGER` — never apply its `PIPE_ROUTER` / `PIPE_RUN` / `PIPE_FUNC_EXECUTOR` claims, and still report ready.
 
 Not fixed here for three reasons: it needs an external interpreter-side orchestrator installed *and* configured *and* a caller of `RuntimeBoot.make()`, of which there are none; every remedy needs a layer signal the runtime layer deliberately does not have (a `PipelexPlugin` carries no layer field, by design); and the nearest clean remedy is a flag on the very class pair that exists to avoid flags — which would contradict the doctor-adoption decision taken twenty lines away in the same file. The gate's comment now states the hole precisely instead of overclaiming (it previously said the runtime-only boot "also rejects an interpreter-contributed orchestrator name, which is correct" — true for built-ins, false for externals, so the comment was the actual defect). Full analysis and two candidate remedies: [`wip/inputs/runtime-boot-external-interpreter-orchestrator.md`](wip/inputs/runtime-boot-external-interpreter-orchestrator.md).
+
+### Round 6 — Greptile back to 5/5; Codex found the granularity bug in my round-4 fix
+
+Codex's last finding is a consequence of the fix I made two rounds earlier, and it is a good one: my `except Exception` sat around the **loop** rather than inside it, so the first raising callback (LIFO, i.e. the last registered) ended the loop and every remaining callback was skipped. With two plugins registered — Temporal plus a sandbox executor is the realistic pair — the second one's runtime stayed live while the log said only that one callback had failed.
+
+"Catch around the loop" and "catch per iteration" look equivalent and are not, which is exactly why this needed a test rather than a re-read. Fixed by moving the catch inside the loop; the outer one became dead and was removed, though the `try`/`finally` stays, because `except Exception` does not cover `BaseException` and the state releases must still run if a teardown is interrupted.
+
+Pinned by `test_one_raising_teardown_callback_does_not_skip_the_others`, which registers the raiser **last** so LIFO reaches it first — the ordering that strands the others. Verified as a real control: restoring the around-the-loop catch fails it with "a raising callback skipped the remaining teardown callbacks".
+
+**Third deliberate behaviour change, now declared:** `teardown()` no longer propagates a plugin callback's exception. That follows from making the loop best-effort, and it is the right semantics — no caller can act on "plugin B failed to release", while every caller is harmed by B never being asked. Same shape as `TelemetryManager.teardown`, which wraps each of its own shutdown steps for the same reason.
 
 ### Round 5 — Greptile blocked on the deferred telemetry leak, and it was right to
 
