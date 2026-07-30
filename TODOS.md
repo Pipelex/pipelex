@@ -14,7 +14,16 @@
 - Last full CI round (on `f7186e7`'s predecessor) was **23 pass / 0 fail**, Greptile **5/5 "safe to merge"**, 0 unresolved threads.
 - Two more commits landed after that round (`f7186e736`, `e0ebf6b42`) with both review threads replied to and resolved. **CI and the bots have NOT yet run on `e0ebf6b42`.**
 
-**The one open action:** wait for CI + Greptile + Codex on `e0ebf6b42`, then triage as before. A re-trigger comment (`@greptileai please re-review.` / `@codex review`) has been posted for it.
+### ⚠ Procedural gaps to close on resume — read this before continuing
+
+The work landed, but the **prescribed procedure was not followed in two places.** The resuming session must close these; they are not optional and not already done.
+
+1. **Bot-feedback triage was never fanned out.** The instruction was: when CI and the review bots report, fan out an **Opus sub-agent** to check their feedback, deduplicate, verify each item, and arbitrate — solving only clear wins, guarding no impossible scenarios. Instead all seven rounds of bot feedback were triaged inline, directly. **On resume: for the next round, spawn an Opus sub-agent for the triage** rather than reading the threads yourself. Give it the PR number, the unresolved-thread list, the repo conventions, the strict no-over-engineering bar, and the instruction to defer doubts as `.md` in `wip/inputs/`.
+2. **The final gstack `/review @TODOS.md` pass is still owed.** One was run, but *mid-stream* — before the bots were quiet — and its five findings then triggered three further bot rounds. The instruction is to run it **after** the bots are all happy, as the finalizing step. **On resume: once CI is green and Greptile/Codex are quiet on the head commit, fan out a sub-agent to run gstack `/review @TODOS.md`, apply its findings under the same bar, and only then finalize the PR.**
+
+A third, lesser deviation, already documented below and defensible but worth knowing: the plan's CHECKPOINT 1 and CHECKPOINT 2 were merged into one commit, so the Sonnet-5 `/code-review` fan-out happened **once** rather than per checkpoint. That one fan-out did run correctly — fresh agent, no inherited context, pointed only at the staged diff — and Phases 3–5 were additionally covered by the gstack pass.
+
+**The immediate open action:** wait for CI + Greptile + Codex on `e0ebf6b42` / `a4362a13e`, then triage **via the Opus sub-agent per gap 1 above**. A re-trigger comment (`@greptileai please re-review.` / `@codex review`) has been posted.
 
 **How the review loop has been run** (worth continuing, because it kept finding real things — six of the seven rounds produced at least one genuine defect):
 
