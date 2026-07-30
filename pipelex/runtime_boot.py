@@ -667,14 +667,14 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         partway through ``setup()``, so a half-built ``teardown()`` raises ``AttributeError``. That is
         deliberate: guarding them would let a half-built teardown look successful.
 
-        It releases a **subset** of what ``teardown()`` does, and the gap is pre-existing rather than
-        chosen: ``TelemetryManager`` carries ``ABCSingletonMeta`` and is cleared only from
-        ``teardown()``, so a boot that dies after the telemetry factory leaves that singleton live and
-        the next boot in the process adopts the dead one instead of constructing a fresh manager. The
-        same holds for ``sdk_client_manager``, ``reporting_delegate`` and ``func_registry``. Widening
-        this method to cover them is a change to failure-path semantics rather than a comment fix, so it
-        is written up in ``wip/inputs/failed-boot-leaks-telemetry-singleton.md`` instead of being done
-        here. Do not read the list below as complete.
+        It releases a **subset** of what ``teardown()`` does, and the subset is chosen: everything that
+        would otherwise *poison the next boot* is here — the hub config, the class-registry scoping, the
+        ``KajsonManager``, the template registries, the telemetry singleton and the ``MetaSingleton``
+        registration. What is deliberately absent is ``sdk_client_manager``, ``reporting_delegate`` and
+        ``func_registry``: those leave resources dangling rather than corrupting the next boot, and
+        adding them here would widen a second hand-maintained copy of the teardown list that is bound to
+        drift from the real one. Collapsing the two paths is the right fix and is a lifecycle decision of
+        its own — ``wip/inputs/failed-boot-does-not-release-every-resource.md``.
 
         Without this, the next boot raises "LogConfig is already set" and serves a stale, half-populated
         class registry (the ``KajsonManager`` singleton ignores a fresh registry once created).
@@ -708,6 +708,15 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             # the ``finally`` below is our own code — which is why it alone is caught.
             log.error(f"A plugin teardown callback failed while releasing a failed boot: {teardown_exc}")
         finally:
+            # The telemetry manager is a *process-global singleton* (``ABCSingletonMeta``), not just an
+            # attribute, so discarding this instance does not release it: the next boot in the process
+            # would adopt the dead manager and export spans through it, because ``__init__`` never
+            # re-runs for an already-registered singleton. Its ``teardown`` both flushes and calls
+            # ``clear_instance()``, and it is written to never raise ("telemetry teardown must never
+            # break the app"), so it is safe on this path. Guarded the same way ``_teardown_runtime``
+            # guards it, since a boot can fail before the telemetry factory has run at all.
+            if self.telemetry_manager is not None:
+                self.telemetry_manager.teardown()
             self.runtime_hub.reset_config()
             class_registry_scoping.reset()
             KajsonManager.teardown()
