@@ -282,8 +282,12 @@ class Pipelex(RuntimeBoot):
             library_dirs: Default library directories for pipeline execution. If provided, these
                 directories will be used instead of the PIPELEXPATH environment variable.
                 Per-call library_dirs in execute/start will override this default.
-            config_dir: Optional explicit config dir. When provided, project/global layering is
-                bypassed and only this directory is read.
+            config_dir: Optional explicit config dir. When provided, the **main TOML load** is scoped
+                to this directory (package defaults + this directory) instead of following
+                project/global layering. Note the limit: the inference files — backends, routing
+                profiles and the model deck — still resolve through the layered paths, so this does not
+                fully isolate a boot from the surrounding project. See
+                ``wip/inputs/config-dir-does-not-scope-inference-paths.md``.
             config_overrides: Optional dict deep-merged on top of all TOML config layers
                 as the highest-priority override. Useful for tests that need specific
                 config without editing TOML files.

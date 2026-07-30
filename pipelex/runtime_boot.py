@@ -170,10 +170,10 @@ class RuntimeBoot(metaclass=MetaSingleton):
             raise PipelexSetupError(msg)
 
         self.is_ready: bool = False
-        # ``config_dir`` is deliberately not stored on the instance. Its predecessor was
-        # (``self.config_dir_path``) and nothing ever read it, which is precisely how it came to be
-        # dropped on the floor instead of reaching ``setup_config``. Keeping a resolved copy beside the
-        # parameter that is actually authoritative would re-create that trap for the next reader.
+        # ``config_dir`` is deliberately not stored on the instance. Its predecessor
+        # (``self.config_dir_path``) was, and nothing ever read it, which is precisely how it came to be
+        # dropped on the floor instead of reaching ``setup_config``. Keeping a copy beside the parameter
+        # that is actually authoritative would re-create that trap for the next reader.
         # The runtime hub is process-scoped infrastructure, and it is constructed first because it is
         # the lower layer, so it reads first. The interpreter half installs its own hub afterwards;
         # that install does not need this one (it only stores the class-registry scoping resolver,
@@ -455,6 +455,14 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.runtime_hub.set_models_manager(models_manager=self.models_manager)
 
         try:
+            # NOTE: ``config_dir`` scopes the main TOML load only; the inference files (backends,
+            # routing profiles, model deck) still resolve through the layered ``config_manager.*``
+            # properties, because pinning them requires the path overrides that exist on the *concrete*
+            # ``ModelManager`` and not on ``ModelManagerAbstract`` — which is what this attribute is
+            # typed as, and which is a public injection point. Widening that interface is a decision of
+            # its own, so the gap is documented rather than half-closed:
+            # ``wip/inputs/config-dir-does-not-scope-inference-paths.md``. The docstrings say exactly
+            # this; do not read ``config_dir`` as "only this directory is read" for inference.
             self.models_manager.setup(
                 secrets_provider=secrets_provider,
                 gateway_config=gateway_config,
@@ -690,6 +698,15 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # happen on both paths, which is precisely what ``finally`` is for.
         try:
             self._teardown_plugin_callbacks()
+        except Exception as teardown_exc:  # noqa: BLE001
+            # (2) plugin-registered teardown callbacks are unbounded third-party code, so their
+            # exception surface cannot be enumerated. Swallowed *and* logged rather than propagated:
+            # this method only ever runs while ``make()`` is already handling the exception that killed
+            # the boot, and letting a teardown error out of here would reach the caller in its place —
+            # the bare ``raise`` in ``make()``'s handler is never executed. The boot failure is the one
+            # the caller must see; this one is a diagnostic. Only this line is unbounded — everything in
+            # the ``finally`` below is our own code — which is why it alone is caught.
+            log.error(f"A plugin teardown callback failed while releasing a failed boot: {teardown_exc}")
         finally:
             self.runtime_hub.reset_config()
             class_registry_scoping.reset()
@@ -730,9 +747,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         """Create and initialize a runtime-layer singleton: inference, storage, models, telemetry.
 
         Loads no method interpreter. Use ``pipelex.pipelex.Pipelex.make`` to boot the full stack.
-        See that method for the shared arguments — including ``config_dir``, which scopes the config
-        load to a single directory; the ones absent here (``pipe_func_executor``, ``pipeline_manager``,
-        ``pipe_router``, ``library_dirs``) are interpreter-layer injections.
+        See that method for the shared arguments — including ``config_dir``, which scopes the *main
+        TOML* load to a single directory (and, per that docstring, not the inference file paths); the
+        ones absent here (``pipe_func_executor``, ``pipeline_manager``, ``pipe_router``,
+        ``library_dirs``) are interpreter-layer injections.
 
         Returns the initialized runtime boot instance, and raises ``PipelexSetupError`` if a boot
         already holds the process globals or if setup fails.

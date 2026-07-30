@@ -1,11 +1,18 @@
-"""`config_dir` at boot must actually scope the config load.
+"""`config_dir` at boot must actually scope the main config load.
 
-It did not. The parameter was stored as `self.config_dir_path` and never read again, while
-`setup_config` was called without a `config_dir` — so an embedder passing an explicit config dir got
-the ordinary project/global layering and no error at all. This is the test that would have caught it.
+It scoped nothing at all at first: the parameter was stored as `self.config_dir_path` and never read
+again, while `setup_config` was called without a `config_dir`, so an embedder passing an explicit
+config dir got the ordinary project/global layering and no error. This is the test that would have
+caught it.
 
 A scoped load is *package defaults + this directory*, so one overridden leaf is enough to tell the
 two apart without writing a whole valid config tree.
+
+Scope note: `config_dir` scopes the main TOML load only — the inference file paths still resolve
+through the layered `config_manager.*` properties, because pinning them needs overrides that live on
+the concrete `ModelManager` rather than on the `ModelManagerAbstract` this boot is typed against. That
+gap is deliberate and documented (`wip/inputs/config-dir-does-not-scope-inference-paths.md`), which is
+why this module asserts the main-config leaf and nothing about backends or decks.
 """
 
 from pathlib import Path
