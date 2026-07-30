@@ -47,12 +47,19 @@ def _revalidate_against_object_class(
     object_class: type[BaseModelTypeVar],
     is_mock_built: bool,
 ) -> BaseModelTypeVar:
-    """Re-validate a leaf-generated object's data against the original ``object_class``.
+    """Convert a leaf-generated object into ``object_class``, unless it already is one.
 
-    On the in-process path the leaf already worked from ``object_class`` itself, so this is a same-type
-    conversion. It is kept because it is also the *boundary* conversion: a leaf that ran on a worker
-    holding only the serialized assignment returns a plain ``BaseModel`` reconstructed from the JSON
-    schema, and re-validating its data here makes the result the proper subtype (e.g.
+    On the in-process path the leaf worked from ``object_class`` itself, so the object needs no
+    conversion — and re-validating it would run the caller's validators a **second** time, on data they
+    already normalized. A validator that transforms rather than merely rejects (``f"INV-{value}"``, a
+    list that gets a default appended) would corrupt its own output, and one that asserts its input is
+    not yet normalized would reject valid provider output. Returning it untouched is what makes the
+    caller's validator constrain the provider exactly once, which is the whole point of handing the live
+    class down.
+
+    The conversion is still needed at the *boundary*: a leaf that ran on a worker holding only the
+    serialized assignment returns a plain ``BaseModel`` reconstructed from the JSON schema — never a
+    subclass of ``object_class`` — so re-validating its data makes the result the proper subtype (e.g.
     ``StructuredContent``) the caller expects.
 
     Under the dry-run leaf mock (``run_mode=DRY``) that reconstruction is also what polyfactory built the
@@ -65,6 +72,8 @@ def _revalidate_against_object_class(
     ``build_mock_object``, and never reaches this function. The catch is scoped to the dry path only — a
     LIVE provider's invalid output keeps its existing ``ValidationError``.
     """
+    if isinstance(raw_obj, object_class):
+        return raw_obj
     raw_data = raw_obj.model_dump(serialize_as_any=True)
     if not is_mock_built:
         return object_class.model_validate(raw_data)

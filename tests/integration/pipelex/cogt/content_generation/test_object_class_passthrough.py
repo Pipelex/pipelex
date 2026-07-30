@@ -24,6 +24,7 @@ from pytest_mock import MockerFixture
 
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
+from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.content_generation.dry_mock import dry_llm_gen_object
 from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen_object_list
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -51,6 +52,21 @@ class SimpleName(StructuredContent):
     """No invariant the round trip drops, so its mock builds under either class resolution."""
 
     name: str
+
+
+class NormalizedReference(StructuredContent):
+    """A validator that *transforms* rather than rejects — the shape that exposes double validation.
+
+    A rejecting validator is idempotent and cannot tell one execution from two, which is why the
+    identity assertions above are not enough on their own.
+    """
+
+    reference: str
+
+    @field_validator("reference")
+    @classmethod
+    def _normalize(cls, value: str) -> str:
+        return f"INV-{value}"
 
 
 class _StubListResponse(BaseModel):
@@ -142,6 +158,40 @@ class TestObjectClassPassthrough:
         list_schema = mock_worker.gen_object.await_args.kwargs["schema"]
         item_annotation = list_schema.model_fields["items"].annotation
         assert get_args(item_annotation)[0] is not HintedName
+
+    async def test_caller_validators_run_exactly_once(self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol) -> None:
+        """Handing the live class down must make the caller's validator constrain the result once, not twice.
+
+        The leaf now builds from the caller's class, so its validators already ran there. Re-validating
+        the result against the same class would run them again on data they had already normalized —
+        ``INV-INV-…`` — which is the opposite of honoring the invariant this change exists to preserve.
+        """
+        result = await content_generator.make_object(
+            job_metadata=job_metadata,
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
+            object_class=NormalizedReference,
+            llm_prompt_for_object=LLMPrompt(user_text="make a reference"),
+            llm_setting_for_object=LLMSetting(model="test-model", temperature=0.5),
+        )
+
+        assert result.reference.startswith("INV-")
+        assert not result.reference.startswith("INV-INV-")
+
+    async def test_caller_validators_run_exactly_once_per_list_item(
+        self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol
+    ) -> None:
+        """The list path revalidates per item, so it carries the same once-only contract."""
+        results = await content_generator.make_object_list(
+            job_metadata=job_metadata,
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
+            object_class=NormalizedReference,
+            llm_prompt_for_object_list=LLMPrompt(user_text="make references"),
+            llm_setting_for_object_list=LLMSetting(model="test-model", temperature=0.5),
+            nb_items=3,
+        )
+
+        assert len(results) == 3
+        assert all(not item.reference.startswith("INV-INV-") for item in results)
 
     async def test_dry_leaf_resolves_the_class_the_same_way_as_the_live_leaf(self) -> None:
         """Both run modes take the same path — asserted directly, not inferred from two passing tests.

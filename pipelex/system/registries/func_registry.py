@@ -19,7 +19,7 @@ FuncRegistryDict = dict[str, Callable[..., Any]]
 PIPE_FUNC_MARKER = "_is_pipe_func"
 
 
-def describe_function_origin(*, func: Callable[..., Any]) -> str:
+def _describe_function_origin(*, func: Callable[..., Any]) -> str:
     """Renders where a registered function came from, for collision diagnostics.
 
     Modules imported by file path get a name mangled from their absolute path, so the module name
@@ -132,7 +132,7 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
                 return
             msg = (
                 f"Function name '{key}' is already registered by a different function: "
-                f"{describe_function_origin(func=already_registered)} would be replaced by {describe_function_origin(func=func)}. "
+                f"{_describe_function_origin(func=already_registered)} would be replaced by {_describe_function_origin(func=func)}. "
                 f"PipeFunc names share a single flat, process-wide name space, so which one wins would depend on "
                 f'scan order. Give one of them a distinct name with @pipe_func(name="..."). '
                 f"See: {URLs.pipe_func_docs}"
