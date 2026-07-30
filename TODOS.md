@@ -4,44 +4,57 @@
 
 ## ⏸ RESUME HERE — session paused 2026-07-30
 
-**Everything is committed and pushed. Nothing is in flight locally.** `git status` is clean; branch `refactor/Boot` == `origin/refactor/Boot` at `e0ebf6b42`.
+**Everything is committed and pushed. Nothing is in flight locally.** `git status` is clean; branch `refactor/Boot` == `origin/refactor/Boot` at `62249bd6a`.
 
-**PR:** https://github.com/Pipelex/pipelex/pull/1073 → `dev`. Eight commits.
+**PR:** https://github.com/Pipelex/pipelex/pull/1073 → `dev`. Twelve commits.
 
 **State at pause:**
 
 - Local gates green on the pushed tree: `make agent-check`, full `make agent-test`, `make drift-check`.
-- Last full CI round (on `f7186e7`'s predecessor) was **23 pass / 0 fail**, Greptile **5/5 "safe to merge"**, 0 unresolved threads.
-- Two more commits landed after that round (`f7186e736`, `e0ebf6b42`) with both review threads replied to and resolved. **CI and the bots have NOT yet run on `e0ebf6b42`.**
+- The last full CI round was **21 pass / 0 fail** (3 conditional jobs skipped), Greptile **5/5 "safe to merge"**, 0 unresolved threads.
+- `62249bd6a` landed after that round and **has not yet been through CI or the bots.** It is a substantive code commit (see below), so it needs a full round.
 
-### ⚠ Procedural gaps to close on resume — read this before continuing
+### The prescribed procedure is now complete
 
-The work landed, but the **prescribed procedure was not followed in two places.** The resuming session must close these; they are not optional and not already done.
+Both procedural gaps from the previous pause are closed. Three sub-agents were fanned out, none with inherited context:
 
-1. **Bot-feedback triage was never fanned out.** The instruction was: when CI and the review bots report, fan out an **Opus sub-agent** to check their feedback, deduplicate, verify each item, and arbitrate — solving only clear wins, guarding no impossible scenarios. Instead all seven rounds of bot feedback were triaged inline, directly. **On resume: for the next round, spawn an Opus sub-agent for the triage** rather than reading the threads yourself. Give it the PR number, the unresolved-thread list, the repo conventions, the strict no-over-engineering bar, and the instruction to defer doubts as `.md` in `wip/inputs/`.
-2. **The final gstack `/review @TODOS.md` pass is still owed.** One was run, but *mid-stream* — before the bots were quiet — and its five findings then triggered three further bot rounds. The instruction is to run it **after** the bots are all happy, as the finalizing step. **On resume: once CI is green and Greptile/Codex are quiet on the head commit, fan out a sub-agent to run gstack `/review @TODOS.md`, apply its findings under the same bar, and only then finalize the PR.**
+1. **Opus bot-feedback triage** — polled CI to terminal, collected every thread (resolved and unresolved) plus both bots' review bodies, deduplicated, and verified each claim against source rather than trusting the bot. Verdict: CI all green; of 13 distinct items, 12 already addressed; **one live clear win.**
+2. **Adversarial review of the boot split** — nine findings, confirming the triage agent's one and adding accuracy defects.
+3. **Test-quality review** — traced every new behavioural assertion back to the `dev` code it pins. **Found no vacuously-passing test**; all eight fail if their fix is reverted, all five repointed `mocker.patch` targets resolve to real bindings, no order dependence under `-n 4`. Its findings are coverage gaps and one wrong comment.
 
-A third, lesser deviation, already documented below and defensible but worth knowing: the plan's CHECKPOINT 1 and CHECKPOINT 2 were merged into one commit, so the Sonnet-5 `/code-review` fan-out happened **once** rather than per checkpoint. That one fan-out did run correctly — fresh agent, no inherited context, pointed only at the staged diff — and Phases 3–5 were additionally covered by the gstack pass.
+**What `62249bd6a` fixed from those reports:**
 
-**The immediate open action:** wait for CI + Greptile + Codex on `e0ebf6b42` / `a4362a13e`, then triage **via the Opus sub-agent per gap 1 above**. A re-trigger comment (`@greptileai please re-review.` / `@codex review`) has been posted.
+- **The teardown wedge** (all three agents, independently). A raising step in `_teardown_runtime` skipped the release block at its end, leaving the boot registered with **no recovery** — `teardown_if_needed` resolves the same instance and re-enters the same raiser. Same for `Pipelex.teardown`'s middle phase. Both now `try`/`finally`, no `except`. Pre-existing on `dev`; this branch had fixed the identical flaw one method away and left its sibling bare.
+- **The same-class boot guard.** The guard sat only in `__init__`, which `MetaSingleton` skips for an already-registered class, so a second `RuntimeBoot.make()` silently re-ran the whole `setup()` on the live boot while its docstring promised a `PipelexSetupError`. Neither cross-class test could see it. Now checked before the construction in both `make()`s, single-sourced.
+- **`get_subclass_instance` iterating a live process-global dict** (its sibling already copied).
+- **Five claims that were wrong, not merely thin** — including a comment asserting a mutation result that is the *opposite* of what the mutation does (verified by re-running it).
 
-**How the review loop has been run** (worth continuing, because it kept finding real things — six of the seven rounds produced at least one genuine defect):
+**Two new deferrals** in `wip/inputs/`, per the no-over-engineering bar: `pipelex-setup-narrows-the-runtime-boot-contract.md` (an LSP narrowing whose every remedy trades one wart for another) and `boot-split-test-coverage-gaps.md` (four gaps whose fixes are decisions, not patches — notably that the closure subprocess boots outside the harness and reads the developer's real `~/.pipelex`).
 
-1. Read every unresolved thread; **verify the claim against the source before acting** — several bot findings were right about the mechanism but wrong about severity, and two were right about a mechanism I had reasoned about incorrectly.
+### ⚠ Read this before spawning any more sub-agents
+
+**A review sub-agent reverted the working tree twice mid-session** — `git stash` / restore to `d845f7dad` — to probe pre-fix behaviour. It destroyed a new test module, a CHANGELOG entry, and two source fixes, and it did so while a `make agent-test` run was executing against the tree. All of it was reconstructed and re-verified, and the agent was stopped.
+
+**Any future review fan-out must be told explicitly: read-only. No `git stash`, `git checkout --`, `git restore`, `git clean`, and no edits to tracked files. To compare against earlier behaviour, use `git show <rev>:<path>`.** The instruction to hand it "only a pointer to the changes under review" is not enough on its own — a pointer plus write access invites exactly this.
+
+**The immediate open action:** wait for CI + Greptile + Codex on `62249bd6a`, then **triage via a fanned-out Opus sub-agent** (that is the procedure, and it is also the context-cheap option — the agent reads the threads, you get the report). If the bots find nothing live, the PR is finalizable: the gstack `/review` pass has run post-quiet, and its findings are applied.
+
+**How the review loop has been run** (worth continuing — every round but one produced at least one genuine defect):
+
+1. Read every unresolved thread; **verify the claim against the source before acting.** Several bot findings were right about the mechanism and wrong about severity; two were right about a mechanism I had reasoned about incorrectly; and one sub-agent finding, re-run by hand, was right where my own committed comment was wrong.
 2. Fix only clear wins. Defer genuine design tradeoffs as `.md` in `wip/inputs/` with an analysis and a suggested shape.
-3. For every behavioural fix, **write the negative control**: revert the fix and confirm the new test fails. This caught a vacuous test and confirmed four real ones.
+3. For every behavioural fix, **write the negative control**: revert the fix and confirm the new test fails. Do it per fix, not for the pair — reverting both at once proves only that the pair is needed. This caught a vacuous test and confirmed six real ones.
 4. Reply on the thread with the reasoning (including where my own earlier reasoning was wrong), resolve it, re-run gates, commit, push, ping both bots.
 
-**Two recurring mistakes of mine, if more findings arrive** — both cost a round each:
+**Three recurring mistakes of mine, if more findings arrive:**
 
-- **Cost misjudgement drove two wrong deferrals.** The telemetry singleton I deferred as "needs its own test matrix" was one guarded call; the `config_dir` propagation I estimated as four lines turned out to need a public abstract interface widened. *Write the patch to price it*, then decide.
-- **Reasoning from a concrete class's guarantees about a call through an injectable abstract type.** Bit twice on the same method (rounds 6 and 7). Anything typed `…Abstract` that a caller can inject must be treated as unbounded.
+- **Cost misjudgement drove two wrong deferrals.** The telemetry singleton I deferred as "needs its own test matrix" was one guarded call; the `config_dir` propagation I priced at four lines needed a public abstract interface widened. *Write the patch to price it*, then decide.
+- **Reasoning from a concrete class's guarantees about a call through an injectable abstract type.** Bit three times now, on three different methods. Anything typed `…Abstract` or `…Protocol` that a caller can inject must be treated as unbounded — and that includes `teardown`.
+- **Fixing a bug class on one path and leaving its sibling.** The teardown wedge existed *next to* the failed-boot path whose 16-line comment explains precisely why it needs `try`/`finally`. When a fix is justified by a general argument, grep for every site the argument covers.
 
-**Three deferrals are recorded** in `wip/inputs/`: `runtime-boot-external-interpreter-orchestrator.md`, `config-dir-does-not-scope-inference-paths.md`, `failed-boot-does-not-release-every-resource.md`. Each has the analysis and a suggested remedy.
+**Five deferrals are recorded** in `wip/inputs/`: `runtime-boot-external-interpreter-orchestrator.md`, `config-dir-does-not-scope-inference-paths.md`, `failed-boot-does-not-release-every-resource.md`, `pipelex-setup-narrows-the-runtime-boot-contract.md`, `boot-split-test-coverage-gaps.md`. Each has the analysis and a suggested remedy.
 
 **One required cross-repo follow-up** (separate repos, out of scope for this PR): `pipelex-temporal/tests/conftest.py:86` and `pipelex-transport/tests/conftest.py:89` patch `"pipelex.pipelex.load_pipelex_service_config_if_exists"` in autouse session fixtures; that symbol is now in `pipelex.runtime_boot`, so both suites break at session start once they pick this up. ⚠ Use `git -C <repo> grep` for any cross-repo sweep here — the environment's `grep` is a **shell function** that does not traverse sibling repos and silently returns zero.
-
-**When the bots are finally quiet:** the remaining planned step is the gstack `/review` pass, which was already run once (its five findings are all applied — see the triage sections below).
 
 ---
 
