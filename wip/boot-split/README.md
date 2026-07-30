@@ -1,8 +1,10 @@
-# Boot split — deferred items
+# Boot split
 
-The composition root `pipelex/pipelex.py` was split into a runtime-layer `RuntimeBoot` (`pipelex/runtime_boot.py`) and the interpreter-layer `Pipelex` that subclasses it. The change itself is described in the branch's `TODOS.md` and in [Where the boot splits](../../docs/contribute/hub-layering.md#where-the-boot-splits); this folder holds only what was **deliberately not done**, each with the analysis and a suggested shape.
+The composition root `pipelex/pipelex.py` was split into a runtime-layer `RuntimeBoot` (`pipelex/runtime_boot.py`) and the interpreter-layer `Pipelex` that subclasses it. **Track complete** — [PR #1073](https://github.com/Pipelex/pipelex/pull/1073) squash-merged into `dev` as `8448c5ca2` on 2026-07-30, and the repo-root `TODOS.md` tracker was archived here as [`boot-split-tracker.md`](boot-split-tracker.md).
 
-Every note here was raised by a review pass, verified against the source, and deferred on a stated tradeoff rather than on effort. Production comments point at these files by path, so moving or renaming one means updating its citation.
+The change itself is described in that tracker — the reviewer's guide, the load-bearing decisions, the measured payoff and every review round's record; start at its "Final state at merge" — and in [Where the boot splits](../../docs/contribute/hub-layering.md#where-the-boot-splits). Everything else here is what was **deliberately not done**, each with the analysis and a suggested shape.
+
+Every deferral note was raised by a review pass, verified against the source, and deferred on a stated tradeoff rather than on effort. Production comments point at these files by path, so moving or renaming one means updating its citation.
 
 | Note | What it defers |
 |---|---|
@@ -12,4 +14,8 @@ Every note here was raised by a review pass, verified against the source, and de
 | [`pipelex-setup-narrows-the-runtime-boot-contract.md`](pipelex-setup-narrows-the-runtime-boot-contract.md) | `Pipelex.setup` is an `@override` that does not accept its base's `builtin_plugins` / `core_unconditional_plugin_names`, absorbs them in `**kwargs` and raises — so a caller written against the base type type-checks and fails at run time. Every candidate remedy trades one wart for another. |
 | [`boot-split-test-coverage-gaps.md`](boot-split-test-coverage-gaps.md) | The gaps *around* the new tests. A test-quality pass confirmed no new test passes vacuously; these are the coverage tradeoffs it found, each a decision rather than a patch. |
 
-None of these blocks the branch. The two that name a first caller — the external-orchestrator hole and the `config_dir` scoping — are the ones to settle before `RuntimeBoot.make()` becomes reachable from a real entry point.
+None of these blocked the merge. The two that name a first caller — the external-orchestrator hole and the `config_dir` scoping — are the ones to settle before `RuntimeBoot.make()` becomes reachable from a real entry point.
+
+## Still open outside this repo
+
+One **required cross-repo follow-up**, deliberately out of scope for PR #1073: `pipelex-temporal/tests/conftest.py:86` and `pipelex-transport/tests/conftest.py:89` each patch `"pipelex.pipelex.load_pipelex_service_config_if_exists"` in an autouse session fixture. That symbol now lives in `pipelex.runtime_boot`, so both suites fail at session start once they pick up the new `pipelex`. Repoint both strings. ⚠ Use `git -C <repo> grep` for any cross-repo sweep here — this environment's `grep` is a shell function that does not traverse sibling repos and silently returns zero.

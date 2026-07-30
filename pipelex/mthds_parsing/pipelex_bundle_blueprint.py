@@ -106,8 +106,8 @@ class PipelexBundleBlueprint(BaseModel):
     # clean. `SkipJsonSchema[...]` ALSO hides the field (and its `ElaborationMetadata` /
     # `StepRole` definitions) from the generated JSON schema — Pydantic v2's `exclude=True`
     # by itself does not affect `model_json_schema()`. Persisting it for downstream
-    # consumers — graph viewer, Temporal payload, library cache — is captured as a
-    # follow-up in TODOS.md.
+    # consumers — graph viewer, Temporal payload, library cache — is the deliberate
+    # next step recorded in `docs/under-the-hood/build-time-elaboration.md`.
     elaboration_metadata: SkipJsonSchema[dict[str, ElaborationMetadata] | None] = Field(default=None, exclude=True)
 
     @field_validator("domain", mode="before")
