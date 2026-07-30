@@ -209,9 +209,17 @@ def stamp_mock_main_coordination(items: Sequence[Any]) -> None:
     main-pipe check. Callers: the mock-input factory (``working_memory_factory``), the batch
     controller's dry aggregation (``pipe_batch``), and the dry object-list leaf mock
     (:func:`dry_llm_gen_object_list`). The stamp is a no-op for items without a ``pipe_code`` field.
+
+    The item is now the *caller's own* class, not a throwaway schema rebuild, so the assignment can hit
+    a model config the caller chose — ``frozen=True`` or ``validate_assignment`` — and raise. Surface
+    that as the same typed :class:`DryRunMockBuildError` the surrounding mock build uses, rather than
+    letting a raw ``ValidationError`` escape from a mutation the caller never asked for.
     """
     if items and hasattr(items[0], "pipe_code"):
-        items[0].pipe_code = MOCK_MAIN_PIPE_CODE
+        try:
+            items[0].pipe_code = MOCK_MAIN_PIPE_CODE
+        except ValidationError as exc:
+            raise DryRunMockBuildError.for_object_class(type(items[0]).__name__) from exc
 
 
 def _nb_list_items(object_assignment: ObjectAssignment) -> int:

@@ -49,9 +49,11 @@ def _revalidate_against_object_class(
 ) -> BaseModelTypeVar:
     """Convert a leaf-generated object into ``object_class``, unless it already is one.
 
-    On the in-process path the leaf worked from ``object_class`` itself, so the object needs no
-    conversion — and re-validating it would run the caller's validators a **second** time, on data they
-    already normalized. A validator that transforms rather than merely rejects (``f"INV-{value}"``, a
+    On the in-process path the leaf worked from ``object_class``, so the object is already one — note
+    ``isinstance``, not ``type(...) is``: instructor does not hand back the class you gave it, it hands
+    back ``create_model(cls.__name__, __base__=(cls, OpenAISchema))``, a *subclass*. Either way it needs
+    no conversion — and re-validating it would run the caller's validators a **second** time, on data
+    they already normalized. A validator that transforms rather than merely rejects (``f"INV-{value}"``, a
     list that gets a default appended) would corrupt its own output, and one that asserts its input is
     not yet normalized would reject valid provider output. Returning it untouched is what makes the
     caller's validator constrain the provider exactly once, which is the whole point of handing the live

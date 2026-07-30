@@ -19,11 +19,12 @@ The LLM worker is mocked, so no inference marker.
 from typing import Any, get_args
 
 import pytest
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, ValidationError, create_model, field_validator
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
+from pipelex.cogt.content_generation.content_generator import _revalidate_against_object_class  # noqa: PLC2701 # pyright: ignore[reportPrivateUsage]
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.content_generation.dry_mock import dry_llm_gen_object
 from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen_object_list
@@ -191,7 +192,37 @@ class TestObjectClassPassthrough:
         )
 
         assert len(results) == 3
+        # Both directions: `not INV-INV-` alone would also pass if the validator never ran at all.
+        assert all(item.reference.startswith("INV-") for item in results)
         assert all(not item.reference.startswith("INV-INV-") for item in results)
+
+    async def test_instructor_style_subclass_is_returned_without_revalidation(self, mocker: MockerFixture) -> None:
+        """Instructor returns a *subclass* of the response model, not the class itself.
+
+        `create_model(cls.__name__, __base__=(cls, OpenAISchema))` is what actually comes back, which is
+        why the conversion short-circuits on `isinstance` and not `type(...) is`. A `type(...) is` check
+        would miss it and reinstate the double validation on every real provider call.
+        """
+        wrapped_class = create_model("NormalizedReference", __base__=NormalizedReference)
+        _patch_worker(mocker, gen_object_result=wrapped_class(reference="123"))
+
+        raw_obj = await llm_gen_object(
+            ObjectAssignment.make_for_class(
+                object_class=NormalizedReference,
+                llm_assignment=LLMAssignment(
+                    job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_wrapped"),
+                    cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
+                    llm_setting=LLMSetting(model="test-model", temperature=0.5),
+                    llm_prompt=LLMPrompt(user_text="make a reference"),
+                ),
+            ),
+            object_class=NormalizedReference,
+        )
+
+        assert type(raw_obj) is not NormalizedReference
+        assert isinstance(raw_obj, NormalizedReference)
+        result = _revalidate_against_object_class(raw_obj, object_class=NormalizedReference, is_mock_built=False)
+        assert result.reference == "INV-123"
 
     async def test_dry_leaf_resolves_the_class_the_same_way_as_the_live_leaf(self) -> None:
         """Both run modes take the same path — asserted directly, not inferred from two passing tests.
