@@ -61,8 +61,8 @@ class TestElaborationMetadata:
         # Codifies the current contract: `elaboration_metadata` is process-local. Round-tripping
         # through `model_dump` + `model_validate` must yield a bundle where the side-table is
         # gone. When a downstream consumer (graph viewer, Temporal, library cache) needs the
-        # metadata after rehydration, this test will be the first to flip — see follow-up
-        # in TODOS.md.
+        # metadata after rehydration, this test will be the first to flip — see
+        # `docs/under-the-hood/build-time-elaboration.md`.
         bundle = PipelexBundleBlueprint(
             domain="my_domain",
             description="A bundle for testing",

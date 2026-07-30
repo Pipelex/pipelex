@@ -4,8 +4,8 @@
 # re-examined against the change, and the examination must be recorded with
 # `make drift-ack CONTRACT=<id> RATIONALE="…"`. `make drift-check` gates the local
 # `make check` aggregate and runs as an advisory CI job (to be promoted to a
-# required check — see TODOS.md). See docs/contribute/drift-contracts.md for the
-# full workflow.
+# required check — gated, see wip/drift-contracts/phase-3-verdict.md). See
+# docs/contribute/drift-contracts.md for the full workflow.
 #
 # Keep this manifest small: every contract here must earn its friction. Anything
 # mechanizable (regenerate-and-diff, referential integrity) belongs in a derived

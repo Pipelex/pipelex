@@ -1,22 +1,24 @@
 # Boot split — the composition root gets the same layer seam as everything else
 
-**Status: complete.** Branch `refactor/Boot`, cut off `dev` at `96b992786`. This document describes the change for review: what it does, why, what was decided and why, and where a reviewer should push hardest.
+**Status: ARCHIVED — track complete and merged.** Archived here from the repo-root `TODOS.md` on 2026-07-30, once [PR #1073](https://github.com/Pipelex/pipelex/pull/1073) squash-merged into `dev` as `8448c5ca2` and branch `refactor/Boot` was deleted. Branch was cut off `dev` at `96b992786`.
 
-## ⏸ RESUME HERE — session paused 2026-07-30
+This document is the reviewer's guide and the as-built record: what the change does, why, what was decided and why, and where a reviewer pushed hardest. The deferrals it names are still open and sit beside it in this folder — see [`README.md`](README.md). Nothing here is an open action; the only work left from this track is the required cross-repo follow-up recorded below.
 
-**PR:** https://github.com/Pipelex/pipelex/pull/1073 → `dev`.
+## Final state at merge
 
-**State: bots are clean on `26b107d78`, and a `/review` pass has run on top of it. Its fixes are UNCOMMITTED in the working tree.**
+**Merged:** [PR #1073](https://github.com/Pipelex/pipelex/pull/1073) → `dev`, squash `8448c5ca2`, 2026-07-30. The round-8 `/review` fixes described below are **in** that squash (`test_runtime_boot_teardown_resilience.py` arrives with it).
 
-- CI on `26b107d78`: **21 pass / 0 fail** (3 conditional jobs skipped). Greptile Review check passed. **Codex reviewed `26b107d781` and found "no major issues".** **0 unresolved review threads.** So the open action from the previous pause — wait for CI + the bots on `62249bd6a`, then triage — is closed, and the triage found nothing live.
-- Local gates re-run green on the working tree, not just on the pushed one: `make agent-check` (pyright 0, mypy clean, keyword-only, hub-layering), full `make agent-test`, `make drift-check`.
+- CI on the final head: **21 pass / 0 fail** (3 conditional jobs skipped). Greptile Review check passed, Codex found "no major issues", **0 unresolved review threads**.
+- Local gates green on the merged tree: `make agent-check` (pyright 0, mypy clean, keyword-only, hub-layering), full `make agent-test`, `make drift-check`.
 - The headline measurement was reproduced independently: `import pipelex.runtime_boot` → **356** modules / **0** interpreter; `import pipelex.pipelex` → 619.
 
-**What the `/review` pass changed (uncommitted):** one behavioural fix and a set of comment/doc accuracy corrections. See "Round 8" below.
+**One item survives the merge:** the required cross-repo follow-up on `pipelex-temporal` and `pipelex-transport` (see below) — separate repos, deliberately out of scope for the PR, still open.
 
-### The prescribed procedure is now complete
+⚠ Every commit SHA below other than `8448c5ca2` is a **pre-squash branch commit**. `refactor/Boot` is deleted, so they survive only as unreferenced objects locally (until GC) and permanently on the PR — read them through [#1073](https://github.com/Pipelex/pipelex/pull/1073), not `git log`.
 
-Both procedural gaps from the previous pause are closed. Three sub-agents were fanned out, none with inherited context:
+### How the review procedure ran
+
+The prescribed review procedure was run to completion. Three sub-agents were fanned out, none with inherited context:
 
 1. **Opus bot-feedback triage** — polled CI to terminal, collected every thread (resolved and unresolved) plus both bots' review bodies, deduplicated, and verified each claim against source rather than trusting the bot. Verdict: CI all green; of 13 distinct items, 12 already addressed; **one live clear win.**
 2. **Adversarial review of the boot split** — nine findings, confirming the triage agent's one and adding accuracy defects.
@@ -37,7 +39,7 @@ Both procedural gaps from the previous pause are closed. Three sub-agents were f
 
 **Any future review fan-out must be told explicitly: read-only. No `git stash`, `git checkout --`, `git restore`, `git clean`, and no edits to tracked files. To compare against earlier behaviour, use `git show <rev>:<path>`.** The instruction to hand it "only a pointer to the changes under review" is not enough on its own — a pointer plus write access invites exactly this.
 
-**The immediate open action:** commit the working tree (see "Round 8"), push, and let CI + the bots run once more. The read-only instruction above was given to all four `/review` sub-agents and none of them touched the tree.
+The read-only instruction above was then given to all four `/review` sub-agents and none of them touched the tree. It is the durable lesson from this track — carry it into every future review fan-out.
 
 ### Round 8 — the `/review` pass, and the fix that traded loud for silent
 
@@ -201,7 +203,7 @@ The fourth was the registration-order consequence above — verified inert, not 
 
 Codex then raised a fifth on the PR, **verified correct and deliberately deferred**: a runtime-only boot rejects an interpreter-layer orchestrator contributed by a *built-in* (it is never registered, since `builtin_plugins` defaults to the runtime half) but **not** one contributed by an *external* entry-point plugin, because `build_registrar` discovers externals unconditionally. Such a boot would apply the plugin's runtime claims — including `TASK_MANAGER` — never apply its `PIPE_ROUTER` / `PIPE_RUN` / `PIPE_FUNC_EXECUTOR` claims, and still report ready.
 
-Not fixed here for three reasons: it needs an external interpreter-side orchestrator installed *and* configured *and* a caller of `RuntimeBoot.make()`, of which there are none; every remedy needs a layer signal the runtime layer deliberately does not have (a `PipelexPlugin` carries no layer field, by design); and the nearest clean remedy is a flag on the very class pair that exists to avoid flags — which would contradict the doctor-adoption decision taken twenty lines away in the same file. The gate's comment now states the hole precisely instead of overclaiming (it previously said the runtime-only boot "also rejects an interpreter-contributed orchestrator name, which is correct" — true for built-ins, false for externals, so the comment was the actual defect). Full analysis and two candidate remedies: [`wip/boot-split/runtime-boot-external-interpreter-orchestrator.md`](wip/boot-split/runtime-boot-external-interpreter-orchestrator.md).
+Not fixed here for three reasons: it needs an external interpreter-side orchestrator installed *and* configured *and* a caller of `RuntimeBoot.make()`, of which there are none; every remedy needs a layer signal the runtime layer deliberately does not have (a `PipelexPlugin` carries no layer field, by design); and the nearest clean remedy is a flag on the very class pair that exists to avoid flags — which would contradict the doctor-adoption decision taken twenty lines away in the same file. The gate's comment now states the hole precisely instead of overclaiming (it previously said the runtime-only boot "also rejects an interpreter-contributed orchestrator name, which is correct" — true for built-ins, false for externals, so the comment was the actual defect). Full analysis and two candidate remedies: [`runtime-boot-external-interpreter-orchestrator.md`](runtime-boot-external-interpreter-orchestrator.md).
 
 ### Round 7 — the same mistake twice, named
 
@@ -231,7 +233,7 @@ Greptile dropped from 5/5 to **3/5** and said the PR should not merge until the 
 
 Fixed, and pinned by `tests/unit/pipelex/test_runtime_boot_failed_boot_release.py`: an injected models manager whose `setup()` raises reproduces the real shape (telemetry is already live by then), and the test asserts no telemetry singleton survives. Verified as a real control — with the release reverted it fails on exactly that assertion.
 
-What remains deferred is genuinely narrower and of a different kind: `sdk_client_manager`, `reporting_delegate` and `func_registry` are still not released on a failed boot. Those leave resources dangling rather than corrupting the next boot, and adding three more calls would widen a second hand-maintained copy of the teardown list. The right fix is to collapse the two paths, which is a lifecycle decision — [`wip/boot-split/failed-boot-does-not-release-every-resource.md`](wip/boot-split/failed-boot-does-not-release-every-resource.md).
+What remains deferred is genuinely narrower and of a different kind: `sdk_client_manager`, `reporting_delegate` and `func_registry` are still not released on a failed boot. Those leave resources dangling rather than corrupting the next boot, and adding three more calls would widen a second hand-maintained copy of the teardown list. The right fix is to collapse the two paths, which is a lifecycle decision — [`failed-boot-does-not-release-every-resource.md`](failed-boot-does-not-release-every-resource.md).
 
 ### Codex round 4 — two more, one fixed and one deferred after being attempted
 
@@ -240,7 +242,7 @@ What remains deferred is genuinely narrower and of a different kind: `sdk_client
 
    The four-line propagation was written and tested, then **backed out**: those path overrides exist on the concrete `ModelManager`, not on `ModelManagerAbstract`, which is what the boot is typed against *and* a documented `make()` injection point. Pyright rejects the call, and this repo forbids the `cast`/`isinstance` shortcut — the honest fix is to widen the abstract interface, which is a change to a public injection contract and does not belong in a placement refactor claiming unchanged behaviour. Two things learned while attempting it and worth carrying: completing the scoping makes an explicit `config_dir` **require a complete config directory** (verified — a dir holding only `pipelex.toml` then fails with `InferenceBackendLibraryNotFoundError`), which is the correct contract but a deliberate behavioural decision; and doctor spells the four paths as inline literals while `config_loader` already owns them as constants, so a second copy would double a drift risk that should be collapsed instead.
 
-   What shipped instead: both `make()` docstrings now state the limit explicitly rather than promising "only this directory is read", the boot carries a `NOTE:` at the call site, and the analysis plus a four-step suggested shape is in [`wip/boot-split/config-dir-does-not-scope-inference-paths.md`](wip/boot-split/config-dir-does-not-scope-inference-paths.md) — including that the negative test for it was written on this branch and verified to fail on a reverted propagation, so it can be lifted from history.
+   What shipped instead: both `make()` docstrings now state the limit explicitly rather than promising "only this directory is read", the boot carries a `NOTE:` at the call site, and the analysis plus a four-step suggested shape is in [`config-dir-does-not-scope-inference-paths.md`](config-dir-does-not-scope-inference-paths.md) — including that the negative test for it was written on this branch and verified to fail on a reverted propagation, so it can be lifted from history.
 
 ### Pre-landing review triage (second independent reviewer)
 
@@ -252,6 +254,6 @@ A pre-landing review then found five more, **four of them in the two commits tha
 4. **The `config_dir` test bypassed `make()`.** Construct-then-`setup()` re-implements what `make()` wraps, and `teardown()` on a half-built instance raises `AttributeError` — masking the real error and leaving the singleton registered for the rest of the xdist worker. Now goes through `RuntimeBoot.make(config_dir=…)`, which already accepts it.
 5. **The booted-runtime test had lost its negative control.** Its sweep lives in a `textwrap.dedent` string, so nothing type-checks the predicate; the sibling import-closure module carries a `DIRTY_ENTRY_POINT` for exactly this reason and the copy dropped it. Verified rather than assumed: changing the sweep's `split(".")[1]` to `[0]` made the module green forever. A control case now treats `cogt` — which the runtime boot loads by definition — as an interpreter package and requires a failure. Re-verified: with the predicate broken, the real case passes and **the control fails**.
 
-A sixth was **pre-existing and deferred**: a failed boot leaves the `TelemetryManager` singleton live, so the next boot in the process adopts the dead one (reachable via `ensure_pipelex_booted`'s per-call lazy boot, since the commonest boot failure — `models_manager.setup()` on a missing deck or credentials — fires *after* telemetry setup). Unchanged from `dev`, and widening the release path is a change to failure-path semantics with its own test matrix, not a comment fix — so it was written up as `wip/inputs/failed-boot-leaks-telemetry-singleton.md` with a suggested shape. (That deferral was **reversed two rounds later** — see "Round 5" below — and the doc was deleted in `760b4a9b3`; what survives of it is [`wip/boot-split/failed-boot-does-not-release-every-resource.md`](wip/boot-split/failed-boot-does-not-release-every-resource.md).) What *was* fixed is the docstring, which claimed this path "releases the same process-global state `teardown()` does": it releases a subset, and the "only safe entry points" rationale never explained the omission, since `reporting_delegate` and `telemetry_manager` are already guarded.
+A sixth was **pre-existing and deferred**: a failed boot leaves the `TelemetryManager` singleton live, so the next boot in the process adopts the dead one (reachable via `ensure_pipelex_booted`'s per-call lazy boot, since the commonest boot failure — `models_manager.setup()` on a missing deck or credentials — fires *after* telemetry setup). Unchanged from `dev`, and widening the release path is a change to failure-path semantics with its own test matrix, not a comment fix — so it was written up as `wip/inputs/failed-boot-leaks-telemetry-singleton.md` with a suggested shape. (That deferral was **reversed two rounds later** — see "Round 5" below — and the doc was deleted in `760b4a9b3`; what survives of it is [`failed-boot-does-not-release-every-resource.md`](failed-boot-does-not-release-every-resource.md).) What *was* fixed is the docstring, which claimed this path "releases the same process-global state `teardown()` does": it releases a subset, and the "only safe entry points" rationale never explained the omission, since `reporting_delegate` and `telemetry_manager` are already guarded.
 
 Codex raised a **sixth** on the re-review, and this one was accepted and fixed: **a failed boot leaked a plugin runtime.** `_release_after_failed_boot()` released process-global state but never ran the plugin teardown callbacks, so a boot dying after the `TASK_MANAGER` thunk left a live runtime running. Verified that the boot split genuinely widened the window — pre-split the thunk ran at `pipelex.py:524`, *after* the pipe-func executor resolution (471), `pipeline_manager.setup()` (499) and the pipe-class registration (504); all three now follow it. The most reachable trigger is a plain config error (`pipe_func_config.execution_mode` naming an unregistered mode). Fixed by running `_teardown_plugin_callbacks()` first on that path, mirroring the normal teardown ordering. Pinned by `test_a_failed_interpreter_tail_still_runs_plugin_teardown_callbacks`, which asserts the thunk ran *and* the callback ran so it cannot pass vacuously — and which was confirmed to fail with the fix removed.
