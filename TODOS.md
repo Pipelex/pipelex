@@ -133,6 +133,16 @@ Codex then raised a fifth on the PR, **verified correct and deliberately deferre
 
 Not fixed here for three reasons: it needs an external interpreter-side orchestrator installed *and* configured *and* a caller of `RuntimeBoot.make()`, of which there are none; every remedy needs a layer signal the runtime layer deliberately does not have (a `PipelexPlugin` carries no layer field, by design); and the nearest clean remedy is a flag on the very class pair that exists to avoid flags — which would contradict the doctor-adoption decision taken twenty lines away in the same file. The gate's comment now states the hole precisely instead of overclaiming (it previously said the runtime-only boot "also rejects an interpreter-contributed orchestrator name, which is correct" — true for built-ins, false for externals, so the comment was the actual defect). Full analysis and two candidate remedies: [`wip/inputs/runtime-boot-external-interpreter-orchestrator.md`](wip/inputs/runtime-boot-external-interpreter-orchestrator.md).
 
+### Round 7 — the same mistake twice, named
+
+Codex found a third defect on the failed-boot path, and it is worth recording because it is the **same reasoning error** as the round-6 one, one line away.
+
+My telemetry release call sat as the first statement in the `finally`, justified by a comment citing the built-in `TelemetryManager`'s "telemetry teardown must never break the app" property. But `self.telemetry_manager` is whatever the *factory* produced, and `telemetry_manager` is a public `make()` injection point typed only as `TelemetryManagerAbstract` — so an injected implementation carries no such guarantee. Unisolated, a raising one skips every release below it and replaces the boot error going out.
+
+**The generalisable mistake: reasoning from a concrete class's guarantees about a call made through an injectable abstract type.** Round 6 was the granularity version of it (catching around a loop over unbounded callbacks); this is the identity version. Both are now isolated per-call, and the comments say why rather than asserting safety.
+
+Pinned by `test_an_injected_telemetry_manager_that_raises_does_not_abort_the_other_releases`. Two things about its construction are deliberate: it patches `TelemetryFactory.make_telemetry_manager` rather than passing `telemetry_manager=`, because the injection is only adopted in some telemetry/integration modes and the subject is the resulting *state*; and it proves the suite completed by asserting the **singleton de-registration**, which is the suite's last statement, rather than by re-booting — which also keeps the patched factory from leaking into a second boot. Verified as a real control: reverting the isolation fails it.
+
 ### Round 6 — Greptile back to 5/5; Codex found the granularity bug in my round-4 fix
 
 Codex's last finding is a consequence of the fix I made two rounds earlier, and it is a good one: my `except Exception` sat around the **loop** rather than inside it, so the first raising callback (LIFO, i.e. the last registered) ended the loop and every remaining callback was skipped. With two plugins registered — Temporal plus a sandbox executor is the realistic pair — the second one's runtime stayed live while the log said only that one callback had failed.

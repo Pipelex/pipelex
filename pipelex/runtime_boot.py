@@ -724,11 +724,24 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             # attribute, so discarding this instance does not release it: the next boot in the process
             # would adopt the dead manager and export spans through it, because ``__init__`` never
             # re-runs for an already-registered singleton. Its ``teardown`` both flushes and calls
-            # ``clear_instance()``, and it is written to never raise ("telemetry teardown must never
-            # break the app"), so it is safe on this path. Guarded the same way ``_teardown_runtime``
-            # guards it, since a boot can fail before the telemetry factory has run at all.
+            # ``clear_instance()``.
+            #
+            # Isolated in its own ``try`` for the same reason the plugin callbacks are, and it is worth
+            # being precise about why the obvious argument fails: the *built-in* ``TelemetryManager`` is
+            # written to never raise ("telemetry teardown must never break the app"), but
+            # ``telemetry_manager`` is a public ``make()`` injection point typed only as
+            # ``TelemetryManagerAbstract``, so an injected implementation carries no such guarantee.
+            # Unisolated, a raising one would skip every release below it — leaving logging configured
+            # and the class registry half-populated — and replace the boot error on the way out. Reasoning
+            # from the concrete class's guarantees about a call made through an injectable abstract type
+            # is the mistake to avoid here.
             if self.telemetry_manager is not None:
-                self.telemetry_manager.teardown()
+                try:
+                    self.telemetry_manager.teardown()
+                except Exception as telemetry_exc:  # noqa: BLE001
+                    # (2) an injected telemetry manager is unbounded code; its exception surface cannot
+                    # be enumerated, and the releases below must happen regardless.
+                    log.error(f"Telemetry teardown failed while releasing a failed boot: {telemetry_exc}")
             self.runtime_hub.reset_config()
             class_registry_scoping.reset()
             KajsonManager.teardown()
