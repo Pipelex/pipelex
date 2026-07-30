@@ -45,7 +45,11 @@ class DryRunObjectFidelityError(PipelexError):
 class DryRunMockBuildError(PipelexError):
     """Raised when building a leaf mock object fails (polyfactory build or model validation).
 
-    The leaf mock builds objects via polyfactory from the schema-reconstructed class. A build failure
+    The leaf mock builds objects via polyfactory from whichever class the leaf resolved: the caller's
+    real class in-process, the schema-reconstructed one on a worker. In-process is the common trigger,
+    because the real class carries every invariant the schema round-trip would have dropped — so a
+    constraint polyfactory cannot satisfy fails here rather than surviving into
+    :class:`DryRunObjectFidelityError`. A build failure
     here is deterministic — retrying it (e.g. Temporal activity retries) can never succeed — so it is
     surfaced as a typed ``PipelexError``, which the activity error boundary converts to a terminal
     ``ApplicationError``. The message names the class and the remedy: declare ``examples`` or

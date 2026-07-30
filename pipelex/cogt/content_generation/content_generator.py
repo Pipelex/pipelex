@@ -49,17 +49,21 @@ def _revalidate_against_object_class(
 ) -> BaseModelTypeVar:
     """Re-validate a leaf-generated object's data against the original ``object_class``.
 
-    ``llm_gen_object`` / ``llm_gen_object_list`` return plain ``BaseModel``s reconstructed from the JSON
-    schema; re-validating their data against the original class makes the result the proper subtype (e.g.
+    On the in-process path the leaf already worked from ``object_class`` itself, so this is a same-type
+    conversion. It is kept because it is also the *boundary* conversion: a leaf that ran on a worker
+    holding only the serialized assignment returns a plain ``BaseModel`` reconstructed from the JSON
+    schema, and re-validating its data here makes the result the proper subtype (e.g.
     ``StructuredContent``) the caller expects.
 
-    Under the dry-run leaf mock (``run_mode=DRY``) the object was built by polyfactory from
-    the schema-reconstructed class, which can drop invariants the original class enforces (custom
-    validators, ``json_schema_extra`` format/pattern hints datamodel-code-generator omits on round-trip).
-    A re-validation failure there is the known object-mock fidelity gap, so the ``ValidationError`` is
+    Under the dry-run leaf mock (``run_mode=DRY``) that reconstruction is also what polyfactory built the
+    mock from, and it can drop invariants the original class enforces (custom validators,
+    ``json_schema_extra`` format/pattern hints datamodel-code-generator omits on round-trip). A
+    re-validation failure there is the known object-mock fidelity gap, so the ``ValidationError`` is
     re-raised as a clear typed :class:`DryRunObjectFidelityError` naming the class and the
-    ``examples`` / ``mock_format`` remedy. The catch is scoped to the dry path only — a LIVE provider's
-    invalid output keeps its existing ``ValidationError``.
+    ``examples`` / ``mock_format`` remedy. That gap cannot occur in-process — the mock is built from the
+    real class, so an unsatisfiable invariant fails earlier and louder, as ``DryRunMockBuildError`` out of
+    ``build_mock_object``, and never reaches this function. The catch is scoped to the dry path only — a
+    LIVE provider's invalid output keeps its existing ``ValidationError``.
     """
     raw_data = raw_obj.model_dump(serialize_as_any=True)
     if not is_mock_built:
@@ -129,7 +133,7 @@ class ContentGenerator(ContentGeneratorProtocol):
             object_class=object_class,
             llm_assignment=llm_assignment_for_object,
         )
-        raw_obj = await llm_gen_object(object_assignment=object_assignment)
+        raw_obj = await llm_gen_object(object_assignment=object_assignment, object_class=object_class)
         log.verbose(f"{self.__class__.__name__} generated object direct: {raw_obj}")
         return _revalidate_against_object_class(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry)
 
@@ -156,7 +160,7 @@ class ContentGenerator(ContentGeneratorProtocol):
             llm_assignment=llm_assignment_for_object,
             nb_items=nb_items,
         )
-        raw_list = await llm_gen_object_list(object_assignment=object_assignment)
+        raw_list = await llm_gen_object_list(object_assignment=object_assignment, object_class=object_class)
         log.verbose(f"{self.__class__.__name__} generated object list direct: {raw_list}")
         return [
             _revalidate_against_object_class(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry)

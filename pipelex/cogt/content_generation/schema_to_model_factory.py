@@ -5,6 +5,13 @@ BaseModel class that can be used as a structured output schema for LLM generatio
 The generated class carries its own source code as __kajson_class_source__, enabling
 kajson to deserialize it across process boundaries without a class registry.
 
+When this perimeter is actually walked: only when the caller has no live class in hand. Structured
+generation in-process passes its real class down beside the assignment (see
+`object_class_resolution.resolve_object_class`) and never reaches this module — the class never left
+the interpreter, so there is nothing to rebuild. The reconstruction is for the boundary case: a worker
+that received a serialized `ObjectAssignment` (or `SearchObjectAssignment`) carrying only the JSON
+schema, which is exactly the case where the schema is attacker-influenceable.
+
 Security model: this module exec()'s code generated from an attacker-influenceable JSON
 schema when schemas cross a process boundary (e.g. Temporal payloads). Two layers
 narrow the attack surface, but Layer 2 is defense-in-depth, NOT a sandbox:

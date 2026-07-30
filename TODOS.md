@@ -55,7 +55,25 @@ The path, in order:
 - Dry run: the fixture that currently triggers `DryRunObjectFidelityError` stops triggering it when the class is in hand, and still triggers it when it is not.
 - Both run modes take the same path, asserted directly rather than inferred from two separate tests passing.
 
-**CHECKPOINT A** — item 1 landed: gates green (`make agent-check` + full `make agent-test`), a before/after measurement of a representative structured call in the PR description, and the `schema_to_model_factory.py` docstring updated to say when the perimeter is actually walked.
+**CHECKPOINT A** — ✅ item 1 landed: gates green (`make agent-check`, `make drift-check`, full `make agent-test`), and `schema_to_model_factory.py`'s module docstring now opens by saying when the perimeter is actually walked (only when no live class is in hand — i.e. the boundary case, which is also the only case where the schema is attacker-influenceable).
+
+**The measurement, and the correction it forces.** The plan asserted "a code generation plus an `exec()` per structured call". That is wrong, and the number says so: `SchemaToModelFactory.make_from_json_schema` memoizes on a sha256 of the schema, so the cost is per *distinct structure per process*, not per call. Measured on a representative `StructuredContent` (mixed primitives, an optional, a nested `$defs` list):
+
+| | before | after |
+|---|---|---|
+| first structure in a process (one-time `datamodel-code-generator` warmup + codegen + `exec()`) | ~81 ms | 0 |
+| each additional distinct structure | ~6–7 ms | 0 |
+| repeat call on an already-seen structure | ~0.01 ms (cache hit) | 0 |
+
+So the throughput win is real but small and front-loaded: ~81 ms + ~7 ms × (N−1) per process for a method with N distinct structured outputs, and effectively nothing per call after warm-up. **The fidelity fix is the reason to do this; the saved `exec()` perimeter and the codegen are the bonus.** Reviewers should weigh it that way, not as a performance change.
+
+**One loss the plan did not name.** The round trip also drops the output structure's *own* description — the class docstring lands in `model_json_schema()["description"]`, and `datamodel-code-generator` does not re-emit it, so the rebuilt class has `__doc__ = None` and its schema has no top-level `description`. Field-level descriptions do survive. That means every in-process structured call was sending the provider a schema stripped of the concept's own description — prompt-relevant signal, silently gone. Reproduce with a two-line `StructuredContent` and `SchemaToModelFactory.make_from_json_schema(schema=Cls.model_json_schema(), class_name="Cls")`.
+
+Answers to the three "verify rather than assume" items:
+
+- **Kajson's `__kajson_class_source__`.** Nothing regresses. The attribute exists so kajson can rebuild the reconstructed class on the far side of a process boundary; on the in-process path the leaf's return value is immediately converted by `_revalidate_against_object_class` into an instance of the caller's real class and never serialized as the rebuild. In-tree, the attribute is read only by `SchemaToModelFactory`'s own tests. The boundary path — the only one that ships the rebuilt class anywhere — is untouched.
+- **`_revalidate_against_object_class` on the fast path.** Kept, as instructed. It becomes a same-type conversion that still runs a full `model_validate`, so there is a second saving available there; it was deliberately **not** collected, because the call is still the boundary-path conversion and still the site that raises the dry fidelity error.
+- **`DryRunObjectFidelityError` reachability.** It stops firing on the in-process object path (the mock is now built from the real class, so the dropped invariant is present) and stays reachable on the boundary path and on the structured-search path, which always rebuilds. The error is not deleted and its tests were re-scoped rather than removed: `test_dry_run_object_fidelity.py` now asserts it against the boundary composition (leaf with no class in hand → re-validate), and asserts that in-process the same constrained fixture instead fails at *build* time with the equally typed `DryRunMockBuildError`, which names the same `examples` / `mock_format` remedy. That is a behaviour change worth seeing in review: the failure moves earlier and changes class, and both classes are `ErrorDomain.INPUT` with caller-facing messages.
 
 ---
 

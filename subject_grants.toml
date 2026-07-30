@@ -1296,10 +1296,6 @@ rationale = "Consumes the object_assignment; single operand."
 param = "object_assignment"
 rationale = "Consumes the object_assignment; single operand."
 
-["pipelex/cogt/content_generation/dry_mock.py::_reconstruct_object_class"]
-param = "object_assignment"
-rationale = "Consumes the object_assignment; single operand."
-
 ["pipelex/cogt/content_generation/dry_mock.py::build_mock_object"]
 param = "model_class"
 rationale = "Factory from source: builds the result from the model_class; single operand."

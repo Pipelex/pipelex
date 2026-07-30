@@ -89,27 +89,25 @@ class TestDryMock:
     def test_failed_dry_object_build_reports_no_usage(self, mocker: MockerFixture) -> None:
         """A failed mock build must not leave a usage event behind (report only after success)."""
         captured = self._capture_reported_job(mocker)
-        mocker.patch("pipelex.cogt.content_generation.dry_mock._reconstruct_object_class", return_value=TextContent)
         mocker.patch(
             "pipelex.cogt.content_generation.dry_mock.build_mock_object",
             side_effect=DryRunMockBuildError.for_object_class("TextContent"),
         )
 
         with pytest.raises(DryRunMockBuildError):
-            dry_llm_gen_object(_dry_object_assignment())
+            dry_llm_gen_object(_dry_object_assignment(), object_class=TextContent)
 
         assert captured == []
 
     def test_failed_dry_object_list_build_reports_no_usage(self, mocker: MockerFixture) -> None:
         """The list leaf carries the same report-only-after-success contract."""
         captured = self._capture_reported_job(mocker)
-        mocker.patch("pipelex.cogt.content_generation.dry_mock._reconstruct_object_class", return_value=TextContent)
         mocker.patch(
             "pipelex.cogt.content_generation.dry_mock.build_mock_objects",
             side_effect=DryRunMockBuildError.for_object_class("TextContent"),
         )
 
         with pytest.raises(DryRunMockBuildError):
-            dry_llm_gen_object_list(_dry_object_assignment())
+            dry_llm_gen_object_list(_dry_object_assignment(), object_class=TextContent)
 
         assert captured == []
