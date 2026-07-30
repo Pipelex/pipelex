@@ -84,15 +84,50 @@ _BOOTED_RUNTIME_SCRIPT = textwrap.dedent(
 )
 
 
-class TestBootedRuntimeLayer:
-    def test_booting_the_runtime_layer_loads_no_interpreter_module_and_installs_no_interpreter_hub(self) -> None:
-        result = subprocess.run(  # noqa: S603
-            [sys.executable, "-c", _BOOTED_RUNTIME_SCRIPT, *INTERPRETER_PACKAGES],
+#: The negative control, and the reason it is needed: the sweep below lives inside a `textwrap.dedent`
+#: string, so nothing type-checks or lints the *logic* in it. A broken predicate would make the real
+#: case pass **forever** while flagging nothing — verified, not theorised: changing the sweep's
+#: `name.split(".")[1]` to `[0]` makes this module green with no other edit. The `interpreter_hub in
+#: sys.modules` check is not a backstop either, since a runtime module importing `pipe_operators`
+#: directly never touches the hub — which is the whole case this test exists for.
+#:
+#: `cogt` is the control package: the runtime boot loads it by definition, so calling it an
+#: "interpreter package" must come back a failure, *reported as offending modules*. The sibling
+#: import-closure module carries the same control for the same reason (its `DIRTY_ENTRY_POINT`).
+CONTROL_PACKAGE_THE_RUNTIME_ALWAYS_LOADS = "cogt"
+
+
+def _run_booted_runtime(*, interpreter_packages: "tuple[str, ...]") -> subprocess.CompletedProcess[str]:
+    """Boot the runtime layer in a fresh interpreter and return the sweep's verdict."""
+    try:
+        return subprocess.run(  # noqa: S603
+            [sys.executable, "-c", _BOOTED_RUNTIME_SCRIPT, *interpreter_packages],
             capture_output=True,
             text=True,
             check=False,
             timeout=SUBPROCESS_TIMEOUT_SECONDS,
         )
+    except subprocess.TimeoutExpired as exc:
+        message = f"the booted-runtime subprocess did not finish within {SUBPROCESS_TIMEOUT_SECONDS}s"
+        raise AssertionError(message) from exc
+
+
+class TestBootedRuntimeLayer:
+    def test_the_sweep_still_detects_a_package_the_runtime_boot_really_loads(self) -> None:
+        """The control: same script, opposite verdict. Without this, every other case is vacuous."""
+        result = _run_booted_runtime(interpreter_packages=(CONTROL_PACKAGE_THE_RUNTIME_ALWAYS_LOADS,))
+
+        assert result.returncode == 1, (
+            f"treating {CONTROL_PACKAGE_THE_RUNTIME_ALWAYS_LOADS!r} as an interpreter package must fail — "
+            "the runtime boot loads it by definition. This passing means the sweep has stopped sweeping, "
+            "and the real case below now proves nothing.\n"
+            f"stdout={result.stdout}\nstderr={result.stderr}"
+        )
+        assert "interpreter module(s)" in result.stdout
+        assert "runtime boot OK" not in result.stdout
+
+    def test_booting_the_runtime_layer_loads_no_interpreter_module_and_installs_no_interpreter_hub(self) -> None:
+        result = _run_booted_runtime(interpreter_packages=INTERPRETER_PACKAGES)
         assert result.returncode == 0, (
             "booting the runtime layer must load zero interpreter modules and install no InterpreterHub.\n"
             "This is the boot-time half of the hub-layering property — see docs/contribute/hub-layering.md "

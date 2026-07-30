@@ -153,6 +153,22 @@ class RuntimeBoot(metaclass=MetaSingleton):
         # Readiness gate: flipped True only at the very end of make(), after setup() and the optional
         # validate_model_deck() both succeed. Readers (ensure_pipelex_booted) must gate on this, NOT on
         # mere registry presence -- MetaSingleton registers the instance before setup() configures the hub.
+        # The process globals are single-owner (``set_runtime_hub``, ``KajsonManager`` and
+        # ``log.configure`` are all once-per-process), so exactly one boot may exist. Asked of the *base*
+        # class, which is what makes a bare ``RuntimeBoot`` and a full ``Pipelex`` exclude each other in
+        # both directions, and the message names whichever one actually holds them.
+        #
+        # Checked here rather than only in ``make()`` because ``__init__`` is where the damage would be
+        # done: ``set_runtime_hub`` below overwrites ``RuntimeHub._instance`` unconditionally, so a direct
+        # construction while another boot is live would orphan that boot from the global hub and only then
+        # fail, at ``log.configure``. ``MetaSingleton`` used to make that unreachable by accident — a
+        # second ``Pipelex(...)`` short-circuits on the registry and never re-runs ``__init__`` — but a
+        # subclass is a different registry key, so the accident no longer covers it.
+        existing_boot = RuntimeBoot.get_optional_instance()
+        if existing_boot is not None:
+            msg = f"{type(existing_boot).__name__} is already initialized"
+            raise PipelexSetupError(msg)
+
         self.is_ready: bool = False
         # ``config_dir`` is deliberately not stored on the instance. Its predecessor was
         # (``self.config_dir_path``) and nothing ever read it, which is precisely how it came to be
@@ -243,7 +259,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         telemetry_manager: TelemetryManagerAbstract | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
         **kwargs: Any,
-    ):
+    ) -> None:
         """Stand up the runtime layer.
 
         ``builtin_plugins`` defaults to ``RUNTIME_BUILTIN_PLUGINS`` — the runtime-layer half — so a bare
@@ -476,11 +492,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             )
             raise PipelexSetupError(error_msg) from credentials_exc
 
-        # Keyless boot forces every run to DRY — consumed at PipeRunParamsFactory.make_run_params,
-        # the single writer of run_mode, covering every entry point; generator selection is
-        # backend-keyed unconditionally (eng review D4) — a keyless Temporal submitter must still
-        # dispatch activities and mock inside them, so `needs_inference` plays no role in picking the
-        # generator. Its other boot roles (gateway/model setup, credentials, telemetry) are unchanged.
         # --- Plugin-derived registries --------------------------------------------------------
         # The plugin registrar was built earlier (with the boot-orchestrator gate checked and the
         # config-selected secrets provider resolved) just before the telemetry factory. Turn its
@@ -505,6 +516,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             storage_provider = storage_provider_registry.get_required(method=storage_config.method)(storage_config)
         self.runtime_hub.set_storage_provider(storage_provider)
 
+        # Keyless boot forces every run to DRY — consumed at PipeRunParamsFactory.make_run_params,
+        # the single writer of run_mode, covering every entry point; generator selection is
+        # backend-keyed unconditionally (eng review D4) — a keyless Temporal submitter must still
+        # dispatch activities and mock inside them, so `needs_inference` plays no role in picking the
+        # generator. Its other boot roles (gateway/model setup, credentials, telemetry) are unchanged.
         self.runtime_hub.set_dry_run_forced(is_forced=not needs_inference)
         # Injection precedence (codex C8): explicit setup() param > plugin slot-claim thunk > core default.
         # A boot-orchestrator plugin (Temporal worker) claims the CONTENT_GENERATOR slot; its thunk runs
@@ -625,7 +641,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if self.__class__ in MetaSingleton.instances:
             del MetaSingleton.instances[self.__class__]
 
-    def teardown(self):
+    def teardown(self) -> None:
         self._teardown_plugin_callbacks()
         self._teardown_runtime()
 
@@ -638,12 +654,19 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         class registry, the template registries) and may mutate config (e.g.
         ``plugins.boot_orchestrator``); failing partway skips ``teardown()``, the normal release point.
 
-        This releases the same process-global state ``teardown()`` does, but only through entry points
-        that are safe on a half-built instance — which is why it exists at all rather than calling
-        ``teardown()``: that path reads ``self.inference_manager`` (and, on the interpreter half,
-        ``self.pipeline_manager``) unguarded, and both are assigned partway through ``setup()``, so a
-        half-built ``teardown()`` raises ``AttributeError``. That is deliberate: guarding them would
-        let a half-built teardown look successful.
+        It exists rather than calling ``teardown()`` because that path reads ``self.inference_manager``
+        (and, on the interpreter half, ``self.pipeline_manager``) unguarded, and both are assigned
+        partway through ``setup()``, so a half-built ``teardown()`` raises ``AttributeError``. That is
+        deliberate: guarding them would let a half-built teardown look successful.
+
+        It releases a **subset** of what ``teardown()`` does, and the gap is pre-existing rather than
+        chosen: ``TelemetryManager`` carries ``ABCSingletonMeta`` and is cleared only from
+        ``teardown()``, so a boot that dies after the telemetry factory leaves that singleton live and
+        the next boot in the process adopts the dead one instead of constructing a fresh manager. The
+        same holds for ``sdk_client_manager``, ``reporting_delegate`` and ``func_registry``. Widening
+        this method to cover them is a change to failure-path semantics rather than a comment fix, so it
+        is written up in ``wip/inputs/failed-boot-leaks-telemetry-singleton.md`` instead of being done
+        here. Do not read the list below as complete.
 
         Without this, the next boot raises "LogConfig is already set" and serves a stale, half-populated
         class registry (the ``KajsonManager`` singleton ignores a fresh registry once created).
@@ -658,15 +681,24 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         used to run *after* the pipe-func executor resolution, ``pipeline_manager.setup()`` and the
         pipe-class registration, and now runs before all three.
         """
-        self._teardown_plugin_callbacks()
-        self.runtime_hub.reset_config()
-        class_registry_scoping.reset()
-        KajsonManager.teardown()
-        TemplateLoader.reset()
-        TemplateRegistry.clear()
-        # Cleanup the singleton instance if setup fails to avoid "already initialized" errors.
-        if self.__class__ in MetaSingleton.instances:
-            del MetaSingleton.instances[self.__class__]
+        # ``try``/``finally`` and not a bare sequence: the callbacks are plugin-supplied, so this is the
+        # one line here that runs unbounded third-party code. If one raises, the releases below are what
+        # the next boot in this process depends on — skipping them leaves logging configured (every later
+        # boot dies on "LogConfig is already set"), the ``KajsonManager`` holding a half-populated class
+        # registry, and this instance still registered as the singleton. It would also replace the
+        # exception that actually killed the boot with a teardown error. The releases must therefore
+        # happen on both paths, which is precisely what ``finally`` is for.
+        try:
+            self._teardown_plugin_callbacks()
+        finally:
+            self.runtime_hub.reset_config()
+            class_registry_scoping.reset()
+            KajsonManager.teardown()
+            TemplateLoader.reset()
+            TemplateRegistry.clear()
+            # Cleanup the singleton instance if setup fails to avoid "already initialized" errors.
+            if self.__class__ in MetaSingleton.instances:
+                del MetaSingleton.instances[self.__class__]
 
     def __enter__(self) -> Self:
         return self
@@ -705,17 +737,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         Returns the initialized runtime boot instance, and raises ``PipelexSetupError`` if a boot
         already holds the process globals or if setup fails.
         """
-        # Asked of the *base* class, not of ``cls``: the process globals are one set, so a bare runtime
-        # boot and a full ``Pipelex`` boot exclude each other in both directions. Asking ``cls`` would
-        # let ``Pipelex.make()`` boot on top of a live ``RuntimeBoot`` and quietly serve its
-        # half-populated class registry. The message names the class that actually holds the globals,
-        # not this one: "Pipelex is already initialized" is a lie when a bare ``RuntimeBoot`` is what
-        # is booted, and an embedder that never touched ``Pipelex`` deserves to be told what did.
-        existing_boot = RuntimeBoot.get_optional_instance()
-        if existing_boot is not None:
-            msg = f"{type(existing_boot).__name__} is already initialized"
-            raise PipelexSetupError(msg)
-
+        # No exclusivity check here: ``__init__`` owns it, so it holds for a direct construction too.
         runtime_boot = cls(config_dir=config_dir, config_overrides=config_overrides)
         try:
             runtime_boot.setup(
@@ -780,11 +802,17 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
     @classmethod
     def teardown_if_needed(cls) -> None:
-        """Teardown the singleton instance if it exists.
+        """Teardown whichever boot holds the process globals, if any.
 
         This is useful for cleanup in finally blocks where the instance
         may or may not have been successfully created.
+
+        Resolved at the **base** class, symmetric with the exclusivity guard in ``__init__``. Asking
+        ``cls`` instead would deadlock the process: ``Pipelex.teardown_if_needed()`` would silently
+        no-op against a live bare ``RuntimeBoot`` (``get_subclass_instance(Pipelex)`` cannot see one)
+        while ``Pipelex(...)`` kept refusing because one exists — with no way out. A release must be
+        able to clear everything its matching guard refuses on.
         """
-        instance = cls.get_optional_instance()
+        instance = RuntimeBoot.get_optional_instance()
         if instance is not None:
             instance.teardown()

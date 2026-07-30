@@ -28,9 +28,16 @@ class TestConfigDirReachesTheConfigLoader:
 
         Pipelex.teardown_if_needed()
         try:
-            runtime_boot = RuntimeBoot(config_dir=tmp_path)
+            # Through `make()`, not a bare construct-then-setup: `make()` is the only entry point that
+            # releases the process globals when a boot dies partway (`_release_after_failed_boot`), and
+            # a hand-rolled `teardown()` on a half-built instance raises `AttributeError` instead —
+            # masking the real error and leaving the singleton registered for the rest of the worker.
+            runtime_boot = RuntimeBoot.make(
+                integration_mode=_test_integration_mode(),
+                needs_inference=False,
+                config_dir=tmp_path,
+            )
             try:
-                runtime_boot.setup(integration_mode=_test_integration_mode(), needs_inference=False)
                 assert get_config().pipelex.log_config.default_log_level == "WARNING"
             finally:
                 runtime_boot.teardown()

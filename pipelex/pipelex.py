@@ -102,9 +102,9 @@ class Pipelex(RuntimeBoot):
         library_manager: LibraryManagerAbstract | None = None,
         library_dirs: list[str] | list[Path] | None = None,
         **kwargs: Any,
-    ):
+    ) -> None:
         if kwargs:
-            msg = f"The base setup method does not support any additional arguments: {kwargs}"
+            msg = f"The Pipelex setup method does not support any additional arguments: {kwargs}"
             raise PipelexSetupError(msg)
 
         # The runtime layer first, with the *composed* plugin manifests: this process will run methods,
@@ -206,7 +206,7 @@ class Pipelex(RuntimeBoot):
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
 
     @override
-    def teardown(self):
+    def teardown(self) -> None:
         # The three phases in this order deliberately: the plugin-contributed callbacks (LIFO) run
         # first — e.g. a Temporal worker tears down its task manager + resets its hub — so a worker's
         # in-flight resources release before the pipeline manager drops the pipelines they may still
