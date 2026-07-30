@@ -2,7 +2,9 @@
 
 **Status:** deferred, narrowed. The headline item this file used to describe — the **telemetry manager singleton** surviving a failed boot so the next boot adopted the dead one — is **fixed** on PR #1073 (`_release_after_failed_boot` now calls the guarded `telemetry_manager.teardown()`, which flushes and calls `clear_instance()`), pinned by `tests/unit/pipelex/test_runtime_boot_failed_boot_release.py` and verified to fail when the release is reverted.
 
-What remains is smaller and of a different kind.
+A second item has since been fixed too, and it belonged to the *other* path — worth recording because this file used to scope itself to the failed-boot path alone, and that scoping is exactly what let the defect hide. `_teardown_runtime` kept `KajsonManager.teardown()`, `TemplateLoader.reset()` and `TemplateRegistry.clear()` in its `try`, above steps reachable through injectable abstract types, while its sibling had them in the `finally`. Since the same commit also moved the `MetaSingleton` de-registration into the `finally`, a raiser stopped failing loudly on the next boot ("already initialized") and started letting it **succeed against the previous boot's class registry** — the `KajsonManager` singleton hands back the surviving manager and discards the fresh registry. The three releases now sit in `_teardown_runtime`'s `finally` as well, so the *poisoning* half of the two lists is identical on both paths, and `test_runtime_boot_teardown_resilience.py` asserts no `KajsonManager` survives a raising teardown.
+
+**The scope of this note is therefore both paths, not just the failed-boot one.** What remains is smaller and of a different kind.
 
 ## What is still not released on a failed boot
 
@@ -14,7 +16,7 @@ What remains is smaller and of a different kind.
 | `reporting_delegate` | `.teardown()` | the delegate's own resources are not released |
 | `func_registry` | `.teardown()` | registrations from this boot persist into the next one |
 
-None of these is a *singleton-identity* bug — that was the telemetry case, where a stale registration silently replaced a fresh construction. These are ordinary "resources not closed on the error path": the next boot builds its own `sdk_client_manager` and `reporting_delegate`, so it does not inherit broken state, it merely leaves the old ones dangling. `func_registry` is the closest to a real problem, being a module-level global whose entries carry over.
+None of these is a *singleton-identity* bug — that was the telemetry case, where a stale registration silently replaced a fresh construction, and the `KajsonManager` case above. These are ordinary "resources not closed on the error path": the next boot builds its own `sdk_client_manager` and `reporting_delegate`, so it does not inherit broken state, it merely leaves the old ones dangling. `func_registry` is the closest to a real problem, being a module-level global whose entries carry over — and note that it carries over on the **normal** teardown path too, whenever a step above it raises, since it stayed in `_teardown_runtime`'s `try`. That was left alone deliberately: moving it would break the symmetry with `_release_after_failed_boot`, which cannot release it at all, and the symmetry is what makes the two lists reviewable against each other. It is the first thing the collapse below should pick up.
 
 ## Why it is deferred rather than patched
 

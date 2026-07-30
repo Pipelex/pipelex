@@ -154,10 +154,13 @@ class RuntimeBoot(metaclass=MetaSingleton):
         # validate_model_deck() both succeed. Readers (ensure_pipelex_booted) must gate on this, NOT on
         # mere registry presence -- MetaSingleton registers the instance before setup() configures the hub.
         # The process globals are single-owner, so exactly one boot may exist. Note *why* that needs a
-        # guard rather than falling out of the code: of the three, only ``log.configure`` refuses a
-        # second call. ``set_runtime_hub`` and ``KajsonManager`` overwrite unconditionally, so without
-        # this check a second boot would silently replace them and the first boot would keep running
-        # against objects nothing else resolves to.
+        # guard rather than falling out of the code: the three fail in three different ways and only one
+        # of them is loud. ``log.configure`` refuses a second call. ``set_runtime_hub`` overwrites
+        # unconditionally, leaving the *first* boot running against a hub nothing else resolves to.
+        # ``KajsonManager`` does the opposite and is the easiest to get backwards: it is a singleton, so
+        # ``KajsonManager(class_registry=…)`` hands back the existing manager and silently discards the
+        # fresh registry — the *second* boot then serves the first one's half-populated class registry
+        # while its own ``self.class_registry`` is what nothing resolves to.
         #
         # Checked here *as well as* in ``make()`` — see the guard's docstring for why neither site covers
         # the other's case. Here it catches a direct construction, which is where the damage would be
@@ -378,7 +381,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # applying the interpreter ones (``PIPE_ROUTER`` / ``PIPE_RUN`` / ``PIPE_FUNC_EXECUTOR``, all
         # applied in ``Pipelex.setup``). Unreachable today — nothing calls ``RuntimeBoot.make`` yet — and
         # deliberately not guarded here, because every remedy needs a layer signal this layer does not
-        # have. Analysed in ``wip/inputs/runtime-boot-external-interpreter-orchestrator.md``; the first
+        # have. Analysed in ``wip/boot-split/runtime-boot-external-interpreter-orchestrator.md``; the first
         # caller of a runtime-only boot is who has to settle it.
         requested_boot_orchestrator = get_config().plugins.boot_orchestrator
         if requested_boot_orchestrator is not None and requested_boot_orchestrator not in plugin_registrar.registered_plugin_names:
@@ -458,7 +461,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             # ``ModelManager`` and not on ``ModelManagerAbstract`` — which is what this attribute is
             # typed as, and which is a public injection point. Widening that interface is a decision of
             # its own, so the gap is documented rather than half-closed:
-            # ``wip/inputs/config-dir-does-not-scope-inference-paths.md``. The docstrings say exactly
+            # ``wip/boot-split/config-dir-does-not-scope-inference-paths.md``. The docstrings say exactly
             # this; do not read ``config_dir`` as "only this directory is read" for inference.
             self.models_manager.setup(
                 secrets_provider=secrets_provider,
@@ -649,10 +652,13 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         the same instance and re-enters the same raiser. ``finally`` and no ``except``: the failure still
         propagates — a teardown that half-failed must not look successful.
 
-        What a raising step *does* still skip is the releases before it in the sequence. Those leave
-        resources dangling or a stale ``KajsonManager`` registry rather than wedging the process, and
-        fixing them means collapsing this path and ``_release_after_failed_boot`` into one list —
-        ``wip/inputs/failed-boot-does-not-release-every-resource.md``.
+        What a raising step *does* still skip is the releases that follow it in the ``try`` — the ones
+        before it have already run. That set is now only the *dangling* half: an SDK client left open, a
+        reporting buffer unflushed, the previous boot's ``func_registry`` entries carried forward.
+        Everything that would instead **poison** the next boot moved into the ``finally``, so the two
+        release paths guarantee the same set. Closing the dangling half means collapsing this path and
+        ``_release_after_failed_boot`` into one list —
+        ``wip/boot-split/failed-boot-does-not-release-every-resource.md``.
         """
         try:
             if self.telemetry_manager:
@@ -665,12 +671,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             self.sdk_client_manager.teardown()
 
             # tools
-            self.kajson_manager.teardown()
             if self.class_registry:
                 self.class_registry.teardown()
             func_registry.teardown()
-            TemplateLoader.reset()
-            TemplateRegistry.clear()
 
             log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done (except config & logs)")
         finally:
@@ -679,13 +682,33 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             # teardown runs — and on a runtime-only boot nothing installed it, where the reset is a no-op.
             self.runtime_hub.reset_config()
             class_registry_scoping.reset()
+            # The same three ``_release_after_failed_boot`` releases, deliberately kept identical: these are
+            # the ones that *poison* the next boot rather than merely dangle, so they must not sit above a
+            # step that can raise. ``KajsonManager`` is the sharp one, and it is easy to get backwards — it
+            # is a singleton, so a surviving manager makes the next boot's ``KajsonManager(class_registry=…)``
+            # hand back the old one and silently discard the fresh registry. ``get_class_registry()`` would
+            # then serve the previous boot's contents while the new boot's own registrations land somewhere
+            # nothing resolves to, and that boot would still report ``is_ready``. Leaving these in the
+            # ``try`` traded the old *loud* failure — "already initialized", because a raiser skipped the
+            # de-registration below as well — for precisely that silent one. All three are idempotent.
+            KajsonManager.teardown()
+            TemplateLoader.reset()
+            TemplateRegistry.clear()
             # Clear the singleton instance from metaclass
             if self.__class__ in MetaSingleton.instances:
                 del MetaSingleton.instances[self.__class__]
 
     def teardown(self) -> None:
-        self._teardown_plugin_callbacks()
-        self._teardown_runtime()
+        # ``try``/``finally`` and not a bare sequence, for the reason ``_release_after_failed_boot``
+        # spells out at its own call to this method: ``_teardown_plugin_callbacks`` swallows each
+        # callback's ordinary ``Exception``, but ``except Exception`` does not cover ``BaseException`` —
+        # a plugin callback that calls ``sys.exit()``, or a ``KeyboardInterrupt`` landing mid-teardown,
+        # would otherwise skip ``_teardown_runtime`` and leave this instance registered with no way back.
+        # No ``except``: the failure still propagates.
+        try:
+            self._teardown_plugin_callbacks()
+        finally:
+            self._teardown_runtime()
 
     def _release_after_failed_boot(self) -> None:
         """Release the process globals a partial boot acquired. Called from every ``make()``'s handler.
@@ -711,20 +734,24 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         It releases a **subset** of what ``teardown()`` does, and the subset is chosen: everything that
         would otherwise *poison the next boot* is here — the hub config, the class-registry scoping, the
         ``KajsonManager``, the template registries, the telemetry singleton and the ``MetaSingleton``
-        registration. What is deliberately absent is ``sdk_client_manager``, ``reporting_delegate`` and
-        ``func_registry``: those leave resources dangling rather than corrupting the next boot, and
-        adding them here would widen a second hand-maintained copy of the teardown list that is bound to
+        registration. What is deliberately absent is ``sdk_client_manager``, ``reporting_delegate``,
+        ``func_registry``, ``inference_manager`` and ``class_registry``. The first three leave resources
+        dangling rather than corrupting the next boot; the last two are the very attributes a partial
+        ``setup()`` may not have assigned, which is the reason this path exists at all. Adding any of
+        them here would widen a second hand-maintained copy of the teardown list that is bound to
         drift from the real one. Collapsing the two paths is the right fix and is a lifecycle decision of
-        its own — ``wip/inputs/failed-boot-does-not-release-every-resource.md``.
+        its own — ``wip/boot-split/failed-boot-does-not-release-every-resource.md``.
 
         Without this, the next boot raises "LogConfig is already set" and serves a stale, half-populated
         class registry (the ``KajsonManager`` singleton ignores a fresh registry once created).
 
         The plugin teardown callbacks run **first**, mirroring the ordering of the normal ``teardown``,
-        and they are what makes this path release more than process-global *state*: by the time the
-        interpreter tail runs, a boot-orchestrator plugin's ``TASK_MANAGER`` thunk has already started a
-        live runtime (a Temporal worker: threads and a client connection). A failure anywhere after that
-        thunk — the ``pipe_func_config.execution_mode`` lookup raising on an unregistered mode is the
+        and they are what makes this path release more than the process-global state released below: by
+        the time the interpreter tail runs, a boot-orchestrator plugin's ``TASK_MANAGER`` thunk has
+        already stood its runtime up, and only the plugin knows what that cost. Our Temporal plugin's
+        thunk registers its own process-global singletons and installs a sandbox predicate — it does not
+        yet start a poller, which is a property of that thunk today and not of the slot. A failure
+        anywhere after that thunk — the ``pipe_func_config.execution_mode`` lookup raising on an unregistered mode is the
         most reachable one, since it is a plain config error — would otherwise leak it, because nothing
         else on this path calls the callbacks. Not a hypothetical widened by the boot split: the thunk
         used to run *after* the pipe-func executor resolution, ``pipeline_manager.setup()`` and the
@@ -881,9 +908,13 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         A ``Pipelex`` *is* a ``RuntimeBoot``, and it owns the same process globals
         (``set_runtime_hub``, ``KajsonManager``, ``log.configure`` are all once-per-process). Keying
         on the exact class would let ``RuntimeBoot.is_fully_booted()`` answer ``False`` while a
-        ``Pipelex`` held the runtime hub — and would let ``Pipelex.make()`` boot on top of a bare
-        runtime boot. In-tree precedent: ``TelemetryManagerAbstract`` and ``GraphTracerManager``
-        resolve their singletons the same way.
+        ``Pipelex`` held the runtime hub — and would let ``RuntimeBoot.make()`` boot on top of a live
+        ``Pipelex``, which is the direction that actually breaks: the guard asks
+        ``RuntimeBoot.get_optional_instance()`` outright, and an exact-class lookup keyed on
+        ``RuntimeBoot`` cannot see an instance registered under ``Pipelex``. (The mirror direction stays
+        blocked either way, because a bare runtime boot *is* registered under ``RuntimeBoot``; what
+        would open it is the guard asking ``cls`` instead of the base.) In-tree precedent:
+        ``TelemetryManagerAbstract`` and ``GraphTracerManager`` resolve their singletons the same way.
         """
         return MetaSingleton.get_subclass_instance(cls)
 

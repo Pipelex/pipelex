@@ -212,12 +212,15 @@ class Pipelex(RuntimeBoot):
         # in-flight resources release before the pipeline manager drops the pipelines they may still
         # be reporting on. Sequenced explicitly here rather than through a template hook, because that
         # order is the whole reason the runtime teardown is split into phases.
-        self._teardown_plugin_callbacks()
-        # ``try``/``finally`` and not a bare sequence: ``pipeline_manager`` is a public ``make()``
-        # injection point typed as ``PipelineManagerAbstract``, so its ``teardown`` can raise, and
-        # ``_teardown_runtime`` is what leaves the process re-bootable. Skipping it would wedge the
-        # process for good — see its docstring. No ``except``: the failure still propagates.
+        # ``try``/``finally`` and not a bare sequence, covering *both* leading phases: ``pipeline_manager``
+        # is a public ``make()`` injection point typed as ``PipelineManagerAbstract``, so its ``teardown``
+        # can raise, and the plugin callbacks are unbounded third-party code whose per-callback
+        # ``except Exception`` does not cover ``BaseException``. ``_teardown_runtime`` is what leaves the
+        # process re-bootable, so skipping it would wedge the process for good — see its docstring. The
+        # order is preserved by keeping both statements in the ``try``. No ``except``: the failure still
+        # propagates.
         try:
+            self._teardown_plugin_callbacks()
             self.pipeline_manager.teardown()
         finally:
             self._teardown_runtime()
@@ -294,7 +297,7 @@ class Pipelex(RuntimeBoot):
                 inference files — backends, routing profiles and the model deck — still resolve through
                 the layered paths, and the gateway consent/onboarding state is read from the global
                 config dir outright. So this does not fully isolate a boot from the surrounding
-                project. See ``wip/inputs/config-dir-does-not-scope-inference-paths.md``.
+                project. See ``wip/boot-split/config-dir-does-not-scope-inference-paths.md``.
             config_overrides: Optional dict deep-merged on top of all TOML config layers
                 as the highest-priority override. Useful for tests that need specific
                 config without editing TOML files.

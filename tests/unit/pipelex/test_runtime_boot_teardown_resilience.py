@@ -11,9 +11,20 @@ Reachable through injection rather than through a built-in defect, which is the 
 injection points typed as abstracts, so that guarantee belongs to the concrete classes and not to the
 calls made here. Both tests therefore inject, and both assert on the de-registration — the *last*
 statement of the release block — because its absence is exactly the wedge.
+
+De-registration alone is not the whole property, and asserting only it is how the first version of this
+module let a second defect through. Releasing the singleton makes the *next* boot succeed, so anything
+poisoning that still survives turns a loud "already initialized" into a silent wrong boot. The
+``KajsonManager`` is the one that bites: it is a singleton, so if it outlives the teardown the next
+boot's ``KajsonManager(class_registry=…)`` hands back the old manager and discards the fresh registry,
+and ``get_class_registry()`` keeps serving the previous boot's classes. The first test therefore also
+asserts no manager survives — a real control, since the raiser it injects is the *first* statement of
+the release block, so every later release in the ``try`` is skipped.
 """
 
 import pytest
+from kajson.kajson_manager import KajsonManager
+from kajson.singleton import MetaSingleton as KajsonMetaSingleton
 from pytest_mock import MockerFixture
 
 from pipelex.pipelex import Pipelex
@@ -49,6 +60,15 @@ class TestAFailingTeardownLeavesTheProcessRebootable:
                 "the raising telemetry teardown skipped the release block — this instance is still "
                 "registered, so the next make() in this process dies on 'already initialized' and "
                 "teardown_if_needed re-enters the same raiser: the process is wedged for good"
+            )
+            # The other half, and the one de-registration alone would hide. Releasing the boot singleton
+            # is what lets the next make() succeed, so a KajsonManager surviving alongside it does not
+            # fail loudly — it silently gives that boot the *previous* boot's class registry, because the
+            # singleton hands back the existing manager and discards the fresh registry passed to it.
+            assert KajsonManager not in KajsonMetaSingleton.instances, (
+                "the raising telemetry teardown skipped KajsonManager.teardown() — the next boot in this "
+                "process will succeed and silently serve this boot's class registry, with its own "
+                "registrations landing in a registry nothing resolves to"
             )
         finally:
             # Stop the patched factory before re-booting, or the restore adopts the exploding mock.

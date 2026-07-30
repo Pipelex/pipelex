@@ -34,7 +34,7 @@ Each kind lives in its own package under `pipelex/pipe_operators/<kind>/` or `pi
 
 `PipeRegistryModels` used to live in `pipelex/core/registry_models.py` alongside core's value model. Importing it loads every pipe operator, every pipe controller and their factories — so a module filed under `core/` pulled in the whole interpreter, and `core` read as a dependant of the pipe packages it is supposed to sit below. The manifest now lives in `pipelex/pipe_machinery/`; `core.registry_models` keeps `CoreRegistryModels` (the stuff-content classes) and imports nothing from `pipe_operators` / `pipe_controllers` / `pipe_signature`.
 
-Both manifests are registered side by side at boot (`pipelex/pipelex.py`), and they must stay **disjoint** — a class in both is a sign one half was edited without the other.
+The two manifests land in one registry from the two halves of the boot: `CoreRegistryModels` is registered by `RuntimeBoot.setup` in `pipelex/runtime_boot.py`, `PipeRegistryModels` by `Pipelex.setup` in `pipelex/pipelex.py` — see [Where the boot splits](hub-layering.md#where-the-boot-splits). They must stay **disjoint** — a class in both is a sign one half was edited without the other — and because registration is name-keyed dict insertion, which side registers first carries no meaning.
 
 See [Hub Layering](hub-layering.md) for the layer boundary this split serves.
 

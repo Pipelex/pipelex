@@ -8,9 +8,12 @@ for them, and it is *allowed* to import downward, so composing the two halves he
 doing it in the runtime adapters' own manifest was the weld that made "the adapters are a runtime
 layer" false.
 
-There is still exactly one place that answers "what are the built-in plugins" — it just lives in the
-layer permitted to do the welding. Both callers of ``build_registrar`` (boot in ``pipelex.py``, and the
-``pipelex plugins list`` diagnostic) consume the lists below. See ``docs/contribute/hub-layering.md``.
+There is still exactly one place that answers "what are the built-in plugins, both layers" — it just
+lives in the layer permitted to do the welding. The lists below are what ``Pipelex.setup`` (the
+interpreter boot) and the ``pipelex plugins list`` diagnostic pass into ``build_registrar``. The third
+caller is the runtime layer's own composition root, ``pipelex/runtime_boot.py``, which calls the same
+function but defaults to ``RUNTIME_BUILTIN_PLUGINS`` alone — it may not name this module.
+See ``docs/contribute/hub-layering.md``.
 """
 
 from pipelex.interpreter_plugins.direct.direct_plugin import DirectOrchestratorPlugin
