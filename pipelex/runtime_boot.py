@@ -647,7 +647,18 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         Without this, the next boot raises "LogConfig is already set" and serves a stale, half-populated
         class registry (the ``KajsonManager`` singleton ignores a fresh registry once created).
+
+        The plugin teardown callbacks run **first**, mirroring the ordering of the normal ``teardown``,
+        and they are what makes this path release more than process-global *state*: by the time the
+        interpreter tail runs, a boot-orchestrator plugin's ``TASK_MANAGER`` thunk has already started a
+        live runtime (a Temporal worker: threads and a client connection). A failure anywhere after that
+        thunk — the ``pipe_func_config.execution_mode`` lookup raising on an unregistered mode is the
+        most reachable one, since it is a plain config error — would otherwise leak it, because nothing
+        else on this path calls the callbacks. Not a hypothetical widened by the boot split: the thunk
+        used to run *after* the pipe-func executor resolution, ``pipeline_manager.setup()`` and the
+        pipe-class registration, and now runs before all three.
         """
+        self._teardown_plugin_callbacks()
         self.runtime_hub.reset_config()
         class_registry_scoping.reset()
         KajsonManager.teardown()
