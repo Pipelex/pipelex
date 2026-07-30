@@ -94,6 +94,17 @@ SCAN_ROOTS: tuple[Path, ...] = (SOURCE_ROOT, TESTS_ROOT)
 #: since nothing in the tuple is a prefix of it. Its closure *is* what the runtime layer means, so an
 #: `interpreter_hub` import there is the one that would break the property outright.
 #:
+#: `pipelex.runtime_boot` is the second module entry, and for the mirror-image reason: it is the runtime
+#: layer's *composition root*, so its closure is what "boot the runtime layer" costs. Declaring it is
+#: what puts it inside this rule's domain at all — an undeclared module is not neutral, it is unpoliced,
+#: and this one is the single most tempting place in the tree to reach for an interpreter type, since
+#: the class it defines is subclassed by the boot that does need them. Its interpreter half,
+#: `pipelex.pipelex`, is deliberately *not* declared: it is interpreter-side by construction, like
+#: `pipelex.cli`, and declaring it would fail the rule by design rather than enforce anything.
+#: A *module* entry is right for both because neither wants a package: they are two top-level modules
+#: mirroring `runtime_hub` / `interpreter_hub`, which is the tree's strongest naming precedent and needs
+#: no top-level-package accounting in the paragraph below.
+#:
 #: `pipelex.core` is a single entry, and getting it there was the point of the modularity work. `core/`
 #: used to be genuinely two layers, so this tuple had to name its data-model packages one by one —
 #: concepts, domains, memory, stuffs, and the input/output *specs* under `pipes/` — while excluding the
@@ -143,8 +154,9 @@ RUNTIME_LAYER_PACKAGES: tuple[str, ...] = (
     "pipelex.test_extras",
     "pipelex.tools",
     "pipelex.tracing",
-    # the runtime layer's own hub — a module, not a package; see the note above
+    # the runtime layer's own hub and its composition root — modules, not packages; see the note above
     "pipelex.runtime_hub",
+    "pipelex.runtime_boot",
 )
 
 #: The interpreter layer's hub, which no runtime-layer module may import — directly or transitively.

@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
     from pytest_mock import MockerFixture
 
-PIPELEX_MODULE = "pipelex.pipelex"
+RUNTIME_BOOT_MODULE = "pipelex.runtime_boot"
 
 
 def _empty_gateway_remote_config_result(source: RemoteConfigSource) -> RemoteConfigResult:
@@ -80,7 +80,7 @@ class TestGatewayUnknownModel:
         ``GatewayUnknownModelError(source=FRESH)`` with the missing model name surfaced.
         """
         Pipelex.teardown_if_needed()
-        mocker.patch(f"{PIPELEX_MODULE}.is_pipelex_gateway_enabled", return_value=True)
+        mocker.patch(f"{RUNTIME_BOOT_MODULE}.is_pipelex_gateway_enabled", return_value=True)
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
             new_callable=mocker.PropertyMock,
@@ -115,7 +115,7 @@ class TestGatewayUnknownModel:
         fetching specs.
         """
         Pipelex.teardown_if_needed()
-        mocker.patch(f"{PIPELEX_MODULE}.is_pipelex_gateway_enabled", return_value=True)
+        mocker.patch(f"{RUNTIME_BOOT_MODULE}.is_pipelex_gateway_enabled", return_value=True)
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
             new_callable=mocker.PropertyMock,
@@ -141,7 +141,7 @@ class TestGatewayUnknownModel:
         message must point at ``pipelex init`` (while online) to refresh the cache.
         """
         Pipelex.teardown_if_needed()
-        mocker.patch(f"{PIPELEX_MODULE}.is_pipelex_gateway_enabled", return_value=True)
+        mocker.patch(f"{RUNTIME_BOOT_MODULE}.is_pipelex_gateway_enabled", return_value=True)
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
             new_callable=mocker.PropertyMock,

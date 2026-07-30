@@ -24,7 +24,7 @@ from pipelex.system.runtime import IntegrationMode
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-PIPELEX_MODULE = "pipelex.pipelex"
+RUNTIME_BOOT_MODULE = "pipelex.runtime_boot"
 
 
 class TestGatewayTermsCheck:
@@ -33,8 +33,8 @@ class TestGatewayTermsCheck:
     @pytest.fixture
     def _gateway_enabled_no_config(self, mocker: MockerFixture) -> None:
         """Configure mocks: gateway is enabled but no service config exists (first run)."""
-        mocker.patch(f"{PIPELEX_MODULE}.is_pipelex_gateway_enabled", return_value=True)
-        mocker.patch(f"{PIPELEX_MODULE}.load_pipelex_service_config_if_exists", return_value=None)
+        mocker.patch(f"{RUNTIME_BOOT_MODULE}.is_pipelex_gateway_enabled", return_value=True)
+        mocker.patch(f"{RUNTIME_BOOT_MODULE}.load_pipelex_service_config_if_exists", return_value=None)
 
     @pytest.fixture
     def _gateway_enabled_setup_done_terms_not_accepted(self, mocker: MockerFixture) -> None:
@@ -43,8 +43,8 @@ class TestGatewayTermsCheck:
             agreement=PipelexServiceAgreement(terms_accepted=False),
             onboarding=PipelexServiceOnboarding(inference_setup_completed=True),
         )
-        mocker.patch(f"{PIPELEX_MODULE}.is_pipelex_gateway_enabled", return_value=True)
-        mocker.patch(f"{PIPELEX_MODULE}.load_pipelex_service_config_if_exists", return_value=config)
+        mocker.patch(f"{RUNTIME_BOOT_MODULE}.is_pipelex_gateway_enabled", return_value=True)
+        mocker.patch(f"{RUNTIME_BOOT_MODULE}.load_pipelex_service_config_if_exists", return_value=config)
 
     @pytest.mark.usefixtures("_gateway_enabled_no_config")
     def test_first_run_raises_inference_setup_required(self) -> None:
@@ -86,7 +86,7 @@ class TestGatewayTermsCheck:
         mock_result = mocker.MagicMock()
         mock_result.config = mock_remote_config
         mock_result.source = "fresh"
-        mocker.patch(f"{PIPELEX_MODULE}.RemoteConfigFetcher.fetch_remote_config", return_value=mock_result)
+        mocker.patch(f"{RUNTIME_BOOT_MODULE}.RemoteConfigFetcher.fetch_remote_config", return_value=mock_result)
 
         pipelex_instance = Pipelex.__new__(Pipelex)
 
