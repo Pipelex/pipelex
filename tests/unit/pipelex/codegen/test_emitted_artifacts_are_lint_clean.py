@@ -240,6 +240,21 @@ class TestEmittedArtifactsAreLintClean:
             ]
             assert not overlong, f"{emitted_file.filename} has lines past prettier's print width:\n" + "\n".join(overlong)
 
+    def test_emitted_ts_has_no_trailing_whitespace(self, every_type_kind_crate: LibraryCrate):
+        """No emitted line may carry trailing whitespace — prettier strips it under *every* config.
+
+        The shape that motivated this: a blank JSDoc line was emitted as `" * "`, which prettier rewrites
+        to `" *"`. Any multi-line concept description reaches it, so a consumer running prettier over the
+        generated `types.ts` changed the bytes and got the artifact reported as `[hand-edited]` — the exact
+        false report these emitters exist to prevent.
+
+        Like the two invariants above, this needs no prettier binary, so it is what holds the line in CI
+        where `test_emitted_ts_is_prettier_clean` skips for want of a node toolchain.
+        """
+        for emitted_file in emit_ts_zod(resolve_concepts_from_crate(every_type_kind_crate)):
+            offenders = [line for line in emitted_file.content.splitlines() if line != line.rstrip()]
+            assert not offenders, f"{emitted_file.filename} has lines with trailing whitespace:\n" + "\n".join(repr(line) for line in offenders)
+
     def test_emitted_ts_is_prettier_clean(self, every_type_kind_crate: LibraryCrate, tmp_path: Path):
         """`prettier --check` must find nothing to change in the emitted TypeScript.
 

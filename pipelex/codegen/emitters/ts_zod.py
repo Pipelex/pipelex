@@ -394,7 +394,11 @@ def _jsdoc(description: str, *, imprecise: str | None, indent: str = "") -> str:
         return ""
     if len(parts) == 1 and imprecise is None:
         return f"{indent}/** {parts[0]} */\n"
-    body = "".join(f"{indent} * {part}\n" for part in parts)
+    # `rstrip` rather than a plain f-string: a blank part (a paragraph break in the authored
+    # description) would otherwise emit `" * "`, and prettier rewrites that to `" *"` under every
+    # config — byte-changing the artifact and breaking its stamp. It covers a part carrying its own
+    # trailing whitespace in the same stroke. The `*` is not whitespace, so the indent survives.
+    body = "".join(f"{indent} * {part}".rstrip() + "\n" for part in parts)
     return f"{indent}/**\n{body}{indent} */\n"
 
 
