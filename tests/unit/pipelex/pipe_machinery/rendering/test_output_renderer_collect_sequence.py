@@ -5,6 +5,7 @@ from pytest_mock import MockerFixture
 
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.concepts.exceptions import ConceptError
+from pipelex.libraries.concept.concept_library import ConceptLibrary
 from pipelex.pipe_machinery.rendering.output_renderer import _collect_possible_outputs  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
 
 GET_REQUIRED_PIPE_TARGET = "pipelex.pipe_machinery.rendering.output_renderer.get_required_pipe"
@@ -53,7 +54,7 @@ class TestCollectPossibleOutputsSequence:
         assert result == []
         get_pipe_mock.assert_not_called()
 
-    def test_concrete_last_pipe_yields_single_entry(self, mocker: MockerFixture) -> None:
+    def test_concrete_last_pipe_yields_single_entry(self, mocker: MockerFixture, renderer_concept_library: ConceptLibrary) -> None:
         """Only the last sub-pipe is resolved and its rendered output is the single possible output."""
         sequence_pipe = _make_sequence_pipe(mocker, ["first_step", "final_step"])
         final_pipe = _make_concrete_pipe(mocker, "test.Final")
@@ -67,7 +68,9 @@ class TestCollectPossibleOutputsSequence:
 
         assert result == [{"concept_ref": "test.Final", "content": {"text": "final output"}}]
         get_pipe_mock.assert_called_once_with(pipe_code="final_step")
-        final_pipe.output.render_stuff_spec.assert_called_once_with(output_format=ConceptRepresentationFormat.JSON)
+        final_pipe.output.render_stuff_spec.assert_called_once_with(
+            concept_provider=renderer_concept_library, output_format=ConceptRepresentationFormat.JSON
+        )
 
     @pytest.mark.parametrize(
         "render_error",
@@ -88,7 +91,7 @@ class TestCollectPossibleOutputsSequence:
 
         assert result == []
 
-    def test_anything_last_pipe_recurses_into_it(self, mocker: MockerFixture) -> None:
+    def test_anything_last_pipe_recurses_into_it(self, mocker: MockerFixture, renderer_concept_library: ConceptLibrary) -> None:
         """When the last pipe itself outputs Anything, collection recurses into it down to the concrete leaf."""
         outer_pipe = _make_sequence_pipe(mocker, ["step_one", "mid_sequence"])
         mid_pipe = _make_sequence_pipe(mocker, ["leaf_step"])
@@ -111,4 +114,6 @@ class TestCollectPossibleOutputsSequence:
         assert get_pipe_mock.call_count == 2
         get_pipe_mock.assert_any_call(pipe_code="mid_sequence")
         get_pipe_mock.assert_any_call(pipe_code="leaf_step")
-        leaf_pipe.output.render_stuff_spec.assert_called_once_with(output_format=ConceptRepresentationFormat.JSON)
+        leaf_pipe.output.render_stuff_spec.assert_called_once_with(
+            concept_provider=renderer_concept_library, output_format=ConceptRepresentationFormat.JSON
+        )

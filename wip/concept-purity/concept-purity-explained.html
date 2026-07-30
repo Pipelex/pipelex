@@ -1,0 +1,705 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Concept purity</title>
+<style>
+  :root{
+    --paper:#f6f7f8; --card:#ffffff; --sunk:#eef1f3;
+    --ink:#12161b; --ink-2:#4a5560; --ink-3:#78838d;
+    --rule:#dfe3e7; --rule-2:#cbd2d8;
+    --rt:#0d7a6f; --rt-soft:#e2f1ee; --rt-line:#0d7a6f;
+    --it:#6d43d6; --it-soft:#eee8fc; --it-line:#6d43d6;
+    --stop:#b3261e; --stop-soft:#fbeae8;
+    --code-bg:#f1f4f6; --code-fg:#1a2027;
+    --add-bg:#e3f1e9; --del-bg:#fbeae8;
+    --shadow:0 1px 1px rgba(18,22,27,.04), 0 10px 30px -22px rgba(18,22,27,.5);
+    --serif:"Iowan Old Style","Charter","Bitstream Charter","Sitka Text",Cambria,Georgia,serif;
+    --sans:ui-sans-serif,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,"JetBrains Mono","Cascadia Mono",Menlo,Consolas,monospace;
+    --measure:68ch;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#0f1216; --card:#161b21; --sunk:#12171c;
+      --ink:#e7ecf0; --ink-2:#a3aeb8; --ink-3:#7d8892;
+      --rule:#252d35; --rule-2:#333d47;
+      --rt:#5eead4; --rt-soft:#0c2b28; --rt-line:#2dd4bf;
+      --it:#c0aaf9; --it-soft:#1e1836; --it-line:#a78bfa;
+      --stop:#f5a3a0; --stop-soft:#301a1a;
+      --code-bg:#0c1015; --code-fg:#dde3e9;
+      --add-bg:#0f2a1d; --del-bg:#301a1a;
+      --shadow:0 1px 1px rgba(0,0,0,.5), 0 10px 30px -22px rgba(0,0,0,.9);
+    }
+  }
+  :root[data-theme="light"]{
+    --paper:#f6f7f8; --card:#ffffff; --sunk:#eef1f3;
+    --ink:#12161b; --ink-2:#4a5560; --ink-3:#78838d;
+    --rule:#dfe3e7; --rule-2:#cbd2d8;
+    --rt:#0d7a6f; --rt-soft:#e2f1ee; --rt-line:#0d7a6f;
+    --it:#6d43d6; --it-soft:#eee8fc; --it-line:#6d43d6;
+    --stop:#b3261e; --stop-soft:#fbeae8;
+    --code-bg:#f1f4f6; --code-fg:#1a2027;
+    --add-bg:#e3f1e9; --del-bg:#fbeae8;
+    --shadow:0 1px 1px rgba(18,22,27,.04), 0 10px 30px -22px rgba(18,22,27,.5);
+  }
+  :root[data-theme="dark"]{
+    --paper:#0f1216; --card:#161b21; --sunk:#12171c;
+    --ink:#e7ecf0; --ink-2:#a3aeb8; --ink-3:#7d8892;
+    --rule:#252d35; --rule-2:#333d47;
+    --rt:#5eead4; --rt-soft:#0c2b28; --rt-line:#2dd4bf;
+    --it:#c0aaf9; --it-soft:#1e1836; --it-line:#a78bfa;
+    --stop:#f5a3a0; --stop-soft:#301a1a;
+    --code-bg:#0c1015; --code-fg:#dde3e9;
+    --add-bg:#0f2a1d; --del-bg:#301a1a;
+    --shadow:0 1px 1px rgba(0,0,0,.5), 0 10px 30px -22px rgba(0,0,0,.9);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans);
+    font-size:16.5px; line-height:1.68; -webkit-font-smoothing:antialiased;
+  }
+  .frame{max-width:1040px; margin:0 auto; padding:0 1.25rem 6rem}
+  p,ul,ol,figcaption,.note,.tldr,blockquote{max-width:var(--measure)}
+
+  a{color:inherit; text-decoration:underline; text-decoration-thickness:1px;
+    text-decoration-color:var(--rule-2); text-underline-offset:3px}
+  a:hover{text-decoration-color:currentColor}
+  a:focus-visible,summary:focus-visible,input:focus-visible + label{outline:2px solid var(--rt-line); outline-offset:2px; border-radius:3px}
+  @media (prefers-reduced-motion: reduce){*{animation:none !important; transition:none !important; scroll-behavior:auto !important}}
+
+  .masthead{padding:3.2rem 0 1.6rem; border-bottom:1px solid var(--rule)}
+  .eyebrow{font-family:var(--mono); font-size:.74rem; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3); margin:0 0 .9rem}
+  h1{font-family:var(--serif); font-weight:600; letter-spacing:-.02em; text-wrap:balance;
+     font-size:clamp(2.15rem,1.55rem + 2.2vw,3rem); line-height:1.1; margin:0 0 .6rem}
+  h1 .mono{font-family:var(--mono); font-size:.82em; font-weight:500; letter-spacing:-.01em}
+  .deck{font-size:1.12rem; color:var(--ink-2); margin:0 0 1.6rem; max-width:60ch; text-wrap:pretty}
+  .deck b{color:var(--ink); font-weight:600}
+  .meta{display:flex; flex-wrap:wrap; gap:.4rem; list-style:none; margin:0; padding:0; max-width:none}
+  .meta li{font-family:var(--mono); font-size:.74rem; letter-spacing:.01em; color:var(--ink-2);
+           border:1px solid var(--rule); background:var(--card); border-radius:2px; padding:.24rem .55rem}
+  .meta li b{color:var(--ink); font-weight:600}
+  .meta li.live{border-color:var(--rt); color:var(--rt)}
+
+  .rail{position:sticky; top:0; z-index:9; display:flex; gap:.15rem; overflow-x:auto; scrollbar-width:none;
+        padding:.5rem 0; margin:0 0 .4rem; border-bottom:1px solid var(--rule);
+        background:color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter:blur(8px)}
+  .rail::-webkit-scrollbar{display:none}
+  .rail a{font-family:var(--mono); font-size:.72rem; letter-spacing:.04em; text-transform:uppercase;
+          color:var(--ink-3); text-decoration:none; white-space:nowrap; padding:.28rem .5rem; border-radius:3px}
+  .rail a:hover{color:var(--ink); background:var(--sunk)}
+
+  h2{font-family:var(--serif); font-weight:600; font-size:1.6rem; letter-spacing:-.015em; text-wrap:balance;
+     margin:3.4rem 0 1rem; scroll-margin-top:4rem; display:flex; align-items:baseline; gap:.7rem}
+  h2 .n{font-family:var(--mono); font-size:.72rem; font-weight:500; letter-spacing:.1em; color:var(--rt);
+        border:1px solid var(--rule); border-radius:2px; padding:.1rem .38rem; flex:none; position:relative; top:-.25em}
+  h3{font-size:1.02rem; font-weight:650; margin:2rem 0 .4rem; letter-spacing:-.005em}
+  h4{font-family:var(--mono); font-size:.74rem; font-weight:500; letter-spacing:.12em; text-transform:uppercase;
+     color:var(--ink-3); margin:1.6rem 0 .3rem}
+  p{margin:.75rem 0} ul,ol{margin:.75rem 0; padding-left:1.15rem} li{margin:.32rem 0}
+
+  code,kbd{font-family:var(--mono); font-size:.86em}
+  :is(p,li,td,th,summary,figcaption,.deck) code{background:var(--code-bg); padding:.08em .32em; border-radius:3px; white-space:nowrap}
+
+  .tldr{margin:2.2rem 0; padding:1.3rem 1.5rem 1.4rem; background:var(--card);
+        border:1px solid var(--rule); border-top:2px solid var(--ink); border-radius:3px; box-shadow:var(--shadow)}
+  .tldr h2{font-family:var(--mono); font-size:.78rem; font-weight:600; letter-spacing:.16em; text-transform:uppercase;
+           color:var(--ink-3); margin:0 0 .7rem; display:block}
+  .tldr ul{margin:0; padding-left:1.05rem; max-width:none}
+  .tldr li{margin:.5rem 0}
+  .tldr li::marker{color:var(--rule-2)}
+
+  .stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(158px,1fr)); gap:.6rem; margin:1.6rem 0}
+  .stat{background:var(--card); border:1px solid var(--rule); border-radius:3px; padding:.75rem .9rem .8rem}
+  .stat .n{display:block; font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:1.4rem;
+           font-weight:600; letter-spacing:-.03em; line-height:1.2}
+  .stat .n s{color:var(--ink-3); font-weight:400; font-size:.62em; text-decoration-color:var(--rule-2)}
+  .stat .n em{font-style:normal; color:var(--rt)}
+  .stat .l{display:block; font-size:.78rem; line-height:1.4; color:var(--ink-2); margin-top:.25rem}
+
+  figure{margin:1.8rem 0; padding:1.1rem 1.1rem .75rem; background:var(--card);
+         border:1px solid var(--rule); border-radius:3px; box-shadow:var(--shadow)}
+  figure svg{display:block; width:100%; height:auto}
+  figcaption{font-size:.83rem; line-height:1.55; color:var(--ink-2); margin-top:.7rem; padding-top:.7rem; border-top:1px solid var(--rule)}
+
+  .s-box{fill:var(--card); stroke:var(--rule-2)}
+  .s-rt{fill:var(--rt-soft); stroke:var(--rt-line)}
+  .s-it{fill:var(--it-soft); stroke:var(--it-line)}
+  .s-bad{fill:var(--stop-soft); stroke:var(--stop)}
+  .s-t{fill:var(--ink); font:600 13px var(--sans)}
+  .s-ts{fill:var(--ink-2); font:400 11.5px var(--mono)}
+  .s-tm{fill:var(--ink-2); font:400 11.5px var(--sans)}
+  .s-trt{fill:var(--rt); font:600 10.5px var(--mono); letter-spacing:.1em}
+  .s-tit{fill:var(--it); font:600 10.5px var(--mono); letter-spacing:.1em}
+  .s-tbad{fill:var(--stop); font:600 11.5px var(--sans)}
+  .s-tok{fill:var(--rt); font:600 12px var(--sans)}
+  .s-line{stroke:var(--rule-2); fill:none}
+  .s-badline{stroke:var(--stop); fill:none}
+  .s-okline{stroke:var(--rt-line); fill:none}
+
+  .scroll{overflow-x:auto; margin:1.2rem 0; border:1px solid var(--rule); border-radius:3px; background:var(--card)}
+  table{border-collapse:collapse; width:100%; font-size:.89rem; font-variant-numeric:tabular-nums}
+  th,td{padding:.55rem .7rem; text-align:left; vertical-align:top; border-bottom:1px solid var(--rule)}
+  th{font-family:var(--mono); font-size:.72rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+     color:var(--ink-3); background:var(--sunk); white-space:nowrap}
+  tbody tr:last-child td{border-bottom:0}
+
+  pre{background:var(--code-bg); color:var(--code-fg); border:1px solid var(--rule); border-radius:3px;
+      padding:.9rem 1rem; overflow-x:auto; font-size:.8rem; line-height:1.6; margin:1rem 0}
+  pre code{font-family:var(--mono)}
+  .diff .del{display:block; margin:0 -1rem; padding:0 1rem; background:var(--del-bg); color:var(--stop)}
+  .diff .add{display:block; margin:0 -1rem; padding:0 1rem; background:var(--add-bg); color:var(--rt)}
+  .diff .hdr{display:block; color:var(--ink-3)}
+  .cmt{color:var(--ink-3)}
+
+  .tabs{display:flex; flex-wrap:wrap; gap:.3rem; margin:1.3rem 0}
+  .tabs input{position:absolute; width:1px; height:1px; opacity:0; clip-path:inset(50%)}
+  .tabs label{cursor:pointer; font-family:var(--mono); font-size:.74rem; letter-spacing:.02em;
+              border:1px solid var(--rule); background:var(--card); color:var(--ink-2);
+              border-radius:2px; padding:.3rem .6rem; user-select:none}
+  .tabs label:hover{color:var(--ink); border-color:var(--rule-2)}
+  .tabs .panels{flex:1 0 100%; margin-top:.35rem}
+  .tabs .panel{display:none}
+  .tabs .panel > :first-child{margin-top:0}
+  #d1:checked ~ label[for="d1"],#d2:checked ~ label[for="d2"],#d3:checked ~ label[for="d3"],
+  #d4:checked ~ label[for="d4"],#d5:checked ~ label[for="d5"]
+    {background:var(--ink); color:var(--paper); border-color:var(--ink)}
+  #d1:focus-visible ~ label[for="d1"],#d2:focus-visible ~ label[for="d2"],#d3:focus-visible ~ label[for="d3"],
+  #d4:focus-visible ~ label[for="d4"],#d5:focus-visible ~ label[for="d5"]
+    {outline:2px solid var(--rt-line); outline-offset:2px}
+  #d1:checked ~ .panels > .panel:nth-child(1),
+  #d2:checked ~ .panels > .panel:nth-child(2),
+  #d3:checked ~ .panels > .panel:nth-child(3),
+  #d4:checked ~ .panels > .panel:nth-child(4),
+  #d5:checked ~ .panels > .panel:nth-child(5){display:block}
+
+  details{background:var(--card); border:1px solid var(--rule); border-radius:3px; padding:.75rem 1rem; margin:1.2rem 0}
+  details[open]{padding-bottom:1rem}
+  summary{cursor:pointer; font-weight:600; font-size:.92rem}
+  summary::marker{color:var(--rule-2)}
+  details > :nth-child(2){margin-top:.85rem}
+
+  .note{border-left:2px solid var(--rule-2); padding:.1rem 0 .1rem .95rem; color:var(--ink-2); font-size:.93rem; margin:1.1rem 0}
+  .note.stop{border-left-color:var(--stop)}
+  .note.go{border-left-color:var(--rt-line)}
+
+  .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(255px,1fr)); gap:.7rem; margin:1.4rem 0}
+  .cards .card{background:var(--card); border:1px solid var(--rule); border-radius:3px; padding:.9rem 1rem}
+  .cards h3{margin:0 0 .3rem; font-size:.95rem}
+  .cards p{margin:.3rem 0; font-size:.88rem; color:var(--ink-2); max-width:none}
+  .cards p strong{color:var(--ink)}
+
+  .legend{display:flex; flex-wrap:wrap; gap:1rem; margin:1.4rem 0 0; font-family:var(--mono); font-size:.74rem; color:var(--ink-2)}
+  .legend span{display:flex; align-items:center; gap:.4rem}
+  .legend i{width:10px; height:10px; border-radius:2px; display:block}
+  .legend .k-rt{background:var(--rt-line)} .legend .k-it{background:var(--it-line)} .legend .k-stop{background:var(--stop)}
+
+  footer{margin-top:3.5rem; padding-top:1.2rem; border-top:1px solid var(--rule); color:var(--ink-3); font-size:.83rem}
+  footer p{max-width:none}
+</style>
+
+<div class="frame">
+
+<header class="masthead">
+  <p class="eyebrow">Pipelex · refactor/Concept-purity · architecture note</p>
+  <h1>Getting the class registry out of <span class="mono">Concept</span></h1>
+  <p class="deck">A protocol-owned wire model was answering behavioural questions by reaching into a process global. Pulling that out split compatibility into two tiers and <b>fixed three live bugs</b> on the way.</p>
+  <ul class="meta">
+    <li><b>PR</b> <a href="https://github.com/Pipelex/pipelex/pull/1072">#1072</a> → <code>dev</code></li>
+    <li><b>7</b> commits</li>
+    <li><b>52</b> files · +1312 / −1326</li>
+    <li class="live">no wire-format change</li>
+  </ul>
+</header>
+
+<nav class="rail" aria-label="Sections">
+  <a href="#problem">Problem</a>
+  <a href="#shape">New shape</a>
+  <a href="#api">API changes</a>
+  <a href="#diffs">Diffs</a>
+  <a href="#bugs">Bugs fixed</a>
+  <a href="#calls">Judgement calls</a>
+  <a href="#notdone">Not done</a>
+  <a href="#reviews">Review log</a>
+  <a href="#links">Links</a>
+</nav>
+
+<section class="tldr">
+  <h2>TL;DR</h2>
+  <ul>
+    <li><code>Concept</code> subclasses the MTHDS-protocol wire model <code>ConceptAbstract</code> — pure serialisable data — but four of its methods read the <b>process-global class registry</b>. It could not answer a question about itself without a Pipelex runtime booted around it, and every caller holding a <code>Concept</code> inherited that dependency invisibly.</li>
+    <li><b>Compatibility is now two tiers.</b> A <i>declaration tier</i> on <code>Concept</code>, pure over the model's own fields. A <i>class tier</i> in <code>tools/typing/</code>, pure over two already-resolved classes. <code>ConceptLibrary.is_compatible</code> composes them — declaration first, classes only if that's inconclusive.</li>
+    <li><b>Class lookup moved to the provider.</b> <code>ConceptProviderAbstract.get_structure_class(concept)</code> is now the single seam that turns a <code>structure_class_name</code> string into a type.</li>
+    <li><b>Three live bugs closed:</b> cross-package <code>refines</code> aliases silently failed to resolve at five call sites; an unresolvable structure class answered <code>False</code> instead of failing; <code>native.Anything</code> was answered for the wrong reason.</li>
+    <li><b>What to watch out for when you touch this:</b> a core data-model function that needs a concept — or its class — takes a <code>concept_provider</code> parameter. Don't import a hub, and don't reach for <code>get_class_registry()</code>. A golden-set test fails the build if a new module under <code>core/concepts/</code> does.</li>
+  </ul>
+</section>
+
+<h2 id="problem"><span class="n">01</span> The problem</h2>
+
+<p><code>Concept</code> carries five fields and nothing else: <code>code</code>, <code>domain_code</code>, <code>description</code>, <code>structure_class_name: str</code>, <code>refines</code>. The MTHDS standard owns that shape. Yet four of its members answered questions that needed a <i>type</i>, not a name — so they called <code>get_class_registry()</code> and looked the name up in a process global.</p>
+
+<figure>
+<svg viewBox="0 0 940 250" role="img" aria-label="Before: five call sites and the library both funnel into Concept, which reads the global class registry">
+  <rect class="s-box" x="8" y="30" width="196" height="88" rx="3"/>
+  <text class="s-t" x="24" y="56">5 operator call sites</text>
+  <text class="s-ts" x="24" y="76">pipe_llm ×2</text>
+  <text class="s-ts" x="24" y="92">template_image_analyzer ×2</text>
+  <text class="s-ts" x="24" y="108">template_document_analyzer</text>
+
+  <rect class="s-it" x="8" y="146" width="196" height="56" rx="3"/>
+  <text class="s-tit" x="24" y="167">INTERPRETER</text>
+  <text class="s-t" x="24" y="188">ConceptLibrary.is_compatible</text>
+
+  <rect class="s-bad" x="300" y="70" width="238" height="108" rx="3"/>
+  <text class="s-tbad" x="318" y="94">Concept  (wire model)</text>
+  <text class="s-ts" x="318" y="116">are_concept_compatible</text>
+  <text class="s-ts" x="318" y="132">get_structure_class</text>
+  <text class="s-ts" x="318" y="148">is_valid_structure_class</text>
+  <text class="s-ts" x="318" y="164">search_for_nested_image_fields…</text>
+
+  <rect class="s-bad" x="678" y="88" width="248" height="72" rx="3"/>
+  <text class="s-tbad" x="696" y="112">process-global class registry</text>
+  <text class="s-ts" x="696" y="132">get_class_registry()</text>
+  <text class="s-ts" x="696" y="148">scoped by ContextVar</text>
+
+  <path class="s-badline" d="M204 74 L296 110" stroke-width="1.5" marker-end="url(#ah-bad)"/>
+  <path class="s-line" d="M204 172 L296 140" stroke-width="1.5" marker-end="url(#ah)"/>
+  <path class="s-badline" d="M538 124 L672 124" stroke-width="1.5" marker-end="url(#ah-bad)"/>
+
+  <text class="s-tbad" x="212" y="46">no resolver</text>
+  <text class="s-tbad" x="556" y="116">ambient</text>
+
+  <defs>
+    <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L8 4 L0 8 z" fill="var(--rule-2)"/>
+    </marker>
+    <marker id="ah-bad" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L8 4 L0 8 z" fill="var(--stop)"/>
+    </marker>
+  </defs>
+</svg>
+<figcaption>Before. The library passed a <code>concept_resolver</code> down; the five operator sites called <code>Concept.are_concept_compatible</code> directly and passed nothing — so a cross-package <code>refines</code> alias could not resolve there. Both paths bottomed out in the same global read.</figcaption>
+</figure>
+
+<p>Three consequences, in increasing order of how much they cost us:</p>
+
+<div class="cards">
+  <div class="card">
+    <h3>Layer inversion</h3>
+    <p>A standard-owned wire model depended on a Pipelex process global. <code>core/</code> is supposed to state its dependencies as parameters — that's the doctrine the hub split established.</p>
+  </div>
+  <div class="card">
+    <h3>Untestable</h3>
+    <p>Asking two concepts whether they were compatible required a booted runtime with the right classes registered. The compatibility matrix could not be tested with plain classes.</p>
+  </div>
+  <div class="card">
+    <h3>Wrong answers</h3>
+    <p>The one that actually bit. Two verdict bugs and a silent resolver bypass, all invisible because <code>False</code> was a legal-looking answer. See <a href="#bugs">§05</a>.</p>
+  </div>
+</div>
+
+<h2 id="shape"><span class="n">02</span> The new shape</h2>
+
+<p>The insight is that "are these two concepts compatible?" was always two questions wearing one coat. One is about <b>declarations</b> — what the author wrote — and is pure string work over the model's own fields. The other is about <b>classes</b> and needs types. Only the second needs a registry, and resolving a name into a type is a library's job.</p>
+
+<figure>
+<svg viewBox="0 0 940 300" role="img" aria-label="After: declaration tier is pure, class tier is pure, the library composes them and owns resolution">
+  <rect class="s-it" x="8" y="118" width="212" height="72" rx="3"/>
+  <text class="s-tit" x="24" y="142">INTERPRETER</text>
+  <text class="s-t" x="24" y="163">ConceptLibrary</text>
+  <text class="s-ts" x="24" y="180">.is_compatible</text>
+
+  <rect class="s-rt" x="322" y="24" width="286" height="96" rx="3"/>
+  <text class="s-trt" x="340" y="48">TIER 1 · PURE</text>
+  <text class="s-t" x="340" y="70">Concept.are_compatible_by_declaration</text>
+  <text class="s-ts" x="340" y="90">refs · class names · refines chains</text>
+  <text class="s-ts" x="340" y="106">+ injected concept_resolver</text>
+
+  <rect class="s-rt" x="322" y="186" width="286" height="90" rx="3"/>
+  <text class="s-trt" x="340" y="210">TIER 2 · PURE</text>
+  <text class="s-t" x="340" y="232">are_structure_classes_compatible</text>
+  <text class="s-ts" x="340" y="252">equivalence → subclass → field</text>
+  <text class="s-ts" x="340" y="268">takes types, never names</text>
+
+  <rect class="s-it" x="686" y="118" width="242" height="72" rx="3"/>
+  <text class="s-tit" x="704" y="142">RESOLUTION · ONE SEAM</text>
+  <text class="s-t" x="704" y="163">provider.get_structure_class</text>
+  <text class="s-ts" x="704" y="180">raises if the name is unusable</text>
+
+  <path class="s-okline" d="M220 140 L316 82" stroke-width="1.5" marker-end="url(#ah2-ok)"/>
+  <text class="s-tok" x="228" y="104">first</text>
+
+  <path class="s-line" d="M220 172 L316 226" stroke-width="1.5" marker-end="url(#ah2)"/>
+  <text class="s-tm" x="228" y="212">only if inconclusive</text>
+
+  <path class="s-line" d="M608 226 L760 196" stroke-width="1.5" marker-end="url(#ah2)"/>
+  <text class="s-tm" x="626" y="216">needs 2 classes</text>
+
+  <path class="s-line" d="M608 72 L806 72 L806 112" stroke-width="1.5" stroke-dasharray="3 3" marker-end="url(#ah2)"/>
+  <text class="s-tm" x="618" y="62">never touches it</text>
+
+  <defs>
+    <marker id="ah2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L8 4 L0 8 z" fill="var(--rule-2)"/>
+    </marker>
+    <marker id="ah2-ok" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L8 4 L0 8 z" fill="var(--rt-line)"/>
+    </marker>
+  </defs>
+</svg>
+<figcaption>After. The library asks tier 1 first; when the declarations settle it, <b>no class is ever looked up</b> — so concepts whose structure classes were never materialised still get an answer. Tier 2 runs only when tier 1 is silent, and it needs both classes, which is why an unusable name raises there instead of answering.</figcaption>
+</figure>
+
+<div class="legend">
+  <span><i class="k-rt"></i> pure · no registry, no ambient state</span>
+  <span><i class="k-it"></i> owns resolution</span>
+  <span><i class="k-stop"></i> the coupling we removed</span>
+</div>
+
+<h3>The asymmetry is deliberate, and it matters</h3>
+
+<p>At the declaration tier, <code>True</code> means "established by the declarations". <code>False</code> means "<b>not established at this tier</b>" — it does <i>not</i> mean incompatible. Two concepts whose declarations say nothing about each other may still be compatible through their classes. Reading tier 1's <code>False</code> as a verdict is the mistake the old single-method design made structurally easy; the docstrings now say so explicitly.</p>
+
+<h2 id="api"><span class="n">03</span> What changed on the surface</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Was, on <code>Concept</code></th><th>Is now</th><th>Why it moved</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>are_concept_compatible(…, strict=)</code></td>
+      <td><code>are_compatible_by_declaration(…)</code> + <code>are_structure_classes_compatible(…)</code>, composed by <code>ConceptLibrary.is_compatible</code></td>
+      <td>Two questions, one method. <code>strict</code> only ever meant anything to the class half.</td>
+    </tr>
+    <tr>
+      <td><code>get_structure_class()</code></td>
+      <td><code>ConceptProviderAbstract.get_structure_class(concept=…)</code></td>
+      <td>A name → type lookup is a registry read. The model carries the name; the provider knows the registry.</td>
+    </tr>
+    <tr>
+      <td><code>is_valid_structure_class(name)</code></td>
+      <td>a private module-level helper in <code>concept_factory.py</code></td>
+      <td>Its only three callers were already there. Materialisation-time only — it asks about a class, not a concept.</td>
+    </tr>
+    <tr>
+      <td><code>search_for_nested_image_fields_in_structure_class()</code></td>
+      <td><code>search_for_nested_image_fields(content_class=provider.get_structure_class(…))</code></td>
+      <td>Composition of two things that already existed. The method was just a resolve-then-call.</td>
+    </tr>
+    <tr>
+      <td><code>render_concept_representation(…)</code></td>
+      <td>same, but takes the already-resolved <code>structure_class</code></td>
+      <td>Rendering still labels with <code>self.concept_ref</code>; the class comes in from the caller.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>Three render-chain helpers gained a <code>concept_provider</code> parameter and resolve once: <code>StuffSpec.render_stuff_spec</code>, <code>InputStuffSpecs.build_inputs_template</code>, <code>render_inputs</code>. Interpreter-layer callers (<code>output_renderer</code>, <code>input_renderer</code>, <code>pipe_io_contracts</code>, <code>builder/runner_code</code>) supply <code>get_concept_library()</code>.</p>
+
+<div class="note go"><b>Nothing serialised changed shape.</b> <code>structure_class_name</code> stays a plain <code>str</code> protocol field. No <code>mthds</code> schema edit, no wire migration, no version skew.</div>
+
+<h2 id="diffs"><span class="n">04</span> The critical diffs</h2>
+
+<p>Five changes carry the whole refactor. Everything else is call-site plumbing.</p>
+
+<div class="tabs">
+  <input type="radio" name="d" id="d1" checked>
+  <label for="d1">1 · tier split</label>
+  <input type="radio" name="d" id="d2">
+  <label for="d2">2 · class tier</label>
+  <input type="radio" name="d" id="d3">
+  <label for="d3">3 · composition</label>
+  <input type="radio" name="d" id="d4">
+  <label for="d4">4 · the seam</label>
+  <input type="radio" name="d" id="d5">
+  <label for="d5">5 · a bypass site</label>
+
+  <div class="panels">
+    <div class="panel">
+      <h4>pipelex/core/concepts/concept.py</h4>
+      <p>The class-tier block leaves the model, and with it the registry import. The rename is the point: the method no longer claims to answer the whole question.</p>
+<pre class="diff"><code><span class="del">-from pipelex.core.stuffs.image_field_search import search_for_nested_image_fields</span>
+<span class="del">-from pipelex.system.registries.class_registry_access import get_class_registry</span>
+<span class="del">-from pipelex.tools.typing.class_utils import are_classes_equivalent, has_compatible_field</span>
+
+     @classmethod
+<span class="del">-    def are_concept_compatible(</span>
+<span class="add">+    def are_compatible_by_declaration(</span>
+         cls, *, concept_1: "Concept", concept_2: "Concept",
+<span class="del">-        strict: bool = False,</span>
+         concept_resolver: Callable[[str], "Concept | None"] | None = None,
+     ) -&gt; bool:
+         <span class="cmt"># … dynamic short-circuits, ref equality, class-name equality,</span>
+         <span class="cmt"># … refines chains + cross-package alias resolution — all unchanged</span>
+
+<span class="del">-        # Check class-based compatibility</span>
+<span class="del">-        concept_1_class = get_class_registry().get_class(name=concept_1.structure_class_name)</span>
+<span class="del">-        concept_2_class = get_class_registry().get_class(name=concept_2.structure_class_name)</span>
+<span class="del">-        if concept_1_class is None or concept_2_class is None:</span>
+<span class="del">-            return False                      # &lt;-- "unknown" indistinguishable from "no"</span>
+<span class="del">-        if are_classes_equivalent(concept_1_class, class_2=concept_2_class):</span>
+<span class="del">-            return True</span>
+<span class="del">-        if strict:</span>
+<span class="del">-            return False</span>
+<span class="del">-        # … subclass + nested-field checks</span>
+<span class="add">+        return False   # not established *at this tier* — see docstring</span>
+</code></pre>
+      <p>A new declared property replaces an inference the old code got wrong:</p>
+<pre class="diff"><code><span class="add">+    @property</span>
+<span class="add">+    def declares_a_structure_class(self) -&gt; bool:</span>
+<span class="add">+        """True for every concept but `native.Anything`, whose content class</span>
+<span class="add">+        deliberately does not exist — so the name derived mechanically from its</span>
+<span class="add">+        code never resolves, and asking a provider for it is a category error</span>
+<span class="add">+        rather than a missing registration."""</span>
+<span class="add">+        if not SpecialDomain.is_native(domain_code=self.domain_code):</span>
+<span class="add">+            return True</span>
+<span class="add">+        return not NativeConceptCode.is_structureless_concept(self.code)</span>
+</code></pre>
+    </div>
+
+    <div class="panel">
+      <h4>pipelex/tools/typing/class_utils.py</h4>
+      <p>The class tier lands next to the two helpers it already used. It takes <i>types</i>, never names — which is what makes it testable with two throwaway classes and no boot.</p>
+<pre class="diff"><code><span class="add">+def are_structure_classes_compatible(*, class_1: type[Any], class_2: type[Any], strict: bool) -&gt; bool:</span>
+<span class="add">+    """Whether `class_1` can stand in for `class_2`, structurally.</span>
+<span class="add">+</span>
+<span class="add">+    Structural equivalence always suffices. Beyond that, `strict` decides how much slack:</span>
+<span class="add">+    strict accepts equivalence only, loose also accepts a subclass relationship (a refined</span>
+<span class="add">+    concept's generated class inherits from the refined one's) and a class that merely</span>
+<span class="add">+    *carries* a compatible value in a field — the "nested" case a template needs when it</span>
+<span class="add">+    pulls an image out of a document.</span>
+<span class="add">+</span>
+<span class="add">+    Pure over the two classes: it takes resolved types, never names, and reads no registry.</span>
+<span class="add">+    """</span>
+<span class="add">+    if are_classes_equivalent(class_1, class_2=class_2):</span>
+<span class="add">+        return True</span>
+<span class="add">+    if strict:</span>
+<span class="add">+        return False</span>
+<span class="add">+    try:</span>
+<span class="add">+        if issubclass(class_1, class_2):</span>
+<span class="add">+            return True</span>
+<span class="add">+    except TypeError:</span>
+<span class="add">+        pass   # not both classes; fall through to field checks</span>
+<span class="add">+    return has_compatible_field(class_1, target_type=class_2)</span>
+</code></pre>
+    </div>
+
+    <div class="panel">
+      <h4>pipelex/libraries/concept/concept_library.py</h4>
+      <p>The composition. Read the ordering carefully — it's where the "still answers for unmaterialised classes" property comes from.</p>
+<pre class="diff"><code>     @override
+     def is_compatible(self, *, tested_concept, wanted_concept, strict: bool = False) -&gt; bool:
+<span class="del">-        return Concept.are_concept_compatible(</span>
+<span class="del">-            concept_1=tested_concept, concept_2=wanted_concept,</span>
+<span class="del">-            strict=strict, concept_resolver=self._concept_resolver,</span>
+<span class="del">-        )</span>
+<span class="add">+        if Concept.are_compatible_by_declaration(</span>
+<span class="add">+            concept_1=tested_concept,</span>
+<span class="add">+            concept_2=wanted_concept,</span>
+<span class="add">+            concept_resolver=self._concept_resolver,</span>
+<span class="add">+        ):</span>
+<span class="add">+            return True</span>
+<span class="add">+</span>
+<span class="add">+        if not (tested_concept.declares_a_structure_class and wanted_concept.declares_a_structure_class):</span>
+<span class="add">+            # `native.Anything` has no structure class, so there is no structural</span>
+<span class="add">+            # comparison left to make: tier 1's silence is the whole answer.</span>
+<span class="add">+            return False</span>
+<span class="add">+</span>
+<span class="add">+        return are_structure_classes_compatible(</span>
+<span class="add">+            class_1=self.get_structure_class(concept=tested_concept),</span>
+<span class="add">+            class_2=self.get_structure_class(concept=wanted_concept),</span>
+<span class="add">+            strict=strict,</span>
+<span class="add">+        )</span>
+</code></pre>
+    </div>
+
+    <div class="panel">
+      <h4>pipelex/libraries/concept/concept_library.py — the resolution seam</h4>
+      <p>One implementation of "name → <code>StuffContent</code> subclass, or a typed error", for the whole tree. Note the <code>StuffContent</code> bound: the old path used an unbounded <code>get_class</code>, so a name registered as something else could reach <code>issubclass</code> and answer <code>True</code>.</p>
+<pre class="diff"><code><span class="add">+    @override</span>
+<span class="add">+    def get_structure_class(self, *, concept: Concept) -&gt; type[StuffContent]:</span>
+<span class="add">+        try:</span>
+<span class="add">+            structure_class = get_class_registry().get_required_subclass(</span>
+<span class="add">+                name=concept.structure_class_name, base_class=StuffContent</span>
+<span class="add">+            )</span>
+<span class="add">+        except (ClassRegistryNotFoundError, ClassRegistryInheritanceError) as exc:</span>
+<span class="add">+            msg = (</span>
+<span class="add">+                f"Concept '{concept.concept_ref}' declares structure class "</span>
+<span class="add">+                f"'{concept.structure_class_name}', which is not a registered "</span>
+<span class="add">+                f"subclass of StuffContent: {exc}"</span>
+<span class="add">+            )</span>
+<span class="add">+            raise ConceptStructureClassNotFoundError(msg) from exc</span>
+<span class="add">+        return cast("type[StuffContent]", structure_class)</span>
+</code></pre>
+      <div class="note">The error is a <code>ConceptValueError</code> subclass, so every guard that already converted that at its own boundary keeps working untouched — which is why this landed without a sweep of <code>except</code> clauses.</div>
+    </div>
+
+    <div class="panel">
+      <h4>pipelex/pipe_operators/shared/template_image_analyzer.py</h4>
+      <p>Representative of all five bypass sites. Routing through the library is what makes the injected <code>concept_resolver</code> reach the comparison — this is bug #1 in <a href="#bugs">§05</a>, and the fix is a one-line swap per site.</p>
+<pre class="diff"><code><span class="del">-            is_image = Concept.are_concept_compatible(</span>
+<span class="del">-                concept_1=root_concept,</span>
+<span class="del">-                concept_2=native_image_concept,</span>
+<span class="add">+            is_image = get_concept_library().is_compatible(</span>
+<span class="add">+                tested_concept=root_concept,</span>
+<span class="add">+                wanted_concept=native_image_concept,</span>
+                 strict=True,
+             )
+
+<span class="del">-        nested_paths = root_concept.search_for_nested_image_fields_in_structure_class()</span>
+<span class="add">+        nested_paths = search_for_nested_image_fields(</span>
+<span class="add">+            content_class=get_concept_library().get_structure_class(concept=root_concept)</span>
+<span class="add">+        )</span>
+</code></pre>
+      <p>The other four: <code>pipe_llm.py</code> ×2 (<code>strict=True</code>), <code>template_image_analyzer.py</code>'s nested check (<code>strict=False</code>), <code>template_document_analyzer.py</code> (<code>strict=True</code>). Direction and strictness were preserved at all five.</p>
+    </div>
+  </div>
+</div>
+
+<h2 id="bugs"><span class="n">05</span> The three bugs this closed</h2>
+
+<h3>1 · Cross-package <code>refines</code> aliases silently failed to resolve</h3>
+<p>Five operator call sites compared two <code>Concept</code> values directly instead of going through <code>ConceptLibrary.is_compatible</code>. That meant <code>concept_resolver=None</code>, and a refinement written across a package boundary — <code>refines = "imgdep-&gt;native.Image"</code> — never resolved <i>at those sites</i>. Every other compatibility check in the tree already went through the wrapper.</p>
+<p><b>What it looked like:</b> a concept that legitimately refines <code>native.Image</code> through a dependency alias was not recognised as an image by the template analyser, so <code>@pic</code> produced no image reference — at authoring time, with no error to read. Same class of failure on the PipeLLM text-vs-object run branch.</p>
+<p>Pinned by <code>test_template_image_analyzer_cross_package.py</code>, which drives the <i>public</i> <code>analyze_template_for_images</code> rather than a private resolver. It failed red with <code>0 == 1</code> before the fix. The other four sites are the same one-line swap through the same wrapper.</p>
+
+<h3>2 · An unresolvable structure class answered <code>False</code>, not an error</h3>
+<p>The old class tier did <code>if concept_1_class is None or concept_2_class is None: return False</code>. "I could not resolve this name" and "these are incompatible" are different answers, and callers cannot tell them apart. Now it raises <code>ConceptStructureClassNotFoundError</code>.</p>
+<div class="note stop"><b>This one was load-bearing for the whole refactor.</b> It's the reason the tiers had to be composed by the library rather than merged: only the thing that owns resolution can tell "no class" from "not compatible", so only it can decide which to return.</div>
+
+<h3>3 · <code>native.Anything</code> was answered for the wrong reason</h3>
+<p><code>NativeConceptCode.ANYTHING.structure_class</code> is <code>None</code> by design — it is the untyped vehicle — while <code>structure_class_name</code> still derives <code>"AnythingContent"</code> mechanically, a name no registry ever holds. So <code>is_compatible(Anything, Text)</code> returned <code>False</code> via the silent <code>None</code> branch: right answer, wrong reason. Making bug #2 raise would have turned that into a crash.</p>
+<p>Fixed at the source rather than papered over: <code>NativeConceptCode.is_structureless_concept</code> + <code>Concept.declares_a_structure_class</code> make "this concept has no structure" a <i>declared property</i>, checked before the class tier. Verdicts are unchanged in both directions; the reasoning is now correct. Pinned by <code>test_the_structureless_native_concept_is_answered_not_raised</code>.</p>
+
+<h2 id="calls"><span class="n">06</span> Judgement calls worth knowing about</h2>
+
+<details>
+  <summary>Why <code>pipe_abstract.py</code> still reads the registry directly</summary>
+  <p>It decorates graph-registry entries with a concept's JSON Schema, and it cannot import either hub. The constraint is a <b>static-analysis</b> cycle, not a runtime one — worth knowing before you "fix" it:</p>
+  <ul>
+    <li>A clean-interpreter probe after <code>import pipelex.runtime_hub</code> shows <code>pipe_machinery.pipe_abstract</code>, <code>pipe_run.pipe_job</code> and <code>plugins.orchestrator_registry</code> all <b>absent</b> — those edges are <code>TYPE_CHECKING</code>-only.</li>
+    <li>But pyright's <code>reportImportCycles</code> counts them, so importing either hub there is a hard type-check failure via <code>runtime_hub → plugins.orchestrator_registry → pipe_run.pipe_job → here</code>.</li>
+    <li>A <i>deferred</i> import doesn't dodge it: pyright reports at <code>interpreter_hub.py</code>, where no line-level ignore can reach.</li>
+  </ul>
+  <p>So it uses the below-both-hubs accessor, deliberately with the lenient <code>get_class</code> (no bound, <code>None</code> rather than a raise) because the schema is optional decoration. This is the one sanctioned read-side exception in the tree, and it's stated as such in <code>class_registry_access.py</code>.</p>
+</details>
+
+<details>
+  <summary>Why <code>--save-csv</code> resolves through an <i>empty</i> library</summary>
+  <p>Found by an e2e test, and it's the surprise of the branch. <code>PipelexMTHDSProtocol.execute</code> tears the run library down on its way out — so <b>every</b> post-run step in <code>_execute_run</code> (the CSV save, the pretty print, the working-memory dump) runs with no current library. Migrating the CSV row-model lookup to <code>get_concept_library()</code> produced <code>RuntimeError: No current library set</code>.</p>
+  <p>The old code never noticed because it read the process-global registry, which is never unregistered at teardown — the classes outlive the library that defined them. <code>ConceptLibrary.make_empty()</code> reads that same registry while keeping the single typed "name → class, or a typed error" implementation.</p>
+  <p>The lifecycle smell underneath is real and out of scope: a post-run step needing the method's <i>declarations</i> is running after the method is gone. The honest fix is a result object carrying what post-run steps need, or holding the library window open across them.</p>
+</details>
+
+<details>
+  <summary>Four <code>except</code> arms: two removed, two deliberately not added</summary>
+  <p><code>ConceptFactory</code> refuses to build a concept whose declared structure class does not resolve — a bad <code>structure = "…"</code> raises <code>ConceptFactoryError</code>, and the basic-blueprint path <i>generates</i> the class. Every <code>Concept(...)</code> construction in <code>pipelex/</code> source lives inside that factory. So a concept in a loaded library always has a resolvable structure class.</p>
+  <p>Consequently: <code>resolve_input_kind</code>'s <code>except ConceptValueError → InputKind.DYNAMIC</code> fallback was unreachable and was <b>removed</b> (keeping it would restore exactly the silent degradation bug #2 removes), and the two run-path lookups the plan flagged as needing guards were <b>left unguarded</b>. Adding them would be guarding an impossible scenario, and bug #2's fix already made the error self-describing — it names the concept ref and the class.</p>
+  <p>The asymmetry with the guarded <i>validation</i> siblings in the same files is intentional: the <code>/validate</code> sweep needs per-pipe granularity or one bad pipe aborts the whole bundle. A run has no sweep.</p>
+</details>
+
+<details>
+  <summary>The purity lock, and why it's a golden set rather than a rule</summary>
+  <p><code>test_concept_registry_boundary.py</code> asserts that exactly two modules under <code>pipelex/core/concepts/</code> touch the class registry, and both are the <b>materialisation write side</b> — <code>concept_factory</code> registering generated classes, <code>structure_generation/generator.py</code> looking up base classes to generate against. That's genuinely the registry's business and stays.</p>
+  <p>A golden set, not a predicate, for the same reason the <code>cogt</code> boundary test gives: nothing separates a sanctioned write-side read from a new read-side one, so the value is turning a third module into a diff a reviewer sees. <b>No other gate can see this edge</b> — both the accessor and its users are runtime-layer, so the hub-layering guard is blind to it by construction.</p>
+  <p>It matches four spellings, because an import-name-only walk waved three of them through: the accessor by name, the module path, the attribute call (<code>runtime_hub.get_class_registry()</code>), and two indirect roots — <code>KajsonManager.get_class_registry()</code> (which skips library scoping entirely, and has a live precedent in <code>runtime_bridge</code>) and <code>ClassRegistryUtils</code>.</p>
+</details>
+
+<h2 id="notdone"><span class="n">07</span> What this does <i>not</i> do</h2>
+
+<div class="note stop"><b>The scoping half is not done.</b> <code>ConceptLibrary.get_structure_class</code> calls <code>get_class_registry()</code>, which selects a registry from the current async context — not one the provider carries. A <code>ConceptLibrary</code> holds no registry at all; the per-library <code>ClassRegistry</code> lives on <code>Library</code>. So passing a specific library as <code>concept_provider</code> does not scope class resolution to it.</div>
+
+<p>Codex raised this as a P1 on the PR. The mechanism is real; the divergence it describes is not reachable:</p>
+
+<ul>
+  <li><b>Provider-library and registry-library are two reads of one variable.</b> Every non-forwarding <code>concept_provider=</code> source is <code>get_concept_library()</code> → <code>LibraryManager.get_current_library()</code> → the <code>_library_id</code> ContextVar, which is the same one <code>_resolve_scoped_class_registry</code> reads. They cannot name different libraries.</li>
+  <li><b>The one place that installs a per-library registry pairs them.</b> <code>runtime_bridge/primitives/rehydration.py</code> calls <code>set_class_registry</code> and <code>set_current_library</code> on the same library in adjacent statements.</li>
+  <li><b>Two sites deliberately depend on the ambient read</b> — the post-teardown <code>--save-csv</code> lookup and every boot-free test using <code>make_empty()</code>. Carrying a registry on the provider would break both unless it re-derived the global fallback <code>get_class_registry()</code> already implements.</li>
+</ul>
+
+<p>Not a regression either: on <code>dev</code>, the removed <code>Concept.get_structure_class()</code> read the same registry. This PR moved <i>where</i> the call lives, never <i>which</i> registry it reads. What it <b>did</b> buy is that scoping it later is now a one-place change.</p>
+
+<h4>Trip-wires that would make it real</h4>
+<ol>
+  <li>A caller passes <code>library_manager.get_library(library_id=X).concept_library</code> instead of <code>get_concept_library()</code>.</li>
+  <li>A <b>dependency/child</b> library's <code>concept_library</code> is used as a provider. Child <code>Library</code> objects live in <code>Library.dependency_libraries</code> and are <i>not</i> in <code>LibraryManager._libraries</code>, so <code>get_library_class_registry</code> structurally cannot see their registry. This is the sharpest of the four.</li>
+  <li><code>InterpreterHub.set_concept_library</code> gains a live writer — it currently has zero callers, so its standalone-library fallback branch is dead code.</li>
+  <li>A <code>set_class_registry</code> call site appears that is not paired with <code>set_current_library</code> on the same library.</li>
+</ol>
+
+<h4>Also deliberately out of scope</h4>
+<ul>
+  <li><b>The write side stays ambient.</b> Making libraries own their class registry explicitly is a separate, larger track.</li>
+  <li><b>No <code>StaticConceptProvider</code></b> — build it when something needs it, not for symmetry.</li>
+  <li><b>No operator parameterisation.</b> Interpreter-layer <code>get_concept_library()</code> calls are the sanctioned idiom for that layer today.</li>
+</ul>
+
+<h2 id="reviews"><span class="n">08</span> Review log — read this bit</h2>
+
+<p>Four review passes ran over this branch. <b>Not one found a correctness defect in the code.</b> Every substantive finding was about a <i>claim</i> — prose asserting more than the implementation delivers. That pattern is the most transferable thing in this document.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Pass</th><th>Found</th><th>Outcome</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Sonnet code-review (checkpoint 1)</td>
+      <td>~8 unguarded call sites for the new raise</td>
+      <td><b>Rejected</b> — unreachable via the factory guard. Residual sweep-granularity tradeoff recorded.</td>
+    </tr>
+    <tr>
+      <td>Sonnet code-review (checkpoint 2)</td>
+      <td>One doc inconsistency ("Two modules", named one)</td>
+      <td><b>Fixed</b> before commit.</td>
+    </tr>
+    <tr>
+      <td>Codex (P1)</td>
+      <td>Provider does not scope class resolution to its own library</td>
+      <td><b>Split.</b> Declined on the code (unreachable, and the fix breaks two sites). Applied on the wording — three places asserted the property.</td>
+    </tr>
+    <tr>
+      <td>gstack <code>/review</code> finalize</td>
+      <td>Four verified doc/code contradictions, one new silent-degradation path, one test narrower than its claim</td>
+      <td><b>All six fixed.</b> Four design tradeoffs deferred to <code>wip/inputs/</code>.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>Two of the finalize findings are worth calling out because they'd bite anyone:</p>
+
+<ul>
+  <li><b><code>pipe_io_contracts</code> documented the hazard this PR removed.</b> Its docstrings warned that a post-teardown call "silently renders against whatever classes the registry last held" — but the builder now resolves the library up front, so it raises. The docstring whose entire job is to instruct callers about the library window described the inverse of the behaviour.</li>
+  <li><b><code>output_renderer</code> gained a silent-degradation path.</b> <code>get_concept_library()</code> sat <i>inside</i> a <code>try</code> whose <code>except (PipelexError, ValueError)</code> renders <code>&lt;unable to render&gt;</code> — so a library-lifecycle fault would surface as the placeholder meant for an unrenderable concept. The exact loud-vs-silent conflation this branch exists to remove, reintroduced one layer up. Hoisted out; a two-line fix.</li>
+</ul>
+
+<div class="note"><b>Greptile:</b> 5/5, no findings, three reviews. <b>Codex:</b> clean on the final head. <b>Cubic:</b> could not review — the workspace hit its free monthly line limit. That's a billing state, not a verdict, so this PR shipped without a cubic pass.</div>
+
+<h2 id="links"><span class="n">09</span> Links</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>What</th><th>Where</th></tr></thead>
+  <tbody>
+    <tr><td>This work</td><td><a href="https://github.com/Pipelex/pipelex/pull/1072">pipelex#1072</a> — <code>refactor/Concept-purity</code> → <code>dev</code></td></tr>
+    <tr><td>Lineage — hub split</td><td><a href="https://github.com/Pipelex/pipelex/pull/1062">pipelex#1062</a> · <a href="https://github.com/Pipelex/pipelex/pull/1064">#1064</a></td></tr>
+    <tr><td>Lineage — layer placement</td><td><a href="https://github.com/Pipelex/pipelex/pull/1070">pipelex#1070</a> · <a href="https://github.com/Pipelex/pipelex/pull/1071">#1071</a></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Cross-repo</h3>
+
+<p><b>No other repo needs a code change.</b> Cross-repo usage of the four removed member names is zero — measured by enumerating the workspace directory rather than trusting a hardcoded repo list. Two <i>documents</i> cite them and will want a look when their tracks resume:</p>
+
+<ul>
+  <li><b><code>pipelex-js</code></b> — <code>wip/gauntlet/invariants-structural.md</code>, invariant <code>CONCEPT-6</code>. A live invariant register for the in-progress TS port, citing the compatibility block this PR restructured. There is a handoff note next to this document for that track.</li>
+  <li><b><code>pipelex-temporal</code></b> — <code>wip/bad-parallel-combine-class-identity-bug.md</code> cites the removed <code>get_structure_class()</code>.</li>
+</ul>
+
+<footer>
+  <p>Diagrams are hand-authored inline SVG — no script, no CDN, renders offline and in both colour schemes. Written from <code>refactor/Concept-purity</code> at head <code>81ba5817c</code>.</p>
+</footer>
+
+</div>

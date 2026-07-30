@@ -14,6 +14,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.interpreter_hub import get_concept_library
 from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -140,7 +141,7 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
         if not self.is_structured_output:
             content = await content_generator.make_search_sourced_answer(search_assignment=search_assignment)
         else:
-            output_structure_class = self.output.concept.get_structure_class()
+            output_structure_class = get_concept_library().get_structure_class(concept=self.output.concept)
             content = await content_generator.make_search_structured(
                 output_structure_class=output_structure_class,
                 search_assignment=search_assignment,

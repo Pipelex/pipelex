@@ -2372,10 +2372,6 @@ rationale = "Verb-object: compute the cost of one usage record; the single obvio
 param = "concept"
 rationale = "Predicate on the concept; single operand."
 
-["pipelex/core/concepts/concept.py::Concept.is_valid_structure_class"]
-param = "structure_class_name"
-rationale = "Predicate on the class name; single operand."
-
 ["pipelex/core/concepts/concept.py::Concept.sentence_from_concept"]
 param = "concept"
 rationale = "Derivation from the concept; single operand."
@@ -2507,6 +2503,10 @@ rationale = "Predicate on the ref-or-code; single operand."
 ["pipelex/core/concepts/native/concept_native.py::NativeConceptCode.is_native_structure_class"]
 param = "class_name"
 rationale = "Predicate on the class name; single operand."
+
+["pipelex/core/concepts/native/concept_native.py::NativeConceptCode.is_structureless_concept"]
+param = "concept_code"
+rationale = "Predicate on the concept code; single operand — same shape as its is_dynamic_concept sibling."
 
 ["pipelex/core/concepts/native/concept_native.py::NativeConceptCode.is_text_concept"]
 param = "concept_code"

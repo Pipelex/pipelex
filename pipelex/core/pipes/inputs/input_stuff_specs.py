@@ -6,6 +6,7 @@ from pydantic import Field, RootModel, field_validator
 
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
@@ -176,24 +177,28 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
         lines = [f"{prefix}- {var_name}: {stuff_spec.to_bundle_representation()}" for var_name, stuff_spec in self.root.items()]
         return "\n" + "\n".join(lines)
 
-    def build_inputs_template(self) -> dict[str, Any]:
+    def build_inputs_template(self, *, concept_provider: ConceptProviderAbstract) -> dict[str, Any]:
         """Build the inputs template dict: variable name -> example stuff representation.
+
+        Args:
+            concept_provider: Resolves each declared concept's structure class.
 
         Returns:
             Dictionary mapping each input variable to its generated example value
         """
         template: dict[str, Any] = {}
         for var_name, stuff_spec in self.root.items():
-            template[var_name] = stuff_spec.render_stuff_spec(output_format=ConceptRepresentationFormat.JSON)
+            template[var_name] = stuff_spec.render_stuff_spec(concept_provider=concept_provider, output_format=ConceptRepresentationFormat.JSON)
         return template
 
-    def render_inputs(self, *, indent: int = 2) -> str:
+    def render_inputs(self, *, concept_provider: ConceptProviderAbstract, indent: int = 2) -> str:
         """Render a JSON representation for all stuff specs as a formatted string.
 
         Args:
+            concept_provider: Resolves each declared concept's structure class.
             indent: Number of spaces for indentation (default: 2)
 
         Returns:
             Formatted JSON string with all inputs
         """
-        return json.dumps(self.build_inputs_template(), indent=indent, ensure_ascii=False)
+        return json.dumps(self.build_inputs_template(concept_provider=concept_provider), indent=indent, ensure_ascii=False)

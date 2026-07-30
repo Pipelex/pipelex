@@ -139,12 +139,13 @@ class StuffFactory:
         cls,
         concept: Concept,
         *,
+        concept_provider: ConceptProviderAbstract,
         content: dict[str, Any],
         name: str | None,
         code: str | None,
     ) -> Stuff | None:
         """Wrap :meth:`try_make_csv_list_content` into a ``Stuff`` (Case 2.5 envelope path)."""
-        list_content = cls.try_make_csv_list_content(concept, content=content, name=name)
+        list_content = cls.try_make_csv_list_content(concept, concept_provider=concept_provider, content=content, name=name)
         if list_content is None:
             return None
         return cls.make_stuff(concept=concept, content=list_content, name=name, code=code)
@@ -154,6 +155,7 @@ class StuffFactory:
         cls,
         concept: Concept,
         *,
+        concept_provider: ConceptProviderAbstract,
         content: dict[str, Any],
         name: str | None,
     ) -> ListContent[StuffContent] | None:
@@ -234,7 +236,7 @@ class StuffFactory:
             raise CsvError(msg)
 
         try:
-            row_model = concept.get_structure_class()
+            row_model = concept_provider.get_structure_class(concept=concept)
         except ConceptValueError as exc:
             # Keep the codec's typed-error boundary intact: an unregistered structure class is a
             # caller-fixable input problem, not a raw ValueError that escapes into core/runner.
@@ -592,7 +594,7 @@ class StuffFactory:
         if isinstance(content, dict):
             content_dict = cast("dict[str, Any]", content)
             # CSV input: a {"url": "...csv"} under a structured row concept loads as ListContent[row-concept].
-            csv_stuff = cls._try_make_csv_list_stuff(concept=concept, content=content_dict, name=name, code=code)
+            csv_stuff = cls._try_make_csv_list_stuff(concept=concept, concept_provider=concept_provider, content=content_dict, name=name, code=code)
             if csv_stuff is not None:
                 return csv_stuff
 

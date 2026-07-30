@@ -3,6 +3,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.pipes.variable_multiplicity import PresenceMarker, VariableMultiplicity, format_concept_with_multiplicity
 
@@ -38,10 +39,13 @@ class StuffSpec(BaseModel):
             presence=self.presence,
         )
 
-    def render_stuff_spec(self, *, output_format: ConceptRepresentationFormat) -> dict[str, Any]:
+    def render_stuff_spec(self, *, concept_provider: ConceptProviderAbstract, output_format: ConceptRepresentationFormat) -> dict[str, Any]:
         """Render a representation of this stuff spec.
 
         Args:
+            concept_provider: Resolves this spec's concept into its structure class. This is the one
+                place in the whole render chain that resolves a class, so a caller states which
+                library it means instead of every renderer reaching for one.
             output_format: The format to generate (JSON or PYTHON)
 
         Returns:
@@ -49,6 +53,7 @@ class StuffSpec(BaseModel):
             wrapped in a list if multiplicity indicates multiple items.
         """
         json_value, _ = self.concept.render_concept_representation(
+            structure_class=concept_provider.get_structure_class(concept=self.concept),
             output_format=output_format,
             is_multiple=self.is_multiple(),
         )

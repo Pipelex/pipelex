@@ -5,6 +5,7 @@ from pytest_mock import MockerFixture
 
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.concepts.exceptions import ConceptError
+from pipelex.libraries.concept.concept_library import ConceptLibrary
 from pipelex.pipe_machinery.rendering.output_renderer import _collect_possible_outputs  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
 
 GET_REQUIRED_PIPE_TARGET = "pipelex.pipe_machinery.rendering.output_renderer.get_required_pipe"
@@ -36,7 +37,7 @@ class TestCollectPossibleOutputsCondition:
         assert result == []
         get_pipe_mock.assert_not_called()
 
-    def test_single_mapped_pipe_uses_content_key(self, mocker: MockerFixture) -> None:
+    def test_single_mapped_pipe_uses_content_key(self, mocker: MockerFixture, renderer_concept_library: ConceptLibrary) -> None:
         """A single mapped pipe yields one entry whose content comes from the rendered dict's 'content' key."""
         condition_pipe = _make_condition_pipe(mocker, {"make_summary"})
         mapped_pipe = _make_mapped_pipe(mocker, "test.Summary")
@@ -50,7 +51,9 @@ class TestCollectPossibleOutputsCondition:
 
         assert result == [{"concept_ref": "test.Summary", "content": {"text": "summary text"}}]
         get_pipe_mock.assert_called_once_with(pipe_code="make_summary")
-        mapped_pipe.output.render_stuff_spec.assert_called_once_with(output_format=ConceptRepresentationFormat.JSON)
+        mapped_pipe.output.render_stuff_spec.assert_called_once_with(
+            concept_provider=renderer_concept_library, output_format=ConceptRepresentationFormat.JSON
+        )
 
     def test_multiple_mapped_pipes_are_ordered_deterministically(self, mocker: MockerFixture) -> None:
         """With several mapped pipes, outputs come back sorted by pipe code regardless of set iteration order."""

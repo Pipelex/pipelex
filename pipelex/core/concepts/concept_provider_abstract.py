@@ -15,6 +15,7 @@ from abc import ABC, abstractmethod
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.stuffs.stuff_content import StuffContent
 
 
 class ConceptProviderAbstract(ABC):
@@ -35,3 +36,14 @@ class ConceptProviderAbstract(ABC):
     @abstractmethod
     def is_compatible(self, *, tested_concept: Concept, wanted_concept: Concept, strict: bool = False) -> bool:
         """Whether `tested_concept` satisfies `wanted_concept` (refinement only when `strict`)."""
+
+    @abstractmethod
+    def get_structure_class(self, *, concept: Concept) -> type[StuffContent]:
+        """Resolve a concept's declared `structure_class_name` into the class itself.
+
+        A `Concept` carries the class *name* as a plain protocol string; turning that name into a
+        type is a lookup against whichever class registry the provider is backed by, which is
+        precisely the knowledge a wire model must not hold. Raises
+        `ConceptStructureClassNotFoundError` when the name resolves to nothing, or to something that
+        is not a `StuffContent` subclass.
+        """

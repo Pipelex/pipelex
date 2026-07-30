@@ -21,6 +21,7 @@ from pipelex.core.concepts.concept_representation_generator import (
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+from pipelex.interpreter_hub import get_concept_library
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.runtime_hub import get_class_registry
 
@@ -115,7 +116,7 @@ def _collect_imports_for_inputs(inputs: InputStuffSpecs, *, class_name_overrides
 
     for input_req in inputs.root.values():
         concept = input_req.concept
-        structure_class = concept.get_structure_class()
+        structure_class = get_concept_library().get_structure_class(concept=concept)
 
         # Get imports from the representation generator (includes nested custom classes)
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON, class_name_overrides=class_name_overrides)
@@ -227,6 +228,7 @@ def generate_runner_code(
         for var_name, input_req in pipe.inputs.root.items():
             is_multiple = _is_multiple(input_req.multiplicity)
             result, _ = input_req.concept.render_concept_representation(
+                structure_class=get_concept_library().get_structure_class(concept=input_req.concept),
                 output_format=ConceptRepresentationFormat.PYTHON,
                 is_multiple=is_multiple,
                 class_name_overrides=overrides,

@@ -10,7 +10,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.interpreter_hub import get_native_concept, get_required_concept
+from pipelex.interpreter_hub import get_concept_library, get_native_concept, get_required_concept
 from pipelex.pipe_operators.llm.document_reference import DocumentReference, DocumentReferenceKind
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_variable_references
 from pipelex.tools.jinja2.template_category import TemplateCategory
@@ -148,9 +148,9 @@ class TemplateDocumentAnalyzer:
         # For simple variable references (no dots after root)
         if var_path == root_var:
             # Check if it's directly a DocumentContent
-            is_document = Concept.are_concept_compatible(
-                concept_1=root_concept,
-                concept_2=native_document_concept,
+            is_document = get_concept_library().is_compatible(
+                tested_concept=root_concept,
+                wanted_concept=native_document_concept,
                 strict=True,
             )
             if is_document:

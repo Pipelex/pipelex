@@ -5,6 +5,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
+from pipelex.libraries.concept.concept_library import ConceptLibrary
 from pipelex.pipe_machinery.rendering.output_renderer import render_output
 
 GET_REQUIRED_PIPE_TARGET = "pipelex.pipe_machinery.rendering.output_renderer.get_required_pipe"
@@ -46,7 +47,7 @@ class TestRenderOutputAnythingFormats:
         with pytest.raises(ValueError, match=r"native\.Anything"):
             render_output(anything_pipe, output_format=output_format)
 
-    def test_anything_json_renders_output_options(self, mocker: MockerFixture) -> None:
+    def test_anything_json_renders_output_options(self, mocker: MockerFixture, renderer_concept_library: ConceptLibrary) -> None:
         """JSON format wraps each possible output under an output_option_N key with concept and content."""
         condition_pipe = _make_anything_condition_pipe(mocker, "make_summary")
         mapped_pipe = _make_mapped_pipe(
@@ -65,9 +66,11 @@ class TestRenderOutputAnythingFormats:
                 "content": {"text": "summary text"},
             }
         }
-        mapped_pipe.output.render_stuff_spec.assert_called_once_with(output_format=ConceptRepresentationFormat.JSON)
+        mapped_pipe.output.render_stuff_spec.assert_called_once_with(
+            concept_provider=renderer_concept_library, output_format=ConceptRepresentationFormat.JSON
+        )
 
-    def test_anything_python_renders_option_lines(self, mocker: MockerFixture) -> None:
+    def test_anything_python_renders_option_lines(self, mocker: MockerFixture, renderer_concept_library: ConceptLibrary) -> None:
         """PYTHON format lists each possible output as a commented option with an output_N assignment."""
         condition_pipe = _make_anything_condition_pipe(mocker, "make_summary")
         mapped_pipe = _make_mapped_pipe(
@@ -84,9 +87,11 @@ class TestRenderOutputAnythingFormats:
         assert result_lines[1] == "# The actual output will be one of the following:"
         assert "# Option 1: test.Summary" in result_lines
         assert 'output_1 = SummaryContent(text="hello")' in result_lines
-        mapped_pipe.output.render_stuff_spec.assert_called_once_with(output_format=ConceptRepresentationFormat.PYTHON)
+        mapped_pipe.output.render_stuff_spec.assert_called_once_with(
+            concept_provider=renderer_concept_library, output_format=ConceptRepresentationFormat.PYTHON
+        )
 
-    def test_anything_schema_renders_schema_options(self, mocker: MockerFixture) -> None:
+    def test_anything_schema_renders_schema_options(self, mocker: MockerFixture, renderer_concept_library: ConceptLibrary) -> None:
         """SCHEMA format wraps each possible output under a schema_option_N key with concept and content."""
         condition_pipe = _make_anything_condition_pipe(mocker, "build_schema")
         schema_content = {"type": "object", "properties": {"text": {"type": "string"}}}
@@ -106,4 +111,6 @@ class TestRenderOutputAnythingFormats:
                 "content": schema_content,
             }
         }
-        mapped_pipe.output.render_stuff_spec.assert_called_once_with(output_format=ConceptRepresentationFormat.SCHEMA)
+        mapped_pipe.output.render_stuff_spec.assert_called_once_with(
+            concept_provider=renderer_concept_library, output_format=ConceptRepresentationFormat.SCHEMA
+        )

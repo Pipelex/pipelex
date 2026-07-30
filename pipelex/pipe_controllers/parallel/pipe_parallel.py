@@ -21,7 +21,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.graphspec import IOSpec
-from pipelex.interpreter_hub import get_optional_pipe, get_required_pipe
+from pipelex.interpreter_hub import get_concept_library, get_optional_pipe, get_required_pipe
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_controllers.absence_taint import (
     ForceConsumptionInfo,
@@ -165,7 +165,7 @@ class PipeParallel(PipeController):
         runtime combine failure into an author-time error surfaced by `/validate`.
         """
         try:
-            structure_class = self.output.concept.get_structure_class()
+            structure_class = get_concept_library().get_structure_class(concept=self.output.concept)
         except ConceptValueError as exc:
             # A plain ValueError would escape the /validate sweep and abort the whole bundle;
             # convert it so this pipe alone is reported as failed.
@@ -383,7 +383,7 @@ class PipeParallel(PipeController):
                 # A list-producing branch combines as a ListContent, not as the item class.
                 continue
             try:
-                branch_structure_class = branch_pipe.output.concept.get_structure_class()
+                branch_structure_class = get_concept_library().get_structure_class(concept=branch_pipe.output.concept)
             except ConceptValueError as exc:
                 # Same conversion as the output lookup above: keep the failure per-pipe.
                 msg = (
@@ -456,7 +456,7 @@ class PipeParallel(PipeController):
 
         pipe_outputs = await asyncio.gather(*tasks)
 
-        structure_class = self.output.concept.get_structure_class()
+        structure_class = get_concept_library().get_structure_class(concept=self.output.concept)
         seen_output_names: set[str] = set()
         output_stuffs: dict[str, Stuff] = {}
         output_stuff_contents: dict[str, StuffContent] = {}

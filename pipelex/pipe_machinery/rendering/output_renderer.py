@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, cast
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.interpreter_hub import get_required_pipe
+from pipelex.interpreter_hub import get_concept_library, get_required_pipe
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_machinery.pipe_blueprint import PipeType
 
@@ -46,11 +46,15 @@ def _collect_possible_outputs(
                 return []
 
             possible_outputs: list[dict[str, Any]] = []
+            # Resolved once, and OUTSIDE the try below: a failure to reach the loaded method's library
+            # is a lifecycle fault, not "this concept's structure cannot be rendered", and the except
+            # there would quietly turn it into the placeholder.
+            concept_provider = get_concept_library()
             # pipe_dependencies() is a set — sort so the user-facing output_option_N numbering is deterministic
             for mapped_pipe_code in sorted(mapped_pipe_codes):
                 mapped_pipe = get_required_pipe(pipe_code=mapped_pipe_code)
                 try:
-                    output_dict = mapped_pipe.output.render_stuff_spec(output_format=output_format)
+                    output_dict = mapped_pipe.output.render_stuff_spec(concept_provider=concept_provider, output_format=output_format)
                     content = output_dict.get("content", output_dict)
                     possible_outputs.append(
                         {
@@ -87,9 +91,11 @@ def _collect_possible_outputs(
             if last_pipe.output.concept.code == NativeConceptCode.ANYTHING:
                 return _collect_possible_outputs(last_pipe, output_format=output_format)
 
-            # Otherwise render the last pipe's output
+            # Otherwise render the last pipe's output. The library lookup sits outside the try for
+            # the same reason as the condition branch above.
+            concept_provider = get_concept_library()
             try:
-                output_dict = last_pipe.output.render_stuff_spec(output_format=output_format)
+                output_dict = last_pipe.output.render_stuff_spec(concept_provider=concept_provider, output_format=output_format)
                 content = output_dict.get("content", output_dict)
                 return [
                     {
@@ -184,7 +190,7 @@ def _render_json_output(the_pipe: PipeAbstract, *, indent: int = 2) -> str:
         return json.dumps(result, indent=indent, ensure_ascii=False)
 
     # Normal output rendering - returns dict with "concept" and "content"
-    output_dict = the_pipe.output.render_stuff_spec(output_format=ConceptRepresentationFormat.JSON)
+    output_dict = the_pipe.output.render_stuff_spec(concept_provider=get_concept_library(), output_format=ConceptRepresentationFormat.JSON)
     return json.dumps(output_dict, indent=indent, ensure_ascii=False)
 
 
@@ -225,7 +231,7 @@ def _render_python_output(the_pipe: PipeAbstract) -> str:
         return "\n".join(lines)
 
     # Normal output rendering
-    output_dict = the_pipe.output.render_stuff_spec(output_format=ConceptRepresentationFormat.PYTHON)
+    output_dict = the_pipe.output.render_stuff_spec(concept_provider=get_concept_library(), output_format=ConceptRepresentationFormat.PYTHON)
     concept_ref = output_dict.get("concept", "")
     content = output_dict.get("content", "")
 
@@ -269,5 +275,5 @@ def _render_schema_output(the_pipe: PipeAbstract, *, indent: int = 2) -> str:
         return json.dumps(result, indent=indent, ensure_ascii=False)
 
     # Normal output rendering - get JSON Schema directly
-    output_dict = the_pipe.output.render_stuff_spec(output_format=ConceptRepresentationFormat.SCHEMA)
+    output_dict = the_pipe.output.render_stuff_spec(concept_provider=get_concept_library(), output_format=ConceptRepresentationFormat.SCHEMA)
     return json.dumps(output_dict, indent=indent, ensure_ascii=False)

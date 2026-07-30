@@ -172,6 +172,41 @@ class NativeConceptCode(StrEnum):
                 return False
 
     @classmethod
+    def is_structureless_concept(cls, concept_code: str) -> bool:
+        """Whether a native code deliberately declares no structure class.
+
+        `Anything` is the untyped vehicle: `structure_class` is `None` for it, so the
+        `AnythingContent` name that `structure_class_name` derives mechanically has no class behind
+        it and never will. Callers that resolve a structure class must not ask for this one's — its
+        absence is a property of the concept, not a missing registration.
+        """
+        try:
+            enum_value = NativeConceptCode(concept_code)
+        except ValueError:
+            return False
+
+        match enum_value:
+            case NativeConceptCode.ANYTHING:
+                return True
+            case (
+                NativeConceptCode.DYNAMIC
+                | NativeConceptCode.TEXT
+                | NativeConceptCode.IMAGE
+                | NativeConceptCode.DOCUMENT
+                | NativeConceptCode.HTML
+                | NativeConceptCode.TEXT_AND_IMAGES
+                | NativeConceptCode.NUMBER
+                | NativeConceptCode.YES_NO
+                | NativeConceptCode.DATE
+                | NativeConceptCode.TIME
+                | NativeConceptCode.PAGE
+                | NativeConceptCode.JSON
+                | NativeConceptCode.SEARCH_RESULT
+                | NativeConceptCode.COMPOSITE
+            ):
+                return False
+
+    @classmethod
     def is_dynamic_concept(cls, concept_code: str) -> bool:
         try:
             enum_value = NativeConceptCode(concept_code)

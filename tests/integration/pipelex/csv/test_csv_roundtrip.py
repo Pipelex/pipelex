@@ -75,7 +75,7 @@ class TestCsvRoundtrip:
     def test_list_content_writes_to_csv(self, tmp_path: Path, load_test_library: Callable[[list[Path]], None]) -> None:
         load_test_library([BUNDLE_DIR])
         summary_concept = get_library_manager().get_current_library().concept_library.get_required_concept("csv_demo.PersonSummary")
-        summary_class = summary_concept.get_structure_class()
+        summary_class = get_concept_library().get_structure_class(concept=summary_concept)
 
         items = [
             summary_class.model_validate({"name": "Ada Lovelace", "country": "United Kingdom", "summary": "A visionary mathematician."}),

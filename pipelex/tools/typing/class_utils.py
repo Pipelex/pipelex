@@ -119,6 +119,33 @@ def are_classes_equivalent(class_1: type[Any], class_2: type[Any]) -> bool:
         return True
 
 
+def are_structure_classes_compatible(*, class_1: type[Any], class_2: type[Any], strict: bool) -> bool:
+    """Whether `class_1` can stand in for `class_2`, structurally.
+
+    Structural equivalence always suffices. Beyond that, `strict` decides how much slack is allowed:
+    strict mode accepts equivalence only, while loose mode also accepts a subclass relationship
+    (a refined concept's generated class inherits from the refined one's) and a class that merely
+    *carries* a compatible value in one of its fields — the "nested" case a template needs when it
+    pulls an image out of a document.
+
+    Pure over the two classes: it takes resolved types, never names, and reads no registry.
+    """
+    if are_classes_equivalent(class_1, class_2=class_2):
+        return True
+
+    if strict:
+        return False
+
+    try:
+        if issubclass(class_1, class_2):
+            return True
+    except TypeError:
+        # Not both classes (e.g. a typing construct slipped through) — fall through to field checks.
+        pass
+
+    return has_compatible_field(class_1, target_type=class_2)
+
+
 def has_compatible_field(model_cls: type[Any], *, target_type: type[Any]) -> bool:
     """Check if model_cls has a field whose (possibly wrapped) type matches/subclasses target_type or is structurally equivalent."""
     if not hasattr(model_cls, "model_fields"):
