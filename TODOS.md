@@ -2,6 +2,40 @@
 
 **Status: complete.** Branch `refactor/Boot`, cut off `dev` at `96b992786`. This document describes the change for review: what it does, why, what was decided and why, and where a reviewer should push hardest.
 
+## ⏸ RESUME HERE — session paused 2026-07-30
+
+**Everything is committed and pushed. Nothing is in flight locally.** `git status` is clean; branch `refactor/Boot` == `origin/refactor/Boot` at `e0ebf6b42`.
+
+**PR:** https://github.com/Pipelex/pipelex/pull/1073 → `dev`. Eight commits.
+
+**State at pause:**
+
+- Local gates green on the pushed tree: `make agent-check`, full `make agent-test`, `make drift-check`.
+- Last full CI round (on `f7186e7`'s predecessor) was **23 pass / 0 fail**, Greptile **5/5 "safe to merge"**, 0 unresolved threads.
+- Two more commits landed after that round (`f7186e736`, `e0ebf6b42`) with both review threads replied to and resolved. **CI and the bots have NOT yet run on `e0ebf6b42`.**
+
+**The one open action:** wait for CI + Greptile + Codex on `e0ebf6b42`, then triage as before. A re-trigger comment (`@greptileai please re-review.` / `@codex review`) has been posted for it.
+
+**How the review loop has been run** (worth continuing, because it kept finding real things — six of the seven rounds produced at least one genuine defect):
+
+1. Read every unresolved thread; **verify the claim against the source before acting** — several bot findings were right about the mechanism but wrong about severity, and two were right about a mechanism I had reasoned about incorrectly.
+2. Fix only clear wins. Defer genuine design tradeoffs as `.md` in `wip/inputs/` with an analysis and a suggested shape.
+3. For every behavioural fix, **write the negative control**: revert the fix and confirm the new test fails. This caught a vacuous test and confirmed four real ones.
+4. Reply on the thread with the reasoning (including where my own earlier reasoning was wrong), resolve it, re-run gates, commit, push, ping both bots.
+
+**Two recurring mistakes of mine, if more findings arrive** — both cost a round each:
+
+- **Cost misjudgement drove two wrong deferrals.** The telemetry singleton I deferred as "needs its own test matrix" was one guarded call; the `config_dir` propagation I estimated as four lines turned out to need a public abstract interface widened. *Write the patch to price it*, then decide.
+- **Reasoning from a concrete class's guarantees about a call through an injectable abstract type.** Bit twice on the same method (rounds 6 and 7). Anything typed `…Abstract` that a caller can inject must be treated as unbounded.
+
+**Three deferrals are recorded** in `wip/inputs/`: `runtime-boot-external-interpreter-orchestrator.md`, `config-dir-does-not-scope-inference-paths.md`, `failed-boot-does-not-release-every-resource.md`. Each has the analysis and a suggested remedy.
+
+**One required cross-repo follow-up** (separate repos, out of scope for this PR): `pipelex-temporal/tests/conftest.py:86` and `pipelex-transport/tests/conftest.py:89` patch `"pipelex.pipelex.load_pipelex_service_config_if_exists"` in autouse session fixtures; that symbol is now in `pipelex.runtime_boot`, so both suites break at session start once they pick this up. ⚠ Use `git -C <repo> grep` for any cross-repo sweep here — the environment's `grep` is a **shell function** that does not traverse sibling repos and silently returns zero.
+
+**When the bots are finally quiet:** the remaining planned step is the gstack `/review` pass, which was already run once (its five findings are all applied — see the triage sections below).
+
+---
+
 ## What this branch does
 
 `pipelex/pipelex.py` is split into two composition roots:
