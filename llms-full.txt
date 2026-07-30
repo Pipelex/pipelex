@@ -2587,8 +2587,13 @@ Pipelex provides multiple layers of validation to catch issues before they cost 
 Check pipeline syntax, structure, and compatibility without execution:
 
 - **Syntax validation** — Catch MTHDS language errors via plxt linting
-- **Structure validation** — Verify concept compatibility between pipes, ensuring inputs and outputs match
-- **Input validation** — Ensure required inputs are provided and correctly typed
+- **Structure validation** — Resolve pipe and concept references in the loaded library, and verify each pipe's declared inputs against the concepts that operator accepts — plus a controller's declared output against what it actually produces (for a `PipeSequence`, its last step's output concept and multiplicity)
+- **Input validation** — Ensure required inputs are provided and correctly typed, and that every variable a step reads is bound by the time that step runs
+
+A pipe that references a sub-pipe from a package that isn't loaded is reported as **skipped** rather than validated, so a passing run is not proof that every cross-package dependency resolves.
+
+!!! note "Steps read from working memory, not from the previous step"
+    A `PipeSequence` step resolves its inputs by name from working memory. They may come from the pipeline's inputs or from any earlier step — not necessarily the one immediately before it. Validation therefore checks that each name is bound when the step runs, rather than matching one step's output concept to the next step's declared input concept. There is no output-to-input chaining contract between consecutive steps to verify.
 
 ## Dry Run Mode
 
@@ -5828,7 +5833,7 @@ From Python, the same knobs live on the runner — the backend comes from config
 ```python
 from pathlib import Path
 
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 runner = PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY)
@@ -10261,7 +10266,7 @@ Generate pipelines, runner code, Python structures, and JSON templates from natu
 | [**build runner**](runner.md) | Generate Python code to run a pipe |
 | [**build structures**](structures.md) | Generate the structures (Pydantic models) of your concepts |
 | [**build inputs**](inputs.md) | Generate example input JSON for a pipe |
-| [**build output**](output.md) | Generate example output JSON for a pipe |
+| [**build output**](output.md) | Generate example output representation for a pipe (JSON, Python, or JSON Schema) |
 
 
 ## Runner
@@ -13912,11 +13917,9 @@ For more information about our data practices, see our [Privacy Policy](https://
 
 Pipelex uses dependency injection to manage service dependencies and make components more modular and testable. The system allows you to customize and extend Pipelex's functionality by injecting your own implementations of various services.
 
-## Injection Methods
+## Injecting your implementation
 
-There are two main ways to inject custom implementations:
-
-### 1. During Initialization
+Inject at boot, by passing your implementation to `Pipelex.make()`:
 
 ```python
 from pipelex.pipelex import Pipelex
@@ -13929,15 +13932,30 @@ pipelex = Pipelex.make(
 )
 ```
 
-### 2. Through the Hub
+This is the supported path. `Pipelex.make()` builds the hubs, applies your overrides in the right order, and wires the results into the components that consume them.
+
+## Reading a dependency: the two hubs
+
+Injection happens at boot; *lookup* happens through a hub. Pipelex has two, split by lifecycle:
+
+- `pipelex.runtime_hub` — process-scoped infrastructure: config, console, secrets, storage, telemetry, the model deck, inference workers, the content generator, the plugin registries.
+- `pipelex.interpreter_hub` — library-scoped method machinery: the library manager and the concept/domain/pipe libraries, the current-library binding, the pipe router, the pipeline manager.
+
+Read a dependency through the module-level accessor for the half that owns it:
 
 ```python
-from pipelex.hub import PipelexHub
+from pipelex.interpreter_hub import get_required_pipe
+from pipelex.runtime_hub import get_model_deck, get_secrets_provider
 
-hub = PipelexHub()
-hub.set_report_delegate(MyReportingDelegate())
-# ... and so on for other components
+secrets = get_secrets_provider()
+deck = get_model_deck()
+pipe = get_required_pipe(pipe_code="my_domain.my_pipe")
 ```
+
+!!! warning "Don't construct a hub yourself"
+    Building a `RuntimeHub()` or `InterpreterHub()` by hand and calling setters on it has no effect on a running Pipelex — the instance you build is not the one the process resolves. Inject through `Pipelex.make()` instead.
+
+Contributors adding a new dependency should read [Hub Layering](../contribute/hub-layering.md), which specifies which half a symbol belongs on and why the boundary is enforced.
 
 ## Protocol Compliance
 
@@ -14106,20 +14124,24 @@ class MyCustomObserver(ObserverProtocol):
         print(f"Failed pipe: {pipe_job.pipe.code}")
 ```
 
-### Step 2: Register Your Observer with Dependency Injection
+### Step 2: Register Your Observer at Boot
 
-The observer is injected through the PipelexHub dependency injection system:
+Observers are injected at boot, through `Pipelex.make()`. Pass a dict keyed by a name of your choosing — Pipelex wraps the whole dict in a `MultiObserver` and hands it to the pipe router, so every observer you register is notified:
 
 ```python
-from pipelex.hub import get_pipelex_hub
+from pipelex.pipelex import Pipelex
 
 # Create your observer instance
 my_observer = MyCustomObserver(config_param="production")
 
-# Inject it into the hub
-hub = get_pipelex_hub()
-hub.set_observer(my_observer)
+# Inject it at boot
+Pipelex.make(observers={"my_observer": my_observer})
 ```
+
+!!! warning "Observers must be registered at boot"
+    Passing `observers` to `Pipelex.make()` is the only way to register one. The router receives its observer when it is constructed during setup, so there is no supported way to swap an observer on a already-running instance.
+
+Registering your own `observers` dict **replaces** the defaults (a no-op observer and the telemetry observer). Include the built-ins explicitly if you want to keep them alongside your own.
 
 ### Step 3: Ensure Proper Integration
 
@@ -14143,7 +14165,7 @@ local_observer = LocalObserver()
 local_observer = LocalObserver(storage_dir="/path/to/custom/dir")
 
 # Inject the observer
-get_pipelex_hub().set_observer(local_observer)
+Pipelex.make(observers={"local": local_observer})
 ```
 
 The LocalObserver creates separate JSONL files for each event type:
@@ -14212,20 +14234,13 @@ class MetricsObserver(ObserverProtocol):
 For automatic observer setup, integrate with your Pipelex initialization:
 
 ```python
-from pipelex.hub import get_pipelex_hub
 from pipelex.pipelex import Pipelex
 
 from my_project.observers import MyCustomObserver
 
 def setup_pipelex():
-    # Initialize Pipelex
-    pipelex_instance = Pipelex.make()
-
-    # Setup custom observer
-    observer = MyCustomObserver()
-    get_pipelex_hub().set_observer(observer)
-
-    return pipelex_instance
+    # Initialize Pipelex with the observer wired in from the start
+    return Pipelex.make(observers={"my_observer": MyCustomObserver()})
 ```
 
 The observer system provides powerful insights into your pipeline execution patterns and is essential for monitoring, debugging, and optimizing your Pipelex methods.
@@ -14373,18 +14388,43 @@ The COGT layer abstracts AI provider details from business logic:
 
 ### Plugin System
 
-Located in [`pipelex/plugins/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/plugins)
+Two packages, one for the mechanism and one for the built-in adapters:
 
-Provider-specific integrations handle API specifics:
+- [`pipelex/plugins/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/plugins) — the plugin **mechanism**: the `PipelexPlugin` contract, the registrar every plugin registers into, and the capability registries. This is what an out-of-tree plugin imports, and what the `pipelex.plugins` entry point resolves against.
+- [`pipelex/providers/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/providers) — the built-in **provider adapters**, one directory per vendor, each handling that vendor's API specifics:
 
-- OpenAI
-- Anthropic
-- Google (Gemini)
-- Mistral
-- AWS Bedrock
-- And more...
+    - OpenAI
+    - Anthropic
+    - Google (Gemini)
+    - Mistral
+    - AWS Bedrock
+    - And more...
 
-Each plugin translates Pipelex's unified interface into provider-specific API calls.
+The dependency runs one way: adapters depend on the mechanism, never the reverse. Each adapter translates Pipelex's unified interface into provider-specific API calls.
+
+---
+
+## What Keeps The Layers Apart: The Two Hubs
+
+The two layers above would be a diagram rather than an architecture if nothing enforced the split. What enforces it is the **hub** — the mechanism every component uses to reach a shared dependency (the config, a model deck, the pipe library) without importing the module that owns it.
+
+There are two hubs, and the boundary between them *is* the boundary between the layers:
+
+- [**`pipelex/runtime_hub.py`**](https://github.com/Pipelex/pipelex/tree/main/pipelex/runtime_hub.py) — process-scoped infrastructure. Config, console, secrets, storage, telemetry, the model deck, the inference workers, the content generator, the plugin registries. Configured once at boot; identical for every method the process runs.
+- [**`pipelex/interpreter_hub.py`**](https://github.com/Pipelex/pipelex/tree/main/pipelex/interpreter_hub.py) — library-scoped method machinery. The library manager and the concept/domain/pipe libraries, the current-library binding, the pipe router, the pipeline manager, the PipeFunc executor. Tied to the method that is loaded.
+
+One rule governs them:
+
+!!! note "The one arrow"
+    `interpreter_hub` imports `runtime_hub`. **`runtime_hub` never imports `interpreter_hub`.**
+
+The practical consequence is that the runtime layer cannot reach the interpreter layer. Importing the inference stack loads no `libraries`, `pipe_operators`, `pipe_controllers`, or `codegen` module at all — so anything that just wants a secret, the console, or the model deck (a health check, `pipelex --version`, a plugin's registration module) does not pay for the method interpreter, and a change to a pipe blueprint structurally cannot perturb the import graph of `cogt`.
+
+That is not a convention held up by review: `make check-hub-layering` fails the build if a runtime-layer module imports — or merely names in a string — the interpreter hub, and an import-closure test pins the property itself in a subprocess.
+
+`pipelex/core/` sits on both sides of the line, deliberately. Its data model — concepts, domains, stuffs, working memory, the input/output specs — belongs to the runtime layer: it describes what a method's values *are*, needs no loaded method, and takes the concept or pipe it needs as an injected argument. Everything in `core/` that names a **`Pipe`** belongs to the interpreter layer, because a pipe is the interpreter's own object.
+
+Contributors: the full specification — what lives on each hub, how to place a new symbol, and how the boundary is enforced — is in [Hub Layering](../contribute/hub-layering.md).
 
 ---
 
@@ -14468,7 +14508,7 @@ Today, exactly one directive is elaborated: `structuring_method = "preliminary_t
 
 ## Where it runs
 
-`BundleElaborator.elaborate(bundle)` runs inside `PipelexInterpreter.make_pipelex_bundle_blueprint()`, right after the bundle dict has been validated into a `PipelexBundleBlueprint`. Every code path that loads a bundle from a `.mthds` file goes through it.
+`BundleElaborator.elaborate(bundle)` runs inside `MthdsParser.make_pipelex_bundle_blueprint()`, right after the bundle dict has been validated into a `PipelexBundleBlueprint`. Every code path that loads a bundle from a `.mthds` file goes through it.
 
 The elaborator has a fast-path short-circuit: if no pipe in the bundle carries `structuring_method = "preliminary_text"`, the input bundle is returned unchanged (identity-preserving). Loading a bundle without preliminary-text pipes pays no overhead.
 
@@ -14575,7 +14615,7 @@ This page describes the projection engine in `pipelex/codegen/` and the contract
 
 The engine reads the crate through two neutral, language-agnostic layers, so every emitter consumes the same resolved shape rather than re-deriving the semantic mapping:
 
-- **Resolved fields** (`pipelex/codegen/resolved_fields.py`) — one structure field becomes a `ResolvedType` tree (`text`/`number`/`concept`/`list`/`dict`/`literal`/…). Inline `choices` become a literal; a bare concept ref is promoted to its domain; natives are flagged. Where the source under-specifies a shape — a `list` with no `item_type`, a `concept` field with no ref — the resolved type is `ANY` carrying an explicit **imprecision marker** (never a guess).
+- **Resolved fields** (`pipelex/core/concepts/resolved_fields.py`) — one structure field becomes a `ResolvedType` tree (`text`/`number`/`concept`/`list`/`dict`/`literal`/…). Inline `choices` become a literal; a bare concept ref is promoted to its domain; natives are flagged. Where the source under-specifies a shape — a `list` with no `item_type`, a `concept` field with no ref — the resolved type is `ANY` carrying an explicit **imprecision marker** (never a guess).
 - **Resolved concepts** (`pipelex/codegen/resolved_concepts.py`) — one crate concept becomes a `ResolvedConcept`: its type name inputs (domain, code, collision flag), its description, its refinement base, and either its resolved fields, or a structureless/opaque marker. Class naming is decided here once: a concept code that is unique across the crate stays bare (`Report`); a code that collides across domains is domain-qualified so a definition and every reference agree.
 
 An emitter then walks the `ResolvedLibrary` and renders text. Emitters live in `pipelex/codegen/emitters/`, dispatched by `emit_types(crate, target=...)`.
@@ -14653,6 +14693,65 @@ The verdict rides the exit code (mirroring `resolve` / `validate`): `0` current,
 ### Idempotent emission
 
 `pipelex/codegen/emission.py` ties it together in two layers. `build_stamped_projection` is the **pure** core: it stamps each emitted body and assembles the matching `codegen.lock` content — no filesystem access — so it is the single source of truth for what a projection *is* on disk. `write_stamped_projection` rides it to materialize locally: it writes each file only when its content changed (write-if-changed — no mtime churn, clean diffs, watch-mode friendly), removes any previously-tracked stamped file that dropped out of the set, and rewrites the lock. Only files the tool itself stamped are ever removed, so a hand-authored file sharing the output directory is never touched. `codegen inputs` applies the same write-if-changed rule to its single (unstamped) template file, so a full regeneration pass over a committed consumer is a true no-op when everything is current.
+
+### Lint-clean by construction
+
+A stamp's `content_hash` is a raw SHA-256 over the body bytes. So if the emitted code is not already what your formatter wants, the first `ruff check --fix` / `ruff format` (or `prettier --write`) over your tree rewrites those bytes and `pipelex codegen check` reports the file as **hand-edited** — accusing you of the one thing you did not do.
+
+The emitters therefore emit exactly what the formatter would write. Generated Python uses builtin generics (`list[str]`, `dict[str, int]`), `X | None` over `Optional[X]`, double-quoted `Literal` members, and isort-grouped imports; generated TypeScript matches Prettier's blank-line and import-wrapping behavior. Running your formatter over a generated tree is a no-op, and the stamp stays valid.
+
+**You should not need to exclude generated paths from your linter.** If you carry such an exclusion from an older version, drop it.
+
+Every import is registered by whoever writes the name it imports, never seeded up front. That matters for crate shapes which use fewer of them than you would expect: a method declaring only structureless concepts emits no `Field(...)` at all, and one whose concepts all refine a native never reaches the runtime root base. An import left unused is an `F401` — a fix ruff applies automatically, so the line would simply vanish and take the stamp with it.
+
+A projection with nothing to emit for a target is its **header alone** — no imports, no trailing blank lines. That case is ordinary rather than degenerate: `python-structures` skips native concepts, since they already exist in the runtime, so a method that declares no concepts of its own leaves that target with no class to write. The header is inert under any formatter, whereas an import block with nothing left to use it is an unused-import finding sitting above a collapsible blank-line run — both of which a formatter would rewrite, breaking the stamp.
+
+#### Line width, which is your setting and not ours
+
+A description or choice list is authored text with no length bound, so a generated line can exceed whatever `line-length` you lint at — and your formatter would then wrap the call, rewriting the bytes.
+
+Because we cannot know your width, anything too long is emitted **already wrapped, with a trailing comma**. That comma is load-bearing: Black and ruff both read it as a deliberate choice to keep the construct exploded, and will not rejoin it at any width. Short lines stay on one line, so ordinary artifacts read exactly as before.
+
+The threshold is 88 columns — ruff's own default, chosen because it is the *tightest* width you are likely to use, and only the tightest threshold is safe. If you lint Python at **fewer than 88 columns**, short generated lines can still be rewrapped; either raise `line-length` for the generated path or keep an exclusion there.
+
+`E501` is the one finding that can survive on a generated file, on a line holding a single long string literal — an authored description or choice value. There is no wrapped form: breaking a string would alter the author's text. It has no automatic fix, so it never changes bytes and never breaks a stamp, and it is not in ruff's default rule set, so most consumers never see it.
+
+#### Docstrings
+
+A concept description becomes the generated class's docstring, rendered the way a human writes one: summary on the first line, continuation lines indented to the class body, closing delimiter on its own line. That shape is not cosmetic — it is the only one that `ruff format` and the pydocstyle rules both leave alone. Rendered flat, a multi-line description trips `D207`/`D209` and edge whitespace trips `D210`, all of which ruff fixes automatically, rewriting the bytes.
+
+So `__doc__` carries the class-body indentation, exactly as a hand-written docstring does. What holds exactly is the value you actually read:
+
+```python
+inspect.getdoc(GeneratedClass) == inspect.cleandoc(authored_description)
+```
+
+Exact bytes survive wherever they are consumed programmatically rather than read as prose — `Field(description=...)` keeps the description verbatim, and so does the crate.
+
+#### TypeScript assumes Prettier's defaults
+
+The `ts-zod` target is emitted to match Prettier's **default** configuration: 80-column print width, double quotes, semicolons. A long concept name or choice list is pre-wrapped the way Prettier would wrap it, for the same reason the Python side pre-explodes long calls.
+
+If your Prettier config changes `printWidth`, `singleQuote`, or `semi`, the generated files will not match it, and `prettier --write` will rewrite them. Either run codegen output through your own Prettier before stamping, or keep an exclusion for the generated path.
+
+One ruff setting is required, because it cannot be fixed in the emitted bytes:
+
+```toml
+[tool.ruff.lint.flake8-type-checking]
+runtime-evaluated-base-classes = [
+  "pydantic.BaseModel",
+  "pipelex.core.stuffs.structured_content.StructuredContent",
+]
+```
+
+Without it, `TC003` asks you to move `from datetime import date` into an `if TYPE_CHECKING:` block. Applying that **breaks** the generated models — pydantic resolves annotations at runtime to build validators, so the import must stay at runtime. The setting tells ruff these classes are runtime-evaluated, and the finding goes away.
+
+The remaining findings are artifacts of *how* you lint, not of file content. None of them has an automatically-applied fix, so none can change bytes:
+
+- `INP001` ("implicit namespace package") fires when you point ruff at a bare directory with no `__init__.py`. Add one, or lint the package that contains it.
+- `E501` on a single long string literal, as described above.
+- `D301` ("use `r\"\"\"`") on the rare description that carries both `\"\"\"` and `'''`, or a control character — the only inputs with no verbatim rendering, which therefore have to be escaped. Ruff classes that fix as *unsafe*, so `ruff check --fix` leaves it alone.
+- Import grouping for the `python-structures` target assumes `pipelex` is a third-party dependency — which it is in your tree. The Pipelex repo itself, where `pipelex` is first-party, is the one place ruff wants the opposite order; no generated artifact is committed there, so the consumer's grouping is the one the emitter targets.
 
 ## Serving the engine over HTTP
 
@@ -15078,7 +15177,7 @@ pipelex run pipe my_pipe --dry-run --graph --mock-inputs
 
 ```python
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 # Execute with graph tracing via config
 runner = PipelexMTHDSProtocol(
@@ -15280,10 +15379,10 @@ Trace events travel through an `EventLogProtocol` backend (`pipelex/tracing/`): 
 
 The assembled usage rides back on `pipe_output.tokens_usages` (with any assembly failure on `usage_assembly_error`), which the sync `/execute` response returns directly. For delivery-enabled runs (a storage target set), the delivery executor (`pipelex/pipe_run/delivery_executor.py`) also persists it as a `tokens_usages.json` result artifact — `{"tokens_usages": [...], "usage_assembly_error": null}` — next to `working_memory.json`, the `main_stuff.*` renders, and the graph outputs, so a durable client polling result files gets the same usage records a sync caller does. The artifact is written unconditionally on every successful result delivery: explicit nulls mean usage assembly was off for that run. A failed run stores no result files at all, so an absent `tokens_usages.json` means either the run failed or it was delivered before the artifact existed — tell those apart from the delivery status, not from the file's presence.
 
-For fully in-process runs, `pipelex.hub.scoped_event_log` pins one shared instance for both sides instead:
+For fully in-process runs, `pipelex.runtime_hub.scoped_event_log` pins one shared instance for both sides instead:
 
 ```python
-from pipelex.hub import scoped_event_log
+from pipelex.runtime_hub import scoped_event_log
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 
 with scoped_event_log(InMemoryEventLog()):
@@ -15536,7 +15635,8 @@ validate_graphspec(graph_spec)
 | `pipelex/graph/graph_tracer.py` | GraphTracer implementation |
 | `pipelex/graph/graph_tracer_manager.py` | Singleton manager for tracers |
 | `pipelex/graph/graph_tracer_protocol.py` | Protocol + NoOp implementation |
-| `pipelex/graph/trace_context.py` | Serializable tracing context |
+| `pipelex/system/trace_context.py` | Serializable tracing context — sits below `graph/` because it rides in every job's metadata |
+| `pipelex/system/data_inclusion_config.py` | Data-capture flags carried by the trace context, surfaced in the TOML under `graph_config.data_inclusion` |
 | `pipelex/graph/graph_analysis.py` | Pre-computed graph analysis |
 | `pipelex/graph/graph_factory.py` | Output generation factory |
 | `pipelex/graph/graph_config.py` | Configuration models |
@@ -16409,7 +16509,7 @@ Each provider has an `effort_to_level_map` in its subconfig within `pipelex.toml
 
 The special value `"disabled"` causes the accessor to return `None`, signaling that reasoning should be skipped. OpenAI uses `"none"` as a valid API value instead (not `"disabled"`).
 
-The level is resolved at runtime via `<ProviderConfig>.get_reasoning_level()` in each plugin's config module (e.g., `pipelex/plugins/openai/openai_config.py`). Each config class returns the provider's native SDK type.
+The level is resolved at runtime via `<ProviderConfig>.get_reasoning_level()` in each plugin's config module (e.g., `pipelex/providers/openai/openai_config.py`). Each config class returns the provider's native SDK type.
 
 ## Effort-to-Budget Configuration
 
@@ -16513,17 +16613,17 @@ All reasoning-related errors use `LLMCapabilityError` (`pipelex/cogt/exceptions.
 | `pipelex/cogt/llm/reasoning_config_base.py` | Shared helpers: `EffortToLevelMap`, `validate_effort_to_level_map()`, `get_reasoning_level_str()` |
 | `pipelex/cogt/llm/llm_setting.py` | `LLMSetting` with reasoning fields and `make_llm_job_params()` |
 | `pipelex/cogt/config_cogt.py` | `LLMConfig` with `get_reasoning_budget()` and effort-to-budget map validation |
-| `pipelex/plugins/openai/openai_config.py` | `OpenAIConfig` with `get_reasoning_level()` returning `ChatCompletionReasoningEffort \| None` |
-| `pipelex/plugins/anthropic/anthropic_config.py` | `AnthropicConfig` with `get_reasoning_level()` returning `AnthropicEffortLevel \| None` |
-| `pipelex/plugins/google/google_config.py` | `GoogleConfig` with `get_reasoning_level()` returning `genai_types.ThinkingLevel \| None` |
-| `pipelex/plugins/mistral/mistral_config.py` | `MistralConfig` with `get_reasoning_level()` returning `MistralPromptMode \| None` |
+| `pipelex/providers/openai/openai_config.py` | `OpenAIConfig` with `get_reasoning_level()` returning `ChatCompletionReasoningEffort \| None` |
+| `pipelex/providers/anthropic/anthropic_config.py` | `AnthropicConfig` with `get_reasoning_level()` returning `AnthropicEffortLevel \| None` |
+| `pipelex/providers/google/google_config.py` | `GoogleConfig` with `get_reasoning_level()` returning `genai_types.ThinkingLevel \| None` |
+| `pipelex/providers/mistral/mistral_config.py` | `MistralConfig` with `get_reasoning_level()` returning `MistralPromptMode \| None` |
 | `pipelex/cogt/model_backends/model_spec.py` | `InferenceModelSpec.thinking_mode` field |
-| `pipelex/plugins/openai/openai_completions_llm_worker.py` | OpenAI Completions reasoning resolution |
-| `pipelex/plugins/openai/openai_responses_llm_worker.py` | OpenAI Responses reasoning resolution |
-| `pipelex/plugins/anthropic/anthropic_llm_worker.py` | Anthropic thinking params builder |
-| `pipelex/plugins/google/google_llm_worker.py` | Google thinking config builder |
-| `pipelex/plugins/mistral/mistral_llm_worker.py` | Mistral prompt mode resolution |
-| `pipelex/plugins/bedrock/bedrock_llm_worker.py` | Bedrock reasoning validation |
+| `pipelex/providers/openai/openai_completions_llm_worker.py` | OpenAI Completions reasoning resolution |
+| `pipelex/providers/openai/openai_responses_llm_worker.py` | OpenAI Responses reasoning resolution |
+| `pipelex/providers/anthropic/anthropic_llm_worker.py` | Anthropic thinking params builder |
+| `pipelex/providers/google/google_llm_worker.py` | Google thinking config builder |
+| `pipelex/providers/mistral/mistral_llm_worker.py` | Mistral prompt mode resolution |
+| `pipelex/providers/bedrock/bedrock_llm_worker.py` | Bedrock reasoning validation |
 | `pipelex/pipelex.toml` | Default effort-to-budget maps and effort-to-level maps |
 
 ---
@@ -17599,7 +17699,7 @@ All writers explicitly target `config_manager.global_config_dir`:
 | Context | Module | How |
 |---------|--------|-----|
 | Doctor | `doctor_cmd.py` → `check_models()` | `load_pipelex_service_config_if_exists(config_dir=global_config_dir)` |
-| Runtime | `pipelex.py` setup | `load_pipelex_service_config_if_exists(config_dir=global_config_dir)` |
+| Runtime | `runtime_boot.py` setup | `load_pipelex_service_config_if_exists(config_dir=global_config_dir)` |
 
 ### Rules
 
@@ -18012,7 +18112,8 @@ flowchart TB
 | LibraryCrate model | `pipelex/libraries/library_crate.py` |
 | LibraryCrate factory | `pipelex/libraries/library_crate_factory.py` |
 | Deferred hydration utility (open core) | `pipelex/runtime_bridge/primitives/hydration.py` |
-| Hub (get_required_pipe, get_class_registry) | `pipelex/hub.py` |
+| Interpreter hub (get_required_pipe) | `pipelex/interpreter_hub.py` |
+| Runtime hub (get_class_registry) | `pipelex/runtime_hub.py` |
 | PipeSequence | `pipelex/pipe_controllers/sequence/pipe_sequence.py` |
 | PipeCondition | `pipelex/pipe_controllers/condition/pipe_condition.py` |
 | PipeBatch | `pipelex/pipe_controllers/batch/pipe_batch.py` |
@@ -18034,8 +18135,8 @@ Core names no backend by import or by string. The built-in drivers (OpenAI, Gate
 
 ```
 boot (Pipelex.setup)
-  └─ build_registrar(config)            # pure, import-light
-       ├─ for each plugin in BUILTIN_PLUGINS
+  └─ build_registrar(config, builtin_plugins=BUILTIN_PLUGINS, …)   # pure, import-light
+       ├─ for each built-in plugin (both layers' halves, composed)
        └─ for each installed "pipelex.plugins" entry point
             └─ plugin.register(registrar)        # side-effect-free
                  └─ registrar.add_inference_backend(family=…, sdk=…, make_worker=…)
@@ -18293,6 +18394,8 @@ An **orchestrator** is what knows how to run a pipe under one token. Core names 
 
 The registry is built once at boot from whatever the discovered plugins contributed (`build_registrar` → `OrchestratorRegistry` on the hub). There is no `match orchestration_mode:` anywhere in the bridge — the token set is open, so validation is the registry lookup itself; adding a mode's behavior means registering an orchestrator for its token, nothing in core changes.
 
+The *port* — `OrchestratorProtocol` and its registry — is runtime-layer, and the registry is set on the `RuntimeHub`. An orchestrator *adapter* is not: constructing one names the method interpreter, so the built-in `direct` one lives in `pipelex/interpreter_plugins/` rather than beside the inference plugins. That split only concerns in-tree built-ins; an out-of-tree plugin sits in no declared layer and is unaffected. See [Hub layering](../contribute/hub-layering.md#where-the-built-in-plugins-split).
+
 !!! note "Open seam, closed host-side entry"
     The host-side entry — the bridge entry point and `PipeJob` builder, plus the dispatch primitives that decode the boundary payload, scope the per-call library, and deliver results — lives in the **closed `pipelex-transport` library**. Embedding Pipelex into a host runtime (Temporal, Mistral, Airflow, your own) is a Pipelex [commercial capability](https://pipelex.com/products#durable-execution), not an open extension point. What stays **open** is the seam a third-party orchestrator extends: the orchestrator registry, `OrchestratorProtocol`, and the `pipelex.runtime_bridge` modules listed in [The Orchestrator SPI](#the-orchestrator-spi) below.
 
@@ -18470,7 +18573,7 @@ What an out-of-tree orchestrator imports *is* a contract. The SPI is a documente
 
 The orchestrator itself (`pipelex_temporal/temporal_orchestrators.py`) keeps the `WorkflowExecutionError` catch and the `make_workflow_id` recompute in the blocking `execute` arm. It serializes its `PipeOutput` through `pipelex.runtime_bridge.serialization`, shared with the core DIRECT orchestrator so the boundary shape cannot drift.
 
-The Temporal plugin is **external** — it ships as the `pipelex-temporal` distribution and is discovered through a `pipelex.plugins` entry point in that dist's `pyproject.toml`, not through `BUILTIN_PLUGINS`. Core's `BUILTIN_PLUGINS` (`pipelex/plugins/builtins.py`) holds only the always-shipped inference and `direct` plugins and explicitly excludes Temporal; installing `pipelex-temporal` is all it takes to make the `"temporal"` orchestrator available — zero config, no core import of `temporalio`. Its operational `worker` / `setup-namespace` commands ship as the standalone `pipelex-temporal` console script, so they travel with that dist.
+The Temporal plugin is **external** — it ships as the `pipelex-temporal` distribution and is discovered through a `pipelex.plugins` entry point in that dist's `pyproject.toml`, not through `BUILTIN_PLUGINS`. Core's built-ins hold only the always-shipped inference and `direct` plugins and explicitly exclude Temporal — split by layer across `pipelex/providers/builtins.py` (the runtime adapters) and `pipelex/interpreter_plugins/builtins.py` (the interpreter-touching `direct` and `pipe_func` plugins, which is also where the two halves are composed); installing `pipelex-temporal` is all it takes to make the `"temporal"` orchestrator available — zero config, no core import of `temporalio`. Its operational `worker` / `setup-namespace` commands ship as the standalone `pipelex-temporal` console script, so they travel with that dist.
 
 ---
 
@@ -18514,8 +18617,8 @@ This is deliberately **not** a hub slot (those are orchestrator-coupled, claimed
 
 ```
 boot (Pipelex.setup)
-  └─ build_registrar(config)                       # pure, import-light
-       ├─ for each plugin in BUILTIN_PLUGINS         (StoragePlugin is one)
+  └─ build_registrar(config, builtin_plugins=BUILTIN_PLUGINS, …)   # pure, import-light
+       ├─ for each built-in plugin                   (StoragePlugin is one)
        └─ for each installed "pipelex.plugins" entry point
             └─ plugin.register(registrar)            # side-effect-free
                  └─ registrar.add_storage_provider(method=…, factory=…)
@@ -18568,7 +18671,7 @@ The factory is a plain callable stored at registration and **invoked only at the
 
 ## The built-in `StoragePlugin`
 
-`pipelex/plugins/storage/storage_plugin.py` is the reference storage plugin. It is **core-unconditional** — storage is required infra, so it joins `CORE_UNCONDITIONAL_PLUGIN_NAMES` and cannot be disabled into a boot with no storage:
+`pipelex/providers/storage/storage_plugin.py` is the reference storage plugin. It is **core-unconditional** — storage is required infra, so it joins the runtime layer's `RUNTIME_CORE_UNCONDITIONAL_PLUGIN_NAMES` — composed into `CORE_UNCONDITIONAL_PLUGIN_NAMES` at the boot entrypoint — and cannot be disabled into a boot with no storage:
 
 ```python
 class StoragePlugin:
@@ -18685,8 +18788,8 @@ This is deliberately **not** a hub slot (those are orchestrator-coupled, claimed
 
 ```
 boot (Pipelex.setup)
-  └─ build_registrar(config)                       # pure, import-light
-       ├─ for each plugin in BUILTIN_PLUGINS         (SecretsPlugin is one)
+  └─ build_registrar(config, builtin_plugins=BUILTIN_PLUGINS, …)   # pure, import-light
+       ├─ for each built-in plugin                   (SecretsPlugin is one)
        └─ for each installed "pipelex.plugins" entry point
             └─ plugin.register(registrar)            # side-effect-free
                  └─ registrar.add_secrets_provider(method=…, factory=…)
@@ -18744,7 +18847,7 @@ The factory is a plain callable stored at registration and **invoked only at the
 
 ## The built-in `SecretsPlugin`
 
-`pipelex/plugins/secrets/secrets_plugin.py` is the reference secrets plugin. It is **core-unconditional** — a secrets provider is required infra, so it joins `CORE_UNCONDITIONAL_PLUGIN_NAMES` and cannot be disabled into a boot with no secrets provider:
+`pipelex/providers/secrets/secrets_plugin.py` is the reference secrets plugin. It is **core-unconditional** — a secrets provider is required infra, so it joins the runtime layer's `RUNTIME_CORE_UNCONDITIONAL_PLUGIN_NAMES` — composed into `CORE_UNCONDITIONAL_PLUGIN_NAMES` at the boot entrypoint — and cannot be disabled into a boot with no secrets provider:
 
 ```python
 class SecretsPlugin:
@@ -18862,7 +18965,7 @@ An error rises through a series of layers. Each layer has exactly one job.
 | **4 — CLI factories** | `cli_factory.py`, `agent_cli_factory.py` | Catch setup errors, route to handlers |
 | **3 — Pipeline runner** | `PipelexMTHDSProtocol.execute()` | Catch + wrap as `PipelineExecutionError` |
 | **2 — Pipe router / operators** | `PipeRouter`, pipe operators | Catch + wrap with pipe context (`pipe_code`, `pipe_stack`) |
-| **1 — Workers / SDK calls** | `pipelex/plugins/*/` | **Catch the SDK exception → classify → raise `CogtError`** |
+| **1 — Workers / SDK calls** | `pipelex/providers/*/` | **Catch the SDK exception → classify → raise `CogtError`** |
 | **0 — Third-party SDKs** | OpenAI, Anthropic, Google, … | Raise raw, untyped provider exceptions |
 
 Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they attach context as they catch and re-raise, but the `error_category`, `error_domain`, `model`, and `provider` set at Layer 1 reach Layer 5 unchanged (see [Cause-Chain Enrichment](#cause-chain-enrichment)).
@@ -18889,6 +18992,14 @@ Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they att
 | `validation_errors` | `list[ValidationErrorItem] \| None` | Structured per-error diagnostics on a bundle-validation failure (`ValidateBundleError` only) |
 
 `PipelexError.to_error_report()` is the entry point. `to_dict()` serializes, dropping `None` fields; `from_dict()` is its strict inverse.
+
+### The identity triple, and why renaming an error class is a wire break
+
+`error_type`, `title` and `type_uri` are the three identity fields on every report. `title` and `type_uri` are *presentation*, and each has a declaration hatch — set `_declared_title` or `_declared_type_uri` directly in a subclass body and that value is used verbatim instead of the auto-derived one (inheritance is deliberately bypassed via `cls.__dict__`, so a parent's curated title never captures its subclasses).
+
+`error_type` has no such hatch: it is `type(self).__name__`, the Python class name with no indirection. That makes it the **machine contract** — consumers outside this repo `switch` on that string. Renaming an error class therefore breaks them *silently*: their build stays green and the branch simply stops matching, falling through to a generic error path.
+
+The guard against that is a committed snapshot of the full `(error_type, title, type_uri)` set at `tests/data/errors/error_identity.txt`, regenerated with `make generate-error-identity` (alias `make gei`) and gated by `tests/unit/pipelex/errors/test_error_identity_snapshot.py`. A rename cannot land without producing a reviewable one-line-pair diff on that file at the moment it is made — which is also the moment to plan the matching consumer updates.
 
 ### `validation_errors` — structured bundle-validation diagnostics
 
@@ -18995,7 +19106,7 @@ class PipelexConfigError(PipelexError):
 
 ## Worker Classification
 
-Layer 0 → Layer 1. Every inference worker under `pipelex/plugins/*/` catches its SDK's typed exceptions and re-raises a categorized `CogtError`.
+Layer 0 → Layer 1. Every inference worker under `pipelex/providers/*/` catches its SDK's typed exceptions and re-raises a categorized `CogtError`.
 
 ### The Uniform Shape — Extract / Classify / Render
 
@@ -19244,7 +19355,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
 | `pipelex/cogt/inference/error_classify.py` | Classify — `classify_inference_error()`, `ClassificationResult` |
 | `pipelex/cogt/inference/error_render.py` | Render — `render_inference_error()`, `InferenceErrorFamily` |
 | `pipelex/cogt/inference/provider_name.py` | `ProviderName` enum keying the extract-fn registry |
-| `pipelex/plugins/*/` | Per-provider inference workers — Layer 0 → 1 classification |
+| `pipelex/providers/*/` | Per-provider inference workers — Layer 0 → 1 classification |
 | `pipelex/pipeline/exceptions.py` | `PipelineExecutionError`, `PipeExecutionError` |
 | `pipelex/cli/error_handlers.py` | Human CLI Rich panels — `display_error_panel()` |
 | `pipelex/cli/agent_cli/commands/agent_output.py` | Agent CLI JSON / markdown delivery |
@@ -19396,7 +19507,7 @@ A single worker may process many concurrent jobs. If two jobs define a concept n
 3. **Lookup chain** — `hub.get_class_registry()` reads the `ContextVar`, returns the scoped library's registry, and falls back to the global registry when no library is set (e.g. a data converter running outside the job scope — which is exactly why output uses deferred hydration).
 4. **Cleanup** — `library_manager.teardown(library_id)` drops the library and its registry; the `ContextVar` is reset. No manual GC needed.
 
-The hub's class-registry and library scoping (`pipelex/hub.py`, `pipelex/libraries/library.py`, `pipelex/libraries/library_manager.py`) is open core — the same machinery serves direct execution, the open runner, and any host-runtime plugin.
+The class-registry accessor and its library scoping (`pipelex/runtime_hub.py`, `pipelex/system/registries/class_registry_access.py`, `pipelex/interpreter_hub.py`, `pipelex/libraries/library.py`, `pipelex/libraries/library_manager.py`) is open core — the same machinery serves direct execution, the open runner, and any host-runtime plugin.
 
 ---
 
@@ -19758,6 +19869,8 @@ A signature is a violation when any of these holds:
 - **Banned literal-typed subject** — the subject is annotated `bool`, `int`, or `float`, including their `Optional[X]` / `X | None` / `Union[X, None]` forms. This is a violation no matter what: a grant can never cover it, because call sites read as bare literals (`f(True)`, `retry(3)`) — exactly the opacity this convention exists to kill. `str` subjects remain grantable; they are the house style (`pipe_code`, `name`, `uri`, …). An unannotated subject is not provably literal and remains grantable.
 - **Stale grant** — a registry entry whose def no longer exists, whose recorded `param` no longer matches the def's subject, or whose def no longer has a positional subject at all (demoted, renamed, moved, or newly carved out). Staleness is symmetric and hard-fails: a rename or file move forces a deliberate re-grant, not silent rot.
 
+The registry carries one more rule that is not about any signature: its entries must stay in sorted key order (see [Staleness is symmetric](#staleness-is-symmetric)).
+
 ## Exception 1 — granted subject parameters
 
 > **History note — this exception was narrowed, deliberately.** Exception 1 used to be a *generic* permission: any first non-`self`/`cls` parameter could stay positional, guard-approved, no questions asked. That judgment-shaped permission was systematically abused by coding agents, which left first arguments positional when they were not the subject or not obviously so — the check passed, so the prose was ignored. The permission is now an **explicitly granted, recorded exception**: judgment still exists, but it happens at grant time and in review of the registry diff, while CI stays 100% deterministic. Agents follow checks, not prose — so the check now carries the whole rule.
@@ -19772,7 +19885,7 @@ param = "node"
 rationale = "Verb–object: renders the node; single obvious operand."
 ```
 
-The registry is machine-written and sorted by key, so diffs stay stable and merge conflicts resolve trivially. It is written **only** by the grant command; never edit it by hand except to delete a stale entry:
+The registry is machine-written and sorted by key, so diffs stay stable and merge conflicts resolve trivially — and that order is **checked**, not merely claimed here (`unsorted-grant`). An unsorted registry parses fine and grants exactly the same subjects, so a bulk rewrite that scrambles it — a package move, a sed over paths — would otherwise break the invariant silently. It is written **only** by the grant command; never edit it by hand except to delete a stale entry:
 
 ```bash
 make subject-grant FUNC="pipelex/graph/render.py::render_node" RATIONALE="Verb–object: renders the node; single obvious operand."
@@ -19795,6 +19908,8 @@ The grant is a permission, not a requirement — making the subject keyword-only
 ### Staleness is symmetric
 
 The guard verifies the registry in both directions on every run: a positional subject without a grant fails, and a grant without a matching def fails (`dead-grant`), as does a grant whose recorded `param` no longer matches the def's subject (`grant-param-mismatch`). Renames, file moves, demotions to all-keyword, and newly added carve-outs (`@override`, framework decorators) all kill the grant — delete the entry or re-grant deliberately. A missing or malformed `subject_grants.toml` is an explicit check error, never treated as an empty registry (that would mass-flag every granted subject in the tree).
+
+File order is checked alongside them (`unsorted-grant`). Order is read from the raw text, not from the parsed registry: TOML declares table order insignificant, so a `dict` is no evidence of what the file looks like. The text scan is cross-checked against the parsed keys, and a disagreement is an explicit check error rather than a quietly narrowed scan — an entry the scan cannot see would otherwise be exempt from the order rule without anyone knowing.
 
 ### Registry schema
 
@@ -19955,10 +20070,11 @@ The entire `pipelex/` source tree is compliant, so the guard hard-blocks on **an
 | `literal-subject` | `bool`/`int`/`float` subject (incl. Optional/union-with-None) | make it keyword-only — grants are impossible |
 | `grant-param-mismatch` | the grant's recorded `param` no longer matches the def | re-grant, or fix the registry |
 | `dead-grant` | the grant matches no def with a positional subject | delete the entry (or re-grant after a rename/move) |
+| `unsorted-grant` | the entry sits out of key order in the registry file | re-record any grant (it rewrites the file sorted), or move the entry back by hand |
 
 The guard runs at several gates:
 
-- A Claude Code `PostToolUse` hook (`.claude/hooks/check-keyword-only.sh`, wired in `.claude/settings.json`) — the tightest loop. After every `Edit`/`Write`/`MultiEdit` of a `pipelex/**/*.py` file it checks just that file and blocks with the offending signatures if it regressed, so an agent learns at edit time rather than at the end of the session. It runs the stdlib-only core by file path (no Typer/hub import), so it costs a few tens of milliseconds — including one `tomllib` read of the registry. The hook is check-only — it never rewrites a file mid-edit. It cannot see registry-level staleness (dead grants are a full-scan concern); the full check owns those.
+- A Claude Code `PostToolUse` hook (`.claude/hooks/check-keyword-only.sh`, wired in `.claude/settings.json`) — the tightest loop. After every `Edit`/`Write`/`MultiEdit` of a `pipelex/**/*.py` file it checks just that file and blocks with the offending signatures if it regressed, so an agent learns at edit time rather than at the end of the session. It runs the stdlib-only core by file path (no Typer/hub import), so it costs a few tens of milliseconds — including one `tomllib` read of the registry. The hook is check-only — it never rewrites a file mid-edit. It cannot see registry-level violations (dead grants and file order are whole-file concerns, invisible from one edited source file); the full check owns those.
 - `make agent-check` — the fast everyday gate. It runs the **auto-fixing** variant (`fix-keyword-only`) early, right after `fix-unused-imports` and before `ruff format`, so a mechanically-fixable violation is corrected in place instead of failing the build. The fixer is **non-gating** — it reports the violations it can't mechanically fix but does not abort — so `format`, `lint`, `pyright`, and `mypy` all still run (you get keyword-only *and* type feedback in a single pass, and the tree is never left half-mutated and unformatted). The **read-only** `check-keyword-only` then runs **last** and is what actually blocks on any remaining violation. ⚠ Note the fixer's reach: an **ungranted subject def is a violation**, so `make agent-check` will silently keyword-only it — record the grant BEFORE running checks if you want the subject to stay positional.
 - `make check` — the heavy aggregate gate. It runs the **check-only** `check-keyword-only` (no rewriting), so CI-equivalent runs stay read-only.
 - CI — a dedicated lint job (`lint-keyword-only` in `.github/workflows/lint-check.yml`) gated by the required `Lint (all)` status check, so no non-compliant signature can merge. This is the hard guarantee; the hook and `make` gates are local conveniences layered on top. The registry diff in the PR is where grant judgment gets reviewed.
@@ -19967,7 +20083,7 @@ When you add or change a signature, place the bare `*` after the subject and gra
 
 ## Auto-fix
 
-`pipelex-dev check-keyword-only --fix` (exposed as `make fix-keyword-only` / `fko`, and run automatically inside `make agent-check`) rewrites every *mechanically-fixable* violation by inserting a bare `*` as far left as possible — immediately after `self`/`cls` (and after any `/`) — so **every** non-`self`/`cls` parameter becomes keyword-only, not just the ones after the subject: `def f(a, b)` becomes `def f(*, a, b)`, `def m(self, a, b)` becomes `def m(self, *, a, b)`, and an ungranted `def render(node)` becomes `def render(*, node)`. (The all-keyword form is always compliant and needs no grant — the fixer takes it.) `missing-star`, `ungranted-subject`, and `literal-subject` violations are all fixable this way; a `grant-param-mismatch` is never rewritten — a stale grant is a registry decision, not a signature to silently change. The raw insert lands on the def's original line(s); the `make fix-keyword-only` / `fko` target runs `ruff format` right after the rewrite, so the standalone path leaves a `ruff format`-clean tree (inside `agent-check` the later `format` step would normalize it anyway). The rewrite is idempotent and is re-parsed before being written — a rewrite that would not parse is discarded and the violation reported instead.
+`pipelex-dev check-keyword-only --fix` (exposed as `make fix-keyword-only` / `fko`, and run automatically inside `make agent-check`) rewrites every *mechanically-fixable* violation by inserting a bare `*` as far left as possible — immediately after `self`/`cls` (and after any `/`) — so **every** non-`self`/`cls` parameter becomes keyword-only, not just the ones after the subject: `def f(a, b)` becomes `def f(*, a, b)`, `def m(self, a, b)` becomes `def m(self, *, a, b)`, and an ungranted `def render(node)` becomes `def render(*, node)`. (The all-keyword form is always compliant and needs no grant — the fixer takes it.) `missing-star`, `ungranted-subject`, and `literal-subject` violations are all fixable this way; the registry-level kinds (`grant-param-mismatch`, `dead-grant`, `unsorted-grant`) are never rewritten — the fixer edits signatures, and the registry has exactly one writer, the grant command. The raw insert lands on the def's original line(s); the `make fix-keyword-only` / `fko` target runs `ruff format` right after the rewrite, so the standalone path leaves a `ruff format`-clean tree (inside `agent-check` the later `format` step would normalize it anyway). The rewrite is idempotent and is re-parsed before being written — a rewrite that would not parse is discarded and the violation reported instead.
 
 A few shapes the guard flags cannot be fixed by a single bare-`*` insert, and are reported for a manual fix rather than rewritten:
 
@@ -19994,6 +20110,368 @@ make subject-grant FUNC="pipelex/….py::qualname" RATIONALE="…"   # alias: ma
 ```
 
 
+## Hub Layering
+
+# Hub layering convention
+
+Pipelex resolves its cross-cutting dependencies through a *hub*: a singleton container plus a set of module-level accessor functions, so a component can reach the config, a worker, or the pipe library without importing the module that owns it. There are **two** hubs, one per layer, and which one a symbol lives on is an architectural boundary, not a filing preference. This document is the canonical specification of that boundary.
+
+The two layers are the textbook language-implementation split:
+
+- **The runtime layer** is the machinery present at execution time whatever is loaded — config, console, secrets, storage, telemetry, the model deck and inference workers, the content generator, reporting, and the value data model. Its hub is `runtime_hub`.
+- **The interpreter layer** reads a method and executes it — the libraries, the pipes, the router, the pipeline manager. Its hub is `interpreter_hub`.
+
+Do not read `runtime_hub` as related to the `pipelex.runtime_bridge` package: they share a word, but the hub is the runtime layer's service container while `runtime_bridge` is a transport.
+
+## The one rule
+
+> `interpreter_hub` may import `runtime_hub`. **`runtime_hub` must never import `interpreter_hub`.**
+
+That single arrow is the whole architecture. Everything below is a consequence of it.
+
+Only the *forbidden* direction is load-bearing. The permitted one is currently unused: the one runtime-layer thing `interpreter_hub` needs is the class-registry scoping slot, which lives below *both* hubs (see [The class-registry exception](#the-class-registry-exception)). So today, importing either hub loads the other in neither direction — which is stronger than the rule requires, not a violation of it.
+
+There is deliberately **no** `pipelex.hub`. It was deleted rather than kept as an alias for either layer, so a stale import fails loudly at import time instead of silently resolving to the wrong layer.
+
+## The two layers
+
+### `pipelex/runtime_hub.py` — process-scoped infrastructure
+
+`RuntimeHub` holds what is configured once at boot and never varies per method:
+
+| group | symbols |
+| --- | --- |
+| container | `RuntimeHub`, `get_runtime_hub`, `set_runtime_hub` |
+| config | `get_required_config`, `get_optional_config` |
+| console | `get_console` |
+| secrets | `get_secrets_provider`, `get_secret` |
+| system registries | `get_class_registry`, `get_func_registry` |
+| storage | `get_storage_provider` |
+| telemetry | `get_telemetry_manager`, `get_otel_tracer` |
+| models | `get_models_manager`, `get_model_deck`, `get_sdk_client_manager` |
+| inference | `get_inference_manager`, `get_llm_worker`, `get_img_gen_worker`, `get_extract_worker` |
+| content generation | `get_content_generator`, `scoped_content_generator` |
+| reporting | `get_report_delegate`, `is_in_isolated_execution` |
+| run mode | `is_dry_run_forced` |
+| tracing | `scoped_event_log`, `get_event_log_override` |
+| plugin registries | `get_inference_backend_registry`, `get_model_lister_registry`, `get_orchestrator_registry`, `get_bundle_validator_registry`, `get_storage_provider_registry`, `get_secrets_provider_registry` |
+
+### `pipelex/interpreter_hub.py` — library-scoped method machinery
+
+`InterpreterHub` holds what belongs to the *loaded method*:
+
+| group | symbols |
+| --- | --- |
+| container | `InterpreterHub`, `get_interpreter_hub`, `set_interpreter_hub` |
+| library manager | `get_library_manager`, `get_library` |
+| library lookups | `get_concept_library`, `get_required_concept`, `get_native_concept`, `get_required_domain`, `get_optional_domain`, `get_pipe_library`, `get_pipes`, `get_required_pipe`, `get_optional_pipe`, `get_pipe_source` |
+| current-library contextvar | `set_current_library`, `get_current_library`, `get_current_library_id_or_none`, `clear_current_library`, `scoped_current_library` |
+| library dirs | `resolve_library_dirs`, `get_default_library_dirs` |
+| pipe router | `get_pipe_router`, `set_pipe_router`, `teardown_current_pipe_router`, `scoped_pipe_router` |
+| run | `get_pipe_run`, `get_pipeline_manager`, `get_pipeline` |
+| pipe func | `get_pipe_func_executor`, `scoped_pipe_func_executor`, `get_pipe_func_executor_registry` |
+
+Setters follow their getters onto the matching container.
+
+### Which hub does a new symbol belong to?
+
+Ask **what its lifecycle is**, not what package it happens to be typed by:
+
+- Configured once at boot from config + plugin registration, identical for every method the process runs → `runtime_hub`.
+- Tied to a loaded method's libraries, or varying with the current library → `interpreter_hub`.
+
+Placement is decided by *kind*, not by who currently imports it. Several accessors have no in-tree importer (`get_bundle_validator_registry`, `get_orchestrator_registry`, `get_default_library_dirs`, …) — they are live plugin contract and are reached through the container. Do not relocate or delete one because a grep looks empty.
+
+`get_pipe_func_executor_registry` is the one placement worth flagging: it is a plugin registry by kind (which would put it in the runtime layer) but its protocol lives in `pipe_operators/func/` (which puts it in the interpreter layer). It is **interpreter-layer**. See [Known inversions](#known-inversions) for the underlying wart.
+
+## Why the boundary exists
+
+`runtime_hub` must not name anything from `libraries`, `pipe_operators`, `pipe_controllers`, `codegen`, `builder`, `interpreter_plugins`, `pipe_machinery`, `pipe_signature`, `mthds_parsing`, `pipeline` or `pipe_run` at module level. That list is now stated in whole top-level packages, which is the point of the modularity moves: it used to have to trail "…or the Pipe-touching modules of `core.pipes`", because some of what it forbids lived under a runtime-named package. Those module-level imports exist only to type the getters, but they are what made a single hub drag the entire method interpreter into every consumer that just wanted `get_console()`.
+
+The property that matters is measurable: **importing the Pipelex runtime loads zero modules from any of the packages named above.** That is both the assertion the closure test pins and the outward-facing claim — the inference engine does not know the MTHDS language exists, so you can embed it without loading a line of the parser, the pipe machinery, or a single pipe kind. Verify it from the repo root on a synced venv:
+
+```bash
+.venv/bin/python - <<'PY'
+import sys
+from pathlib import Path
+
+import pipelex.cogt.content_generation.content_generator  # noqa: F401
+
+INTERPRETER = {"libraries", "pipe_operators", "pipe_controllers", "codegen", "builder", "interpreter_plugins", "pipe_machinery", "pipe_signature", "mthds_parsing", "pipeline", "pipe_run"}
+loaded = {name: mod for name, mod in sys.modules.items() if name.startswith("pipelex.")}
+interpreter = sorted(n for n in loaded if n.split(".")[1] in INTERPRETER)
+sloc = 0
+for mod in loaded.values():
+    file = getattr(mod, "__file__", None)
+    if file:
+        sloc += sum(1 for line in Path(file).read_text(encoding="utf-8").splitlines() if line.strip() and not line.strip().startswith("#"))
+print(f"pipelex modules: {len(loaded)} | sloc: {sloc} | interpreter modules: {len(interpreter)}")
+print("offenders:", interpreter)
+PY
+```
+
+`interpreter modules` must print **0**. When it does not, the `offenders` list names the modules that leaked, and the shortest import path to one of them is what to fix. Swap the imported module to measure any other entry point.
+
+## Where core splits
+
+`pipelex/core/` used to be two layers under one name, and the runtime-layer declaration had to work around it. It does not any more — `pipelex.core` is a single declared entry — but the split is worth recording, because *how* it was resolved is the general lesson.
+
+For a long time `core/` held two different kinds of thing:
+
+- **The data model — runtime.** `core.concepts`, `core.domains`, `core.stuffs`, `core.memory`, the input/output *specs* under `core.pipes.inputs` and `core.pipes.stuff_spec`, and `core.pipes.pipe_output`. These describe what a method's values *are*. Nothing in them needs a loaded method, and each measures **zero** modules from the packages the predicate names. `pipe_output` reads as Pipe machinery but is not: it names no `Pipe` — it holds the working memory, graph spec and usage a run *produced* — and it sits inside `runtime_hub`'s own closure (the chain under [The class-registry exception](#the-class-registry-exception) passes straight through it).
+- **The Pipe machinery — interpreter.** `pipe_abstract`, `pipe_blueprint`, `pipe_factory`, `validation`, `template_guard_lint` and the two renderers. Every one of them names a `Pipe`, and a pipe is the interpreter's own object — they import `pipe_operators` / `pipe_controllers` / `libraries` **directly**, not through a hub. No amount of dependency injection makes those runtime.
+
+**The resolution was to move the second kind out, not to describe it more precisely.** All of it now lives in two top-level packages of its own: `pipelex.pipe_machinery` holds the Pipe machinery proper plus the pipe-kind registration manifest (`registry_models.PipeRegistryModels` — the fattest edge of the lot, a list of every pipe class and every pipe factory, so importing it loaded the whole interpreter), and `pipelex.mthds_parsing` holds the MTHDS parser and the bundle blueprint it produces, whose `pipelex_bundle_blueprint` is a discriminated union over every pipe blueprint. See [Registration surface](registration-surface.md) for what adding a pipe kind touches.
+
+One model stayed behind on purpose, and it is the interesting case. `PipelexBundleBlueprintValidationErrorData` is raised by the parser but imported by `pipeline/` and `libraries/`, which carry it into every runtime-layer import closure. Filing it with the parser would have made the boundary unenforceable for `mthds_parsing` — the closure predicate would have needed a permanent exclusion for it. It lives in `core.exceptions` instead, beside the two sibling structured error-data models it shares `PipeValidationErrorType` with. **Moving the leaf is what buys the clean predicate**; excluding it would only have recorded the problem.
+
+So the declaration names `pipelex.core` wholesale, which is a claim the measurement now supports: every `pipelex.core.*` module loads zero modules from the interpreter packages the predicate names, and none reaches `interpreter_hub`. It once listed core's data-model packages one by one, and that enumeration was the shape of the problem — a package-granular declaration is only honest when the packages match the layers.
+
+The dividing line is worth stating as a rule of thumb: **if it names a `Pipe`, it belongs to the interpreter layer.**
+
+### Injected providers, not ambient lookups
+
+The data-model half used to reach for `get_concept_library()` / `get_native_concept()` / `get_required_concept()` — ambient lookups into a loaded method, which is exactly what made `core/` inseparable from the interpreter. It now takes what it needs as a parameter, through one read-side contract: `ConceptProviderAbstract` (`pipelex/core/concepts/concept_provider_abstract.py`) — resolve a ref, a code, or a native code into a `Concept`, answer compatibility questions about two of them, and resolve a concept's declared `structure_class_name` into the class itself.
+
+**Class resolution is part of that contract, and it took a second pass to get there.** The hub split moved *concept* resolution onto the provider but left *class* resolution ambient one level down, inside `Concept` itself: the model reached `get_class_registry()` to answer "what is my structure class?" and to run the structural half of a compatibility check. A `Concept` is a subclass of the MTHDS-protocol wire model `ConceptAbstract` — pure serializable data — so that coupled a standard-owned wire model to a Pipelex process-global. `ConceptProviderAbstract.get_structure_class` decouples them: a `Concept` carries the class *name* as a plain protocol string, and turning a name into a type is the provider's business, never the model's.
+
+Be precise about what that buys, because it is easy to overstate. The read is still **ambient** — `ConceptLibrary.get_structure_class` calls `get_class_registry()`, which selects a registry from the current async context rather than from the provider instance (a `ConceptLibrary` holds none; the per-library `ClassRegistry` lives on `Library`). What changed is that the whole tree now has *one* implementation of that read, behind one seam, instead of it happening inside a wire model. Scoping it to the provider's own library is consequently a one-place change — see `wip/inputs/provider-scoped-class-resolution.md` for why nothing needs it yet.
+
+Two shapes fall out of that, and they are the ones to copy:
+
+- **Compatibility is two tiers, composed by the thing that owns resolution.** `Concept.are_compatible_by_declaration` is pure over the model's fields (plus an injected `concept_resolver`): dynamic short-circuits, ref equality, declared-class-name equality, `refines` chains. `ConceptLibrary.is_compatible` asks that first and only resolves classes when it is inconclusive. A name that should have resolved and didn't now raises `ConceptStructureClassNotFoundError` instead of answering `False` — "unknown" and "incompatible" are different answers, and conflating them was a latent wrong-verdict bug.
+- **Rendering takes the resolved class, not the name.** `Concept.render_concept_representation` receives a `structure_class`; `StuffSpec.render_stuff_spec` takes the `concept_provider`, resolves once, and passes the class down. Interpreter-layer callers (`output_renderer`, `input_renderer`, `pipe_io_contracts`, `builder/runner_code`) supply `get_concept_library()`.
+
+The **write side** stays ambient on purpose: `concept_factory` and `structure_generation/generator.py` generate structure classes and register them at library-load time, which is genuinely the registry's business. That those two are the only modules under `pipelex/core/concepts/` touching the registry is pinned as a golden set by `tests/unit/pipelex/core/concepts/test_concept_registry_boundary.py` — nothing else can see it, since both the accessor and its users are runtime-layer.
+
+It is **read-side only**. Managing a library — adding, removing, listing, setup/teardown — stays in the interpreter layer: `ConceptLibraryAbstract` *extends* it, keeping its management half in `libraries/`. Splitting read from write is what lets a core module state its dependency honestly ("I need something that can resolve concepts") without inheriting a library lifecycle it has no business touching.
+
+**There is deliberately no pipe counterpart.** Nothing in core's runtime half resolves a pipe. The two places that follow a pipe reference found *inside* a pipe graph — a condition's mapped pipes, a sequence's last step — live in `pipe_machinery/rendering/`, which is interpreter-layer and calls `interpreter_hub.get_required_pipe` directly; a provider parameter there would buy no closure property. `get_required_pipe` therefore stays on `PipeLibraryAbstract`. Split a read half out when a runtime-layer caller actually needs one, not for symmetry with concepts.
+
+The injection point is the interpreter layer. `pipe_factory`, `input_renderer` and `output_renderer` — already interpreter-bound, so nothing is lost — resolve the concept library themselves and pass it down; `pipeline/execution_seams.py` does the same for `WorkingMemoryFactory`. That is the one-way arrow the whole design rests on, applied inside `core/`: **the half that knows about a loaded method resolves the collaborator and hands it downward.**
+
+When you add a core data-model function that needs a concept — or a concept's structure class — add a `concept_provider` parameter. Do not add a hub import, and do not reach for `get_class_registry()`: the guard will reject the first, and the second is the coupling this section exists to describe.
+
+One module outside `core/` cannot import either hub at module level, and the constraint is a **static-analysis** cycle rather than a runtime one — worth knowing before you restate it. `pipe_machinery/pipe_abstract.py` reads `class_registry_access` directly to decorate graph-registry entries with a JSON Schema. It is *not* in `runtime_hub`'s runtime closure (`plugins.orchestrator_registry` and `pipe_run.pipe_job` reach it through `TYPE_CHECKING`-only edges, and a clean-interpreter probe shows all three absent) — but pyright's `reportImportCycles` counts those edges, so either hub import is a hard type-check failure, reported at `interpreter_hub.py` where no line-level ignore can reach it. Deferring the import does not dodge it. The below-both-hubs accessor is what that case is for; its docstring records the measurement.
+
+## Where the built-in plugins split
+
+Two different splits run through the built-in plugins, and they are easy to conflate. The first is **mechanism vs adapters**, and it does *not* cross a layer boundary: `pipelex/plugins/` is the plugin mechanism — the `PipelexPlugin` contract, the `PluginRegistrar`, and the capability registries the registrar accumulates into — while `pipelex/providers/` holds the built-in adapters that register through it, one directory per provider. Both packages are declared runtime-layer. What the split makes visible is the one-way dependency between them: adapters depend on the mechanism, and the mechanism knows nothing of its adapters. It also stops `pipelex/plugins/` from reading as "the vendors", which is what made the second split hard to see. Note the scope of that claim — it is about these two packages, not about the whole tree: `cogt` does name four providers directly, which [Known inversions](#known-inversions) records and justifies.
+
+Most of those directories are vendor adapters, but not all of them, which is why the package is `providers/` and not `vendors/`: `providers/secrets/` registers the built-in `env` backend, which has no vendor at all, and `providers/storage/` registers local, in-memory, S3 and GCP behind one directory. In both cases only the registration shim lives here — the implementations are under `pipelex/tools/`.
+
+The second split *is* the layer boundary, and the same rule of thumb divides it. Most built-ins adapt a runtime-layer port — an inference backend, a model lister, a storage or secrets provider — and those are the packages under `pipelex/providers/`. Two adapt interpreter-layer ports, because their job is to *construct* interpreter-layer objects: `DirectOrchestratorPlugin` registers a `DirectOrchestrator` and a `DirectBundleValidator`, and `PipeFuncPlugin` registers a concrete `DirectPipeFuncExecutor`. Those two live in **`pipelex/interpreter_plugins/`**.
+
+External plugins are unaffected by the mechanism/adapter split: they import `pipelex.plugins.contract` and `pipelex.plugins.registrar`, both of which stayed put, and they are discovered through the `pipelex.plugins` entry-point group — a group identifier, not a module path, and unchanged.
+
+The registrar's slots are *ports* and they stay runtime-layer — `OrchestratorProtocol`, `BundleValidatorProtocol` and `PipeFuncExecutorFactoryFn` all live under `plugins/*_registry.py`. Only the *adapters* are interpreter-layer. That is ordinary ports-and-adapters, and it is what the layer rule's own remedy text prescribes: have the interpreter layer install it downward at boot. Where each derived registry is *installed* still follows the hub partition rather than the port's home: `RuntimeBoot.setup` puts the orchestrator, bundle-validator, backend, lister, storage and secrets registries on the `RuntimeHub`, and `Pipelex.setup` puts the `PipeFuncExecutorRegistry` on the `InterpreterHub` — the one placement flagged [above](#which-hub-does-a-new-symbol-belong-to). Since [the boot split](#where-the-boot-splits) the two installs sit in the two halves that match their hubs, so the partition is now visible in the code rather than only in this sentence.
+
+Composition happens where welding is legal. `pipelex/providers/builtins.py` exports `RUNTIME_BUILTIN_PLUGINS`; `pipelex/interpreter_plugins/builtins.py` imports that half — downward, which the interpreter layer may do — and exports the composed `BUILTIN_PLUGINS` and `CORE_UNCONDITIONAL_PLUGIN_NAMES`. Both are **parameters** of `build_registrar`, never module globals it imports, so `plugins/discovery.py` stays runtime-layer: `pipelex.py` (the interpreter boot) and the `pipelex plugins list` diagnostic pass the composed lists in, while `runtime_boot.py` defaults to the runtime half alone. Exactly one place still answers "what are the built-in plugins" — it just lives in the layer permitted to say it.
+
+This is the seam external plugins already use. Our Temporal plugin contributes an orchestrator and our Daytona plugin a PipeFunc executor; both are interpreter-touching, both live outside this repo, and both arrive through the `pipelex.plugins` entry point without welding anything. The in-tree built-ins used to be the only ones that welded — [Known inversions](#known-inversions) records what that cost.
+
+One consequence is worth stating as a contract, and it is written into `PipelexPlugin`'s docstring: **a plugin belongs to exactly one layer.** A capability needing adapters in both is two plugins. Nothing enforces it mechanically; a straddling plugin would simply put the interpreter back into every runtime closure, and the guard's transitive rule would say so.
+
+## Where the boot splits
+
+The composition root is split the same way, and it is the same move: a runtime half in a declared runtime-layer home, and an interpreter half that imports it downward and adds what only a method-running process needs.
+
+`pipelex/runtime_boot.py` holds `RuntimeBoot`. It stands up config, logging, the secrets provider, telemetry, the Kajson class registry with `CoreRegistryModels`, the template sets, the SDK client manager, the model deck, the plugin-derived runtime registries, storage, the content generator, the inference manager, the reporting delegate and the observers — and it loads **zero interpreter modules** doing it. `pipelex/pipelex.py` holds `Pipelex`, which subclasses it and appends the `InterpreterHub`, the composed plugin manifests, the `PipeFuncExecutorRegistry` and its executor, the `LibraryManager` and default library dirs, the `PipelineManager`, the `PipeRegistryModels` registration, the `PipeRouter` and the `PipeRun`.
+
+Two top-level modules, not a `boot/` package: they mirror `runtime_hub.py` / `interpreter_hub.py`, which is the tree's strongest naming precedent for a layered pair. `Pipelex` does not move and is not renamed — it is the public entry point every consumer and sibling repo imports, and the layer boundary never required moving it.
+
+**This is what finally gives `RUNTIME_BUILTIN_PLUGINS` a caller.** The plugin split created that constant with no importer in the tree; `RuntimeBoot.setup` defaults to it, so a runtime-only boot discovers exactly the runtime half and the two interpreter-touching built-ins are simply absent. The consequence is worth stating plainly, because it is the reason nothing needed redesigning to make this work: `OrchestratorRegistry`, `BundleValidatorRegistry` and the PipeFunc executor modes are all interpreter-contributed, and therefore **empty on a runtime-only boot** — which is harmless only because nothing in the runtime half *resolves* out of them at boot. They are constructed, set on the hub, and looked up at run time by the interpreter. The two registries the runtime half does resolve out of, secrets and storage, are runtime-contributed and core-unconditional.
+
+Inheritance rather than composition, deliberately: it preserves every attribute address (`self.models_manager`, `self.class_registry`, `self.telemetry_manager` and the rest read the same from both halves, so no consumer inside or outside this repo changes), and it reads as what it is — the interpreter boot *is* the runtime boot plus the interpreter constructions. Two consequences are load-bearing:
+
+- **The singleton resolves by subclass.** `RuntimeBoot` carries `MetaSingleton` too, and the class-level accessors go through `MetaSingleton.get_subclass_instance`, so `RuntimeBoot.is_fully_booted()` answers `True` while a `Pipelex` owns the process globals. Each `make()` asks the *base* class whether a boot exists, which is what makes the two mutually exclusive in both directions — `set_runtime_hub`, `KajsonManager` and `log.configure` are all once-per-process, so booting one on top of the other would serve a half-populated class registry.
+- **Teardown ordering is explicit, not a template hook.** The plugin-contributed teardown callbacks must run *before* `pipeline_manager.teardown()`, so a worker's in-flight resources release first. `RuntimeBoot` exposes `_teardown_plugin_callbacks()` and `_teardown_runtime()` as separate phases and `Pipelex.teardown` sequences them with its own step in between, because that order is the whole reason the split exists in this shape.
+
+Enforcement mirrors the packages': `pipelex.runtime_boot` is declared in `RUNTIME_LAYER_PACKAGES` (a *module* entry, beside `pipelex.runtime_hub`) and listed in the closure test's `RUNTIME_LAYER_ENTRY_POINTS`. `pipelex.pipelex` is deliberately **undeclared** — it is interpreter-side by construction, like `pipelex.cli`, so declaring it would fail the rule by design rather than enforce anything. `tests/unit/pipelex/cli/dev/test_hub_layering_guard.py` asserts both directions, because "surely the boot should be runtime-layer" is a plausible future edit.
+
+## Placement, not coupling
+
+Splitting the hub removes the *lookups* that crossed the boundary. It does not move a type that was simply filed in the wrong package — and a misfiled type drags its whole package into every closure that names it. Two were resolved this way; both are worth knowing as the pattern to apply to the next one.
+
+**`JobMetadata` moved to `pipelex/system/`.** It is an argument to essentially every `cogt` call, yet it lived in `pipelex/pipeline/` — which made `cogt → pipeline` the fattest remaining edge and pulled `graph.trace_context` into every closure that touched inference. `JobMetadata`, `JobCategory` and `UnitJobId` now live in `pipelex/system/job_metadata.py`, and `JobMetadataError` moved from `pipeline/exceptions.py` to `pipelex/system/exceptions.py`. `cogt → pipeline` is now **zero statements**.
+
+`TraceContext` moved with it, to `pipelex/system/trace_context.py`: it is the transport `JobMetadata` carries, so leaving it in `graph/` would only have renamed the inversion to `system → graph`. Its one dependency on the graph package — `DataInclusionConfig`, nested under `[...graph_config.data_inclusion]` in the TOML — moved down to `pipelex/system/data_inclusion_config.py`, which `graph_config.py` now imports. The TOML shape is unchanged; only the class's home moved, which is what keeps `trace_context` from re-importing `mermaid_config` and `reactflow_config` through `GraphConfig`.
+
+**The templating primitives moved down into `tools/`.** `TemplateCategory`, `TemplatingStyle`, `TagStyle` and `TextFormat` sat under `cogt/templating/` while eight `tools/jinja2/` and `tools/mermaid/` modules imported them — so `tools`, the intended bottom layer, depended on `cogt`. None of the three modules holding them named anything from `cogt`, so this was pure misfiling:
+
+- `TextFormat` and `TemplatingStyle` / `TagStyle` → `pipelex/tools/templating/`, which imports nothing from `pipelex` beyond its own sibling. It is a leaf.
+- `TemplateCategory` → `pipelex/tools/jinja2/`, because its entire payload is a map of jinja2 filters. Filing it in `tools/templating/` would have made that package import `tools/jinja2` while `tools/jinja2` imports it back — a cycle inside one layer. As placed, the edges run one way: `tools/mermaid → tools/jinja2 → tools/templating`.
+
+What stays in `cogt/templating/` — `TemplateBlueprint`, the sigil preprocessor, the rendering entrypoint — belongs there: a blueprint is language-layer, and the rest imports `tools/jinja2` downward.
+
+**`resolved_fields` moved down into `core/concepts/`.** The neutral resolved-field layer — one structure field becoming a `ResolvedType` tree — lived under `pipelex/codegen/` while `core/concepts/structure_generation/generator.py` imported it, which put `pipelex.codegen` into the closure of every core module that reached structure generation. It names nothing outside `pipelex.core`, so this was misfiling again: it now lives at `pipelex/core/concepts/resolved_fields.py`, and the codegen emitters import it upward.
+
+**The two renderers regrouped, then left `core/` altogether — they are now `pipe_machinery/rendering/`.** `input_renderer` sat in `core/pipes/inputs/` beside genuinely runtime-layer modules while `output_renderer` sat alone in `core/pipes/output/`. Both render a `PipeAbstract` for a human or an agent, so both belong to the interpreter layer, and leaving `input_renderer` where it was would have forced the runtime-layer declaration to be a list of *modules* rather than packages. Regrouping them into one `rendering/` package was the first half of the fix and bought a real improvement — the boundary fell on package lines instead of module lines. It was only half, though: the declaration still had to name six `pipelex.core.*` sub-packages, because the boundary now fell on package lines *inside* `core/`. Moving the whole group out to `pipe_machinery/` is what collapsed those six entries to one. The general form: regrouping tells you where the boundary is, moving is what makes the boundary a package name.
+
+The lesson generalizes: when a runtime-layer package imports an interpreter-layer one, check whether the *type* is misplaced before designing an indirection. None of these needed a resolver slot or a protocol — only a `git mv` and an import rewrite. And when a package straddles the boundary, moving the odd module out is usually cheaper than teaching the guard about exceptions — which is exactly how the built-in plugins were split, [below](#where-the-built-in-plugins-split).
+
+## The class-registry exception
+
+`get_class_registry` is the one runtime-layer accessor that is *not* implemented in `runtime_hub`. Its implementation lives in `pipelex/system/registries/class_registry_access.py`, and `pipelex.runtime_hub.get_class_registry` delegates to it.
+
+The reason is a genuine cycle. `core.concepts.concept` needs the active class registry, and it sits **inside** `runtime_hub`'s own import closure:
+
+```
+runtime_hub → cogt.llm.llm_worker_abstract → system.telemetry.otel_factory
+            → core.pipes.pipe_output → core.stuffs.stuff → core.concepts.concept
+```
+
+so `concept.py` cannot import `runtime_hub` at module level. Hosting the accessor in a module that imports nothing from `pipelex` is what lets `core/concepts/` use a plain top-level import — replacing three identical `importlib.import_module("pipelex.hub")` shims that were invisible to every import lint and to pyright's module graph.
+
+**Use `pipelex.runtime_hub.get_class_registry` everywhere.** The exception is a module that must stay import-light *with respect to* `runtime_hub` — that one imports the leaf directly. `core/concepts/` is the case, for two different reasons: `concept.py` sits **inside** `runtime_hub`'s own closure, so the public accessor is literally unreachable there; `concept_factory.py` and `structure_generation/generator.py` sit outside it, and routing them through `runtime_hub` would re-couple `core.concepts` — a declared runtime-layer package — to the whole cogt/plugin stack for one function. Do not "fix" those two to the public accessor: nothing checks this mechanically, and the closure test would not catch it either, since it measures interpreter modules rather than weight.
+
+### Library scoping crosses downward, at install time
+
+A run may pin a per-library `ClassRegistry` rather than the process-global Kajson one. Knowing *which* library is current is method-layer knowledge, so the runtime layer holds only a slot: `class_registry_scoping`, defaulting to a resolver that returns `None`. `set_interpreter_hub` installs the real resolver, which means scoping is live exactly when a `InterpreterHub` exists — an invariant a caller cannot forget to wire. The runtime teardown phase (`RuntimeBoot._teardown_runtime`, reached from every `teardown`) calls `class_registry_scoping.reset()` so a torn-down library manager is never reachable through a still-pinned library id. It lives on the runtime half because releasing the slot belongs to whichever teardown runs — on a runtime-only boot nothing installed a resolver and the reset is a no-op.
+
+This is the same shape as `HubSlot.ISOLATED_EXECUTION_PROBE`: a defaulted callable a higher layer replaces at boot, never an unset attribute. A process that only ever builds a `RuntimeHub` therefore degrades to the process-global registry instead of raising. That used to describe only the doctor path and most unit tests; since [the boot split](#where-the-boot-splits) it is a first-class entry point — `RuntimeBoot.make()` installs no `InterpreterHub`, and a test pins that scoping stays at its unscoped default on that boot.
+
+## Enforcement
+
+The boundary is enforced mechanically. Two things are checked, because the rule and the property it buys can fail independently.
+
+### The rule — `make check-hub-layering`
+
+```bash
+make check-hub-layering   # alias: make chl
+```
+
+An AST guard (`pipelex-dev check-hub-layering`, core in `pipelex/cli/dev_cli/commands/hub_layering_guard.py`) that runs in `make agent-check`, in the `make check` aggregate, and in CI. It checks three rules over `pipelex/` and `tests/`:
+
+1. **The layer rule.** A module in the declared runtime layer — `pipelex.cogt`, `pipelex.core`, `pipelex.errors`, `pipelex.graph`, `pipelex.observer`, `pipelex.plugins`, `pipelex.providers`, `pipelex.reporting`, `pipelex.system`, `pipelex.test_extras`, `pipelex.tools`, `pipelex.tracing`, plus the `pipelex.runtime_hub` and `pipelex.runtime_boot` modules themselves — may not import `pipelex.interpreter_hub`. The declaration is compliant with an empty exception list, so the guard hard-blocks on **any** violation. Entries are matched exact-or-dotted-prefix, which is why a bare *module* is a legal entry beside the packages: without `pipelex.runtime_hub` spelled out, the module at the centre of the rule would be exempt from it, and without `pipelex.runtime_boot` the runtime layer's own composition root would be — see [Where the boot splits](#where-the-boot-splits). `pipelex.core` was six entries until its interpreter tenants moved out — see [Where core splits](#where-core-splits) for what that enumeration was working around.
+
+    `graph`, `tracing`, `observer` and `errors` joined the list late, and the delay cost something — see [Known inversions](#known-inversions). They are the run-graph data model with its tracer and renderers, the trace-event assembler feeding it, the run-observation hooks, and the error taxonomy: machinery present at execution time whatever is loaded, which is the runtime layer's own definition. `pipelex.test_extras` is on the list for the same reason: it ships, `runtime_boot.py` imports it at boot, and it measures clean. `pipelex.kit` is data files with no module to police; `pipelex.language`, `pipelex.runtime_bridge` and `pipelex.cli` all measure dirty and are interpreter-side by construction. That is every top-level package accounted for — which is the point, because the rule of thumb is that a measured-clean package should be *declared*, not left undeclared: **an undeclared package is not neutral, it is unpoliced.**
+2. **The dead-module rule.** *No* scanned module may reference `pipelex.hub`. It was deleted rather than aliased so a stale import fails loudly; this closes the one hole in that guarantee.
+3. **The transitive rule.** No runtime-layer module may *reach* `pipelex.interpreter_hub` either, through any chain of module-level imports. Rules 1 and 2 are per-file and see one hop; this one resolves the whole module-level import graph of `pipelex/` and does reachability over it, reporting the shortest chain and the line of its first hop. It exists because the one-hop rules missed a live breach for a whole release: four modules of the declared runtime-layer `pipelex.plugins` package reached the interpreter hub through `runtime_bridge`, `pipeline` and `pipe_operators`, and both gates stayed green (see [Known inversions](#known-inversions)). A *direct* import is left to rule 1, which names the more specific remedy, rather than reported twice.
+
+    The rule scopes itself to what an import actually loads: module-level imports only, `TYPE_CHECKING` blocks, function bodies and `# hub-layering: ignore`d statements excluded — the same carve-outs rule 1 grants, applied to the graph. It also models what an import loads *on the way*: reaching `pkg.sub.mod` executes `pkg/__init__.py` and `pkg/sub/__init__.py` first, so those are edges too and a breach in a package init is reached by every importer of anything beneath it. And a module-level **string** naming the interpreter hub is an edge, since a dynamic import loads it just the same — rule 1 catches that string in a runtime-layer module, but an *intermediary* sits in no declared layer, so without this the graph would miss it. A finding cannot be silenced **where it is reported** — the marker suppresses one reviewed *import*, never a module's transitive reach, so a module the declaration claims is runtime-layer while the graph says otherwise gets moved or has its dependency inverted.
+
+    The rule also refuses to pass vacuously: if the scan finds no `pipelex.interpreter_hub` among the modules it parsed — a renamed hub, or a scan root the module names cannot be derived from — it raises instead of reporting zero. Reverse reachability from a module the graph does not contain is empty by construction, so without that check a rename would silently turn the whole rule off while the gate stayed green.
+
+All three rules match **imports and bare string literals**, and the string half is the load-bearing one. A missed *import* of a deleted module is an immediate `ImportError`; a missed *string* is not, and it is invisible to every import-graph tool and to pyright's module graph. Both forms that actually occurred here were strings: three `importlib.import_module("pipelex.hub")` shims hiding a cycle from every lint, and one `mocker.patch("pipelex.hub.get_console", ...)` that broke a whole CLI test suite with an `AttributeError` raised nowhere near a hub. Matching is exact-or-boundary against the module path, so `pipelex.runtime_hub` never matches `pipelex.hub` and prose that merely *mentions* a module is not a reference.
+
+The guard resolves relative imports (`from ...interpreter_hub import …`) against the importing module's own package, so the forbidden arrow cannot be spelled around. A path assembled at runtime from f-strings or concatenation is beyond any AST scan; nothing in the tree does that.
+
+Two deliberate carve-outs:
+
+- **`if TYPE_CHECKING:` blocks are exempt from the layer rule** — the rule is about what *loads*, and a type-only import loads nothing. Only `TYPE_CHECKING` and `typing.TYPE_CHECKING` open such a block: an attribute of any other receiver (`settings.TYPE_CHECKING:`) is an ordinary runtime condition and earns no exemption. The `else` branch is not exempt either, nor is `if not TYPE_CHECKING:`, and the dead-module rule applies inside `TYPE_CHECKING` too (a deleted module exists in no phase).
+- An inline `# hub-layering: ignore` comment anywhere on the offending statement suppresses it, mirroring `# kw-only: ignore`. It applies to every rule that is about what *loads*, so a suppressed import is also not an edge in rule 3's graph. The only two in the tree are on the guard's own declarations of the two hub paths, which name them rather than importing them.
+
+`tests/` is scanned for the dead-module rule only. `tests.*` sits in no declared layer, so a test may freely patch `pipelex.interpreter_hub` — while a stale `pipelex.hub` patch target, the landmine above, still fails the check. The transitive rule likewise walks `pipelex/` only: a test module has no closure to protect.
+
+### The property — the import-closure test
+
+`tests/unit/pipelex/test_runtime_layer_import_closure.py` imports each runtime-layer entry point in a **subprocess** and asserts that no module from its `INTERPRETER_PACKAGES` set — and no `pipelex.interpreter_hub` — landed in `sys.modules`. This is the [measurement above](#why-the-boundary-exists), pinned. It exists separately from the lint because the two fail independently: a runtime-layer module reaching directly into `pipe_operators`, without touching a hub, breaks the property while the lint stays green.
+
+The entry points are the inference layer, `runtime_hub` itself, `providers.builtins`, and the heaviest module of each runtime-layer `core/` package. `providers.builtins` earns its place by history, under its former name `plugins.builtins`: it instantiates every built-in vendor adapter, and `pipelex.plugins` — then the largest declared runtime-layer package, vendors and mechanism together — had no entry point here when the transitive breach happened. The guard now follows the import graph, but that is *static* analysis and cannot see a dynamic import, so the package that bit us gets a runtime-truth check too. One entry point still covers both halves of what has since become two packages: importing the manifest pulls in every built-in adapter, and they reach the mechanism they register through.
+
+Its predicate is now a single membership test over whole top-level packages — no per-module list and no exclusions. It used to need both: core's Pipe-machinery modules had to be named one by one (most were caught only *transitively*, through the `pipe_operators` / `libraries` they pull in, and `pipe_blueprint` pulled in none of it, so a runtime-layer import of it would have passed a package-only predicate), and `core.bundles.exceptions` had to be excluded by exact match because its validation-error data landed in every runtime closure. Both disappeared when the modules moved: the machinery to `pipe_machinery`, the parser to `mthds_parsing`, and the one leaf model to `core.exceptions`. **A package-granular predicate is honest only once the packages match the layers** — that is the whole argument for the moves, stated as a check.
+
+The predicate now names **every** interpreter package. `pipeline` and `pipe_run` were the last two absent, and the reason was placement, not a broken arrow: four leaf models of theirs landed in every runtime closure, so naming them would have failed every entry point over an address. The remedy was the one `mthds_parsing` used — move the leaves first, then widen the predicate — and where each leaf went is decided by what it *is*, not by which package used to hold it:
+
+| leaf | was | is now | why there |
+| --- | --- | --- | --- |
+| `SpecialPipelineId` | `pipeline.pipeline_models` | `system.job_metadata` | it is the vocabulary of `pipeline_run_id`, and that is `JobMetadata`'s field |
+| `PipeRunMode` | `pipe_run.pipe_run_mode` | `system.pipe_run_mode` | a run-scope directive, not one of a method's values |
+| `PipeRunParamKey` | inside `pipe_run.pipe_run_params` | `system.pipe_run_param_key` | same, and `core.concepts` needs it as its reserved-names list |
+| `PipeRunError` | `pipe_run.exceptions` | `core.pipes.exceptions` | the runtime layer *subclasses* it — `PipeRunInputsError` and `OptionalValueAbsentError` derive from it in `core.pipes.inputs` |
+
+Note the last row does not follow the first three into `system/`. Consistency of destination is not the criterion — what the symbol *is* decides. Three are run-scope directives and enums; the fourth is the base of a pipe-error family whose other members already live in `core/pipes/`, and filing it with them also lands it in the same error-reference section as the two subclasses that derive from it.
+
+The detector runs in a subprocess, so its logic lives in a `textwrap.dedent` string that no linter or type checker sees — and a predicate that has quietly stopped detecting would make every entry point pass *vacuously*. Three guards close that, each covering what the others cannot:
+
+- **A negative control.** `pipelex.interpreter_hub` is dirty by definition, and the test asserts it comes back *reported as offending modules*, not merely non-zero — so a broken predicate fails rather than going quietly green. It proves the detector detects, but only that *some* name matches.
+- **Every configured name is a real package directory** under `pipelex/`. A typo'd or retired name matches nothing, and because the predicate is a membership test that is invisible rather than loud. (The package set is a module-level constant handed to the subprocess as argv, so the names are at least lint-visible; nothing checks a string against disk.)
+- **The set matches the `INTERPRETER` set** in this page's [verification snippet](#why-the-boundary-exists) — a reader who runs a stale copy measures zero and believes it. The two had silently disagreed before anyone compared them by machine.
+
+Each subprocess is time-bounded, because an unbounded one turns a deadlock into a hung suite instead of a failure.
+
+Alongside them, `tests/unit/pipelex/test_hub_lifecycle.py` pins that a boot installs both singletons, and that the production `Pipelex.teardown` — not a stand-in calling `class_registry_scoping.reset()` directly — really releases the scoping an `InterpreterHub` installed, and that the next boot re-installs it. `tests/unit/pipelex/test_runtime_boot_closure.py` pins the boot-time half of the property: it *runs* `RuntimeBoot.make()` in a subprocess and asserts zero interpreter modules loaded, no `InterpreterHub` installed, and scoping left unscoped. A subprocess is required rather than preferred — both hubs are sticky class-attribute singletons that teardown never clears, so an in-process check would answer with a stale hub and pass vacuously. Booting rather than importing is what catches a boot step resolving out of an interpreter-contributed registry that is empty on that boot.
+
+### This document — the `hub-layering-convention` drift contract
+
+The guard and the closure test keep the *code* honest; neither can tell whether **this page** still describes it. That is a [drift contract](drift-contracts.md): `hub-layering-convention` names the guard and both hub modules as triggers and this document as the review target, so adding or moving a hub accessor — or changing the declared runtime layer — obliges a recorded review here before the change can land. It carries no verify command, because `check-hub-layering` already gates `make check` and CI.
+
+Two checks make that review mechanical rather than a re-read, and are the ones to run:
+
+- Extract every public module-level symbol from `runtime_hub` and `interpreter_hub` and confirm each appears in the partition tables above. An undocumented accessor is the failure mode this contract exists to catch.
+- Import `RUNTIME_LAYER_PACKAGES` from the guard and confirm every declared package is named under [The rule](#the-rule-make-check-hub-layering).
+
+## Known inversions
+
+Named so this document stays honest.
+
+**The one that was fixed, kept as the worked example.** Four modules of the declared runtime-layer `pipelex.plugins` package used to reach `interpreter_hub` — `direct/direct_plugin.py` and `pipe_func/pipe_func_plugin.py` as the leaves (their job is to *construct* interpreter-layer objects), `builtins.py` and `discovery.py` purely as aggregators over them. (That `builtins.py` is today `pipelex/providers/builtins.py`; it moved with the vendor adapters it aggregates when the mechanism and the adapters were split.) None imported the hub *directly*, so the guard did not flag them, and the closure test had no entry point for the package, so nothing else did either: from the moment the declaration landed it claimed a property the measurement contradicted, with both gates green. The remedy was placement, not indirection — the two leaves moved to `pipelex/interpreter_plugins/` and the composition moved to the layer allowed to weld (see [Where the built-in plugins split](#where-the-built-in-plugins-split)) — and the guard grew the [transitive rule](#the-rule-make-check-hub-layering) so the next one cannot hide the same way. Three lessons generalize: a package-granular declaration is a claim about the whole package, an aggregator inherits every breach it aggregates, and a rule that stops at one hop will eventually be walked around.
+
+**The one the worked example predicted, found by declaring the package.** `graph/graph_rendering.py` imported `pipeline.dry_run_pipeline` at module level, and importing it pulled in `interpreter_hub` plus ~76 interpreter modules. Every gate stayed green, for a reason worth stating plainly: rules 1 and 3 both filter their candidates through `is_runtime_layer`, and `pipelex.graph` was not declared — so the module had been outside the rules' domain the whole time. This is the `pipelex.plugins` breach again, one level up: not a package whose declaration overreached, but a package with **no** declaration at all. The remedy was placement, as before. The module split along "do I need a loaded method?", which is this boundary's own question: the pure renderer (`GraphFormat`, `render_graph_from_spec`) stayed in `pipelex.graph`, and the bundle-driven half that has to dry-run a method first (`generate_graph_for_bundle`, `generate_view_for_bundle`) became `pipelex.pipeline.bundle_graph_rendering`, next to the `dry_run_pipeline` it exists to wrap. The lesson is the one this page now states under [The rule](#the-rule-make-check-hub-layering): **an undeclared package is not neutral, it is unpoliced** — omitting an entry makes the guard quieter, never louder.
+
+**The one an aggregate module hid.** Five built-in vendor adapters — `providers/{anthropic,bedrock,google,mistral}/*_list.py` — imported `MissingDependencyError` from `pipelex.exceptions` rather than from its definition site in `pipelex.system.exceptions`. `pipelex/exceptions.py` is the *public all-errors aggregate*: it re-exports every interpreter package's exceptions, so importing anything from it loads `pipeline.exceptions` → `validation_errors` → `fixes.planner` and more. Each of those five declared runtime-layer modules therefore loaded 15 interpreter modules. Neither gate could see it: the guard's rules only chase `interpreter_hub`, and the aggregate never reaches it; the closure test's `providers.builtins` entry point does not cover these modules either, because the vendor plugins import them *inside a function*, which hides them from the static import graph and from the aggregator's own closure at once. The fix is the repo's existing rule — *direct full-path imports everywhere*, i.e. import from where the symbol is defined, never from a convenience aggregate — plus one new entry point (`providers.anthropic.anthropic_list`) so the runtime-truth check now covers the shape. The generalizable lesson: **a module that re-exports across layers is a layer boundary with the sign filed off**, and a deferred import will hide it from every static gate you have.
+
+- **`cogt` names four specific vendors, deliberately.** `cogt/config_cogt.py` imports `AnthropicConfig`, `GoogleConfig`, `MistralConfig` and `OpenAIConfig` from their `pipelex/providers/` packages. Both sides are runtime-layer, so this breaches no hub rule — it is a placement inversion: the vendor-neutral engine names four vendors. It is accepted rather than fixed, because the alternative is worse. The main config model is statically typed end-to-end (`system/configuration/configs.py` and the `pipelex.toml` files are structurally synced, and boot fails loud when they disagree), so making vendor config sections plugin-contributed would trade compile-time typing for a dynamic registry — a real loss to buy a cosmetic win. The edge is one-way and shallow: a config class, not a worker.
+- **The img-gen one that stopped being an inversion.** `cogt/img_gen/img_gen_args_factory.py` used to import two vendor img-gen factories at module level, for taxonomy and geometry helpers. It was never a registry problem: dispatch is keyed on `AspectRatioTaxonomy`, a `cogt`-owned enum that names model families and no providers, and no family is served by a single adapter — the `openai` and `azure_openai` decks both ship GPT Image models, and the gateway worker resolves Gemini geometry through the same mapping the native Google worker uses — so there was no provider key to dispatch on, and a registrar slot would have bought a plugin-API bump for two import sites. Fixed by placement instead: the helpers are now `cogt/img_gen/img_gen_gemini_mapping.py` and `cogt/img_gen/img_gen_gpt_mapping.py`, and the Google worker and the gateway factory import *inward* to them. One `cogt → specific vendor` edge of this kind remains — `model_backends/backend_factory.py` reaching for `VertexAIFactory` — already deferred inside a function, and it self-resolves when VertexAI support is removed.
+- **What pins the two bullets above.** The complete `cogt → pipelex.providers` list — the four config imports plus that one deferred factory import — is a golden set in `tests/unit/pipelex/cogt/test_cogt_dependency_boundaries.py`, together with the stronger fact that `pipelex/cogt/**` imports no vendor SDK at all. A sixth edge fails it, and nothing else in the repo would notice: both packages are runtime-layer, so the guard and the closure test are blind to an edge between them by construction. Golden sets rather than a rule, because these are *accepted* inversions — there is no predicate separating the sanctioned edges from a new one, and the point is to make the next one a diff a reviewer reads. Note the tempting generalization — *no vendor SDK anywhere in `pipelex/` outside `providers/`* — is **false**, and a test asserting it would be red on day one: `tools/pdf/pypdfium2_renderer.py`, `tools/storage/`, `tracing/` and `reporting/` import pypdfium2 and the AWS/GCP SDKs on purpose, because `providers/storage/` is a registration shim whose implementations live under `pipelex/tools/`. The scope that holds is `cogt`.
+- `plugins/pipe_func_executor_registry.py` is typed by a protocol from `pipe_operators/` and defers that import under `TYPE_CHECKING` precisely because `pipelex.config` imports it and the inference layer imports `pipelex.config` — a module-level import there would drag the interpreter back into every inference closure. Being type-only it loads nothing, so it breaches neither rule — the sanctioned deferral pattern. The placement inversion itself is unfixed.
+- **The one that stopped being an inversion.** `core/`'s Pipe-touching half — `pipe_abstract`, `pipe_blueprint`, `pipe_factory`, the renderers — imported the interpreter directly while sitting under a package the runtime layer wanted to declare. That was never a wrong *import* (it is a fact about what a pipe is), it was a wrong *address*, and it forced the declaration to enumerate core's data-model packages instead of naming `pipelex.core`. Fixed by placement: the modules are now `pipelex.pipe_machinery` and `pipelex.mthds_parsing`, and the six `pipelex.core.*` entries collapsed to one. Several of them still import `interpreter_hub` on purpose, to inject downward — that is the sanctioned direction and always was.
+- Broader measured inversions, out of scope for the hub boundary: `cogt → core`, `system → cogt`, `plugins → runtime_bridge`, and `cogt/model_backends/model_lists.py` importing `pipelex.cli.exceptions.PipelexCLIError`. What remains of `tools → cogt` is `tools/pdf/pypdfium2_renderer.py` reaching for `cogt.extract` and `cogt.image` types; the templating half of that cluster is gone (see [Placement, not coupling](#placement-not-coupling)).
+
+## For consumers outside this repo
+
+`pipelex.hub` is gone; there is no shim. Every external importer must choose a layer. The symbols that crossed the repo boundary are split as follows — runtime-layer ones now come from `pipelex.runtime_hub`, interpreter-layer ones from `pipelex.interpreter_hub`, per the tables above. `get_pipelex_hub` splits into `get_runtime_hub` and `get_interpreter_hub`, so each call site must pick the container it actually meant.
+
+
+## Registration Surface
+
+# Registration surface
+
+A pipe kind is not one class. Adding `PipeFoo` means touching a handful of separate places, none of which the others infer — there is no plugin registry for pipe kinds and no scan of the tree. This page is the checklist, and the explanation of which of those places are genuinely load-bearing versus which look like duplication and are not.
+
+## What a pipe kind is made of
+
+Each kind lives in its own package under `pipelex/pipe_operators/<kind>/` or `pipelex/pipe_controllers/<kind>/`, and holds three classes:
+
+| file | class | role |
+| --- | --- | --- |
+| `pipe_foo_blueprint.py` | `PipeFooBlueprint` | the MTHDS language surface — what a `.mthds` file parses into |
+| `pipe_foo.py` | `PipeFoo` | the runnable pipe |
+| `pipe_foo_factory.py` | `PipeFooFactory` | blueprint → pipe |
+
+`PipeSignature` follows the same shape from `pipelex/pipe_signature/`, with the caveat noted below.
+
+## The checklist
+
+1. **The kind's package** — the three classes above, plus an `exceptions.py` if the kind raises its own errors (see the error-class location convention in the Python standards).
+
+2. **The type tag** — add the value to `PipeType` in `pipelex/pipe_machinery/pipe_blueprint.py`, and give it an arm in the `category` property that maps it to `PipeCategory.PIPE_OPERATOR` or `PipeCategory.PIPE_CONTROLLER`. The match is exhaustive with no `case _`, so the type checker walks you to every remaining site — that is the point of writing it that way.
+
+3. **The blueprint union** — add `PipeFooBlueprint` to `PipeBlueprintUnion` in `pipelex/mthds_parsing/pipelex_bundle_blueprint.py`. It is a pydantic discriminated union keyed on the `type` field, so a kind absent from the union is a parse error on any `.mthds` file that names it, not a silent skip.
+
+4. **The registration manifest** — add `PipeFoo` and `PipeFooFactory` to `PipeRegistryModels` in `pipelex/pipe_machinery/registry_models.py`, in `PIPE_OPERATORS` / `PIPE_OPERATORS_FACTORY` or `PIPE_CONTROLLERS` / `PIPE_CONTROLLERS_FACTORY`. This is the one whose omission is **silent**: boot succeeds either way, and the failure surfaces later as a kajson deserialization error on a pipe. `tests/unit/pipelex/test_registry_models_split.py` pins the manifests against the class registry for exactly that reason.
+
+5. **The spec layer** — add `PipeFooSpec` under `pipelex/builder/pipe/`, then register it in **both** `pipe_spec_map.py` (`pipe_type_to_spec_class`, the authoring lookup) and `pipe_spec_union.py` (`PipeSpecUnion`, the discriminated union). The two are separate on purpose: the union carries `PipeSignatureSpec`, the map does not, because a signature is not a user-selectable type.
+
+## Why `core/` no longer holds the manifest
+
+`PipeRegistryModels` used to live in `pipelex/core/registry_models.py` alongside core's value model. Importing it loads every pipe operator, every pipe controller and their factories — so a module filed under `core/` pulled in the whole interpreter, and `core` read as a dependant of the pipe packages it is supposed to sit below. The manifest now lives in `pipelex/pipe_machinery/`; `core.registry_models` keeps `CoreRegistryModels` (the stuff-content classes) and imports nothing from `pipe_operators` / `pipe_controllers` / `pipe_signature`.
+
+The two manifests land in one registry from the two halves of the boot: `CoreRegistryModels` is registered by `RuntimeBoot.setup` in `pipelex/runtime_boot.py`, `PipeRegistryModels` by `Pipelex.setup` in `pipelex/pipelex.py` — see [Where the boot splits](hub-layering.md#where-the-boot-splits). They must stay **disjoint** — a class in both is a sign one half was edited without the other — and because registration is name-keyed dict insertion, which side registers first carries no meaning.
+
+See [Hub Layering](hub-layering.md) for the layer boundary this split serves.
+
+## The spec/blueprint parallel is deliberate
+
+Steps 3 and 5 look like the same list written twice. They are not, and collapsing them would be a mistake:
+
+- **Blueprints are the MTHDS language.** `PipeFooBlueprint` defines what an author may write in a `.mthds` file. It is the reference for the standard.
+- **Specs are an authoring convenience for AI agents.** `PipeFooSpec` is a simplified shape with convenience fields that `to_blueprint()` transforms into blueprint fields. Spec-level fields deliberately differ from blueprint-level ones — `PipeComposeSpec.target_format` is a spec convenience with no blueprint counterpart, for instance.
+
+The two layers evolve for different reasons and answer to different consumers, so they carry their own unions. When adding validation or a field, decide which layer owns it first: language rules go on blueprints, authoring convenience goes on specs. `pipelex/builder/CLAUDE.md` is the canonical statement of that split.
+
+
 ## Drift Contracts
 
 # Drift Contracts
@@ -20006,11 +20484,11 @@ Not every code↔doc relationship deserves a review contract. This repo distingu
 
 | Tier | Mechanism | Judgment needed |
 |---|---|---|
-| **Derived** | Regenerate and diff: `check-config-sync`, `check-mthds-schema`, `check-gateway-models`, `generate-error-pages` | None — the output is a pure function of its sources |
+| **Derived** | Regenerate and diff: `check-config-sync`, `check-mthds-schema`, `check-gateway-models`, `generate-error-pages`, `generate-error-identity` | None — the output is a pure function of its sources |
 | **Linkage** | Referential integrity of declared cross-references (the spec/conformance `check-spec-links` pair) | None — links either resolve or they don't |
 | **Review** | Drift contracts: "this changed → that must be looked at, and the look recorded" | Yes — someone must judge whether the prose still holds |
 
-The standing rule: **anything mechanizable becomes a derived check.** If a review contract keeps opening and the review is always the same mechanical comparison, delete the contract and write a derived check instead — it needs no judgment and can't be rubber-stamped. The best review contract is one you eventually mechanize out of existence. Corollary: generated artifacts (`docs/errors/`, `derived/`, gateway model docs) must never appear in a contract's `review` list — reviewing generator *output* is how you end up editing generated files.
+The standing rule: **anything mechanizable becomes a derived check.** If a review contract keeps opening and the review is always the same mechanical comparison, delete the contract and write a derived check instead — it needs no judgment and can't be rubber-stamped. The best review contract is one you eventually mechanize out of existence. Corollary: generated artifacts (`docs/errors/`, `derived/`, `tests/data/errors/error_identity.txt`, gateway model docs) must never appear in a contract's `review` list — reviewing generator *output* is how you end up editing generated files.
 
 ## How it works
 
