@@ -87,6 +87,23 @@ async def concatenate_texts(working_memory: WorkingMemory) -> TextContent:
 
 Then use `function_name = "custom_concat"` in your `.mthds` file.
 
+### Function names share one flat name space
+
+Registration names are unqualified — there is no module or package prefix — and every library directory Pipelex scans registers into the same process-wide registry. Two functions registered under the same name is therefore an error: Pipelex raises a `FuncRegistryError` naming both origins instead of letting scan order decide which one your `.mthds` files actually call.
+
+Registering the *same* function again — a directory scanned twice, a module reached by two paths — is a no-op, so overlapping scan roots are fine.
+
+If you hit a collision, give one of the two functions a distinct registration name:
+
+```python
+@pipe_func(name="invoices_summarize")
+async def summarize(working_memory: WorkingMemory) -> TextContent:
+    # Implementation...
+    pass
+```
+
+Prefixing names with the domain they serve is the simplest way to keep them distinct as a project grows.
+
 ## Configuration
 
 Once the function is registered, you can use it in your `.mthds` file.

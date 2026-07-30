@@ -8,6 +8,7 @@ from pydantic import Field
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.system.registries.exceptions import FuncRegistryError
 from pipelex.system.registries.func_registry import func_registry
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 
@@ -226,6 +227,47 @@ async def nested_function(working_memory: WorkingMemory) -> TextContent:
             # Only root function should be registered
             assert func_registry.has_function("root_function"), "root_function should be registered"
             assert not func_registry.has_function("nested_function"), "nested_function should NOT be registered"
+
+    def test_same_function_name_in_two_folders_raises(self):
+        """Two library dirs defining the same @pipe_func name must fail loudly, not silently pick a winner."""
+        source_template = """
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.text_content import TextContent
+from pipelex.system.registries.func_registry import pipe_func
+
+@pipe_func()
+async def summarize(working_memory: WorkingMemory) -> TextContent:
+    return TextContent(text="{flavor}")
+"""
+        with tempfile.TemporaryDirectory() as first_dir, tempfile.TemporaryDirectory() as second_dir:
+            (Path(first_dir) / "first_funcs.py").write_text(source_template.format(flavor="first"))
+            (Path(second_dir) / "second_funcs.py").write_text(source_template.format(flavor="second"))
+
+            func_registry.teardown()
+            FuncRegistryUtils.register_funcs_in_folder(folder_path=Path(first_dir), is_recursive=False)
+            with pytest.raises(FuncRegistryError, match="summarize"):
+                FuncRegistryUtils.register_funcs_in_folder(folder_path=Path(second_dir), is_recursive=False)
+            func_registry.teardown()
+
+    def test_rescanning_the_same_folder_is_idempotent(self):
+        """A folder scanned twice reuses the cached module, so the same function object re-registers cleanly."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            (Path(temp_dir) / "stable_funcs.py").write_text("""
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.text_content import TextContent
+from pipelex.system.registries.func_registry import pipe_func
+
+@pipe_func()
+async def stable_function(working_memory: WorkingMemory) -> TextContent:
+    return TextContent(text="stable")
+""")
+
+            func_registry.teardown()
+            FuncRegistryUtils.register_funcs_in_folder(folder_path=Path(temp_dir), is_recursive=False)
+            first_registration = func_registry.get_function("stable_function")
+            FuncRegistryUtils.register_funcs_in_folder(folder_path=Path(temp_dir), is_recursive=False)
+            assert func_registry.get_function("stable_function") is first_registration
+            func_registry.teardown()
 
     def test_eligibility_check_directly(self):
         # Valid async function

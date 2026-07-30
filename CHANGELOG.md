@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **PipeFunc Name Collisions Are Now Loud:** Registering two different functions under the same PipeFunc name raises `FuncRegistryError` naming both origins, instead of logging at debug level and letting the last scan win. Registration names are unqualified and every scanned library directory feeds one process-wide registry, so a silent overwrite made which function a `.mthds` step actually ran depend on filesystem scan order — and could differ between two machines running the same code. Re-registering the *same* function object stays a no-op, so overlapping scan roots are unaffected. See [PipeFunc](building-methods/pipes/pipe-operators/PipeFunc.md). (Breaking)
+
 ## [v0.41.0] - 2026-07-30
 
 ### Highlights

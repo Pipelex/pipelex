@@ -106,7 +106,14 @@ Two library directories — or a library plus an installed package — each defi
 - A `docs/` note on naming `@pipe_func` functions and what the flat name space implies.
 - If a new error class is introduced rather than reusing `FuncRegistryError`, regenerate the error reference (`make gep`) and the identity snapshot (`make gei`).
 
-**CHECKPOINT B** — item 2 landed: gates green, changelog entry, docs updated.
+**CHECKPOINT B** — ✅ item 2 landed: gates green (`make agent-check`, `make drift-check`, full `make agent-test`), changelog entry under `[Unreleased]` marked breaking, `docs/building-methods/pipes/pipe-operators/PipeFunc.md` gained a "Function names share one flat name space" section.
+
+Answers to the two questions the plan left open:
+
+- **Is re-registering the same function object a collision?** No — it is a no-op. Verified this is the shape the double-scan actually produces: `import_module_from_file` keys `sys.modules` by a name mangled from the file's *absolute path*, so a folder scanned twice returns the cached module and therefore the *same* function object. Two distinct files defining the same name are the only way to get two objects under one key, and that is the real bug. Covered by `test_rescanning_the_same_folder_is_idempotent`.
+- **Does any first-party code deliberately overwrite?** No — `pipelex/` defines no `@pipe_func` of its own, so nothing registers a builtin expecting a user function to replace it. No `replace=True` parameter was added; it would have been a speculative surface.
+
+One reachability check worth recording: the transported PipeFunc path (`DirectPipeFuncExecutor.run_pipe_func_transported`) materializes customer sources into a fresh `mkdtemp` workdir, which *would* yield a different function object under the same name on a second run in one process. It stays safe because that path is one-shot per process (`pipe_func_transported_entrypoint` runs exactly one request, then `Pipelex.teardown_if_needed()` clears the registry).
 
 ---
 
