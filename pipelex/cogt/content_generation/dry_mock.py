@@ -26,9 +26,11 @@ trigger, which requires ``--dry-run`` and is not shown in --help):
   to exist. Non-LLM leaves keep their no-usage dry behavior either way.
 
 This module is the single home for "what a mocked inference produces". Object
-mocks are built from the **schema-reconstructed** class on both backends (one
-code path, identical mock everywhere); exotic format constraints must declare
-``examples`` / ``mock_format`` — see ``DryRunObjectFidelityError``.
+mocks resolve their class exactly the way the live leaf does (see
+``object_class_resolution``): from the caller's real class when one is in hand,
+from the JSON schema otherwise — so the mock is never built against a *weaker*
+class than the one the provider is constrained by. Exotic format constraints
+must declare ``examples`` / ``mock_format`` — see ``DryRunObjectFidelityError``.
 """
 
 from collections.abc import Sequence
@@ -52,6 +54,7 @@ from pipelex.cogt.content_generation.assignment_models import (
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.content_generation.exceptions import DryRunMockBuildError
+from pipelex.cogt.content_generation.object_class_resolution import resolve_object_class
 from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobReport
@@ -196,20 +199,6 @@ def build_mock_objects(model_class: type[BaseModelTypeVar], *, count: int) -> li
         raise DryRunMockBuildError.for_object_class(model_class.__name__) from exc
 
 
-def _reconstruct_object_class(object_assignment: ObjectAssignment) -> type[BaseModel]:
-    """Reconstruct the object's model class from its JSON schema.
-
-    The leaf carries only the JSON schema (not the original class), so the class is rebuilt via
-    :class:`SchemaToModelFactory`. This is the single schema-based mock site: both backends build
-    the same mock, and fidelity bugs surface in cheap local unit tests instead of only on a worker
-    (pre-flight decision 2).
-    """
-    return SchemaToModelFactory.make_from_json_schema(
-        schema=object_assignment.object_class_schema,
-        class_name=object_assignment.object_class_name,
-    )
-
-
 def stamp_mock_main_coordination(items: Sequence[Any]) -> None:
     """Set the first item's ``pipe_code`` to ``"mock_main"`` — the single home of this coordination (D3).
 
@@ -220,9 +209,17 @@ def stamp_mock_main_coordination(items: Sequence[Any]) -> None:
     main-pipe check. Callers: the mock-input factory (``working_memory_factory``), the batch
     controller's dry aggregation (``pipe_batch``), and the dry object-list leaf mock
     (:func:`dry_llm_gen_object_list`). The stamp is a no-op for items without a ``pipe_code`` field.
+
+    The item is now the *caller's own* class, not a throwaway schema rebuild, so the assignment can hit
+    a model config the caller chose — ``frozen=True`` or ``validate_assignment`` — and raise. Surface
+    that as the same typed :class:`DryRunMockBuildError` the surrounding mock build uses, rather than
+    letting a raw ``ValidationError`` escape from a mutation the caller never asked for.
     """
     if items and hasattr(items[0], "pipe_code"):
-        items[0].pipe_code = MOCK_MAIN_PIPE_CODE
+        try:
+            items[0].pipe_code = MOCK_MAIN_PIPE_CODE
+        except ValidationError as exc:
+            raise DryRunMockBuildError.for_object_class(type(items[0]).__name__) from exc
 
 
 def _nb_list_items(object_assignment: ObjectAssignment) -> int:
@@ -236,21 +233,22 @@ class _ReportLLMJobFunc(Protocol):
     def __call__(self, job_metadata: JobMetadata, *, llm_setting: LLMSetting, llm_prompt: LLMPrompt) -> None: ...
 
 
-def _leaf_gen_object(object_assignment: ObjectAssignment, *, report_func: _ReportLLMJobFunc) -> BaseModel:
-    """Shared object-mock pipeline: reconstruct the class from its schema, report once, build one mock.
+def _leaf_gen_object(object_assignment: ObjectAssignment, *, report_func: _ReportLLMJobFunc, object_class: type[BaseModel] | None) -> BaseModel:
+    """Shared object-mock pipeline: resolve the class to mock, report once, build one mock.
 
-    Built from the schema-reconstructed class (the leaf carries only the JSON schema, not the original
-    class), so format hints encoded via ``json_schema_extra`` that datamodel-code-generator drops on
-    round-trip are not honored — exotic-format schemas may yield mock data the original class would
-    reject. The generator re-validates against the original class and re-raises that failure as
-    ``DryRunObjectFidelityError`` (review F2); declare ``examples`` / ``mock_format`` on the
-    constrained fields to fix it.
+    With the caller's class in hand the mock is built from it directly, so every invariant it enforces
+    is honored. Without it (the boundary case) the class is rebuilt from the JSON schema, which drops
+    custom validators and the format hints encoded via ``json_schema_extra`` that
+    datamodel-code-generator omits on round-trip — so exotic-format schemas may yield mock data the
+    original class would reject. The generator re-validates against the original class and re-raises
+    that failure as ``DryRunObjectFidelityError`` (review F2); declare ``examples`` / ``mock_format``
+    on the constrained fields to fix it.
 
     Reports exactly once — the live leaf makes one ``gen_object`` call (a list is one call against a
     list-wrapper schema), so a single ``UsageReportEvent`` matches the real one-call topology that
     cross-worker assertions count.
     """
-    item_class = _reconstruct_object_class(object_assignment)
+    item_class = resolve_object_class(object_assignment=object_assignment, object_class=object_class)
     mock_object = build_mock_object(item_class)
     # Report only after a successful build — a failed mock must not leave a usage event behind.
     llm_assignment = object_assignment.llm_assignment_for_object
@@ -258,9 +256,11 @@ def _leaf_gen_object(object_assignment: ObjectAssignment, *, report_func: _Repor
     return mock_object
 
 
-def _leaf_gen_object_list(object_assignment: ObjectAssignment, *, report_func: _ReportLLMJobFunc) -> list[BaseModel]:
+def _leaf_gen_object_list(
+    object_assignment: ObjectAssignment, *, report_func: _ReportLLMJobFunc, object_class: type[BaseModel] | None
+) -> list[BaseModel]:
     """List counterpart of :func:`_leaf_gen_object`: one report, ``nb_items`` builds (D11)."""
-    item_class = _reconstruct_object_class(object_assignment)
+    item_class = resolve_object_class(object_assignment=object_assignment, object_class=object_class)
     mock_objects = build_mock_objects(item_class, count=_nb_list_items(object_assignment))
     # Report only after a successful build — a failed mock must not leave a usage event behind.
     llm_assignment = object_assignment.llm_assignment_for_object
@@ -299,14 +299,18 @@ def dry_llm_gen_text(llm_assignment: LLMAssignment) -> str:
     return f"DRY RUN: llm_gen_text • llm_setting={llm_assignment.llm_setting.desc()} • prompt={prompt_truncated}"
 
 
-def dry_llm_gen_object(object_assignment: ObjectAssignment) -> BaseModel:
-    """Dry leaf for ``llm_gen_object``: schema-built mock instance + synthetic job report."""
+def dry_llm_gen_object(object_assignment: ObjectAssignment, *, object_class: type[BaseModel] | None = None) -> BaseModel:
+    """Dry leaf for ``llm_gen_object``: mock instance + synthetic job report.
+
+    Mirrors the live leaf's class resolution so the two run modes cannot drift: with the caller's class
+    in hand the mock is built from it, without it the class is rebuilt from the schema.
+    """
     log.verbose(f"🤡 DRY RUN: llm_gen_object for '{object_assignment.object_class_name}'")
-    return _leaf_gen_object(object_assignment, report_func=_dry_report_func(object_assignment.cogt_run_params))
+    return _leaf_gen_object(object_assignment, report_func=_dry_report_func(object_assignment.cogt_run_params), object_class=object_class)
 
 
-def dry_llm_gen_object_list(object_assignment: ObjectAssignment) -> list[BaseModel]:
-    """Dry leaf for ``llm_gen_object_list``: ``nb_items`` schema-built mocks + one synthetic report.
+def dry_llm_gen_object_list(object_assignment: ObjectAssignment, *, object_class: type[BaseModel] | None = None) -> list[BaseModel]:
+    """Dry leaf for ``llm_gen_object_list``: ``nb_items`` mocks + one synthetic report.
 
     Applies :func:`stamp_mock_main_coordination` so bundle dry-validation's mocked
     ``BundleHeaderSpec.main_pipe`` check passes through the leaf mock (D3). The stamp is
@@ -314,7 +318,7 @@ def dry_llm_gen_object_list(object_assignment: ObjectAssignment) -> list[BaseMod
     harmless elsewhere.
     """
     log.verbose(f"🤡 DRY RUN: llm_gen_object_list for '{object_assignment.object_class_name}'")
-    items = _leaf_gen_object_list(object_assignment, report_func=_dry_report_func(object_assignment.cogt_run_params))
+    items = _leaf_gen_object_list(object_assignment, report_func=_dry_report_func(object_assignment.cogt_run_params), object_class=object_class)
     stamp_mock_main_coordination(items)
     return items
 

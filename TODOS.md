@@ -1,119 +1,157 @@
-# Determinism: prompt rendering must not mutate library-held pipe objects
+# Two places where the runtime silently substituted something for what the caller gave it
 
-**Branch:** `refactor/Determinism`
+Branch `refactor/Exec`, off `dev` at v0.41.0. Two independent fixes, batched because they share a shape and nothing else: in both, the runtime accepted a caller's object, quietly replaced it with something almost-equivalent, and never said so. One replaced a Pydantic class with a lossy rebuild of it; the other replaced a registered function with a later one of the same name.
 
-**Status: COMPLETE.** All three phases done. Every design claim was verified against the code before implementing (see [Verification log](#verification-log)). Gates green (`make agent-check`), full suite green (`make agent-test`). The MTHDS schema came out byte-identical and never mentioned `LLMPromptBlueprint` at all. No doc changes were needed. Deviations from the design are recorded at the bottom.
+This file is the review guide. It carries the reasoning, the measurements, and — importantly — the two places where doing the work **corrected the plan that motivated it**. Read those first if you are short on time: they are where a reviewer's attention is worth the most.
 
-## Problem
+- **Commit `ba9b0750c`** — `FuncRegistry.register_function` silently overwrote (item 2 below).
+- **Commit `bbf06b707`** — the schema→`exec()` round trip was paid in-process, and it was lossy (item 1 below).
 
-Rendering an LLM prompt writes a derived value back onto objects owned by the pipe library. `PipeLibrary.get_required_pipe` (`pipelex/libraries/pipe/pipe_library.py:111`) returns the stored instance — nothing copies it — so these write-backs mutate shared, long-lived state as a side effect of running a pipe. Two sites:
+Each commit is independently green on `make agent-check`, `make drift-check`, and the full `make agent-test`.
 
-1. `pipelex/pipe_operators/llm/pipe_llm.py:232` — inside `_live_run_operator_pipe`, the operator caches the config-derived prompting style onto its own spec: `self.llm_prompt_spec.templating_style = get_config().pipelex.prompting_config.get_prompting_style(...)`. (Thirty lines above, `resolve_dynamic_output_stuff_spec`'s docstring advertises "Pure: never mutates `self`" — that purity is local to that one method; the run method itself is not pure.)
-2. `pipelex/pipe_operators/llm/llm_prompt_blueprint.py:358-359` — `_unravel_text` writes the spec-level style into the caller's `TemplateBlueprint`: `jinja2_blueprint.templating_style = templating_style`. The written value is never even read on this path — the `render_template` call at line 374-379 passes `self.templating_style`, not the blueprint's field — so the write is pure pollution of a library-held object.
+---
 
-Executed proof (three lines: boot dry, build an `LLMPromptBlueprint` with a `TemplateBlueprint`, set `templating_style` on the spec, `await make_llm_prompt(...)`, read `template_blueprint.templating_style`):
+## Item 1 — the schema→`exec()` round trip was paid in-process, and it was lossy
 
+### What was wrong
+
+Structured generation handed a concrete Pydantic class to the content generator, which threw the class away, rebuilt an approximation of it from its JSON schema through code generation plus `exec()`, and gave the **rebuild** to the provider as the structured-output schema — while the original class was still sitting in the caller's frame.
+
+The path: `content_generator.make_object` / `make_object_list` received `object_class: type[BaseModelTypeVar]`; `ObjectAssignment.make_for_class` kept only `__name__` + `model_json_schema()` and dropped the class; `llm_generate.py` rebuilt it via `SchemaToModelFactory.make_from_json_schema` and passed the rebuild to `llm_worker.gen_object(schema=...)`; `dry_mock.py` rebuilt it on the dry path too. Then `content_generator` re-validated the result against the class it had never stopped holding.
+
+### What the rebuild drops — verified, not assumed
+
+- custom `@field_validator` / `@model_validator` logic
+- `json_schema_extra` format/pattern hints
+- **the output structure's own description** — its class docstring lands in `model_json_schema()["description"]`, and `datamodel-code-generator` does not re-emit it, so the rebuilt class has `__doc__ = None` and its schema has no top-level `description`. Field-level descriptions do survive.
+
+That last one the original plan did not name, and it is the most directly user-visible: every in-process structured call was sending the provider a schema stripped of the concept's own description — prompt-relevant signal, silently gone. Reproduce in three lines:
+
+```python
+class Line(StructuredContent):
+    """A billed line."""
+    label: str
+
+rebuilt = SchemaToModelFactory.make_from_json_schema(schema=Line.model_json_schema(), class_name="Line")
+assert rebuilt.__doc__ is None  # and "description" is absent from rebuilt.model_json_schema()
 ```
-BEFORE  spec.templating_style=None   prompt_blueprint.templating_style=None
-AFTER   spec.templating_style=<set>  prompt_blueprint.templating_style=<set>
-SAME OBJECT as spec.prompt_blueprint: True
-```
 
-**Consequences:**
+Read from the user's side: someone who writes a model with a validator got a structured-output schema that had silently lost it, so the provider was constrained by a weaker contract than the one they wrote. The re-validation caught the bad result *afterwards*; it did not stop the weaker schema from being sent.
 
-- A pipe's `model_dump()` — used by `_make_pipe_data_for_registry` for the graph registry and by the crate payload that travels to a Temporal worker — differs before and after its first run in a process. Serialized output depends on run order.
-- The cached value can go stale: a deck reconfigured in-process, or an external-plugin model with no `InferenceModel`, means the first run's cached style silently governs every later run. First run and subsequent runs of the same instance are not equivalent.
-- Any harness that compares two executions in one process is measuring a mutated object on the second pass.
+### The constraint that shaped the fix
 
-## Design
+`ObjectAssignment` is a serializable DTO **by design**. It is the payload a distributed orchestrator — our Temporal plugin, hooked in via `pipelex/plugins/orchestrator_registry.py` — sends to a worker that has no access to the caller's class object. Across that boundary the class genuinely cannot travel, and rebuilding from schema is the right answer. So the fix is not "remove the reconstruction". It is "stop paying for it when nothing crossed a boundary".
 
-Compute the style into a local and pass it down — the value stays run-scoped, never written onto `self` or the blueprint.
+### What changed
 
-**Key facts established by code reading (verify cheaply before relying on them):**
+- **`ObjectAssignment` is untouched.** No live-class field was added. It is a wire model; a `type[BaseModel]` field makes it unserializable and breaks the boundary path outright. This is the tempting wrong fix — the class is *right there* in `make_for_class` — and it was rejected deliberately, not overlooked.
+- **The class is threaded as an explicit keyword-only parameter beside the assignment**, on the in-process path only: `llm_gen_object(object_assignment, *, object_class=None)` and the same on `llm_gen_object_list` and the two dry leaves. `None` means "no class in hand, rebuild from the schema" — which is exactly what a worker entering from the boundary passes, so **the boundary path keeps today's behaviour by construction, with no flag to set**.
+- **One resolution helper serves both run modes** — `object_class_resolution.resolve_object_class`, a new leaf module so neither `llm_generate` nor `dry_mock` has to import the other. Live and dry both rebuilt before and both take the fast path now. Had only the live leaf been fixed, the dry mock would be built against a *weaker* class than the one the provider is constrained by — the mock would be more faithful than the thing it mocks, which is worse than the state we started from. `test_dry_leaf_resolves_the_class_the_same_way_as_the_live_leaf` asserts this directly rather than leaving it inferred from two separate passing tests.
+- Keyword-only matters mechanically here: every function on this path already carries a subject grant in `subject_grants.toml`, and a grant covers one positional subject. A second bare positional would be a violation with or without it. No grant was added; the grant for the deleted `dry_mock._reconstruct_object_class` was removed.
 
-- `LLMPromptBlueprint.templating_style` has exactly one writer in the tree: the run-time cache at `pipe_llm.py:232`. `PipeLLMFactory.make` (`pipe_llm_factory.py:118-125`) never sets it; no test, doc, or schema references it. The field *is* the cache — remove it (no backward compat, per workspace policy).
-- `TemplateBlueprint.templating_style` stays: it is a declared field that the compose and img-gen paths legitimately read (`pipe_compose_blueprint.py:82`, `img_gen_prompt_blueprint.py:294`). On the LLM path the factory never sets it, so it is `None` for every LLM prompt blueprint today.
-- The only reader of the config-derived style is `render_template(templating_style=...)`; `get_prompting_style` (`system/configuration/configs.py:84`) is a cheap pure lookup — recomputing per run instead of caching is free and is the *correct* behavior (a deck/config change in-process takes effect on the next run instead of being shadowed by the first run's cache).
+### The measurement, and the correction it forces
 
-**Changes:**
+The plan asserted "a code generation plus an `exec()` per structured call". **That is wrong**, and the number says so: `SchemaToModelFactory.make_from_json_schema` memoizes on a sha256 of the schema, so the cost is per *distinct structure per process*, not per call. Measured on a representative `StructuredContent` (mixed primitives, an optional, a nested `$defs` list):
 
-1. `pipe_llm.py::_live_run_operator_pipe`: replace the cache-guard block (lines 226-234) with a local:
+| | before | after |
+|---|---|---|
+| first structure in a process (one-time `datamodel-code-generator` warmup + codegen + `exec()`) | ~81 ms | 0 |
+| each additional distinct structure | ~6–7 ms | 0 |
+| repeat call on an already-seen structure | ~0.01 ms (cache hit) | 0 |
 
-   ```python
-   templating_style: TemplatingStyle | None = None
-   if inference_model := model_deck.get_optional_inference_model(model_handle=llm_setting_main.model, model_type=ModelType.LLM):
-       prompting_target = llm_setting_main.prompting_target or inference_model.prompting_target
-       templating_style = get_config().pipelex.prompting_config.get_prompting_style(prompting_target=prompting_target)
-   ```
+So the throughput win is real but small and front-loaded: ~81 ms + ~7 ms × (N−1) per process for a method with N distinct structured outputs, and effectively nothing per call after warm-up. **The fidelity fix is the reason to do this; the saved `exec()` perimeter and the codegen are the bonus.** Please weigh it that way — this is not a performance change.
 
-   Pass `templating_style=templating_style` to **both** `make_llm_prompt` calls (text branch line ~252, object branch line ~297). Keep the existing TODO comment about external LLM plugins having no inference model.
-2. `llm_prompt_blueprint.py::make_llm_prompt`: add keyword-only param `templating_style: TemplatingStyle | None = None`; thread it to both `_unravel_text` calls (system prompt line ~230, user prompt line ~242).
-3. `llm_prompt_blueprint.py::_unravel_text`: add the same param; delete the write-back (lines 358-360); compute the effective style into a local and hand it to `render_template`:
+`schema_to_model_factory.py`'s module docstring now opens by saying when its perimeter is actually walked: only when no live class is in hand, which is also the only case where the schema is attacker-influenceable. Its Layer 2 restricted builtins are explicitly *not* a sandbox (`().__class__.__base__.__subclasses__()` stays reachable), so not walking it where nothing crossed a boundary is worth having on its own.
 
-   ```python
-   effective_style = jinja2_blueprint.templating_style or templating_style
-   ```
+### The three "verify rather than assume" items
 
-   Blueprint-declared style wins over the run-derived one — that is the evident intent of the old guard (`and not jinja2_blueprint.templating_style`), and it fixes the latent inconsistency where the blueprint's own style was respected by the write-back guard but then ignored by the render call. Behavior-identical today on the LLM path (the factory never sets the blueprint field), but now coherent.
-4. `llm_prompt_blueprint.py`: remove the `templating_style` field from `LLMPromptBlueprint` (line 30). It has no remaining reader or writer after 1-3.
-5. Default param stays `None` so the many existing `make_llm_prompt` call sites in `tests/integration/pipelex/pipes/llm_prompt_inputs/` keep working unchanged (they exercise image/document extraction, not styling).
+- **Kajson's `__kajson_class_source__`.** Nothing regresses. The attribute exists so kajson can rebuild the reconstructed class on the far side of a process boundary. In-process, the leaf's return value is immediately converted by `_revalidate_against_object_class` into an instance of the caller's real class and never serialized as the rebuild; in-tree the attribute is read only by `SchemaToModelFactory`'s own tests. The boundary path — the only one that ships the rebuilt class anywhere — is untouched.
+- **`_revalidate_against_object_class` on the fast path.** ⚠ **The plan got this one wrong, and both PR review bots caught it.** The plan said to keep the call and framed short-circuiting it as declining a *performance* saving. It is not a performance question: with the live class at the leaf, the provider (instructor's `response_model=`) already constructs **and validates** an instance of the caller's class, so re-validating the dump ran the caller's validators a **second** time, on data they had already normalized. A validator that transforms rather than rejects — `return f"INV-{value}"` — produced `INV-INV-…`; one that asserts its input is not yet normalized would reject valid provider output. Same defect on the list path and on the dry path. That is a regression this branch introduced, and it hit exactly the population the fix exists to serve. The fix is subtractive: `if isinstance(raw_obj, object_class): return raw_obj`. **`isinstance`, not `type(...) is`** — and not for defensiveness: instructor never returns the class you gave it, it returns `create_model(cls.__name__, __base__=(cls, OpenAISchema))`, a subclass. A `type(...) is` check would miss every real provider call and silently reinstate the double validation. `test_instructor_style_subclass_is_returned_without_revalidation` pins that. The call is still the boundary-path conversion (a schema-rebuilt class is never a subclass of `object_class`, so it falls through) and still the site that raises the dry fidelity error. The measured cost of the removed round trip is ~0.008 ms/object — nil, which is the point: the reason to short-circuit is semantic, not throughput.
+- **`DryRunObjectFidelityError` reachability.** It stops firing on the in-process object path and stays reachable on the boundary path and on the structured-search path, which always rebuilds. Not deleted; its tests were re-scoped rather than removed.
 
-**Non-goals:**
+### The behaviour change a reviewer should actually look at
 
-- `TemplateBlueprint` model and the compose / img-gen styling paths — untouched.
-- `WorkingMemory` mutation semantics (`set_new_main_stuff`) — separate concern, out of scope.
-- Other library-held-object mutation hazards, if any turn up — file them, don't fix them here.
+On the in-process path the mock is now built from the real class, so an invariant the schema round-trip used to drop is present at *build* time. The constrained fixture therefore fails earlier and with a different class: `DryRunMockBuildError` out of `build_mock_object`, instead of `DryRunObjectFidelityError` out of the re-validation. Both are `ErrorDomain.INPUT`, both are caller-facing, and both name the same `examples` / `mock_format` remedy — but it is a wire-visible `error_type` change on that path and it should be seen, not skimmed.
 
-## Phase 0 — Red tests (TDD)
+`test_dry_run_object_fidelity.py` was rewritten around exactly this split: it asserts the fidelity error against the boundary composition (leaf with no class in hand → re-validate, the same comprehension shape `make_object_list` uses), and asserts the build error in-process.
 
-- [x] New test module, e.g. `tests/unit/pipelex/pipe_operators/pipe_llm/test_prompt_rendering_purity.py`:
-  - [x] **Blueprint-level purity:** build an `LLMPromptBlueprint` with a `prompt_blueprint` `TemplateBlueprint`, snapshot `spec.model_dump()`, `await make_llm_prompt(...)` with a style passed in (and a minimal context provider — reuse whatever the `llm_prompt_inputs` integration tests use), assert `template_blueprint.templating_style is None` afterward and `spec.model_dump()` is unchanged. This is the executed proof from the problem statement, inverted into a regression test.
-  - [x] **Effective-style precedence:** a `TemplateBlueprint` with an explicit `templating_style` renders with its own style even when a different one is passed in; a blueprint without one renders with the passed style. Assert via the rendered output or by monkeypatching/spying `render_template` — whichever the existing test idiom supports (check `tests/unit/pipelex/tools/test_template_content_rendering.py` for the established pattern).
-  - [x] **Pipe-level purity (site 1):** run a `PipeLLM` in dry mode, snapshot `pipe.model_dump()` before and after, assert identical. Dry run boots without inference; follow the boot pattern used by existing dry-run tests.
-- [x] Run the new module only (`.venv/bin/pytest -x -q <module>`), confirm the purity tests are **red** against the current code (the precedence test may need the new param to exist first — it can start as red-on-TypeError).
+### Tests
 
-## Phase 1 — Implement
+- **Identity, not equality** — `test_object_class_passthrough.py` asserts the provider receives *the same class object* (`schema is HintedName`), never a structurally-equal one. Structural equality is precisely what the round trip already preserved, so an equality assertion would have passed against the bug.
+- **A validator that transforms, asserted to run exactly once** (`NormalizedReference`, `INV-` prefix). The original test suite used only a *rejecting* validator, which is idempotent and therefore structurally blind to double execution — which is why the double-validation regression above got past it. Both new tests were confirmed red without the `isinstance` short-circuit and green with it.
+- A model carrying a custom validator and `json_schema_extra` hints reaches the provider with both intact, asserted observably (the received class rejects the invalid value; its schema still carries the hint).
+- A **control** test proves the loss is real: with no class in hand, the rebuilt class *accepts* data the author's class rejects.
+- The list path asserts the wrapper's item annotation is the caller's class, on both arms.
+- Both run modes take the same path, asserted directly.
 
-- [x] Changes 1-4 above, in one pass (they are interlocking; the field removal is what makes the compiler/type-checker find any reader the grep missed).
-- [x] Re-grep `templating_style` across `pipelex/` to confirm the only remaining occurrences are `TemplateBlueprint`, the compose/img-gen paths, jinja2 plumbing, and config.
-- [x] New params are keyword-only (both methods already have `*`-sections — add the param after `*`).
-- [x] Run the Phase 0 module: all green.
+---
 
-## Phase 2 — Gates, docs, changelog
+## Item 2 — `FuncRegistry.register_function` silently overwrote
 
-- [x] `make agent-check` — includes the mthds-schema regen; inspect the `derived/mthds_schema.json` diff. Expected: no change (`LLMPromptBlueprint` is factory-built, not part of the parse surface). If it *does* change, stop and reassess — that would mean the field was on a documented surface after all.
-- [x] `git diff` review: no stray edits, no leftover guard at `pipe_llm.py:226`.
-- [x] Grep `docs/` for `templating_style` / prompting-style caching claims; update anything that describes the old cache-on-first-run behavior.
-- [x] `CHANGELOG.md` under `[Unreleased]`:
-  - Fixed: rendering an LLM prompt no longer mutates the library-held pipe (`templating_style` write-backs removed); a pipe's serialized form is now identical before and after runs, and in-process config/deck changes take effect on the next run instead of being shadowed by a first-run cache.
-  - Changed (breaking): `LLMPromptBlueprint` no longer has a `templating_style` field; `make_llm_prompt` takes the style as a parameter.
-- [x] `make agent-test` — full suite.
+### What was wrong
 
-## Checkpoint — wrap-up
+On a key collision, `register_function` logged and then overwrote anyway. `log()` is `self._logger.debug(...)`, so under any normal configuration the collision produced no visible output at all — and the assignment ran on both branches, so the `if` distinguished only the wording.
 
-- [x] Update this file: mark phases done, record any deviations from the design (especially if the schema diff or the doc grep turned something up).
-- [x] Commit on `refactor/Determinism`. Do not push or open a PR without explicit go-ahead.
+Three facts made it reachable rather than theoretical: the registry is a flat, process-global `dict[str, Callable]`, so there is one key space for every source that ever registers; registration names are unqualified (the `@pipe_func` custom name if given, otherwise the bare `func.__name__` — no module, no package, no library prefix); and registration is driven by scanning the configured library directories.
 
-## Verification log
+**The asymmetry gives it away.** `unregister_function` and `unregister_function_by_name` *raise* `FuncRegistryError` when a name is absent. Removing something that was never there was a hard error; replacing something that is there was a debug line.
 
-Each "key fact" the design said to verify cheaply, and how it actually checked out:
+### The failure
 
-- **One writer, no stray readers.** A tree-wide grep for `templating_style` (py/toml/mthds/json/md) confirms `LLMPromptBlueprint.templating_style` had exactly one writer (`pipe_llm.py:232`) and two readers, both inside `_unravel_text`. Zero references in tests, docs, or the schema. Confirmed removable.
-- **The factory never sets it.** `pipe_llm_factory.py` contains no occurrence of `templating_style` at all; it builds `LLMPromptBlueprint` without the field and its `TemplateBlueprint`s without a style.
-- **Nothing on the LLM path can declare a blueprint-level style.** `PipeLLMBlueprint.prompt` and `system_prompt` are plain `str | None` — no nested template section, unlike PipeCompose's `template`. So the new precedence rule (`jinja2_blueprint.templating_style or templating_style`) is unreachable-by-declaration on the LLM path today, and the change is a coherence fix rather than a live behavior change. Worth re-checking if PipeLLM ever gains a rich prompt section.
-- **The dry path really does reach the mutating code.** `PipeLLM` does not override `_dry_run_operator_pipe`, and the `PipeOperator` default delegates to `_live_run_operator_pipe`. This is what makes the dry-run purity test a valid guard on site 1 rather than a vacuous pass.
-- **The mutation is observable with the default deck.** Probed before writing the test: the default text model resolves to `claude-4.6-sonnet`, whose `LLMSetting.prompting_target` is `None` but whose `InferenceModelSpec.prompting_target` is `anthropic`, deriving a real `xml/plain` style. Had both been `None` the write-back would have been `None`-over-`None` and the pipe-level test would have passed against the unfixed code. Confirmed red for the right reason before implementing (the failure diff named `llm_prompt_spec`).
-- **Schema untouched.** `derived/mthds_schema.json` is gitignored, so a snapshot/compare was used instead of `git diff`: byte-identical across the regen, and `LLMPromptBlueprint` appears in it **zero** times — it is factory-built and was never on the parse surface, exactly as the design predicted.
-- **Docs clean.** No page describes the cache-on-first-run behavior. The prompting-style page documents only `PromptingConfig` and `get_prompting_style` (both unchanged); `features/llm-integration.md` says provider-specific formatting is applied "automatically", which stays true and is now more accurate. No doc edit needed.
+Two library directories — or a library plus an installed package — each defining a `@pipe_func` named `summarize` produced a registry containing one of them, chosen by scan order. Every `PipeFunc` step naming `summarize` then ran the winner, including steps authored against the loser, with no warning at author time, boot time, or run time. Scan order comes from the filesystem and `pkgutil`, so which one wins could differ between two machines running the same code.
 
-## Deviations from the design
+### What changed
 
-- **Precedence asserted through rendered output, not a spy.** The design left the choice open. Observing the output is stronger and needs no mocking: the XML tag style wraps an `@variable` in `<name>…</name>` while NO_TAG inlines it bare, so the rendered text names the style that actually governed. The test is parametrized over three cases, including a negative one (passed NO_TAG really applies) so the two positive cases can't both pass by accident.
-- **`TemplatingStyle` in `pipe_llm.py` sits in a `TYPE_CHECKING` block.** It is used only in a local-variable annotation, so ruff's `TC001` requires it; the module had no `TYPE_CHECKING` block before and gained one (with `TYPE_CHECKING` added to the `typing` import). Local annotations aren't evaluated at runtime, so this is safe. `llm_prompt_blueprint.py` keeps its runtime import — there the name appears in method signatures on a `BaseModel`.
-- **The `log.verbose` line changed meaning.** It was `"Setting prompting style to …"`, emitted only when the cache was written; it is now `"Rendering with prompting style …"`, emitted on every render (including when the effective style is `None`). Intentional: with the cache gone there is no "setting" event to report, and the per-render line is the more useful trace.
-- **One tuple-vs-string lint nit.** `pytest.mark.parametrize` takes a tuple of names in this repo (ruff `PT006`), not the comma-separated string shown in `.claude/rules/pytest-standards.md`.
+A collision now raises `FuncRegistryError` naming the key, both origins, and the remedy (`@pipe_func(name=...)`). The registry already raised on the symmetric case, so this is consistency, not a new posture.
 
-## Follow-ups (not done here, per the non-goals)
+### The two open questions, answered by reading the code
 
-- `WorkingMemory` mutation semantics (`set_new_main_stuff`) — untouched, separate concern.
-- No other library-held-object mutation hazard surfaced during the grep sweep. The `resolve_dynamic_output_stuff_spec` purity docstring noted in the problem statement is now accurate for the whole run method, not just that one helper.
+- **Is re-registering the *same* function object a collision?** No — it is a no-op. This is the shape the double-scan actually produces: `import_module_from_file` keys `sys.modules` by a name mangled from the file's **absolute path**, so a folder scanned twice returns the cached module and therefore the *same* function object. Two distinct objects under one key is the only shape that indicates a real clash. Pinned by `test_rescanning_the_same_folder_is_idempotent`.
+- **Does any first-party code deliberately overwrite?** No — `pipelex/` defines no `@pipe_func` of its own, so nothing registers a builtin expecting a user function to replace it. **No `replace=True` parameter was added**; with no caller for it, it would have been a speculative surface.
+
+### ⚠ The one place this narrows a path that used to work
+
+`LibraryManager.teardown(library_id=…)` does **not** clear `func_registry` — only `RuntimeBoot.teardown` does. So in a long-lived process that loads bundle A, tears it down, then loads bundle B, a registration name shared by both now collides with A's **stale** entry and B fails to load until the process restarts. Previously the overwrite was silent and B won, which for the sequential case was right.
+
+Tracing the hosts shows **no first-party process can reach this today**: a direct-mode `pipelex-api`'s library dirs are process-constant (per-request `ApiRunner()` passes `library_dirs=None`, resolving to boot-time defaults or `PIPELEXPATH`, and inline `.mthds` text registers no functions), the local MCP workshop is a TypeScript client that runs no pipelex in-process, and the hosted runner is immune (it takes the source-capture branch and never registers in-process). The exposed population is a third-party embedder varying `library_dirs` per call in one long-lived process — a public surface, so the narrowing is real, but the failure there is loud and typed, not silent. Two loads of the *same* bundle are fine — the module is cached by absolute path, so the same object re-registers and the idempotent no-op absorbs it.
+
+Not fixed here, and not because it is unimportant: there is no small correct fix. `func_registry` is a flat process-global dict with **no ownership dimension**, so per-library eviction has nothing to key on — note that each `Library` already owns its own `ClassRegistry`, and functions never got the same treatment. The remedy (ownership side table, id threaded through registration, eviction on teardown, rollback on a failed scan) is a design change that deserves its own review, not a late addition to this branch. Written up in `wip/refactoring/func-registry-entries-outlive-their-library.md`. **Ruled 2026-07-31: non-blocking.** With no first-party path reachable (see above) and the third-party failure mode loud and typed, this PR ships with the gap documented and the ownership design lands as its own follow-up PR.
+
+### One reachability check worth recording
+
+The transported PipeFunc path (`DirectPipeFuncExecutor.run_pipe_func_transported`) materializes customer sources into a fresh `mkdtemp` workdir, which *would* yield a different function object under the same name on a second run in one process. It stays safe because that path is one-shot per process: `pipe_func_transported_entrypoint` runs exactly one request and then calls `Pipelex.teardown_if_needed()`, which clears the registry. Recorded here so a reviewer does not have to re-derive it.
+
+### Tests
+
+Two distinct functions under one name raise, and the message names both sources; the same function object registered twice is a no-op; an ineligible function still routes to `register_ineligible_function` and does not participate in collision detection; and end to end, two library directories defining the same function name fail the scan with the typed error instead of silently picking one.
+
+---
+
+## Deliberately not done
+
+Each of these is a plausible-looking scope expansion that was declined on purpose.
+
+- **Not replacing `exec()` with `pydantic.create_model()`.** That is the standing TODO at `schema_to_model_factory.py` and a larger change with its own compatibility surface (`__kajson_class_source__` exists because the generated source is shipped verbatim). Item 1 makes that TODO matter *less* by not walking the path in-process; it does not close it, and the docstring does not imply otherwise.
+- **Not namespacing the function registry by module.** Qualified names would remove the collision class entirely, but `function_name` is authored in `.mthds` files, so that is a language decision, not a registry fix.
+- **Not changing `ObjectAssignment`'s wire shape.** Anything that alters the payload an orchestrator plugin sends belongs in its own change, argued on its own terms.
+- **Not extending the fix to the in-process structured-*search* path.** `make_search_structured` holds `output_structure_class` and does not thread it down, so `PipeSearch` with a structured output still loses the docstring, validators and `json_schema_extra` hints to the rebuild. It is the same bug in the same shape, roughly four lines away — declined here rather than in scope creep, because it changes a *second* error-class surface the same way the object path's did (fidelity error → build error), which needs its own test re-scoping and its own review pass rather than riding in on a branch that is already bot-clean. Deferred to `wip/refactoring/structured-search-still-rebuilds-in-process.md`.
+- **Not auditing the *boundary* arm of `_revalidate_against_object_class`.** Its `model_dump(serialize_as_any=True)` → `model_validate` round trip is not identity-preserving in general (subclass erasure; dumped-by-field-name data that only revalidates thanks to `populate_by_name=True` and a compensating before-validator elsewhere). Pre-existing, unchanged here, must stay — it *is* the boundary conversion. Deferred to `wip/refactoring/boundary-revalidation-round-trip-is-unaudited.md`.
+
+## Cross-repo
+
+⚠ **An earlier revision of this file claimed "checked, nothing to change". That claim was false, and the reason is worth knowing: a workspace-rooted `grep -r … .` silently returned zero matches while iterating the sibling repo directories explicitly returned 71.** The sweep below was redone by enumerating `*/` one directory at a time. Never trust a single `.`-rooted recursive grep for a cross-repo sweep here.
+
+**`cocode` breaks on upgrade — release-gated, needs a follow-up PR in that repo.** `cocode/cocode/pipelines/doc_proofread/file_utils.py` carries `@pipe_func()` *and* a redundant module-level `func_registry.register_function(read_file_content, name="read_file_content")`. `cocode/cocode/swe/swe_cmd.py:18` dotted-imports that module at CLI startup, registering object **A**; `PIPELINE_LIBRARY_DIRS` then makes the same directory a library dir, so the boot scan re-imports the file under a path-mangled `sys.modules` key, the module-level call fires again with object **B**, and the new collision check raises. Every `cocode` command would die at first `load_libraries`. Shielded only by cocode's `pipelex==0.41.0` pin. The fix belongs in cocode and is a deletion: the `@pipe_func()` decorator already covers the registration, so the explicit call is redundant belt-and-braces. `cocode/cocode/pipelines/text_utils.py:81` is the same shape but currently latent — it has no `@pipe_func`, so the scan's AST pre-check skips the file entirely.
+
+Checked and clean:
+
+- The private Temporal plugin's `act_llm_gen_object` / `act_llm_gen_object_list` call `llm_gen_object(object_assignment=...)` with no class, so they take the boundary path unchanged. Its `content_generator_in_workflow.py` comment describing the reconstruction stays accurate for that path.
+- `pipelex-transport` and `pipelex-mistralai-workflows` bridge conftests register module-level function objects with teardown — the idempotent case.
+- `pipelex-demo-mistral` / `pipelex-demo-vibe` register `flaky_echo` explicitly, and it carries no `@pipe_func` decorator, so the folder scan's AST pre-check never imports the file. One registration per process.
+- The only `llm_gen_object` mention in `docs/specs/` is the `UnitJobId` string value, which did not change.
+
+## Docs touched
+
+- `docs/building-methods/pipes/pipe-operators/PipeFunc.md` — new "Function names share one flat name space" section.
+- `docs/under-the-hood/dry-run-mock-generation.md` — the dry object leaf resolves its class the same way the live leaf does; which typed error you get on which path.
+- `docs/under-the-hood/distributed-content-generation.md` — reconstruction is the boundary answer and only that; the type bridge is kept in-process on purpose.

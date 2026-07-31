@@ -47,20 +47,35 @@ def _revalidate_against_object_class(
     object_class: type[BaseModelTypeVar],
     is_mock_built: bool,
 ) -> BaseModelTypeVar:
-    """Re-validate a leaf-generated object's data against the original ``object_class``.
+    """Convert a leaf-generated object into ``object_class``, unless it already is one.
 
-    ``llm_gen_object`` / ``llm_gen_object_list`` return plain ``BaseModel``s reconstructed from the JSON
-    schema; re-validating their data against the original class makes the result the proper subtype (e.g.
+    On the in-process path the leaf worked from ``object_class``, so the object is already one — note
+    ``isinstance``, not ``type(...) is``: instructor does not hand back the class you gave it, it hands
+    back ``create_model(cls.__name__, __base__=(cls, OpenAISchema))``, a *subclass*. Either way it needs
+    no conversion — and re-validating it would run the caller's validators a **second** time, on data
+    they already normalized. A validator that transforms rather than merely rejects (``f"INV-{value}"``, a
+    list that gets a default appended) would corrupt its own output, and one that asserts its input is
+    not yet normalized would reject valid provider output. Returning it untouched is what makes the
+    caller's validator constrain the provider exactly once, which is the whole point of handing the live
+    class down.
+
+    The conversion is still needed at the *boundary*: a leaf that ran on a worker holding only the
+    serialized assignment returns a plain ``BaseModel`` reconstructed from the JSON schema — never a
+    subclass of ``object_class`` — so re-validating its data makes the result the proper subtype (e.g.
     ``StructuredContent``) the caller expects.
 
-    Under the dry-run leaf mock (``run_mode=DRY``) the object was built by polyfactory from
-    the schema-reconstructed class, which can drop invariants the original class enforces (custom
-    validators, ``json_schema_extra`` format/pattern hints datamodel-code-generator omits on round-trip).
-    A re-validation failure there is the known object-mock fidelity gap, so the ``ValidationError`` is
+    Under the dry-run leaf mock (``run_mode=DRY``) that reconstruction is also what polyfactory built the
+    mock from, and it can drop invariants the original class enforces (custom validators,
+    ``json_schema_extra`` format/pattern hints datamodel-code-generator omits on round-trip). A
+    re-validation failure there is the known object-mock fidelity gap, so the ``ValidationError`` is
     re-raised as a clear typed :class:`DryRunObjectFidelityError` naming the class and the
-    ``examples`` / ``mock_format`` remedy. The catch is scoped to the dry path only — a LIVE provider's
-    invalid output keeps its existing ``ValidationError``.
+    ``examples`` / ``mock_format`` remedy. That gap cannot occur in-process — the mock is built from the
+    real class, so an unsatisfiable invariant fails earlier and louder, as ``DryRunMockBuildError`` out of
+    ``build_mock_object``, and never reaches this function. The catch is scoped to the dry path only — a
+    LIVE provider's invalid output keeps its existing ``ValidationError``.
     """
+    if isinstance(raw_obj, object_class):
+        return raw_obj
     raw_data = raw_obj.model_dump(serialize_as_any=True)
     if not is_mock_built:
         return object_class.model_validate(raw_data)
@@ -129,7 +144,7 @@ class ContentGenerator(ContentGeneratorProtocol):
             object_class=object_class,
             llm_assignment=llm_assignment_for_object,
         )
-        raw_obj = await llm_gen_object(object_assignment=object_assignment)
+        raw_obj = await llm_gen_object(object_assignment=object_assignment, object_class=object_class)
         log.verbose(f"{self.__class__.__name__} generated object direct: {raw_obj}")
         return _revalidate_against_object_class(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry)
 
@@ -156,7 +171,7 @@ class ContentGenerator(ContentGeneratorProtocol):
             llm_assignment=llm_assignment_for_object,
             nb_items=nb_items,
         )
-        raw_list = await llm_gen_object_list(object_assignment=object_assignment)
+        raw_list = await llm_gen_object_list(object_assignment=object_assignment, object_class=object_class)
         log.verbose(f"{self.__class__.__name__} generated object list direct: {raw_list}")
         return [
             _revalidate_against_object_class(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry)

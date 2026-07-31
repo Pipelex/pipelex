@@ -51,6 +51,8 @@ The schema is a plain `dict` — fully serializable, inspectable on the wire, an
 
 ### Schema-to-model reconstruction
 
+Reconstruction is the *boundary* answer, and only that. An in-process run never walks it: `ContentGenerator` passes the caller's live class down beside the assignment, and `resolve_object_class` (`pipelex/cogt/content_generation/object_class_resolution.py`) uses it as-is. That matters because the rebuild is lossy — custom validators, `json_schema_extra` hints, and the output structure's own description do not survive the round trip — so in-process the provider would otherwise be constrained by a weaker contract than the author wrote, for no reason. On a worker there is no choice: the class genuinely cannot travel, so the rebuild below is the right answer there.
+
 On the worker, `SchemaToModelFactory.make_from_json_schema(schema, *, class_name)` (`pipelex/cogt/content_generation/schema_to_model_factory.py`) rebuilds a live Pydantic class from the embedded schema:
 
 ```python
@@ -103,11 +105,11 @@ Re-attaching after `kajson.loads()` ensures the source survives if the object cr
 The class reconstructed on the worker is a structural match to the original, but a different Python class in memory — so `isinstance()` checks would fail. The caller bridges the gap with a `model_validate` round-trip (`pipelex/cogt/content_generation/content_generator.py`):
 
 ```python
-raw_obj = await llm_gen_object(object_assignment=object_assignment)
+raw_obj = await llm_gen_object(object_assignment=object_assignment, object_class=object_class)
 return object_class.model_validate(raw_obj.model_dump(serialize_as_any=True))
 ```
 
-`model_dump(serialize_as_any=True)` produces a plain dict from the reconstructed object, and `model_validate()` rebuilds it as a proper instance of the original class, restoring type safety for downstream code.
+`model_dump(serialize_as_any=True)` produces a plain dict from the reconstructed object, and `model_validate()` rebuilds it as a proper instance of the original class, restoring type safety for downstream code. The bridge is kept on the in-process path too, where it becomes a same-type conversion: it is still the site that raises the typed dry-run fidelity error, and it is what makes the two paths return the same thing.
 
 ### Structured web search reuses the same mechanism
 

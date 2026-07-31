@@ -1,15 +1,18 @@
 """Integration tests for the ``run_mode == DRY`` object mocks at the cogt leaf.
 
-The dry object mock is built from the **schema-reconstructed** class — the single schema-based
-mock site shared by both backends (pre-flight decision 2), exercising real datamodel-code-generator
-codegen. Contracts pinned here:
+These call the leaves with no live class in hand, so the mock is built from the **schema-reconstructed**
+class (pre-flight decision 2), exercising real datamodel-code-generator codegen. Contracts pinned here:
 
 - a representative ``StructuredContent`` mocks into a valid instance of the original class
   (the object-mock fidelity pin mandated by pre-flight decision 2);
 - ``nb_items`` carried on ``ObjectAssignment`` controls the dry list length, falling back to
   ``dry_run_config.nb_list_items`` (eng review D11);
-- a hidden invariant the schema round-trip drops surfaces as ``DryRunObjectFidelityError`` (eng review D6);
-- the structured-search dry leaf returns a dict that validates against the original class.
+- the structured-search dry leaf returns a dict that validates against the original class, and a hidden
+  invariant the schema round-trip drops there surfaces as ``DryRunObjectFidelityError`` (eng review D6).
+
+The object leaf's own fidelity arms live in ``test_dry_run_object_fidelity.py``, which separates the
+boundary case (still schema-rebuilt, still the fidelity error) from the in-process case (built from the
+caller's real class).
 
 No provider is ever called (the leaves short-circuit before any worker), so no inference marker.
 """
@@ -130,20 +133,6 @@ class TestLeafDryObjectMocks:
 
         assert len(result) == 3
         assert all(isinstance(item, RepresentativeInvoiceLine) for item in result)
-
-    async def test_generator_dry_arm_raises_typed_fidelity_error(
-        self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol
-    ) -> None:
-        """The DRY arm of the fidelity wrapper fires (D6): a dropped invariant surfaces as the typed error."""
-        with pytest.raises(DryRunObjectFidelityError) as exc_info:
-            await content_generator.make_object(
-                job_metadata=job_metadata,
-                cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
-                object_class=ConstrainedName,
-                llm_setting_for_object=LLMSetting(model="gpt-4o", temperature=0.5),
-                llm_prompt_for_object=LLMPrompt(user_text="make a prefixed name"),
-            )
-        assert ConstrainedName.__name__ in str(exc_info.value)
 
     async def test_dry_search_structured_fidelity_gap_raises_typed_error(
         self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol
