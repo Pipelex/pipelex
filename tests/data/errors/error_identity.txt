@@ -98,6 +98,7 @@ GatewayDoNotTrackConflictError | Gateway do not track conflict | https://docs.pi
 GatewayError | Gateway | https://docs.pipelex.com/latest/errors/gateway-error/
 GatewayExtractResponseError | Gateway extract response | https://docs.pipelex.com/latest/errors/gateway-extract-response-error/
 GatewayFactoryError | Gateway factory | https://docs.pipelex.com/latest/errors/gateway-factory-error/
+GatewaySearchEmptyResultError | Gateway search empty result | https://docs.pipelex.com/latest/errors/gateway-search-empty-result-error/
 GatewaySearchResponseError | Gateway search response | https://docs.pipelex.com/latest/errors/gateway-search-response-error/
 GatewayTelemetryManagerInjectedError | Gateway telemetry manager injected | https://docs.pipelex.com/latest/errors/gateway-telemetry-manager-injected-error/
 GatewayTermsNotAcceptedError | Gateway terms not accepted | https://docs.pipelex.com/latest/errors/gateway-terms-not-accepted-error/
@@ -149,6 +150,8 @@ LLMSettingsValidationError | LLM settings validation | https://docs.pipelex.com/
 LangfuseCredentialsError | Langfuse credentials | https://docs.pipelex.com/latest/errors/langfuse-credentials-error/
 LibraryError | Library error | https://docs.pipelex.com/latest/errors/library-error/
 LibraryLoadingError | Library loading | https://docs.pipelex.com/latest/errors/library-loading-error/
+LinkupError | Linkup | https://docs.pipelex.com/latest/errors/linkup-error/
+LinkupSearchEmptyResultError | Linkup search empty result | https://docs.pipelex.com/latest/errors/linkup-search-empty-result-error/
 LinkupSearchResponseError | Linkup search response | https://docs.pipelex.com/latest/errors/linkup-search-response-error/
 ListWhereSingularError | List where singular | https://docs.pipelex.com/latest/errors/list-where-singular-error/
 MissingBundleValidatorError | Missing bundle validator | https://docs.pipelex.com/latest/errors/missing-bundle-validator-error/
@@ -177,6 +180,7 @@ NestedKeyConflictError | Nested key conflict | https://docs.pipelex.com/latest/e
 NullInputError | Null input | https://docs.pipelex.com/latest/errors/null-input-error/
 OpenAIClientFactoryError | OpenAI client factory error | https://docs.pipelex.com/latest/errors/open-ai-client-factory-error/
 OptionalValueAbsentError | Optional value absent | https://docs.pipelex.com/latest/errors/optional-value-absent-error/
+OutputStructureSchemaError | Output structure schema | https://docs.pipelex.com/latest/errors/output-structure-schema-error/
 PipeBatchFactoryError | Pipe batch factory | https://docs.pipelex.com/latest/errors/pipe-batch-factory-error/
 PipeComposeError | Pipe compose | https://docs.pipelex.com/latest/errors/pipe-compose-error/
 PipeComposeFactoryError | Pipe compose factory | https://docs.pipelex.com/latest/errors/pipe-compose-factory-error/

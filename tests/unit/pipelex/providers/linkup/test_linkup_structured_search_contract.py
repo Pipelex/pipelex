@@ -21,11 +21,11 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from pydantic import BaseModel, Field, field_validator
 
+from pipelex.providers.linkup.linkup_exceptions import LinkupSearchEmptyResultError, LinkupSearchResponseError
+from pipelex.providers.linkup.linkup_search_worker import LinkupSearchWorker
+
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
-
-from pipelex.providers.linkup.exceptions import LinkupSearchResponseError
-from pipelex.providers.linkup.linkup_search_worker import LinkupSearchWorker
 
 
 class TopicSummary(BaseModel):
@@ -38,6 +38,13 @@ class TopicSummary(BaseModel):
     @classmethod
     def _require_prefix(cls, value: str) -> str:
         return f"INV-{value}"
+
+
+class AllDefaults(BaseModel):
+    """An output structure with no required field — the shape that makes a wrong payload validate silently."""
+
+    title: str = "untitled"
+    summary: str = ""
 
 
 def _make_worker(mocker: MockerFixture, *, sdk_result: Any) -> LinkupSearchWorker:
@@ -102,6 +109,34 @@ class TestLinkupStructuredSearchContract:
         # The caller's transforming validator has not run yet — it runs once, when the leaf validates.
         validated = TopicSummary.model_validate(result)
         assert validated.title == "INV-pipelex"
+
+    async def test_an_unrequested_envelope_is_unwrapped_rather_than_silently_validated(self, mocker: MockerFixture) -> None:
+        """Not requesting sources is not the same as not receiving them, and the difference is silent.
+
+        Asking `include_sources=False` is a request, not a guarantee — the SDK's own source hedges on it
+        ("we assume that include_sources will default to False, since the API output can be arbitrary").
+        A provider that ignores the flag hands back the envelope, and an output structure whose fields all
+        carry defaults validates that envelope *successfully* into an all-defaults object, because
+        pydantic's default `extra="ignore"` drops both keys. That is wrong answers with no error, so the
+        shape is recognised rather than assumed.
+        """
+        payload = {"title": "pipelex", "summary": "a language"}
+        envelope = {"data": payload, "sources": [{"name": "src", "url": "https://example.com", "snippet": "…"}]}
+        worker = _make_worker(mocker, sdk_result=envelope)
+
+        result = await worker._search_structured(search_job=_make_search_job(mocker), schema=AllDefaults)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert result == payload
+        # What the guard prevents: validating the envelope instead would have succeeded and thrown the
+        # provider's real answer away.
+        assert AllDefaults.model_validate(envelope).title == "untitled"
+
+    async def test_an_envelope_carrying_no_payload_raises_an_empty_result_error(self, mocker: MockerFixture) -> None:
+        """A search that found nothing is not a malformed response — it must not advise changing model."""
+        worker = _make_worker(mocker, sdk_result={"data": None, "sources": []})
+
+        with pytest.raises(LinkupSearchEmptyResultError, match="empty structured result"):
+            await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
     async def test_a_non_object_payload_raises_a_classified_search_error(self, mocker: MockerFixture) -> None:
         """The SDK returns the provider's JSON verbatim, so a non-object payload must surface here as a classified error, not at the leaf."""

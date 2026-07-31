@@ -20,13 +20,13 @@ No provider is ever called (the leaves short-circuit before any worker), so no i
 """
 
 import pytest
-from pydantic import field_validator
+from pydantic import ConfigDict, field_validator
 
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment, SearchAssignment, SearchObjectAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.content_generation.dry_mock import dry_llm_gen_object, dry_llm_gen_object_list
-from pipelex.cogt.content_generation.exceptions import DryRunMockBuildError, DryRunObjectFidelityError
+from pipelex.cogt.content_generation.exceptions import DryRunMockBuildError, DryRunObjectFidelityError, OutputStructureSchemaError
 from pipelex.cogt.content_generation.object_revalidation import revalidate_leaf_data
 from pipelex.cogt.content_generation.search_generate import search_gen_structured
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -54,6 +54,19 @@ class StructuredAnswer(StructuredContent):
 
     answer: str
     confidence: float
+
+
+class OpaqueWidget:
+    """A type pydantic can hold but cannot describe as JSON Schema."""
+
+
+class UndescribableOutput(StructuredContent):
+    """Output structure polyfactory can mock but no provider can be given a schema for."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    label: str
+    widget: OpaqueWidget
 
 
 class NormalizedAnswer(StructuredContent):
@@ -179,6 +192,25 @@ class TestLeafDryObjectMocks:
             )
         assert ConstrainedName.__name__ in str(exc_info.value)
         assert "mock_format" in str(exc_info.value)
+
+    async def test_in_process_dry_search_structured_rejects_an_output_class_with_no_json_schema(
+        self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol
+    ) -> None:
+        """The dry run has to be what catches a class no provider can be given a schema for.
+
+        Polyfactory mocks such a class happily, so nothing else on the dry path notices — and carrying the
+        caller's class down removed the ``model_json_schema()`` call that used to ride along inside
+        ``SearchObjectAssignment.make_for_class``. Without this the live run would die inside the worker on
+        a bare ``PydanticInvalidForJsonSchema``, which is a ``RuntimeError``: no model attribution, no
+        remedy, no error identity. The boundary arm still builds the assignment, so skipping the check
+        here would also make a dry-run verdict depend on how the method is deployed.
+        """
+        with pytest.raises(OutputStructureSchemaError) as exc_info:
+            await content_generator.make_search_structured(
+                output_structure_class=UndescribableOutput,
+                search_assignment=self._dry_search_assignment(job_metadata),
+            )
+        assert UndescribableOutput.__name__ in str(exc_info.value)
 
     async def test_in_process_dry_search_structured_runs_the_caller_validators_exactly_once(
         self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol

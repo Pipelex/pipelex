@@ -1,6 +1,6 @@
 import json
 from datetime import date
-from typing import Any, cast
+from typing import Any
 
 from linkup import (
     LinkupAuthenticationError,
@@ -23,10 +23,11 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_job import SearchJob
 from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
+from pipelex.cogt.search.structured_search_payload import extract_structured_search_payload
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
-from pipelex.providers.linkup.exceptions import LinkupSearchResponseError
+from pipelex.providers.linkup.linkup_exceptions import LinkupSearchEmptyResultError, LinkupSearchResponseError
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.runtime_hub import get_secrets_provider
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
@@ -165,22 +166,39 @@ class LinkupSearchWorker(SearchWorkerAbstract):
             search_tokens_usage.nb_tokens_by_category = {TokenCategory.INPUT: 1_000_000, TokenCategory.OUTPUT: 1_000_000}
 
         # The contract of a structured search is the structured payload itself — it is validated against
-        # the caller's output structure class, which has nowhere to put sources. Asking for them wrapped
-        # the payload in a {data, sources} envelope that no output class could accept, so this asks for
-        # the payload alone. (The gateway backend's relay still asks for sources; its worker unwraps the
-        # envelope on receipt — both backends hand the leaf the bare payload.)
+        # the caller's output structure class, which has nowhere to put sources. Asking for them wraps the
+        # payload in a {data, sources} envelope no output class could accept, so this asks for the payload
+        # alone — but it does not *trust* that flag. A provider that ignored it would hand back the
+        # envelope, and an output structure whose fields all carry defaults validates that envelope
+        # *silently* into an all-defaults object (pydantic's default `extra="ignore"` drops both keys), so
+        # the failure would be wrong answers rather than an error. The extractor recognises the envelope
+        # structurally instead, which is also what lets both backends share one rule.
         # The schema crossed as a string, so the SDK did no validation of its own: `response` is the
-        # provider's JSON verbatim, typed `Any`. Guard the shape here so a non-object payload surfaces
-        # as a classified search error naming the model, not as an opaque ValidationError at the leaf.
-        if not isinstance(response, dict):
-            msg = f"Linkup structured search returned a non-object payload of type '{type(response).__name__}'"
-            raise LinkupSearchResponseError(
+        # provider's JSON verbatim, typed `Any`.
+        payload = extract_structured_search_payload(response=response, schema=schema)
+        if payload is not None:
+            return payload
+        if isinstance(response, dict):
+            # The envelope was there but carried no object payload: the search ran and found nothing to
+            # fill the output structure with. That is the query's fault, not the model's — advising a
+            # model change here would send the user after the wrong thing.
+            msg = "Linkup structured search returned an empty structured result"
+            raise LinkupSearchEmptyResultError(
                 msg,
                 error_category=InferenceErrorCategory.UNKNOWN,
                 user_action=UserAction(
-                    kind=UserActionKind.CHANGE_MODEL,
-                    detail="Linkup returned a malformed structured search response — try a different model",
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="The search found nothing to fill your output structure — try a broader query or a wider date range",
                 ),
                 provider_metadata=None,
             )
-        return cast("dict[str, Any]", response)
+        msg = f"Linkup structured search returned a non-object payload of type '{type(response).__name__}'"
+        raise LinkupSearchResponseError(
+            msg,
+            error_category=InferenceErrorCategory.UNKNOWN,
+            user_action=UserAction(
+                kind=UserActionKind.CHANGE_MODEL,
+                detail="Linkup returned a malformed structured search response — try a different model",
+            ),
+            provider_metadata=None,
+        )

@@ -43,10 +43,16 @@ class SearchWorkerAbstract(InferenceWorkerAbstract):
         except CogtError as exc:
             exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
             raise
-
-        search_job.search_job_after_complete()
-        if self.reporting_delegate:
-            self.reporting_delegate.report_inference_job(inference_job=search_job)
+        finally:
+            # Completion and reporting belong on *every* way out, not just the happy one. A backend's
+            # response-shape guard raises after the provider already answered and after usage was
+            # recorded, so that call is billed — reporting only on success would make the spend vanish
+            # from the run's cost report. A failure that never reached the provider recorded no tokens
+            # (`search_job_before_start` initialises `nb_tokens_by_category` empty), so it reports as the
+            # zero-cost attempt it was rather than inventing a charge.
+            search_job.search_job_after_complete()
+            if self.reporting_delegate:
+                self.reporting_delegate.report_inference_job(inference_job=search_job)
 
         return result
 
@@ -67,10 +73,13 @@ class SearchWorkerAbstract(InferenceWorkerAbstract):
         except CogtError as exc:
             exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
             raise
-
-        search_job.search_job_after_complete()
-        if self.reporting_delegate:
-            self.reporting_delegate.report_inference_job(inference_job=search_job)
+        finally:
+            # Reported on every way out, for the reason spelled out in `search_sourced_answer` — and it
+            # bites hardest here, because this arm is the one whose response-shape guards reject a
+            # payload the provider already charged for.
+            search_job.search_job_after_complete()
+            if self.reporting_delegate:
+                self.reporting_delegate.report_inference_job(inference_job=search_job)
 
         return result
 

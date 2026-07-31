@@ -17,16 +17,23 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from pydantic import BaseModel
 
+from pipelex.providers.gateway.gateway_exceptions import GatewaySearchEmptyResultError, GatewaySearchResponseError
+from pipelex.providers.gateway.gateway_search_worker import GatewaySearchWorker
+
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
-
-from pipelex.providers.gateway.gateway_exceptions import GatewaySearchResponseError
-from pipelex.providers.gateway.gateway_search_worker import GatewaySearchWorker
 
 
 class TopicSummary(BaseModel):
     title: str
     summary: str
+
+
+class DataAndSources(BaseModel):
+    """An output structure that legitimately spells its own fields the way the relay envelope does."""
+
+    data: dict[str, str]
+    sources: list[str]
 
 
 def _make_worker(mocker: MockerFixture, *, content: str) -> GatewaySearchWorker:
@@ -72,16 +79,45 @@ class TestGatewayStructuredSearchContract:
         validated = TopicSummary.model_validate(result)
         assert validated.title == "pipelex"
 
-    async def test_a_missing_data_key_raises_a_classified_search_error(self, mocker: MockerFixture) -> None:
-        """A relay response without the envelope fails here as a classified error, not at the leaf."""
-        worker = _make_worker(mocker, content=json.dumps({"title": "pipelex", "summary": "a language"}))
+    async def test_a_bare_payload_passes_through_unwrapped(self, mocker: MockerFixture) -> None:
+        """The relay dropping sources must not break this worker — the envelope is recognised, not demanded.
 
-        with pytest.raises(GatewaySearchResponseError, match="envelope"):
+        Demanding it would make "relay stops asking Linkup for sources" a coordinated two-sided deploy:
+        every gateway structured search would fail until both repos shipped together.
+        """
+        payload = {"title": "pipelex", "summary": "a language"}
+        worker = _make_worker(mocker, content=json.dumps(payload))
+
+        result = await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert result == payload
+
+    async def test_an_output_class_that_declares_data_and_sources_is_not_unwrapped(self, mocker: MockerFixture) -> None:
+        """The one shape a positional `.get("data")` unwrap would silently corrupt."""
+        payload = {"data": {"nested": "value"}, "sources": ["a"]}
+        worker = _make_worker(mocker, content=json.dumps(payload))
+
+        result = await worker._search_structured(search_job=_make_search_job(mocker), schema=DataAndSources)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        assert result == payload, "the caller's own {data, sources} output is its payload, not an envelope around one"
+
+    async def test_an_envelope_carrying_no_payload_raises_an_empty_result_error(self, mocker: MockerFixture) -> None:
+        """A search that found nothing is not a malformed response — it must not advise changing model."""
+        worker = _make_worker(mocker, content=json.dumps({"data": None, "sources": []}))
+
+        with pytest.raises(GatewaySearchEmptyResultError, match="empty structured result"):
             await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
     async def test_a_non_object_response_raises_a_classified_search_error(self, mocker: MockerFixture) -> None:
-        """A response that is not even a JSON object fails the same way."""
+        """A response that is not a JSON object at all is malformed, and says so."""
         worker = _make_worker(mocker, content=json.dumps(["not", "an", "object"]))
 
-        with pytest.raises(GatewaySearchResponseError, match="envelope"):
+        with pytest.raises(GatewaySearchResponseError, match="non-object payload"):
+            await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+    async def test_a_non_json_body_raises_a_classified_search_error(self, mocker: MockerFixture) -> None:
+        """The likeliest way the relay contract breaks must not escape as a bare JSONDecodeError."""
+        worker = _make_worker(mocker, content="<html>502 Bad Gateway</html>")
+
+        with pytest.raises(GatewaySearchResponseError, match="not valid JSON"):
             await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]

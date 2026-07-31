@@ -23,3 +23,7 @@ class GatewayExtractResponseError(GatewayError):
 
 class GatewaySearchResponseError(GatewayError):
     pass
+
+
+class GatewaySearchEmptyResultError(GatewayError):
+    pass
