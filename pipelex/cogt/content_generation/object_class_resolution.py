@@ -11,6 +11,10 @@ In-process there is no boundary: the caller's real class is still on the stack, 
 beside the assignment and is used as-is. ``None`` means "no class in hand", which is exactly what a
 worker entering from the boundary passes — so the distributed path keeps today's behaviour by
 construction, with no flag to set.
+
+The structured-*search* leaf has no nullable arm to resolve: its in-process entry point carries the
+caller's class outright, and its boundary arm always rebuilds — it calls ``SchemaToModelFactory``
+directly.
 """
 
 from pydantic import BaseModel

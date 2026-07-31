@@ -20,10 +20,10 @@ import pytest
 
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
-from pipelex.cogt.content_generation.content_generator import _revalidate_against_object_class  # noqa: PLC2701 # pyright: ignore[reportPrivateUsage]
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.content_generation.dry_mock import dry_llm_gen_object, dry_llm_gen_object_list
 from pipelex.cogt.content_generation.exceptions import DryRunMockBuildError, DryRunObjectFidelityError
+from pipelex.cogt.content_generation.object_revalidation import revalidate_leaf_object
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.system.job_metadata import JobMetadata
@@ -55,7 +55,7 @@ class TestDryRunObjectFidelity:
         raw_mock = dry_llm_gen_object(_boundary_assignment(job_metadata))
 
         with pytest.raises(DryRunObjectFidelityError) as exc_info:
-            _revalidate_against_object_class(raw_mock, object_class=ConstrainedName, is_mock_built=True)
+            revalidate_leaf_object(raw_mock, object_class=ConstrainedName, is_mock_built=True)
         assert ConstrainedName.__name__ in str(exc_info.value)
         assert "mock_format" in str(exc_info.value)
 
@@ -65,7 +65,7 @@ class TestDryRunObjectFidelity:
 
         # Same comprehension shape as ContentGenerator.make_object_list, so this is the real composition.
         with pytest.raises(DryRunObjectFidelityError):
-            _ = [_revalidate_against_object_class(raw_mock, object_class=ConstrainedName, is_mock_built=True) for raw_mock in raw_mocks]
+            _ = [revalidate_leaf_object(raw_mock, object_class=ConstrainedName, is_mock_built=True) for raw_mock in raw_mocks]
 
     async def test_make_object_builds_the_mock_from_the_caller_class(
         self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol

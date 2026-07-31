@@ -5,7 +5,7 @@ when the caller's real class was still on the stack. The rebuild is lossy — cu
 ``json_schema_extra`` hints do not survive the round trip — so the provider was constrained by a
 weaker contract than the one the author wrote.
 
-These tests pin both arms:
+These tests pin both arms, on the object leaves and on the structured-search leaf:
 
 - in-process (a class is in hand): the provider receives *the same class object*, so every invariant
   is intact. Asserted with ``is``: a structural-equality assertion would pass against the bug, since
@@ -13,7 +13,7 @@ These tests pin both arms:
 - at the boundary (only the serialized assignment): the class is still rebuilt from the schema, and
   the loss is still real — which is what makes the first arm worth having.
 
-The LLM worker is mocked, so no inference marker.
+The workers are mocked, so no inference marker.
 """
 
 from typing import Any, get_args
@@ -22,14 +22,16 @@ import pytest
 from pydantic import BaseModel, Field, ValidationError, create_model, field_validator
 from pytest_mock import MockerFixture
 
-from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment
+from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment, SearchAssignment, SearchObjectAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
-from pipelex.cogt.content_generation.content_generator import _revalidate_against_object_class  # noqa: PLC2701 # pyright: ignore[reportPrivateUsage]
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.content_generation.dry_mock import dry_llm_gen_object
 from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen_object_list
+from pipelex.cogt.content_generation.object_revalidation import revalidate_leaf_object
+from pipelex.cogt.content_generation.search_generate import search_gen_structured, search_gen_structured_object
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -96,10 +98,34 @@ def _dry_object_assignment() -> ObjectAssignment:
     return ObjectAssignment.make_for_class(object_class=SimpleName, llm_assignment=llm_assignment)
 
 
+def _live_search_assignment() -> SearchAssignment:
+    return SearchAssignment(
+        job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_search_class_passthrough"),
+        cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
+        query="make a name",
+        search_setting=SearchSetting(model="mock-search-handle"),
+    )
+
+
+def _live_search_object_assignment() -> SearchObjectAssignment:
+    return SearchObjectAssignment.make_for_class(
+        output_class=HintedName,
+        search_assignment=_live_search_assignment(),
+    )
+
+
 def _patch_worker(mocker: MockerFixture, *, gen_object_result: BaseModel) -> Any:
     mock_worker = mocker.MagicMock()
     mock_worker.gen_object = mocker.AsyncMock(return_value=gen_object_result)
     mocker.patch("pipelex.cogt.content_generation.llm_generate.get_llm_worker", return_value=mock_worker)
+    return mock_worker
+
+
+def _patch_search_worker(mocker: MockerFixture, *, search_structured_result: dict[str, Any]) -> Any:
+    mock_worker = mocker.MagicMock()
+    mock_worker.search_structured = mocker.AsyncMock(return_value=search_structured_result)
+    mocker.patch("pipelex.cogt.content_generation.search_generate._make_search_worker", return_value=mock_worker)
+    mocker.patch("pipelex.cogt.content_generation.search_generate._make_search_job", return_value=mocker.MagicMock())
     return mock_worker
 
 
@@ -221,8 +247,27 @@ class TestObjectClassPassthrough:
 
         assert type(raw_obj) is not NormalizedReference
         assert isinstance(raw_obj, NormalizedReference)
-        result = _revalidate_against_object_class(raw_obj, object_class=NormalizedReference, is_mock_built=False)
+        result = revalidate_leaf_object(raw_obj, object_class=NormalizedReference, is_mock_built=False)
         assert result.reference == "INV-123"
+
+    async def test_live_search_leaf_hands_the_provider_the_caller_class_itself(self, mocker: MockerFixture) -> None:
+        """The structured-search leaf carries the same contract as the object leaf, asserted the same way."""
+        mock_worker = _patch_search_worker(mocker, search_structured_result={"name": "PFX_ok"})
+
+        await search_gen_structured_object(_live_search_assignment(), output_class=HintedName)
+
+        assert mock_worker.search_structured.await_args.kwargs["schema"] is HintedName
+
+    async def test_boundary_search_leaf_still_rebuilds_from_the_schema(self, mocker: MockerFixture) -> None:
+        """Control for the search arm: no class in hand still means a rebuilt class and a raw dict out."""
+        mock_worker = _patch_search_worker(mocker, search_structured_result={"name": "no_prefix"})
+
+        result = await search_gen_structured(search_object_assignment=_live_search_object_assignment())
+
+        rebuilt_class = mock_worker.search_structured.await_args.kwargs["schema"]
+        assert rebuilt_class is not HintedName
+        assert rebuilt_class.__name__ == HintedName.__name__
+        assert result == {"name": "no_prefix"}
 
     async def test_dry_leaf_resolves_the_class_the_same_way_as_the_live_leaf(self) -> None:
         """Both run modes take the same path — asserted directly, not inferred from two passing tests.

@@ -102,18 +102,30 @@ Re-attaching after `kajson.loads()` ensures the source survives if the object cr
 
 ### The type bridge
 
-The class reconstructed on the worker is a structural match to the original, but a different Python class in memory — so `isinstance()` checks would fail. The caller bridges the gap with a `model_validate` round-trip (`pipelex/cogt/content_generation/content_generator.py`):
+The class reconstructed on the worker is a structural match to the original, but a different Python class in memory — so `isinstance()` checks would fail. The caller bridges the gap with a `model_validate` round-trip, in `revalidate_leaf_object` (`pipelex/cogt/content_generation/object_revalidation.py`):
 
 ```python
-raw_obj = await llm_gen_object(object_assignment=object_assignment, object_class=object_class)
-return object_class.model_validate(raw_obj.model_dump(serialize_as_any=True))
+if isinstance(raw_obj, object_class):
+    return raw_obj
+return object_class.model_validate(raw_obj.model_dump(mode=dump_mode, serialize_as_any=True, by_alias=True))
 ```
 
-`model_dump(serialize_as_any=True)` produces a plain dict from the reconstructed object, and `model_validate()` rebuilds it as a proper instance of the original class, restoring type safety for downstream code. The bridge is kept on the in-process path too, where it becomes a same-type conversion: it is still the site that raises the typed dry-run fidelity error, and it is what makes the two paths return the same thing.
+`model_dump(serialize_as_any=True)` produces a plain dict from the reconstructed object, and `model_validate()` rebuilds it as a proper instance of the original class, restoring type safety for downstream code.
+
+`by_alias=True` is what keys that dict correctly. `model_json_schema()` emits **by alias**, so the schema's property names are what the original class accepts on the way back in — but the reconstructed class does not always name its fields that way. `datamodel-code-generator` renames any property that cannot be a field name (a python keyword, or a name shadowing a `BaseModel` attribute such as `json`, `copy`, `schema`, `construct`) and records the original as an alias. Dumping by field name would emit `construct_` for a field the original calls `construct`. Where nothing was renamed, the alias is the field name, so this is a no-op.
+
+The short-circuit is what makes this a *boundary* conversion rather than a step on every path. In-process the leaf already worked from the caller's class, so the object is already one — note `isinstance`, not `type(...) is`: a provider library typically returns a *subclass* of the response model, not the class itself. Converting it anyway would run the caller's validators a second time on data they already normalized, which corrupts the output of any validator that transforms rather than merely rejects. A reconstructed class is never a subclass of the original, so the boundary path falls through to the conversion as before.
+
+The helper is public so that both implementations of `ContentGeneratorProtocol` can share it — the in-process generator, which uses it today, and a host runtime's workflow arm, which still carries its own copy and adopts the shared one on its next release. The point of the single home is that the conversion, the short-circuit and the typed dry-run fidelity error stop being two copies that only agree until someone edits one. `dump_mode` is the one thing the two boundaries differ on: an object that crossed a payload boundary needs `mode="json"`, because some field types only round-trip cleanly through their json form.
 
 ### Structured web search reuses the same mechanism
 
-Structured web search (`PipeSearch` with a non-text output concept) faces the identical dynamic-class problem and solves it the same way. `SearchObjectAssignment` mirrors `ObjectAssignment` — it ships `output_class_name` + `output_class_schema` alongside the `SearchAssignment`, the activity reconstructs a throwaway class to drive the provider call, and returns the **raw result dict**. The submitter re-validates that dict against the original output class (`output_structure_class.model_validate(result_dict)`) — a pure, deterministic step that keeps the dynamic class on the submitter side and never ships it across the boundary. The sourced-answer path (`make_search_sourced_answer`) has no dynamic class at all: it returns a `SearchResultContent`, a native serializable model.
+Structured web search (`PipeSearch` with a non-text output concept) faces the identical dynamic-class problem and splits the same way, with one twist: the boundary arm must keep the *result* serializable too.
+
+- **At the boundary**, `SearchObjectAssignment` mirrors `ObjectAssignment` — it ships `output_class_name` + `output_class_schema` alongside the `SearchAssignment`, the activity reconstructs a throwaway class to drive the provider call, and `search_gen_structured` returns the **raw result dict**. The submitter re-validates that dict against the original output class — a pure, deterministic step that keeps the dynamic class on the submitter side and never ships it across the boundary.
+- **In-process**, `search_gen_structured_object` takes the caller's class, hands it to the provider unchanged, and returns an instance of it. The validation happens once, at the leaf, next to the provider. Returning the instance rather than a dump of it is what keeps it once: the search leaf has no object to short-circuit on if its result has already become a dict.
+
+The sourced-answer path (`make_search_sourced_answer`) has no dynamic class at all: it returns a `SearchResultContent`, a native serializable model.
 
 ---
 

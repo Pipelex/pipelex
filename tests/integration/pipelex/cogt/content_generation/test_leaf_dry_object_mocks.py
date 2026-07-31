@@ -7,8 +7,10 @@ class (pre-flight decision 2), exercising real datamodel-code-generator codegen.
   (the object-mock fidelity pin mandated by pre-flight decision 2);
 - ``nb_items`` carried on ``ObjectAssignment`` controls the dry list length, falling back to
   ``dry_run_config.nb_list_items`` (eng review D11);
-- the structured-search dry leaf returns a dict that validates against the original class, and a hidden
-  invariant the schema round-trip drops there surfaces as ``DryRunObjectFidelityError`` (eng review D6).
+- the structured-search dry leaf splits the same way the object leaf does: at the boundary it returns a
+  dict built from the schema rebuild, where a dropped invariant surfaces as ``DryRunObjectFidelityError``
+  (eng review D6); in-process it mocks the caller's real class, where that invariant is present at build
+  time and an unsatisfiable one fails as ``DryRunMockBuildError`` instead.
 
 The object leaf's own fidelity arms live in ``test_dry_run_object_fidelity.py``, which separates the
 boundary case (still schema-rebuilt, still the fidelity error) from the in-process case (built from the
@@ -18,12 +20,14 @@ No provider is ever called (the leaves short-circuit before any worker), so no i
 """
 
 import pytest
+from pydantic import ConfigDict, field_validator
 
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment, SearchAssignment, SearchObjectAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.content_generation.dry_mock import dry_llm_gen_object, dry_llm_gen_object_list
-from pipelex.cogt.content_generation.exceptions import DryRunObjectFidelityError
+from pipelex.cogt.content_generation.exceptions import DryRunMockBuildError, DryRunObjectFidelityError, OutputStructureSchemaError
+from pipelex.cogt.content_generation.object_revalidation import revalidate_leaf_data
 from pipelex.cogt.content_generation.search_generate import search_gen_structured
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
@@ -50,6 +54,30 @@ class StructuredAnswer(StructuredContent):
 
     answer: str
     confidence: float
+
+
+class OpaqueWidget:
+    """A type pydantic can hold but cannot describe as JSON Schema."""
+
+
+class UndescribableOutput(StructuredContent):
+    """Output structure polyfactory can mock but no provider can be given a schema for."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    label: str
+    widget: OpaqueWidget
+
+
+class NormalizedAnswer(StructuredContent):
+    """Output structure whose validator *transforms* — the shape that exposes a double validation."""
+
+    answer: str
+
+    @field_validator("answer")
+    @classmethod
+    def _normalize(cls, value: str) -> str:
+        return f"INV-{value}"
 
 
 class SpecWithPipeCode(StructuredContent):
@@ -134,28 +162,75 @@ class TestLeafDryObjectMocks:
         assert len(result) == 3
         assert all(isinstance(item, RepresentativeInvoiceLine) for item in result)
 
-    async def test_dry_search_structured_fidelity_gap_raises_typed_error(
-        self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol
-    ) -> None:
-        """The structured-search path carries the same D6 fidelity guard as the object paths:
-        a schema-built dict that drops a hidden invariant surfaces as DryRunObjectFidelityError.
+    async def test_boundary_dry_search_structured_fidelity_gap_raises_typed_error(self, job_metadata: JobMetadata) -> None:
+        """The structured-search *boundary* carries the same D6 fidelity guard as the object paths.
+
+        Scoped to the boundary composition — the leaf that holds only the serialized assignment, plus the
+        submitter that re-validates its dict — exactly as the object path's fidelity test is. In-process
+        the mock is built from the caller's real class, so this gap cannot occur there; the constrained
+        class fails earlier and louder instead (see the test below).
         """
-        search_assignment = SearchAssignment(
-            job_metadata=job_metadata,
-            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
-            query="what is pipelex?",
-            search_setting=SearchSetting(model="mock-search-handle"),
+        search_object_assignment = SearchObjectAssignment.make_for_class(
+            output_class=ConstrainedName,
+            search_assignment=self._dry_search_assignment(job_metadata),
         )
 
+        result_dict = await search_gen_structured(search_object_assignment=search_object_assignment)
+
         with pytest.raises(DryRunObjectFidelityError) as exc_info:
-            await content_generator.make_search_structured(
-                output_structure_class=ConstrainedName,
-                search_assignment=search_assignment,
-            )
+            revalidate_leaf_data(result_dict, object_class=ConstrainedName, is_mock_built=True)
         assert ConstrainedName.__name__ in str(exc_info.value)
 
-    async def test_dry_search_structured_dict_validates_against_original_class(self) -> None:
-        """The structured-search dry leaf returns a dict the original output class accepts."""
+    async def test_in_process_dry_search_structured_builds_the_mock_from_the_caller_class(
+        self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol
+    ) -> None:
+        """In-process the invariant is present at build time, so the failure is a build error, not a fidelity gap."""
+        with pytest.raises(DryRunMockBuildError) as exc_info:
+            await content_generator.make_search_structured(
+                output_structure_class=ConstrainedName,
+                search_assignment=self._dry_search_assignment(job_metadata),
+            )
+        assert ConstrainedName.__name__ in str(exc_info.value)
+        assert "mock_format" in str(exc_info.value)
+
+    async def test_in_process_dry_search_structured_rejects_an_output_class_with_no_json_schema(
+        self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol
+    ) -> None:
+        """The dry run has to be what catches a class no provider can be given a schema for.
+
+        Polyfactory mocks such a class happily, so nothing else on the dry path notices — and carrying the
+        caller's class down removed the ``model_json_schema()`` call that used to ride along inside
+        ``SearchObjectAssignment.make_for_class``. Without this the live run would die inside the worker on
+        a bare ``PydanticInvalidForJsonSchema``, which is a ``RuntimeError``: no model attribution, no
+        remedy, no error identity. The boundary arm still builds the assignment, so skipping the check
+        here would also make a dry-run verdict depend on how the method is deployed.
+        """
+        with pytest.raises(OutputStructureSchemaError) as exc_info:
+            await content_generator.make_search_structured(
+                output_structure_class=UndescribableOutput,
+                search_assignment=self._dry_search_assignment(job_metadata),
+            )
+        assert UndescribableOutput.__name__ in str(exc_info.value)
+
+    async def test_in_process_dry_search_structured_runs_the_caller_validators_exactly_once(
+        self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol
+    ) -> None:
+        """The mock is built from the caller's class, so its validators must not run again on a dump of it.
+
+        The search leaf is dict-out at the boundary, and dumping the in-process mock for the submitter to
+        re-validate is exactly how a transforming validator would produce ``INV-INV-…`` here.
+        """
+        result = await content_generator.make_search_structured(
+            output_structure_class=NormalizedAnswer,
+            search_assignment=self._dry_search_assignment(job_metadata),
+        )
+
+        assert isinstance(result, NormalizedAnswer)
+        assert result.answer.startswith("INV-")
+        assert not result.answer.startswith("INV-INV-")
+
+    async def test_boundary_dry_search_structured_dict_validates_against_original_class(self) -> None:
+        """The structured-search dry boundary leaf returns a dict the original output class accepts."""
         search_assignment = SearchAssignment(
             job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_dry_search_structured"),
             cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
@@ -172,3 +247,11 @@ class TestLeafDryObjectMocks:
         validated = StructuredAnswer.model_validate(result_dict)
         assert isinstance(validated.answer, str)
         assert isinstance(validated.confidence, float)
+
+    def _dry_search_assignment(self, job_metadata: JobMetadata) -> SearchAssignment:
+        return SearchAssignment(
+            job_metadata=job_metadata,
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
+            query="what is pipelex?",
+            search_setting=SearchSetting(model="mock-search-handle"),
+        )

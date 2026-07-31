@@ -42,6 +42,38 @@ class DryRunObjectFidelityError(PipelexError):
         )
 
 
+class OutputStructureSchemaError(PipelexError):
+    """Raised when an output structure class cannot produce the JSON schema a structured leaf needs.
+
+    Every structured leaf ultimately describes the caller's output class to a provider as JSON Schema, so
+    a class pydantic cannot describe cannot drive one — an ``arbitrary_types_allowed`` field, or an opaque
+    type carrying only ``__get_pydantic_core_schema__``, makes ``model_json_schema()`` raise.
+
+    The dry run has to be the place that says so. Polyfactory will happily mock such a class, so nothing
+    else on the dry path notices, and pydantic's own ``PydanticInvalidForJsonSchema`` is a bare
+    ``RuntimeError``: raised live, inside the worker, it carries no model attribution, no remedy and no
+    error identity. Surfacing it here turns a mid-run crash into a ``pipelex validate`` failure that names
+    the class.
+    """
+
+    # The caller's output concept uses a type pydantic cannot describe as JSON Schema; they fix it by
+    # changing the field or teaching the type `__get_pydantic_json_schema__` — caller-fixable input.
+    error_domain = ErrorDomain.INPUT
+    # The message names the caller's own output concept class and the remedy, with no internal paths or
+    # secrets, so it should survive STRICT disclosure intact.
+    _authors_caller_facing_message = True
+
+    @classmethod
+    def for_object_class(cls, *, object_class_name: str, reason: str) -> "OutputStructureSchemaError":
+        """Build the schema error for a named output object class (e.g. ``"InvoiceLine"``)."""
+        return cls(
+            f"The output structure '{object_class_name}' cannot produce a JSON schema, so it cannot be used as a "
+            f"structured output: {reason}. Every structured leaf describes your output class to the provider as "
+            "JSON Schema. Replace the field whose type pydantic cannot describe, or give that type a "
+            "`__get_pydantic_json_schema__`."
+        )
+
+
 class DryRunMockBuildError(PipelexError):
     """Raised when building a leaf mock object fails (polyfactory build or model validation).
 

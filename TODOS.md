@@ -1,157 +1,137 @@
-# Two places where the runtime silently substituted something for what the caller gave it
+# The follow-ups #1076 deferred, in the order they had to happen
 
-Branch `refactor/Exec`, off `dev` at v0.41.0. Two independent fixes, batched because they share a shape and nothing else: in both, the runtime accepted a caller's object, quietly replaced it with something almost-equivalent, and never said so. One replaced a Pydantic class with a lossy rebuild of it; the other replaced a registered function with a later one of the same name.
+Branch `refactor/Follow-ups`, off `dev` at #1076. Three items, ruled to run 2 → 4 → 3 for a reason worth stating up front: item 4 *removes* an in-process conversion, so item 3's audit of the surviving conversions is only meaningful after it — and item 2 first, because both of the others needed a single home for the contract they were about to change. (The numbering is #1076's, kept so the deferral notes still line up. Its item 1 — func-registry entries outliving their library — is untouched here and stays its own later PR.)
 
-This file is the review guide. It carries the reasoning, the measurements, and — importantly — the two places where doing the work **corrected the plan that motivated it**. Read those first if you are short on time: they are where a reviewer's attention is worth the most.
-
-- **Commit `ba9b0750c`** — `FuncRegistry.register_function` silently overwrote (item 2 below).
-- **Commit `bbf06b707`** — the schema→`exec()` round trip was paid in-process, and it was lossy (item 1 below).
-
-Each commit is independently green on `make agent-check`, `make drift-check`, and the full `make agent-test`.
+This file is the review guide. The part most worth a reviewer's time is at the end of item 4: the live structured-search path turned out to be **broken today**, in a way none of the deferral notes predicted, and fixing it is what makes item 4 correct rather than merely wider.
 
 ---
 
-## Item 1 — the schema→`exec()` round trip was paid in-process, and it was lossy
+## Item 2 — one home for "convert a leaf result into the caller's class"
 
 ### What was wrong
 
-Structured generation handed a concrete Pydantic class to the content generator, which threw the class away, rebuilt an approximation of it from its JSON schema through code generation plus `exec()`, and gave the **rebuild** to the provider as the structured-output schema — while the original class was still sitting in the caller's frame.
+The same conversion existed four times across two repos: `_revalidate_against_object_class` in `content_generator.py`, a copy of it in our distributed-execution plugin's workflow arm, and a dict-shaped inline in each repo's `make_search_structured`. All four implement one contract — validate the leaf's data against the caller's original class, and on the dry path re-raise the `ValidationError` as `DryRunObjectFidelityError` naming the class and the `examples` / `mock_format` remedy.
 
-The path: `content_generator.make_object` / `make_object_list` received `object_class: type[BaseModelTypeVar]`; `ObjectAssignment.make_for_class` kept only `__name__` + `model_json_schema()` and dropped the class; `llm_generate.py` rebuilt it via `SchemaToModelFactory.make_from_json_schema` and passed the rebuild to `llm_worker.gen_object(schema=...)`; `dry_mock.py` rebuilt it on the dry path too. Then `content_generator` re-validated the result against the class it had never stopped holding.
+The copies existed for one reason only: the original was `_`-private, so the plugin could not import it — even though it already imports `assignment_models`, `content_generator_protocol` and `exceptions` from that same package.
 
-### What the rebuild drops — verified, not assumed
+#1076 then made them **diverge**: core's copy gained the `isinstance` short-circuit, the plugin's did not. That is correct today — across `workflow.execute_activity` the object is always an instance of the class kajson rebuilt from `__kajson_class_source__`, never of `object_class` — but it is a latent trap, and the reasoning for why the check is `isinstance` and not `type(...) is` lived only in core's docstring.
 
-- custom `@field_validator` / `@model_validator` logic
-- `json_schema_extra` format/pattern hints
-- **the output structure's own description** — its class docstring lands in `model_json_schema()["description"]`, and `datamodel-code-generator` does not re-emit it, so the rebuilt class has `__doc__ = None` and its schema has no top-level `description`. Field-level descriptions do survive.
+### What landed
 
-That last one the original plan did not name, and it is the most directly user-visible: every in-process structured call was sending the provider a schema stripped of the concept's own description — prompt-relevant signal, silently gone. Reproduce in three lines:
+`pipelex/cogt/content_generation/object_revalidation.py`, a leaf module beside `object_class_resolution.py`. The two are the down leg and the up leg of the same journey, which is why they are siblings rather than one module.
 
-```python
-class Line(StructuredContent):
-    """A billed line."""
-    label: str
+- `revalidate_leaf_object(raw_obj, *, object_class, is_mock_built, dump_mode="python")` — the object arm, carrying the short-circuit.
+- `revalidate_leaf_data(raw_data, *, object_class, is_mock_built)` — the data arm. Data is never an instance of anything, so there is no short-circuit to make and its validation is the single one on its path.
 
-rebuilt = SchemaToModelFactory.make_from_json_schema(schema=Line.model_json_schema(), class_name="Line")
-assert rebuilt.__doc__ is None  # and "description" is absent from rebuilt.model_json_schema()
-```
+The object arm delegates to the data arm, so the tree has exactly one `model_validate` call and one `except ValidationError` for this contract. The dry/live split is a branch inside that single `except`, rather than the two separate validate calls all four copies carried.
 
-Read from the user's side: someone who writes a model with a validator got a structured-output schema that had silently lost it, so the provider was constrained by a weaker contract than the one they wrote. The re-validation caught the bad result *afterwards*; it did not stop the weaker schema from being sent.
+**`dump_mode` is a parameter, not a unification.** Json mode coerces values (`datetime` → `str` and back); the in-process path must keep `"python"`. That was the deferral note's explicit instruction, and item 3 is why.
 
-### The constraint that shaped the fix
+### Worth a reviewer's attention
 
-`ObjectAssignment` is a serializable DTO **by design**. It is the payload a distributed orchestrator — our Temporal plugin, hooked in via `pipelex/plugins/orchestrator_registry.py` — sends to a worker that has no access to the caller's class object. Across that boundary the class genuinely cannot travel, and rebuilding from schema is the right answer. So the fix is not "remove the reconstruction". It is "stop paying for it when nothing crossed a boundary".
-
-### What changed
-
-- **`ObjectAssignment` is untouched.** No live-class field was added. It is a wire model; a `type[BaseModel]` field makes it unserializable and breaks the boundary path outright. This is the tempting wrong fix — the class is *right there* in `make_for_class` — and it was rejected deliberately, not overlooked.
-- **The class is threaded as an explicit keyword-only parameter beside the assignment**, on the in-process path only: `llm_gen_object(object_assignment, *, object_class=None)` and the same on `llm_gen_object_list` and the two dry leaves. `None` means "no class in hand, rebuild from the schema" — which is exactly what a worker entering from the boundary passes, so **the boundary path keeps today's behaviour by construction, with no flag to set**.
-- **One resolution helper serves both run modes** — `object_class_resolution.resolve_object_class`, a new leaf module so neither `llm_generate` nor `dry_mock` has to import the other. Live and dry both rebuilt before and both take the fast path now. Had only the live leaf been fixed, the dry mock would be built against a *weaker* class than the one the provider is constrained by — the mock would be more faithful than the thing it mocks, which is worse than the state we started from. `test_dry_leaf_resolves_the_class_the_same_way_as_the_live_leaf` asserts this directly rather than leaving it inferred from two separate passing tests.
-- Keyword-only matters mechanically here: every function on this path already carries a subject grant in `subject_grants.toml`, and a grant covers one positional subject. A second bare positional would be a violation with or without it. No grant was added; the grant for the deleted `dry_mock._reconstruct_object_class` was removed.
-
-### The measurement, and the correction it forces
-
-The plan asserted "a code generation plus an `exec()` per structured call". **That is wrong**, and the number says so: `SchemaToModelFactory.make_from_json_schema` memoizes on a sha256 of the schema, so the cost is per *distinct structure per process*, not per call. Measured on a representative `StructuredContent` (mixed primitives, an optional, a nested `$defs` list):
-
-| | before | after |
-|---|---|---|
-| first structure in a process (one-time `datamodel-code-generator` warmup + codegen + `exec()`) | ~81 ms | 0 |
-| each additional distinct structure | ~6–7 ms | 0 |
-| repeat call on an already-seen structure | ~0.01 ms (cache hit) | 0 |
-
-So the throughput win is real but small and front-loaded: ~81 ms + ~7 ms × (N−1) per process for a method with N distinct structured outputs, and effectively nothing per call after warm-up. **The fidelity fix is the reason to do this; the saved `exec()` perimeter and the codegen are the bonus.** Please weigh it that way — this is not a performance change.
-
-`schema_to_model_factory.py`'s module docstring now opens by saying when its perimeter is actually walked: only when no live class is in hand, which is also the only case where the schema is attacker-influenceable. Its Layer 2 restricted builtins are explicitly *not* a sandbox (`().__class__.__base__.__subclasses__()` stays reachable), so not walking it where nothing crossed a boundary is worth having on its own.
-
-### The three "verify rather than assume" items
-
-- **Kajson's `__kajson_class_source__`.** Nothing regresses. The attribute exists so kajson can rebuild the reconstructed class on the far side of a process boundary. In-process, the leaf's return value is immediately converted by `_revalidate_against_object_class` into an instance of the caller's real class and never serialized as the rebuild; in-tree the attribute is read only by `SchemaToModelFactory`'s own tests. The boundary path — the only one that ships the rebuilt class anywhere — is untouched.
-- **`_revalidate_against_object_class` on the fast path.** ⚠ **The plan got this one wrong, and both PR review bots caught it.** The plan said to keep the call and framed short-circuiting it as declining a *performance* saving. It is not a performance question: with the live class at the leaf, the provider (instructor's `response_model=`) already constructs **and validates** an instance of the caller's class, so re-validating the dump ran the caller's validators a **second** time, on data they had already normalized. A validator that transforms rather than rejects — `return f"INV-{value}"` — produced `INV-INV-…`; one that asserts its input is not yet normalized would reject valid provider output. Same defect on the list path and on the dry path. That is a regression this branch introduced, and it hit exactly the population the fix exists to serve. The fix is subtractive: `if isinstance(raw_obj, object_class): return raw_obj`. **`isinstance`, not `type(...) is`** — and not for defensiveness: instructor never returns the class you gave it, it returns `create_model(cls.__name__, __base__=(cls, OpenAISchema))`, a subclass. A `type(...) is` check would miss every real provider call and silently reinstate the double validation. `test_instructor_style_subclass_is_returned_without_revalidation` pins that. The call is still the boundary-path conversion (a schema-rebuilt class is never a subclass of `object_class`, so it falls through) and still the site that raises the dry fidelity error. The measured cost of the removed round trip is ~0.008 ms/object — nil, which is the point: the reason to short-circuit is semantic, not throughput.
-- **`DryRunObjectFidelityError` reachability.** It stops firing on the in-process object path and stays reachable on the boundary path and on the structured-search path, which always rebuilds. Not deleted; its tests were re-scoped rather than removed.
-
-### The behaviour change a reviewer should actually look at
-
-On the in-process path the mock is now built from the real class, so an invariant the schema round-trip used to drop is present at *build* time. The constrained fixture therefore fails earlier and with a different class: `DryRunMockBuildError` out of `build_mock_object`, instead of `DryRunObjectFidelityError` out of the re-validation. Both are `ErrorDomain.INPUT`, both are caller-facing, and both name the same `examples` / `mock_format` remedy — but it is a wire-visible `error_type` change on that path and it should be seen, not skimmed.
-
-`test_dry_run_object_fidelity.py` was rewritten around exactly this split: it asserts the fidelity error against the boundary composition (leaf with no class in hand → re-validate, the same comprehension shape `make_object_list` uses), and asserts the build error in-process.
-
-### Tests
-
-- **Identity, not equality** — `test_object_class_passthrough.py` asserts the provider receives *the same class object* (`schema is HintedName`), never a structurally-equal one. Structural equality is precisely what the round trip already preserved, so an equality assertion would have passed against the bug.
-- **A validator that transforms, asserted to run exactly once** (`NormalizedReference`, `INV-` prefix). The original test suite used only a *rejecting* validator, which is idempotent and therefore structurally blind to double execution — which is why the double-validation regression above got past it. Both new tests were confirmed red without the `isinstance` short-circuit and green with it.
-- A model carrying a custom validator and `json_schema_extra` hints reaches the provider with both intact, asserted observably (the received class rejects the invalid value; its schema still carries the hint).
-- A **control** test proves the loss is real: with no class in hand, the rebuilt class *accepts* data the author's class rejects.
-- The list path asserts the wrapper's item annotation is the caller's class, on both arms.
-- Both run modes take the same path, asserted directly.
+- **The short-circuit now reaches the plugin's boundary path, where it never fires.** Intentional, not an oversight: it is dead code there today and exists so that a boundary which ever *does* hand back the caller's real class — a local activity, an in-process shortcut, a converter change — cannot silently reinstate the double validation. `test_instance_short_circuits_in_either_dump_mode` pins it in both modes.
+- **A LIVE `ValidationError` passes through untouched, on purpose.** The plugin's `make_search_structured` catches exactly that to convert it into a terminal typed error, because a bare `ValidationError` raised in workflow code is neither a workflow-execution error nor a `PipelexError`, so the host runtime treats it as a workflow-task failure and retries it forever — hanging the submitter. Had the shared helper swallowed or re-typed it, that conversion would have gone quiet. `test_live_data_failure_keeps_its_validation_error` pins the half of the contract that lives here.
+- **The plugin still carries its copies, and must.** It pins a released `pipelex` from PyPI, so it cannot import the new module until this ships. The swap is written up in the workspace notes, outside this repo.
 
 ---
 
-## Item 2 — `FuncRegistry.register_function` silently overwrote
+## Item 4 — the in-process structured-*search* path still rebuilt the output class
 
 ### What was wrong
 
-On a key collision, `register_function` logged and then overwrote anyway. `log()` is `self._logger.debug(...)`, so under any normal configuration the collision produced no visible output at all — and the assignment ran on both branches, so the `if` distinguished only the wording.
+`make_search_structured` held the caller's `output_structure_class` and never threaded it down, so `PipeSearch` with a structured output still handed the provider a class rebuilt from JSON schema — losing the custom validators, the `json_schema_extra` hints, and the output structure's own description, exactly as #1076 established for the object paths. Same defect, same shape, one remaining path.
 
-Three facts made it reachable rather than theoretical: the registry is a flat, process-global `dict[str, Callable]`, so there is one key space for every source that ever registers; registration names are unqualified (the `@pipe_func` custom name if given, otherwise the bare `func.__name__` — no module, no package, no library prefix); and registration is driven by scanning the configured library directories.
+### Why it was not "four lines"
 
-**The asymmetry gives it away.** `unregister_function` and `unregister_function_by_name` *raise* `FuncRegistryError` when a name is absent. Removing something that was never there was a hard error; replacing something that is there was a debug line.
+The search leaf is **dict-out by contract** — that is what keeps a dynamic class off a distributed orchestrator's wire — and the submitter's re-validation of that dict is the single validation on the live path. Mirroring the object path naively breaks that in the dry arm: `dry_search_gen_structured` builds the mock and *dumps it*, so a mock built from the real class would have the caller's validators run at build **and again** on the dump. A transforming validator would produce `INV-INV-…` — the defect #1076 fixed on the object path with the `isinstance` short-circuit, which cannot apply once the instance has become a dict.
 
-### The failure
+### What landed
 
-Two library directories — or a library plus an installed package — each defining a `@pipe_func` named `summarize` produced a registry containing one of them, chosen by scan order. Every `PipeFunc` step naming `summarize` then ran the winner, including steps authored against the loser, with no warning at author time, boot time, or run time. Scan order comes from the filesystem and `pkgutil`, so which one wins could differ between two machines running the same code.
+Two entry points rather than one nullable parameter, because the two arms genuinely return different things:
 
-### What changed
+- `search_gen_structured(search_object_assignment) -> dict[str, Any]` — the boundary arm. Unchanged signature, unchanged return, so **the activity that calls it needs no change at all**.
+- `search_gen_structured_object(search_assignment, *, output_class) -> BaseModelTypeVar` — the in-process arm. The class goes down to the provider; an instance of it comes back, validated once at the leaf. It takes the plain `SearchAssignment`, not the wire model: nothing crosses a boundary in-process, so there is no schema to ship — and building the `SearchObjectAssignment` anyway would pay a `model_json_schema()` per call for a field nothing reads.
 
-A collision now raises `FuncRegistryError` naming the key, both origins, and the remedy (`@pipe_func(name=...)`). The registry already raised on the symmetric case, so this is consistency, not a new posture.
+`dry_search_gen_structured_object` is the dry counterpart and returns the mock *instance*, not a dump of it. That is the double-validation fix, and its docstring says so in those terms.
 
-### The two open questions, answered by reading the code
+No search-side resolution helper survived review: once the in-process arm carries the class outright, a `resolve_search_output_class` would have had no caller that ever passes a live class — a nullable arm that cannot fire. The boundary sites call `SchemaToModelFactory.make_from_json_schema` directly, and `resolve_object_class` keeps its genuinely dual-armed nullable parameter (exercised by `llm_generate`).
 
-- **Is re-registering the *same* function object a collision?** No — it is a no-op. This is the shape the double-scan actually produces: `import_module_from_file` keys `sys.modules` by a name mangled from the file's **absolute path**, so a folder scanned twice returns the cached module and therefore the *same* function object. Two distinct objects under one key is the only shape that indicates a real clash. Pinned by `test_rescanning_the_same_folder_is_idempotent`.
-- **Does any first-party code deliberately overwrite?** No — `pipelex/` defines no `@pipe_func` of its own, so nothing registers a builtin expecting a user function to replace it. **No `replace=True` parameter was added**; with no caller for it, it would have been a speculative surface.
+`ContentGenerator.make_search_structured` now returns the leaf's instance directly. It no longer re-validates, and therefore no longer raises `DryRunObjectFidelityError` — in-process the mock is built from the real class, so a constrained class fails earlier and louder as `DryRunMockBuildError`, exactly as the object path has since #1076. `test_dry_search_structured_fidelity_gap_raises_typed_error` was re-scoped to the boundary composition and renamed for it; the in-process build-error arm and an `INV-INV-` once-only arm are new tests beside it.
 
-### ⚠ The one place this narrows a path that used to work
+### ⚠ The live search path was broken, and threading the class down would have made it worse
 
-`LibraryManager.teardown(library_id=…)` does **not** clear `func_registry` — only `RuntimeBoot.teardown` does. So in a long-lived process that loads bundle A, tears it down, then loads bundle B, a registration name shared by both now collides with A's **stale** entry and B fails to load until the process restarts. Previously the overwrite was silent and B won, which for the sequential case was right.
+The deferral note flagged the live arm as "unverified: check whether the SDK internally instantiates the schema class". It does — and checking turned up something else first.
 
-Tracing the hosts shows **no first-party process can reach this today**: a direct-mode `pipelex-api`'s library dirs are process-constant (per-request `ApiRunner()` passes `library_dirs=None`, resolving to boot-time defaults or `PIPELEXPATH`, and inline `.mthds` text registers no functions), the local MCP workshop is a TypeScript client that runs no pipelex in-process, and the hosted runner is immune (it takes the source-capture branch and never registers in-process). The exposed population is a third-party embedder varying `library_dirs` per call in one long-lived process — a public surface, so the narrowing is real, but the failure there is loud and typed, not silent. Two loads of the *same* bundle are fine — the module is cached by absolute path, so the same object re-registers and the idempotent no-op absorbs it.
+**The Linkup backend asked for `include_sources=True`.** With that flag the SDK returns a `LinkupSearchStructuredResponse`, and the worker dumped the whole thing — so `search_structured` returned `{"data": {...}, "sources": [...]}` rather than the structured payload. The submitter then validated that envelope against the caller's output structure class, which has no `data` and no `sources` field. **Structured search through Linkup could not have worked.** The only test covering it is a live worker-level one written to assert the envelope, so it documented the shape rather than catching it. And the gateway backend had the same defect one hop removed: the relay's `WebSearcher.search_structured` also passes `include_sources=True` and returns the SDK response's `model_dump()`, so the gateway worker handed the leaf the same envelope — the default routing profile ships `all_pipelex_gateway`, so this was the arm users actually hit. The direct backend now asks for the payload alone; the gateway worker unwraps the relay's envelope on receipt (loudly, so a relay contract change surfaces as a classified error), and both backends hand the leaf the bare payload.
 
-Not fixed here, and not because it is unimportant: there is no small correct fix. `func_registry` is a flat process-global dict with **no ownership dimension**, so per-library eviction has nothing to key on — note that each `Library` already owns its own `ClassRegistry`, and functions never got the same treatment. The remedy (ownership side table, id threaded through registration, eviction on teardown, rollback on a failed scan) is a design change that deserves its own review, not a late addition to this branch. Written up in `wip/refactoring/func-registry-entries-outlive-their-library.md`. **Ruled 2026-07-31: non-blocking.** With no first-party path reachable (see above) and the third-party failure mode loud and typed, this PR ships with the gap documented and the ownership design lands as its own follow-up PR.
+**And the SDK does instantiate the class.** `_parse_search_response` calls `structured_output_schema.model_validate(...)` whenever it was handed a class rather than a string. Threading the caller's real class in would therefore have run the caller's validators inside the SDK and then again at the leaf — the same `INV-INV-…` defect, arriving through the provider instead of through the mock.
 
-### One reachability check worth recording
+Both are fixed at the worker, and the fix for the second is the one to check: **the schema crosses as a JSON string.** `_get_search_params` sends `json.dumps(cls.model_json_schema())` when handed a class and the string verbatim when handed a string, so `json.dumps(schema.model_json_schema())` is byte-for-byte the same request — while the parse branch that instantiates is guarded by `not isinstance(..., str)`, so the response comes back raw. The caller's real schema still reaches the provider in full; the single validation stays at the leaf, where the run mode and the fidelity contract live. `include_sources` is now `False`, matching what the contract can actually carry.
 
-The transported PipeFunc path (`DirectPipeFuncExecutor.run_pipe_func_transported`) materializes customer sources into a fresh `mkdtemp` workdir, which *would* yield a different function object under the same name on a second run in one process. It stays safe because that path is one-shot per process: `pipe_func_transported_entrypoint` runs exactly one request and then calls `Pipelex.teardown_if_needed()`, which clears the registry. Recorded here so a reviewer does not have to re-derive it.
-
-### Tests
-
-Two distinct functions under one name raise, and the message names both sources; the same function object registered twice is a no-op; an ineligible function still routes to `register_ineligible_function` and does not participate in collision detection; and end to end, two library directories defining the same function name fail the scan with the typed error instead of silently picking one.
+`tests/unit/pipelex/providers/linkup/test_linkup_structured_search_contract.py` pins all three properties against a mocked client, and the live worker test's assertions were corrected to the payload shape.
 
 ---
 
-## Deliberately not done
+## Item 3 — auditing the boundary dump→validate round trip
 
-Each of these is a plausible-looking scope expansion that was declined on purpose.
+The deferral said: audit what actually crosses this conversion, add a round-trip property test over the models that do, and *if the audit finds a real loss*, consider having the boundary return raw data instead of a reconstructed instance. It found one. The fix turned out to be one keyword, not a redesign.
 
-- **Not replacing `exec()` with `pydantic.create_model()`.** That is the standing TODO at `schema_to_model_factory.py` and a larger change with its own compatibility surface (`__kajson_class_source__` exists because the generated source is shipped verbatim). Item 1 makes that TODO matter *less* by not walking the path in-process; it does not close it, and the docstring does not imply otherwise.
-- **Not namespacing the function registry by module.** Qualified names would remove the collision class entirely, but `function_name` is authored in `.mthds` files, so that is a language decision, not a registry fix.
-- **Not changing `ObjectAssignment`'s wire shape.** Anything that alters the payload an orchestrator plugin sends belongs in its own change, argued on its own terms.
-- **Not extending the fix to the in-process structured-*search* path.** `make_search_structured` holds `output_structure_class` and does not thread it down, so `PipeSearch` with a structured output still loses the docstring, validators and `json_schema_extra` hints to the rebuild. It is the same bug in the same shape, roughly four lines away — declined here rather than in scope creep, because it changes a *second* error-class surface the same way the object path's did (fidelity error → build error), which needs its own test re-scoping and its own review pass rather than riding in on a branch that is already bot-clean. Deferred to `wip/refactoring/structured-search-still-rebuilds-in-process.md`.
-- **Not auditing the *boundary* arm of `_revalidate_against_object_class`.** Its `model_dump(serialize_as_any=True)` → `model_validate` round trip is not identity-preserving in general (subclass erasure; dumped-by-field-name data that only revalidates thanks to `populate_by_name=True` and a compensating before-validator elsewhere). Pre-existing, unchanged here, must stay — it *is* the boundary conversion. Deferred to `wip/refactoring/boundary-revalidation-round-trip-is-unaudited.md`.
+### Who reaches the conversion
+
+**Nothing in this repo does.** Every branch of `make_object` / `make_object_list` returns an `isinstance` of `object_class`, so the short-circuit always fires:
+
+- **DRY** — `resolve_object_class` returns the caller's class unchanged and polyfactory's `build()` instantiates `__model__` itself, so the mock is exactly `object_class`.
+- **LIVE** — checked against every concrete LLM worker, not a sample: the OpenAI (completions + responses), Anthropic, Mistral and Google workers all return instructor's object untouched, and Bedrock raises `LLMCapabilityError` rather than returning. Gateway / Portkey / Azure / OpenRouter are those same workers under a different factory. Instructor's wrapper is `create_model(cls.__name__, __base__=(cls, OpenAISchema))`, a subclass — which is why the check is `isinstance`.
+- **The list path** wraps only the top-level `ListSchema`; its `items` are constructed by pydantic against `list[item_class]`.
+
+**The distributed boundary always reaches it**, and cannot short-circuit: the activity calls the leaves without a class, and kajson re-execs the rebuilt class on the workflow side from `__kajson_class_source__`, so what comes back is never a subclass of `object_class`. That is the split the design intends, now established rather than assumed.
+
+### The loss
+
+`object_class` is always a `StuffContent` subclass resolved **by name** from the class registry, so the set is open — any field name a user writes in a concept structure crosses this conversion.
+
+`datamodel-code-generator` cannot name a field `json`, `copy`, `schema` or `construct` (they shadow `BaseModel` attributes), nor use a python keyword. It renames the field and records the schema's property name as an alias. Dumping **by field name** emitted `construct_` for a field the caller's class calls `construct`, and re-validation failed with a bare `Field required` — on a field the caller had supplied.
+
+`by_alias=True` on the dump fixes it: the schema's property names are what the class was serialized as and what it accepts back, and where nothing was renamed the alias *is* the field name, so nothing else moves. The same one-word fix was needed on `dry_search_gen_structured`, which dumps its mock for the wire. `test_boundary_roundtrip_fidelity.py` fails on every shadowing field without it, in both dump modes, and carries the native content classes as controls.
+
+**The old note had the mechanism wrong, and it matters.** It supposed `PipeSearchSpec` / `PipeComposeSpec` survive thanks to `populate_by_name=True`. `PipeComposeSpec` did **not** survive — its `construct` property is exactly a shadowed name, and `populate_by_name` cannot help when the emitted key (`construct_`) matches neither the field name nor the alias. `PipeSearchSpec` survived only because `query` happens to be a legal field name.
+
+### What turned out to be safe, and now has a test
+
+- **Plain aliases need no compensation at all.** `model_json_schema()` emits by alias, so the rebuilt class's field name *is* the alias — with or without `populate_by_name`.
+- **Subclass erasure is structurally unreachable**, not merely unobserved: the crossing object is built from `object_class`'s own schema so it cannot carry extra fields, and the one object that *is* a subclass hits the short-circuit and is never dumped. No test, because the case cannot be constructed through this path.
+- **`CompositeContent` survives** — `extra="allow"` comes through the rebuild, so its components are preserved rather than dropped as unknown keys.
+
+### Left open, deliberately
+
+- **Instructor's `PARALLEL_TOOLS` modes return a generator, not an instance** — which would break the short-circuit's premise. Reachable from `StructureMethod`, but no model in the shipped TOMLs selects them. A config-reachable hazard, not a live one; worth a guard when one is configured, not before.
+- **Json-mode losslessness for arbitrary user field types** on the distributed arm. The residue of the original note, now narrowed to that.
+
+Both are recorded in `wip/refactoring/boundary-revalidation-round-trip-audit.md`, which replaces the "unaudited" note.
+
+---
+
+## What the pre-landing review changed
+
+A full `/review` pass on this branch found production holes the deferral notes did not anticipate, and they are fixed here: the **direct Linkup backend could silently return wrong answers** (its only guard was `isinstance(response, dict)`, which the `{data, sources}` envelope passes — and an output structure whose fields all carry defaults validates that envelope *successfully* into an all-defaults object); a **billed search whose shape was rejected vanished from the cost report** (both new guards raise after the provider answered and after usage was recorded, and the worker only reported on the success path); and **`pipelex validate` stopped catching an output class that cannot emit a JSON schema** (dropping `SearchObjectAssignment.make_for_class` in-process also dropped the only `model_json_schema()` call on that path, so a dry run passed and the live run died inside the worker on a bare `RuntimeError`).
+
+Both backends now recognise the envelope **structurally** — via `pipelex/cogt/search/structured_search_payload.py` — rather than inferring the response shape from their own request. That also decouples the deploy: when the relay stops asking Linkup for sources, the gateway keeps working on the bare payload instead of rejecting every search. Alongside: reporting moved into `finally` in both search methods; a schema-generability check with a typed `OutputStructureSchemaError` on the in-process dry arm; `json.loads` wrapped so a non-JSON relay body is classified; an empty result now says so and points at the query instead of advising "try a different model"; and `linkup/exceptions.py` became `linkup_exceptions.py` with a `LinkupError` base, matching the sibling providers.
+
+## Still deferred
+
+The items the review surfaced and did **not** fix are written up, with their evidence and the command that produced it, in [`wip/refactoring/leaf-conversion-and-search-follow-ups.md`](wip/refactoring/leaf-conversion-and-search-follow-ups.md) — cite them as **RF-1** … **RF-7**. **RF-1 is the one to settle before the plugin sweep:** the bare live re-raise documented above as deliberate is right, but the plugin's *own* two arms disagree about it — its object helper lets a live `ValidationError` escape workflow code, while its search submitter converts it to a terminal typed error with a comment explaining that letting it escape retries forever and hangs the submitter. Both run in workflow code, so they cannot both be right, and swapping in the shared helper as-is would carry that unresolved disagreement into the shared home.
+
+- **Func-registry entries outliving their library** (#1076's item 1). Ruled to be its own later PR, after these. `wip/refactoring/func-registry-entries-outlive-their-library.md`.
+- **Our distributed-execution plugin's copies of the revalidation helper.** Release-gated on shipping `object_revalidation` — but no longer just a swap: see **RF-1** (the live-error contract blocks adoption) and **RF-2** (the copies now diverge on the `by_alias` fix this branch announces, which is reachable only on the plugin's arm).
+- **Dry search leaves report no usage.** Pre-existing, not introduced here; a small design rather than a mechanical patch, because it means choosing the synthetic-search-job conventions. Now recorded as **RF-6** rather than living only in this file.
+- **The remaining test gaps, the missing Linkup request timeout, and a coupled optimisation trap on the LLM path** — **RF-3**, **RF-4**, **RF-5**. RF-5 is worth reading before anyone "cleans up" the unused `model_json_schema()` call in `ObjectAssignment.make_for_class`: that call is what still implicitly guards the LLM path.
 
 ## Cross-repo
 
-⚠ **An earlier revision of this file claimed "checked, nothing to change". That claim was false, and the reason is worth knowing: a workspace-rooted `grep -r … .` silently returned zero matches while iterating the sibling repo directories explicitly returned 71.** The sweep below was redone by enumerating `*/` one directory at a time. Never trust a single `.`-rooted recursive grep for a cross-repo sweep here.
+The sweep was done by enumerating the workspace's sibling repos one directory at a time. ⚠ A workspace-rooted `grep -r … .` silently returns zero matches here; exactly one consumer holds affected code, and every other hit is another worktree of this same repo.
 
-**`cocode` breaks on upgrade — release-gated, needs a follow-up PR in that repo.** `cocode/cocode/pipelines/doc_proofread/file_utils.py` carries `@pipe_func()` *and* a redundant module-level `func_registry.register_function(read_file_content, name="read_file_content")`. `cocode/cocode/swe/swe_cmd.py:18` dotted-imports that module at CLI startup, registering object **A**; `PIPELINE_LIBRARY_DIRS` then makes the same directory a library dir, so the boot scan re-imports the file under a path-mangled `sys.modules` key, the module-level call fires again with object **B**, and the new collision check raises. Every `cocode` command would die at first `load_libraries`. Shielded only by cocode's `pipelex==0.41.0` pin. The fix belongs in cocode and is a deletion: the `@pipe_func()` decorator already covers the registration, so the explicit call is redundant belt-and-braces. `cocode/cocode/pipelines/text_utils.py:81` is the same shape but currently latent — it has no `@pipe_func`, so the scan's AST pre-check skips the file entirely.
+**Our distributed-execution plugin** — carries the copies item 2 replaces, and needs no change for item 4: the structured-search activity calls the boundary arm, whose signature and return type did not move. Release-gated on this shipping; the swap is written up in the workspace notes, outside this repo.
 
-Checked and clean:
+**`pipelex-relay`** — optional alignment, not required for correctness, and **no longer a coordinated two-sided change**: the relay's structured route still passes `include_sources=True`, making Linkup gather sources the structured contract cannot carry, and wraps the payload in the `{data, sources}` envelope. The gateway worker now recognises that envelope *structurally* rather than demanding it, so the relay can stop requesting sources and return the payload alone on its own schedule — the worker handles either shape. What is left is that nothing on the producing side pins the contract, and the relay's own unit test asserts the opposite shape; that is **RF-7**.
 
-- The private Temporal plugin's `act_llm_gen_object` / `act_llm_gen_object_list` call `llm_gen_object(object_assignment=...)` with no class, so they take the boundary path unchanged. Its `content_generator_in_workflow.py` comment describing the reconstruction stays accurate for that path.
-- `pipelex-transport` and `pipelex-mistralai-workflows` bridge conftests register module-level function objects with teardown — the idempotent case.
-- `pipelex-demo-mistral` / `pipelex-demo-vibe` register `flaky_echo` explicitly, and it carries no `@pipe_func` decorator, so the folder scan's AST pre-check never imports the file. One registration per process.
-- The only `llm_gen_object` mention in `docs/specs/` is the `UnitJobId` string value, which did not change.
-
-## Docs touched
-
-- `docs/building-methods/pipes/pipe-operators/PipeFunc.md` — new "Function names share one flat name space" section.
-- `docs/under-the-hood/dry-run-mock-generation.md` — the dry object leaf resolves its class the same way the live leaf does; which typed error you get on which path.
-- `docs/under-the-hood/distributed-content-generation.md` — reconstruction is the boundary answer and only that; the type bridge is kept in-process on purpose.
+**`cocode` breaks on upgrade — still open, carried over from #1076, needs a follow-up PR in that repo.** `cocode/cocode/pipelines/doc_proofread/file_utils.py` carries `@pipe_func()` *and* a redundant module-level `func_registry.register_function(read_file_content, name="read_file_content")`. `cocode/cocode/swe/swe_cmd.py:18` dotted-imports that module at CLI startup, registering object **A**; `PIPELINE_LIBRARY_DIRS` then makes the same directory a library dir, so the boot scan re-imports the file under a path-mangled `sys.modules` key, the module-level call fires again with object **B**, and #1076's collision check raises. Every `cocode` command would die at first `load_libraries`. Shielded only by cocode's `pipelex==0.41.0` pin. The fix belongs in cocode and is a deletion: the `@pipe_func()` decorator already covers the registration. ⚠ `cocode/cocode/pipelines/text_utils.py:81` is *not* the same fix — it has no decorator, so its explicit call is its only registration.

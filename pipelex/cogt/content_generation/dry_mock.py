@@ -39,6 +39,7 @@ from typing import Any, Protocol
 
 from polyfactory.exceptions import FactoryException
 from pydantic import BaseModel, ValidationError
+from pydantic.errors import PydanticInvalidForJsonSchema
 
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import (
@@ -53,7 +54,7 @@ from pipelex.cogt.content_generation.assignment_models import (
 )
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
-from pipelex.cogt.content_generation.exceptions import DryRunMockBuildError
+from pipelex.cogt.content_generation.exceptions import DryRunMockBuildError, OutputStructureSchemaError
 from pipelex.cogt.content_generation.object_class_resolution import resolve_object_class
 from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
 from pipelex.cogt.llm.llm_job import LLMJob
@@ -416,14 +417,59 @@ def dry_search_gen_sourced_answer(search_assignment: SearchAssignment) -> Search
 
 
 def dry_search_gen_structured(search_object_assignment: SearchObjectAssignment) -> dict[str, Any]:
-    """Dry leaf for structured search: schema-built mock dumped to a dict, no provider.
+    """Dry leaf for structured search at the *boundary*: schema-built mock dumped to a dict, no provider.
 
-    Returns a raw dict (the leaf contract) which the submitter re-validates against the original
-    output structure class, matching the live path.
+    Returns a raw dict — the wire contract of the boundary arm — which the submitter re-validates
+    against the original output structure class, matching the live path. The mock is built from the
+    schema-reconstructed class, so an invariant the round trip drops surfaces there as
+    ``DryRunObjectFidelityError``.
+
+    ``by_alias=True`` keys the dict by the schema's property names, which is what the live arm returns
+    (the provider answers the schema it was given) and what the original class accepts. Without it, a
+    property the class rebuild had to rename — a python keyword, or a name shadowing a ``BaseModel``
+    attribute — would come back under the renamed key and fail re-validation; see
+    :func:`~pipelex.cogt.content_generation.object_revalidation.revalidate_leaf_object`.
     """
     log.verbose(f"🤡 DRY RUN: search_gen_structured for '{search_object_assignment.output_class_name}'")
-    output_class = SchemaToModelFactory.make_from_json_schema(
+    boundary_class = SchemaToModelFactory.make_from_json_schema(
         schema=search_object_assignment.output_class_schema,
         class_name=search_object_assignment.output_class_name,
     )
-    return build_mock_object(output_class).model_dump(mode="json")
+    return build_mock_object(boundary_class).model_dump(mode="json", by_alias=True)
+
+
+def dry_search_gen_structured_object(
+    search_assignment: SearchAssignment,
+    *,
+    output_class: type[BaseModelTypeVar],
+) -> BaseModelTypeVar:
+    """Dry leaf for structured search *in-process*: a mock built from the caller's own class, no provider.
+
+    Returns the instance rather than a dump of it, and that is load-bearing rather than a convenience:
+    ``build_mock_object`` runs the caller's validators, so dumping the mock for the submitter to
+    re-validate would run them a second time on data they already normalized — a transforming validator
+    would produce ``INV-INV-…``, the very defect the object path's ``isinstance`` short-circuit exists to
+    prevent, and no short-circuit can catch it once the instance has become a dict.
+
+    Because the mock is built from the real class, an invariant the schema round trip would have dropped
+    is present at build time, so an unsatisfiable one fails earlier and louder as ``DryRunMockBuildError``
+    instead of surviving into the boundary arm's ``DryRunObjectFidelityError``.
+
+    The schema check is here because carrying the class down took away the one that used to ride along
+    for free: the in-process arm built a ``SearchObjectAssignment``, whose factory called
+    ``model_json_schema()`` before any run-mode branch. Polyfactory is happy to mock a class pydantic
+    cannot describe, so without an explicit check ``pipelex validate`` would pass a method whose live run
+    dies inside the worker on a bare ``PydanticInvalidForJsonSchema`` — and the *boundary* arm still
+    builds the assignment, so a dry-run verdict would depend on how the method is deployed.
+    """
+    _validate_schema_is_generable(output_class=output_class)
+    log.verbose(f"🤡 DRY RUN: search_gen_structured_object for '{output_class.__name__}' ({search_assignment.search_handle})")
+    return build_mock_object(output_class)
+
+
+def _validate_schema_is_generable(*, output_class: type[BaseModel]) -> None:
+    """Prove the output class can describe itself as JSON Schema, which every structured leaf requires."""
+    try:
+        output_class.model_json_schema()
+    except PydanticInvalidForJsonSchema as exc:
+        raise OutputStructureSchemaError.for_object_class(object_class_name=output_class.__name__, reason=str(exc)) from exc

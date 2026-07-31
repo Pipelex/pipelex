@@ -1264,10 +1264,6 @@ rationale = "Factory from source: builds the result from the object_class; singl
 param = "output_class"
 rationale = "Factory from source: builds the result from the output_class; single operand."
 
-["pipelex/cogt/content_generation/content_generator.py::_revalidate_against_object_class"]
-param = "raw_obj"
-rationale = "Consumes the raw_obj; single operand."
-
 ["pipelex/cogt/content_generation/content_generator_protocol.py::ContentGeneratorProtocol.make_search_sourced_answer"]
 param = "search_assignment"
 rationale = "Factory from source: builds the result from the search_assignment; single operand."
@@ -1335,6 +1331,10 @@ rationale = "Consumes the search_assignment; single operand."
 ["pipelex/cogt/content_generation/dry_mock.py::dry_search_gen_structured"]
 param = "search_object_assignment"
 rationale = "Consumes the search_object_assignment; single operand."
+
+["pipelex/cogt/content_generation/dry_mock.py::dry_search_gen_structured_object"]
+param = "search_assignment"
+rationale = "Worker verb–object: processes the search_assignment; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::dry_templating_gen_text"]
 param = "templating_assignment"
@@ -1456,6 +1456,14 @@ rationale = "Processes the object assignment; single operand."
 param = "llm_assignment"
 rationale = "Processes the LLM assignment; single operand."
 
+["pipelex/cogt/content_generation/object_revalidation.py::revalidate_leaf_data"]
+param = "raw_data"
+rationale = "Consumes the raw_data the leaf returned; single operand."
+
+["pipelex/cogt/content_generation/object_revalidation.py::revalidate_leaf_object"]
+param = "raw_obj"
+rationale = "Consumes the raw_obj the leaf returned; single operand."
+
 ["pipelex/cogt/content_generation/render_generate.py::render_page_views_and_store"]
 param = "render_assignment"
 rationale = "Transforms/renders the render_assignment; single operand."
@@ -1500,6 +1508,10 @@ rationale = "Factory from source: builds the result from the search_assignment; 
 param = "search_assignment"
 rationale = "Factory from source: builds the result from the search_assignment; single operand."
 
+["pipelex/cogt/content_generation/search_generate.py::_run_structured_search"]
+param = "search_assignment"
+rationale = "Worker verb–object: processes the search_assignment; single operand."
+
 ["pipelex/cogt/content_generation/search_generate.py::search_gen_sourced_answer"]
 param = "search_assignment"
 rationale = "Worker verb–object: processes the search_assignment; single operand."
@@ -1507,6 +1519,10 @@ rationale = "Worker verb–object: processes the search_assignment; single opera
 ["pipelex/cogt/content_generation/search_generate.py::search_gen_structured"]
 param = "search_object_assignment"
 rationale = "Worker verb–object: processes the search_object_assignment; single operand."
+
+["pipelex/cogt/content_generation/search_generate.py::search_gen_structured_object"]
+param = "search_assignment"
+rationale = "Worker verb–object: processes the search_assignment; single operand."
 
 ["pipelex/cogt/content_generation/templating_generate.py::templating_gen_text"]
 param = "templating_assignment"

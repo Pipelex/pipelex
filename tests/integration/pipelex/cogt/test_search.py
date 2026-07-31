@@ -67,11 +67,12 @@ class TestSearch:
         )
         result = await worker.search_structured(search_job=search_job, schema=TopicSummary)
         pretty_print(result, title=f"Structured Search Result ({topic})")
+        # The result is the structured payload itself — what the leaf validates against the output
+        # structure class — not an envelope around it.
         assert isinstance(result, dict), "Expected a dict result"
-        assert "data" in result, "Expected 'data' key in result"
-        assert "sources" in result, "Expected 'sources' key in result"
-        data = result["data"]
-        assert "title" in data, "Expected 'title' key in data"
-        assert "summary" in data, "Expected 'summary' key in data"
-        assert "key_points" in data, "Expected 'key_points' key in data"
-        assert len(result["sources"]) > 0, "Expected at least one source"
+        assert "title" in result, "Expected 'title' key in result"
+        assert "summary" in result, "Expected 'summary' key in result"
+        assert "key_points" in result, "Expected 'key_points' key in result"
+        validated = TopicSummary.model_validate(result)
+        assert validated.title, "Expected a non-empty title"
+        assert validated.key_points, "Expected at least one key point"
