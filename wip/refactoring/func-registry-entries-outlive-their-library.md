@@ -42,4 +42,4 @@ Do **not** "fix" it by weakening the collision check back to a silent overwrite 
 
 ## Related
 
-- `wip/inputs/structured-search-still-rebuilds-in-process.md`, `wip/inputs/boundary-revalidation-round-trip-is-unaudited.md` — the other deferrals out of the same PR.
+- `wip/refactoring/structured-search-still-rebuilds-in-process.md`, `wip/refactoring/boundary-revalidation-round-trip-is-unaudited.md` — the other deferrals out of the same PR.

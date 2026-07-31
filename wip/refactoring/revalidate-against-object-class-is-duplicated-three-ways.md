@@ -27,7 +27,7 @@ That is correct today: across `workflow.execute_activity` the object is always a
 ## What doing it looks like
 
 1. Promote one public helper into `pipelex.cogt.content_generation` — the plugin already imports from that package, so this needs no new boundary.
-2. Give it the dump mode as a parameter rather than forking the function. **Do not** unify blindly on `mode="json"` for the in-process path: it coerces values (datetime → str and back) and the round-trip's edge cases are unaudited — see `wip/inputs/boundary-revalidation-round-trip-is-unaudited.md`, which is about exactly this conversion.
+2. Give it the dump mode as a parameter rather than forking the function. **Do not** unify blindly on `mode="json"` for the in-process path: it coerces values (datetime → str and back) and the round-trip's edge cases are unaudited — see `wip/refactoring/boundary-revalidation-round-trip-is-unaudited.md`, which is about exactly this conversion.
 3. Fold the `make_search_structured` inline into it, or give the dict-in case its own thin entry point on the same helper, so the fidelity-error contract has one home.
 4. Then delete the plugin's copy and have it call the shared one.
 
@@ -35,5 +35,5 @@ The prize is not line count — it is that the fidelity-error contract, and the 
 
 ## Related
 
-- `wip/inputs/boundary-revalidation-round-trip-is-unaudited.md` — what the shared helper's boundary arm actually does, and what has not been checked about it.
-- `wip/inputs/structured-search-still-rebuilds-in-process.md` — the search path's other half of the same story.
+- `wip/refactoring/boundary-revalidation-round-trip-is-unaudited.md` — what the shared helper's boundary arm actually does, and what has not been checked about it.
+- `wip/refactoring/structured-search-still-rebuilds-in-process.md` — the search path's other half of the same story.

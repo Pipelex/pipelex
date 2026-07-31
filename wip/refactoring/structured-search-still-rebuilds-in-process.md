@@ -32,4 +32,4 @@ Mirror the object path exactly — that is the point:
 
 ## Related
 
-- `wip/inputs/boundary-revalidation-round-trip-is-unaudited.md` — the other deferral out of the same PR.
+- `wip/refactoring/boundary-revalidation-round-trip-is-unaudited.md` — the other deferral out of the same PR.
