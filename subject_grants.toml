@@ -1333,8 +1333,8 @@ param = "search_object_assignment"
 rationale = "Consumes the search_object_assignment; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::dry_search_gen_structured_object"]
-param = "search_object_assignment"
-rationale = "Worker verb–object: processes the search_object_assignment; single operand."
+param = "search_assignment"
+rationale = "Worker verb–object: processes the search_assignment; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::dry_templating_gen_text"]
 param = "templating_assignment"
@@ -1509,8 +1509,8 @@ param = "search_assignment"
 rationale = "Factory from source: builds the result from the search_assignment; single operand."
 
 ["pipelex/cogt/content_generation/search_generate.py::_run_structured_search"]
-param = "search_object_assignment"
-rationale = "Worker verb–object: processes the search_object_assignment; single operand."
+param = "search_assignment"
+rationale = "Worker verb–object: processes the search_assignment; single operand."
 
 ["pipelex/cogt/content_generation/search_generate.py::search_gen_sourced_answer"]
 param = "search_assignment"
@@ -1521,8 +1521,8 @@ param = "search_object_assignment"
 rationale = "Worker verb–object: processes the search_object_assignment; single operand."
 
 ["pipelex/cogt/content_generation/search_generate.py::search_gen_structured_object"]
-param = "search_object_assignment"
-rationale = "Worker verb–object: processes the search_object_assignment; single operand."
+param = "search_assignment"
+rationale = "Worker verb–object: processes the search_assignment; single operand."
 
 ["pipelex/cogt/content_generation/templating_generate.py::templating_gen_text"]
 param = "templating_assignment"

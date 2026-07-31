@@ -10,7 +10,6 @@ from pipelex.cogt.content_generation.assignment_models import (
     ObjectAssignment,
     RenderPageViewsAssignment,
     SearchAssignment,
-    SearchObjectAssignment,
     TemplatingAssignment,
 )
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
@@ -300,11 +299,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         search_assignment: SearchAssignment,
     ) -> BaseModelTypeVar:
         # In-process, so the caller's class travels down to the leaf exactly as it does on the object
-        # paths, and comes back as an instance of itself — validated once, next to the provider.
-        return await search_gen_structured_object(
-            SearchObjectAssignment.make_for_class(
-                output_class=output_structure_class,
-                search_assignment=search_assignment,
-            ),
-            output_class=output_structure_class,
-        )
+        # paths, and comes back as an instance of itself — validated once, next to the provider. No
+        # `SearchObjectAssignment` is built here: that wire model ships the class's schema across a
+        # boundary, and this arm has none to cross.
+        return await search_gen_structured_object(search_assignment, output_class=output_structure_class)

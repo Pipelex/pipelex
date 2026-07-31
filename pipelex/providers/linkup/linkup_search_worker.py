@@ -1,6 +1,6 @@
 import json
 from datetime import date
-from typing import Any
+from typing import Any, cast
 
 from linkup import (
     LinkupAuthenticationError,
@@ -15,7 +15,8 @@ from linkup import (
 )
 from typing_extensions import override
 
-from pipelex.cogt.inference.error_classification import extract_linkup_metadata
+from pipelex.cogt.exceptions import InferenceErrorCategory
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_linkup_metadata
 from pipelex.cogt.inference.error_classify import classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -25,6 +26,7 @@ from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
+from pipelex.providers.linkup.exceptions import LinkupSearchResponseError
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.runtime_hub import get_secrets_provider
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
@@ -165,6 +167,20 @@ class LinkupSearchWorker(SearchWorkerAbstract):
         # The contract of a structured search is the structured payload itself — it is validated against
         # the caller's output structure class, which has nowhere to put sources. Asking for them wrapped
         # the payload in a {data, sources} envelope that no output class could accept, so this asks for
-        # the payload alone, matching what the gateway backend returns.
-        structured_result: dict[str, Any] = response
-        return structured_result
+        # the payload alone. (The gateway backend's relay still asks for sources; its worker unwraps the
+        # envelope on receipt — both backends hand the leaf the bare payload.)
+        # The schema crossed as a string, so the SDK did no validation of its own: `response` is the
+        # provider's JSON verbatim, typed `Any`. Guard the shape here so a non-object payload surfaces
+        # as a classified search error naming the model, not as an opaque ValidationError at the leaf.
+        if not isinstance(response, dict):
+            msg = f"Linkup structured search returned a non-object payload of type '{type(response).__name__}'"
+            raise LinkupSearchResponseError(
+                msg,
+                error_category=InferenceErrorCategory.UNKNOWN,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_MODEL,
+                    detail="Linkup returned a malformed structured search response — try a different model",
+                ),
+                provider_metadata=None,
+            )
+        return cast("dict[str, Any]", response)

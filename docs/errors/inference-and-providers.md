@@ -91,6 +91,7 @@ own page. Classes are grouped by subsystem.
 - [`GatewaySearchResponseError`](gateway-search-response-error.md) — Gateway search response
 - [`GoogleImgGenWorkerError`](google-img-gen-worker-error.md) — Google img gen worker
 - [`GoogleLLMWorkerError`](google-llm-worker-error.md) — Google LLM worker
+- [`LinkupSearchResponseError`](linkup-search-response-error.md) — Linkup search response
 - [`MistralExtractResponseError`](mistral-extract-response-error.md) — Mistral extract response
 - [`MistralModelListingError`](mistral-model-listing-error.md) — Mistral model listing
 - [`MistralPluginError`](mistral-plugin-error.md) — Mistral plugin

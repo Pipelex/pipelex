@@ -122,8 +122,29 @@ class GatewaySearchWorker(SearchWorkerAbstract):
         self._extract_usage(response=response, search_job=search_job)
 
         content_str = self._extract_content(response)
-        result: dict[str, Any] = json.loads(content_str)
-        return result
+        envelope: Any = json.loads(content_str)
+        # The relay asks Linkup for sources alongside the structured payload, so its wire shape is a
+        # {data, sources} envelope — but the contract of a structured search is the payload alone: it is
+        # validated against the caller's output structure class, which has nowhere to put sources.
+        # Unwrap here, loudly, so a relay contract change surfaces as a classified search error instead
+        # of an opaque validation failure against the caller's class.
+        structured_payload: Any
+        if isinstance(envelope, dict):
+            structured_payload = cast("dict[str, Any]", envelope).get("data")
+        else:
+            structured_payload = None
+        if not isinstance(structured_payload, dict):
+            msg = "Gateway structured search response is not a {data, sources} envelope carrying an object payload"
+            raise GatewaySearchResponseError(
+                msg,
+                error_category=InferenceErrorCategory.UNKNOWN,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_MODEL,
+                    detail="The Gateway returned a malformed structured search response — try a different model",
+                ),
+                provider_metadata=None,
+            )
+        return cast("dict[str, Any]", structured_payload)
 
     def _extract_usage(self, response: GenericResponse, *, search_job: SearchJob) -> None:
         """Extract token usage from the GenericResponse and populate the search job report."""

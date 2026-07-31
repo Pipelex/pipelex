@@ -9,7 +9,9 @@ loop, which left search failures hanging the submitter — see ``wip/`` brief).
 
 The structured search has two entry points rather than one nullable parameter, because its two arms
 genuinely return different things: in-process the caller's class travels down and an instance of it
-comes back; at the boundary only the schema is available and the raw dict stays on the wire.
+comes back; at the boundary only the schema is available and the raw dict stays on the wire. Only the
+boundary arm takes the ``SearchObjectAssignment`` wire model — in-process nothing crosses a boundary,
+so there is no schema to ship and the plain ``SearchAssignment`` travels beside the class itself.
 """
 
 from typing import Any
@@ -22,8 +24,8 @@ from pipelex.cogt.content_generation.dry_mock import (
     dry_search_gen_structured,
     dry_search_gen_structured_object,
 )
-from pipelex.cogt.content_generation.object_class_resolution import resolve_search_output_class
 from pipelex.cogt.content_generation.object_revalidation import revalidate_leaf_data
+from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.search.search_job import SearchJob
 from pipelex.cogt.search.search_job_factory import SearchJobFactory
@@ -77,12 +79,15 @@ async def search_gen_structured(search_object_assignment: SearchObjectAssignment
     search_assignment = search_object_assignment.search_assignment
     if search_assignment.cogt_run_params.run_mode.is_dry:
         return dry_search_gen_structured(search_object_assignment)
-    boundary_class = resolve_search_output_class(search_object_assignment=search_object_assignment, output_class=None)
-    return await _run_structured_search(search_object_assignment, schema=boundary_class)
+    boundary_class = SchemaToModelFactory.make_from_json_schema(
+        schema=search_object_assignment.output_class_schema,
+        class_name=search_object_assignment.output_class_name,
+    )
+    return await _run_structured_search(search_assignment, schema=boundary_class)
 
 
 async def search_gen_structured_object(
-    search_object_assignment: SearchObjectAssignment,
+    search_assignment: SearchAssignment,
     *,
     output_class: type[BaseModelTypeVar],
 ) -> BaseModelTypeVar:
@@ -90,26 +95,25 @@ async def search_gen_structured_object(
 
     The class travels down to the provider unchanged, so the search is constrained by the schema the
     caller actually wrote — its custom validators are reflected in the hints and description the schema
-    carries, rather than being erased by a JSON-schema rebuild.
+    carries, rather than being erased by a JSON-schema rebuild. No ``SearchObjectAssignment`` is built
+    on this arm: that wire model exists to ship the schema across a boundary, and here there is none.
 
     Returns an instance rather than a dict because the validation belongs here, next to the provider:
     doing it once at the leaf is what stops the caller's validators running a second time in the
     submitter. The two arms of this module therefore differ in return type on purpose — a dict is the
     wire's shape, an instance is the caller's.
     """
-    search_assignment = search_object_assignment.search_assignment
     if search_assignment.cogt_run_params.run_mode.is_dry:
-        return dry_search_gen_structured_object(search_object_assignment, output_class=output_class)
-    result_dict = await _run_structured_search(search_object_assignment, schema=output_class)
+        return dry_search_gen_structured_object(search_assignment, output_class=output_class)
+    result_dict = await _run_structured_search(search_assignment, schema=output_class)
     # ``is_mock_built=False`` is a statement, not a formality: this data came from the provider, so a
     # failure here is a malformed response and keeps its ``ValidationError`` — it is not the dry-run
     # schema-round-trip gap, which cannot arise on an arm that never rebuilt the class.
     return revalidate_leaf_data(result_dict, object_class=output_class, is_mock_built=False)
 
 
-async def _run_structured_search(search_object_assignment: SearchObjectAssignment, *, schema: type[BaseModel]) -> dict[str, Any]:
+async def _run_structured_search(search_assignment: SearchAssignment, *, schema: type[BaseModel]) -> dict[str, Any]:
     """Resolve the worker and run the provider call — the part both arms share."""
-    search_assignment = search_object_assignment.search_assignment
     worker = _make_search_worker(search_assignment)
     search_job = _make_search_job(search_assignment)
     return await worker.search_structured(search_job=search_job, schema=schema)

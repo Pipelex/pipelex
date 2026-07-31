@@ -98,15 +98,19 @@ def _dry_object_assignment() -> ObjectAssignment:
     return ObjectAssignment.make_for_class(object_class=SimpleName, llm_assignment=llm_assignment)
 
 
+def _live_search_assignment() -> SearchAssignment:
+    return SearchAssignment(
+        job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_search_class_passthrough"),
+        cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
+        query="make a name",
+        search_setting=SearchSetting(model="mock-search-handle"),
+    )
+
+
 def _live_search_object_assignment() -> SearchObjectAssignment:
     return SearchObjectAssignment.make_for_class(
         output_class=HintedName,
-        search_assignment=SearchAssignment(
-            job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_search_class_passthrough"),
-            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
-            query="make a name",
-            search_setting=SearchSetting(model="mock-search-handle"),
-        ),
+        search_assignment=_live_search_assignment(),
     )
 
 
@@ -250,7 +254,7 @@ class TestObjectClassPassthrough:
         """The structured-search leaf carries the same contract as the object leaf, asserted the same way."""
         mock_worker = _patch_search_worker(mocker, search_structured_result={"name": "PFX_ok"})
 
-        await search_gen_structured_object(_live_search_object_assignment(), output_class=HintedName)
+        await search_gen_structured_object(_live_search_assignment(), output_class=HintedName)
 
         assert mock_worker.search_structured.await_args.kwargs["schema"] is HintedName
 

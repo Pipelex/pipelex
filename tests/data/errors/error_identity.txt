@@ -149,6 +149,7 @@ LLMSettingsValidationError | LLM settings validation | https://docs.pipelex.com/
 LangfuseCredentialsError | Langfuse credentials | https://docs.pipelex.com/latest/errors/langfuse-credentials-error/
 LibraryError | Library error | https://docs.pipelex.com/latest/errors/library-error/
 LibraryLoadingError | Library loading | https://docs.pipelex.com/latest/errors/library-loading-error/
+LinkupSearchResponseError | Linkup search response | https://docs.pipelex.com/latest/errors/linkup-search-response-error/
 ListWhereSingularError | List where singular | https://docs.pipelex.com/latest/errors/list-where-singular-error/
 MissingBundleValidatorError | Missing bundle validator | https://docs.pipelex.com/latest/errors/missing-bundle-validator-error/
 MissingDependencyError | Missing dependency | https://docs.pipelex.com/latest/errors/missing-dependency-error/

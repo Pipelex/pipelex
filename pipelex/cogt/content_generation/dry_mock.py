@@ -54,7 +54,8 @@ from pipelex.cogt.content_generation.assignment_models import (
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.content_generation.exceptions import DryRunMockBuildError
-from pipelex.cogt.content_generation.object_class_resolution import resolve_object_class, resolve_search_output_class
+from pipelex.cogt.content_generation.object_class_resolution import resolve_object_class
+from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobReport
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -429,12 +430,15 @@ def dry_search_gen_structured(search_object_assignment: SearchObjectAssignment) 
     :func:`~pipelex.cogt.content_generation.object_revalidation.revalidate_leaf_object`.
     """
     log.verbose(f"🤡 DRY RUN: search_gen_structured for '{search_object_assignment.output_class_name}'")
-    boundary_class = resolve_search_output_class(search_object_assignment=search_object_assignment, output_class=None)
+    boundary_class = SchemaToModelFactory.make_from_json_schema(
+        schema=search_object_assignment.output_class_schema,
+        class_name=search_object_assignment.output_class_name,
+    )
     return build_mock_object(boundary_class).model_dump(mode="json", by_alias=True)
 
 
 def dry_search_gen_structured_object(
-    search_object_assignment: SearchObjectAssignment,
+    search_assignment: SearchAssignment,
     *,
     output_class: type[BaseModelTypeVar],
 ) -> BaseModelTypeVar:
@@ -450,5 +454,5 @@ def dry_search_gen_structured_object(
     is present at build time, so an unsatisfiable one fails earlier and louder as ``DryRunMockBuildError``
     instead of surviving into the boundary arm's ``DryRunObjectFidelityError``.
     """
-    log.verbose(f"🤡 DRY RUN: search_gen_structured for '{search_object_assignment.output_class_name}'")
+    log.verbose(f"🤡 DRY RUN: search_gen_structured_object for '{output_class.__name__}' ({search_assignment.search_handle})")
     return build_mock_object(output_class)

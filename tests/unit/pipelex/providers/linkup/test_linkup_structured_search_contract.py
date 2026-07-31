@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field, field_validator
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
+from pipelex.providers.linkup.exceptions import LinkupSearchResponseError
 from pipelex.providers.linkup.linkup_search_worker import LinkupSearchWorker
 
 
@@ -101,3 +102,10 @@ class TestLinkupStructuredSearchContract:
         # The caller's transforming validator has not run yet — it runs once, when the leaf validates.
         validated = TopicSummary.model_validate(result)
         assert validated.title == "INV-pipelex"
+
+    async def test_a_non_object_payload_raises_a_classified_search_error(self, mocker: MockerFixture) -> None:
+        """The SDK returns the provider's JSON verbatim, so a non-object payload must surface here as a classified error, not at the leaf."""
+        worker = _make_worker(mocker, sdk_result=["not", "an", "object"])
+
+        with pytest.raises(LinkupSearchResponseError, match="list"):
+            await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
