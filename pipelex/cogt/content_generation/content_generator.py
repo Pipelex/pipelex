@@ -1,6 +1,5 @@
 from typing import Any
 
-from pydantic import BaseModel, ValidationError
 from typing_extensions import override
 
 from pipelex import log
@@ -16,13 +15,13 @@ from pipelex.cogt.content_generation.assignment_models import (
 )
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
-from pipelex.cogt.content_generation.exceptions import DryRunObjectFidelityError
 from pipelex.cogt.content_generation.extract_generate import extract_gen_pages_and_store
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.content_generation.img_gen_generate import img_gen_image_list_and_store, img_gen_single_image_and_store
 from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen_object_list, llm_gen_text
+from pipelex.cogt.content_generation.object_revalidation import revalidate_leaf_object
 from pipelex.cogt.content_generation.render_generate import render_page_views_and_store
-from pipelex.cogt.content_generation.search_generate import search_gen_sourced_answer, search_gen_structured
+from pipelex.cogt.content_generation.search_generate import search_gen_sourced_answer, search_gen_structured_object
 from pipelex.cogt.content_generation.templating_generate import templating_gen_text
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
@@ -39,50 +38,6 @@ from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
-
-
-def _revalidate_against_object_class(
-    raw_obj: BaseModel,
-    *,
-    object_class: type[BaseModelTypeVar],
-    is_mock_built: bool,
-) -> BaseModelTypeVar:
-    """Convert a leaf-generated object into ``object_class``, unless it already is one.
-
-    On the in-process path the leaf worked from ``object_class``, so the object is already one — note
-    ``isinstance``, not ``type(...) is``: instructor does not hand back the class you gave it, it hands
-    back ``create_model(cls.__name__, __base__=(cls, OpenAISchema))``, a *subclass*. Either way it needs
-    no conversion — and re-validating it would run the caller's validators a **second** time, on data
-    they already normalized. A validator that transforms rather than merely rejects (``f"INV-{value}"``, a
-    list that gets a default appended) would corrupt its own output, and one that asserts its input is
-    not yet normalized would reject valid provider output. Returning it untouched is what makes the
-    caller's validator constrain the provider exactly once, which is the whole point of handing the live
-    class down.
-
-    The conversion is still needed at the *boundary*: a leaf that ran on a worker holding only the
-    serialized assignment returns a plain ``BaseModel`` reconstructed from the JSON schema — never a
-    subclass of ``object_class`` — so re-validating its data makes the result the proper subtype (e.g.
-    ``StructuredContent``) the caller expects.
-
-    Under the dry-run leaf mock (``run_mode=DRY``) that reconstruction is also what polyfactory built the
-    mock from, and it can drop invariants the original class enforces (custom validators,
-    ``json_schema_extra`` format/pattern hints datamodel-code-generator omits on round-trip). A
-    re-validation failure there is the known object-mock fidelity gap, so the ``ValidationError`` is
-    re-raised as a clear typed :class:`DryRunObjectFidelityError` naming the class and the
-    ``examples`` / ``mock_format`` remedy. That gap cannot occur in-process — the mock is built from the
-    real class, so an unsatisfiable invariant fails earlier and louder, as ``DryRunMockBuildError`` out of
-    ``build_mock_object``, and never reaches this function. The catch is scoped to the dry path only — a
-    LIVE provider's invalid output keeps its existing ``ValidationError``.
-    """
-    if isinstance(raw_obj, object_class):
-        return raw_obj
-    raw_data = raw_obj.model_dump(serialize_as_any=True)
-    if not is_mock_built:
-        return object_class.model_validate(raw_data)
-    try:
-        return object_class.model_validate(raw_data)
-    except ValidationError as exc:
-        raise DryRunObjectFidelityError.for_object_class(object_class.__name__) from exc
 
 
 class ContentGenerator(ContentGeneratorProtocol):
@@ -146,7 +101,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         raw_obj = await llm_gen_object(object_assignment=object_assignment, object_class=object_class)
         log.verbose(f"{self.__class__.__name__} generated object direct: {raw_obj}")
-        return _revalidate_against_object_class(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry)
+        return revalidate_leaf_object(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry)
 
     @override
     @update_job_metadata
@@ -173,10 +128,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         raw_list = await llm_gen_object_list(object_assignment=object_assignment, object_class=object_class)
         log.verbose(f"{self.__class__.__name__} generated object list direct: {raw_list}")
-        return [
-            _revalidate_against_object_class(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry)
-            for raw_obj in raw_list
-        ]
+        return [revalidate_leaf_object(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry) for raw_obj in raw_list]
 
     @override
     @update_job_metadata
@@ -347,17 +299,12 @@ class ContentGenerator(ContentGeneratorProtocol):
         output_structure_class: type[BaseModelTypeVar],
         search_assignment: SearchAssignment,
     ) -> BaseModelTypeVar:
-        result_dict = await search_gen_structured(
-            search_object_assignment=SearchObjectAssignment.make_for_class(
+        # In-process, so the caller's class travels down to the leaf exactly as it does on the object
+        # paths, and comes back as an instance of itself — validated once, next to the provider.
+        return await search_gen_structured_object(
+            SearchObjectAssignment.make_for_class(
                 output_class=output_structure_class,
                 search_assignment=search_assignment,
             ),
+            output_class=output_structure_class,
         )
-        # Same fidelity guard as the object paths (D6): a mock-built dict that fails re-validation
-        # against the original class is the known schema-round-trip gap, not a provider fault.
-        if not search_assignment.cogt_run_params.run_mode.is_dry:
-            return output_structure_class.model_validate(result_dict)
-        try:
-            return output_structure_class.model_validate(result_dict)
-        except ValidationError as exc:
-            raise DryRunObjectFidelityError.for_object_class(output_structure_class.__name__) from exc

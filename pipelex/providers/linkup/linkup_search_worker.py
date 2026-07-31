@@ -1,3 +1,4 @@
+import json
 from datetime import date
 from typing import Any
 
@@ -116,20 +117,27 @@ class LinkupSearchWorker(SearchWorkerAbstract):
         job_params = search_job.job_params
         search_setting = job_params.search_setting
 
+        # The schema crosses as a JSON string, which is byte-for-byte what the SDK puts on the wire when
+        # handed the class itself. Handing it the class would *also* make it instantiate that class from
+        # the response — running the caller's validators inside the SDK, and then again when the leaf
+        # validates the dict this returns. Serializing the schema here keeps the response raw and the
+        # validation single, at the leaf, where the run mode and the fidelity contract live.
+        schema_json = json.dumps(schema.model_json_schema())
+
         depth_value = SearchDepth(self.inference_model.model_id.rsplit("/", 1)[-1])
         try:
             response = await self._linkup_client.async_search(
                 query=search_job.query,
                 depth=depth_value,  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]
                 output_type="structured",
-                structured_output_schema=schema,
+                structured_output_schema=schema_json,
                 include_images=search_setting.include_images,
                 max_results=search_setting.max_results,
                 include_domains=job_params.include_domains,
                 exclude_domains=job_params.exclude_domains,
                 from_date=self._parse_date(job_params.from_date),
                 to_date=self._parse_date(job_params.to_date),
-                include_sources=True,
+                include_sources=False,
             )
         except (
             LinkupAuthenticationError,
@@ -154,8 +162,9 @@ class LinkupSearchWorker(SearchWorkerAbstract):
         if search_tokens_usage := search_job.job_report.search_tokens_usage:
             search_tokens_usage.nb_tokens_by_category = {TokenCategory.INPUT: 1_000_000, TokenCategory.OUTPUT: 1_000_000}
 
-        # If response is a Pydantic model, convert to dict
-        if hasattr(response, "model_dump"):
-            result: dict[str, Any] = response.model_dump()
-            return result
-        return dict(response)  # type: ignore[arg-type]
+        # The contract of a structured search is the structured payload itself — it is validated against
+        # the caller's output structure class, which has nowhere to put sources. Asking for them wrapped
+        # the payload in a {data, sources} envelope that no output class could accept, so this asks for
+        # the payload alone, matching what the gateway backend returns.
+        structured_result: dict[str, Any] = response
+        return structured_result

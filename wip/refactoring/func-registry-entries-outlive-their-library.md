@@ -46,4 +46,4 @@ Do **not** "fix" it by weakening the collision check back to a silent overwrite 
 
 ## Related
 
-- `wip/refactoring/structured-search-still-rebuilds-in-process.md`, `wip/refactoring/boundary-revalidation-round-trip-is-unaudited.md` — the other deferrals out of the same PR.
+- The other deferrals out of the same PR are done: the shared revalidation helper and the structured-search class threading landed on `refactor/Follow-ups` (see that branch's `TODOS.md`), and the boundary round trip is now audited in `wip/refactoring/boundary-revalidation-round-trip-audit.md`. This one is the last of the four, and stays its own PR.

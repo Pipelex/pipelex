@@ -52,6 +52,7 @@ A dry run does not swap in a special content generator: `run_mode=DRY` rides `Co
 |---------|-------------|-----------------|
 | `pipelex validate` | `BundleValidator.validate_pipes()` | `WorkingMemoryFactory.make_mock_inputs()` |
 | `PipeLLM` output in dry mode | `dry_llm_gen_object()` / `dry_llm_gen_object_list()` (cogt leaf, `dry_mock.py`) | `DryRunFactory` via the caller's class in-process, via the schema-reconstructed class on a worker |
+| `PipeSearch` structured output in dry mode | `dry_search_gen_structured_object()` in-process / `dry_search_gen_structured()` on a worker (cogt leaf, `dry_mock.py`) | Same split as `PipeLLM`; the worker arm dumps its mock to a dict, because the leaf's result crosses the boundary as data |
 | `PipeFunc` output in dry mode | `WorkingMemoryFactory.make_mock_content()` | `DryRunFactory` (with explicit field constraints) |
 | `PipeCompose` in dry mode | `StructuredContentComposer.compose()` | Uses resolved values from working memory; falls back to a `DryRunFactory` mock of the output class only when a value error hits under mock inputs |
 
