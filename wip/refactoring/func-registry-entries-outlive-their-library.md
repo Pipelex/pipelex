@@ -16,10 +16,14 @@ Before #1076 the same sequence silently overwrote, and B won — which for the s
 
 ## Who this hits
 
-- A self-hosted, direct-mode `pipelex-api` serving `/validate` or `/execute` for more than one project.
-- The local MCP workshop across bundles.
+**No first-party host can reach this today** — an earlier revision of this note named two victims, and tracing the code shows both are immune:
 
-Not the hosted runner: `is_pipe_func_sandbox_hosted()` takes the source-capture branch and never registers in-process.
+- A self-hosted, direct-mode `pipelex-api` cannot vary its PipeFunc directories within one process. `ApiRunner()` is constructed per request with `library_dirs=None`, which `resolve_library_dirs` resolves to instance defaults fixed at boot or `PIPELEXPATH` — both process-constant. The per-request variation is inline `.mthds` text, which registers no functions. Re-scanning the same constant dirs returns `sys.modules`-cached modules, so the same function objects re-register and the idempotent no-op absorbs them.
+- The local MCP workshop (`pipelex-mcp`) is a TypeScript stdio *client* of the Pipelex API — it runs no pipelex in-process, and `.mthds` contents travel as text with no Python. It can only hit whatever server backs it, which is the previous (immune) case or the hosted runner.
+
+Not the hosted runner either: `is_pipe_func_sandbox_hosted()` takes the source-capture branch and never registers in-process. The Temporal worker ignores `library_dirs` outright, and the transported-PipeFunc path is one-shot per process.
+
+The exposed population is a **third-party embedder**: a long-lived Python process passing *different* `library_dirs` per call through the public surface (`PipelexMTHDSProtocol(library_dirs=…)`, `validate_bundles_in_process(library_dirs=…)`, `acquire_library(library_dirs=…)`), where two projects' Python files share a registration name. That is a legitimate use of a public parameter, so the narrowing is real — but when it fires, the failure is loud and typed (`FuncRegistryError` naming both origins and the `@pipe_func(name=...)` remedy), not silent corruption. This is why the narrowing was ruled non-blocking for PR #1076 (decision 2026-07-31): ship with the gap documented, fix ownership in its own PR.
 
 Two loads of the **same** bundle are fine — `import_module_from_file` returns the module cached under its absolute-path key, so the second scan re-registers the identical object and the idempotent no-op absorbs it. The failure needs two *different* files that share a registration name.
 

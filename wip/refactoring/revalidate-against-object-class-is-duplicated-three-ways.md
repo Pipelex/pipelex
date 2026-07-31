@@ -28,7 +28,7 @@ That is correct today: across `workflow.execute_activity` the object is always a
 
 1. Promote one public helper into `pipelex.cogt.content_generation` — the plugin already imports from that package, so this needs no new boundary.
 2. Give it the dump mode as a parameter rather than forking the function. **Do not** unify blindly on `mode="json"` for the in-process path: it coerces values (datetime → str and back) and the round-trip's edge cases are unaudited — see `wip/refactoring/boundary-revalidation-round-trip-is-unaudited.md`, which is about exactly this conversion.
-3. Fold the `make_search_structured` inline into it, or give the dict-in case its own thin entry point on the same helper, so the fidelity-error contract has one home.
+3. Fold the `make_search_structured` inline into it, or give the dict-in case its own thin entry point on the same helper, so the fidelity-error contract has one home. The dict arm has no `isinstance` short-circuit (a dict is never an instance of the class), so its validation is the single one — and that shapes the search-path fix: see the dry-arm double-validation trap recorded in `wip/refactoring/structured-search-still-rebuilds-in-process.md`, which the helper's contract must accommodate.
 4. Then delete the plugin's copy and have it call the shared one.
 
 The prize is not line count — it is that the fidelity-error contract, and the `isinstance`-not-`type` reasoning, stop being things you have to already know to get right.
