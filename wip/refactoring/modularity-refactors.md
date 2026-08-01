@@ -1,6 +1,6 @@
 # Three modularity refactors after the hub split
 
-> ⚠ **SUPERSEDED IN PART — read [`../../TODOS.md`](../../TODOS.md) first.** An engineering review on 2026-07-27 (plus an independent Codex pass) reversed and re-ruled several decisions below. The tracker is now authoritative for *what to do*; this document remains the record of the *original* reasoning. Specifically:
+> ⚠ **SUPERSEDED IN PART — read [`modularity-refactors-tracker.md`](modularity-refactors-tracker.md) first.** An engineering review on 2026-07-27 (plus an independent Codex pass) reversed and re-ruled several decisions below. The tracker is now authoritative for *what to do*; this document remains the record of the *original* reasoning. Specifically:
 >
 > - **D-M1-2 is REVERSED.** `pipe_blueprint.py` is **interpreter-layer and moves**, together with `validation.py`, `template_guard_lint.py` and `handle_pipe_errors.py`. The measurement below counts **outbound** imports, which tells you whether a module is a *leaf*, not which layer owns it. The deciding test is **inbound**: zero declared runtime-layer modules import any of those four. Sections "The rulings that shape the hoist" (below), move 5, and the Decisions row for D-M1-2 are all stale.
 > - **The rule of thumb is NOT rewritten.** *"If it names a `Pipe`, it belongs to the interpreter layer"* was correct all along; move 5's proposed replacement only existed to accommodate the `pipe_blueprint` misclassification.
