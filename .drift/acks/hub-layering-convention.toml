@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:2a3662e43c2de3ecd77a1bb3ff50b911e36f5165531a1c85587acf9f055b6841"
+digest = "sha256:bc7a86460032c9ba507dc6d580bab382077b5d963c891ad1fa525d64beb820a3"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-01T17:06:17Z"
-rationale = "Trigger is the kernel extraction adding pipelex.kernel to RUNTIME_LAYER_PACKAGES. Reviewed docs/contribute/hub-layering.md and made two changes. (1) Ran the page's prescribed mechanical check: all fifteen names in RUNTIME_LAYER_PACKAGES appear under 'The rule', including the new pipelex.kernel, whose enumeration entry and its why-declared-ahead-of-a-breach paragraph landed with the guard change. (2) Added a fourth gate to the Enforcement section: tests/unit/pipelex/kernel/test_kernel_boot_contract.py boots runtime-only, CALLS a kernel op, and sweeps sys.modules after the call rather than after the import. That order closes the function-local blind spot the page's own 'Known inversions' section describes — verified rather than asserted, by injecting a function-local pipe_operators import into a kernel op and observing check-hub-layering exit 0 and the import-closure module pass 15 while only the new test went red. The page previously described three gates and would have understated its own coverage."
+reviewed_at = "2026-08-01T18:35:20Z"
+rationale = "Trigger is the forced-DRY fix adding resolve_run_mode_for_boot to runtime_hub.py. Reviewed docs/contribute/hub-layering.md and made two changes. (1) Added the new symbol to the runtime_hub accessor table under 'run mode', beside is_dry_run_forced. (2) The substantive one: the page opens by defining a hub as a container plus module-level ACCESSOR functions, and resolve_run_mode_for_boot is not an accessor — it applies a boot-scoped flag rather than reading it, so the page's own framing did not accommodate the symbol it now lists. Added a paragraph to 'Which hub does a new symbol belong to?' stating the case: the lifecycle rule still decides placement (a boot-set flag identical for every method makes the rule that interprets it runtime-layer by kind), and what makes the hub module the right home over either caller is that a boot-scoped invariant with two callers drifts if copied. Left the guard and RUNTIME_LAYER_PACKAGES sections alone — this change touched neither."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:151bee2b65ca3717b09f754d2e30aad830894f43"
 "pipelex/interpreter_hub.py" = "blob:b7ac885d348d32f1aa4b1e660da5b03533fb305b"
-"pipelex/runtime_hub.py" = "blob:81fb34f097b440293b8b68f9eefb7289778c911b"
+"pipelex/runtime_hub.py" = "blob:f3e2c4248ab13d09e16443e5f60b2b7494eea9f1"
