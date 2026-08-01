@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Method kernel (`pipelex.kernel`)**: A new public subpackage holding operator-execution semantics as importable functions, so what a `PipeLLM` step *does* — deck resolution, templating-style derivation, prompt assembly, generation, memory write-back — is no longer reachable only through a fully booted interpreter with a loaded library. Every kernel call is servable on a runtime-only boot with zero `.mthds` loaded, which is pinned by a permanent test. This first release covers the LLM operator; the remaining operators follow.
+
+### Changed
+
+- **Prompt reference types moved (Breaking)**: `ImageReference` and `DocumentReference` (with their `*Kind` enums) moved from `pipelex.pipe_operators.shared.image_reference` / `pipelex.pipe_operators.llm.document_reference` to `pipelex.kernel.prompt_references`. They describe how a prompt resolves an image or document out of working memory, which is execution semantics rather than a language artifact.
+- **`LLMPromptBlueprintValueError` replaced (Breaking)**: The error raised when a prompt's image or document reference cannot be resolved is now `pipelex.kernel.exceptions.PromptContentError`, moved with the code that raises it. `LLMPromptBlueprint` keeps its fields, its validation and its `make_llm_prompt` signature.
+
 ## [v0.42.0] - 2026-08-01
 
 ### Added

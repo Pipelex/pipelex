@@ -47,6 +47,14 @@ That check also subsumes the narrower orchestrator question: it catches *any* ex
 
 **Cheaper alternative worth weighing first:** have `build_registrar` take the set of slots the caller will apply and refuse a claim outside it. That pushes the check into the one place that already knows every claim, and removes the class attribute — but it widens `build_registrar`'s signature, and that function is currently a pure discover-and-register with no policy in it, which is a property worth protecting.
 
+## The first runtime-only caller has arrived — and the verdict is "still not now"
+
+`tests/unit/pipelex/kernel/test_kernel_boot_contract.py` (the method-kernel extraction, Phase 1) is the first thing in the tree to call `RuntimeBoot.make()` for a purpose other than measuring the boot itself: it boots runtime-only and then *runs* a kernel `llm_object` call on it. That is the caller this document deferred the decision to, so the decision is recorded here rather than left open.
+
+**It does not trigger the hole, and not by luck.** The gate is only reached when `get_config().plugins.boot_orchestrator` is non-`None`. That test names no `boot_orchestrator` and the config sets none, so nothing is requested, nothing is matched, and no slot claim is half-applied. The same is true of every runtime-only caller the kernel work adds — the kernel's own doctrine forbids it from reading `HubSlot` at all, and Phase 2's `PipeFunc` op takes its executor as an explicit protocol-typed argument for exactly that reason.
+
+**The remedy stays unbuilt, deliberately.** Both candidates above are real machinery — a `HubSlot.is_interpreter_slot` property plus a `honours_interpreter_slots` class attribute, or a widened `build_registrar` signature — bought for a path that *still* has no production caller. The three preconditions are unchanged: an external interpreter-side orchestrator installed, config or an argument naming it, and a runtime-only boot. A test that names no orchestrator satisfies none of the second two, so implementing the guard now would mean adding a mechanism no code can reach in order to close a hole no code can fall into. Reassess when a runtime-only boot is offered to real callers (a kernel-embedding host, an SDK entry point) — at that moment the second precondition becomes reachable for the first time and the slot-property remedy is the one to build.
+
 ## What exists today instead
 
 The gate's comment in `runtime_boot.py` states the hole precisely and points here, so the next reader meets the reasoning rather than rediscovering the trap. Nothing silently claims to handle it.

@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:2b509c7efe7ebaa99dcf1fce041dcf141b94e516dd91cda75b13deba982538f9"
+digest = "sha256:2a3662e43c2de3ecd77a1bb3ff50b911e36f5165531a1c85587acf9f055b6841"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-07-30T05:25:03Z"
-rationale = "Trigger is a one-paragraph docstring accuracy fix on RuntimeHub.setup_config's config_dir parameter: it said 'project/global layering is bypassed and only this directory is read', which contradicted config_loader (the package defaults layer always applies) and the two make() docstrings that already said 'package defaults + this directory'. Reviewed docs/contribute/hub-layering.md: it does not describe setup_config, config_dir, or config layering anywhere — grep for config_dir/setup_config/'only this directory' returns nothing — so the page carries no copy of the claim that was wrong and nothing is stale. Re-ran the prescribed mechanical check anyway (every name in the guard's RUNTIME_LAYER_PACKAGES appears under 'The rule'): all fourteen present, including pipelex.runtime_boot from the previous ack, so the enumeration that has been the rot seven rounds running is clean this time. No doc change needed."
+reviewed_at = "2026-08-01T17:06:17Z"
+rationale = "Trigger is the kernel extraction adding pipelex.kernel to RUNTIME_LAYER_PACKAGES. Reviewed docs/contribute/hub-layering.md and made two changes. (1) Ran the page's prescribed mechanical check: all fifteen names in RUNTIME_LAYER_PACKAGES appear under 'The rule', including the new pipelex.kernel, whose enumeration entry and its why-declared-ahead-of-a-breach paragraph landed with the guard change. (2) Added a fourth gate to the Enforcement section: tests/unit/pipelex/kernel/test_kernel_boot_contract.py boots runtime-only, CALLS a kernel op, and sweeps sys.modules after the call rather than after the import. That order closes the function-local blind spot the page's own 'Known inversions' section describes — verified rather than asserted, by injecting a function-local pipe_operators import into a kernel op and observing check-hub-layering exit 0 and the import-closure module pass 15 while only the new test went red. The page previously described three gates and would have understated its own coverage."
 
 [trigger_files]
-"pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:a602008dabb5b1ce81496513c37253ef6f5c0765"
+"pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:151bee2b65ca3717b09f754d2e30aad830894f43"
 "pipelex/interpreter_hub.py" = "blob:b7ac885d348d32f1aa4b1e660da5b03533fb305b"
 "pipelex/runtime_hub.py" = "blob:81fb34f097b440293b8b68f9eefb7289778c911b"

@@ -4208,26 +4208,6 @@ rationale = "Verb-object: extracts from the image ref; context stays keyword."
 param = "image_ref"
 rationale = "Verb-object: extracts from the image ref; context stays keyword."
 
-["pipelex/pipe_operators/llm/helpers.py::get_output_structure_prompt"]
-param = "concept_ref"
-rationale = "Derivation keyed by the concept ref; single operand."
-
-["pipelex/pipe_operators/llm/llm_prompt_blueprint.py::LLMPromptBlueprint._extract_direct_document"]
-param = "doc_ref"
-rationale = "Verb-object: extracts from the document ref; context stays keyword."
-
-["pipelex/pipe_operators/llm/llm_prompt_blueprint.py::LLMPromptBlueprint._extract_direct_image"]
-param = "image_ref"
-rationale = "Verb-object: extracts from the image ref; context stays keyword."
-
-["pipelex/pipe_operators/llm/llm_prompt_blueprint.py::LLMPromptBlueprint._extract_direct_list_documents"]
-param = "doc_ref"
-rationale = "Verb-object: extracts from the document ref; context stays keyword."
-
-["pipelex/pipe_operators/llm/llm_prompt_blueprint.py::LLMPromptBlueprint._extract_direct_list_images"]
-param = "image_ref"
-rationale = "Verb-object: extracts from the image ref; context stays keyword."
-
 ["pipelex/pipe_operators/llm/pipe_llm.py::PipeLLM._format_error_location"]
 param = "pipe_run_params"
 rationale = "Derivation from the run params; single operand."
