@@ -37,6 +37,7 @@ from pipelex.kernel.llm_ops import (
 )
 from pipelex.kernel.llm_prompt_content import LlmPromptContent
 from pipelex.kernel.llm_results import LlmObjectResult, LlmTextResult
+from pipelex.runtime_hub import resolve_run_mode_for_boot
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 
@@ -50,10 +51,17 @@ class MethodKernel:
 
     @classmethod
     def make(cls, *, run_mode: PipeRunMode = PipeRunMode.LIVE, user_id: str) -> Self:
-        """Mint a kernel for one run: a fresh run id, and the execution-mode contract for it."""
+        """Mint a kernel for one run: a fresh run id, and the execution-mode contract for it.
+
+        This is a run-params factory, so it owes the same keyless-boot contract as the pipe tier's:
+        a process booted with ``needs_inference=False`` forces every run it initiates to DRY, and a
+        kernel that skipped that would spend real money on the exact boot this package documents as
+        its target. Applied through the shared ``resolve_run_mode_for_boot`` — a second copy of the
+        rule at a second factory is how the two would drift.
+        """
         return cls(
             job_metadata=JobMetadata(user_id=user_id, pipeline_run_id=str(uuid4())),
-            cogt_run_params=CogtRunParams(run_mode=run_mode),
+            cogt_run_params=CogtRunParams(run_mode=resolve_run_mode_for_boot(requested=run_mode)),
         )
 
     def make_step_metadata(self) -> JobMetadata:

@@ -43,7 +43,7 @@ There is deliberately **no** `pipelex.hub`. It was deleted rather than kept as a
 | inference | `get_inference_manager`, `get_llm_worker`, `get_img_gen_worker`, `get_extract_worker` |
 | content generation | `get_content_generator`, `scoped_content_generator` |
 | reporting | `get_report_delegate`, `is_in_isolated_execution` |
-| run mode | `is_dry_run_forced` |
+| run mode | `is_dry_run_forced`, `resolve_run_mode_for_boot` |
 | tracing | `scoped_event_log`, `get_event_log_override` |
 | plugin registries | `get_inference_backend_registry`, `get_model_lister_registry`, `get_orchestrator_registry`, `get_bundle_validator_registry`, `get_storage_provider_registry`, `get_secrets_provider_registry` |
 

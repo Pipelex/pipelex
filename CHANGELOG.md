@@ -10,6 +10,7 @@
 
 - **Prompt reference types moved (Breaking)**: `ImageReference` and `DocumentReference` (with their `*Kind` enums) moved from `pipelex.pipe_operators.shared.image_reference` / `pipelex.pipe_operators.llm.document_reference` to `pipelex.kernel.prompt_references`. They describe how a prompt resolves an image or document out of working memory, which is execution semantics rather than a language artifact.
 - **`LLMPromptBlueprintValueError` replaced (Breaking)**: The error raised when a prompt's image or document reference cannot be resolved is now `pipelex.kernel.exceptions.PromptContentError`, moved with the code that raises it. `LLMPromptBlueprint` keeps its fields, its validation and its `make_llm_prompt` signature.
+- **Keyless-boot forced-DRY rule has one home**: `pipelex.runtime_hub.resolve_run_mode_for_boot` now owns the coercion that a keyless boot (`needs_inference=False`) applies to a requested run mode. Both run-params factories call it — the pipe tier's `PipeRunParamsFactory.make_run_params`, whose behavior is unchanged, and the kernel tier's `MethodKernel.make`, which previously minted a LIVE `CogtRunParams` on an offline boot. A programmatic kernel caller on a keyless boot now gets the same forced DRY and the same warning as a pipe run.
 
 ## [v0.42.0] - 2026-08-01
 
