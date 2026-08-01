@@ -2,8 +2,9 @@
 
 ## Status block (update at every checkpoint)
 
-- **Current phase:** Phase 1 — LLM vertical slice. **Phase 0 is done and committed** (`23276cecd`). Phase 1 tasks 1.1–1.6 are **written and committed** (`make agent-check` green); **task 1.7 (tests) is the remaining Phase-1 work**, and the full `make agent-test` suite has NOT yet been run against the re-point. Branch `refactor/Kernel`, off `dev` with `dev` merged in at `221b8ee0b`. Nothing pushed yet; no PR open.
-- **Next action:** run the full `make agent-test` suite and fix whatever the re-point broke, then write task 1.7's tests. See "Cold-start: where the code is" below for the exact shape of what landed.
+- **Current phase:** Phase 1 — LLM vertical slice. **Phase 0 done and committed** (`23276cecd`); **Phase 1 tasks 1.1–1.6 done and committed** (`3a11d113a`). `make agent-check` is green. **Task 1.7 (tests) is the remaining Phase-1 work.** Branch `refactor/Kernel`, off `dev` with `dev` merged in at `221b8ee0b`; working tree clean, nothing pushed, no PR open.
+- **Test signal so far:** the targeted slice (`tests/unit/pipelex/kernel`, `tests/unit/pipelex/pipe_operators`, `tests/integration/pipelex/pipes`, `tests/unit/pipelex/cli/dev`, the two runtime-layer gate modules) is **green** — 871 passed after one fix: `test_pipe_llm_model_not_found_reroute` patched `pipelex.pipe_operators.llm.pipe_llm.get_content_generator`, which the move made a dead target; it now patches `pipelex.kernel.llm_ops.get_content_generator`. **The full `make agent-test` has not been run yet** — that is the first thing to do on resume, and this patch-target class of breakage is what to expect from it.
+- **Next action:** run the full `make agent-test`, fix any further patch-target/import fallout, then write task 1.7's tests. See "Cold-start: where the code is" and "What 1.7 still has to do" below.
 - **Open decisions:** none blocking. The kernel construction shape (0.2) is settled as implemented; three deviations from the plan's letter are recorded under Decisions.
 
 ### Cold-start: where the code is
