@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Callable, cast
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.interpreter_hub import get_concept_library
-from pipelex.pipe_operators.shared.image_reference import ImageReferenceKind
+from pipelex.kernel.prompt_references import ImageReferenceKind
 from pipelex.pipe_operators.shared.template_image_analyzer import TemplateImageAnalyzer
 
 if TYPE_CHECKING:

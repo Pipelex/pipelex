@@ -3,8 +3,8 @@
 from pathlib import Path
 from typing import Callable
 
+from pipelex.kernel.prompt_references import ImageReferenceKind
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
-from pipelex.pipe_operators.llm.image_reference import ImageReferenceKind
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 

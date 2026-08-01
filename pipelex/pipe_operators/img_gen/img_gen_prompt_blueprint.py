@@ -16,8 +16,8 @@ from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.kernel.prompt_references import ImageReference, ImageReferenceKind
 from pipelex.pipe_operators.img_gen.exceptions import PipeImgGenFactoryError
-from pipelex.pipe_operators.shared.image_reference import ImageReference, ImageReferenceKind
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract

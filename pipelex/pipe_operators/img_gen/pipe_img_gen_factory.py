@@ -14,7 +14,7 @@ from pipelex.pipe_operators.shared.template_image_analyzer import TemplateImageA
 from pipelex.tools.jinja2.template_category import TemplateCategory
 
 if TYPE_CHECKING:
-    from pipelex.pipe_operators.shared.image_reference import ImageReference
+    from pipelex.kernel.prompt_references import ImageReference
 
 
 class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
