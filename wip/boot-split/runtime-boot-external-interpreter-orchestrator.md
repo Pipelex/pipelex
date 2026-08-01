@@ -49,7 +49,7 @@ That check also subsumes the narrower orchestrator question: it catches *any* ex
 
 ## The first runtime-only caller has arrived — and the verdict is "still not now"
 
-`tests/unit/pipelex/kernel/test_kernel_boot_contract.py` (the method-kernel extraction, Phase 1) is the first thing in the tree to call `RuntimeBoot.make()` for a purpose other than measuring the boot itself: it boots runtime-only and then *runs* a kernel `llm_object` call on it. That is the caller this document deferred the decision to, so the decision is recorded here rather than left open.
+`tests/unit/pipelex/kernel/test_kernel_boot_contract.py` (the method-kernel extraction, Phase 1) is the first thing in the tree to call `RuntimeBoot.make()` for a purpose other than measuring the boot itself: it boots runtime-only and then *runs* both kernel façade calls (`llm_object` and `llm_text`) on it. That is the caller this document deferred the decision to, so the decision is recorded here rather than left open.
 
 **It does not trigger the hole, and not by luck.** The gate is only reached when `get_config().plugins.boot_orchestrator` is non-`None`. That test names no `boot_orchestrator` and the config sets none, so nothing is requested, nothing is matched, and no slot claim is half-applied. The same is true of every runtime-only caller the kernel work adds — the kernel's own doctrine forbids it from reading `HubSlot` at all, and Phase 2's `PipeFunc` op takes its executor as an explicit protocol-typed argument for exactly that reason.
 
