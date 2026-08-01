@@ -4,4 +4,5 @@ Extraction of operator-execution semantics out of the interpreter's operator cla
 
 | Doc | What it holds |
 | --- | --- |
-| [`kernel-extraction-plan.md`](kernel-extraction-plan.md) | The execution plan: goal, doctrine, target API sketch, phases 0–3 with checkpoints, open decisions, non-goals, gates. **Start here**; its status block is updated at every checkpoint. |
+| [`kernel-extraction-plan.md`](kernel-extraction-plan.md) | The execution plan: goal, doctrine, target API sketch, phases 0–3 with checkpoints, decisions, non-goals, gates. **Start here**; its status block is updated at every checkpoint. |
+| [`deferred-follow-ups.md`](deferred-follow-ups.md) | Items surfaced in review and deliberately kept out of this branch's scope, with pick-up-cold context. |
