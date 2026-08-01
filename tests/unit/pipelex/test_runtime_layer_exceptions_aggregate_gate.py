@@ -12,8 +12,12 @@ with both gates green (see `docs/contribute/hub-layering.md`, the aggregate sect
 Until now the rule was prose — *import from the definition site, never from the aggregate*. This
 test makes it mechanical for every package declared in `RUNTIME_LAYER_PACKAGES`: it AST-walks each
 module and fails on any import of `pipelex.exceptions`, module-level or function-local, absolute or
-relative. The fix for a violation is always the same and always cheap: import the error class from
-the `exceptions.py` module that defines it.
+relative — and on any bare string literal naming it, because `importlib.import_module`,
+`__import__` and a `mocker.patch` target all load the aggregate through a path no import node
+records. That string form is the one the sibling hub-layering guard matches for the same reason, and
+it is matched the same way: exact-or-boundary against the module path, so prose that merely mentions
+the aggregate is not a reference. The fix for a violation is always the same and always cheap:
+import the error class from the `exceptions.py` module that defines it.
 
 Interpreter-side code and tests are out of scope on purpose — the aggregate is a legitimate public
 surface for callers *outside* the runtime layer; the ban is on the layer whose import closure it
@@ -23,7 +27,7 @@ would silently widen.
 import ast
 from pathlib import Path
 
-from pipelex.cli.dev_cli.commands.hub_layering_guard import RUNTIME_LAYER_PACKAGES
+from pipelex.cli.dev_cli.commands.hub_layering_guard import RUNTIME_LAYER_PACKAGES, references_module
 
 _TESTS_ROOT = next(parent for parent in Path(__file__).resolve().parents if parent.name == "tests")
 _REPO_ROOT = _TESTS_ROOT.parent
@@ -53,19 +57,25 @@ def _imported_module_targets(*, node: ast.Import | ast.ImportFrom, module_dotted
     return targets
 
 
-def find_aggregate_imports(*, module_path: Path, module_dotted: str) -> list[str]:
-    """Return one `path:line` locator per import of the exceptions aggregate found in the module."""
+def find_aggregate_references(*, module_path: Path, module_dotted: str) -> list[str]:
+    """Return one `path:line` locator per reference to the exceptions aggregate found in the module.
+
+    A reference is an import statement naming it, or a string literal that *is* its dotted path — the
+    dynamic-import and patch-target shape, which no import node records.
+    """
     tree = ast.parse(module_path.read_text(encoding="utf-8"))
     is_package_init = module_path.name == "__init__.py"
     violations: list[str] = []
     for node in ast.walk(tree):
-        if not isinstance(node, (ast.Import, ast.ImportFrom)):
+        candidates: list[str]
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            candidates = _imported_module_targets(node=node, module_dotted=module_dotted, is_package_init=is_package_init)
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            candidates = [node.value]
+        else:
             continue
-        targets = _imported_module_targets(node=node, module_dotted=module_dotted, is_package_init=is_package_init)
-        for target in targets:
-            if target == AGGREGATE_MODULE or target.startswith(f"{AGGREGATE_MODULE}."):
-                violations.append(f"{module_path}:{node.lineno}")
-                break
+        if any(references_module(candidate=candidate, target=AGGREGATE_MODULE) for candidate in candidates):
+            violations.append(f"{module_path}:{node.lineno}")
     return violations
 
 
@@ -90,13 +100,13 @@ class TestRuntimeLayerExceptionsAggregateGate:
         violations: list[str] = []
         for dotted_package in RUNTIME_LAYER_PACKAGES:
             for module_path in _module_paths_for(dotted_package=dotted_package):
-                violations.extend(find_aggregate_imports(module_path=module_path, module_dotted=_dotted_for(module_path=module_path)))
+                violations.extend(find_aggregate_references(module_path=module_path, module_dotted=_dotted_for(module_path=module_path)))
         assert not violations, (
-            "Runtime-layer modules import the `pipelex.exceptions` aggregate, which drags interpreter packages "
+            "Runtime-layer modules reference the `pipelex.exceptions` aggregate, which drags interpreter packages "
             "into the runtime closure. Import each error class from the `exceptions.py` module that defines it instead:\n" + "\n".join(violations)
         )
 
-    def test_the_gate_detects_every_banned_import_shape(self, tmp_path: Path) -> None:
+    def test_the_gate_detects_every_banned_reference_shape(self, tmp_path: Path) -> None:
         banned_shapes = [
             "from pipelex.exceptions import ConceptError\n",
             "def helper() -> None:\n    from pipelex.exceptions import ConceptError  # noqa: PLC0415\n",
@@ -104,19 +114,24 @@ class TestRuntimeLayerExceptionsAggregateGate:
             "from pipelex import exceptions\n",
             "from .. import exceptions\n",
             "from ..exceptions import ConceptError\n",
+            'import importlib\n\nmodule = importlib.import_module("pipelex.exceptions")\n',
+            'module = __import__("pipelex.exceptions")\n',
+            'def test_it(mocker: object) -> None:\n    mocker.patch("pipelex.exceptions.ConceptError")\n',
         ]
         for index_shape, shape_source in enumerate(banned_shapes):
             module_path = tmp_path / f"module_{index_shape}.py"
             module_path.write_text(shape_source, encoding="utf-8")
-            found = find_aggregate_imports(module_path=module_path, module_dotted=f"pipelex.fake.module_{index_shape}")
+            found = find_aggregate_references(module_path=module_path, module_dotted=f"pipelex.fake.module_{index_shape}")
             assert found, f"gate missed the banned shape: {shape_source!r}"
 
     def test_the_gate_stays_quiet_on_definition_site_imports(self, tmp_path: Path) -> None:
         clean_source = (
+            '"""Import errors from their definition site, never from the pipelex.exceptions aggregate."""\n'
             "from pipelex.core.concepts.exceptions import ConceptError\n"
             "from pipelex.system.exceptions import MissingDependencyError\n"
             "import pipelex.core.stuffs.exceptions\n"
+            'MODULE_NAME = "pipelex.core.concepts.exceptions"\n'
         )
         module_path = tmp_path / "clean_module.py"
         module_path.write_text(clean_source, encoding="utf-8")
-        assert find_aggregate_imports(module_path=module_path, module_dotted="pipelex.fake.clean_module") == []
+        assert find_aggregate_references(module_path=module_path, module_dotted="pipelex.fake.clean_module") == []
