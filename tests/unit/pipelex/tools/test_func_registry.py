@@ -150,11 +150,32 @@ class TestFuncRegistry:
         registry.register_functions([])
         assert len(registry.root) == 0
 
-    def test_register_existing_function_with_warning(self, registry: FuncRegistry, caplog: LogCaptureFixture):
+    def test_register_same_function_twice_is_idempotent(self, registry: FuncRegistry):
+        """Re-registering the very same function object is a no-op: a folder scanned twice must not fail."""
         registry.register_function(valid_function)
-        with caplog.at_level("DEBUG"):
-            registry.register_function(valid_function)
-        assert "already exists in registry" in caplog.text
+        registry.register_function(valid_function)
+        assert registry.get_function("valid_function") is valid_function
+
+    def test_register_colliding_function_raises_and_names_both_sources(self, registry: FuncRegistry):
+        """Two distinct functions under one name is an error, and the message must name both origins."""
+        registry.register_function(valid_function, name="shared_name")
+        with pytest.raises(FuncRegistryError) as exc_info:
+            registry.register_function(valid_async_function, name="shared_name")
+
+        message = str(exc_info.value)
+        assert "shared_name" in message
+        assert "valid_function" in message
+        assert "valid_async_function" in message
+        assert valid_function.__module__ in message
+        assert '@pipe_func(name="..."' in message
+        # The first registration wins: the collision is refused, not applied.
+        assert registry.get_function("shared_name") is valid_function
+
+    def test_ineligible_function_does_not_collide(self, registry: FuncRegistry):
+        """Ineligible functions never enter the registry, so they cannot trigger collision detection."""
+        registry.register_function(valid_function, name="shared_name")
+        registry.register_function(sample_function, name="shared_name")
+        assert registry.get_function("shared_name") is valid_function
 
     def test_teardown(self, registry: FuncRegistry):
         registry.register_function(valid_function)

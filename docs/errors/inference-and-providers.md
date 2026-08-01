@@ -59,6 +59,7 @@ own page. Classes are grouped by subsystem.
 - [`ModelReferenceParseError`](model-reference-parse-error.md) — Model reference parse
 - [`ModelWaterfallError`](model-waterfall-error.md) — Model waterfall
 - [`NeitherUrlNorDataError`](neither-url-nor-data-error.md) — Neither url nor data
+- [`OutputStructureSchemaError`](output-structure-schema-error.md) — Output structure schema
 - [`PromptDocumentFactoryError`](prompt-document-factory-error.md) — Prompt document factory
 - [`PromptImageFactoryError`](prompt-image-factory-error.md) — Prompt image factory
 - [`PromptImageFormatError`](prompt-image-format-error.md) — Prompt image format
@@ -88,9 +89,13 @@ own page. Classes are grouped by subsystem.
 - [`GatewayError`](gateway-error.md) — Gateway
 - [`GatewayExtractResponseError`](gateway-extract-response-error.md) — Gateway extract response
 - [`GatewayFactoryError`](gateway-factory-error.md) — Gateway factory
+- [`GatewaySearchEmptyResultError`](gateway-search-empty-result-error.md) — Gateway search empty result
 - [`GatewaySearchResponseError`](gateway-search-response-error.md) — Gateway search response
 - [`GoogleImgGenWorkerError`](google-img-gen-worker-error.md) — Google img gen worker
 - [`GoogleLLMWorkerError`](google-llm-worker-error.md) — Google LLM worker
+- [`LinkupError`](linkup-error.md) — Linkup
+- [`LinkupSearchEmptyResultError`](linkup-search-empty-result-error.md) — Linkup search empty result
+- [`LinkupSearchResponseError`](linkup-search-response-error.md) — Linkup search response
 - [`MistralExtractResponseError`](mistral-extract-response-error.md) — Mistral extract response
 - [`MistralModelListingError`](mistral-model-listing-error.md) — Mistral model listing
 - [`MistralPluginError`](mistral-plugin-error.md) — Mistral plugin

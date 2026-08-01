@@ -1,5 +1,29 @@
 # Changelog
 
+## [v0.42.0] - 2026-08-01
+
+### Added
+
+- **New classified error types**: Introduced specific error classes for clearer debugging and handling, each with dedicated documentation pages:
+    - `OutputStructureSchemaError`: raised when an output structure class cannot produce the JSON schema required by a structured leaf.
+    - `GatewaySearchEmptyResultError` & `LinkupSearchEmptyResultError`: raised when a search returns no object payload to fill the output structure (pointing to the query rather than the model).
+    - `LinkupError` (base class) & `LinkupSearchResponseError`: raised when the Linkup API answers a structured search with an invalid payload shape.
+
+### Changed
+
+- **Strict `PipeFunc` name collisions (Breaking)**: Registering two different functions under the same `PipeFunc` name now raises a `FuncRegistryError` (naming both origins) instead of silently overwriting the previous registration. Re-registering the exact same function object remains a safe no-op. Docs updated to explain the new flat namespace collision rules.
+- **Stricter `pipelex validate` for structured search (Breaking)**: `pipelex validate` now rejects structured-search output classes that Pydantic cannot describe as a JSON Schema (e.g. `arbitrary_types_allowed` fields), failing early with an `OutputStructureSchemaError` instead of crashing mid-run inside the worker.
+- **Dry-run object mocks built from real classes (Breaking)**: Dry-run leaf mocks for `PipeLLM` and `PipeSearch` structured outputs are now built directly from your output class rather than a schema rebuild. Constraints previously erased are now enforced at mock-build time, failing loudly with a `DryRunMockBuildError` if Polyfactory cannot satisfy them. Related "Under the Hood" docs for dry-run mock generation updated.
+- **Consolidated leaf result conversion**: Centralized the logic for converting a leaf result into the caller's class into a single shared helper (`pipelex.cogt.content_generation.object_revalidation`), ensuring consistent behavior across in-process and distributed-execution boundaries. Related "Under the Hood" docs for distributed content generation updated.
+
+### Fixed
+
+- **Preserved class invariants in structured output & web search**: In-process structured generation and structured web searches no longer lose your class's invariants (custom `@field_validator`s, `json_schema_extra` hints, and docstrings). The caller's live class is now passed directly down to the leaf and used as-is, preventing weaker contracts from reaching the provider.
+- **Shadowed field names in worker-boundary round trips**: Output fields named `json`, `copy`, `schema`, or `construct` no longer break when crossing a worker boundary. The shared conversion now serializes with `by_alias=True`, ensuring keys match the published schema and preventing false `Field required` validation errors. Our distributed-execution plugin picks this fix up with its next release, once it adopts the shared helper.
+- **Structured web search envelope unwrapping**: Fixed an issue where Linkup and Gateway search backends returned a `{data, sources}` envelope that no output class could accept, making structured search unusable. The direct backend now requests the payload alone, and both backends recognize and unwrap the envelope if returned.
+- **Accurate cost reporting for failed searches**: A structured search whose response shape was rejected by the backend previously vanished from the run's cost report because it failed after the provider had answered. Completion and reporting now run in a `finally` block, ensuring billed usage is always recorded.
+- **Malformed Gateway responses properly classified**: A Gateway relay answering with non-JSON content previously raised a bare `JSONDecodeError`; it is now caught and surfaced as a classified `GatewaySearchResponseError`.
+
 ## [v0.41.0] - 2026-07-30
 
 ### Highlights

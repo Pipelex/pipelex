@@ -15,11 +15,12 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_job import SearchJob
 from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
+from pipelex.cogt.search.structured_search_payload import extract_structured_search_payload
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.providers.gateway.gateway_deck import GatewayDeck
-from pipelex.providers.gateway.gateway_exceptions import GatewaySearchResponseError
+from pipelex.providers.gateway.gateway_exceptions import GatewaySearchEmptyResultError, GatewaySearchResponseError
 from pipelex.providers.gateway.gateway_search_schemas import GatewaySearchRequestParams
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
@@ -70,7 +71,19 @@ class GatewaySearchWorker(SearchWorkerAbstract):
         self._extract_usage(response=response, search_job=search_job)
 
         content_str = self._extract_content(response)
-        result_dict: dict[str, Any] = json.loads(content_str)
+        relay_result = self._decode_relay_json(content_str=content_str)
+        if not isinstance(relay_result, dict):
+            msg = f"Gateway sourced-answer search returned a non-object payload of type '{type(relay_result).__name__}'"
+            raise GatewaySearchResponseError(
+                msg,
+                error_category=InferenceErrorCategory.UNKNOWN,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_MODEL,
+                    detail="The Gateway returned a malformed search response — try a different model",
+                ),
+                provider_metadata=None,
+            )
+        result_dict = cast("dict[str, Any]", relay_result)
 
         sources = [
             DocumentContent(
@@ -122,8 +135,60 @@ class GatewaySearchWorker(SearchWorkerAbstract):
         self._extract_usage(response=response, search_job=search_job)
 
         content_str = self._extract_content(response)
-        result: dict[str, Any] = json.loads(content_str)
-        return result
+        relay_result = self._decode_relay_json(content_str=content_str)
+        # The relay asks Linkup for sources alongside the structured payload, so its wire shape is a
+        # {data, sources} envelope — but the contract of a structured search is the payload alone: it is
+        # validated against the caller's output structure class, which has nowhere to put sources.
+        # The envelope is recognised *structurally* rather than demanded: the day the relay stops asking
+        # for sources, this worker keeps working on the bare payload it then returns, so the two repos do
+        # not have to deploy in lockstep. Demanding it would make that a coordinated two-sided change.
+        payload = extract_structured_search_payload(response=relay_result, schema=schema)
+        if payload is not None:
+            return payload
+        if isinstance(relay_result, dict):
+            # The response was an object but carried no structured payload: the search ran and found
+            # nothing to fill the output structure with. That is the query's fault, not the model's.
+            msg = "Gateway structured search returned an empty structured result"
+            raise GatewaySearchEmptyResultError(
+                msg,
+                error_category=InferenceErrorCategory.UNKNOWN,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="The search found nothing to fill your output structure — try a broader query or a wider date range",
+                ),
+                provider_metadata=None,
+            )
+        msg = f"Gateway structured search returned a non-object payload of type '{type(relay_result).__name__}'"
+        raise GatewaySearchResponseError(
+            msg,
+            error_category=InferenceErrorCategory.UNKNOWN,
+            user_action=UserAction(
+                kind=UserActionKind.CHANGE_MODEL,
+                detail="The Gateway returned a malformed structured search response — try a different model",
+            ),
+            provider_metadata=None,
+        )
+
+    def _decode_relay_json(self, *, content_str: str) -> Any:
+        """Parse the relay's JSON content, classifying a malformed body instead of letting it escape raw.
+
+        A relay answering with something that is not JSON is the likeliest way its contract breaks, and a
+        bare ``JSONDecodeError`` is neither a ``CogtError`` nor annotated with the model — so it would slip
+        past exactly the classification the rest of this path exists to provide.
+        """
+        try:
+            return json.loads(content_str)
+        except json.JSONDecodeError as exc:
+            msg = "Gateway search response body is not valid JSON"
+            raise GatewaySearchResponseError(
+                msg,
+                error_category=InferenceErrorCategory.UNKNOWN,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_MODEL,
+                    detail="The Gateway returned a malformed search response — try a different model",
+                ),
+                provider_metadata=None,
+            ) from exc
 
     def _extract_usage(self, response: GenericResponse, *, search_job: SearchJob) -> None:
         """Extract token usage from the GenericResponse and populate the search job report."""

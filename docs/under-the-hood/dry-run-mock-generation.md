@@ -51,7 +51,8 @@ A dry run does not swap in a special content generator: `run_mode=DRY` rides `Co
 | Trigger | Entry Point | Mock Generation |
 |---------|-------------|-----------------|
 | `pipelex validate` | `BundleValidator.validate_pipes()` | `WorkingMemoryFactory.make_mock_inputs()` |
-| `PipeLLM` output in dry mode | `dry_llm_gen_object()` / `dry_llm_gen_object_list()` (cogt leaf, `dry_mock.py`) | `DryRunFactory` via the schema-reconstructed class |
+| `PipeLLM` output in dry mode | `dry_llm_gen_object()` / `dry_llm_gen_object_list()` (cogt leaf, `dry_mock.py`) | `DryRunFactory` via the caller's class in-process, via the schema-reconstructed class on a worker |
+| `PipeSearch` structured output in dry mode | `dry_search_gen_structured_object()` in-process / `dry_search_gen_structured()` on a worker (cogt leaf, `dry_mock.py`) | Same split as `PipeLLM`; the worker arm dumps its mock to a dict, because the leaf's result crosses the boundary as data |
 | `PipeFunc` output in dry mode | `WorkingMemoryFactory.make_mock_content()` | `DryRunFactory` (with explicit field constraints) |
 | `PipeCompose` in dry mode | `StructuredContentComposer.compose()` | Uses resolved values from working memory; falls back to a `DryRunFactory` mock of the output class only when a value error hits under mock inputs |
 
@@ -221,14 +222,16 @@ The `factory_use_construct=True` flag bypasses `field_validator` and `model_vali
 
 ### LLM Output Generation
 
-When the dry LLM leaf (`dry_llm_gen_object` in `dry_mock.py`) generates mock outputs, it reconstructs the output class from the JSON schema carried on the assignment (the same class on any backend), then builds via `build_mock_object()`:
+When the dry LLM leaf (`dry_llm_gen_object` in `dry_mock.py`) generates mock outputs, it resolves the output class exactly the way the live leaf does — via `resolve_object_class` — then builds via `build_mock_object()`:
 
 ```python
-item_class = SchemaToModelFactory.make_from_json_schema(schema=..., class_name=...)
+item_class = resolve_object_class(object_assignment=..., object_class=...)
 return build_mock_object(item_class)
 ```
 
-No explicit field constraints are passed — the factory auto-detects `MockFormat` from field definitions. Note that `json_schema_extra` hints can be dropped by the schema round-trip: classes with exotic format constraints should declare `examples` / `mock_format`, otherwise re-validation against the original class raises a typed `DryRunObjectFidelityError`.
+`object_class` is the caller's live class when there is one (the in-process case), and `None` when only the serialized assignment is in hand (the distributed-worker case), in which case the class is rebuilt from the assignment's JSON schema. Keeping the two run modes on one resolution matters: if only the live leaf used the real class, the mock would be built against a *weaker* class than the one the provider is constrained by — the mock would be less faithful than the thing it mocks.
+
+No explicit field constraints are passed — the factory auto-detects `MockFormat` from field definitions. On the rebuilt-class path, `json_schema_extra` hints and custom validators are dropped by the schema round-trip: classes with exotic format constraints should declare `examples` / `mock_format`, otherwise re-validation against the original class raises a typed `DryRunObjectFidelityError`. On the live-class path those invariants are present at build time instead, so an unsatisfiable one surfaces as a typed `DryRunMockBuildError` naming the same remedy.
 
 ### PipeCompose Resolution
 

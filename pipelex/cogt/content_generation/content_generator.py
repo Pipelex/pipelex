@@ -1,6 +1,5 @@
 from typing import Any
 
-from pydantic import BaseModel, ValidationError
 from typing_extensions import override
 
 from pipelex import log
@@ -11,18 +10,17 @@ from pipelex.cogt.content_generation.assignment_models import (
     ObjectAssignment,
     RenderPageViewsAssignment,
     SearchAssignment,
-    SearchObjectAssignment,
     TemplatingAssignment,
 )
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
-from pipelex.cogt.content_generation.exceptions import DryRunObjectFidelityError
 from pipelex.cogt.content_generation.extract_generate import extract_gen_pages_and_store
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.content_generation.img_gen_generate import img_gen_image_list_and_store, img_gen_single_image_and_store
 from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen_object_list, llm_gen_text
+from pipelex.cogt.content_generation.object_revalidation import revalidate_leaf_object
 from pipelex.cogt.content_generation.render_generate import render_page_views_and_store
-from pipelex.cogt.content_generation.search_generate import search_gen_sourced_answer, search_gen_structured
+from pipelex.cogt.content_generation.search_generate import search_gen_sourced_answer, search_gen_structured_object
 from pipelex.cogt.content_generation.templating_generate import templating_gen_text
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
@@ -39,35 +37,6 @@ from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
-
-
-def _revalidate_against_object_class(
-    raw_obj: BaseModel,
-    *,
-    object_class: type[BaseModelTypeVar],
-    is_mock_built: bool,
-) -> BaseModelTypeVar:
-    """Re-validate a leaf-generated object's data against the original ``object_class``.
-
-    ``llm_gen_object`` / ``llm_gen_object_list`` return plain ``BaseModel``s reconstructed from the JSON
-    schema; re-validating their data against the original class makes the result the proper subtype (e.g.
-    ``StructuredContent``) the caller expects.
-
-    Under the dry-run leaf mock (``run_mode=DRY``) the object was built by polyfactory from
-    the schema-reconstructed class, which can drop invariants the original class enforces (custom
-    validators, ``json_schema_extra`` format/pattern hints datamodel-code-generator omits on round-trip).
-    A re-validation failure there is the known object-mock fidelity gap, so the ``ValidationError`` is
-    re-raised as a clear typed :class:`DryRunObjectFidelityError` naming the class and the
-    ``examples`` / ``mock_format`` remedy. The catch is scoped to the dry path only — a LIVE provider's
-    invalid output keeps its existing ``ValidationError``.
-    """
-    raw_data = raw_obj.model_dump(serialize_as_any=True)
-    if not is_mock_built:
-        return object_class.model_validate(raw_data)
-    try:
-        return object_class.model_validate(raw_data)
-    except ValidationError as exc:
-        raise DryRunObjectFidelityError.for_object_class(object_class.__name__) from exc
 
 
 class ContentGenerator(ContentGeneratorProtocol):
@@ -129,9 +98,9 @@ class ContentGenerator(ContentGeneratorProtocol):
             object_class=object_class,
             llm_assignment=llm_assignment_for_object,
         )
-        raw_obj = await llm_gen_object(object_assignment=object_assignment)
+        raw_obj = await llm_gen_object(object_assignment=object_assignment, object_class=object_class)
         log.verbose(f"{self.__class__.__name__} generated object direct: {raw_obj}")
-        return _revalidate_against_object_class(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry)
+        return revalidate_leaf_object(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry)
 
     @override
     @update_job_metadata
@@ -156,12 +125,9 @@ class ContentGenerator(ContentGeneratorProtocol):
             llm_assignment=llm_assignment_for_object,
             nb_items=nb_items,
         )
-        raw_list = await llm_gen_object_list(object_assignment=object_assignment)
+        raw_list = await llm_gen_object_list(object_assignment=object_assignment, object_class=object_class)
         log.verbose(f"{self.__class__.__name__} generated object list direct: {raw_list}")
-        return [
-            _revalidate_against_object_class(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry)
-            for raw_obj in raw_list
-        ]
+        return [revalidate_leaf_object(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry) for raw_obj in raw_list]
 
     @override
     @update_job_metadata
@@ -332,17 +298,8 @@ class ContentGenerator(ContentGeneratorProtocol):
         output_structure_class: type[BaseModelTypeVar],
         search_assignment: SearchAssignment,
     ) -> BaseModelTypeVar:
-        result_dict = await search_gen_structured(
-            search_object_assignment=SearchObjectAssignment.make_for_class(
-                output_class=output_structure_class,
-                search_assignment=search_assignment,
-            ),
-        )
-        # Same fidelity guard as the object paths (D6): a mock-built dict that fails re-validation
-        # against the original class is the known schema-round-trip gap, not a provider fault.
-        if not search_assignment.cogt_run_params.run_mode.is_dry:
-            return output_structure_class.model_validate(result_dict)
-        try:
-            return output_structure_class.model_validate(result_dict)
-        except ValidationError as exc:
-            raise DryRunObjectFidelityError.for_object_class(output_structure_class.__name__) from exc
+        # In-process, so the caller's class travels down to the leaf exactly as it does on the object
+        # paths, and comes back as an instance of itself — validated once, next to the provider. No
+        # `SearchObjectAssignment` is built here: that wire model ships the class's schema across a
+        # boundary, and this arm has none to cross.
+        return await search_gen_structured_object(search_assignment, output_class=output_structure_class)

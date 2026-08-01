@@ -1,3 +1,4 @@
+import json
 from datetime import date
 from typing import Any
 
@@ -14,16 +15,19 @@ from linkup import (
 )
 from typing_extensions import override
 
-from pipelex.cogt.inference.error_classification import extract_linkup_metadata
+from pipelex.cogt.exceptions import InferenceErrorCategory
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_linkup_metadata
 from pipelex.cogt.inference.error_classify import classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_job import SearchJob
 from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
+from pipelex.cogt.search.structured_search_payload import extract_structured_search_payload
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
+from pipelex.providers.linkup.linkup_exceptions import LinkupSearchEmptyResultError, LinkupSearchResponseError
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.runtime_hub import get_secrets_provider
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
@@ -116,20 +120,27 @@ class LinkupSearchWorker(SearchWorkerAbstract):
         job_params = search_job.job_params
         search_setting = job_params.search_setting
 
+        # The schema crosses as a JSON string, which is byte-for-byte what the SDK puts on the wire when
+        # handed the class itself. Handing it the class would *also* make it instantiate that class from
+        # the response — running the caller's validators inside the SDK, and then again when the leaf
+        # validates the dict this returns. Serializing the schema here keeps the response raw and the
+        # validation single, at the leaf, where the run mode and the fidelity contract live.
+        schema_json = json.dumps(schema.model_json_schema())
+
         depth_value = SearchDepth(self.inference_model.model_id.rsplit("/", 1)[-1])
         try:
             response = await self._linkup_client.async_search(
                 query=search_job.query,
                 depth=depth_value,  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]
                 output_type="structured",
-                structured_output_schema=schema,
+                structured_output_schema=schema_json,
                 include_images=search_setting.include_images,
                 max_results=search_setting.max_results,
                 include_domains=job_params.include_domains,
                 exclude_domains=job_params.exclude_domains,
                 from_date=self._parse_date(job_params.from_date),
                 to_date=self._parse_date(job_params.to_date),
-                include_sources=True,
+                include_sources=False,
             )
         except (
             LinkupAuthenticationError,
@@ -154,8 +165,40 @@ class LinkupSearchWorker(SearchWorkerAbstract):
         if search_tokens_usage := search_job.job_report.search_tokens_usage:
             search_tokens_usage.nb_tokens_by_category = {TokenCategory.INPUT: 1_000_000, TokenCategory.OUTPUT: 1_000_000}
 
-        # If response is a Pydantic model, convert to dict
-        if hasattr(response, "model_dump"):
-            result: dict[str, Any] = response.model_dump()
-            return result
-        return dict(response)  # type: ignore[arg-type]
+        # The contract of a structured search is the structured payload itself — it is validated against
+        # the caller's output structure class, which has nowhere to put sources. Asking for them wraps the
+        # payload in a {data, sources} envelope no output class could accept, so this asks for the payload
+        # alone — but it does not *trust* that flag. A provider that ignored it would hand back the
+        # envelope, and an output structure whose fields all carry defaults validates that envelope
+        # *silently* into an all-defaults object (pydantic's default `extra="ignore"` drops both keys), so
+        # the failure would be wrong answers rather than an error. The extractor recognises the envelope
+        # structurally instead, which is also what lets both backends share one rule.
+        # The schema crossed as a string, so the SDK did no validation of its own: `response` is the
+        # provider's JSON verbatim, typed `Any`.
+        payload = extract_structured_search_payload(response=response, schema=schema)
+        if payload is not None:
+            return payload
+        if isinstance(response, dict):
+            # The envelope was there but carried no object payload: the search ran and found nothing to
+            # fill the output structure with. That is the query's fault, not the model's — advising a
+            # model change here would send the user after the wrong thing.
+            msg = "Linkup structured search returned an empty structured result"
+            raise LinkupSearchEmptyResultError(
+                msg,
+                error_category=InferenceErrorCategory.UNKNOWN,
+                user_action=UserAction(
+                    kind=UserActionKind.CHANGE_INPUT,
+                    detail="The search found nothing to fill your output structure — try a broader query or a wider date range",
+                ),
+                provider_metadata=None,
+            )
+        msg = f"Linkup structured search returned a non-object payload of type '{type(response).__name__}'"
+        raise LinkupSearchResponseError(
+            msg,
+            error_category=InferenceErrorCategory.UNKNOWN,
+            user_action=UserAction(
+                kind=UserActionKind.CHANGE_MODEL,
+                detail="Linkup returned a malformed structured search response — try a different model",
+            ),
+            provider_metadata=None,
+        )

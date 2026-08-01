@@ -19,6 +19,17 @@ FuncRegistryDict = dict[str, Callable[..., Any]]
 PIPE_FUNC_MARKER = "_is_pipe_func"
 
 
+def _describe_function_origin(*, func: Callable[..., Any]) -> str:
+    """Renders where a registered function came from, for collision diagnostics.
+
+    Modules imported by file path get a name mangled from their absolute path, so the module name
+    alone is enough to point the author at the offending file.
+    """
+    module_name = getattr(func, "__module__", None) or "<unknown module>"
+    qualified_name = getattr(func, "__qualname__", None) or getattr(func, "__name__", "<unknown function>")
+    return f"'{qualified_name}' from module '{module_name}'"
+
+
 def pipe_func(name: str | None = None) -> Callable[[T], T]:
     """Decorator to mark a function for automatic registration in the func_registry.
 
@@ -102,15 +113,33 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
         *,
         name: str | None = None,
     ) -> None:
-        """Registers a function in the registry with a name if it meets eligibility criteria."""
+        """Registers a function in the registry with a name if it meets eligibility criteria.
+
+        Raises:
+            FuncRegistryError: If a *different* function is already registered under the same name.
+                Registering the same function object again is a no-op, so a folder scanned twice
+                (the same module object is reused from ``sys.modules``) stays idempotent.
+
+        """
         if not self.is_eligible_function(func):
             return
 
         key = name or func.__name__
-        if key in self.root:
-            self.log(f"Function '{key}' already exists in registry")
-        else:
-            self.log(f"Registered new single function '{key}' in registry")
+        already_registered = self.root.get(key)
+        if already_registered is not None:
+            if already_registered is func:
+                self.log(f"Function '{key}' is already registered in registry with the same function object")
+                return
+            msg = (
+                f"Function name '{key}' is already registered by a different function: "
+                f"{_describe_function_origin(func=already_registered)} would be replaced by {_describe_function_origin(func=func)}. "
+                f"PipeFunc names share a single flat, process-wide name space, so which one wins would depend on "
+                f'scan order. Give one of them a distinct name with @pipe_func(name="..."). '
+                f"See: {URLs.pipe_func_docs}"
+            )
+            raise FuncRegistryError(msg)
+
+        self.log(f"Registered new single function '{key}' in registry")
         self.root[key] = func
 
     def unregister_function(self, func: Callable[..., Any]) -> None:
