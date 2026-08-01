@@ -8,6 +8,14 @@ extraction exists to kill.
 The memory contract, restated where callers meet it: **the returned `memory` is the result.** A
 kernel call may mutate the memory it was passed, and today inline execution aliases the two — but a
 serialization boundary will not, so no caller may rely on the argument having been updated.
+
+**Serializing a result: use `kajson`, not `model_dump()`.** `content` is annotated with the base
+`StuffContent`, so a plain `model_dump()` drops the concrete subclass's fields — `NumberContent(number=3)`
+dumps as `{}`. That is not specific to this model: `Stuff.content` is annotated the same way and behaves
+the same way, and the project's answer at both sites is the same one — `kajson` records the class and
+reconstructs it, and `model_dump(serialize_as_any=True)` is the escape hatch for a one-off dump. Nothing
+serializes these results today (the interpreter unwraps them inline), so this is a note for the
+programmatic caller, not a description of a live path.
 """
 
 from enum import StrEnum

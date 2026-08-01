@@ -31,3 +31,21 @@ Items surfaced during the plan's engineering review that are deliberately **not*
 **Surfaced by** the Checkpoint-A cold review. `tests/unit/pipelex/kernel/test_document_reference.py` holds both `TestDocumentReference` and `TestDocumentReferenceKind`; `test_image_reference.py` has the analogous split. The repo's pytest standards say, twice and in caps, never to put more than one `TestClass` in a module.
 
 **Why it is deferred rather than fixed here.** It is pre-existing — both files moved at 97% similarity with only the import line changed, so the violation was inherited, not introduced. And fixing it *now* has a specific cost that will not apply later: splitting each file into two destroys git's rename detection, turning a reviewable "this moved verbatim" into a delete-plus-add in a PR whose entire claim is that the move is behavior-preserving. That is a bad trade in this PR and a free change in any later one. Do it as a standalone tidy after this series lands — it is mechanical, and `.test_durations` will need the same node-id sweep the plan already records for Phase 2 moves.
+
+## KF-5 — What kernel results do at a serialization boundary is a Phase-3 question
+
+**Surfaced by** Codex on PR #1081, as a P1 against `LlmObjectResult.content`: the field is annotated with the base `StuffContent`, so pydantic v2 serializes it by the annotation and a `NumberContent(number=3)` dumps as `{}`.
+
+**The behavior is real; the framing as a new defect is not.** Verified empirically, and the decisive comparison is `Stuff.content` — the codebase's canonical polymorphic content holder, annotated identically, and the one that genuinely crosses Temporal boundaries today:
+
+```
+Stuff.content plain model_dump  : {}
+Stuff.content serialize_as_any  : {'number': 3}
+Stuff kajson round-trip type    : NumberContent 3
+```
+
+So the kernel result is behaving exactly like the type it mirrors, and the project's answer at both sites is already in place: `kajson` (which records the class and reconstructs it) is what actually crosses process boundaries, and `model_dump(serialize_as_any=True)` covers a one-off dump. There are **zero** `SerializeAsAny` annotations in the tree — adding one here alone would introduce a pattern that exists nowhere else and would make the kernel result inconsistent with `Stuff`.
+
+**Why nothing is changed beyond a docstring.** Nothing serializes `LlmObjectResult` or `LlmTextResult` today: they are built in `llm_ops.py` and unwrapped inline by `PipeLLM`/`PipeStructure`, and there is no `model_dump`/`kajson` call anywhere in `pipelex/kernel/`. Fixing a corruption on a path no caller takes is guarding an impossible scenario. What *was* added is a note in the module docstring, because the kernel is aimed at programmatic callers and "call `model_dump()` on the result you were handed" is a plausible caller mistake in a way it is not for an internal type.
+
+**When it becomes real.** Phase 3 shapes the caller-facing boundary (3.1 `shape_inputs`, 3.2 result extraction). If kernel results are ever handed across a process, API or cache boundary there, this is the moment to decide deliberately — and the answer should almost certainly be "serialize with `kajson`, like everything else that crosses", not a bespoke annotation on one field. Revisit at 3.2 alongside KF-2, which is the same boundary seen from the input side.
