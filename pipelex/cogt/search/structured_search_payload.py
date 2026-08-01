@@ -15,9 +15,9 @@ Neither backend can therefore assume its own request shape decided the response 
   stops, a worker that demands the envelope rejects every search — a two-sided deploy hazard.
 
 Recognising the envelope *structurally* removes both. A response is the envelope only when it carries
-exactly ``data`` and ``sources`` **and** the caller's own output structure does not declare those two
-names itself — that last clause is what stops a legitimate ``{data, sources}`` output class from being
-unwrapped into its own sub-object.
+exactly ``data`` and ``sources`` **and** the caller's own output structure does not put those two names
+on the wire itself — that last clause is what stops a legitimate ``{data, sources}`` output class from
+being unwrapped into its own sub-object.
 """
 
 from typing import Any, cast
@@ -49,12 +49,30 @@ def extract_structured_search_payload(*, response: Any, schema: type[BaseModel])
 def _is_sources_envelope(*, payload: dict[str, Any], schema: type[BaseModel]) -> bool:
     """Whether this object is Linkup's sources envelope rather than the structured payload itself.
 
-    Field names *and* aliases are checked because the response is keyed by the schema's property names,
-    which pydantic emits by alias — so an output structure that reaches the wire as ``{data, sources}``
-    must be recognised as its own payload whichever way it spells those fields in Python.
+    The declared names come from the generated JSON schema rather than from ``model_fields``, because the
+    schema is what the provider was handed and the response is keyed by its property names. Pydantic emits
+    those properties *by alias*, and only the schema knows which of a field's alias forms actually reaches
+    the wire: ``Field(validation_alias=...)`` renames the property while leaving ``field.alias`` ``None``,
+    whereas ``Field(serialization_alias=...)`` does not rename it at all. Reading the schema keeps this
+    guard aligned with the provider by construction, instead of re-deriving pydantic's alias precedence
+    here. It is reached only once the payload carries exactly the two envelope keys, so the schema build
+    costs nothing on the ordinary path.
     """
     if frozenset(payload) != _ENVELOPE_KEYS:
         return False
-    declared = set(schema.model_fields)
-    declared.update(field.alias for field in schema.model_fields.values() if field.alias)
-    return not _ENVELOPE_KEYS.issubset(declared)
+    return not _ENVELOPE_KEYS.issubset(_declared_wire_names(schema=schema))
+
+
+def _declared_wire_names(*, schema: type[BaseModel]) -> set[str]:
+    """The property names the caller's output structure puts on the wire.
+
+    A schema whose root is a ``$ref`` — what pydantic emits for a self-referencing model — carries its
+    properties under ``$defs`` rather than at the top level, so the reference is followed before reading
+    them; otherwise such a class would declare nothing and have its own payload unwrapped.
+    """
+    json_schema = schema.model_json_schema()
+    root_ref = json_schema.get("$ref")
+    if isinstance(root_ref, str):
+        definitions = cast("dict[str, Any]", json_schema.get("$defs", {}))
+        json_schema = cast("dict[str, Any]", definitions.get(root_ref.rsplit("/", 1)[-1], {}))
+    return set(cast("dict[str, Any]", json_schema.get("properties", {})))

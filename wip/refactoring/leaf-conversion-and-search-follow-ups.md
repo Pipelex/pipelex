@@ -15,6 +15,7 @@ Every claim below was re-verified against the tree on **2026-07-31 at `2cc27966a
 | [RF-5](#rf-5--the-llm-paths-schema-check-is-implicit-and-a-plausible-optimisation-would-delete-it) | The LLM path's schema check is implicit, and a plausible optimisation deletes it | true | small | nothing |
 | [RF-6](#rf-6--dry-search-leaves-report-no-usage) | Dry search leaves report no usage | true, pre-existing | small design | nothing |
 | [RF-7](#rf-7--the-relays-envelope-contract-is-unpinned-on-the-producing-side) | The relay's envelope contract is unpinned on the producing side | true | small, cross-repo | a `pipelex-relay` PR |
+| [RF-8](#rf-8--an-envelope-whose-data-is-neither-null-nor-an-object-is-called-empty-rather-than-malformed) | An envelope whose `data` is neither null nor an object is called *empty* rather than *malformed* | true, deliberate | small, but two workers | nothing — decide whether the split is worth it |
 
 **What the review already fixed, so you do not re-find it:** the direct Linkup backend silently validating a `{data, sources}` envelope into an all-defaults object; a billed search whose shape was rejected vanishing from the cost report; `pipelex validate` no longer catching an output class that cannot emit a JSON schema; the gateway's positional `.get("data")` unwrap; `JSONDecodeError` escaping unclassified; the misleading "try a different model" advice on an empty result; and `linkup/exceptions.py` not following the `<provider>_exceptions.py` convention.
 
@@ -266,6 +267,46 @@ So the contract the gateway worker consumes is encoded nowhere on the producing 
 The review changed the gateway worker to recognise the envelope **structurally** rather than demand it, so a relay that stops asking for sources no longer breaks every gateway structured search — the two sides are decoupled and this is no longer a coordinated deploy. What remains is that the relay could change its response shape with nothing to notice.
 
 Worth doing anyway, and cheap: a relay-side regression test pinning `{data, sources}`, plus a line in the relay's README or CHANGELOG naming the shape. The hazard is amplified by this branch's own reasoning — it changed the *direct* backend to `include_sources=False` because "a structured result has nowhere to put sources", and someone applying that same reasoning to the relay is the likeliest way this moves.
+
+---
+
+## RF-8 — An envelope whose `data` is neither null nor an object is called *empty* rather than *malformed*
+
+Raised by a review bot on the v0.42.0 release PR (#1078) against `linkup_search_worker.py`. Verified true as a mechanic, judged **not worth fixing there** — recorded here rather than patched under a release.
+
+### Verified
+
+Both workers make the malformed-vs-empty split the extractor's docstring promises, and both make it the same way:
+
+```bash
+sed -n '178,182p' pipelex/providers/linkup/linkup_search_worker.py
+# payload = extract_structured_search_payload(response=response, schema=schema)
+# if payload is not None: return payload
+# if isinstance(response, dict):   ← empty; else → malformed
+```
+
+`extract_structured_search_payload` returns `None` in exactly two places (`structured_search_payload.py`): the response is not a dict at all, or it *is* the envelope and `payload["data"]` is not a dict. The `isinstance` line excludes the first, so the empty branch is reachable iff an envelope arrived carrying `data` of `None`, `list`, `str`, `int`, `float` or `bool`. Only `data: null` is genuinely "the search found nothing"; a list or a scalar is a provider contract breach — the schema always crosses as `model_json_schema()`, which is always `"type": "object"` — and gets `CHANGE_INPUT` / "try a broader query" advice it does not deserve.
+
+The extractor's own docstring closes that sub-split on purpose: *"an envelope whose `data` is null **or not an object** (the search simply found nothing…)"*. So this is a documented simplification, not an oversight.
+
+### Why it was not fixed on the release PR
+
+- Blast radius is the advice string and the message wording, on a path that already raises a classified error in the right family. Nothing is silently wrong.
+- The only shape observed in practice is `data: null`, which is classified correctly today. `data: {}` never reaches the branch at all — it is a dict, so it is returned as the payload and the leaf decides.
+- `gateway_search_worker.py` is structurally identical here, so fixing linkup alone would *create* a divergence where there is currently none. The change is two workers plus the shared helper plus both contract suites.
+
+### If you do it
+
+Put the predicate in the module that owns the envelope rule, not in the call sites: a `structured_search_payload` helper returning "envelope present **and** `data` is null", and swap the `isinstance(response, dict)` line in both workers for it. Inlining `response["data"] is None` at each call site instead hard-codes the helper's internals in two places and breaks the day the helper grows a third `None` case. Then tighten the extractor docstring's "null or not an object" → "null", or it becomes the drifted artifact. Make the fall-through message name the offending `data` type rather than the outer `dict`.
+
+**Do not** reach for a three-way outcome enum + result type + `match/case` in both workers. That is the shape the docstring literally describes, but it is a lot of new machinery to change an advice string on a shape never observed.
+
+### Two coverage gaps found while verifying this
+
+Both are real, independent of whether RF-8 itself is ever done:
+
+1. **The shared rule has no direct test.** `pipelex/cogt/search/structured_search_payload.py` is exercised only indirectly, through the two worker contract suites. It is the one piece of logic both backends share, and the alias defect fixed on #1078 lived in it.
+2. **The linkup suite is missing the `DataAndSources` case.** `test_gateway_structured_search_contract.py` pins `test_an_output_class_that_declares_data_and_sources_is_not_unwrapped` — "the one shape a positional `.get('data')` unwrap would silently corrupt" — and its linkup counterpart has no equivalent, despite running the same shared rule. The aliased variants added on #1078 landed on the gateway side only, for the same reason.
 
 ---
 
