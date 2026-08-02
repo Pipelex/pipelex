@@ -124,6 +124,16 @@ Phase 1's `LLMPromptBlueprint` precedent looks like it points the other way, and
 **The failure a user hits.** They write `seed = 12345` in a `PipeImgGen` step to reproduce an image, run it twice, and get two different images — no error, no warning, nothing indicating the parameter was discarded.
 
 **Why it is deferred rather than fixed here.** It is pre-existing, entirely outside the kernel extraction, and the fix is per-provider plumbing (each SDK spells the seed differently, and not all of them accept one) plus a decision about what to do for backends that cannot honor it — reject at validation, or document the field as best-effort. Both are product calls. Recorded here because this is where it was found; it belongs in the img-gen backlog rather than the kernel one.
+
+## KF-12 — `run_img_gen` treats a non-positive `nb_images` as one image, and what it *should* do is a Phase-3 question
+
+**Surfaced by** Codex on PR #1082 (P2): `nb_images=0` or a negative count falls through the `if nb_images > 1:` fork to `make_single_image`, so an invalid request generates one billable image instead of being rejected.
+
+**Why it is not a regression.** The fork is byte-identical to the base branch — `git show refactor/Kernel:pipelex/pipe_operators/img_gen/pipe_img_gen.py` has the same `if nb_images > 1:` at line 268, with the same `make_image_list` / `make_single_image` arms. The multiplicity derivation above it also moved unchanged: `nb_images = applied_output_multiplicity` whenever that is an `int`, with no lower bound anywhere on the way in.
+
+**Why it is deferred rather than fixed here, and this one is genuine doubt rather than scope.** There is no zero-behavior-change fix available. Unlike the `run_search` signature narrowing in this PR — where the ignorable fields could simply be removed from the signature — `nb_images` is an `int` and plain Python cannot express `int >= 1` at the boundary, so any fix *adds an error path* to a PR whose contract is that it adds none. And the fix's shape is not obvious: `nb_images=0` could defensibly mean "reject this request" or "produce an empty `ListContent`", and picking between them from a bot comment rather than from the caller experience is exactly the mistake KF-2 records. Phase 3's task 3.1 (`shape_inputs`) is the task that decides what a kernel entry point does with a malformed argument; settle it there, for all the ops at once, rather than one `int` at a time.
+
+**Worth noting on the way.** The interpreter path can reach it too — nothing between a `.mthds` `nb_output` and `nb_images` constrains the value — so if the answer turns out to be "reject", the constraint most likely belongs upstream on the blueprint, the same conclusion KF-10 reaches about `max_results`. The two should be settled together.
 ## KF-16 — The model-derived prompting style is obsolete and should become an explicit choice
 
 **Numbered 16, not 7, deliberately.** This item lands on the *first* PR of a three-PR stack, but the stacked Phase 2 and Phase 3 PRs already add KF-7 through KF-15. Taking the next free number instead of the next sequential one keeps every one of those entries — and the cross-references to them in the plan — exactly as written, so folding this in churns neither of the PRs above it. The gap below is theirs to fill.

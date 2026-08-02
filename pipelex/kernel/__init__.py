@@ -1,8 +1,8 @@
 """The Pipelex kernel: operator-execution semantics as importable functions.
 
-What a `PipeLLM` step actually *does* — deck resolution, templating-style derivation, prompt
-assembly, generation, memory write-back — used to be reachable only through a fully booted
-interpreter with a loaded library. This package holds that semantics once, so it has **one
+What an operator step actually *does* — deck resolution, prompt or job-params assembly, generation,
+memory write-back — used to be reachable only through a fully booted interpreter with a loaded
+library. This package holds that semantics once, so it has **one
 implementation with multiple callers**: the interpreter's operator classes, and any programmatic
 caller invoking the same functions on a ``RuntimeBoot``-only process with zero ``.mthds`` loaded.
 Single-sourcing is the point — two callers with two copies drift.
@@ -60,8 +60,16 @@ and strictly only when it is obviously the subject. Nothing here clears that bar
 argument.
 
 **Boot contract.** Every kernel call must be servable on ``RuntimeBoot.make()``
-(``pipelex/runtime_boot.py``) with no interpreter constructed and no library loaded. The
-import-closure test guards that structurally; a booted-runtime test proves it dynamically.
+(``pipelex/runtime_boot.py``) with no interpreter constructed and no library loaded.
+``tests/unit/pipelex/kernel/test_kernel_boot_contract.py`` is what proves it: it boots keyless,
+**calls every entry point**, and sweeps ``sys.modules`` afterwards. Treat that as the gate rather
+than as one of two — ``tests/unit/pipelex/test_runtime_layer_import_closure.py`` covers only what
+its ``pipelex.kernel.method_kernel`` entry point imports, and the façade is LLM-only, so most of
+this package sits outside its closure. **Every new entry point here gets an arm in that
+subprocess.** The rule is not ceremony: the sweep is the only gate that can see a function-local
+interpreter import (both static guards read module-level imports, and the blind spot is
+*per-function*), and nothing tells you when it has fallen behind — Phase 2 added five ops and every
+gate stayed green while covering none of them.
 
 Per the repo-wide rule, this module holds **no re-exports** — import each symbol from the module
 that defines it.
