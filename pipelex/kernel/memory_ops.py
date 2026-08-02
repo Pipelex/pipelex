@@ -6,7 +6,7 @@ each domain's ops module. It is also where the memory contract is actually imple
 a domain module never inlines the two calls: the day the contract stops aliasing argument and return,
 exactly one function changes.
 
-`shape_inputs` and the two extraction helpers are the boundary's other two ends. They are thin over
+`shape_inputs` and the extraction helpers are the boundary's other two ends. They are thin over
 machinery that already exists (`InputShaper`, `WorkingMemory`'s typed accessors) and are deliberately
 kept that way — the value is not new behavior, it is that a programmatic caller reads the whole
 memory boundary off one module whose every function is keyword-only, hub-free and boot-contract
@@ -24,6 +24,7 @@ from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstr
 from pipelex.core.memory.input_shaper import InputShaper
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 
@@ -89,7 +90,7 @@ def extract_main_content(*, memory: WorkingMemory, content_type: type[StuffConte
 
     Raises:
         WorkingMemoryStuffNotFoundError: nothing has been stored as main stuff yet.
-        WorkingMemoryTypeError: the stored content is not a `content_type`.
+        StuffContentTypeError: the stored content is not a `content_type`.
     """
     return memory.main_stuff_as(content_type)
 
@@ -102,6 +103,35 @@ def extract_named_content(*, memory: WorkingMemory, name: str, content_type: typ
 
     Raises:
         WorkingMemoryStuffNotFoundError: no stuff (and no alias) under that name.
-        WorkingMemoryTypeError: the stored content is not a `content_type`.
+        StuffContentTypeError: the stored content is not a `content_type`.
     """
     return memory.get_stuff_as(name=name, content_type=content_type)
+
+
+def extract_main_content_as_list(*, memory: WorkingMemory, item_type: type[StuffContentType]) -> ListContent[StuffContentType]:
+    """Read the memory's main stuff as a list of `item_type` — the typed read for a multi-output call.
+
+    A kernel op that produces several objects (`llm_object(is_multiple_output=True)`) stores them as one
+    `ListContent`, and the single-content read above cannot narrow that: passing the bare item class
+    raises, and passing `ListContent[item_type]` is rejected by design. Without this, the one shape the
+    kernel produces that its own read half could not narrow would send the caller back out to
+    `WorkingMemory`'s positional accessors — and the bare-`ListContent` workaround loses the item type,
+    which is the whole point of asking.
+
+    Every item is verified against `item_type`, so the returned list is typed all the way down.
+
+    Raises:
+        WorkingMemoryStuffNotFoundError: nothing has been stored as main stuff yet.
+        StuffContentTypeError: the stored content is not a list, or an item is not an `item_type`.
+    """
+    return memory.main_stuff_as_list(item_type)
+
+
+def extract_named_content_as_list(*, memory: WorkingMemory, name: str, item_type: type[StuffContentType]) -> ListContent[StuffContentType]:
+    """Read a named slot as a list of `item_type` — the same typed read as `extract_main_content_as_list`, by name.
+
+    Raises:
+        WorkingMemoryStuffNotFoundError: no stuff (and no alias) under that name.
+        StuffContentTypeError: the stored content is not a list, or an item is not an `item_type`.
+    """
+    return memory.get_stuff_as_list(name, item_type=item_type)

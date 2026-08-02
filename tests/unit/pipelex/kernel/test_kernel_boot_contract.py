@@ -16,7 +16,7 @@ import-closure test *at once*. The sweep below therefore runs **after** the kern
 what makes this test strictly stronger than the import-time one it complements.
 
 **Every kernel entry point is called, not a representative one** — the seven operator arms and the
-three memory-boundary ops (`shape_inputs` and the two extraction helpers). The blind spot this test
+memory-boundary ops (`shape_inputs` and the four extraction helpers). The blind spot this test
 exists for is per-function, so covering one op says nothing about the next: a function-local import
 inside `run_search` is caught only by calling `run_search`. That also makes this the only gate the
 ops modules other than `llm_ops` have — `PipelexKernel` is an LLM-era façade that does not import
@@ -100,7 +100,13 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     from pipelex.kernel.img_gen_ops import build_img_gen_job_params, run_img_gen
     from pipelex.kernel.img_gen_prompt import assemble_img_gen_prompt
     from pipelex.kernel.llm_results import LlmObjectResult, LlmTextResult
-    from pipelex.kernel.memory_ops import extract_main_content, extract_named_content, shape_inputs
+    from pipelex.kernel.memory_ops import (
+        extract_main_content,
+        extract_main_content_as_list,
+        extract_named_content,
+        extract_named_content_as_list,
+        shape_inputs,
+    )
     from pipelex.kernel.pipelex_kernel import PipelexKernel
     from pipelex.kernel.prompt_references import ImageReference, ImageReferenceKind
     from pipelex.kernel.search_ops import run_search
@@ -202,6 +208,32 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
         fail("extract_main_content did not return the content llm_object produced")
     if extract_named_content(memory=object_result.memory, name="topic", content_type=TextContent).text != SHAPED_TOPIC:
         fail("the shaped input did not survive the kernel call it was passed into")
+
+    # The multi-output shape, which the single-content reads above cannot narrow: it is stored as one
+    # ListContent, so it needs the list reads to come back typed down to the item.
+    list_result = asyncio.run(
+        kernel.llm_object(
+            memory=WorkingMemoryFactory.make_empty(),
+            output_class=NumberContent,
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.NUMBER),
+            model=model,
+            user="Pick a few numbers.",
+            result="answers",
+            is_multiple_output=True,
+        )
+    )
+
+    if not isinstance(list_result.content, ListContent):
+        fail(f"llm_object(is_multiple_output=True) produced {type(list_result.content).__name__}, not a ListContent")
+    for extracted_list in (
+        extract_main_content_as_list(memory=list_result.memory, item_type=NumberContent),
+        extract_named_content_as_list(memory=list_result.memory, name="answers", item_type=NumberContent),
+    ):
+        if not extracted_list.items:
+            fail("a list extraction helper returned no items for a multiple-output result")
+        for extracted_item in extracted_list.items:
+            if not isinstance(extracted_item, NumberContent):
+                fail(f"a list extraction helper yielded a {type(extracted_item).__name__}, not the NumberContent it was asked for")
 
     text_result = asyncio.run(
         kernel.llm_text(

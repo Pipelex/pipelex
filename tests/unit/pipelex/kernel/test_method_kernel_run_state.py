@@ -5,11 +5,21 @@ interpreter run's. These pin the links, because a parity failure there says "no 
 saying which link dropped: the run-level metadata, the per-step copy, or the run mode.
 """
 
+import pytest
+
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.stuffs.exceptions import StuffContentTypeError
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.kernel.memory_ops import extract_main_content, extract_named_content, store_result
+from pipelex.kernel.memory_ops import (
+    extract_main_content,
+    extract_main_content_as_list,
+    extract_named_content,
+    extract_named_content_as_list,
+    store_result,
+)
 from pipelex.kernel.method_kernel import MethodKernel
 from pipelex.system.data_inclusion_config import DataInclusionConfig
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -89,3 +99,26 @@ class TestMethodKernelRunState:
 
         assert extract_main_content(memory=memory, content_type=TextContent).text == "written by the kernel"
         assert extract_named_content(memory=memory, name="written", content_type=TextContent).text == "written by the kernel"
+
+    def test_the_memory_boundary_reads_back_a_multiple_output_result_typed(self) -> None:
+        """The list reads narrow a `ListContent` down to its items, which the single-content reads cannot.
+
+        That is the whole reason they exist: a multiple-output kernel call stores one `ListContent`, and
+        asking for the bare item class raises rather than unwrapping it.
+        """
+        concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT)
+        memory = store_result(
+            memory=WorkingMemoryFactory.make_empty(),
+            concept=concept,
+            content=ListContent(items=[TextContent(text="first"), TextContent(text="second")]),
+            result_name="written",
+        )
+
+        for extracted in (
+            extract_main_content_as_list(memory=memory, item_type=TextContent),
+            extract_named_content_as_list(memory=memory, name="written", item_type=TextContent),
+        ):
+            assert [item.text for item in extracted.items] == ["first", "second"]
+
+        with pytest.raises(StuffContentTypeError):
+            extract_main_content(memory=memory, content_type=TextContent)

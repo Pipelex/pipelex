@@ -71,7 +71,7 @@ Module-level functions carry the semantics. `MethodKernel` is a thin façade ove
 | `pipelex.kernel.search_ops` | `resolve_search_setting`, `run_search` |
 | `pipelex.kernel.compose_ops` | `build_compose_context`, `build_composed_content`, `run_compose_template` |
 | `pipelex.kernel.func_ops` | `call_registered_function`, `run_func` |
-| `pipelex.kernel.memory_ops` | `shape_inputs`, `store_result`, `extract_main_content`, `extract_named_content` |
+| `pipelex.kernel.memory_ops` | `shape_inputs`, `store_result`, `extract_main_content` / `extract_named_content`, `extract_main_content_as_list` / `extract_named_content_as_list` |
 | `pipelex.kernel.llm_prompt_content` | `LlmPromptContent`, `assemble_llm_prompt` |
 | `pipelex.kernel.*_results` | The typed result envelopes |
 
@@ -88,16 +88,24 @@ Every kernel function is **fully keyword-only**, with zero entries in `subject_g
 !!! warning "Treat the returned memory as the result"
     A kernel call may mutate the memory it was passed **and** returns it. Callers must use the returned one and must not rely on the two being the same object — inline execution aliases them today, and a serialization boundary will not.
 
-`pipelex.kernel.memory_ops` holds the three ends of that boundary:
+`pipelex.kernel.memory_ops` holds the three ends of that boundary — shape in, write back, read out:
 
 - **`shape_inputs`** — interpret raw values against the specs declared for them (Smart Inputs: a bare string becomes the declared concept, a dict validates against a structured one, a list shapes element-wise). It takes a `ConceptProviderAbstract` explicitly, because resolving concepts is what a loaded method's library is for and the kernel must stay callable without one. The interpreter hands over its concept library; a library-free caller supplies its own provider (the boot-contract test shows the smallest one that works — native concepts from `ConceptFactory`, compatibility from the declaration tier, structure classes from the class registry a boot fills).
 - **`store_result`** — the write-back every operator's ops end with, and the one place the memory contract is implemented.
 - **`extract_main_content` / `extract_named_content`** — the typed read. Needed even though every result envelope already carries the produced content, because those fields are annotated with the base `StuffContent`: pass the class you asked for and get it back narrowed.
+- **`extract_main_content_as_list` / `extract_named_content_as_list`** — the same typed read for a call that produced several objects. A multiple-output call stores one `ListContent`, which the single-content reads cannot narrow: the bare item class raises, and `ListContent[item_type]` is rejected by design. These verify every item against `item_type`, so the list comes back typed all the way down.
 
 ```python
 memory = shape_inputs(inputs={"topic": "kernels"}, concept_provider=provider, input_specs=specs)
 result = await kernel.llm_object(memory=memory, output_class=Summary, concept=summary_concept, model=model, user="Summarize $topic", result="summary")
 summary = extract_main_content(memory=result.memory, content_type=Summary)
+```
+
+Reach for the list pair whenever the call asked for several — `is_multiple_output=True` or `fixed_nb_output=n`:
+
+```python
+result = await kernel.llm_object(memory=memory, output_class=Summary, concept=summary_concept, model=model, user="Summarize $topic", result="summaries", is_multiple_output=True)
+summaries = extract_main_content_as_list(memory=result.memory, item_type=Summary).items
 ```
 
 ---
