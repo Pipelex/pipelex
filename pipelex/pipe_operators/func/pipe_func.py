@@ -16,6 +16,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_pipe_func_executor
+from pipelex.kernel.memory_ops import store_result
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.runtime_hub import get_class_registry
@@ -225,15 +226,11 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
 
         the_content = execution_result.content
 
-        output_stuff = StuffFactory.make_stuff(
-            name=output_name,
+        working_memory = store_result(
+            memory=working_memory,
             concept=self.output.concept,
             content=the_content,
-        )
-
-        working_memory.set_new_main_stuff(
-            stuff=output_stuff,
-            name=output_name,
+            result_name=output_name,
         )
 
         # Capture execution data for the graph tracer. PipeFunc has no prompts or

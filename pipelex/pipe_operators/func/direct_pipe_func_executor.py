@@ -1,10 +1,8 @@
 import asyncio
-import inspect
 import shutil
 import sys
 import tempfile
 from pathlib import Path
-from typing import cast
 
 from typing_extensions import override
 
@@ -12,12 +10,10 @@ from pipelex import log
 from pipelex.codegen.emitters.python_structures import emit_python_structures
 from pipelex.codegen.resolved_concepts import resolve_concepts_from_crate
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.core.stuffs.text_content import TextContent
 from pipelex.interpreter_hub import get_library_manager
+from pipelex.kernel.func_ops import call_registered_function
 from pipelex.pipe_operators.func.exceptions import PipeFuncExecutionError
 from pipelex.pipe_operators.func.pipe_func_execution_dtos import PipeFuncExecutionRequest, PipeFuncExecutionResponse
 from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutionResult, PipeFuncExecutorProtocol
@@ -25,7 +21,6 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.runtime_bridge.primitives.rehydration import rehydrate_library_and_memory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
-from pipelex.system.registries.func_registry import func_registry
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 
 # The library id the transported run rebuilds under. Internal to one process (a fresh sandbox box or a
@@ -37,10 +32,14 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
     """The ``direct`` execution mode: resolve the function from the process-global registry and run it here.
 
     The free, in-process, trusted mode core owns (mirrors ``DirectOrchestrator`` on the orchestration
-    axis). This is the pre-existing PipeFunc behavior, extracted verbatim from ``_live_run_operator_pipe``:
-    async vs sync dispatch, and str/list -> StuffContent coercion. It is used for local runs and inside
-    a sandbox box (where the real function IS registered); a sandbox-dispatching executor from the
-    out-of-tree plugin runs it out-of-process instead when ``execution_mode`` names a sandbox backend.
+    axis). It is used for local runs and inside a sandbox box (where the real function IS registered);
+    a sandbox-dispatching executor from the out-of-tree plugin runs it out-of-process instead when
+    ``execution_mode`` names a sandbox backend.
+
+    What running a function *means* — the registry lookup, async-vs-sync dispatch, and the
+    str/list -> StuffContent coercion — is the kernel's ``call_registered_function``, so this executor
+    is what is left once that is factored out: the in-process wiring of the live arm, and the whole
+    transported arm below.
     """
 
     @override
@@ -54,32 +53,16 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         pipe_run_params: PipeRunParams,
     ) -> PipeFuncExecutionResult:
         log.verbose(f"Running PipeFunc in-process with function '{function_name}'")
-        function = func_registry.get_required_function(function_name)
-
-        # The function is arbitrary user code; its failure surface is not enumerable. We do NOT catch
-        # here: the operator wraps this call and decorates the failure with the pipe's inputs/output
-        # for a diagnostic PipeRunError (preserving the pre-refactor behavior).
-        if inspect.iscoroutinefunction(function):
-            func_output_object = await function(working_memory=working_memory)
-        else:
-            func_output_object = await asyncio.to_thread(function, working_memory=working_memory)
-
-        the_content: StuffContent
-        if isinstance(func_output_object, StuffContent):
-            the_content = func_output_object
-        elif isinstance(func_output_object, list):
-            func_result_list = cast("list[StuffContent]", func_output_object)
-            the_content = ListContent(items=func_result_list)
-        elif isinstance(func_output_object, str):
-            the_content = TextContent(text=func_output_object)
-        else:
-            msg = f"Function '{function_name}' must return a StuffContent or a list, got {type(func_output_object)}"
-            raise TypeError(msg)
-
+        # The call itself — registry lookup, async/sync dispatch, return coercion — is the kernel's,
+        # so an out-of-process executor and this one share one definition of what running a function
+        # means. Nothing is caught here: the function is arbitrary user code whose failure surface is
+        # not enumerable, and the operator wraps this call to decorate the failure with the pipe's
+        # inputs/output for a diagnostic PipeRunError.
+        call_result = await call_registered_function(function_name=function_name, memory=working_memory)
         return PipeFuncExecutionResult(
-            content=the_content,
-            function_module=getattr(function, "__module__", None),
-            function_qualname=getattr(function, "__qualname__", function_name),
+            content=call_result.content,
+            function_module=call_result.function_module,
+            function_qualname=call_result.function_qualname,
         )
 
     @override

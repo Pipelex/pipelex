@@ -75,6 +75,23 @@ Phase 1's `LLMPromptBlueprint` precedent looks like it points the other way, and
 **What was done instead.** The one thing genuinely shared between the two paths — the three-layer context ordering (memory stuffs → run params → step `extra_context`) that both the template path and the construct path's TEMPLATE fields render against — is now single-sourced in `build_compose_context` and called from both. That is the drift this extraction exists to kill; the rest of construct mode was never at risk of forking, because it has exactly one caller.
 
 **When to revisit.** If a second caller of construct-mode composition ever appears, or if `pipelex/kernel/` is packaged as a standalone distribution (a stated non-goal today) and the MTHDS blueprint models get a layer verdict of their own. Note the precedent that would support the move when it comes: `TemplateBlueprint` is also a `.mthds`-parsed artifact and already lives in the runtime layer, under `pipelex/cogt/templating/`.
+
+## KF-8 — `PipeFunc`'s executor seam is not kernel-carried, so a kernel `run_func` always runs in this process
+
+**Surfaced by** task 2.5 itself. The task read "kernel function-call op over the `PipeFuncExecutorProtocol` seam ... the kernel op must carry **both arms**"; the call and the write-back landed, the seam did not.
+
+**Why the seam did not.** Neither arm's type survives the layer boundary. `PipeFuncExecutorProtocol.run_pipe_func` declares `pipe_run_params: PipeRunParams` and `run_pipe_func_transported` is typed on `PipeFuncExecutionRequest`, which carries a `LibraryCrate`. `pipe_run` and `libraries` are both interpreter packages, and the task's own analysis rules out moving those two models as far outside Phase 2. So the kernel cannot name the protocol it was told to take as an argument.
+
+**The two ways to satisfy the letter, and why neither was taken.**
+
+- *Re-type the protocol off `PipeRunParams`.* Cheap in this tree — nothing in it reads the parameter, including `DirectPipeFuncExecutor` — but it is not a cleanup, it is a wire-format change: both out-of-tree implementers (our Daytona sandbox plugin and our Temporal plugin) thread `pipe_run_params` straight onto `PipeFuncExecutionRequest`, which crosses a process boundary. Two repos this tree's CI cannot see would break at the same time, and the honest first question — *does anything downstream ever read it?* — is not answerable from here.
+- *A kernel-side narrow protocol plus an interpreter-side adapter.* Buys a second protocol for one seam, an adapter class binding `pipe_run_params`, and a result-model conversion at the boundary — to compose two calls. Against a "no over-engineering" bar that is the more expensive of the two, not the safer one.
+
+**What was done instead.** The split follows what is actually shared. `call_registered_function` holds what running a function *means* — registry lookup, async-vs-sync dispatch, the str/list→`StuffContent` coercion — and both the in-process executor and the kernel's own `run_func` ride it, so the executor and a programmatic caller cannot fork on it. `store_result` holds the write-back, which `PipeFunc` now rides too. What stays interpreter-side is *where the function runs*, which is configured deployment machinery rather than operator semantics.
+
+**What the caller loses, stated plainly.** A programmatic caller cannot ask the kernel to run its function in a sandbox: `run_func` is the in-process path, full stop. And `run_func` has no in-tree caller — `PipeFunc` rides the pieces, not the composition — which is why it carries its own kernel unit tests rather than leaning on the zero-behavior-change suite.
+
+**When to revisit.** Whenever `pipe_run_params` on the executor seam is settled on its own merits — the question is whether a serialized PipeFunc request needs the run params at all, and it wants an answer coordinated across the three repos, not a drive-by narrowing here. Phase 3's `JobMetadata` task (3.3) is the natural moment: it is already the task that asks what run-scoped state a kernel call carries, and this is the same question asked at the one seam that serializes it.
 ## KF-16 — The model-derived prompting style is obsolete and should become an explicit choice
 
 **Numbered 16, not 7, deliberately.** This item lands on the *first* PR of a three-PR stack, but the stacked Phase 2 and Phase 3 PRs already add KF-7 through KF-15. Taking the next free number instead of the next sequential one keeps every one of those entries — and the cross-references to them in the plan — exactly as written, so folding this in churns neither of the PRs above it. The gap below is theirs to fill.
