@@ -52,7 +52,7 @@ Four gates hold this, and each covers something the others miss — see [Hub Lay
 | `pipelex-dev check-hub-layering` | No kernel *module* imports the interpreter hub |
 | `tests/unit/pipelex/test_runtime_layer_import_closure.py` | A kernel entry point *imports* clean |
 | `tests/unit/pipelex/test_runtime_layer_exceptions_aggregate_gate.py` | No kernel module reaches the exceptions aggregate — imports and bare strings alike |
-| `tests/unit/pipelex/kernel/test_kernel_boot_contract.py` | Every kernel entry point **runs** on a keyless boot, swept afterwards |
+| `tests/unit/pipelex/kernel/test_kernel_boot_contract.py` | Every kernel entry point **runs** on a keyless boot, swept afterwards — except the three `resolve_*_setting` helpers, which read the model deck (a separate question from this one) |
 
 Only the last one can see a function-local interpreter import, and it is **per-function**: it catches one inside `run_search` only by calling `run_search`. Every new kernel entry point owes it an arm.
 

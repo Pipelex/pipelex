@@ -48,6 +48,13 @@ def shape_inputs(
 
     `concept_provider` is taken explicitly, never looked up: resolving concepts is what a loaded
     method's library is for, and the kernel must stay callable without one.
+
+    A malformed input is rejected here with a typed, locator-bearing error rather than coerced — this
+    is the boundary where a caller's raw values stop being raw, so it is the right place to refuse.
+
+    Raises:
+        UnknownInputNameError: a provided name is not declared in `input_specs` (D8).
+        InputShapingError subclasses: a provided value cannot be shaped to its declared concept (D4).
     """
     return InputShaper.shape(
         inputs,
