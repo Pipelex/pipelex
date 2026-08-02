@@ -15,12 +15,24 @@ What it deliberately does **not** hold is anything derived from config or the mo
 LLM settings, prompting style. Those are computed per call and never cached here, exactly as
 ``pipe_llm.py`` derives them per run today: cached derived state is hidden shared state, it makes a
 later config or deck change invisible to a live kernel, and it breaks per-call variation.
+
+**Who owns the usage/trace lifecycle for a kernel-driven run: the caller, not the kernel.** The
+interpreter's run machinery opens a graph tracer, builds the event log, registers it on the report
+delegate and closes all three in a ``finally`` — because it has a run boundary to hang that on. A
+kernel call has no such boundary: it is one step, and a caller may make one or a thousand. So the
+kernel takes a ``TraceContext`` as an argument and does exactly one thing with it — stamp it onto
+every step's :class:`JobMetadata`, which is what the cogt leaf reads to decide whether and where to
+emit a usage event. Opening the event log, registering it (``get_report_delegate().set_event_log``),
+reading the events back and clearing the registration stay the caller's, and they are the whole of
+what stands between a kernel run and the interpreter's cost reporting. ``pipelex/tracing/`` holds
+both halves a caller needs (``make_event_log``, ``UsageAggregator``) and is runtime-layer, so none of
+this costs the boot contract. See ``docs/under-the-hood/method-kernel.md``.
 """
 
 from typing import Self
 from uuid import uuid4
 
-from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams, check_mock_usage_requires_dry
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -40,6 +52,7 @@ from pipelex.kernel.llm_results import LlmObjectResult, LlmTextResult
 from pipelex.runtime_hub import resolve_run_mode_for_boot
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.system.trace_context import TraceContext
 
 
 class PipelexKernel:
@@ -50,18 +63,40 @@ class PipelexKernel:
         self.cogt_run_params = cogt_run_params
 
     @classmethod
-    def make(cls, *, run_mode: PipeRunMode = PipeRunMode.LIVE, user_id: str) -> Self:
-        """Mint a kernel for one run: a fresh run id, and the execution-mode contract for it.
+    def make(
+        cls,
+        *,
+        run_mode: PipeRunMode = PipeRunMode.LIVE,
+        user_id: str,
+        is_mock_usage: bool = False,
+        trace_context: TraceContext | None = None,
+    ) -> Self:
+        """Mint a kernel for one run: a run id, the execution-mode contract, and optional tracing.
 
         This is a run-params factory, so it owes the same keyless-boot contract as the pipe tier's:
         a process booted with ``needs_inference=False`` forces every run it initiates to DRY, and a
         kernel that skipped that would spend real money on the exact boot this package documents as
         its target. Applied through the shared ``resolve_run_mode_for_boot`` — a second copy of the
-        rule at a second factory is how the two would drift.
+        rule at a second factory is how the two would drift. And, like the pipe tier's factory, the
+        REQUESTED mode is validated before that coercion: ``is_mock_usage`` is a DRY-only sub-flag,
+        so an illegal LIVE request must fail loud on every boot rather than be silently legalised by
+        a keyless process forcing it to DRY.
+
+        ``trace_context`` is what makes cost/usage reporting reach parity with an interpreter run:
+        the cogt leaf emits a usage event only when the metadata it is handed carries one. Passing it
+        adopts its ``graph_id`` as this run's ``pipeline_run_id`` rather than minting a fresh id —
+        the two are one identity, and letting them diverge would scatter a single run's usage events
+        across two ids (the registered-context emit path stamps the event log's id, the runner
+        fallback stamps the metadata's), so the read-back would silently miss half of them.
         """
+        check_mock_usage_requires_dry(run_mode=run_mode, is_mock_usage=is_mock_usage)
         return cls(
-            job_metadata=JobMetadata(user_id=user_id, pipeline_run_id=str(uuid4())),
-            cogt_run_params=CogtRunParams(run_mode=resolve_run_mode_for_boot(requested=run_mode)),
+            job_metadata=JobMetadata(
+                user_id=user_id,
+                pipeline_run_id=trace_context.graph_id if trace_context is not None else str(uuid4()),
+                trace_context=trace_context,
+            ),
+            cogt_run_params=CogtRunParams(run_mode=resolve_run_mode_for_boot(requested=run_mode), is_mock_usage=is_mock_usage),
         )
 
     def make_step_metadata(self) -> JobMetadata:
@@ -69,8 +104,9 @@ class PipelexKernel:
 
         ``otel_context`` is passed explicitly as ``None`` rather than left to inherit, which is the
         contract ``copy_with_update`` states: the field is computed fresh per step by whoever opens
-        the span, and a kernel call opens none. Span and trace-context wiring for a kernel-driven
-        run is a separate concern from minting the identity, and is not wired here.
+        the span, and a kernel call opens none. ``trace_context`` is left to inherit, which is the
+        same method's other contract and the reason usage events from every step of a kernel run
+        attribute to the one context the caller supplied.
         """
         return self.job_metadata.copy_with_update(otel_context=None, pipe_run_id=str(uuid4()))
 

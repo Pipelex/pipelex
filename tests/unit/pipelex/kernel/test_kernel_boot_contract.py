@@ -15,12 +15,18 @@ interpreter through a function-local import, which is invisible to the static gr
 import-closure test *at once*. The sweep below therefore runs **after** the kernel call, which is
 what makes this test strictly stronger than the import-time one it complements.
 
-**Every operator's entry point is called, not a representative one.** The blind spot this test exists
-for is per-function, so covering one op says nothing about the next: a function-local import inside
-`run_search` is caught only by calling `run_search`. That also makes this the only gate the ops
-modules other than `llm_ops` have — `PipelexKernel` is an LLM-era façade that does not import them, so
-`test_runtime_layer_import_closure.py`'s `pipelex.kernel.pipelex_kernel` entry point does not reach
-them even at import time.
+**Every kernel entry point is called, not a representative one** — the seven operator arms and the
+three memory-boundary ops (`shape_inputs` and the two extraction helpers). The blind spot this test
+exists for is per-function, so covering one op says nothing about the next: a function-local import
+inside `run_search` is caught only by calling `run_search`. That also makes this the only gate the
+ops modules other than `llm_ops` have — `PipelexKernel` is an LLM-era façade that does not import
+them, so `test_runtime_layer_import_closure.py`'s `pipelex.kernel.pipelex_kernel` entry point does not
+reach them even at import time.
+
+The memory-boundary arm carries a second proof the operator arms cannot: `shape_inputs` needs a
+`ConceptProviderAbstract`, and the only implementation in the tree is the interpreter's concept
+library. The script therefore supplies its own, which is what a library-free caller has to do — so
+the arm demonstrates the shape of that caller as well as pinning the closure.
 
 Run in a **subprocess** for the reason its two siblings state: a suite-level boot already owns the
 process singletons, and both hubs are sticky class attributes that `teardown` deliberately does not
@@ -65,20 +71,27 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     import asyncio
     import sys
 
+    from typing_extensions import override
+
     from pipelex.cogt.extract.extract_input import ExtractInput
     from pipelex.cogt.extract.extract_setting import ExtractSetting
     from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
     from pipelex.cogt.llm.llm_setting import LLMSetting
     from pipelex.cogt.search.search_setting import SearchSetting
     from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
+    from pipelex.core.concepts.concept import Concept
     from pipelex.core.concepts.concept_factory import ConceptFactory
+    from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
     from pipelex.core.concepts.native.concept_native import NativeConceptCode
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+    from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
+    from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
     from pipelex.core.stuffs.image_content import ImageContent
     from pipelex.core.stuffs.list_content import ListContent
     from pipelex.core.stuffs.number_content import NumberContent
     from pipelex.core.stuffs.search_result_content import SearchResultContent
+    from pipelex.core.stuffs.stuff_content import StuffContent
     from pipelex.core.stuffs.stuff_factory import StuffFactory
     from pipelex.core.stuffs.text_content import TextContent
     from pipelex.kernel.compose_ops import run_compose_template
@@ -87,11 +100,13 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     from pipelex.kernel.img_gen_ops import build_img_gen_job_params, run_img_gen
     from pipelex.kernel.img_gen_prompt import assemble_img_gen_prompt
     from pipelex.kernel.llm_results import LlmObjectResult, LlmTextResult
+    from pipelex.kernel.memory_ops import extract_main_content, extract_named_content, shape_inputs
     from pipelex.kernel.pipelex_kernel import PipelexKernel
     from pipelex.kernel.prompt_references import ImageReference, ImageReferenceKind
     from pipelex.kernel.search_ops import run_search
     from pipelex.runtime_boot import RuntimeBoot
     from pipelex.system.pipe_run_mode import PipeRunMode
+    from pipelex.system.registries.class_registry_access import get_class_registry
     from pipelex.system.registries.func_registry import func_registry
     from pipelex.system.runtime import IntegrationMode
     from pipelex.tools.jinja2.template_category import TemplateCategory
@@ -117,15 +132,54 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
         if not isinstance(stored, expected_type):
             fail(f"the memory returned by {label} carries {type(stored).__name__}, not the {expected_type.__name__} it produced")
 
+    class NativeOnlyConceptProvider(ConceptProviderAbstract):
+        # A caller without a loaded library still has to answer concept questions, and this is what
+        # that costs on a runtime-only boot: native concepts from the pure factory, compatibility
+        # from the declaration tier the kernel doctrine routes to, and structure classes from the
+        # class registry a RuntimeBoot fills. `shape_inputs` takes the provider explicitly for
+        # exactly this reason — the interpreter hands over its library, a programmatic caller hands
+        # over something like this.
+        @override
+        def get_required_concept(self, concept_ref):
+            return ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode(concept_ref.split(".")[-1]))
+
+        @override
+        def get_native_concept(self, native_concept):
+            return ConceptFactory.make_native_concept(native_concept_code=native_concept)
+
+        @override
+        def get_required_concept_from_concept_ref_or_code(self, concept_ref_or_code, *, search_domain_codes=None):
+            return self.get_required_concept(concept_ref_or_code)
+
+        @override
+        def is_compatible(self, *, tested_concept, wanted_concept, strict=False):
+            return Concept.are_compatible_by_declaration(concept_1=tested_concept, concept_2=wanted_concept)
+
+        @override
+        def get_structure_class(self, *, concept):
+            return get_class_registry().get_required_subclass(name=concept.structure_class_name, base_class=StuffContent)
+
     RuntimeBoot.make(integration_mode=IntegrationMode.PYTEST, needs_inference=False)
 
     kernel = PipelexKernel.make(run_mode=PipeRunMode.DRY, user_id="kernel-boot-contract")
     model = LLMSetting(model="kernel-boot-contract-model", temperature=0.5)
     text_concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT)
 
+    # The input end of the memory boundary, driven the way a library-free caller drives it: raw values
+    # plus the specs it declares for them. The shaped memory is then what the first op runs on, so the
+    # two ends of the boundary are proven against each other rather than in isolation.
+    SHAPED_TOPIC = "what a runtime-only boot can run"
+    shaped_memory = shape_inputs(
+        inputs={"topic": SHAPED_TOPIC},
+        concept_provider=NativeOnlyConceptProvider(),
+        input_specs=InputStuffSpecs(root={"topic": StuffSpec(concept=text_concept)}),
+    )
+    if extract_named_content(memory=shaped_memory, name="topic", content_type=TextContent).text != SHAPED_TOPIC:
+        fail("shape_inputs did not land the provided value under its declared name")
+
     object_result = asyncio.run(
         kernel.llm_object(
-            memory=WorkingMemoryFactory.make_empty(),
+            memory=shaped_memory,
             output_class=NumberContent,
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.NUMBER),
             model=model,
@@ -140,6 +194,14 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
         fail(f"llm_object produced {type(object_result.content).__name__}, not the NumberContent it was given")
     if object_result.memory.get_main_stuff().content is not object_result.content:
         fail("the memory returned by llm_object does not carry the produced content as its main stuff")
+
+    # The read end of the boundary, on the memory the call returned: the produced content narrowed to
+    # the class it was asked for (the result envelope annotates that field as the base StuffContent),
+    # and the shaped input still readable beside it.
+    if extract_main_content(memory=object_result.memory, content_type=NumberContent) is not object_result.content:
+        fail("extract_main_content did not return the content llm_object produced")
+    if extract_named_content(memory=object_result.memory, name="topic", content_type=TextContent).text != SHAPED_TOPIC:
+        fail("the shaped input did not survive the kernel call it was passed into")
 
     text_result = asyncio.run(
         kernel.llm_text(
