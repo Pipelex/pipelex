@@ -18,7 +18,8 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.interpreter_hub import get_concept_library, get_native_concept
-from pipelex.kernel.llm_ops import derive_structure_prompt, generate_object_content, resolve_llm_setting_for_object, store_result
+from pipelex.kernel.llm_ops import derive_structure_prompt, generate_object_content, resolve_llm_setting_for_object
+from pipelex.kernel.memory_ops import store_result
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.runtime_hub import get_class_registry
