@@ -76,10 +76,11 @@ def build_img_gen_job_params(
     default, so leaving it unset means "let the backend decide".
 
     `seed` accepts the literal `"auto"` that the config and the language both allow, and turns it into
-    `None` — the backend reads an absent seed as "pick one".
+    `None` — the backend reads an absent seed as "pick one". `0` is a legal seed (`ImgGenJobParams`
+    constrains it with `ge=0`), so it is read as a value rather than as an absence.
     """
     img_gen_param_defaults = get_config().cogt.img_gen_config.img_gen_param_defaults
-    seed_setting = seed or img_gen_param_defaults.seed
+    seed_setting = seed if seed is not None else img_gen_param_defaults.seed
     resolved_seed: int | None
     if isinstance(seed_setting, str):
         resolved_seed = None

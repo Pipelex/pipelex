@@ -71,7 +71,6 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
     from pipelex.cogt.llm.llm_setting import LLMSetting
     from pipelex.cogt.search.search_setting import SearchSetting
-    from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
     from pipelex.core.concepts.concept_factory import ConceptFactory
     from pipelex.core.concepts.native.concept_native import NativeConceptCode
     from pipelex.core.memory.working_memory import WorkingMemory
@@ -199,7 +198,8 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     search_result = asyncio.run(
         run_search(
             memory=WorkingMemoryFactory.make_empty(),
-            prompt_blueprint=TemplateBlueprint(template=search_query, category=TemplateCategory.LLM_PROMPT),
+            template=search_query,
+            category=TemplateCategory.LLM_PROMPT,
             search_setting=SearchSetting(model="kernel-boot-contract-search-model"),
             concept=text_concept,
             job_metadata=kernel.make_step_metadata(),

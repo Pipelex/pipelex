@@ -14,7 +14,6 @@ from pipelex.cogt.content_generation.assignment_models import SearchAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
-from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -23,6 +22,7 @@ from pipelex.kernel.memory_ops import store_result
 from pipelex.kernel.search_results import SearchResult
 from pipelex.runtime_hub import get_content_generator, get_model_deck
 from pipelex.system.job_metadata import JobMetadata
+from pipelex.tools.jinja2.template_category import TemplateCategory
 
 
 def resolve_search_setting(
@@ -55,7 +55,8 @@ def resolve_search_setting(
 async def run_search(
     *,
     memory: WorkingMemory,
-    prompt_blueprint: TemplateBlueprint,
+    template: str,
+    category: TemplateCategory,
     search_setting: SearchSetting,
     concept: Concept,
     job_metadata: JobMetadata,
@@ -70,14 +71,18 @@ async def run_search(
 ) -> SearchResult:
     """A whole search step: render the query, search, store, report.
 
+    The query template arrives as source plus category rather than as a `TemplateBlueprint`, the way
+    `run_compose_template` takes it: a search renders against memory alone, with no style and no extra
+    context, so a blueprint would hand over two fields this function has nothing to do with.
+
     The search itself goes through the same content-generation seam as the LLM, image-generation and
     extract leaves — direct inline, an activity when in-workflow, or a dry mock — which is what makes
     it replay-safe under a distributed orchestrator and lets its failures cross a workflow boundary as
     classified errors instead of hanging.
     """
     query_text = await render_template(
-        template=prompt_blueprint.template,
-        category=prompt_blueprint.category,
+        template=template,
+        category=category,
         context=memory.generate_context(),
     )
     search_assignment = SearchAssignment(

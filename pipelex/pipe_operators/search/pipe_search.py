@@ -108,7 +108,8 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
 
         search_result = await run_search(
             memory=working_memory,
-            prompt_blueprint=self.prompt_blueprint,
+            template=self.prompt_blueprint.template,
+            category=self.prompt_blueprint.category,
             search_setting=search_setting,
             concept=self.output.concept,
             job_metadata=job_metadata,

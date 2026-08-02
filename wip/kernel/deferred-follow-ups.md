@@ -92,6 +92,38 @@ Phase 1's `LLMPromptBlueprint` precedent looks like it points the other way, and
 **What the caller loses, stated plainly.** A programmatic caller cannot ask the kernel to run its function in a sandbox: `run_func` is the in-process path, full stop. And `run_func` has no in-tree caller — `PipeFunc` rides the pieces, not the composition — which is why it carries its own kernel unit tests rather than leaning on the zero-behavior-change suite.
 
 **When to revisit.** Whenever `pipe_run_params` on the executor seam is settled on its own merits — the question is whether a serialized PipeFunc request needs the run params at all, and it wants an answer coordinated across the three repos, not a drive-by narrowing here. Phase 3's `JobMetadata` task (3.3) is the natural moment: it is already the task that asks what run-scoped state a kernel call carries, and this is the same question asked at the one seam that serializes it.
+
+## KF-9 — Two constructors build `ImgGenJobParams` from the same config defaults with different derivation rules
+
+**Surfaced by** cubic on PR #1082, against `build_img_gen_job_params` in `pipelex/kernel/img_gen_ops.py`: a transparent background with no step-level `output_format` builds params that fail `ImgGenJobParams.validate_background_vs_output_format`.
+
+**The asymmetry is real.** `ImgGenJobParamsDefaults.make_img_gen_job_params` (`pipelex/cogt/img_gen/img_gen_job_components.py`) derives `output_format = ImageFormat.PNG` when `self.background.is_certainly_transparent`; the kernel's `build_img_gen_job_params` passes `output_format` straight through. Both read the same `img_gen_param_defaults`, and both are live — the defaults constructor is the fallback in `content_generator.py` and `img_gen_job_factory.py`.
+
+**Why it is not a regression.** The pre-refactor `PipeImgGen._live_run_operator_pipe` constructed `ImgGenJobParams(...)` inline with the identical `output_format=self.output_format`; the operator path never went through `make_img_gen_job_params`. Verified against `git show refactor/Kernel:pipelex/pipe_operators/img_gen/pipe_img_gen.py`. The behavior moved unchanged.
+
+**Reachability.** The shipped default is `background = "auto"`, so it does not fire out of the box. It fires under a `.pipelex/pipelex.toml` override of `[cogt.img_gen_config.img_gen_param_defaults] background = "transparent"`, which would then break every `PipeImgGen` that omits `output_format`. Note the same failure is already reachable today with no config override at all, via a step-level `background = "transparent"` with no `output_format` — so a fix confined to the config path would not close the case.
+
+**Why it is deferred rather than fixed here.** Re-deriving PNG inside `build_img_gen_job_params` would make a currently-failing configuration start working — a behavior change inside a zero-behavior-change PR — and it is the wrong-shaped fix. The defect is that *two* constructors of the same type read the same defaults with divergent rules, which is precisely the duplication this extraction exists to kill. Single-source them; do not patch one side. Failure today is loud and well-worded, not silent corruption, so nothing is at risk in the meantime.
+
+## KF-10 — `max_results` reaches a provider unvalidated because the constraint sits on the wrong model
+
+**Surfaced by** cubic on PR #1082, against `resolve_search_setting` in `pipelex/kernel/search_ops.py`: `search_setting.model_copy(update={"max_results": max_results_override})` skips validation, because pydantic v2's `model_copy` does no validation by design.
+
+**The chain is genuinely unconstrained end to end.** `PipeSearchBlueprint.max_results` is `int | None = None` with no `ge`; `PipeSearchFactory.make` passes it through to `PipeSearch.max_results_override`, also unconstrained; only `SearchSetting.max_results` carries `Field(default=None, ge=1)`, and the `model_copy` is what bypasses it. So `max_results = 0` in a `.mthds` reaches a search provider.
+
+**Why it is not a regression.** Identical on the base branch, step 4 of `PipeSearch._live_run_operator_pipe`. Verified against `git show refactor/Kernel:pipelex/pipe_operators/search/pipe_search.py`.
+
+**Why it is deferred rather than fixed here, and why the obvious fix is the wrong one.** Revalidating the copy (the bot's suggestion) would raise a pydantic `ValidationError` deep inside the search run path, with no `.mthds` locator to tell the author which step is wrong — trading an unvalidated value for a bad diagnostic. The constraint belongs on `PipeSearchBlueprint.max_results` as `Field(default=None, ge=1)`, where it is caught at validation time with a proper error. That changes the MTHDS JSON Schema and drags the committed downstream copies (`mthds/`, `vscode-pipelex/`, `mthds-ui/`) with it, which is unambiguously outside a zero-behavior-change refactor. Do it as a standalone language-surface change with the schema regeneration and the cross-repo sweep in the same PR.
+
+## KF-11 — `PipeImgGen`'s `seed` is documented language surface that no image-generation provider reads
+
+**Surfaced by** verifying cubic's P2 against `build_img_gen_job_params`, which reported that `seed or img_gen_param_defaults.seed` discarded an explicit `0`. That part was true and is **fixed in PR #1082** — the line now reads `seed if seed is not None else …`, matching the `is_raw` line below it. The larger fact came out of checking the claimed impact.
+
+**The seed is inert.** `seed` is a declared `PipeImgGen` blueprint field (therefore in the published MTHDS JSON Schema), it is validated (`ImgGenJobParams.seed`, `ge=0`), and it is composed into `ImgGenJobParams` on every image-generation run — and no img-gen worker reads it. Grepping `job_params.seed` across every worker under `pipelex/providers/*/` finds exactly one image-generation reference, and it is commented out: `pipelex/providers/google/google_img_gen_worker.py`. (The live hits are all `LLMJobParams.seed`, a different field on a different job type.) Which is why the `0` fix is observationally a no-op and does not dent the PR's zero-behavior-change claim.
+
+**The failure a user hits.** They write `seed = 12345` in a `PipeImgGen` step to reproduce an image, run it twice, and get two different images — no error, no warning, nothing indicating the parameter was discarded.
+
+**Why it is deferred rather than fixed here.** It is pre-existing, entirely outside the kernel extraction, and the fix is per-provider plumbing (each SDK spells the seed differently, and not all of them accept one) plus a decision about what to do for backends that cannot honor it — reject at validation, or document the field as best-effort. Both are product calls. Recorded here because this is where it was found; it belongs in the img-gen backlog rather than the kernel one.
 ## KF-16 — The model-derived prompting style is obsolete and should become an explicit choice
 
 **Numbered 16, not 7, deliberately.** This item lands on the *first* PR of a three-PR stack, but the stacked Phase 2 and Phase 3 PRs already add KF-7 through KF-15. Taking the next free number instead of the next sequential one keeps every one of those entries — and the cross-references to them in the plan — exactly as written, so folding this in churns neither of the PRs above it. The gap below is theirs to fill.
