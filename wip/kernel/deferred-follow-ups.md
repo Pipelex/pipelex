@@ -60,7 +60,9 @@ So the kernel result is behaving exactly like the type it mirrors, and the proje
 
 **Why it is deferred rather than fixed here.** The right fix depends on a question Phase 2 answers, not this PR: is `"structure"` a *fourth kernel structuring path*, or a pipe-level label that merely shares a dict key? Today it is the latter — `PipeStructure` calls `generate_object_content` directly and builds its own execution data, so the kernel never produces `"structure"` and adding the member now would put a value into a "what the kernel op did" type that no kernel op can return. When Phase 2 re-points `PipeStructure` fully, the answer falls out: either it starts flowing through a kernel entry point that legitimately returns a fourth path (add the member, drop the literal), or it stays a caller-side label (narrow the enum's docstring to say it names the *LLM* paths, not the whole key). Cheap either way; wrong to guess now.
 
-## KF-7 — The model-derived prompting style is obsolete and should become an explicit choice
+## KF-16 — The model-derived prompting style is obsolete and should become an explicit choice
+
+**Numbered 16, not 7, deliberately.** This item lands on the *first* PR of a three-PR stack, but the stacked Phase 2 and Phase 3 PRs already add KF-7 through KF-15. Taking the next free number instead of the next sequential one keeps every one of those entries — and the cross-references to them in the plan — exactly as written, so folding this in churns neither of the PRs above it. The gap below is theirs to fill.
 
 **Surfaced by** folding the parity-gaps track's Phase 2 into this stack. That plan listed a gap 2.2 — *"`MethodKernel.llm_object` renders under the wrong model's prompting style"* — and called it a wrong value. **Re-verified against this branch: that was overstated, and nothing here is broken.**
 
