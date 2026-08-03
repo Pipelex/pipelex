@@ -58,8 +58,14 @@ def _render_class(concept: ResolvedConcept, *, by_ref: dict[str, ResolvedConcept
     docstring = class_docstring(concept.description, extra_line=caveat)
     header = f"class {class_name}({base}):"
     if concept.structureless:
-        # Opaque = pass-through, never lossy (B1-1): the runtime base inherits pydantic's default
-        # extra="ignore", which would silently strip every field on model_validate.
+        # Opaque carries no declared field, so without this every field would hit pydantic's default
+        # extra="ignore" and be silently stripped on model_validate (B1-1). It stays load-bearing on
+        # all three structureless bases, `TextContent` included: there it preserves everything
+        # *alongside* `text`. What it cannot do is make the promoted arm accept an object payload with
+        # no `text` at all — that field is required, so pass-through holds for the fields around it,
+        # not for a payload shaped like something else. The runtime's class for the same declaration is
+        # a `TextContent` subclass too and refuses the same payload; see the exception noted in
+        # docs/under-the-hood/codegen-projections.md.
         imports.add("from pydantic import ConfigDict")
         return f'{header}\n{docstring}\n\n    model_config = ConfigDict(extra="allow")'
     if not concept.fields:
