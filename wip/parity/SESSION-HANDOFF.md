@@ -1,6 +1,6 @@
 # Session handoff — parity gaps, paused after Phase 1 lands
 
-**Paused:** 2026-08-03, mid-goal, for context. **Branch:** `fix/Parity-gaps` in the `_gaps/` worktree. **HEAD:** `d9efffbfb` (one commit, on top of `221b8ee0b`). Working tree clean.
+**Branch:** `fix/Parity-gaps` in the `_gaps/` worktree, off `dev` at `221b8ee0b`. **PR:** [#1085](https://github.com/Pipelex/pipelex/pull/1085) → `dev`, open.
 
 Read this first, then [`README.md`](README.md) and [`parity-gaps-plan.md`](parity-gaps-plan.md) (Checkpoint A holds the full record of what landed).
 
@@ -34,8 +34,8 @@ Verbatim, so the new session picks up the same contract:
 
 ## Next actions, in order
 
-1. **Checkpoint A's code review.** Fan out a Sonnet-5 sub-agent with the `/code-review` skill, **no inherited context**, pointed only at commit `d9efffbfb` (e.g. `git show d9efffbfb`, or `git diff 221b8ee0b..d9efffbfb`). Include the no-over-engineering / defer-to-`wip/parity/` instruction. Then sort its findings with a strict bar.
-2. **Open the PR** `fix/Parity-gaps` → `dev`. Phase 1 ships on its own — the plan's Checkpoint A says so, since Phase 2's gate is still closed. Title it around the parity theme; the commit message body is the PR body's raw material.
+1. ~~Checkpoint A's code review (Sonnet-5 `/code-review`, no inherited context, pointed at `d9efffbfb`).~~ Fanned out.
+2. ~~Open the PR.~~ [#1085](https://github.com/Pipelex/pipelex/pull/1085).
 3. **Poll CI + the review bots**, then fan out an Opus 5 sub-agent over their feedback (dedupe, verify each item, fix only clear wins). Resolve threads, push, ping `@greptileai` / `@cubic-dev-ai` to re-trigger, repeat until clean.
 4. **Finalize** with an Opus 5 sub-agent running gstack's `/review wip/parity/parity-gaps-plan.md`.
 5. **Phase 2** only after #1081 / #1082 merge, re-verifying 2.1–2.3 against the merged code.

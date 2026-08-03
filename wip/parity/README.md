@@ -2,7 +2,7 @@
 
 This track fixes a family of defects that share one shape: a single authored fact (a pipe ref, a concept declaration, a model choice, an emitted line of code) is read by two pipelex implementations that disagree about what it means. Every item below is silent — both readers succeed, produce plausible output, and diverge without an error attached — which is why they are batched as one sweep rather than fixed opportunistically.
 
-**Branch:** `fix/Parity-gaps` (this worktree, `_gaps/`). **Plan:** [`parity-gaps-plan.md`](parity-gaps-plan.md).
+**Branch:** `fix/Parity-gaps` (this worktree, `_gaps/`). **PR:** [#1085](https://github.com/Pipelex/pipelex/pull/1085) → `dev`. **Plan:** [`parity-gaps-plan.md`](parity-gaps-plan.md).
 
 ## The gaps at a glance
 
