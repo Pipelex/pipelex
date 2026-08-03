@@ -23,7 +23,8 @@ Gates all run and green at `d9efffbfb`:
 | 2.1 `llm_text` narrowness | fixed | `9fbb12f34` on `refactor/Kernel` (#1081) |
 | 2.2 `llm_object` prompting style | **withdrawn** — not a live defect | silenced by `f688989a6` (#1081); deferred as KF-16 |
 | 2.3 kernel cannot build an `ImgGenPrompt` | fixed | `7279effbd` on `refactor/Kernel-phase2` (#1082) |
-| — its boot-contract arm | added | `015688747` on `refactor/Kernel-phase3` (#1083) |
+| — its boot-contract arm | added | `2643b137c` on `refactor/Kernel-phase2` (#1082) — same PR as the entry point |
+| — the kernel doc's drift review | recorded | `5af77589b` on `refactor/Kernel-phase3` (#1083), where the doc and its contract live |
 
 **Nothing about Phase 2 lands on `fix/Parity-gaps`.** This branch's only Phase 2 artifact is the plan/README/handoff record you are reading.
 
