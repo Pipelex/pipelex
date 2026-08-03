@@ -15,7 +15,7 @@
 - `pipelex/codegen/emitters/python_structures.py:59–63` — the structureless arm emits `ConfigDict(extra="allow")` on a `StructuredContent` base; `pipelex/core/concepts/concept_factory.py:376` — `_handle_basic_blueprint` is the runtime's opposite reading.
 - `pipelex/codegen/emitters/python_common.py:255` — `render_import_block`, no wrapping at any width; `PY_EXPLODE_WIDTH = 88` at line 24; the lint-clean gate is `tests/unit/pipelex/codegen/test_emitted_artifacts_are_lint_clean.py` and it runs `ruff check`, not `ruff format --diff`.
 - `pipelex/pipe_operators/llm/pipe_llm.py:219–237` — the interpreter resolves `llm_setting_main` (text) and `llm_setting_for_object` separately and derives `templating_style` from `llm_setting_main`.
-- `pipelex/kernel/` does **not** exist on this branch. The façade and operator ops arrive with the open kernel-extraction PRs: #1081 (package + LLM slice), #1082 (remaining operators), #1083 (memory boundary). Phase 2 claims are written against those PRs' code and must be re-verified on the merged result.
+- `pipelex/kernel/` does **not** exist on this branch. The façade and operator ops arrive with the open kernel-extraction PRs: #1081 (package + LLM slice), #1082 (remaining operators), #1083 (memory boundary). Phase 2 claims are written against those PRs' code and must be re-verified on the merged result. — **Superseded:** Phase 2 shipped inside those PRs instead, so it was re-verified and built on their branches; nothing in Phase 2 lands on this one.
 
 ## Phase 1 — the dev-buildable trio
 
@@ -76,11 +76,21 @@ All three fixes landed on `fix/Parity-gaps`, each red-green verified against the
 
 That review also corrected three documentation inaccuracies, all fixed: the doc's "opaque is always pass-through, never lossy" claim (false for this target since 1.2 — `TextContent.text` is required, so an object payload now raises), a citation of a `ConceptBlueprint` validator that does not exist, and the mechanism sentence in the D-1 note (the guarantee comes from `validate_library`'s `isinstance(pipe, PipeController)` gate covering *all four* controller kinds, and the crate is built **before** validation, not after). Its remaining observations were judged not-clear-wins and deferred to [`deferred-review-observations.md`](deferred-review-observations.md).
 
-This is the PR boundary: Phase 2's gate (#1081 / #1082 merging) is still closed, so Phase 1 ships on its own.
+This is the PR boundary: Phase 1 ships on its own, as PR #1085 against `dev`. Phase 2 did not wait behind it — see below.
 
-## Phase 2 — the kernel trio (gated on #1081 / #1082 merging)
+## Phase 2 — the kernel trio ✅ **RESOLVED, by folding into #1081 / #1082 rather than waiting for the gate**
 
-These three are written against the open kernel-extraction PRs and share a theme: the `pipelex.kernel` package's stated contract — a runtime layer callable without the interpreter, whose façade is a faithful convenience over the ops — is not yet true in three places. **Re-verify every claim against the merged code before building; do not land these as review feedback on the finalized stacked PRs.**
+These three are written against the open kernel-extraction PRs and share a theme: the `pipelex.kernel` package's stated contract — a runtime layer callable without the interpreter, whose façade is a faithful convenience over the ops — is not yet true in three places.
+
+**How this phase actually shipped.** The plan's instruction was to re-verify against the *merged* code and not land these as review feedback on the finalized stacked PRs. That was the right default and it was overridden deliberately, by Louis' call, once the alternative was priced honestly: each of these is a defect *the kernel PRs themselves introduce*, so landing them afterwards would mean knowingly merging a package whose contract is false and then repairing it — and the repair PR would have to re-open the same files. Two of the three folded in; the third dissolved on re-verification.
+
+| Gap | Outcome | Where |
+|---|---|---|
+| 2.1 `llm_text` narrower than its op | Fixed | `9fbb12f34` on `refactor/Kernel` (#1081) |
+| 2.2 `llm_object` prompting style | **Not a live defect** — claim overstated; the surviving question is deferred | `f688989a6` (#1081), KF-16 → `wip/prompting-style/README.md` |
+| 2.3 kernel cannot build an `ImgGenPrompt` | Fixed | `7279effbd` on `refactor/Kernel-phase2` (#1082), arm in `015688747` (#1083) |
+
+The re-verification the plan asked for happened against each PR's own branch rather than against a merged result, which is stricter in one way (the code is exactly what will merge) and weaker in another (it cannot see interactions with a later PR in the stack). Nothing in the stack touches these paths after #1082, so the weakness is not live here.
 
 ### 2.1 `MethodKernel.llm_text` is narrower than the op beneath it
 
@@ -90,6 +100,8 @@ These three are written against the open kernel-extraction PRs and share a theme
 
 **The fix.** Widen `llm_text` to match `llm_object`: `concept` and `output_class` optional, defaulting to today's hardcoded pair; `model` optional, passed through to the resolution unchanged. Additive — every existing call site keeps working because the defaults are today's behavior.
 
+**✅ Done — `9fbb12f34` on `refactor/Kernel` (#1081).** Re-verified against that branch and held exactly as written. `model` turned out to be optional already, so the fix is the other two. Gated by `tests/unit/pipelex/kernel/test_llm_text_kernel.py`, which asserts on what lands in the returned memory (`type(stuff.content) is MeetingSummary`, the stuff's `concept_ref`) rather than on the signature — a signature assertion would pass on a façade that accepted the arguments and dropped them. No changelog entry: the package is new and unreleased, so there is no shipped behavior to note.
+
 ### 2.2 `MethodKernel.llm_object` renders under the wrong model's prompting style
 
 **The defect** (against #1081's code). A `PipeLLM` carries two model choices (`model` → for_text, `model_to_structure` → for_object). The interpreter resolves **two** settings and derives the templating style from the **text** one (`pipe_llm.py:219–237` on dev — the pipe's main model governs how the prompt is written; the object path differs only in how the answer comes back). The façade collapses to one choice, drops the object chain's `for_text` fallback rung, and derives the style from the **object** setting. Unlike 2.1 this is not narrowness visible in a signature — it is a wrong value.
@@ -97,6 +109,14 @@ These three are written against the open kernel-extraction PRs and share a theme
 **When it bites.** A pipe declaring both choices, resolving to models with different prompting targets: the prompt is assembled under the structuring model's style while an interpreted run assembles it under the main model's. Both calls succeed; the prompt text differs. Also, "text model X, object model default" is expressible in MTHDS and inexpressible through the façade.
 
 **The fix.** Give `llm_object` the second choice (`model_for_object`), forward the `for_text` rung into the object resolution, and derive the style from the text setting — mirroring the interpreter line for line. Existing single-choice callers keep working and their style derivation *changes*, which is the point: today it is wrong whenever the two settings differ. Pair with a test asserting the two-choice case — no current test covers a pipe declaring both.
+
+**⚠️ Not built — the claim above is overstated, and the feature it defends is slated for removal.** Two independent reasons, either sufficient:
+
+*The defect is not live.* The façade's single explicit `model` wins `resolve_llm_setting_for_object`'s **first** rung, so the style is derived from that very setting — which is also what an interpreted run derives for a pipe naming only a text model. The two agree for every call the façade can express. Divergence needs a pipe naming *both* choices, and the façade cannot express one. So what remains is narrowness, not a wrong value — the same category as 2.1, and a much weaker instance of it.
+
+*The mechanism is obsolete.* Model-derived prompting style dates from when models were genuinely sensitive to prompt markup. Louis' ruling: rather than widen the derivation, the style becomes an explicit user choice defaulting to XML, and the derivation goes away. Building `model_for_object` here would mean constructing the two-setting derivation that refactor deletes.
+
+Deferred as **KF-16** in `wip/kernel/deferred-follow-ups.md`, with the design in `wip/prompting-style/README.md` — both on the kernel stack, not on this branch, hence plain paths rather than links. Silenced in #1081 by `f688989a6` — a docstring on `llm_object` recording why its single `model` is correct, carrying the trap explicitly: *do not "fix" this by deriving the style from an object-only resolution, which would introduce the divergence rather than close it.*
 
 ### 2.3 Nothing in the kernel can build an `ImgGenPrompt`
 
@@ -106,13 +126,21 @@ These three are written against the open kernel-extraction PRs and share a theme
 
 **The gate.** A test that builds an `ImgGenPrompt` through the new kernel constructor and through the blueprint from the same authored inputs and asserts they are equal — the same "both readers, same answer" shape as everything above — plus a boot-scoped test that the constructor is importable and usable under `RuntimeBoot` alone.
 
+**✅ Done — `7279effbd` on `refactor/Kernel-phase2` (#1082), recommendation (a).** `pipelex/kernel/img_gen_prompt.py` holds `assemble_img_gen_prompt`; `ImgGenPromptBlueprint` drops 296 → 82 lines and delegates, keeping parse-and-validate. `ImgGenPromptBlueprintValueError` becomes the kernel's existing `PromptContentError`, whose docstring already described exactly this failure — the same swap Phase 1 made on the LLM side.
+
+**D-3's scoping question, answered: it cost nothing.** The plan priced the move as dragging `ImageRegistry`, `PromptImageFactory`, `substitute_nested_in_context` and `render_template` across a layer boundary. All four are already `cogt`/`tools` citizens, and the blueprint held exactly **one** interpreter-layer import (`PipeImgGenFactoryError`). Nothing moved layers. `max_prompt_images` deliberately stayed with the blueprint: it is a property of the model the *pipe* chose, its breach is a pipe-level error, and it is a `len()` check rather than the subtlety the kernel module exists to centralise.
+
+**Both gates built, and the boot-scoped one found a real gap.** The equality test is `tests/unit/pipelex/kernel/test_img_gen_prompt_kernel.py`. The boot-scoped half revealed that `assemble_img_gen_prompt` had no arm in `test_kernel_boot_contract.py` — which the kernel's own standing rule requires, because that subprocess is per-function and is the only gate that can see a function-local interpreter import. `assemble_llm_prompt` needs none (both `run_llm_*` call it, so the LLM arms carry its closure); `run_img_gen` takes a *ready* prompt and calls nothing, so the img-gen arm's coverage was incomplete in precisely the way the kernel surface was — it hand-built its `ImgGenPrompt` because nothing in the kernel could build one. Fixed in `015688747` on #1083 (where the kernel doc and its drift contract live): the arm now assembles then generates, asserting on the `[Image N]` token *and* `input_images`, the two readings of one registry.
+
 **🔶 CHECKPOINT B — plan complete.** Record: merged-code re-verification results for 2.1–2.3 (what moved, what held), each fix's commit and gates, D-3's scoping outcome (which helpers moved to which layer), and changelog entries. Run the full gate set. Update the README status block and close the track, or spin out whatever the re-verification surfaced.
+
+**Checkpoint B record.** Re-verification: 2.1 held as written except `model`, already optional; 2.2 did **not** hold and was withdrawn (above); 2.3 held, and its predicted layering cost did not materialise. Commits and gates are recorded per-gap above. D-3 settled on (a) with no helper moving layers. Changelog: one entry extended (`LLMPromptBlueprintValueError` → *and `ImgGenPromptBlueprintValueError`*) plus one new entry for `assemble_img_gen_prompt`, both on #1082; 2.1 needed none. Gate set green on both branches — `make agent-check`, `make drift-check`, and a full `make agent-test`. Spun out: KF-16 / `wip/prompting-style/README.md`.
 
 ## Decisions
 
 - **D-1 — bare cross-domain qualification: (a) qualify against the crate (recommended) vs (b) reject the authored form.** (a) matches the runtime the language already ships and fixes fingerprint + round-trip at once; (b) is a breaking language ruling for Louis. Settle at 1.1; note the adjacent `domain_hint` TODO either way.
 - **D-2 — structureless base class: (a) projection follows the runtime (`TextContent` base, recommended) vs (b) runtime stops promoting.** (a) is one arm in the projection and honors what the declaration means to authors today; (b) is a language change. Settle at 1.2.
-- **D-3 — img-gen prompt assembly: (a) kernel constructor module mirroring `llm_prompt_content` (recommended) vs (b) export the bare render step.** (a) completes the layering the kernel already claims in writing; (b) re-distributes the subtle half to every caller. Settle at 2.3, with the helper-scoping question answered explicitly rather than by drift.
+- **D-3 — img-gen prompt assembly: (a) kernel constructor module mirroring `llm_prompt_content` (recommended) vs (b) export the bare render step.** (a) completes the layering the kernel already claims in writing; (b) re-distributes the subtle half to every caller. Settle at 2.3, with the helper-scoping question answered explicitly rather than by drift. — **✅ Settled: (a).** The scoping question answered itself: no helper changed layers, because all four were already `cogt`/`tools`. See 2.3.
 
 ## Out of scope
 

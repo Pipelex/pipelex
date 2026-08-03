@@ -11,20 +11,20 @@ This track fixes a family of defects that share one shape: a single authored fac
 | Bare cross-domain pipe refs | `crate_normalization` qualifies with the owner domain; the live `PipeLibrary` searches every domain | now |
 | Structureless concept base class | runtime promotes to a `TextContent` refinement; the `python-structures` projection emits `StructuredContent` + `extra="allow"` | now |
 | Import-block format stability | `render_import_block` never wraps; a consumer's `ruff format` wraps past 88 columns | now |
-| `MethodKernel.llm_text` narrowness | the façade hardcodes concept/class and requires a model; `run_llm_text` and the interpreter take all three | after #1081 |
-| `MethodKernel.llm_object` prompting style | the façade derives style from the object setting and drops the `for_text` rung; the interpreter derives style from the text setting | after #1081 |
-| Img-gen prompt constructor | `kernel/prompt_references.py` says the kernel resolves image references; only the interpreter-layer blueprint can actually build an `ImgGenPrompt` | after #1082 |
+| `MethodKernel.llm_text` narrowness | the façade hardcodes concept/class and requires a model; `run_llm_text` and the interpreter take all three | ✅ fixed **in** #1081 |
+| `MethodKernel.llm_object` prompting style | the façade derives style from the object setting and drops the `for_text` rung; the interpreter derives style from the text setting | ⚠️ withdrawn — not a live defect |
+| Img-gen prompt constructor | `kernel/prompt_references.py` says the kernel resolves image references; only the interpreter-layer blueprint can actually build an `ImgGenPrompt` | ✅ fixed **in** #1082 |
 
 ## Phasing
 
 - **Phase 1 — the dev-buildable trio** (crate qualification, structureless base class, import wrapping). All targets exist on this branch today; each lands with its regression gate.
-- **Phase 2 — the kernel trio**, gated on the kernel-extraction PRs (#1081 façade, #1082 operators) merging to `dev`. Do not destabilize those finalized PRs with review feedback; land these as follow-ups here once they merge, re-verifying each claim against the merged code first.
+- **Phase 2 — the kernel trio.** Originally gated on the kernel-extraction PRs (#1081 façade, #1082 operators) merging to `dev`, to avoid destabilizing finalized PRs. **Louis overrode that gate:** each of these is a defect *those PRs introduce*, so deferring meant knowingly merging a package whose stated contract is false and re-opening the same files to repair it. Phase 2 therefore shipped **inside** #1081 and #1082, not on this branch.
 
 ## Status
 
 - **Phase 0 (planning): ✅ done 2026-08-03.** Plan written, targets verified on this tree, decisions D-1..D-3 posed with recommendations.
 - **Phase 1: ✅ done 2026-08-03.** All three fixes landed with their gates, red-green verified; Checkpoint A recorded in the plan. D-1 settled as crate-wide resolution (not own-domain-first — see [`d1-domain-hint-deferred.md`](d1-domain-hint-deferred.md)); D-2 settled as recommended.
-- **Phase 2: gated** on #1081/#1082.
+- **Phase 2: ✅ done 2026-08-04, folded into the kernel stack.** 2.1 fixed in #1081 (`9fbb12f34`); 2.3 fixed in #1082 (`7279effbd`), with the boot-contract arm it turned out to owe in #1083 (`015688747`). 2.2 **withdrawn** on re-verification — the façade's single `model` wins the object resolution's first rung, so the style it derives already matches an interpreted run for every call the façade can express; the surviving narrowness is deferred as KF-16, because the whole model-derived-style mechanism is slated to become an explicit user choice (design in `wip/prompting-style/README.md`, which ships on the kernel stack — not on this branch). D-3 settled as recommended, (a), and its predicted layering cost did not materialise.
 
 ## Deferred, not dropped
 

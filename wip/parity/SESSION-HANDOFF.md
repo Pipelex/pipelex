@@ -1,4 +1,4 @@
-# Session handoff — parity gaps, paused after Phase 1 lands
+# Session handoff — parity gaps, both phases built
 
 **Branch:** `fix/Parity-gaps` in the `_gaps/` worktree, off `dev` at `221b8ee0b`. **PR:** [#1085](https://github.com/Pipelex/pipelex/pull/1085) → `dev`, open.
 
@@ -16,7 +16,16 @@ Gates all run and green at `d9efffbfb`:
 - real-world confirmation of 1.1 against `../pipelex-cookbook/examples/wip/advisory_board/`: the dangling ref `advisory_orchestrator.master_advisory_orchestrator -> advisory_orchestrator.present_as_markdown` is gone
 - `[Unreleased]` changelog entry for each of the three fixes
 
-**Phase 2 is still gated** on the kernel-extraction PRs #1081 / #1082 merging to `dev`. Do not start it before they merge, and re-verify every 2.1–2.3 claim against the merged code first — the plan says so explicitly and the claims were written against unmerged PR code.
+**Phase 2 is built too — but not on this branch.** The plan gated it on #1081/#1082 merging; Louis overrode that gate, because each of these is a defect *those PRs introduce*, so deferring meant merging a package whose stated contract is false and then re-opening the same files to repair it. Phase 2 therefore shipped **inside** the kernel stack, in the `_kernel/` worktree:
+
+| Gap | Outcome | Commit |
+| --- | --- | --- |
+| 2.1 `llm_text` narrowness | fixed | `9fbb12f34` on `refactor/Kernel` (#1081) |
+| 2.2 `llm_object` prompting style | **withdrawn** — not a live defect | silenced by `f688989a6` (#1081); deferred as KF-16 |
+| 2.3 kernel cannot build an `ImgGenPrompt` | fixed | `7279effbd` on `refactor/Kernel-phase2` (#1082) |
+| — its boot-contract arm | added | `015688747` on `refactor/Kernel-phase3` (#1083) |
+
+**Nothing about Phase 2 lands on `fix/Parity-gaps`.** This branch's only Phase 2 artifact is the plan/README/handoff record you are reading.
 
 ## The goal this session was executing
 
@@ -40,7 +49,7 @@ Verbatim, so the new session picks up the same contract:
 4. ~~Finalize with gstack's `/review`.~~ Done — verdict **land**. It caught one real defect the other four missed (the `Anything` import omission) plus three doc inaccuracies, all fixed; the rest deferred to [`deferred-review-observations.md`](deferred-review-observations.md).
 5. ~~Rounds 3–4: cubic follow-ups.~~ Done. Round 3 = a fair catch on a stale code comment (fixed, `c4788e47b`); round 4 = a P1 duplicate of Codex's round-1 P2, answered with measurements (`e0f2d2362`).
 6. **Merge decision is Louis'.** Every prescribed review step in the goal has run. Final state on `e0f2d2362`: **23 checks success, 6 skipped, 0 failures, 0 unresolved threads.** Nothing is pending on the PR.
-7. **Phase 2** only after #1081 / #1082 merge, re-verifying 2.1–2.3 against the merged code.
+7. ~~**Phase 2** only after #1081 / #1082 merge.~~ Superseded — folded into the kernel stack instead (see above). What remains there is the stack's own review cycle: push the three branches, poll CI and the bots, and merge in order #1081 → #1082 → #1083.
 
 **One open question wants a human ruling** (it does not block Phase 1): whether a hand-written class should have to be *named* in the `.mthds` to bind, or whether the bare-name auto-detect at `concept_factory.py:389` keeps working. Two independent reviewers converged on it — see [`structureless-concept-with-registered-class.md`](structureless-concept-with-registered-class.md), which now carries the measurements.
 
@@ -69,4 +78,6 @@ Verbatim, so the new session picks up the same contract:
 - **A green cubic *check* does not mean cubic found nothing.** Its check bucket went `pass` on the same run whose review body said "1 issue found". Read `gh api repos/.../pulls/N/reviews` bodies, not just `gh pr checks`. (Cubic also *edits* an earlier review body in place once threads are resolved, so re-fetching an old review can show a different summary than when it was posted.)
 - **The local clock in this worktree is UTC+7.** Filtering the GitHub API with a local-time string silently returns nothing and looks exactly like "the bots have not replied". Always build timestamp filters from `date -u`.
 - **`make agent-test` takes ~19 minutes.** Run it in the background and use the targeted paths from `tests/CLAUDE.md` while iterating.
+- **Stacked rebases need `--onto`.** Folding Phase 2 into the stack meant rebasing #1082 and #1083 onto rewritten parents. `git rebase <new-base> <branch>` replays the branch's *whole* history including the parent commits already rewritten, which conflicts in every file the parent touched; `git rebase --onto <new-base> <old-base> <branch>` is the correct form, with `<old-base>` the parent tip the branch was actually built on. Verify each one by `git diff <pre-rebase-tag>..<new-tip>` — it must show *exactly* the folded change and nothing else.
+- **Never redirect a `git` command's output to `/dev/null`.** `git stash push -- <paths>` refuses when the paths include an untracked file; with the error silenced, the following `git stash pop` applied a *different, unrelated* stash into the tree. It survived only because a conflicted pop does not drop the stash. Use `mv` to set a file aside for a red-green check — `git stash` is the wrong tool whenever untracked files are involved.
 - **A fixture that already registers an import cannot gate a missing one.** The `Anything` defect was invisible to `every_type_kind_crate` because its structured concepts import `StructuredContent` anyway. Gating an *omission* needs a crate where nothing else supplies the thing — hence the single-concept `refines_anything_crate`. Worth remembering before adding a shape to a rich fixture and calling it covered.
