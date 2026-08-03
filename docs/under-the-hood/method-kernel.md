@@ -62,6 +62,8 @@ Only the last one can see a function-local interpreter import, and it is **per-f
 
 Module-level functions carry the semantics. `MethodKernel` is a thin façade over the LLM pair, holding the per-run state a caller would otherwise thread through every call; every other operator is called directly.
 
+Both façade calls take the concept and the output class the caller wants, defaulting to `Text` and `TextContent` when it wants neither. `llm_text` accepts them because a text step is not always a *native*-`Text` step: a method may declare its output as a concept refining `Text`, and a façade that hardcoded the native one would write a different concept into memory than the interpreter writes from the same authored declaration.
+
 | Module | Entry points |
 |---|---|
 | `pipelex.kernel.method_kernel` | `MethodKernel.make`, `.llm_text`, `.llm_object`, `.make_step_metadata` |
@@ -73,7 +75,10 @@ Module-level functions carry the semantics. `MethodKernel` is a thin façade ove
 | `pipelex.kernel.func_ops` | `call_registered_function`, `run_func` |
 | `pipelex.kernel.memory_ops` | `shape_inputs`, `store_result`, `extract_main_content` / `extract_named_content`, `extract_main_content_as_list` / `extract_named_content_as_list` |
 | `pipelex.kernel.llm_prompt_content` | `LlmPromptContent`, `assemble_llm_prompt` |
+| `pipelex.kernel.img_gen_prompt` | `assemble_img_gen_prompt` |
 | `pipelex.kernel.*_results` | The typed result envelopes |
+
+The two `assemble_*` functions are there because `run_llm_text` and `run_img_gen` both take a *ready* prompt. A caller that could not build one would be holding an operator it cannot reach, which is what image generation was until `assemble_img_gen_prompt` existed: its only builder was an interpreter-layer blueprint. What they own is the part a caller must not re-derive — resolving `ImageReference` and `DocumentReference` out of working memory, and, on the image side, keeping the `[Image N]` tokens numbered from the same registry that orders `input_images`, since a mismatch mislabels which image the prompt is describing and nothing downstream can detect it.
 
 There are **no re-exports**: `pipelex/kernel/__init__.py` holds doctrine and nothing else, and every symbol is imported from the module that defines it. For this package that is a layering property rather than a style one — a module that re-exports across layers is a layer boundary with the sign filed off.
 
