@@ -4,6 +4,29 @@
 
 Read this first, then [`README.md`](README.md) and [`parity-gaps-plan.md`](parity-gaps-plan.md) (Checkpoint A holds the full record of what landed).
 
+## Resume here (paused 2026-08-04, ~00:55 local / 17:55 UTC)
+
+**Everything is pushed and green. Nothing is half-done.** The single next action is to read a fresh round of bot feedback on **all four** PRs, then merge.
+
+| PR | Branch / worktree | Head | CI | Bots |
+| --- | --- | --- | --- | --- |
+| [#1081](https://github.com/Pipelex/pipelex/pull/1081) (1/3) | `refactor/Kernel` — `_kernel/` | `f688989a6` | 22 ✅ / 2 skip | pinged, **not yet re-reviewed** |
+| [#1082](https://github.com/Pipelex/pipelex/pull/1082) (2/3) | `refactor/Kernel-phase2` — `_kernel/` | `2643b137c` | 21 ✅ / 3 skip | pinged, **not yet re-reviewed** |
+| [#1083](https://github.com/Pipelex/pipelex/pull/1083) (3/3) | `refactor/Kernel-phase3` — `_kernel/` | `5af77589b` | 21 ✅ / 3 skip | pinged, **not yet re-reviewed** |
+| [#1085](https://github.com/Pipelex/pipelex/pull/1085) | `fix/Parity-gaps` — `_gaps/` | `abef073d7` | 22 ✅ / 2 skip | pinged, **not yet re-reviewed** |
+
+**Why all four need a fresh round:** the kernel stack was rewritten today to fold Phase 2 in, so every SHA on #1081/#1082/#1083 is newer than anything Greptile or cubic has looked at (their last passes were 2026-08-02, against commits that no longer exist). #1085 gained wip-docs-only commits since cubic's round-4 pass. All four were pinged with a summary of what changed at ~17:50 UTC.
+
+**Next actions, in order:**
+
+1. Read the bot feedback on all four — **review bodies and inline comments, not check states** (see the cubic trap below). Greptile posts as *issue comments*; cubic posts *reviews* + issue comments; Codex posts reviews.
+2. Fan out an **Opus 5** sub-agent to dedupe, verify each item, and arbitrate — fixing **only clear wins**, no over-engineering, no guarding impossible scenarios. Anything doubtful becomes a `.md` in `wip/parity/` (or `wip/kernel/` for stack items). Tell the sub-agent it is **STRICTLY READ-ONLY**.
+3. Merge in order **#1081 → #1082 → #1083**. #1085 is independent of the stack and can merge whenever Louis chooses.
+
+**Local gates already run and green on every branch:** `make agent-check`, full `make agent-test`, `make drift-check`. Nothing is owed locally.
+
+Backup tags on `origin`, in case a rebase needs undoing: `backup/kernel-pre-fold`, `backup/kernel-phase2-pre-fold`, `backup/kernel-phase3-pre-fold`, `backup/kernel-phase3-pre-2.3`, `backup/kernel-phase3-pre-resplit`.
+
 ## Where the work stands
 
 **Phase 1 is complete and committed.** All three dev-buildable fixes landed with their gates, each red-green verified (gate written first, run against the unfixed tree, observed to fail for the stated reason). Nothing is left to build in Phase 1.
