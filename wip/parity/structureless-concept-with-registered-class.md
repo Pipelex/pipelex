@@ -1,6 +1,8 @@
 # Deferred — a structureless concept bound to a registered class through a channel the crate cannot see
 
-**Raised by:** the Codex reviewer on PR #1085 (against 1.2, the structureless base-class fix). **Verified 2026-08-03**, against the tree at `d9efffbfb`. **Status: deferred** — no fix available at the emitter layer that is a clear win, and the correct fix is a language decision for a separate change.
+**Raised by:** the Codex reviewer on PR #1085 (P2), then **independently re-raised by cubic at P1** two rounds later against the same line. **Verified 2026-08-03**, against the tree at `d9efffbfb`, re-checked and quantified at `c4788e47b`. **Status: deferred** — no fix available at the emitter layer that is a clear win, and the correct fix is a language decision for a separate change.
+
+⚠ **Two independent reviewers converged on this**, which raises its priority above an ordinary deferral. It is the one open question on this PR that a human should rule on. Nothing about the ruling blocks Phase 1 — but it should not sit indefinitely either.
 
 ## The shape
 
@@ -8,7 +10,19 @@
 
 So a description-only concept `CustomerReview = "..."` sitting beside a hand-written `class CustomerReview(StructuredContent)` resolves, at run time, to the hand-written class.
 
-This is not theoretical. It is **the documented endpoint of a migration guide** — `docs/building-methods/concepts/python-classes.md:162-224` teaches exactly this move ("Structure section removed — now defined in Python"), and it teaches the *bare-name* form rather than the crate-visible `structure = "<ClassName>"` one. This repo's own fixtures hold many concept/class pairs of the shape, e.g. `tests/integration/pipelex/pipes/controller/pipe_sequence/pipe_sequence_2.mthds` (`CustomerReview = "A single customer review text"`) beside `pipe_sequence.py`'s three-field `CustomerReview`. The cookbook holds none — its structure classes all use the domain-qualified generated form, which hits the *second* lookup (`:391`) and lands on the same `TextContent`-based generated class, so no divergence there.
+This is not theoretical. It is **the documented endpoint of a migration guide** — `docs/building-methods/concepts/python-classes.md:162-224` teaches exactly this move ("Structure section removed — now defined in Python"), and it teaches the *bare-name* form rather than the crate-visible `structure = "<ClassName>"` one.
+
+**Measured 2026-08-03**, and the split is what decides the trade:
+
+| Tree | Hand-written content classes | Description-only concepts | Colliding (the shape) |
+| --- | --- | --- | --- |
+| `pipelex/` own test fixtures | — | — | **93** |
+| `pipelex-cookbook/` | 40 | 13 | **0** |
+| `pipelex-starter-python/` | 0 | 0 | **0** |
+
+So the shape is pervasive in this repo's fixtures (e.g. `tests/integration/pipelex/pipes/controller/pipe_sequence/pipe_sequence_2.mthds`'s `CustomerReview = "A single customer review text"` beside `pipe_sequence.py`'s three-field `CustomerReview`) — and **those fixtures are interpreted, never codegen'd**. The trees that *are* the codegen-facing examples hold none: the cookbook's structure classes all use the domain-qualified generated form, which hits the *second* lookup (`concept_factory.py:391`) and lands on the same `TextContent`-based generated class, so no divergence there.
+
+That asymmetry is the argument for what landed. 1.2 makes the projection agree with the runtime for the plain description-only concept — common in every tree, including the 13 in the cookbook — and disagree for the registered-class shape, which does not occur in any tree that runs codegen. Reverting inverts both.
 
 ## What PR #1085 changed about it, honestly
 
