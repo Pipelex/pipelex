@@ -1,9 +1,10 @@
-"""python-structures emitter: project a crate's concept set as Pipelex `StructuredContent` classes.
+"""python-structures emitter: project a crate's concept set as Pipelex `StuffContent` classes.
 
 The runtime idiom (today's `StructureGenerator` presentation) over the shared resolved layers. Each
-non-native concept becomes a `StructuredContent` subclass; native *references* map to the runtime
-content classes (`TextContent`, ...); a concept that still refines a native inherits that content
-class. Native concepts themselves are not re-emitted — they already exist in the runtime.
+non-native concept becomes a `StuffContent` subclass; native *references* map to the runtime content
+classes (`TextContent`, ...); a concept that still refines a native inherits that content class, and
+a structureless one inherits `TextContent` because that is what the runtime promotes it to (see
+`_base_class`). Native concepts themselves are not re-emitted — they already exist in the runtime.
 
 Field annotations use `from __future__ import annotations`, so concept references are plain forward
 names resolved from the module namespace (no explicit string quoting, no ordering constraint beyond
@@ -69,6 +70,16 @@ def _render_class(concept: ResolvedConcept, *, by_ref: dict[str, ResolvedConcept
 
 def _base_class(concept: ResolvedConcept, *, by_ref: dict[str, ResolvedConcept], imports: set[str]) -> str:
     if concept.base_ref is None:
+        if concept.structureless and concept.opaque_python_class is None:
+            # A concept declaring only a description is promoted by the runtime to a refinement of
+            # native Text (`ConceptFactory._handle_basic_blueprint` generates it on a `TextContent`
+            # base), so the projection has to land on the same content class. `TextContent` and
+            # `StructuredContent` are siblings: emitting the latter makes the interpreter's
+            # text-vs-object dispatch answer differently for the same authored concept, and the text
+            # path's `model_validate({"text": ...})` succeeds on both, so nothing raises.
+            # A Python-class-backed concept is the one structureless shape that keeps the root base:
+            # its real shape lives in hand-written Python and is genuinely unknown here (B1-1 floor).
+            return _native_class(NativeConceptCode.TEXT.concept_ref, imports=imports)
         return _structured_content(imports=imports)
     if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept.base_ref):
         return _native_class(concept.base_ref, imports=imports)
@@ -80,7 +91,7 @@ def _base_class(concept: ResolvedConcept, *, by_ref: dict[str, ResolvedConcept],
 
 
 def _structured_content(*, imports: set[str]) -> str:
-    """The runtime root base, registering its import — every concept refining a native uses `_native_class` instead."""
+    """The runtime root base, registering its import — a concept whose content class is known uses `_native_class` instead."""
     imports.add("from pipelex.core.stuffs.structured_content import StructuredContent")
     return "StructuredContent"
 

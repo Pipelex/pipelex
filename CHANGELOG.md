@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **Cross-domain pipe refs in normalized crates (Breaking)**: A bare pipe ref calling a pipe declared in another domain was normalized by prefixing the *caller's* domain, naming a pipe the crate does not hold — while the live library resolves the same ref by searching every domain. The crate fingerprinted the wrong content and a crate round-trip broke the method at run time with `PipeNotFoundError`, with nothing raised on the way in. Normalization now resolves a bare pipe ref against the whole crate exactly as `PipeLibrary` does, and raises `CrateNormalizationError` when the ref is ambiguous or matches no pipe instead of emitting a dangling ref.
+- **Structureless concepts in the `python-structures` projection (Breaking)**: A concept declaring only a description was projected as a `StructuredContent` subclass while the runtime promotes the same declaration to a refinement of native `Text`. Since `TextContent` and `StructuredContent` are siblings, the interpreter's text-vs-object dispatch answered differently depending on which class it was handed — and the mismatch raised nothing, because the read-back validated against both. The projection now emits `TextContent` as the base, matching the runtime. A Python-class-backed concept (`structure = "<ClassName>"`) still projects onto the root base: its real shape is not visible to the crate.
+- **Format-stable import blocks in generated Python**: A generated import line whose merged names crossed 88 columns was emitted flat, so the first `ruff format` in a consumer's tree rewrote it — changing the body bytes and making `pipelex codegen check` report the file as hand-edited. The import block now pre-explodes past the threshold like every other emitted construct.
+
 ## [v0.42.0] - 2026-08-01
 
 ### Added

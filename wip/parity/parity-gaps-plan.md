@@ -1,0 +1,114 @@
+# Parity-gaps plan — fix the places where two readers disagree about one authored fact
+
+**Thesis.** pipelex has several surfaces that each claim to be a faithful reading of the same authored source: the live library vs the normalized crate, the runtime concept factory vs the `python-structures` projection, the emitted bytes vs the consumer's formatter, and (once the kernel extraction merges) the `MethodKernel` façade vs the ops the interpreter actually calls. Where two of them disagree, the result is a *wrong value with no error attached* — both sides succeed, and only downstream behavior reveals the split. This plan fixes every such disagreement currently known, each with the regression gate that would have caught it.
+
+**Standing rules for this branch:**
+
+- Every claim below carries its instrument (file:line or a repro) and its date. Re-verify before building on any of them — code moves.
+- Each fix lands with the test that pins the *agreement*, not just the fixed behavior: the natural gate is "both readers, same answer", asserted mechanically.
+- No backward compatibility (repo principle): where a fix changes observable behavior, it changes it, with a changelog entry — no deprecation shims.
+- Changelog entries go under `[Unreleased]` on this work branch; a versioned heading only at release time.
+
+## Grounding — verified on this tree (`fix/Parity-gaps` at `221b8ee0b`), 2026-08-03
+
+- `pipelex/libraries/crate_normalization.py` — `_qualify_pipe_ref` applied to sequence steps, condition branches, and outcomes (lines 232–239); `CrateNormalizationError` already exists (`pipelex/libraries/exceptions.py`), so the fix needs no new error class.
+- `pipelex/codegen/emitters/python_structures.py:59–63` — the structureless arm emits `ConfigDict(extra="allow")` on a `StructuredContent` base; `pipelex/core/concepts/concept_factory.py:376` — `_handle_basic_blueprint` is the runtime's opposite reading.
+- `pipelex/codegen/emitters/python_common.py:255` — `render_import_block`, no wrapping at any width; `PY_EXPLODE_WIDTH = 88` at line 24; the lint-clean gate is `tests/unit/pipelex/codegen/test_emitted_artifacts_are_lint_clean.py` and it runs `ruff check`, not `ruff format --diff`.
+- `pipelex/pipe_operators/llm/pipe_llm.py:219–237` — the interpreter resolves `llm_setting_main` (text) and `llm_setting_for_object` separately and derives `templating_style` from `llm_setting_main`.
+- `pipelex/kernel/` does **not** exist on this branch. The façade and operator ops arrive with the open kernel-extraction PRs: #1081 (package + LLM slice), #1082 (remaining operators), #1083 (memory boundary). Phase 2 claims are written against those PRs' code and must be re-verified on the merged result.
+
+## Phase 1 — the dev-buildable trio
+
+### 1.1 Crate normalization mis-qualifies a bare cross-domain pipe ref
+
+**The defect.** `_qualify_pipe_ref` prefixes a bare pipe ref with the **owner domain** unconditionally, while the live `PipeLibrary.get_optional_pipe` resolves a bare code by **searching every domain** (its bare-code fallback is gated on `"." not in pipe_code`). So a bundle calling a sibling domain's pipe runs correctly through the interpreter and normalizes into a crate whose step names a pipe that does not exist.
+
+**Repro** (measured 2026-08-03): load `pipelex-cookbook/examples/wip/advisory_board/` (domain `advisory_orchestrator` calling `present_as_markdown`, declared in domain `presentation`), normalize, and query both sides: the normalized step ref `advisory_orchestrator.present_as_markdown` is absent from `crate.pipes`, while the live lookup of the bare code succeeds. The library loads and validates green; the crate is silently wrong.
+
+**Why it matters.** (1) The normalized fingerprint hashes the wrong content — two libraries differing only in which domain declares the callee hash as if the caller pointed at its own domain. (2) A crate round-trip breaks the method at run time: decode → `load_from_crate` reinstates the *dotted* ref, which never reaches the bare-code fallback, so the run dies with `PipeNotFoundError`. That is the transport path (sandbox-hosted load, distributed execution payloads), not a hypothetical. (3) Every consumer of `crate.pipes` inherits it, including the per-pipe codegen kinds the spec reserves.
+
+**The fix — decision D-1, recommendation (a).** Qualify against the crate, the way the library resolves: own domain first, then a crate-wide unique match, raising `CrateNormalizationError` on ambiguity or absence. Normalization already sees all domains at once, so this is a lookup change, not a restructuring. The alternative (b) — reject the authored bare cross-domain form as a validation error — is a language decision that needs Louis, breaks authored bundles, and contradicts `get_optional_pipe`'s deliberate fallback (whose own `TODO` asks for a `domain_hint`, i.e. the fallback is intended to stay). Whoever lands (a) should also decide whether that `domain_hint` TODO is the same conversation — normalization is exactly the caller that knows the hint.
+
+**The gate.** Normalize a two-domain crate whose step crosses domains and assert every step ref (steps, branches, outcomes — all three `_qualify_pipe_ref` call sites) resolves to a key present in `crate.pipes`. A crate-closedness assertion of that shape would have caught this the day the fallback was written; make it a standing test, not a one-off.
+
+### 1.2 The types projection and the runtime disagree on a structureless concept's base class
+
+**The defect.** A concept declaring only a description — no `structure`, no `refines` — resolves to two different types. The runtime promotes it to a refinement of native `Text`: `ConceptFactory._handle_basic_blueprint` generates its class on a `TextContent` base. The `python-structures` projection emits it as `class X(StructuredContent)` with `ConfigDict(extra="allow")`. `TextContent` and `StructuredContent` are siblings, so the same authored concept is a text type on one side and an object type on the other.
+
+**Why it is worse than the (deliberate) naming difference.** Two things branch on the base class. First, the interpreter's text-vs-object dispatch asks whether the output concept is strictly compatible with native `Text` — `True` with the runtime's class, `False` with the projected one, so the same concept triggers two different LLM calls with different prompts and result shapes. Second, the text path's read-back (`model_validate({"text": ...})`) succeeds on **both** classes with identical dumps — `extra="allow"` swallows the mismatch — so the divergence produces no exception anywhere. Any consumer that generates `structures.py` and hands those classes back to the runtime (the projection's entire point) inherits this. Cookbook bundles authoring structureless output concepts (e.g. `examples/wip/blog_article_generator/`, `examples/wip/write_tweet/tech_tweet.mthds`) are live instances of the shape.
+
+**The fix — decision D-2, recommendation (a).** Make the projection follow the runtime: emit `TextContent` as the base for a structureless concept (one arm in `python_structures`), so the projected class satisfies the same `isinstance` checks the runtime's does and carries a real `text` field — `extra="allow"` stops doing load-bearing work for this shape (it stays, for pass-through of unknown fields, which was its actual job). The alternative (b) — stop the runtime's promotion and make structureless genuinely shapeless — is a language decision: "describe it in prose and get text back" is what a structureless concept currently *means* to authors, and changing that is not a codegen call.
+
+**The gate.** Assert that the projected class and `ConceptFactory`'s generated class for the same blueprint share the same `StuffContent` ancestor, across all four shapes: structureless, structured, refines-native, refines-in-crate. One language invariant keeps the sweep closed and should be stated in the test: MTHDS forbids `refines` + `structure` together, so a structured concept refining a structureless one — the shape where a divergence could hide — cannot be authored at all.
+
+### 1.3 `render_import_block` emits lines a consumer's formatter rewrites
+
+**The defect.** Every renderer in `python_common.py` respects `PY_EXPLODE_WIDTH = 88` and pre-explodes past it with a magic trailing comma — the formatter-clean discipline #1070 established, precisely so a consumer's `ruff format` cannot rewrite emitted bytes. `render_import_block` is the one hole: it merges and sorts, but never wraps, at any width. A merged import whose names cross 88 columns renders flat and gets rewritten into the parenthesized form by the first `ruff format` in the consumer's tree. Today's emitted artifacts stay under the threshold, so the defect is latent rather than absent — one more name sharing a module and it fires, and the existing lint-clean test would not notice, since `ruff check` has no opinion on a long import line.
+
+**The fix.** Wrap past `PY_EXPLODE_WIDTH` in the parenthesized form with a magic trailing comma — the same shape the sibling renderers already use and exactly what ruff itself produces, so the emitted bytes become a fixed point of the consumer's formatter at any width ≥ 88.
+
+**The gate.** Extend the lint-clean test to assert `ruff format --diff --line-length 88` is empty for each emitted artifact, not just that `ruff check` passes — and keep #1070's sweep shape (input shapes × targets × widths), because example-based versions of this exact claim have been disproved before. Lint-clean and format-stable are different properties, and only the second is what byte-reproducibility in a consumer's tree rests on.
+
+**🔶 CHECKPOINT A — the dev-buildable trio landed.** ✅ **Reached 2026-08-03.**
+
+All three fixes landed on `fix/Parity-gaps`, each red-green verified against the tree before it (the gate was written first, run against the unfixed code, and observed to fail for the stated reason).
+
+| Fix | What landed | Gate |
+| --- | --- | --- |
+| 1.1 | `_qualify_pipe_ref` resolves a bare pipe ref crate-wide against an index of the crate's own pipe refs, raising `CrateNormalizationError` on ambiguity or absence | `test_crate_normalization.py`: crate-closedness over `pipe_dependencies` (parametrized across both crate shapes), the four call sites' cross-domain resolution, special outcomes untouched, ambiguity, absence |
+| 1.2 | `python_structures._base_class` emits `TextContent` for a structureless concept; a Python-class-backed one keeps the root base | `test_projection_agrees_with_runtime_base.py`: same nearest `StuffContent` ancestor as `ConceptFactory`'s generated class, across all four authorable shapes, plus the named answer and the opaque-class carve-out |
+| 1.3 | `render_import_block` pre-explodes past `PY_EXPLODE_WIDTH` via `_import_statement` | `test_emitted_artifacts_are_lint_clean.py`: `ruff format --check` at `PY_EXPLODE_WIDTH` over a merged block and a single overlong name |
+
+**Real-world confirmation of 1.1.** The plan's repro was run end-to-end against `pipelex-cookbook/examples/wip/advisory_board/`: before the fix, `advisory_orchestrator.master_advisory_orchestrator -> advisory_orchestrator.present_as_markdown` is dangling in the normalized crate; after, the ref reads `presentation.present_as_markdown` and the crate is closed.
+
+**Deviations from the recommendations.**
+
+- **D-1: the "own domain first" rung was dropped.** Recommendation (a) had own-domain-first, then crate-wide. `get_optional_pipe` does not prefer the caller's domain — it raises on an ambiguous bare code — so that rung would have *created* a disagreement in the one case the two differ. What landed mirrors the shipping reader exactly. Written up in [`d1-domain-hint-deferred.md`](d1-domain-hint-deferred.md).
+- **D-1's `domain_hint` conversation: deferred**, not opened. It is a runtime/language decision (which pipe a runnable bundle calls), and the normalizer follows it for free once it is settled — same doc.
+- **1.3's grounding claim was stale.** The plan recorded that the lint-clean gate "runs `ruff check`, not `ruff format --diff`". It already ran `ruff format --check`, including parametrized over consumer line-lengths down to 88. The real hole was coverage, not the assertion: no crate shape produces an import line past 88 (each native content class lives in its own module, so nothing merges far enough), so the gate is a direct test on `render_import_block` rather than another crate fixture. `_assert_ruff_clean` was split so the new test reuses the format-stability half — an import block alone has nothing to *use* its names, so `ruff check` would flag `F401` on a shape no emitter writes.
+
+**Gates run:** `make agent-check` ✅ · full `make agent-test` ✅ · `make drift-check` ✅ · `[Unreleased]` changelog entry for each of the three ✅.
+
+This is the PR boundary: Phase 2's gate (#1081 / #1082 merging) is still closed, so Phase 1 ships on its own.
+
+## Phase 2 — the kernel trio (gated on #1081 / #1082 merging)
+
+These three are written against the open kernel-extraction PRs and share a theme: the `pipelex.kernel` package's stated contract — a runtime layer callable without the interpreter, whose façade is a faithful convenience over the ops — is not yet true in three places. **Re-verify every claim against the merged code before building; do not land these as review feedback on the finalized stacked PRs.**
+
+### 2.1 `MethodKernel.llm_text` is narrower than the op beneath it
+
+**The defect** (against #1081's code). The façade's text method hardcodes what the op parameterizes, in three ways: output concept (op takes `concept: Concept`; façade hardcodes native `Text`), output class (op takes `output_class`; façade hardcodes `TextContent`), and model (op's resolution accepts `None` and defers to the deck; façade requires a `model`). Its sibling `llm_object` has none of these limits — the asymmetry is between the façade's own two methods. The interpreter passes all three through, with the model choice routinely `None`.
+
+**Why it matters.** A programmatic caller producing a concept that refines native `Text` stores `native.Text`/`TextContent` where an interpreted run stores the declared concept and its generated class — a silent memory divergence, and a hard `StuffContentTypeError` the moment anything reads the result back expecting the declared class. And a model-less call — the normal authored case, since omitting the model defers to the deck exactly like a `$preset` does — is inexpressible through the façade for no semantic reason.
+
+**The fix.** Widen `llm_text` to match `llm_object`: `concept` and `output_class` optional, defaulting to today's hardcoded pair; `model` optional, passed through to the resolution unchanged. Additive — every existing call site keeps working because the defaults are today's behavior.
+
+### 2.2 `MethodKernel.llm_object` renders under the wrong model's prompting style
+
+**The defect** (against #1081's code). A `PipeLLM` carries two model choices (`model` → for_text, `model_to_structure` → for_object). The interpreter resolves **two** settings and derives the templating style from the **text** one (`pipe_llm.py:219–237` on dev — the pipe's main model governs how the prompt is written; the object path differs only in how the answer comes back). The façade collapses to one choice, drops the object chain's `for_text` fallback rung, and derives the style from the **object** setting. Unlike 2.1 this is not narrowness visible in a signature — it is a wrong value.
+
+**When it bites.** A pipe declaring both choices, resolving to models with different prompting targets: the prompt is assembled under the structuring model's style while an interpreted run assembles it under the main model's. Both calls succeed; the prompt text differs. Also, "text model X, object model default" is expressible in MTHDS and inexpressible through the façade.
+
+**The fix.** Give `llm_object` the second choice (`model_for_object`), forward the `for_text` rung into the object resolution, and derive the style from the text setting — mirroring the interpreter line for line. Existing single-choice callers keep working and their style derivation *changes*, which is the point: today it is wrong whenever the two settings differ. Pair with a test asserting the two-choice case — no current test covers a pipe declaring both.
+
+### 2.3 Nothing in the kernel can build an `ImgGenPrompt`
+
+**The defect** (against #1082's code). `kernel.img_gen_ops.run_img_gen` takes a ready `ImgGenPrompt`, by deliberate analogy with `run_llm_text` taking a ready `LlmPromptContent`. The analogy is where it breaks: the kernel ships the LLM prompt's constructor (`llm_prompt_content.make_from_text`) but no image counterpart — the only builder is `ImgGenPromptBlueprint.make_img_gen_prompt`, an interpreter-layer module. So a `RuntimeBoot`-only process can call the text, object, and compose ops and **cannot call the image op at all**. Sharper: `kernel/prompt_references.py` hosts `ImageReference`/`ImageReferenceKind` under a docstring asserting the kernel is what resolves them — and it is not; the blueprint imports those names upward and does the resolving. The vocabulary migrated and the semantics did not, which makes the layer's "callable without the interpreter" guarantee false for one operator — and that guarantee is the kind worth nothing at less than 100%.
+
+**The fix — decision D-3, recommendation (a).** A `pipelex/kernel/img_gen_prompt.py` mirroring `llm_prompt_content.py`: takes memory (as a context provider), the template source/category/style, an optional negative template, and the kernel's own `ImageReference` list; returns an `ImgGenPrompt`. The blueprint keeps its parse-and-validate role and delegates — completing the move its own docstring describes as already done. The honest cost: the assembly pulls `ImageRegistry`, `PromptImageFactory`, `substitute_nested_in_context` and `render_template` with it, so scoping must decide whether those are runtime-layer or tools-layer citizens (most already are). The alternative (b) — export just the render step and let callers assemble — is smaller but leaves the image-registry and `[Image N]` placeholder logic (the genuinely subtle part, where a token-order/`input_images`-order mismatch silently mislabels images) to be re-derived by every caller; acceptable only if explicitly framed as a first step.
+
+**The gate.** A test that builds an `ImgGenPrompt` through the new kernel constructor and through the blueprint from the same authored inputs and asserts they are equal — the same "both readers, same answer" shape as everything above — plus a boot-scoped test that the constructor is importable and usable under `RuntimeBoot` alone.
+
+**🔶 CHECKPOINT B — plan complete.** Record: merged-code re-verification results for 2.1–2.3 (what moved, what held), each fix's commit and gates, D-3's scoping outcome (which helpers moved to which layer), and changelog entries. Run the full gate set. Update the README status block and close the track, or spin out whatever the re-verification surfaced.
+
+## Decisions
+
+- **D-1 — bare cross-domain qualification: (a) qualify against the crate (recommended) vs (b) reject the authored form.** (a) matches the runtime the language already ships and fixes fingerprint + round-trip at once; (b) is a breaking language ruling for Louis. Settle at 1.1; note the adjacent `domain_hint` TODO either way.
+- **D-2 — structureless base class: (a) projection follows the runtime (`TextContent` base, recommended) vs (b) runtime stops promoting.** (a) is one arm in the projection and honors what the declaration means to authors today; (b) is a language change. Settle at 1.2.
+- **D-3 — img-gen prompt assembly: (a) kernel constructor module mirroring `llm_prompt_content` (recommended) vs (b) export the bare render step.** (a) completes the layering the kernel already claims in writing; (b) re-distributes the subtle half to every caller. Settle at 2.3, with the helper-scoping question answered explicitly rather than by drift.
+
+## Out of scope
+
+- The runtime's structureless *promotion* semantics (D-2 option (b)) and the bare-ref *language rule* (D-1 option (b)) — both are author-facing language decisions, flagged for Louis, not taken here.
+- `MethodKernel` growing façade methods for the non-LLM operators — a design conversation for after the kernel PRs settle, not a parity defect.
+- Anything in the open kernel PRs themselves — they are finalized and stacked; this branch follows them, it does not amend them.
