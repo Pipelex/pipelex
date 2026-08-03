@@ -67,10 +67,10 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
 
     from pipelex.cogt.extract.extract_input import ExtractInput
     from pipelex.cogt.extract.extract_setting import ExtractSetting
-    from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
     from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
     from pipelex.cogt.llm.llm_setting import LLMSetting
     from pipelex.cogt.search.search_setting import SearchSetting
+    from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
     from pipelex.core.concepts.concept_factory import ConceptFactory
     from pipelex.core.concepts.native.concept_native import NativeConceptCode
     from pipelex.core.memory.working_memory import WorkingMemory
@@ -79,13 +79,16 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     from pipelex.core.stuffs.list_content import ListContent
     from pipelex.core.stuffs.number_content import NumberContent
     from pipelex.core.stuffs.search_result_content import SearchResultContent
+    from pipelex.core.stuffs.stuff_factory import StuffFactory
     from pipelex.core.stuffs.text_content import TextContent
     from pipelex.kernel.compose_ops import run_compose_template
     from pipelex.kernel.extract_ops import build_extract_job_params, run_extract
     from pipelex.kernel.func_ops import run_func
     from pipelex.kernel.img_gen_ops import build_img_gen_job_params, run_img_gen
+    from pipelex.kernel.img_gen_prompt import assemble_img_gen_prompt
     from pipelex.kernel.llm_results import LlmObjectResult, LlmTextResult
     from pipelex.kernel.pipelex_kernel import PipelexKernel
+    from pipelex.kernel.prompt_references import ImageReference, ImageReferenceKind
     from pipelex.kernel.search_ops import run_search
     from pipelex.runtime_boot import RuntimeBoot
     from pipelex.system.pipe_run_mode import PipeRunMode
@@ -175,11 +178,42 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
         fail(f"run_extract produced {type(extract_result.content).__name__}, not the ListContent of pages it owes")
     check_stored(extract_result, "run_extract", ListContent)
 
+    # The image arm runs the pair, assemble then generate, rather than handing `run_img_gen` a prompt
+    # built in the test. It could not do otherwise before `assemble_img_gen_prompt` existed, because
+    # the only builder was an interpreter-layer blueprint — so this arm's coverage was incomplete in
+    # exactly the way the kernel surface was. Assembly is also the half that reaches into memory to
+    # resolve references, which is where a function-local interpreter import would hide, and this
+    # subprocess is the only gate that can see one.
+    img_gen_memory = WorkingMemoryFactory.make_from_single_stuff(
+        StuffFactory.make_stuff(
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),
+            content=ImageContent(url="https://example.com/kernel-boot-contract-reference.png"),
+            name="reference",
+        )
+    )
+    img_gen_prompt = asyncio.run(
+        assemble_img_gen_prompt(
+            context_provider=img_gen_memory,
+            prompt_blueprint=TemplateBlueprint(
+                template="Draw something like {{ reference }}.",
+                category=TemplateCategory.IMG_GEN_PROMPT,
+            ),
+            image_references=[ImageReference(variable_path="reference", kind=ImageReferenceKind.DIRECT)],
+        )
+    )
+    # The token and the input image are two readings of one registry; asserting only that the call
+    # returned would leave the half that actually reaches into memory — reference resolution —
+    # unproven on a boot that has no library.
+    if "[Image 1]" not in img_gen_prompt.positive_text:
+        fail(f"assemble_img_gen_prompt left the referenced image unsubstituted: {img_gen_prompt.positive_text!r}")
+    if not img_gen_prompt.input_images or len(img_gen_prompt.input_images) != 1:
+        fail("assemble_img_gen_prompt did not carry the referenced image through to input_images")
+
     img_gen_setting = ImgGenSetting(model="kernel-boot-contract-img-gen-model")
     img_gen_result = asyncio.run(
         run_img_gen(
-            memory=WorkingMemoryFactory.make_empty(),
-            img_gen_prompt=ImgGenPrompt(positive_text="Draw something."),
+            memory=img_gen_memory,
+            img_gen_prompt=img_gen_prompt,
             img_gen_setting=img_gen_setting,
             img_gen_job_params=build_img_gen_job_params(img_gen_setting=img_gen_setting),
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),
