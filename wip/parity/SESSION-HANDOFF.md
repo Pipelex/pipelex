@@ -36,9 +36,10 @@ Verbatim, so the new session picks up the same contract:
 
 1. ~~Checkpoint A's code review (Sonnet-5 `/code-review`, no inherited context, pointed at `d9efffbfb`).~~ Fanned out.
 2. ~~Open the PR.~~ [#1085](https://github.com/Pipelex/pipelex/pull/1085).
-3. **Poll CI + the review bots**, then fan out an Opus 5 sub-agent over their feedback (dedupe, verify each item, fix only clear wins). Resolve threads, push, ping `@greptileai` / `@cubic-dev-ai` to re-trigger, repeat until clean.
-4. **Finalize** with an Opus 5 sub-agent running gstack's `/review wip/parity/parity-gaps-plan.md`.
-5. **Phase 2** only after #1081 / #1082 merge, re-verifying 2.1–2.3 against the merged code.
+3. ~~Poll CI + the review bots, fan out an Opus 5 sub-agent over their feedback.~~ Done — CI green, Greptile 5/5 clean, cubic clean, Sonnet-5 `/code-review` clean, one Codex P2 verified pre-existing and deferred. Both bot threads answered inline and resolved.
+4. ~~Finalize with gstack's `/review`.~~ Done — verdict **land**. It caught one real defect the other four missed (the `Anything` import omission) plus three doc inaccuracies, all fixed; the rest deferred to [`deferred-review-observations.md`](deferred-review-observations.md).
+5. **Merge decision is Louis'.** Every prescribed review step in the goal has run. Nothing is pending on the PR.
+6. **Phase 2** only after #1081 / #1082 merge, re-verifying 2.1–2.3 against the merged code.
 
 ## What changed, file by file
 
@@ -46,10 +47,11 @@ Verbatim, so the new session picks up the same contract:
 | --- | --- |
 | `pipelex/libraries/crate_normalization.py` | `_index_pipe_refs_by_code` + `_qualify_pipe_ref` resolving crate-wide, raising on ambiguity/absence |
 | `pipelex/libraries/exceptions.py` | `CrateNormalizationError` docstring names the new raise reasons (the docstring is the generator source for `docs/errors/crate-normalization-error.md`; it must fit 150 columns on one line) |
-| `pipelex/codegen/emitters/python_structures.py` | `_base_class` emits `TextContent` for a structureless concept, root base for a Python-class-backed one |
+| `pipelex/codegen/emitters/python_structures.py` | `_base_class` emits `TextContent` for a structureless concept, root base for a Python-class-backed one; `_native_class` routes the `Anything` fallback through `_structured_content` so the root base it names is actually imported |
 | `pipelex/codegen/emitters/python_common.py` | `_import_statement` pre-explodes past `PY_EXPLODE_WIDTH` |
 | `tests/unit/pipelex/libraries/test_crate_normalization.py` | `_cross_domain_crate` fixture + closedness / cross-domain / special-outcome / ambiguity / absence tests |
 | `tests/unit/pipelex/codegen/test_projection_agrees_with_runtime_base.py` | new — the four-shape ancestor-agreement gate |
+| `tests/unit/pipelex/codegen/conftest.py`, `test_python_structures_emitter.py` | `refines_anything_crate` fixture + the load-the-module gate for the `Anything` fallback |
 | `tests/unit/pipelex/codegen/test_emitted_artifacts_are_lint_clean.py` | `_assert_ruff_clean` split so the new import-block format-stability test reuses the format half |
 | `docs/under-the-hood/codegen-projections.md`, `docs/errors/crate-normalization-error.md` | doc updates (the errors page is generated — regenerate with `make generate-error-pages`, never hand-edit) |
 | `CHANGELOG.md` | three `[Unreleased]` → `Fixed` entries |
@@ -62,3 +64,4 @@ Verbatim, so the new session picks up the same contract:
 - **`extra="allow"` stayed** on the structureless arm, per the plan. It no longer does load-bearing work (the class now carries a real `text` field), which was always its actual job: pass-through of unknown fields.
 - **The keyword-only hook fires on every edit** under `pipelex/`. Record a subject grant *before* running checks if a subject should stay positional — `make agent-check` runs the auto-fixer, which will silently keyword-only an ungranted one.
 - **`make agent-test` takes ~19 minutes.** Run it in the background and use the targeted paths from `tests/CLAUDE.md` while iterating.
+- **A fixture that already registers an import cannot gate a missing one.** The `Anything` defect was invisible to `every_type_kind_crate` because its structured concepts import `StructuredContent` anyway. Gating an *omission* needs a crate where nothing else supplies the thing — hence the single-concept `refines_anything_crate`. Worth remembering before adding a shape to a rich fixture and calling it covered.

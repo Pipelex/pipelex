@@ -35,7 +35,7 @@ _FILENAME = "structures.py"
 
 
 def emit_python_structures(library: ResolvedLibrary) -> list[EmittedFile]:
-    """Emit the `structures.py` module: one `StructuredContent` subclass per non-native concept."""
+    """Emit the `structures.py` module: one `StuffContent` subclass per non-native concept."""
     by_ref = library.by_ref()
     emitted = [concept for concept in library.concepts if not concept.is_native]
     in_module = {concept.concept_ref for concept in emitted}
@@ -152,6 +152,8 @@ def _native_class(concept_ref: str, *, imports: set[str]) -> str:
     native_code = NativeConceptCode(QualifiedRef.parse(concept_ref).local_code)
     structure_class = native_code.structure_class
     if structure_class is None:
-        return "StructuredContent"
+        # `Anything` alone has no content class of its own, so it falls back to the runtime root — via
+        # the renderer that registers the import, never a bare name the module would not import.
+        return _structured_content(imports=imports)
     imports.add(f"from {structure_class.__module__} import {structure_class.__name__}")
     return structure_class.__name__

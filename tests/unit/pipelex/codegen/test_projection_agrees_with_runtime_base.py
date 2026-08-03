@@ -7,9 +7,16 @@ nothing raises — the interpreter's text-vs-object dispatch just answers differ
 concept, and the text path's `model_validate({"text": ...})` succeeds on either class. So the gate is
 the agreement itself: same nearest `StuffContent` ancestor, for every shape a concept can be authored in.
 
-There are exactly four such shapes, and the enumeration is closed because MTHDS forbids `refines` and
-`structure` together (`ConceptBlueprint.validate_refines_and_structure`) — the one combination where a
-divergence could hide behind a structured concept refining a structureless one cannot be authored at all.
+There are exactly four such shapes **among concepts the crate can resolve on its own**, and that
+enumeration is closed because MTHDS forbids `refines` and `structure` together
+(`ConceptBlueprint.validate_mutually_exclusive_fields`) — the one combination where a divergence could
+hide behind a structured concept refining a structureless one cannot be authored at all.
+
+Two shapes sit outside it, both because the crate genuinely cannot see what they resolve to (the B1-1
+floor): a concept backed by a hand-written Python class, and one refining a target the crate does not
+carry (a cross-package base leaves `structureless=True` *with* `base_ref` set, so it lands on the root
+rather than on this module's structureless arm). Neither is gated here, and neither is a defect this
+module can settle — see `wip/parity/structureless-concept-with-registered-class.md`.
 """
 
 from pathlib import Path

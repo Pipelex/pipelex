@@ -29,4 +29,8 @@ If the answer is yes, the normalizer follows in the same change: `_qualify_pipe_
 
 ## Why the strictness costs nothing today
 
-An ambiguous bare pipe ref cannot exist in a library that loads: `PipeCondition` and `PipeSequence` resolve every dependency at validation time, so `get_optional_pipe` raises before the crate is ever built. Raising in the normalizer therefore changes no behavior for any bundle that works — it only turns a hand-built crate's silent dangling ref into a diagnostic.
+An ambiguous or dangling bare pipe ref cannot survive in a library that loads. `Library.validate_library` (`pipelex/libraries/library.py:128`) gates on `isinstance(pipe, PipeController)` — so **every** controller kind, Sequence, Condition, Parallel and Batch alike, not just the two that motivated the check — and puts each of its `pipe_dependencies()` through `get_required_pipe`. An unresolvable one surfaces as a structured `LibraryLoadingError(UNRESOLVED_PIPE_DEPENDENCY)` naming both the referencing controller and the missing ref.
+
+Note the ordering, because it is the opposite of what "validation gates the crate" would suggest: the crate is **built first** (`LibraryCrateFactory.make_from_blueprints`, `library_manager.py:528`) and validated after, inside `load_from_crate` (`:492`). What runs after validation is *normalization* — `get_crate` → `normalize_crate` — and that is the step this fix guards. So the guarantee is not "validation runs first"; it is that no library reaching a normalized crate through the loader has an unresolvable controller dependency, because `validate_library` has already rejected it with a better error.
+
+Raising in the normalizer therefore changes no behavior for any bundle that loads — it only turns a hand-built or transported crate's silent dangling ref into a diagnostic, on the path where nothing else would catch it.

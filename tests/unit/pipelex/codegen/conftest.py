@@ -314,6 +314,22 @@ def refines_native_only_crate() -> LibraryCrate:
     return normalize_crate(authored, mthds_version=CRATE_TEST_VERSION)
 
 
+@pytest.fixture
+def refines_anything_crate() -> LibraryCrate:
+    """The lone concept refines `Anything` — the one native with no dedicated content class.
+
+    Every other native maps to a runtime content class the emitter both names *and* imports. `Anything`
+    is the single base that sends `python-structures` back to the root `StructuredContent`, which the
+    native renderer therefore has to import itself. Nothing else in this crate reaches the root, so a
+    missing import is not masked by a sibling concept — the module names a class it never imported.
+    """
+    authored = LibraryCrate(
+        concepts={"wildcard.Loose": ConceptBlueprint(description="A refinement of the wildcard native", refines="Anything")},
+        domains={"wildcard": DomainBlueprint(code="wildcard", description="Wildcard domain")},
+    )
+    return normalize_crate(authored, mthds_version=CRATE_TEST_VERSION)
+
+
 def load_generated_module(content: str, *, tmp_path: Path, name: str) -> Any:
     """Write generated Python to disk, import it, and return it (proves compile + exec).
 

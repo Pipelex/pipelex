@@ -30,6 +30,7 @@ This track fixes a family of defects that share one shape: a single authored fac
 
 - [`d1-domain-hint-deferred.md`](d1-domain-hint-deferred.md) — whether `PipeLibrary` should prefer the caller's domain on an ambiguous bare pipe ref. A language call; the normalizer follows for free once settled.
 - [`structureless-concept-with-registered-class.md`](structureless-concept-with-registered-class.md) — a description-only concept bound to a same-named hand-written class through a channel the crate structurally cannot see. Raised on PR #1085, verified pre-existing; the correct fix is a language call.
+- [`deferred-review-observations.md`](deferred-review-observations.md) — four follow-ups from the #1085 finalization review: the cross-package `refines` shape, qualified-ref closedness, a latent test-order flake, and the `mthds/` spec's missing bare-**pipe**-ref rule (a cross-repo edit, ordered *after* D-1).
 
 ## Cold start
 
