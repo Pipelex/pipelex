@@ -78,9 +78,11 @@ class MethodKernel:
         self,
         *,
         memory: WorkingMemory,
-        model: LLMModelChoice,
+        model: LLMModelChoice | None = None,
         user: str,
         system: str | None = None,
+        concept: Concept | None = None,
+        output_class: type[StuffContent] | None = None,
         result: str,
     ) -> LlmTextResult:
         """The semantics of an LLM step with a Text output.
@@ -89,14 +91,23 @@ class MethodKernel:
         returned memory plus the rendered prompts and the resolved setting. Images and documents
         enter a prompt through references, which this convenience form has none of — build an
         `LlmPromptContent` and call `run_llm_text` directly for those.
+
+        `concept`, `output_class` and `model` are optional and default to what this method used to
+        hardcode — native `Text`, `TextContent`, and the deck's own choice. They are parameters
+        because the op beneath takes them and the interpreter passes all three: a caller producing a
+        concept that *refines* native `Text` must be able to store the declared concept and its
+        generated class, or the memory it hands back differs from an interpreted run's for the same
+        step and anything reading the result back raises `StuffContentTypeError`. Omitting `model`
+        is the ordinary authored case, not an edge one — it defers to the deck exactly as a `$preset`
+        does. `llm_object` below has taken all three from the start; this is the same convenience.
         """
         llm_setting = resolve_llm_setting_for_text(llm_choice=model)
         return await run_llm_text(
             memory=memory,
             prompt_content=LlmPromptContent.make_from_text(user=user, system=system),
             llm_setting=llm_setting,
-            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
-            output_class=TextContent,
+            concept=concept or ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
+            output_class=output_class or TextContent,
             job_metadata=self.make_step_metadata(),
             cogt_run_params=self.cogt_run_params,
             templating_style=derive_templating_style(llm_setting=llm_setting),
@@ -123,6 +134,17 @@ class MethodKernel:
         schema-to-class reconstruction, because the class exists. The structure prompt is derived
         from `output_class` by default; pass `structure_prompt` to override it. As with `llm_text`,
         prompts carrying image or document references go through `run_llm_object` directly.
+
+        **One `model`, and it carries the interpreter's *text*-choice semantics for templating.** A
+        `PipeLLM` can name two models (`model` → for_text, `model_to_structure` → for_object) and
+        derives the prompting style from the text one. Here the single explicit choice wins
+        `resolve_llm_setting_for_object`'s first rung, so the style comes from that same setting —
+        which is what an interpreted run derives for a pipe naming only a text model. The two agree
+        for every call this form can express; a pipe naming *both* is what it cannot express, and
+        that is deliberate. Do not "fix" this by deriving the style from an object-only resolution:
+        that would introduce the divergence rather than close it. The whole model-derived-style
+        mechanism is slated for replacement by an explicit caller-chosen style — see
+        `wip/prompting-style/README.md`.
         """
         llm_setting = resolve_llm_setting_for_object(llm_choice=model)
         return await run_llm_object(
