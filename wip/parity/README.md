@@ -28,4 +28,4 @@ This track fixes a family of defects that share one shape: a single authored fac
 
 ## Cold start
 
-Read [`parity-gaps-plan.md`](parity-gaps-plan.md) top to bottom — it carries the evidence, the chosen fixes, and the gates. Verify the grounding claims against the tree before building on them (each carries its file:line). Gates for every phase: `make agent-check`, full `make agent-test`, `make drift-check`, and an `[Unreleased]` changelog entry per user-visible fix.
+**Start with [`SESSION-HANDOFF.md`](SESSION-HANDOFF.md)** — where the work stands, what runs next, and the traps. Then read [`parity-gaps-plan.md`](parity-gaps-plan.md) top to bottom — it carries the evidence, the chosen fixes, and the gates. Verify the grounding claims against the tree before building on them (each carries its file:line). Gates for every phase: `make agent-check`, full `make agent-test`, `make drift-check`, and an `[Unreleased]` changelog entry per user-visible fix.
