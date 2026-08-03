@@ -26,6 +26,11 @@ This track fixes a family of defects that share one shape: a single authored fac
 - **Phase 1: ✅ done 2026-08-03.** All three fixes landed with their gates, red-green verified; Checkpoint A recorded in the plan. D-1 settled as crate-wide resolution (not own-domain-first — see [`d1-domain-hint-deferred.md`](d1-domain-hint-deferred.md)); D-2 settled as recommended.
 - **Phase 2: gated** on #1081/#1082.
 
+## Deferred, not dropped
+
+- [`d1-domain-hint-deferred.md`](d1-domain-hint-deferred.md) — whether `PipeLibrary` should prefer the caller's domain on an ambiguous bare pipe ref. A language call; the normalizer follows for free once settled.
+- [`structureless-concept-with-registered-class.md`](structureless-concept-with-registered-class.md) — a description-only concept bound to a same-named hand-written class through a channel the crate structurally cannot see. Raised on PR #1085, verified pre-existing; the correct fix is a language call.
+
 ## Cold start
 
 **Start with [`SESSION-HANDOFF.md`](SESSION-HANDOFF.md)** — where the work stands, what runs next, and the traps. Then read [`parity-gaps-plan.md`](parity-gaps-plan.md) top to bottom — it carries the evidence, the chosen fixes, and the gates. Verify the grounding claims against the tree before building on them (each carries its file:line). Gates for every phase: `make agent-check`, full `make agent-test`, `make drift-check`, and an `[Unreleased]` changelog entry per user-visible fix.
