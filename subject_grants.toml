@@ -4200,14 +4200,6 @@ rationale = "Verb-object: validates the item; expectations stay keyword."
 param = "response"
 rationale = "Converter: rebinds a transported response into a result; single self-labelling operand."
 
-["pipelex/pipe_operators/img_gen/img_gen_prompt_blueprint.py::ImgGenPromptBlueprint._extract_direct_image"]
-param = "image_ref"
-rationale = "Verb-object: extracts from the image ref; context stays keyword."
-
-["pipelex/pipe_operators/img_gen/img_gen_prompt_blueprint.py::ImgGenPromptBlueprint._extract_direct_list_images"]
-param = "image_ref"
-rationale = "Verb-object: extracts from the image ref; context stays keyword."
-
 ["pipelex/pipe_operators/llm/pipe_llm.py::PipeLLM._format_error_location"]
 param = "pipe_run_params"
 rationale = "Derivation from the run params; single operand."

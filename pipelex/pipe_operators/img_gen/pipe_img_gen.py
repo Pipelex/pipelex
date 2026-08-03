@@ -19,10 +19,11 @@ from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.exceptions import StuffContentTypeError
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.interpreter_hub import get_concept_library, get_native_concept
+from pipelex.kernel.exceptions import PromptContentError
 from pipelex.kernel.img_gen_ops import build_img_gen_job_params, resolve_img_gen_setting, run_img_gen
 from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
 from pipelex.pipe_operators.img_gen.exceptions import PipeImgGenFactoryError, PipeImgGenRunError
-from pipelex.pipe_operators.img_gen.img_gen_prompt_blueprint import ImgGenPromptBlueprint, ImgGenPromptBlueprintValueError
+from pipelex.pipe_operators.img_gen.img_gen_prompt_blueprint import ImgGenPromptBlueprint
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
@@ -183,7 +184,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         except StuffContentTypeError as stuff_content_type_error:
             msg = f"While runnning the PipeImgGen '{self.code}' some inputs are not of the right type: {stuff_content_type_error}"
             raise PipeImgGenRunError(message=msg) from stuff_content_type_error
-        except ImgGenPromptBlueprintValueError as blueprint_error:
+        except PromptContentError as blueprint_error:
             msg = f"While running the PipeImgGen '{self.code}' image extraction failed: {blueprint_error}"
             raise PipeImgGenRunError(message=msg) from blueprint_error
         except PipeImgGenFactoryError as factory_error:
