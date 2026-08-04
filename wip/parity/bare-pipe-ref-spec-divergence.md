@@ -4,7 +4,7 @@
 
 ## The divergence
 
-`mthds/docs/spec/namespace-resolution.md` § *Resolution Order for Bare Pipe References* is explicit:
+The MTHDS standard is explicit. **The spec is not in this repository** — it lives in the sibling `mthds/` repo at the workspace root (the open standard, published to mthds.ai), so a fresh `pipelex` clone cannot resolve the path below. The normative sentences are quoted verbatim here so the claim stays checkable without it; to re-verify against the source, read `docs/spec/namespace-resolution.md` § *Resolution Order for Bare Pipe References* in `mthds/`.
 
 > 1. **Current bundle** — check pipes declared in the same `.mthds` file.
 > 2. **Same domain, other bundles** — if the bundle is part of a package, check pipes in other bundles that declare the same domain.
