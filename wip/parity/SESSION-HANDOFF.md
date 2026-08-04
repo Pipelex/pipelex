@@ -4,16 +4,20 @@
 
 Read this first, then [`README.md`](README.md) and [`parity-gaps-plan.md`](parity-gaps-plan.md) (Checkpoint A holds the full record of what landed).
 
-## Resume here (bot round answered 2026-08-04, ~09:15 local / 02:15 UTC)
+## Resume here (bot round 3 answered 2026-08-04, ~09:50 local / 02:50 UTC)
 
-**Everything is pushed. Nothing is half-done.** Cubic's round on the current heads has been arbitrated and answered across all four PRs. The next action is to read whatever the bots say about *these* heads, then merge.
+**Everything is pushed. Nothing is half-done.** Round 3 has been arbitrated and answered. The next action is to read whatever the bots say about *these* heads, then merge.
 
-| PR | Branch / worktree | Bots |
+| PR | Branch / worktree | Round 3 |
 | --- | --- | --- |
-| [#1081](https://github.com/Pipelex/pipelex/pull/1081) (1/3) | `refactor/Kernel` — `_kernel/` | cubic answered; re-pinged |
-| [#1082](https://github.com/Pipelex/pipelex/pull/1082) (2/3) | `refactor/Kernel-phase2` — `_kernel/` | cubic answered; re-pinged |
-| [#1083](https://github.com/Pipelex/pipelex/pull/1083) (3/3) | `refactor/Kernel-phase3` — `_kernel/` | cubic answered; re-pinged |
-| [#1085](https://github.com/Pipelex/pipelex/pull/1085) | `fix/Parity-gaps` — `_gaps/` | cubic answered; re-pinged |
+| [#1081](https://github.com/Pipelex/pipelex/pull/1081) (1/3) | `refactor/Kernel` — `_kernel/` | cubic **no issues**; head unchanged |
+| [#1082](https://github.com/Pipelex/pipelex/pull/1082) (2/3) | `refactor/Kernel-phase2` — `_kernel/` | cubic **no issues**; one dead-hash fix pushed anyway; re-pinged |
+| [#1083](https://github.com/Pipelex/pipelex/pull/1083) (3/3) | `refactor/Kernel-phase3` — `_kernel/` | cubic 1×P3 fixed + rebased onto new #1082; re-pinged |
+| [#1085](https://github.com/Pipelex/pipelex/pull/1085) | `fix/Parity-gaps` — `_gaps/` | cubic 1×P3 fixed + dead-hash sweep; re-pinged |
+
+**Round 3 was small and the interesting part was not cubic's.** Two P3s, both doc-accuracy, both fixed. What the round actually produced was the realisation that **round 2's arbitration had a hole** (recorded below), and a sweep that found three commit hashes across these docs resolving from no branch at all. Backups for this round: `backup/parity-pre-round3`, `backup/kernel-phase2-pre-round3`, `backup/kernel-phase3-pre-round3`.
+
+**Greptile and Codex have now been silent for three consecutive rounds** despite a ping each time. Cubic is the only live external signal. Before reading "the bots are clean" as coverage, decide deliberately whether to chase them — the finalization review already demonstrated once that a defect can survive every bot plus a cold `/code-review`.
 
 **This table deliberately carries no head SHAs.** It used to, and they were wrong within one push — the three kernel branches are rebased whenever a parent moves, and every branch moves when a review round lands. Read the live heads instead: `for p in 1081 1082 1083 1085; do gh pr view $p --json number,headRefOid; done`.
 
