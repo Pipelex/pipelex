@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **Input shaping honors its injected concept provider (Breaking)**: `InputShaper` took a `ConceptProviderAbstract` and consulted it for concept resolution and compatibility, then resolved each value's structure class from the process-global class registry anyway — the ambient lookup the provider parameter exists to replace. It now resolves the class through the provider and hands the resolved type down, so a caller that supplies its own provider can shape inputs without a loaded library. Breaking on one failure path: a declared structure class that does not resolve now raises `ConceptStructureClassNotFoundError` instead of arriving as a `StructureValidationError` about the value, which pointed the author at their input rather than at the concept.
+
 ## [v0.42.0] - 2026-08-01
 
 ### Added
