@@ -178,7 +178,7 @@ Phase 1's `LLMPromptBlueprint` precedent looks like it points the other way, and
 **The gap.** Its docstring documents `Raises: TypeError` (`pipelex/core/stuffs/stuff.py`). It raises `StuffContentTypeError`, via `content_as` and `verify_content_type`, like every other typed accessor on `Stuff`. A caller who writes `except TypeError` around it catches nothing — `StuffContentTypeError` descends from `StuffError`, not from `TypeError`.
 
 **Why it is deferred rather than fixed here.** Pre-existing, one line, and in `pipelex/core/stuffs/` rather than on the kernel surface this PR is scoped to. Worth folding into whatever next touches those accessors; the same pass should check the sibling docstrings in that module for the same error, since this one was found by reading a single function rather than by sweeping.
-**Spotted in passing, unfixed.** `Stuff.as_list_of_fixed_content_type`'s docstring documents `Raises: TypeError`; it raises `StuffContentTypeError`, like the rest of the typed accessors. One line, pre-existing, in `pipelex/core/stuffs/stuff.py` — left alone here to keep this PR's diff to the kernel surface.
+
 ## KF-16 — The model-derived prompting style is obsolete and should become an explicit choice
 
 **Numbered 16, not 7, deliberately.** This item lands on the *first* PR of a three-PR stack, but the stacked Phase 2 and Phase 3 PRs already add KF-7 through KF-15. Taking the next free number instead of the next sequential one keeps every one of those entries — and the cross-references to them in the plan — exactly as written, so folding this in churns neither of the PRs above it. The gap below is theirs to fill.
