@@ -21,13 +21,19 @@ from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 
 class ImgGenPromptBlueprint(BaseModel):
-    """Blueprint for building ImgGenPrompt with optional image inputs.
+    """The authored shape of an image-generation prompt, and its input contract.
 
-    This class handles:
-    - Template rendering for positive and negative prompts
-    - Image reference extraction (direct images, image lists, nested images)
-    - [Image N] placeholder generation in prompt text
-    - Collecting all images for the ImgGenPrompt.input_images field
+    This class no longer assembles anything. Template rendering, image-reference extraction,
+    `[Image N]` placeholder generation and `input_images` collection all live in
+    `pipelex.kernel.img_gen_prompt.assemble_img_gen_prompt`, so a caller with no interpreter can
+    build an `ImgGenPrompt` too. What stays here is what is genuinely blueprint-shaped:
+
+    - the authored fields (`prompt_blueprint`, `negative_prompt_blueprint`, `image_references`)
+    - the input variables they declare (`required_variables`)
+    - the `max_prompt_images` limit, whose breach is an interpreter-layer error about the model
+      the pipe chose, and which is therefore applied here rather than in the kernel
+
+    Add assembly behavior to the kernel module, not to this class.
     """
 
     prompt_blueprint: TemplateBlueprint | None = None
