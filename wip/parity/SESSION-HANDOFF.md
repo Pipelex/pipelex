@@ -10,12 +10,18 @@ Read this first, then [`README.md`](README.md) and [`parity-gaps-plan.md`](parit
 
 | PR | Branch / worktree | Round 3 |
 | --- | --- | --- |
-| [#1081](https://github.com/Pipelex/pipelex/pull/1081) (1/3) | `refactor/Kernel` — `_kernel/` | cubic **no issues**; head unchanged |
-| [#1082](https://github.com/Pipelex/pipelex/pull/1082) (2/3) | `refactor/Kernel-phase2` — `_kernel/` | cubic **no issues**; one dead-hash fix pushed anyway; re-pinged |
-| [#1083](https://github.com/Pipelex/pipelex/pull/1083) (3/3) | `refactor/Kernel-phase3` — `_kernel/` | cubic 1×P3 fixed + rebased onto new #1082; re-pinged |
+| [#1081](https://github.com/Pipelex/pipelex/pull/1081) (1/3) | `refactor/Kernel` — `_kernel/` | KF-3's wrong holder fixed; re-pinged |
+| [#1082](https://github.com/Pipelex/pipelex/pull/1082) (2/3) | `refactor/Kernel-phase2` — `_kernel/` | cubic **no issues** twice; dead-hash fix; rebased; re-pinged |
+| [#1083](https://github.com/Pipelex/pipelex/pull/1083) (3/3) | `refactor/Kernel-phase3` — `_kernel/` | 3×P3 + 1×P2 fixed; rebased twice; re-pinged |
 | [#1085](https://github.com/Pipelex/pipelex/pull/1085) | `fix/Parity-gaps` — `_gaps/` | cubic 1×P3 fixed + dead-hash sweep; re-pinged |
 
-**Round 3 was small and the interesting part was not cubic's.** Two P3s, both doc-accuracy, both fixed. What the round actually produced was the realisation that **round 2's arbitration had a hole** (recorded below), and a sweep that found three commit hashes across these docs resolving from no branch at all. Backups for this round: `backup/parity-pre-round3`, `backup/kernel-phase2-pre-round3`, `backup/kernel-phase3-pre-round3`.
+**Round 3 ran in two waves, and the second was the one that mattered.** Wave A: two P3s, both doc-accuracy. Wave B (cubic re-reviewed the new heads): a P2 and a P3 on #1083, both verified and both real.
+
+The P3 is worth reading before touching KF-3. It reported that the Phase 3 scheduling note names the wrong holder for `LLMPromptBlueprint`. True — and the sentence it copied from, on #1081, was **never** true on any branch: `pipe_structure.py` has never referenced the blueprint. `PipeLLM` holds it, as `llm_prompt_spec`. That matters because KF-3's whole deferral argument rested on the wrong operator, and the corrected reading changes the item's shape: **what is production-dead is `make_llm_prompt`, one method — not the model**, which stays. Fixed at the source on #1081, hence the third stack rewrite.
+
+The P2 (`docs/specs/pipelex-transport-boundary.md` "does not exist") was right about the path and wrong about the remedy — the file is at the **workspace root**, not in this repo, and it does pin the factory method. Qualified rather than deleted; the suggested edit would have removed the only pointer that makes the cross-repo claim checkable.
+
+Backups: `backup/parity-pre-round3`, `backup/kernel-{,phase2-,phase3-}pre-round3b` (wave B, the ones to roll back to).
 
 **Greptile and Codex have now been silent for three consecutive rounds** despite a ping each time. Cubic is the only live external signal. Before reading "the bots are clean" as coverage, decide deliberately whether to chase them — the finalization review already demonstrated once that a defect can survive every bot plus a cold `/code-review`.
 
