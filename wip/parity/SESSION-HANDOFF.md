@@ -4,24 +4,29 @@
 
 Read this first, then [`README.md`](README.md) and [`parity-gaps-plan.md`](parity-gaps-plan.md) (Checkpoint A holds the full record of what landed).
 
-## Resume here (bot round 3 answered 2026-08-04, ~09:50 local / 02:50 UTC)
+## Resume here (round 3 fully answered 2026-08-04, ~11:20 local / 04:20 UTC)
 
-**Everything is pushed. Nothing is half-done.** Round 3 has been arbitrated and answered. The next action is to read whatever the bots say about *these* heads, then merge.
+**Everything is pushed. Nothing is half-done.** Round 3 ran as four sub-rounds — 3a through 3d, each one cubic re-reviewing the head the previous fix produced — and all of them are arbitrated and answered. The next action is to read whatever comes back on *these* heads, then merge.
+
+**One consistent labelling scheme, since the doc uses it throughout:** rounds 1–2 were the pre-2026-08-04 passes; **round 3** is this session, split into **3a** (the first cubic pass on the round-2 heads), **3b** (the KF-3 holder fix, which rewrote the whole stack), **3c** (the KF range), and **3d** (the spec divergence and the stale-status fixes). Anything below labelled "rounds 3–4" belongs to the *older* #1085-only numbering and is left as written, because it is a historical record of that PR's own cycle.
 
 | PR | Branch / worktree | Round 3 |
 | --- | --- | --- |
-| [#1081](https://github.com/Pipelex/pipelex/pull/1081) (1/3) | `refactor/Kernel` — `_kernel/` | KF-3's wrong holder fixed; re-pinged |
-| [#1082](https://github.com/Pipelex/pipelex/pull/1082) (2/3) | `refactor/Kernel-phase2` — `_kernel/` | cubic **no issues** twice; dead-hash fix; rebased; re-pinged |
-| [#1083](https://github.com/Pipelex/pipelex/pull/1083) (3/3) | `refactor/Kernel-phase3` — `_kernel/` | 3×P3 + 1×P2 fixed; rebased twice; re-pinged |
-| [#1085](https://github.com/Pipelex/pipelex/pull/1085) | `fix/Parity-gaps` — `_gaps/` | cubic 1×P3 fixed + dead-hash sweep; re-pinged |
+| [#1081](https://github.com/Pipelex/pipelex/pull/1081) (1/3) | `refactor/Kernel` — `_kernel/` | KF-3's wrong holder fixed (3b); cubic clean on head |
+| [#1082](https://github.com/Pipelex/pipelex/pull/1082) (2/3) | `refactor/Kernel-phase2` — `_kernel/` | dead-hash fix (3a); rebased (3b); cubic clean on head |
+| [#1083](https://github.com/Pipelex/pipelex/pull/1083) (3/3) | `refactor/Kernel-phase3` — `_kernel/` | fixes in 3a/3b/3c/3d; rebased twice; cubic clean on head |
+| [#1085](https://github.com/Pipelex/pipelex/pull/1085) | `fix/Parity-gaps` — `_gaps/` | fixes in 3a/3d; **3d's answer is the one to read**; re-pinged |
 
-**Round 3 ran in two waves, and the second was the one that mattered.** Wave A: two P3s, both doc-accuracy. Wave B (cubic re-reviewed the new heads): a P2 and a P3 on #1083, both verified and both real.
+**Read heads live** — `for p in 1081 1082 1083 1085; do gh pr view $p --json number,headRefOid; done`. Deliberately not written down: the kernel branches are rebased whenever a parent moves, so any head recorded here is wrong within one push.
 
-The P3 is worth reading before touching KF-3. It reported that the Phase 3 scheduling note names the wrong holder for `LLMPromptBlueprint`. True — and the sentence it copied from, on #1081, was **never** true on any branch: `pipe_structure.py` has never referenced the blueprint. `PipeLLM` holds it, as `llm_prompt_spec`. That matters because KF-3's whole deferral argument rested on the wrong operator, and the corrected reading changes the item's shape: **what is production-dead is `make_llm_prompt`, one method — not the model**, which stays. Fixed at the source on #1081, hence the third stack rewrite.
+**What round 3 produced, in order of what matters.**
 
-The P2 (`docs/specs/pipelex-transport-boundary.md` "does not exist") was right about the path and wrong about the remedy — the file is at the **workspace root**, not in this repo, and it does pin the factory method. Qualified rather than deleted; the suggested edit would have removed the only pointer that makes the cross-repo claim checkable.
+1. **A real spec divergence, found in 3d and *not* fixed.** The MTHDS spec says bare pipe references "do NOT fall through to other domains"; the runtime searches across domains and Phase 1's 1.1 mirrored it. Both readers agree with each other and both disagree with the standard — in *two* rows, and in opposite directions. Written up in [`bare-pipe-ref-spec-divergence.md`](bare-pipe-ref-spec-divergence.md); it subsumes D-1, so settle the two together and the spec question first.
+2. **KF-3 was pointed at the wrong operator (3b), and the argument rested on it.** `pipe_structure.py` has never referenced `LLMPromptBlueprint` — on any branch, including `dev`. `PipeLLM` holds it as `llm_prompt_spec`. The corrected reading changes the item's shape: **what is production-dead is `make_llm_prompt`, one method — not the model**, which stays. Fixed at the source, hence the stack rewrite.
+3. **Round 2's arbitration had a hole (3a).** Recorded below under the rejected findings — the general lesson is there and it is the one worth carrying forward.
+4. **Three self-staling constructs were converted, not patched**: commit hashes → subjects, a `KF-1..KF-15` range → the file, and a hardcoded helper count → no count. Each had already gone stale at least once; two produced review findings this round.
 
-Backups: `backup/parity-pre-round3`, `backup/kernel-{,phase2-,phase3-}pre-round3b` (wave B, the ones to roll back to).
+Backups to roll back to: `backup/parity-pre-round3` and `backup/kernel-{,phase2-,phase3-}pre-round3b`.
 
 **Greptile and Codex have now been silent for three consecutive rounds** despite a ping each time. Cubic is the only live external signal. Before reading "the bots are clean" as coverage, decide deliberately whether to chase them — the finalization review already demonstrated once that a defect can survive every bot plus a cold `/code-review`.
 
@@ -96,7 +101,7 @@ Verbatim, so the new session picks up the same contract:
 3. ~~Poll CI + the review bots, fan out an Opus 5 sub-agent over their feedback.~~ Done — CI green, Greptile 5/5 clean, cubic clean, Sonnet-5 `/code-review` clean, one Codex P2 verified pre-existing and deferred. Both bot threads answered inline and resolved.
 4. ~~Finalize with gstack's `/review`.~~ Done — verdict **land**. It caught one real defect the other four missed (the `Anything` import omission) plus three doc inaccuracies, all fixed; the rest deferred to [`deferred-review-observations.md`](deferred-review-observations.md).
 5. ~~Rounds 3–4: cubic follow-ups.~~ Done. Round 3 = a fair catch on a stale code comment (fixed, `c4788e47b`); round 4 = a P1 duplicate of Codex's round-1 P2, answered with measurements (`e0f2d2362`).
-6. **Merge decision is Louis'.** Every prescribed review step in the goal has run. That was the state **as of `e0f2d2362`, before round 3** — 23 checks success, 6 skipped, 0 failures, 0 unresolved threads. It is a record of that moment, not of the current head: rounds 3a–3c have landed since, and the live state is the table at the top of this file. Check the current head before reading "nothing is pending".
+6. **Merge decision is Louis'.** Every prescribed review step in the goal has run. That was the state **as of `e0f2d2362`, before round 3** — 23 checks success, 6 skipped, 0 failures, 0 unresolved threads. It is a record of that moment, not of the current head: round 3 (3a–3d) has landed since. The top of this file is the current summary, and heads are read live rather than written down. Check the head before reading "nothing is pending".
 7. ~~**Phase 2** only after #1081 / #1082 merge.~~ Superseded — folded into the kernel stack instead (see above). What remains there is the stack's own review cycle: push the three branches, poll CI and the bots, and merge in order #1081 → #1082 → #1083.
 
 **One open question wants a human ruling** (it does not block Phase 1): whether a hand-written class should have to be *named* in the `.mthds` to bind, or whether the bare-name auto-detect at `concept_factory.py:389` keeps working. Two independent reviewers converged on it — see [`structureless-concept-with-registered-class.md`](structureless-concept-with-registered-class.md), which now carries the measurements.

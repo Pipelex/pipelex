@@ -14,22 +14,26 @@
 
 The runtime does fall through. `PipeLibrary.get_optional_pipe` (`pipelex/libraries/pipe/pipe_library.py`), step 3, is commented *"Bare code fallback — search across domains"* and matches on `val.code == pipe_code` across every non-cross-package entry, ignoring the caller's domain entirely:
 
-| bare ref `foo` used from domain `A` | spec | runtime today |
-| --- | --- | --- |
-| only `A.foo` exists | `A.foo` | `A.foo` |
-| only `B.foo` exists | **error** — no fall-through | `B.foo` |
-| both exist | **error** — never reached, `A.foo` wins at step 1 | raises `PipeLibraryError` (ambiguous) |
-| neither | error | `None` → `PipeNotFoundError` |
+| bare ref `foo` used from domain `A` | spec | runtime today | |
+| --- | --- | --- | --- |
+| only `A.foo` exists | `A.foo` | `A.foo` | agree |
+| only `B.foo` exists | **error** — no fall-through | `B.foo` | **differ** |
+| both exist | `A.foo` — found in the own domain at step 1/2, so the search stops before `B` | **raises** `PipeLibraryError` (ambiguous) | **differ** |
+| neither | error | `None` → `PipeNotFoundError` | agree |
 
-Row 2 is the divergence. Row 3 diverges in its *reason* rather than its outcome — both error, but the spec errors because it never left domain `A`, while the runtime errors because it searched everywhere and found two.
+**Two rows diverge, and both diverge in outcome.** Row 2 is the fall-through the spec forbids. Row 3 is subtler and easy to get backwards: the spec never reaches an ambiguity at all, because it finds `A.foo` in the caller's own domain and stops — so where the spec quietly succeeds, the runtime raises. A working bundle under the spec is a hard error today.
+
+Row 3 also settles the relationship to D-1: the answer the spec gives there — prefer the own domain — is exactly what a `domain_hint` would produce. Spec compliance therefore delivers D-1's outcome for the ambiguous case *and* closes row 2, which `domain_hint` alone would leave open.
 
 ## Why the parity fix mirrored the runtime rather than the spec
 
 Deliberately, and it would be a mistake to "correct" it in isolation. Phase 1's 1.1 made the crate normalizer resolve bare pipe refs the way `get_optional_pipe` does — crate-wide — because the track's entire purpose is that two readers of one authored fact agree. Making the *normalizer* spec-compliant while the runtime stayed permissive would have manufactured a fresh disagreement of exactly the kind being removed: a library that normalizes to an error but runs fine, or vice versa.
 
-So the landed state is coherent: **both readers agree, and both are more permissive than the spec.** That is a strictly better position than where the track started, and it is the correct stopping point for a parity change.
+So the landed state is coherent: **both readers agree with each other, and both disagree with the spec in the same two places.** That is a strictly better position than where the track started, and it is the correct stopping point for a parity change.
 
-See [`d1-domain-hint-deferred.md`](d1-domain-hint-deferred.md) for the separate, narrower question it raises (whether `get_optional_pipe` should grow a `domain_hint` and prefer the caller's domain on ambiguity). Note the two pull in opposite directions and should be settled together: `domain_hint` makes the runtime *prefer* the own domain on ambiguity, while spec compliance makes it *never leave* the own domain at all. Spec compliance subsumes the `domain_hint` question — if bare refs never fall through, ambiguity across domains cannot arise.
+Note the disagreement does not run one way. On row 2 the runtime is *more permissive* than the spec (it resolves where the spec errors); on row 3 it is *stricter* (it raises where the spec quietly returns `A.foo`). "The runtime is looser than the standard" is the tempting one-line summary and it is wrong — worth knowing before anyone reasons about which direction a fix travels.
+
+See [`d1-domain-hint-deferred.md`](d1-domain-hint-deferred.md) for the narrower question this raises (whether `get_optional_pipe` should grow a `domain_hint` and prefer the caller's domain on ambiguity). **Spec compliance subsumes it**: if bare refs never leave their own domain, cross-domain ambiguity cannot arise, and row 3 resolves to `A.foo` — the same answer `domain_hint` was invented to produce. Settle them together, and settle the spec question first, because it decides whether `domain_hint` has anything left to do.
 
 ## Why this is not being fixed here
 
