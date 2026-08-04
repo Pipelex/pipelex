@@ -1,6 +1,6 @@
 # Parity gaps — one authored fact, two readers that disagree
 
-This track fixes a family of defects that share one shape: a single authored fact (a pipe ref, a concept declaration, a model choice, an emitted line of code) is read by two pipelex implementations that disagree about what it means. Every item below is silent — both readers succeed, produce plausible output, and diverge without an error attached — which is why they are batched as one sweep rather than fixed opportunistically.
+This track fixes a family of defects that share one shape: a single authored fact (a pipe ref, a concept declaration, a model choice, an emitted line of code) is read by two pipelex implementations that disagree about what it means. The **Phase 1 trio** are silent in the strict sense — both readers succeed, produce plausible output, and diverge with no error attached anywhere — which is why they are batched as one sweep rather than fixed opportunistically. The **Phase 2 kernel items fail differently**, and the difference is worth keeping straight: 2.1 was a *contract* gap whose divergence surfaces one step later as a `StuffContentTypeError` on read-back, 2.3 an *expressiveness* gap where one reader cannot state the fact at all, and 2.2 turned out on re-verification not to be a defect.
 
 **Branch:** `fix/Parity-gaps` (this worktree, `_gaps/`). **PR:** [#1085](https://github.com/Pipelex/pipelex/pull/1085) → `dev`. **Plan:** [`parity-gaps-plan.md`](parity-gaps-plan.md).
 
@@ -18,7 +18,7 @@ This track fixes a family of defects that share one shape: a single authored fac
 ## Phasing
 
 - **Phase 1 — the dev-buildable trio** (crate qualification, structureless base class, import wrapping). All targets exist on this branch today; each lands with its regression gate.
-- **Phase 2 — the kernel trio.** Originally gated on the kernel-extraction PRs (#1081 façade, #1082 operators) merging to `dev`, to avoid destabilizing finalized PRs. **Louis overrode that gate:** each of these is a defect *those PRs introduce*, so deferring meant knowingly merging a package whose stated contract is false and re-opening the same files to repair it. Phase 2 therefore shipped **inside** #1081 and #1082, not on this branch.
+- **Phase 2 — the kernel trio.** Originally gated on the kernel-extraction PRs (#1081 façade, #1082 operators) merging to `dev`, to avoid destabilizing finalized PRs. **Louis overrode that gate:** the two live ones (2.1 and 2.3 — 2.2 was withdrawn) are defects *those PRs introduce*, so deferring meant knowingly merging a package whose stated contract is false and re-opening the same files to repair it. Phase 2 therefore shipped **inside** #1081 and #1082, not on this branch.
 
 ## Status
 
