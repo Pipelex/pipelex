@@ -4,28 +4,38 @@
 
 Read this first, then [`README.md`](README.md) and [`parity-gaps-plan.md`](parity-gaps-plan.md) (Checkpoint A holds the full record of what landed).
 
-## Resume here (paused 2026-08-04, ~00:55 local / 17:55 UTC)
+## Resume here (bot round answered 2026-08-04, ~09:15 local / 02:15 UTC)
 
-**Everything is pushed and green. Nothing is half-done.** The single next action is to read a fresh round of bot feedback on **all four** PRs, then merge.
+**Everything is pushed. Nothing is half-done.** Cubic's round on the current heads has been arbitrated and answered across all four PRs. The next action is to read whatever the bots say about *these* heads, then merge.
 
-| PR | Branch / worktree | Head | CI | Bots |
-| --- | --- | --- | --- | --- |
-| [#1081](https://github.com/Pipelex/pipelex/pull/1081) (1/3) | `refactor/Kernel` — `_kernel/` | `f688989a6` | 22 ✅ / 2 skip | pinged, **not yet re-reviewed** |
-| [#1082](https://github.com/Pipelex/pipelex/pull/1082) (2/3) | `refactor/Kernel-phase2` — `_kernel/` | `2643b137c` | 21 ✅ / 3 skip | pinged, **not yet re-reviewed** |
-| [#1083](https://github.com/Pipelex/pipelex/pull/1083) (3/3) | `refactor/Kernel-phase3` — `_kernel/` | `5af77589b` | 21 ✅ / 3 skip | pinged, **not yet re-reviewed** |
-| [#1085](https://github.com/Pipelex/pipelex/pull/1085) | `fix/Parity-gaps` — `_gaps/` | `abef073d7` | 22 ✅ / 2 skip | pinged, **not yet re-reviewed** |
+| PR | Branch / worktree | Head | Bots |
+| --- | --- | --- | --- |
+| [#1081](https://github.com/Pipelex/pipelex/pull/1081) (1/3) | `refactor/Kernel` — `_kernel/` | `1dd955765` | cubic answered; re-pinged |
+| [#1082](https://github.com/Pipelex/pipelex/pull/1082) (2/3) | `refactor/Kernel-phase2` — `_kernel/` | `26a304875` | cubic answered; re-pinged |
+| [#1083](https://github.com/Pipelex/pipelex/pull/1083) (3/3) | `refactor/Kernel-phase3` — `_kernel/` | `926088667` | cubic answered; re-pinged |
+| [#1085](https://github.com/Pipelex/pipelex/pull/1085) | `fix/Parity-gaps` — `_gaps/` | `448ae671b` | cubic answered; re-pinged |
 
-**Why all four need a fresh round:** the kernel stack was rewritten today to fold Phase 2 in, so every SHA on #1081/#1082/#1083 is newer than anything Greptile or cubic has looked at (their last passes were 2026-08-02, against commits that no longer exist). #1085 gained wip-docs-only commits since cubic's round-4 pass. All four were pinged with a summary of what changed at ~17:50 UTC.
+**What that round produced.** Cubic came back on all four heads; **Greptile and Codex did not, despite pings** — cubic has been the only fresh external signal for two rounds now, so treat "the bots are happy" with corresponding caution. Its findings were mostly doc-accuracy, and the arbitration is recorded in a comment on each PR. The substantive ones:
+
+- **#1081 — the one that mattered.** `wip/prompting-style/README.md` described the prompting style as derived "in two places that must agree" and rested its first argument on exactly that. False since the extraction: `pipe_llm.py:223` calls the kernel's `derive_templating_style`, so there is one site. Left alone, KF-16's design basis would have carried a false premise.
+- **#1082.** `ImgGenPromptBlueprint`'s class docstring still advertised the four things it had just delegated to the kernel, contradicting its own module docstring.
+- **Deferred as KF-17**, not fixed: the resolvers select the model choice by truthiness, so `model=""` falls through to the deck default. The chain is verbatim from `dev`'s `pipe_llm.py`, the interpreter calls these same functions so no divergence exists, and pydantic already rejects `""` on every authored path. The honest fix is `LLMModelChoice` rejecting `""` at the type boundary once — a deliberate pass, not a spot edit.
+
+**Two findings were rejected on verification — do not re-litigate them:** (a) "`model` was already optional on `llm_text`" — it was not; pre-fix it was `model: LLMModelChoice` with no default; (b) "the changelog gate conflicts with the Phase 2 record" — the line already reads "per user-visible fix", which is the scoping the finding asked for.
 
 **Next actions, in order:**
 
-1. Read the bot feedback on all four — **review bodies and inline comments, not check states** (see the cubic trap below). Greptile posts as *issue comments*; cubic posts *reviews* + issue comments; Codex posts reviews.
+1. Read the bot feedback on all four — **review bodies and inline comments, not check states** (see the cubic trap below). Greptile posts as *issue comments*; cubic posts *reviews* + issue comments; Codex posts reviews. If Greptile and Codex stay silent again, decide whether to chase them or proceed on cubic alone.
 2. Fan out an **Opus 5** sub-agent to dedupe, verify each item, and arbitrate — fixing **only clear wins**, no over-engineering, no guarding impossible scenarios. Anything doubtful becomes a `.md` in `wip/parity/` (or `wip/kernel/` for stack items). Tell the sub-agent it is **STRICTLY READ-ONLY**.
 3. Merge in order **#1081 → #1082 → #1083**. #1085 is independent of the stack and can merge whenever Louis chooses.
 
-**Local gates already run and green on every branch:** `make agent-check`, full `make agent-test`, `make drift-check`. Nothing is owed locally.
+**A trap this round taught, now written into the kernel plan:** a doc that lives *on* a stacked branch must name commits **by subject, never by SHA**. Every rebase of the parent rewrites every hash on the child, so the SHAs are dead before anyone reads them — including the "corrected" ones a reviewer suggests. Cubic's proposed replacements were themselves already stale when the fix was written.
 
-Backup tags on `origin`, in case a rebase needs undoing: `backup/kernel-pre-fold`, `backup/kernel-phase2-pre-fold`, `backup/kernel-phase3-pre-fold`, `backup/kernel-phase3-pre-2.3`, `backup/kernel-phase3-pre-resplit`.
+**Local gates.** `make agent-check` and `make drift-check` green on every branch. Full `make agent-test` green on `refactor/Kernel-phase3`, which is the stack tip and therefore carries all three PRs' content — the only source change in this round is a docstring, so it was not re-run on each branch separately. CI green on all four. Nothing is owed locally.
+
+Each rebase in this round was verified the same way: tag the tip, rebase with `--onto`, then `git diff <pre-rebase-tag>..<new-tip>` and confirm it shows **exactly** the intended change and nothing else. Both rebases conflicted in one file only — the plan's status block, which both sides genuinely edited. That is the legitimate shape; an unexpected conflicted *source* file means the command was wrong, and the right move is to abort rather than resolve.
+
+Backup tags on `origin`, in case a rebase needs undoing: `backup/kernel-pre-fold`, `backup/kernel-phase2-pre-fold`, `backup/kernel-phase3-pre-fold`, `backup/kernel-phase3-pre-2.3`, `backup/kernel-phase3-pre-resplit`, plus this round's `backup/kernel-pre-botround2`, `backup/kernel-phase2-pre-botround2`, `backup/kernel-phase3-pre-botround2`.
 
 ## Where the work stands
 
