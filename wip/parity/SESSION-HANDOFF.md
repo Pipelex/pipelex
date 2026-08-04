@@ -8,12 +8,14 @@ Read this first, then [`README.md`](README.md) and [`parity-gaps-plan.md`](parit
 
 **Everything is pushed. Nothing is half-done.** Cubic's round on the current heads has been arbitrated and answered across all four PRs. The next action is to read whatever the bots say about *these* heads, then merge.
 
-| PR | Branch / worktree | Head | Bots |
-| --- | --- | --- | --- |
-| [#1081](https://github.com/Pipelex/pipelex/pull/1081) (1/3) | `refactor/Kernel` — `_kernel/` | `1dd955765` | cubic answered; re-pinged |
-| [#1082](https://github.com/Pipelex/pipelex/pull/1082) (2/3) | `refactor/Kernel-phase2` — `_kernel/` | `26a304875` | cubic answered; re-pinged |
-| [#1083](https://github.com/Pipelex/pipelex/pull/1083) (3/3) | `refactor/Kernel-phase3` — `_kernel/` | `926088667` | cubic answered; re-pinged |
-| [#1085](https://github.com/Pipelex/pipelex/pull/1085) | `fix/Parity-gaps` — `_gaps/` | `448ae671b` | cubic answered; re-pinged |
+| PR | Branch / worktree | Bots |
+| --- | --- | --- |
+| [#1081](https://github.com/Pipelex/pipelex/pull/1081) (1/3) | `refactor/Kernel` — `_kernel/` | cubic answered; re-pinged |
+| [#1082](https://github.com/Pipelex/pipelex/pull/1082) (2/3) | `refactor/Kernel-phase2` — `_kernel/` | cubic answered; re-pinged |
+| [#1083](https://github.com/Pipelex/pipelex/pull/1083) (3/3) | `refactor/Kernel-phase3` — `_kernel/` | cubic answered; re-pinged |
+| [#1085](https://github.com/Pipelex/pipelex/pull/1085) | `fix/Parity-gaps` — `_gaps/` | cubic answered; re-pinged |
+
+**This table deliberately carries no head SHAs.** It used to, and they were wrong within one push — the three kernel branches are rebased whenever a parent moves, and every branch moves when a review round lands. Read the live heads instead: `for p in 1081 1082 1083 1085; do gh pr view $p --json number,headRefOid; done`.
 
 **What that round produced.** Cubic came back on all four heads; **Greptile and Codex did not, despite pings** — cubic has been the only fresh external signal for two rounds now, so treat "the bots are happy" with corresponding caution. Its findings were mostly doc-accuracy, and the arbitration is recorded in a comment on each PR. The substantive ones:
 
@@ -21,7 +23,9 @@ Read this first, then [`README.md`](README.md) and [`parity-gaps-plan.md`](parit
 - **#1082.** `ImgGenPromptBlueprint`'s class docstring still advertised the four things it had just delegated to the kernel, contradicting its own module docstring.
 - **Deferred as KF-17**, not fixed: the resolvers select the model choice by truthiness, so `model=""` falls through to the deck default. The chain is verbatim from `dev`'s `pipe_llm.py`, the interpreter calls these same functions so no divergence exists, and pydantic already rejects `""` on every authored path. The honest fix is `LLMModelChoice` rejecting `""` at the type boundary once — a deliberate pass, not a spot edit.
 
-**Two findings were rejected on verification — do not re-litigate them:** (a) "`model` was already optional on `llm_text`" — it was not; pre-fix it was `model: LLMModelChoice` with no default; (b) "the changelog gate conflicts with the Phase 2 record" — the line already reads "per user-visible fix", which is the scoping the finding asked for.
+**One finding was rejected on verification — do not re-litigate it:** "the changelog gate conflicts with the Phase 2 record" — the line already reads "per user-visible fix", which is the scoping the finding asked for.
+
+**And one rejection was itself half-wrong, which is the lesson worth keeping.** Round 2 reported that "`model` was already optional on `llm_text`". Checked against the code that was false — pre-fix the façade declared `model: LLMModelChoice` with no default — so it was rejected and the round moved on. Round 3 came back with the same subject from the other end: §2.1's own "✅ Done" record *asserted* `model` was already optional. The bot had been echoing this plan, not misreading the code, and rejecting the code claim left the false sentence sitting in the doc to be re-reported. **When a finding is wrong about the code, check whether it is right about a doc that says so** — a claim has to be traced to its source before "verified false" means anything.
 
 **Next actions, in order:**
 
@@ -51,13 +55,13 @@ Gates all run and green at `d9efffbfb`:
 
 **Phase 2 is built too — but not on this branch.** The plan gated it on #1081/#1082 merging; Louis overrode that gate, because each of these is a defect *those PRs introduce*, so deferring meant merging a package whose stated contract is false and then re-opening the same files to repair it. Phase 2 therefore shipped **inside** the kernel stack, in the `_kernel/` worktree:
 
-| Gap | Outcome | Commit |
+| Gap | Outcome | Commit (by subject — the stack is rebased, so hashes die) |
 | --- | --- | --- |
-| 2.1 `llm_text` narrowness | fixed | `9fbb12f34` on `refactor/Kernel` (#1081) |
-| 2.2 `llm_object` prompting style | **withdrawn** — not a live defect | silenced by `f688989a6` (#1081); deferred as KF-16 |
-| 2.3 kernel cannot build an `ImgGenPrompt` | fixed | `7279effbd` on `refactor/Kernel-phase2` (#1082) |
-| — its boot-contract arm | added | `2643b137c` on `refactor/Kernel-phase2` (#1082) — same PR as the entry point |
-| — the kernel doc's drift review | recorded | `5af77589b` on `refactor/Kernel-phase3` (#1083), where the doc and its contract live |
+| 2.1 `llm_text` narrowness | fixed | *make llm_text as wide as the op beneath it* — `refactor/Kernel` (#1081) |
+| 2.2 `llm_object` prompting style | **withdrawn** — not a live defect | silenced by *number the prompting-style follow-up KF-16 to keep the stack's* (#1081); deferred as KF-16 |
+| 2.3 kernel cannot build an `ImgGenPrompt` | fixed | *let a runtime-only caller build the image prompt it has to pass in* — `refactor/Kernel-phase2` (#1082) |
+| — its boot-contract arm | added | *give the image prompt assembler the boot-contract arm the rule owes it* — `refactor/Kernel-phase2` (#1082), same PR as the entry point |
+| — the kernel doc's drift review | recorded | *record the image prompt assembler on the page that specifies the kernel* — `refactor/Kernel-phase3` (#1083), where the doc and its contract live |
 
 **Nothing about Phase 2 lands on `fix/Parity-gaps`.** This branch's only Phase 2 artifact is the plan/README/handoff record you are reading.
 
