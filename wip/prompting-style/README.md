@@ -4,12 +4,14 @@
 
 ## What exists today
 
-The prompting style is **derived from the model**, per call, in two places that must agree:
+The prompting style is **derived from the model**, per call, in exactly one place — `derive_templating_style` in `pipelex/kernel/llm_ops.py` — which both callers go through:
 
-- interpreter — `pipelex/pipe_operators/llm/pipe_llm.py`: resolves the pipe's text setting, reads `llm_setting.prompting_target or inference_model.prompting_target`, and looks the style up in `prompting_config`.
-- kernel — `derive_templating_style` in `pipelex/kernel/llm_ops.py`: the same lookup, over whichever `LLMSetting` the caller's op passes.
+- interpreter — `pipelex/pipe_operators/llm/pipe_llm.py` resolves the pipe's text setting and calls `derive_templating_style` with it (`pipe_llm.py:223`), passing the result to both the text and the object generation paths.
+- kernel — the ops call the same function over whichever `LLMSetting` the caller supplied.
 
-The chain is `model handle → inference model → prompting_target → prompting_config.get_prompting_style(...) → TemplatingStyle`. Note the silent arm: `derive_templating_style` returns `None` when the deck holds no inference model for the handle, which is what an external LLM plugin looks like from there.
+**That single site is the extraction's doing.** Before it, the interpreter carried its own copy of the lookup, and an earlier draft of this doc described two readers that must be kept in agreement. There is now one, so the parity hazard is already gone — none of the reasons below depend on it.
+
+The chain is `llm_setting.prompting_target` when set, otherwise the inference model's own `prompting_target`, then `prompting_config.get_prompting_style(...)` → `TemplatingStyle`. The setting-level override is the first branch and is easy to miss: a caller can steer the style without changing the model. Note also the silent arm — `derive_templating_style` returns `None` when the deck holds no inference model for the handle, which is what an external LLM plugin looks like from there.
 
 ## Why it should go
 
@@ -17,7 +19,7 @@ The mechanism dates from when models were genuinely sensitive to prompt shape an
 
 What the indirection actually costs:
 
-- **Two readers must agree on a derivation neither caller can see.** That is the shape of every defect in the parity-gaps track. The derivation being invisible is precisely why the divergence below was hard to reason about.
+- **The derivation is invisible to every caller.** Nothing at a call site says which style a prompt will render under; it falls out of a deck lookup two hops away. That invisibility is why the parity-gaps track's 2.2 took real work to adjudicate — and why it was initially, and wrongly, called a live defect.
 - **The style is unstateable.** A caller who wants a specific style has no way to say so — they must pick a *model* whose prompting target maps to it.
 - **A deck/config change silently changes prompt text** for a method nobody edited.
 
@@ -27,7 +29,7 @@ Make the prompting style an **explicit choice**, defaulting to **XML**:
 
 - an explicit setting a caller/author can state directly, defaulting to XML when unstated;
 - the model-derived path removed, along with `prompting_target` plumbing that exists only to feed it (check what else reads it before deleting — it may have non-style consumers);
-- one derivation site, or none, instead of two that must be kept in agreement;
+- no derivation site at all, rather than the single one that survives today;
 - `TemplatingStyle | None` at the op boundary reconsidered: with an explicit default, `None` may stop being a reachable state, which would let `run_llm_*` take a plain `TemplatingStyle`.
 
 Open questions for whoever picks this up:
