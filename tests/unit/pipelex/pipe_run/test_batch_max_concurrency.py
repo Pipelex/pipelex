@@ -13,7 +13,7 @@ from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory, resol
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 
-class TestResolveBatchMaxConcurrency:
+class TestBatchMaxConcurrency:
     @pytest.mark.parametrize(
         ("max_concurrency_setting", "expected_bound"),
         [
@@ -35,8 +35,6 @@ class TestResolveBatchMaxConcurrency:
         """
         assert resolve_batch_max_concurrency(max_concurrency_setting) == expected_bound
 
-
-class TestBatchMaxConcurrencyIsFrozenAtConstruction:
     def test_factory_freezes_the_live_config_value(self) -> None:
         execution_config = get_config().pipelex.pipeline_execution_config
         expected = resolve_batch_max_concurrency(execution_config.max_concurrency)
