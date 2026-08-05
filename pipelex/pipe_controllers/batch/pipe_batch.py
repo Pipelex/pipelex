@@ -5,7 +5,6 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.content_generation.dry_mock import stamp_mock_main_coordination
-from pipelex.config import get_config
 from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeRunError
@@ -32,17 +31,6 @@ if TYPE_CHECKING:
 # When a single PipeBatch fans out over more than this many items, log a one-time advisory pointing at
 # durable execution — bounded fan-out is a basic backpressure effort, not durable, rate-limited execution.
 LARGE_BATCH_ADVISORY_THRESHOLD = 100
-
-
-def resolve_batch_max_concurrency(max_concurrency_setting: int | str) -> int | None:
-    """Translate the ``pipeline_execution_config.max_concurrency`` setting into a ``gather_bounded`` bound.
-
-    The config exposes the explicit literal ``"unbounded"``; ``gather_bounded`` takes ``None`` for no
-    bound. Any int value is passed through unchanged. Centralizing this guards against passing the
-    raw ``"unbounded"`` string into ``gather_bounded``, which would raise ``TypeError`` on its
-    ``max_concurrency < 1`` check.
-    """
-    return None if isinstance(max_concurrency_setting, str) else max_concurrency_setting
 
 
 class PipeBatch(PipeController):
@@ -142,13 +130,16 @@ class PipeBatch(PipeController):
         batch_output_stuff_code = StuffFactory.make_stuff_code()
 
         item_count = len(input_content.items)
-        max_concurrency_setting = get_config().pipelex.pipeline_execution_config.max_concurrency
-        max_concurrency = resolve_batch_max_concurrency(max_concurrency_setting)
+        # Read off the payload, never off live config: the bound was frozen into the run params at
+        # submit time precisely so the fan-out shape stays a pure function of the run. See
+        # `PipeRunParams.batch_max_concurrency`.
+        max_concurrency = pipe_run_params.batch_max_concurrency
         if item_count > LARGE_BATCH_ADVISORY_THRESHOLD:
             log.warning(
                 f"PipeBatch '{self.code}' is fanning out over {item_count} items. Bounded fan-out "
-                f"(max_concurrency={max_concurrency_setting}) is a basic backpressure effort, not durable execution — "
-                f"for a workload this size, consider a durable execution backend for rate-limited, resumable runs: {URLs.durable_execution}"
+                f"(max_concurrency={max_concurrency if max_concurrency is not None else 'unbounded'}) is a basic backpressure "
+                f"effort, not durable execution — for a workload this size, consider a durable execution backend for "
+                f"rate-limited, resumable runs: {URLs.durable_execution}"
             )
 
         async def _run_branch(item_input_stuff: "Stuff", *, branch_output_item_code: str) -> PipeOutput:
@@ -167,7 +158,10 @@ class PipeBatch(PipeController):
                     "output_multiplicity": None,
                 },
             )
-            return await get_pipe_router().run(
+            # `run_batch_branch`, not `run`: this is the one dispatch in the pipe tree whose
+            # semantics are "a per-item fan-out branch". In-process routers treat it as a plain
+            # run (the protocol's default body); a distributed router may isolate it.
+            return await get_pipe_router().run_batch_branch(
                 pipe_job=PipeJobFactory.make_pipe_job(
                     pipe=sub_pipe,
                     job_metadata=job_metadata,

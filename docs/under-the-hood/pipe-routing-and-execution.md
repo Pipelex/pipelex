@@ -137,6 +137,19 @@ async def _run_pipe_job(self, pipe_job: PipeJob) -> PipeOutput:
 
 The router does not route by pipe type — it delegates to the pipe itself. Controllers handle their own orchestration internally.
 
+### The batch-branch hook
+
+`PipeRouterProtocol` carries one more entry point beside `run`:
+
+```python
+async def run_batch_branch(self, pipe_job: PipeJob) -> PipeOutput:
+    return await self.run(pipe_job)
+```
+
+`PipeBatch` calls it instead of `run` for each per-item fan-out dispatch. That is the only place in the pipe tree where the *dispatch* carries semantics its `PipeJob` cannot express: a branch job holds the branch pipe and the item's memory, which is byte-for-byte the shape of any other dispatch. The hook is how a router learns "this one is a fan-out branch".
+
+The default body IS the behavior for in-process routers — a branch is just a run, so `PipeRouter` deliberately does not override it and nothing about direct execution changed. A **distributed** router may override it to give each branch its own isolation (own retry, own history partition) while every other dispatch it receives runs inline. Because the default delegates to `run` and not to `_run_pipe_job`, batch branches still pass through the observer hooks.
+
 ---
 
 ## Pipe Controllers
@@ -153,7 +166,7 @@ Controllers are pipes that orchestrate the execution of other pipes. They resolv
 All controllers follow the same pattern:
 
 1. Call `get_required_pipe(child_pipe_code)` to resolve the child pipe from the library
-2. Route through `get_pipe_router().run(PipeJob(...))` — the hub auto-selects the right router
+2. Route through `get_pipe_router().run(PipeJob(...))` — the hub auto-selects the right router. `PipeBatch` is the one exception: its per-item branch dispatches go through [`run_batch_branch`](#the-batch-branch-hook) instead, so a distributed router can isolate them.
 3. Aggregate results into working memory or output
 
 ### Auto-Switching Router
@@ -161,9 +174,9 @@ All controllers follow the same pattern:
 The hub (`get_pipe_router()`) returns the router for whichever orchestrator the process is booted under:
 
 - **Direct execution**: the in-process `PipeRouter` — child pipes run in the same process.
-- **Distributed execution**: the booted host-runtime orchestrator's router, which has claimed the hub's `PIPE_ROUTER` slot. That router auto-detects whether it is dispatching from the **submitter** (start a top-level workflow) or from **inside a running workflow** (start a child workflow). Pipelex's Temporal backend realizes this as `TemporalPipeRouter`, which picks `execute_workflow` vs `execute_child_workflow` accordingly.
+- **Distributed execution**: the booted host-runtime orchestrator's router, which has claimed the hub's `PIPE_ROUTER` slot. That router auto-detects whether it is dispatching from the **submitter** (start a unit of durable work) or from **inside a running one** (continue within it, or spawn a nested unit).
 
-This means each child pipe in a controller gets its own workflow boundary in distributed mode — enabling independent retries, separate worker assignment, and per-pipe visibility in the host runtime's UI.
+How much of a controller tree a distributed backend spreads across separate durable units is that backend's call, not core's — core's contract is only that every dispatch reaches the router, and that batch branches are *labelled* as such via `run_batch_branch`. See the backend's own documentation for the topology it chooses.
 
 !!! note "Library Dependency"
     Controllers depend on the library being loaded in the current process. `get_required_pipe()` queries the library scoped to the current run via `ContextVar`, which must have been populated by loading a `LibraryCrate`. In distributed execution, each worker-side job loads the crate from the `PipeJob` into a per-run `Library` instance before resolving child pipes. (Temporal-specific detail: the backend disables the Temporal sandbox via `--no-sandbox` because library loading is a side effect incompatible with replay semantics.) See [Runtime Bridge & Transport](./runtime-bridge-and-transport.md) for how the crate and working memory cross the boundary.
@@ -189,10 +202,10 @@ sequenceDiagram
 
     Note over S: TemporalPipeRouter.run() (submitter side)
     S->>S: transport prep (closed)<br/>(WM → working_memory_raw)
-    S->>T: Submit WfPipeRouter(PipeJob)
+    S->>T: Submit run workflow(PipeJob)
     T->>W: Dispatch workflow
 
-    Note over W: WfPipeRouter.run()
+    Note over W: run workflow
     W->>W: Create per-workflow ClassRegistry
     W->>W: Load LibraryCrate (register classes)
     W->>W: Hydrate working_memory_raw → WM
@@ -200,7 +213,7 @@ sequenceDiagram
 
     alt Concrete pipe
         W->>W: Execute via Activity
-    else Controller pipe
+    else Dispatch the backend chooses to isolate
         W->>T: Child workflow (crate propagates)
         T->>W: Child result
     end

@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`run_batch_branch` router hook**: `PipeRouterProtocol` gained a second dispatch entry point, which `PipeBatch` uses for each per-item fan-out branch. It is the only signal a router gets that a dispatch is a batch branch rather than an ordinary step — a branch's `PipeJob` is otherwise indistinguishable from any other. The default body delegates to `run`, so in-process execution is unchanged and every existing router implementation keeps working untouched; a distributed backend can override it to give each branch its own isolation. Documented on the "Pipe Routing and Execution" page and listed in the Orchestrator SPI.
+
+### Fixed
+
+- **`PipeBatch` fan-out bound is frozen onto the run (Breaking)**: the `[pipelex.pipeline_execution_config] max_concurrency` setting is now read once, when the run's parameters are built, and carried on the run as `PipeRunParams.batch_max_concurrency` instead of being re-read inside every `PipeBatch`. Editing the config while a run is in flight no longer reshapes it. This closes a durable-execution hazard: the bound is also the chunk size that decides where a backend's task boundaries fall between branch dispatches, so a worker redeploy mid-run could make a replay group its dispatches differently from the recorded history. Breaking only for code that mutated `max_concurrency` mid-run and expected the change to take effect.
+
 ## [v0.42.0] - 2026-08-01
 
 ### Added
