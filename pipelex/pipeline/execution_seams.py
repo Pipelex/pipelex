@@ -60,6 +60,7 @@ def acquire_library(
     library_dirs: list[str] | None = None,
     mthds_contents: list[str] | None = None,
     bundle_uris: list[str] | None = None,
+    is_loading_pipes: bool = True,
 ) -> tuple[str, str | None]:
     """Set the current library, open it, and load dirs + blueprints into it.
 
@@ -72,6 +73,11 @@ def acquire_library(
     Returns the ``library_id`` and the bundle's qualified ``main_pipe`` ref
     (``domain.pipe_code``) when an ``mthds_contents`` bundle declares one, else
     ``None``. Pipe resolution is the caller's responsibility.
+
+    ``is_loading_pipes=False`` acquires a domains + concepts library with no live pipes in it — for
+    callers that only project the concept set. The returned ``main_pipe`` ref is still computed (it
+    is read off the blueprints), but there is no pipe to resolve it against, so such a library must
+    never be handed to :func:`prepare_pipe_job`.
     """
     library_manager = get_library_manager()
     prev_library_id = get_current_library_id_or_none()
@@ -88,7 +94,7 @@ def acquire_library(
             log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}):")
             for index_dir, dir_path in enumerate(effective_dirs):
                 log.verbose(f"  [{index_dir + 1}] {dir_path}")
-            library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+            library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs, is_loading_pipes=is_loading_pipes)
         else:
             log.verbose(f"No library directories to load ({source_label})")
 
@@ -112,7 +118,7 @@ def acquire_library(
                         blueprints_to_load.append(blueprint)
 
             if blueprints_to_load:
-                library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints_to_load)
+                library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints_to_load, is_loading_pipes=is_loading_pipes)
 
             # Qualify main_pipe with domain to avoid ambiguity when multiple domains define pipes with
             # the same code — via the one shared selection rule (first declaring main_pipe, else first).
@@ -131,7 +137,7 @@ def acquire_library(
             library_manager.teardown(library_id=library_id)
 
 
-def load_libraries_and_activate(library_dirs: Sequence[str | Path] | None = None) -> str:
+def load_libraries_and_activate(library_dirs: Sequence[str | Path] | None = None, *, is_loading_pipes: bool = True) -> str:
     """Open a fresh library, set it current, resolve + load ``library_dirs``, and leave it loaded.
 
     The single public entry for the open/set/load ceremony that ``Pipelex.make`` deliberately does
@@ -144,11 +150,15 @@ def load_libraries_and_activate(library_dirs: Sequence[str | Path] | None = None
     ``library_dirs`` follows the standard 3-tier resolution (see :func:`resolve_library_dirs`): ``None``
     falls back to the instance defaults / ``PIPELEXPATH``; an explicit ``[]`` disables loading. A bare
     ``str``/``Path`` (a single directory) is rejected — wrap it in a list.
+
+    ``is_loading_pipes=False`` leaves the library's pipe library empty (domains + concepts only) —
+    see :func:`acquire_library`.
     """
     reject_bare_str_or_path(library_dirs, param_name="library_dirs")
     library_id, _ = acquire_library(
         library_id="",
         library_dirs=[str(lib_dir) for lib_dir in library_dirs] if library_dirs is not None else None,
+        is_loading_pipes=is_loading_pipes,
     )
     return library_id
 

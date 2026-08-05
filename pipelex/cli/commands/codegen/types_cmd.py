@@ -15,7 +15,7 @@ import typer
 from posthog import tag
 
 from pipelex.cli.cli_factory import make_pipelex_for_cli
-from pipelex.cli.commands.crate_loading import load_normalized_crate_or_exit
+from pipelex.cli.commands.crate_loading import load_crate_for_concept_projection_or_exit
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.codegen.emission import write_stamped_projection
 from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget
@@ -49,9 +49,13 @@ def codegen_types_cmd(
     ] = None,
 ) -> None:
     """Project the crate's concept set into typed artifacts for the chosen target."""
-    # needs_model_specs=True (like `validate`): library validation checks pipe model pins
-    # against the deck, so the specs must be loaded even though codegen needs no inference.
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False, needs_model_specs=True)
+    # needs_model_specs=False, unlike `validate` / `resolve` / `codegen inputs`: the only reason those
+    # load the deck is that library validation checks pipe model pins (`model = "gpt-4o-mini"`)
+    # against it. This command projects the CONCEPT set through
+    # load_crate_for_concept_projection_or_exit, which never instantiates a pipe, so there is no pin
+    # to check — and loading the deck would mean a remote gateway-config fetch for nothing. Keeping it
+    # would also make `build structures` need the network.
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False, needs_model_specs=False)
     output_root = Path(output_dir).expanduser()
 
     try:
@@ -61,7 +65,7 @@ def codegen_types_cmd(
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND}")
 
             combined_dirs: list[Path] = [*(paths or []), *(library_dir or [])]
-            crate = load_normalized_crate_or_exit(library_dirs=combined_dirs or None)
+            crate = load_crate_for_concept_projection_or_exit(library_dirs=combined_dirs or None)
 
             emitted = emit_types(crate, target=target)
             report = write_stamped_projection(

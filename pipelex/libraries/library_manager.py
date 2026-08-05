@@ -292,6 +292,7 @@ class LibraryManager(LibraryManagerAbstract):
         library_id: str,
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
+        is_loading_pipes: bool = True,
     ) -> list[PipeAbstract]:
         # Ensure libraries exist for this library_id
         if library_id not in self._libraries:
@@ -340,6 +341,14 @@ class LibraryManager(LibraryManagerAbstract):
                     base_class_names=[StructuredContent.__name__],
                     force_include_dirs=[Path(builder_pkg.__file__).parent],
                 )
+                if not is_loading_pipes:
+                    # Concepts-only load: no pipe is instantiated, so nothing will ever consult the
+                    # func_registry. Importing the customer's @pipe_func bodies would be pure waste —
+                    # and worse, it is precisely the import that cannot succeed while bootstrapping a
+                    # PipeFunc method, since the body imports the structures.py this very load exists
+                    # to generate. Module-level failures other than ImportError/SyntaxError are not
+                    # caught downstream, so not importing at all is what makes the bootstrap robust.
+                    continue
                 if is_sandbox_hosted:
                     # Sandbox-hosted mode: never import/register the customer's PipeFunc bodies in this
                     # process. Capture every .py as source text (no import) so it can travel to the
@@ -376,7 +385,11 @@ class LibraryManager(LibraryManagerAbstract):
 
             # Load MTHDS files into the specific library
             log.verbose(f"Loading MTHDS files from: {[str(p) for p in valid_mthds_paths]}")
-            return self._load_mthds_files_into_library(library_id=library_id, valid_mthds_paths=valid_mthds_paths)
+            return self._load_mthds_files_into_library(
+                library_id=library_id,
+                valid_mthds_paths=valid_mthds_paths,
+                is_loading_pipes=is_loading_pipes,
+            )
 
     @override
     def is_crate_loaded(self, *, library_id: str, fingerprint: str) -> bool:
@@ -391,7 +404,7 @@ class LibraryManager(LibraryManagerAbstract):
         return fingerprint in self._loaded_fingerprints.get(library_id, set())
 
     @override
-    def load_from_crate(self, *, library_id: str, crate: LibraryCrate) -> list[PipeAbstract]:
+    def load_from_crate(self, *, library_id: str, crate: LibraryCrate, is_loading_pipes: bool = True) -> list[PipeAbstract]:
         """Load a LibraryCrate into a live Library.
 
         Fingerprint idempotency: if a crate with the same fingerprint was already loaded
@@ -405,9 +418,14 @@ class LibraryManager(LibraryManagerAbstract):
         Args:
             library_id: The library to load into
             crate: The LibraryCrate containing qualified blueprints, domain metadata, and source info
+            is_loading_pipes: Whether to instantiate the crate's pipe blueprints into live pipes.
+                ``False`` loads domains + concepts only and returns an empty pipe list — for callers
+                that project the CONCEPT set and never touch a pipe object (see
+                ``load_crate_for_structure_generation``). Pipe validation is then vacuous rather than
+                skipped: ``validate_library()`` still runs, over an empty pipe library.
 
         Returns:
-            List of all pipes that were loaded, or empty list if already loaded
+            List of all pipes that were loaded, empty if already loaded or if is_loading_pipes is False
         """
         # Bind the target library as current for the whole load: PipeFactory and the concept
         # factories resolve concepts and the class registry through the ambient current library,
@@ -464,7 +482,7 @@ class LibraryManager(LibraryManagerAbstract):
 
             # Load pipes with domain-filtered concept codes
             all_pipes: list[PipeAbstract] = []
-            for pipe_ref, pipe_blueprint in crate.pipes.items():
+            for pipe_ref, pipe_blueprint in crate.pipes.items() if is_loading_pipes else ():
                 parsed = QualifiedRef.parse_pipe_ref(raw=pipe_ref)
                 if parsed.domain_path is None:
                     msg = f"Crate pipe_ref '{pipe_ref}' must be domain-qualified"
@@ -492,12 +510,15 @@ class LibraryManager(LibraryManagerAbstract):
             library.validate_library()
 
             # Only cache fingerprint after the entire load succeeds — if loading fails
-            # with an exception, subsequent retries must not be skipped.
-            loaded_set.add(fingerprint)
+            # with an exception, subsequent retries must not be skipped. A concepts-only load is
+            # never "the entire load" either: recording its fingerprint would make a LATER full load
+            # of the same crate into this library a no-op, leaving the library permanently pipe-less.
+            if is_loading_pipes:
+                loaded_set.add(fingerprint)
             return all_pipes
 
     @override
-    def load_from_blueprints(self, *, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
+    def load_from_blueprints(self, *, library_id: str, blueprints: list[PipelexBundleBlueprint], is_loading_pipes: bool = True) -> list[PipeAbstract]:
         """Load domains, concepts, and pipes from a list of blueprints.
 
         Delegates through LibraryCrate: builds a crate from blueprints, then loads from the crate.
@@ -506,6 +527,10 @@ class LibraryManager(LibraryManagerAbstract):
         Args:
             library_id: The ID of the library to load into
             blueprints: List of parsed MTHDS blueprints to load
+            is_loading_pipes: Forwarded to :meth:`load_from_crate` — ``False`` loads domains +
+                concepts only. Blueprint accumulation is unaffected, so ``get_crate()`` still returns
+                the FULL crate (pipe blueprints included): the crate is derived from blueprints, not
+                from live pipes.
 
         Returns:
             List of all pipes that were loaded
@@ -539,14 +564,15 @@ class LibraryManager(LibraryManagerAbstract):
             )
 
             # Load from crate (domains, concepts, pipes, validation)
-            all_pipes = self.load_from_crate(library_id=library_id, crate=crate)
+            all_pipes = self.load_from_crate(library_id=library_id, crate=crate, is_loading_pipes=is_loading_pipes)
 
             # Also record the aggregate crate fingerprint: get_crate() rebuilds one crate from
             # ALL accumulated blueprints, so once the library holds more than one batch its
             # fingerprint differs from every per-batch fingerprint recorded by load_from_crate.
             # Recorded only after the load succeeds, so a failed batch (whose blueprints were
-            # already accumulated above) never registers a phantom fingerprint.
-            if aggregate_crate := self.get_crate(library_id=library_id):
+            # already accumulated above) never registers a phantom fingerprint — and, for the same
+            # reason, never after a concepts-only load, which is not a complete load of the crate.
+            if is_loading_pipes and (aggregate_crate := self.get_crate(library_id=library_id)):
                 self._loaded_fingerprints.setdefault(library_id, set()).add(aggregate_crate.fingerprint)
 
             return all_pipes
@@ -701,7 +727,7 @@ class LibraryManager(LibraryManagerAbstract):
     # Private helper methods
     ############################################################
 
-    def _load_mthds_files_into_library(self, *, library_id: str, valid_mthds_paths: list[Path]) -> list[PipeAbstract]:
+    def _load_mthds_files_into_library(self, *, library_id: str, valid_mthds_paths: list[Path], is_loading_pipes: bool = True) -> list[PipeAbstract]:
         """Load MTHDS files into a specific library.
 
         This method:
@@ -712,6 +738,8 @@ class LibraryManager(LibraryManagerAbstract):
         Args:
             library_id: The ID of the library to load into
             valid_mthds_paths: List of MTHDS file paths to load
+            is_loading_pipes: Forwarded to :meth:`load_from_blueprints` — ``False`` loads domains +
+                concepts only. Parsing, manifest visibility and dependency loading are unaffected.
         """
         blueprints: list[PipelexBundleBlueprint] = []
         for mthds_file_path in valid_mthds_paths:
@@ -760,7 +788,7 @@ class LibraryManager(LibraryManagerAbstract):
             library.loaded_mthds_paths.append(resolved_path)
 
         try:
-            return self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
+            return self.load_from_blueprints(library_id=library_id, blueprints=blueprints, is_loading_pipes=is_loading_pipes)
         except ValidationError as validation_error:
             validation_error_msg = report_validation_error(category="mthds", validation_error=validation_error)
             msg = f"Could not load blueprints from {[str(pth) for pth in valid_mthds_paths]} because of: {validation_error_msg}"

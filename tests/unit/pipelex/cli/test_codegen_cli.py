@@ -45,7 +45,7 @@ class TestCodegenCli:
     def test_types_writes_every_emitted_stamped_and_locked_exit_0(self, mocker: MockerFixture, tmp_path: Path) -> None:
         self._neutralize_boot(mocker, module=TYPES)
         crate = LibraryCrate(fingerprint="deadbeef")
-        mocker.patch(f"{TYPES}.load_normalized_crate_or_exit", return_value=crate)
+        mocker.patch(f"{TYPES}.load_crate_for_concept_projection_or_exit", return_value=crate)
         mocker.patch(
             f"{TYPES}.emit_types",
             return_value=[EmittedFile(filename="types.ts", content="// types\n"), EmittedFile(filename="binder.ts", content="// binder\n")],
@@ -59,43 +59,50 @@ class TestCodegenCli:
         assert (tmp_path / "binder.ts").read_text(encoding="utf-8").endswith("// binder\n")
         assert (tmp_path / CODEGEN_LOCK_FILENAME).is_file()
 
-    @pytest.mark.parametrize("module", [TYPES, INPUTS])
-    def test_boot_loads_model_specs_for_offline_validation(self, mocker: MockerFixture, tmp_path: Path, module: str) -> None:
-        """Codegen boots offline but WITH model specs (like `validate`): library validation checks
-        pipe model pins (`model = "gpt-4o-mini"`) against the deck, so a spec-less boot would reject
-        any bundle that pins a model — the drift this test guards against.
+    def test_inputs_boots_with_model_specs_for_offline_validation(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """`codegen inputs` boots offline but WITH model specs (like `validate`): it loads the live
+        pipe library, whose validation checks pipe model pins (`model = "gpt-4o-mini"`) against the
+        deck, so a spec-less boot would reject any bundle that pins a model — the drift guarded here.
         """
-        boot = self._neutralize_boot(mocker, module=module)
-        if module == TYPES:
-            mocker.patch(f"{TYPES}.load_normalized_crate_or_exit", return_value=LibraryCrate(fingerprint="deadbeef"))
-            mocker.patch(f"{TYPES}.emit_types", return_value=[EmittedFile(filename="types.ts", content="// types\n")])
-            codegen_types_cmd(target=CodegenTarget.TS_ZOD, paths=None, output_dir=str(tmp_path), library_dir=None)
-        else:
-            crate = LibraryCrate(domains={"scoring": DomainBlueprint(code="scoring", description="d", main_pipe="run_scoring")})
-            mocker.patch(f"{INPUTS}.load_normalized_crate_or_exit", return_value=crate)
-            mocker.patch(f"{INPUTS}.get_required_pipe")
-            mocker.patch(f"{INPUTS}.render_inputs", return_value="{}")
-            codegen_inputs_cmd(
-                pipe=None,
-                paths=None,
-                template_format=InputsTemplateFormat.JSON,
-                explicit=False,
-                output=str(tmp_path / "inputs.json"),
-                library_dir=None,
-            )
+        boot = self._neutralize_boot(mocker, module=INPUTS)
+        crate = LibraryCrate(domains={"scoring": DomainBlueprint(code="scoring", description="d", main_pipe="run_scoring")})
+        mocker.patch(f"{INPUTS}.load_normalized_crate_or_exit", return_value=crate)
+        mocker.patch(f"{INPUTS}.get_required_pipe")
+        mocker.patch(f"{INPUTS}.render_inputs", return_value="{}")
+        codegen_inputs_cmd(
+            pipe=None,
+            paths=None,
+            template_format=InputsTemplateFormat.JSON,
+            explicit=False,
+            output=str(tmp_path / "inputs.json"),
+            library_dir=None,
+        )
         assert boot.call_args.kwargs["needs_inference"] is False
         assert boot.call_args.kwargs["needs_model_specs"] is True
 
+    def test_types_boots_without_model_specs(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """`codegen types` boots WITHOUT the deck, unlike its `inputs` sibling: the concept projection
+        never instantiates a pipe, so no model pin is ever checked. Pinned because loading the deck
+        costs a remote gateway-config fetch, which would silently make `build structures` need the
+        network for a projection that reads only the crate's concepts.
+        """
+        boot = self._neutralize_boot(mocker, module=TYPES)
+        mocker.patch(f"{TYPES}.load_crate_for_concept_projection_or_exit", return_value=LibraryCrate(fingerprint="deadbeef"))
+        mocker.patch(f"{TYPES}.emit_types", return_value=[EmittedFile(filename="types.ts", content="// types\n")])
+        codegen_types_cmd(target=CodegenTarget.TS_ZOD, paths=None, output_dir=str(tmp_path), library_dir=None)
+        assert boot.call_args.kwargs["needs_inference"] is False
+        assert boot.call_args.kwargs["needs_model_specs"] is False
+
     def test_types_invalid_library_verdict_propagates(self, mocker: MockerFixture, tmp_path: Path) -> None:
         self._neutralize_boot(mocker, module=TYPES)
-        mocker.patch(f"{TYPES}.load_normalized_crate_or_exit", side_effect=typer.Exit(1))
+        mocker.patch(f"{TYPES}.load_crate_for_concept_projection_or_exit", side_effect=typer.Exit(1))
         with pytest.raises(typer.Exit) as exc_info:
             codegen_types_cmd(target=CodegenTarget.TS_ZOD, paths=None, output_dir=str(tmp_path), library_dir=None)
         assert exc_info.value.exit_code == 1
 
     def test_types_expands_home_relative_output(self, mocker: MockerFixture) -> None:
         self._neutralize_boot(mocker, module=TYPES)
-        mocker.patch(f"{TYPES}.load_normalized_crate_or_exit", return_value=LibraryCrate(fingerprint="deadbeef"))
+        mocker.patch(f"{TYPES}.load_crate_for_concept_projection_or_exit", return_value=LibraryCrate(fingerprint="deadbeef"))
         mocker.patch(f"{TYPES}.emit_types", return_value=[])
         write_projection = mocker.patch(f"{TYPES}.write_stamped_projection")
         write_projection.return_value.written = []
