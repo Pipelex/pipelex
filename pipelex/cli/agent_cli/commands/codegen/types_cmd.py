@@ -21,7 +21,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     agent_success_formatted,
     set_agent_cli_error_format,
 )
-from pipelex.cli.commands.crate_loading import load_normalized_crate
+from pipelex.cli.commands.crate_loading import load_crate_for_concept_projection
 from pipelex.codegen.emission import write_stamped_projection
 from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget
 from pipelex.codegen.emitters.types_emitter import emit_types
@@ -72,16 +72,17 @@ def agent_codegen_types_cmd(
     """
     set_agent_cli_error_format(error_format or output_format)
     output_root = Path(output_dir).expanduser()
-    # needs_model_specs=True (like `validate`): library validation checks pipe model pins
-    # against the deck, so the specs must be loaded even though codegen needs no inference.
-    make_pipelex_for_agent_cli(needs_inference=False, needs_model_specs=True)
+    # needs_model_specs=False, mirroring the bare CLI: the concept projection never instantiates a
+    # pipe, so no pipe model pin is validated against the deck and loading it would cost a remote
+    # gateway-config fetch for nothing. See `cli/commands/codegen/types_cmd.py` for the full rationale.
+    make_pipelex_for_agent_cli(needs_inference=False, needs_model_specs=False)
 
     try:
         combined_dirs: list[Path] = [*(paths or []), *(Path(lib_dir) for lib_dir in library_dir or [])]
 
         crate: LibraryCrate
         try:
-            crate = load_normalized_crate(library_dirs=combined_dirs or None)
+            crate = load_crate_for_concept_projection(library_dirs=combined_dirs or None)
         except (LibraryLoadingError, PipeLibraryError) as exc:
             # Negative verdict: the library is structurally invalid, so no crate can be produced.
             agent_error(f"Cannot resolve — the library is invalid: {exc}", error_type=type(exc).__name__, cause=exc, exit_code=1)

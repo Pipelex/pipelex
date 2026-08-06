@@ -38,7 +38,7 @@ class TestAgentCodegenTypesCmd:
     def test_json_success_envelope_and_stamped_files(self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """A successful projection emits the structured JSON envelope on stdout and stamped files + lock on disk."""
         self._neutralize_boot(mocker)
-        mocker.patch(f"{CMD_MODULE}.load_normalized_crate", return_value=LibraryCrate(fingerprint="deadbeef"))
+        mocker.patch(f"{CMD_MODULE}.load_crate_for_concept_projection", return_value=LibraryCrate(fingerprint="deadbeef"))
         mocker.patch(f"{CMD_MODULE}.emit_types", return_value=[EmittedFile(filename="models.py", content="# models\n")])
 
         agent_codegen_types_cmd(
@@ -65,7 +65,7 @@ class TestAgentCodegenTypesCmd:
 
     def test_markdown_success_is_the_default(self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         self._neutralize_boot(mocker)
-        mocker.patch(f"{CMD_MODULE}.load_normalized_crate", return_value=LibraryCrate(fingerprint="deadbeef"))
+        mocker.patch(f"{CMD_MODULE}.load_crate_for_concept_projection", return_value=LibraryCrate(fingerprint="deadbeef"))
         mocker.patch(f"{CMD_MODULE}.emit_types", return_value=[EmittedFile(filename="models.py", content="# models\n")])
 
         agent_codegen_types_cmd(
@@ -85,7 +85,7 @@ class TestAgentCodegenTypesCmd:
     def test_invalid_library_is_structured_error_exit_1(self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """An invalid library is a negative verdict: exit 1 with the structured error envelope on stderr."""
         self._neutralize_boot(mocker)
-        mocker.patch(f"{CMD_MODULE}.load_normalized_crate", side_effect=LibraryLoadingError("duplicate pipe"))
+        mocker.patch(f"{CMD_MODULE}.load_crate_for_concept_projection", side_effect=LibraryLoadingError("duplicate pipe"))
 
         with pytest.raises(typer.Exit) as exc_info:
             agent_codegen_types_cmd(
@@ -105,7 +105,7 @@ class TestAgentCodegenTypesCmd:
 
     def test_unassembled_closure_is_no_verdict_exit_2(self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         self._neutralize_boot(mocker)
-        mocker.patch(f"{CMD_MODULE}.load_normalized_crate", side_effect=FileNotFoundError("no .mthds bundles found in the closure."))
+        mocker.patch(f"{CMD_MODULE}.load_crate_for_concept_projection", side_effect=FileNotFoundError("no .mthds bundles found in the closure."))
 
         with pytest.raises(typer.Exit) as exc_info:
             agent_codegen_types_cmd(
@@ -121,14 +121,14 @@ class TestAgentCodegenTypesCmd:
         error = json.loads(capsys.readouterr().err)
         assert error["error_type"] == "FileNotFoundError"
 
-    def test_boot_loads_model_specs_for_offline_validation(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """Like the bare CLI, the agent mirror boots offline but WITH model specs: library validation
-        checks pipe model pins against the deck, so a spec-less boot would reject any bundle pinning
-        a model — the drift this test guards against.
+    def test_boots_without_model_specs(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """Like the bare CLI, the agent mirror boots offline and WITHOUT the model deck: the concept
+        projection never instantiates a pipe, so no model pin is checked and the deck would cost a
+        remote gateway-config fetch for nothing. Both surfaces are pinned here or they drift.
         """
         boot = mocker.patch(f"{CMD_MODULE}.make_pipelex_for_agent_cli")
         mocker.patch(f"{CMD_MODULE}.Pipelex.teardown_if_needed")
-        mocker.patch(f"{CMD_MODULE}.load_normalized_crate", return_value=LibraryCrate(fingerprint="deadbeef"))
+        mocker.patch(f"{CMD_MODULE}.load_crate_for_concept_projection", return_value=LibraryCrate(fingerprint="deadbeef"))
         mocker.patch(f"{CMD_MODULE}.emit_types", return_value=[EmittedFile(filename="models.py", content="# models\n")])
 
         agent_codegen_types_cmd(
@@ -141,11 +141,11 @@ class TestAgentCodegenTypesCmd:
         )
 
         assert boot.call_args.kwargs["needs_inference"] is False
-        assert boot.call_args.kwargs["needs_model_specs"] is True
+        assert boot.call_args.kwargs["needs_model_specs"] is False
 
     def test_expands_home_relative_output(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         self._neutralize_boot(mocker)
-        mocker.patch(f"{CMD_MODULE}.load_normalized_crate", return_value=LibraryCrate(fingerprint="deadbeef"))
+        mocker.patch(f"{CMD_MODULE}.load_crate_for_concept_projection", return_value=LibraryCrate(fingerprint="deadbeef"))
         mocker.patch(f"{CMD_MODULE}.emit_types", return_value=[])
         write_projection = mocker.patch(f"{CMD_MODULE}.write_stamped_projection")
         write_projection.return_value.written = []

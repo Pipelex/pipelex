@@ -55,6 +55,29 @@ One `structures.py` module for the whole closure, plus a `codegen.lock`:
 
 Generated files are never meant to be edited: to customize a type, subclass it in a sibling module (the generated header shows how) — subclasses survive regeneration.
 
+## Bootstrapping a Method That Uses `PipeFunc`
+
+This command projects your **concepts**, so it never loads or runs your pipes — and never imports your `@pipe_func` Python. That is what lets you start a `PipeFunc` method from nothing:
+
+1. Write your `.mthds` bundle, declaring the concepts and the `PipeFunc` that outputs one of them.
+2. Run `pipelex build structures . -o .` — it succeeds even though your implementation file does not exist yet.
+3. Write your `@pipe_func`, importing the class you just generated and annotating it as the return type.
+
+Without this, step 2 would demand the function from step 3, and step 3 would demand the output of step 2. At step 2 your implementation may be missing, half-written, or fail to import — structure generation is unaffected. The command needs no model deck either, so it works offline.
+
+## This Command Is Not a Validation Gate
+
+The point above is broader than `PipeFunc`, so it is worth stating on its own: because no pipe is instantiated, **no pipe of any type is validated here**. A closure whose `PipeSequence` names a step that does not exist, or whose pipe declares an output concept it never produces, still generates its structures and exits `0`. What *is* checked is the concept layer — domains, concepts and their structures — which is exactly what gets emitted.
+
+So do not use `pipelex build structures` in CI as a proxy for "my bundle is sound". Use it to generate, then:
+
+```bash
+pipelex build structures . -o .
+pipelex validate --all          # the actual gate
+```
+
+`pipelex validate`, `pipelex resolve`, `pipelex build inputs` and `pipelex run` all keep the strict load and reject a broken method — whether the breakage is a missing `PipeFunc` implementation or anything else. Generating structures is not a claim that your method is runnable.
+
 ## Why Use Generated Structures?
 
 - **Use as type hints** - Get IDE autocompletion and type checking in your code

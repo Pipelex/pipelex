@@ -98,7 +98,7 @@ class LibraryManagerAbstract(ABC):
         """
 
     @abstractmethod
-    def load_from_crate(self, *, library_id: str, crate: LibraryCrate) -> list[PipeAbstract]:
+    def load_from_crate(self, *, library_id: str, crate: LibraryCrate, is_loading_pipes: bool = True) -> list[PipeAbstract]:
         """Load a LibraryCrate into a live Library.
 
         Note: This method does NOT resolve cross-package address-based dependencies.
@@ -107,10 +107,12 @@ class LibraryManagerAbstract(ABC):
         Args:
             library_id: The library to load into
             crate: The LibraryCrate containing qualified blueprints, domain metadata, and source info
+            is_loading_pipes: Whether to instantiate the crate's pipe blueprints into live pipes.
+                ``False`` loads domains + concepts only, for callers that project the concept set.
         """
 
     @abstractmethod
-    def load_from_blueprints(self, *, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
+    def load_from_blueprints(self, *, library_id: str, blueprints: list[PipelexBundleBlueprint], is_loading_pipes: bool = True) -> list[PipeAbstract]:
         pass
 
     @abstractmethod
@@ -128,5 +130,6 @@ class LibraryManagerAbstract(ABC):
         library_id: str,
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
+        is_loading_pipes: bool = True,
     ) -> list[PipeAbstract]:
         pass

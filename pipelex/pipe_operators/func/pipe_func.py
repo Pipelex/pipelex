@@ -111,6 +111,15 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             )
             raise TypeError(msg)
 
+        # The two class names that legitimately denote this concept's structure. The runtime names its
+        # dynamically generated class domain-qualified (`atlas_devis__PricedQuote`), while
+        # `codegen types --target python-structures` names the class it emits bare when the code is
+        # unique across the crate and falls back to the SAME qualified spelling when it collides
+        # (`codegen/emitters/naming.py::python_class_name`). Both are correct names for this concept,
+        # so a function returning a generated structure class must validate — otherwise `build
+        # structures` would emit classes its own PipeFunc could never legally return.
+        accepted_structure_class_names = {self.output.concept.structure_class_name, self.output.concept.code}
+
         # Validate that the function's return type matches the concept's structure class
         concept_structure_class = get_class_registry().get_class(name=self.output.concept.structure_class_name)
         if concept_structure_class is None:
@@ -143,10 +152,12 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
                 # Check if item type matches the concept's structure class:
                 # 1. Same class object
                 # 2. Subclass relationship
-                # 3. Same class name (for cases where the class is defined in different modules but represents the same concept)
+                # 3. Either accepted name for this concept — the runtime's qualified spelling, or the
+                #    bare code that codegen emits when it is unique (see accepted_structure_class_names).
+                #    Name-based, so a class defined in another module still counts as the same concept.
                 is_same_class = item_type == concept_structure_class
                 is_subclass = not is_same_class and issubclass(item_type, concept_structure_class)
-                is_same_name = item_type.__name__ == self.output.concept.structure_class_name
+                is_same_name = item_type.__name__ in accepted_structure_class_names
 
                 # Debug logging
                 log.verbose(
@@ -162,7 +173,8 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
                         f"(from {concept_structure_class.__module__}.{concept_structure_class.__name__}), "
                         f"but the function '{self.function_name}' return type is 'ListContent[{item_type.__name__}]' "
                         f"(from {item_type.__module__}.{item_type.__name__}). "
-                        f"The item type of your ListContent should be '{self.output.concept.structure_class_name}' or a subclass of it."
+                        f"The item type of your ListContent should be '{self.output.concept.structure_class_name}' "
+                        f"or '{self.output.concept.code}' (the generated structure class), or a subclass of either."
                     )
                     raise TypeError(msg)
             # If no type_args found, return_type is raw ListContent without generic parameter - we already validated it's a ListContent subclass
@@ -171,13 +183,14 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             # Same checks as above: same class, subclass, or same name
             is_same_class = return_type == concept_structure_class
             is_subclass = not is_same_class and issubclass(return_type, concept_structure_class)
-            is_same_name = return_type.__name__ == self.output.concept.structure_class_name
+            is_same_name = return_type.__name__ in accepted_structure_class_names
 
             if not (is_same_class or is_subclass or is_same_name):
                 msg = (
                     f"PipeFunc '{self.code}' output concept expects structure class '{self.output.concept.structure_class_name}', "
                     f"but the function '{self.function_name}' return type is '{return_type.__name__}'. "
-                    f"The return type of your function should be '{self.output.concept.structure_class_name}' or a subclass of it."
+                    f"The return type of your function should be '{self.output.concept.structure_class_name}' "
+                    f"or '{self.output.concept.code}' (the generated structure class), or a subclass of either."
                 )
                 raise TypeError(msg)
 

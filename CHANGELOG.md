@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **A `PipeFunc` can return the structure class `build structures` generated for its output concept**: the runtime names the class it builds for an inline-structure concept domain-qualified (`atlas_devis__PricedQuote`), while `codegen types --target python-structures` names the class it emits bare when the code is unique across the crate (`PricedQuote`) — so `validate_output_with_library` rejected every generated class with *"output concept expects structure class 'X', but the function return type is 'Y'"*, and no import spelling could satisfy both ends. It now accepts either name for the concept, in both the scalar and the `Concept[]` arms. Unrelated class names are still rejected. The collision case never diverged: codegen already emits the qualified spelling verbatim there.
+- **`build structures` no longer requires the PipeFunc it exists to unblock**: generating structures for a method containing a `PipeFunc` used to fail with `Function '<name>' not found in registry` whenever the function's Python was absent or not yet importable — a bootstrap deadlock, since writing that function requires the very `structures.py` being generated (the validator enforces `return type == the output concept's structure class`). Starting a new `PipeFunc` method meant hand-writing a throwaway stub. `pipelex build structures` / `codegen types` now project the crate's concept set without instantiating the closure's pipes at all, on both the bare and the agent CLI.
+
+### Changed
+
+- **`codegen types` boots without the model deck**: the concept projection never instantiates a pipe, so no pipe model pin is validated against the deck. The command no longer loads model specs, which also removes a remote gateway-config fetch from `build structures` — it now works offline. `resolve`, `validate` and `codegen inputs` are unchanged; they load live pipes and still need the deck.
+- **Concepts-only library loading**: `load_libraries` / `load_from_blueprints` / `load_from_crate` accept `is_loading_pipes` (default `True`, preserving current behavior); `False` loads domains + concepts and leaves the pipe library empty. `pipelex.cli.commands.crate_loading` exposes `load_crate_for_concept_projection` beside `load_normalized_crate`, with an explicitly weaker documented contract — a crate from it has **not** been proven runnable. `resolve`, `codegen inputs` and `run` keep the validated contract and still reject a bundle whose `PipeFunc` implementation is missing.
+
 ## [v0.42.0] - 2026-08-01
 
 ### Added
