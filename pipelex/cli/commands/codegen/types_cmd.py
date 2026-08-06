@@ -3,7 +3,12 @@
 Thin wiring over the `emit_types` engine (`pipelex/codegen/emitters/types_emitter.py`): load and
 normalize the closure into a crate, project its concept set for the chosen `--target`, and write each
 emitted file under the output root. The verdict (resolved / invalid library) rides the resolve exit
-codes via `load_normalized_crate_or_exit`; the success stream is the list of written files.
+codes via `load_crate_for_concept_projection_or_exit`; the success stream is the list of written files.
+
+That loader is the weaker of the two contracts in `crate_loading.py`: it validates domains and
+concepts but never instantiates ANY pipe — not just `PipeFunc`. So this command is NOT a validation
+gate: a closure whose `PipeSequence` names a missing step, or whose `PipeFunc` implementation is
+absent, still projects its concepts successfully here and is rejected only by `validate` / `run`.
 
 See `docs/specs/pipelex-codegen.md` -> "CLI: codegen" and "Two axes".
 """

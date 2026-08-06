@@ -421,8 +421,10 @@ class LibraryManager(LibraryManagerAbstract):
             is_loading_pipes: Whether to instantiate the crate's pipe blueprints into live pipes.
                 ``False`` loads domains + concepts only and returns an empty pipe list — for callers
                 that project the CONCEPT set and never touch a pipe object (see
-                ``load_crate_for_structure_generation``). Pipe validation is then vacuous rather than
-                skipped: ``validate_library()`` still runs, over an empty pipe library.
+                ``load_crate_for_concept_projection``). This drops pipe validation for EVERY pipe
+                type, not only ``PipeFunc``: ``validate_library()`` still runs, but over an empty
+                pipe library, so it is vacuous. A crate loaded this way is never a runnability
+                verdict.
 
         Returns:
             List of all pipes that were loaded, empty if already loaded or if is_loading_pipes is False
