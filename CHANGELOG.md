@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- **A dry run now identifies the pipe it is running**: `dry_run_pipe` stamps the running pipe onto the `JobMetadata` it hands down, exactly as `live_run_pipe` already did. Previously `job_metadata.pipe_code` kept whatever the caller passed — usually nothing — for the whole of a dry run, so anything that identifies a step by it (log correlation, and the per-step labelling a distributed backend derives) saw an anonymous step in DRY and a named one in LIVE. Telemetry stays live-only: `pipe_run_id` and `otel_context` still belong to a real run, and the dry copy clears `otel_context` rather than inheriting a live span.
 - **`PipeBatch` fan-out bound is frozen onto the run (Breaking)**: the `[pipelex.pipeline_execution_config] max_concurrency` setting is now read once, when the run's parameters are built, and carried on the run as `PipeRunParams.batch_max_concurrency` instead of being re-read inside every `PipeBatch`. Editing the config while a run is in flight no longer reshapes it. This closes a durable-execution hazard: the bound is also the chunk size that decides where a backend's task boundaries fall between branch dispatches, so a worker redeploy mid-run could make a replay group its dispatches differently from the recorded history. Breaking only for code that mutated `max_concurrency` mid-run and expected the change to take effect.
 
 ## [v0.42.0] - 2026-08-01
