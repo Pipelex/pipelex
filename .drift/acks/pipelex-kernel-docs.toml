@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:73aafaa2a6d3151a0d8f775cd90e8648f4b8b57ac9808cdb94579a2ae59fd0f8"
-reviewed_by = "Claude (Fable 5)"
-reviewed_at = "2026-08-13T12:05:20Z"
-rationale = "Trigger is the search_domain_codes to search_scope rename passing through shape_inputs (memory_ops.py) and the boot-contract mock swapping get_required_concept_from_concept_ref_or_code for get_required_entry_concept. Reviewed docs/under-the-hood/pipelex-kernel.md: its shape_inputs paragraph and code example name neither the renamed parameter nor the replaced provider method, and the smallest-provider description does not enumerate resolver method names, so every claim still holds. Reviewed, no doc change needed."
+digest = "sha256:5ec1035b41c34141c61a699d4310d73f2999c3d8cd6c4cc6d95fc930ab2101d9"
+reviewed_by = "Louis Choquel"
+reviewed_at = "2026-08-14T06:58:58Z"
+rationale = "Cherry-pick of the step-identity change: make_step_metadata gains pipe_code and PipelexKernel.make gains an injectable step_id_source. Updated the doc's run-scoped-state section: the façade now holds identity plus the step_id_source seam, the job_metadata bullet documents pipe_code naming with its omit-not-None contract and the façade's deliberate anonymity."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -20,7 +20,7 @@ rationale = "Trigger is the search_domain_codes to search_scope rename passing t
 "pipelex/kernel/llm_prompt_content.py" = "blob:26dfce734de582320c0ea7b9a09b01f2d1ca8627"
 "pipelex/kernel/llm_results.py" = "blob:6e3b8a2878b5bb284ece5fac10262fb59ac2029d"
 "pipelex/kernel/memory_ops.py" = "blob:f6a5745e804ac08f19c70f1beb1f78baf50d51cd"
-"pipelex/kernel/pipelex_kernel.py" = "blob:ad13e02168590a1173d7db1e210b3cecd7059651"
+"pipelex/kernel/pipelex_kernel.py" = "blob:fde22aedea2ad8ca41e12a4f1a67e2189dc3fbce"
 "pipelex/kernel/prompt_references.py" = "blob:03ec9ef67ae84f141d072ca2d2c3ef888549ccc0"
 "pipelex/kernel/search_ops.py" = "blob:01be4bef28f98342678cba16ac8c4b21fadcaae1"
 "pipelex/kernel/search_results.py" = "blob:101b70dc96cc5ee1721c9f6b1cb725a5ca78ff70"

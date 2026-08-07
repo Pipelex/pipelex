@@ -5,6 +5,8 @@ interpreter run's. These pin the links, because a parity failure there says "no 
 saying which link dropped: the run-level metadata, the per-step copy, or the run mode.
 """
 
+from uuid import UUID
+
 import pytest
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -79,6 +81,55 @@ class TestPipelexKernelRunState:
         assert first_step.pipe_run_id != second_step.pipe_run_id
         # Computed fresh per step by whoever opens the span, and a kernel call opens none.
         assert first_step.otel_context is None
+
+    def test_a_step_names_the_pipe_it_is_running_when_told_which(self) -> None:
+        """The kernel tier's half of what the interpreter already does in `pipe_abstract`.
+
+        Anything that attributes work by `pipe_code` — log correlation, usage accounting, the
+        per-step labelling a distributed backend derives — sees an anonymous step without this.
+        """
+        kernel = PipelexKernel.make(run_mode=PipeRunMode.DRY, user_id="test-user")
+
+        assert kernel.make_step_metadata(pipe_code="answer_question").pipe_code == "answer_question"
+
+    def test_an_unnamed_step_does_not_erase_the_runs_own_pipe_code(self) -> None:
+        """The erasure trap: `copy_with_update` applies whatever it is handed, `None` included.
+
+        Passing `pipe_code=None` through unconditionally would turn an optional enrichment into a
+        silent wipe of the run-level value for every caller that never asked for the feature. The
+        key must be omitted, not passed as None — so this constructs a run that HAS a run-level
+        `pipe_code`, which no caller in the tree does today.
+        """
+        kernel = PipelexKernel.make(run_mode=PipeRunMode.DRY, user_id="test-user")
+        kernel.job_metadata.pipe_code = "set_at_run_level"
+
+        assert kernel.make_step_metadata().pipe_code == "set_at_run_level"
+
+    def test_the_step_id_source_is_injectable_and_defaults_to_uuid(self) -> None:
+        """A workflow-hosted kernel must be able to supply a replay-safe id source.
+
+        The kernel cannot import `temporalio` — that is the whole point of the tier — so the
+        replay-safe source arrives from outside. ⚠ Measured 2026-08-07: `uuid4()` in workflow code
+        does NOT currently raise on replay (see `kernel-step-identity-plan.md`), so this closes a
+        latent trap rather than a live defect; Phase 3's usage wiring is the consumer that would
+        first observe the drift.
+        """
+        minted: list[str] = []
+
+        def _source() -> str:
+            minted.append(f"step-{len(minted)}")
+            return minted[-1]
+
+        kernel = PipelexKernel.make(run_mode=PipeRunMode.DRY, user_id="test-user", step_id_source=_source)
+
+        assert kernel.make_step_metadata().pipe_run_id == "step-0"
+        assert kernel.make_step_metadata().pipe_run_id == "step-1"
+
+        default_kernel = PipelexKernel.make(run_mode=PipeRunMode.DRY, user_id="test-user")
+        first_default = default_kernel.make_step_metadata().pipe_run_id
+        assert first_default is not None
+        assert UUID(first_default).version == 4
+        assert first_default != default_kernel.make_step_metadata().pipe_run_id
 
     def test_mock_usage_rides_the_execution_mode_contract(self) -> None:
         """The DRY sub-flag lands on the carrier every cogt leaf reads off its assignment."""
