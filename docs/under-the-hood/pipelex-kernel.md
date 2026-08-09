@@ -1,9 +1,9 @@
 ---
-title: "The Method Kernel"
+title: "The Pipelex Kernel"
 description: "Operator semantics as importable functions — what pipelex/kernel/ is, the layering contract that keeps it callable without a loaded method, and how a programmatic caller boots it."
 ---
 
-# The Method Kernel
+# The Pipelex Kernel
 
 This page is for contributors working on Pipelex internals, and for anyone embedding the runtime directly rather than running `.mthds` methods. For how the operator classes above it fit into the whole, see [Architecture Overview](./architecture-overview.md).
 
@@ -22,15 +22,15 @@ Every kernel call must be servable on `RuntimeBoot.make()` ([`pipelex/runtime_bo
 
 ```python
 from pipelex.runtime_boot import RuntimeBoot
-from pipelex.kernel.method_kernel import MethodKernel
+from pipelex.kernel.pipelex_kernel import PipelexKernel
 
 RuntimeBoot.make()
-kernel = MethodKernel.make(user_id="my-service")
+kernel = PipelexKernel.make(user_id="my-service")
 ```
 
 That boot stands up the model deck, the content generator, the class registry, the reporting delegate and the plugin registries — the machinery inference needs. It does **not** stand up the library manager, the pipe router or the pipeline manager, because a kernel caller has no method to load.
 
-`needs_inference=False` boots keyless (no credentials, no model-deck validation) and sets the forced-DRY flag: every run the process initiates is coerced to `run_mode=DRY`, so the leaves mock instead of calling a provider. `MethodKernel.make` applies that rule through the same `runtime_hub.resolve_run_mode_for_boot` the pipe tier uses — a second copy of the rule at a second factory is how the two would drift apart.
+`needs_inference=False` boots keyless (no credentials, no model-deck validation) and sets the forced-DRY flag: every run the process initiates is coerced to `run_mode=DRY`, so the leaves mock instead of calling a provider. `PipelexKernel.make` applies that rule through the same `runtime_hub.resolve_run_mode_for_boot` the pipe tier uses — a second copy of the rule at a second factory is how the two would drift apart.
 
 ---
 
@@ -60,13 +60,13 @@ Only the last one can see a function-local interpreter import, and it is **per-f
 
 ## What a programmatic caller imports
 
-Module-level functions carry the semantics. `MethodKernel` is a thin façade over the LLM pair, holding the per-run state a caller would otherwise thread through every call; every other operator is called directly.
+Module-level functions carry the semantics. `PipelexKernel` is a thin façade over the LLM pair, holding the per-run state a caller would otherwise thread through every call; every other operator is called directly.
 
 Both façade calls take the concept and the output class the caller wants, defaulting to `Text` and `TextContent` when it wants neither. `llm_text` accepts them because a text step is not always a *native*-`Text` step: a method may declare its output as a concept refining `Text`, and a façade that hardcoded the native one would write a different concept into memory than the interpreter writes from the same authored declaration.
 
 | Module | Entry points |
 |---|---|
-| `pipelex.kernel.method_kernel` | `MethodKernel.make`, `.llm_text`, `.llm_object`, `.make_step_metadata` |
+| `pipelex.kernel.pipelex_kernel` | `PipelexKernel.make`, `.llm_text`, `.llm_object`, `.make_step_metadata` |
 | `pipelex.kernel.llm_ops` | `resolve_llm_setting_for_text` / `_for_object`, `derive_templating_style`, `derive_structure_prompt`, `generate_object_content`, `run_llm_text`, `run_llm_object` |
 | `pipelex.kernel.extract_ops` | `resolve_extract_setting`, `build_extract_job_params`, `run_extract` |
 | `pipelex.kernel.img_gen_ops` | `resolve_img_gen_setting`, `resolve_default_size`, `build_img_gen_job_params`, `run_img_gen` |
@@ -117,7 +117,7 @@ summaries = extract_main_content_as_list(memory=result.memory, item_type=Summary
 
 ## Run-scoped state, and who owns the usage lifecycle
 
-`MethodKernel` holds exactly two things, both run-scoped identity:
+`PipelexKernel` holds exactly two things, both run-scoped identity:
 
 - **`job_metadata`** — the run-level metadata. It is not what a step runs under: every call mints a per-step copy through `make_step_metadata()`, carrying a fresh `pipe_run_id` and inheriting the trace context, so trace and usage attribution stay per-step. This mirrors the interpreter's pass-down-a-modified-copy pattern.
 - **`cogt_run_params`** — the execution-mode contract (`run_mode`, and the DRY-only `is_mock_usage` sub-flag) that every cogt leaf reads off the assignment it is handed.
@@ -138,7 +138,7 @@ event_log = InMemoryEventLog()
 trace_context = TraceContext(graph_id=run_id, data_inclusion=data_inclusion, emit_graph_events=False, emit_usage_events=True)
 get_report_delegate().set_event_log(context_key=trace_context.lookup_key, event_log=event_log, workflow_id="direct", pipeline_run_id=run_id)
 try:
-    kernel = MethodKernel.make(user_id="my-service", trace_context=trace_context)
+    kernel = PipelexKernel.make(user_id="my-service", trace_context=trace_context)
     ...
     tokens_usages = UsageAggregator.aggregate(event_log.read_events(run_id))
 finally:

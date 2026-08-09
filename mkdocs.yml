@@ -310,7 +310,7 @@ plugins:
         Under the Hood:
         - under-the-hood/index.md: "Under the Hood Overview"
         - under-the-hood/architecture-overview.md: "Architecture Overview"
-        - under-the-hood/method-kernel.md: "The Method Kernel"
+        - under-the-hood/pipelex-kernel.md: "The Pipelex Kernel"
         - under-the-hood/build-time-elaboration.md: "Build-time Elaboration"
         - under-the-hood/codegen-projections.md: "Codegen Projections"
         - under-the-hood/dry-run-mock-generation.md: "Dry Run Mock Generation"
@@ -551,7 +551,7 @@ nav:
     - Under the Hood:
       - Overview: under-the-hood/index.md
       - Architecture Overview: under-the-hood/architecture-overview.md
-      - The Method Kernel: under-the-hood/method-kernel.md
+      - The Pipelex Kernel: under-the-hood/pipelex-kernel.md
       - Build-time Elaboration: under-the-hood/build-time-elaboration.md
       - Codegen Projections: under-the-hood/codegen-projections.md
       - Dry Run Mock Generation: under-the-hood/dry-run-mock-generation.md

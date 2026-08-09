@@ -161,7 +161,7 @@ Phase 1's `LLMPromptBlueprint` precedent looks like it points the other way, and
 
 ## KF-14 — `UsageReportEvent.node_id` has no readers, which is why a kernel run's flat node state is not a bug yet
 
-**Surfaced by** cubic on PR #1083 (P2), which argued that `MethodKernel.make_step_metadata` inherits the run-level `TraceContext` unchanged, so every step of a multi-call kernel run carries `node_sequence=0` and `parent_node_id=None` — and concluded that a multi-step run's usage records would collide onto one node. The cold `/code-review` raised the same point independently.
+**Surfaced by** cubic on PR #1083 (P2), which argued that `PipelexKernel.make_step_metadata` inherits the run-level `TraceContext` unchanged, so every step of a multi-call kernel run carries `node_sequence=0` and `parent_node_id=None` — and concluded that a multi-step run's usage records would collide onto one node. The cold `/code-review` raised the same point independently.
 
 **Rejected as a code change, on measurement.** Two kernel LLM calls under one `TraceContext` produce two events and two records with the correct token total, on both emit paths (the registered-context fast path and the runner fallback). Nothing collides, because nothing on that path keys on the node: the event log's dedup key is `(workflow_id, writer_id, event type, sequence)` with `sequence` coming from a lock-guarded per-log counter, `UsageAggregator.aggregate` is a flat filter-and-map with no grouping, and `TokensUsageRecord` has no `node_id` field at all — so it never reaches `/execute`'s `tokens_usages` or `tokens_usages.json`.
 

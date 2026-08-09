@@ -35,7 +35,7 @@ from pipelex.cogt.content_generation.dry_mock import MOCK_USAGE_MODEL_NAME
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.kernel.method_kernel import MethodKernel
+from pipelex.kernel.pipelex_kernel import PipelexKernel
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.reporting.usage_records import TokensUsageRecord, make_tokens_usage_record
@@ -106,7 +106,7 @@ class TestKernelUsageParity:
             pipeline_run_id=trace_context.graph_id,
         )
         try:
-            kernel = MethodKernel.make(
+            kernel = PipelexKernel.make(
                 run_mode=PipeRunMode.DRY,
                 user_id="kernel-usage-parity",
                 is_mock_usage=True,

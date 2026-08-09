@@ -114,7 +114,7 @@ class TestKeylessBootForcedDry:
             assert is_dry_run_forced()
 
             with pytest.raises(ValueError, match="is_mock_usage"):
-                MethodKernel.make(run_mode=PipeRunMode.LIVE, user_id="test-user", is_mock_usage=True)
+                PipelexKernel.make(run_mode=PipeRunMode.LIVE, user_id="test-user", is_mock_usage=True)
         finally:
             Pipelex.teardown_if_needed()
 

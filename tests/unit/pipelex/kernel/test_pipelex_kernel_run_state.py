@@ -1,4 +1,4 @@
-"""The run-scoped state `MethodKernel` holds, and what each step inherits from it.
+"""The run-scoped state `PipelexKernel` holds, and what each step inherits from it.
 
 `test_usage_parity.py` measures the end of this chain — that a kernel run's usage records match an
 interpreter run's. These pin the links, because a parity failure there says "no events" without
@@ -20,7 +20,7 @@ from pipelex.kernel.memory_ops import (
     extract_named_content_as_list,
     store_result,
 )
-from pipelex.kernel.method_kernel import MethodKernel
+from pipelex.kernel.pipelex_kernel import PipelexKernel
 from pipelex.system.data_inclusion_config import DataInclusionConfig
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
@@ -43,7 +43,7 @@ def _trace_context() -> TraceContext:
     )
 
 
-class TestMethodKernelRunState:
+class TestPipelexKernelRunState:
     def test_a_supplied_trace_context_becomes_the_runs_identity(self) -> None:
         """Passing a context adopts its graph_id as the run id — the two are one identity.
 
@@ -53,22 +53,22 @@ class TestMethodKernelRunState:
         """
         trace_context = _trace_context()
 
-        kernel = MethodKernel.make(run_mode=PipeRunMode.DRY, user_id="test-user", trace_context=trace_context)
+        kernel = PipelexKernel.make(run_mode=PipeRunMode.DRY, user_id="test-user", trace_context=trace_context)
 
         assert kernel.job_metadata.pipeline_run_id == _GRAPH_ID
         assert kernel.job_metadata.trace_context == trace_context
 
     def test_without_a_trace_context_the_run_mints_its_own_id_and_traces_nothing(self) -> None:
         """The default stays what it was: a fresh run id, and no context for the leaf to emit against."""
-        first = MethodKernel.make(run_mode=PipeRunMode.DRY, user_id="test-user")
-        second = MethodKernel.make(run_mode=PipeRunMode.DRY, user_id="test-user")
+        first = PipelexKernel.make(run_mode=PipeRunMode.DRY, user_id="test-user")
+        second = PipelexKernel.make(run_mode=PipeRunMode.DRY, user_id="test-user")
 
         assert first.job_metadata.trace_context is None
         assert first.job_metadata.pipeline_run_id != second.job_metadata.pipeline_run_id
 
     def test_each_step_inherits_the_trace_context_and_carries_its_own_run_id(self) -> None:
         """The per-step copy: same trace context (so every step attributes to it), distinct pipe_run_id."""
-        kernel = MethodKernel.make(run_mode=PipeRunMode.DRY, user_id="test-user", trace_context=_trace_context())
+        kernel = PipelexKernel.make(run_mode=PipeRunMode.DRY, user_id="test-user", trace_context=_trace_context())
 
         first_step = kernel.make_step_metadata()
         second_step = kernel.make_step_metadata()
@@ -82,7 +82,7 @@ class TestMethodKernelRunState:
 
     def test_mock_usage_rides_the_execution_mode_contract(self) -> None:
         """The DRY sub-flag lands on the carrier every cogt leaf reads off its assignment."""
-        kernel = MethodKernel.make(run_mode=PipeRunMode.DRY, user_id="test-user", is_mock_usage=True)
+        kernel = PipelexKernel.make(run_mode=PipeRunMode.DRY, user_id="test-user", is_mock_usage=True)
 
         assert kernel.cogt_run_params.run_mode.is_dry
         assert kernel.cogt_run_params.is_mock_usage

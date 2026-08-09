@@ -26,7 +26,7 @@ emit a usage event. Opening the event log, registering it (``get_report_delegate
 reading the events back and clearing the registration stay the caller's, and they are the whole of
 what stands between a kernel run and the interpreter's cost reporting. ``pipelex/tracing/`` holds
 both halves a caller needs (``make_event_log``, ``UsageAggregator``) and is runtime-layer, so none of
-this costs the boot contract. See ``docs/under-the-hood/method-kernel.md``.
+this costs the boot contract. See ``docs/under-the-hood/pipelex-kernel.md``.
 """
 
 from typing import Self

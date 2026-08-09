@@ -72,8 +72,8 @@ review = [
 ]
 verify_commands = []
 
-[contracts.method-kernel-docs]
-description = "The method-kernel doc is the kernel's specification for programmatic callers and must track the kernel surface."
+[contracts.pipelex-kernel-docs]
+description = "The pipelex-kernel doc is the kernel's specification for programmatic callers and must track the kernel surface."
 # The page tabulates the surface module by module (every entry point a caller imports) and states
 # what each of the four layering gates covers. A kernel function added, renamed or moved silently
 # falsifies the first table; a change to the boot-contract script's coverage silently falsifies the
@@ -85,6 +85,6 @@ triggers = [
   "tests/unit/pipelex/kernel/test_kernel_boot_contract.py",
 ]
 review = [
-  "docs/under-the-hood/method-kernel.md",
+  "docs/under-the-hood/pipelex-kernel.md",
 ]
 verify_commands = []
