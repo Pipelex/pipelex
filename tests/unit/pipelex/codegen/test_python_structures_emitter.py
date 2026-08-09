@@ -50,6 +50,18 @@ class TestPythonStructuresEmitter:
         content = emit_python_structures(resolve_concepts_from_crate(refines_crate))[0].content
         assert "class Thumbnail(ImageContent):" in content
 
+    def test_refines_anything_imports_the_root_base_it_names(self, refines_anything_crate: LibraryCrate, tmp_path: Path):
+        """Naming a base is not enough — the renderer that writes the name has to register its import.
+
+        `Anything` is the only native with no content class of its own, so it is the only reference that
+        falls back to the root `StructuredContent`. Emitting the bare name without the import produces a
+        module that raises `NameError` on the consumer's first import, so this loads it rather than
+        grepping for the line.
+        """
+        content = emit_python_structures(resolve_concepts_from_crate(refines_anything_crate))[0].content
+        module = load_generated_module(content, tmp_path=tmp_path, name="gen_structures_anything")
+        assert module.Loose.__mro__[1].__name__ == "StructuredContent"
+
     def test_collision_qualifies_class_names(self, edge_crate: LibraryCrate):
         content = emit_python_structures(resolve_concepts_from_crate(edge_crate))[0].content
         assert "class alpha__Result(" in content

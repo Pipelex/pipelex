@@ -36,7 +36,7 @@ from typing import cast
 
 import pytest
 
-from pipelex.codegen.emitters.python_common import python_header
+from pipelex.codegen.emitters.python_common import PY_EXPLODE_WIDTH, python_header, render_import_block
 from pipelex.codegen.emitters.python_pydantic import emit_python_pydantic
 from pipelex.codegen.emitters.python_structures import emit_python_structures
 from pipelex.codegen.emitters.target import EmittedFile
@@ -80,8 +80,8 @@ def _collect_kinds(resolved_type: ResolvedType) -> set[ResolvedTypeKind]:
     return kinds
 
 
-def _assert_ruff_clean(*, emitted: list[EmittedFile], tmp_path: Path, target: str, line_length: int | None = None) -> None:
-    """Write the artifacts out and require both `ruff check` and `ruff format --check` to find nothing."""
+def _write_artifacts(*, emitted: list[EmittedFile], tmp_path: Path) -> None:
+    """Write the artifacts out, skipping the test when the current interpreter has no ruff."""
     try:
         subprocess.run([sys.executable, "-m", "ruff", "--version"], check=True, capture_output=True)  # noqa: S603
     except (subprocess.CalledProcessError, FileNotFoundError):
@@ -90,24 +90,41 @@ def _assert_ruff_clean(*, emitted: list[EmittedFile], tmp_path: Path, target: st
     for emitted_file in emitted:
         (tmp_path / emitted_file.filename).write_text(emitted_file.content, encoding="utf-8")
 
-    width_config = ["--config", f"line-length={line_length}"] if line_length is not None else []
-    label = f"[{target}]" if line_length is None else f"[{target} @ line-length={line_length}]"
+
+def _width_config(line_length: int | None) -> list[str]:
+    return ["--config", f"line-length={line_length}"] if line_length is not None else []
+
+
+def _label(*, target: str, line_length: int | None) -> str:
+    return f"[{target}]" if line_length is None else f"[{target} @ line-length={line_length}]"
+
+
+def _assert_ruff_format_stable(*, tmp_path: Path, target: str, line_length: int | None = None) -> None:
+    """Require `ruff format --check` to find nothing — the property byte-reproducibility rests on."""
+    formatted = subprocess.run(  # noqa: S603
+        [sys.executable, "-m", "ruff", "format", "--check", str(tmp_path), "--config", str(_PYPROJECT), *_width_config(line_length)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    label = _label(target=target, line_length=line_length)
+    assert formatted.returncode == 0, f"{label} emitted artifact is not `ruff format` clean:\n{formatted.stdout}{formatted.stderr}"
+
+
+def _assert_ruff_clean(*, emitted: list[EmittedFile], tmp_path: Path, target: str, line_length: int | None = None) -> None:
+    """Write the artifacts out and require both `ruff check` and `ruff format --check` to find nothing."""
+    _write_artifacts(emitted=emitted, tmp_path=tmp_path)
 
     check = subprocess.run(  # noqa: S603
-        [sys.executable, "-m", "ruff", "check", str(tmp_path), *_CONSUMER_LINT_CONFIG, *width_config],
+        [sys.executable, "-m", "ruff", "check", str(tmp_path), *_CONSUMER_LINT_CONFIG, *_width_config(line_length)],
         capture_output=True,
         text=True,
         check=False,
     )
+    label = _label(target=target, line_length=line_length)
     assert check.returncode == 0, f"{label} emitted artifact is not lint-clean:\n{check.stdout}{check.stderr}"
 
-    formatted = subprocess.run(  # noqa: S603
-        [sys.executable, "-m", "ruff", "format", "--check", str(tmp_path), "--config", str(_PYPROJECT), *width_config],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert formatted.returncode == 0, f"{label} emitted artifact is not `ruff format` clean:\n{formatted.stdout}{formatted.stderr}"
+    _assert_ruff_format_stable(tmp_path=tmp_path, target=target, line_length=line_length)
 
 
 class TestEmittedArtifactsAreLintClean:
@@ -188,6 +205,36 @@ class TestEmittedArtifactsAreLintClean:
         """
         crate = cast("LibraryCrate", request.getfixturevalue(crate_fixture))
         _assert_ruff_clean(emitted=emit(resolve_concepts_from_crate(crate)), tmp_path=tmp_path, target=target)
+
+    @pytest.mark.parametrize(
+        "imports",
+        [
+            pytest.param(
+                {f"from a.deeply.nested.consumer.module import Alpha{index}Content" for index in range(6)},
+                id="merged-names-cross-the-width",
+            ),
+            pytest.param(
+                {"from a.deeply.nested.consumer.module import ASingleNameLongEnoughToCrossTheThresholdOnItsOwn"},
+                id="one-name-crosses-the-width",
+            ),
+        ],
+    )
+    def test_import_block_is_format_stable_past_the_explode_width(self, imports: set[str], tmp_path: Path):
+        """The import block is emitted bytes like any other, so it has to be a formatter fixed point too.
+
+        Every *other* renderer pre-explodes past `PY_EXPLODE_WIDTH`; a flat import line that crosses it is
+        rewritten into the parenthesized form by the consumer's first `ruff format`, which changes the body
+        bytes and makes `codegen check` report the file as hand-edited. No crate shape reaches the width
+        today — each native content class lives in its own module, so nothing merges far enough — which is
+        exactly why the property needs a direct test rather than a crate fixture that happens to cover it.
+
+        Format-stable only, not lint-clean: an import block on its own has nothing to *use* the names it
+        imports, so `F401` fires on a shape no emitter ever writes. The whole-artifact tests above cover
+        lint-cleanliness; what is under test here is the formatter fixed point.
+        """
+        emitted = [EmittedFile(filename="structures.py", content=f"{python_header(target='python-structures')}{render_import_block(imports)}\n")]
+        _write_artifacts(emitted=emitted, tmp_path=tmp_path)
+        _assert_ruff_format_stable(tmp_path=tmp_path, target="import-block", line_length=PY_EXPLODE_WIDTH)
 
     def test_natives_only_crate_emits_a_lint_clean_structures_module(self, natives_only_crate: LibraryCrate, tmp_path: Path):
         """The reachable route to an empty projection, and the reason the case is not academic.

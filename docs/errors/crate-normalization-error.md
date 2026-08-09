@@ -7,7 +7,7 @@ description: "Reference for the `CrateNormalizationError` Pipelex error class."
 
 # Crate normalization error
 
-Raised when a library crate cannot be normalized (e.g. a crate key that is not domain-qualified).
+Raised when a library crate cannot be normalized (e.g. a non-domain-qualified key, or a pipe ref matching no crate pipe, or several).
 
 | Field | Value |
 |---|---|
