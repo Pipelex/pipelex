@@ -536,9 +536,30 @@ class InputShaper:
         stuff_spec: StuffSpec,
         variable_name: str,
     ) -> StuffContent:
-        """Delegate to ``StuffContentFactory``, wrapping a build failure as a D4 structure error."""
+        """Delegate to ``StuffContentFactory``, wrapping a build failure as a D4 structure error.
+
+        The structure class is resolved through the **injected provider**, then handed down as a
+        resolved type — the shape ``hub-layering.md`` prescribes for exactly this ("rendering takes
+        the resolved class, not the name"), and the one ``StuffSpec.render_stuff_spec`` already
+        follows. The registry-resolving overload
+        (``make_stuff_content_from_concept_required``) stays for the bottom-up callers that hold no
+        provider; a caller that *has* one must not reach past it into ambient state, which is what
+        the provider parameter exists to avoid.
+
+        Two things follow, and neither is incidental. A shaper that resolved names from the process
+        registry could not run without a loaded library at all — the registry is empty outside a
+        booted process, so `shape_inputs` was un-callable by any programmatic caller that built its
+        own provider, despite taking one explicitly for that purpose. And a name that should have
+        resolved and did not now raises ``ConceptStructureClassNotFoundError`` (uncaught here,
+        deliberately) rather than arriving as a ``StructureValidationError``: an unresolvable
+        declared class is not a malformed *value*, and reporting it as one pointed the author at
+        their input instead of at the concept.
+        """
         try:
-            return StuffContentFactory.make_stuff_content_from_concept_required(concept=concept, value=value)
+            return StuffContentFactory.make_content_from_value(
+                stuff_content_subclass=concept_provider.get_structure_class(concept=concept),
+                value=value,
+            )
         except (ValidationError, StuffContentFactoryError) as exc:
             raise StructureValidationError.make(
                 variable_name=variable_name,
