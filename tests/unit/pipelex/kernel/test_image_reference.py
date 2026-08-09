@@ -1,6 +1,6 @@
 import pytest
 
-from pipelex.pipe_operators.llm.image_reference import ImageReference, ImageReferenceKind
+from pipelex.kernel.prompt_references import ImageReference, ImageReferenceKind
 
 
 class TestImageReference:

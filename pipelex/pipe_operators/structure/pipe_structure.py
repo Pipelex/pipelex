@@ -16,14 +16,12 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
-from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_concept_library, get_native_concept
-from pipelex.pipe_operators.llm.helpers import get_output_structure_prompt
+from pipelex.kernel.llm_ops import derive_structure_prompt, generate_object_content, resolve_llm_setting_for_object, store_result
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
-from pipelex.runtime_hub import get_class_registry, get_content_generator, get_model_deck
+from pipelex.runtime_hub import get_class_registry
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.template_category import TemplateCategory
 
@@ -104,8 +102,6 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeStructureOutput:
-        content_generator = get_content_generator()
-
         text_str = working_memory.get_stuff_as_str(name=self.text_input_name)
 
         # Resolve list-vs-single from base + override.
@@ -116,14 +112,13 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
         is_multiple_output = multiplicity_resolution.is_multiple_outputs_enabled
         fixed_nb_output = multiplicity_resolution.specific_output_count
 
-        # LLM choice: explicit on the pipe → for_object override → for_object default.
-        model_deck = get_model_deck()
-        llm_choice_for_object: LLMModelChoice = (
-            self.llm_choice or model_deck.llm_choice_overrides.for_object or model_deck.llm_choice_defaults.for_object
-        )
-        llm_setting_for_object: LLMSetting = model_deck.get_llm_setting(llm_choice=llm_choice_for_object)
+        # LLM choice: explicit on the pipe → for_object override → for_object default. This pipe has
+        # no text choice of its own, so the kernel's object chain reduces to exactly those three rungs.
+        llm_setting_for_object: LLMSetting = resolve_llm_setting_for_object(llm_choice=self.llm_choice)
 
-        # Render the structuring prompt template against the input text.
+        # Render the structuring prompt template against the input text. Prompt *assembly* is not
+        # shared with PipeLLM: this pipe has no template of its own and no memory-borne references —
+        # it renders one configured template over one input string.
         llm_config = get_config().cogt.llm_config
         structuring_template = llm_config.get_template(template_name="structuring_prompt")
         rendered_user_prompt = await render_template(
@@ -132,58 +127,43 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
             context={"text": text_str},
         )
 
-        # Append the schema description, just like PipeLLM does for object generation.
-        if llm_config.is_structure_prompt_enabled:
-            output_structure_prompt = await get_output_structure_prompt(concept_ref=self.output.concept.concept_ref)
-            if output_structure_prompt:
-                rendered_user_prompt += output_structure_prompt
-
-        llm_prompt = LLMPrompt(user_text=rendered_user_prompt)
-
         content_class: type[StuffContent] = get_class_registry().get_required_subclass(
             name=self.output.concept.structure_class_name,
             base_class=StuffContent,
         )
 
-        the_content: StuffContent
-        if is_multiple_output:
-            try:
-                generated_objects = await content_generator.make_object_list(
-                    job_metadata=job_metadata,
-                    cogt_run_params=pipe_run_params.cogt_run_params,
-                    object_class=content_class,
-                    llm_prompt_for_object_list=llm_prompt,
-                    llm_setting_for_object_list=llm_setting_for_object,
-                    nb_items=fixed_nb_output,
-                )
-            except LLMCompletionError as exc:
-                location = self._format_error_location(pipe_run_params=pipe_run_params)
-                msg = f"Error generating object list in PipeStructure {location}: {exc}"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
-            the_content = ListContent(items=generated_objects)
-        else:
-            try:
-                the_content = await content_generator.make_object(
-                    job_metadata=job_metadata,
-                    cogt_run_params=pipe_run_params.cogt_run_params,
-                    object_class=content_class,
-                    llm_prompt_for_object=llm_prompt,
-                    llm_setting_for_object=llm_setting_for_object,
-                )
-            except LLMCompletionError as exc:
-                location = self._format_error_location(pipe_run_params=pipe_run_params)
-                msg = f"Error generating single object in PipeStructure {location}: {exc}"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
+        # Append the schema description, from the same kernel derivation PipeLLM's object path uses.
+        output_structure_prompt = await derive_structure_prompt(output_class=content_class)
+        if output_structure_prompt:
+            rendered_user_prompt += output_structure_prompt
+
+        llm_prompt = LLMPrompt(user_text=rendered_user_prompt)
+
+        try:
+            the_content = await generate_object_content(
+                job_metadata=job_metadata,
+                cogt_run_params=pipe_run_params.cogt_run_params,
+                llm_prompt=llm_prompt,
+                llm_setting=llm_setting_for_object,
+                output_class=content_class,
+                is_multiple_output=is_multiple_output,
+                fixed_nb_output=fixed_nb_output,
+            )
+        except LLMCompletionError as exc:
+            location = self._format_error_location(pipe_run_params=pipe_run_params)
+            what_failed = "object list" if is_multiple_output else "single object"
+            msg = f"Error generating {what_failed} in PipeStructure {location}: {exc}"
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
         log.verbose(f"PipeStructure '{self.code}' produced {content_class.__name__} (list={is_multiple_output})")
 
-        output_stuff = StuffFactory.make_stuff(
-            name=output_name,
+        working_memory = store_result(
+            memory=working_memory,
             concept=self.output.concept,
             content=the_content,
-            code=pipe_run_params.final_stuff_code,
+            result_name=output_name,
+            result_code=pipe_run_params.final_stuff_code,
         )
-        working_memory.set_new_main_stuff(stuff=output_stuff, name=output_name)
 
         execution_data_dict: dict[str, Any] = {
             "resolved_model": llm_setting_for_object.model,

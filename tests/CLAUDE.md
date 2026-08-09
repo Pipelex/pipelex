@@ -23,6 +23,7 @@ Replace `<paths>` with the test directories from the mapping below. Concatenate 
 | `pipelex/cogt/` | `tests/unit/pipelex/cogt/ tests/integration/pipelex/cogt/` |
 | `pipelex/core/` | `tests/unit/pipelex/core/ tests/integration/pipelex/core/ tests/integration/pipelex/pipes/` |
 | `pipelex/graph/` | `tests/unit/pipelex/graph/ tests/e2e/pipelex/graph/` |
+| `pipelex/kernel/` | `tests/unit/pipelex/kernel/ tests/unit/pipelex/pipe_operators/ tests/integration/pipelex/pipes/` |
 | `pipelex/kit/` | `tests/unit/pipelex/kit/ tests/integration/pipelex/kit/` |
 | `pipelex/language/` | `tests/unit/pipelex/language/ tests/integration/pipelex/language/` |
 | `pipelex/libraries/` | `tests/unit/pipelex/libraries/ tests/integration/pipelex/libraries/` |

@@ -1,6 +1,6 @@
 # Parity-gaps plan — fix the places where two readers disagree about one authored fact
 
-**Thesis.** pipelex has several surfaces that each claim to be a faithful reading of the same authored source: the live library vs the normalized crate, the runtime concept factory vs the `python-structures` projection, the emitted bytes vs the consumer's formatter, and (once the kernel extraction merges) the `MethodKernel` façade vs the ops the interpreter actually calls. Where two of them disagree, the result is a *wrong value with no error attached* — both sides succeed, and only downstream behavior reveals the split. This plan fixes every such disagreement currently known, each with the regression gate that would have caught it.
+**Thesis.** pipelex has several surfaces that each claim to be a faithful reading of the same authored source: the live library vs the normalized crate, the runtime concept factory vs the `python-structures` projection, the emitted bytes vs the consumer's formatter, and (once the kernel extraction merges) the `PipelexKernel` façade vs the ops the interpreter actually calls. Where two of them disagree, the result is a *wrong value with no error attached* — both sides succeed, and only downstream behavior reveals the split. This plan fixes every such disagreement currently known, each with the regression gate that would have caught it.
 
 **Standing rules for this branch:**
 
@@ -94,7 +94,7 @@ These three are written against the open kernel-extraction PRs and share a theme
 
 The re-verification the plan asked for happened against each PR's own branch rather than against a merged result, which is stricter in one way (the code is exactly what will merge) and weaker in another (it cannot see interactions with a later PR in the stack). Nothing in the stack touches these paths after #1082, so the weakness is not live here.
 
-### 2.1 `MethodKernel.llm_text` is narrower than the op beneath it
+### 2.1 `PipelexKernel.llm_text` is narrower than the op beneath it
 
 **The defect** (against #1081's code). The façade's text method hardcodes what the op parameterizes, in three ways: output concept (op takes `concept: Concept`; façade hardcodes native `Text`), output class (op takes `output_class`; façade hardcodes `TextContent`), and model (op's resolution accepts `None` and defers to the deck; façade requires a `model`). Its sibling `llm_object` has none of these limits — the asymmetry is between the façade's own two methods. The interpreter passes all three through, with the model choice routinely `None`.
 
@@ -104,7 +104,7 @@ The re-verification the plan asked for happened against each PR's own branch rat
 
 **✅ Done — *make llm_text as wide as the op beneath it*, on `refactor/Kernel` (#1081).** Re-verified against that branch and held exactly as written: all three widenings were needed. Pre-fix the façade declared `model: LLMModelChoice` with no default — required — and it now declares `model: LLMModelChoice | None = None` alongside the newly optional `concept` and `output_class`. Gated by `tests/unit/pipelex/kernel/test_llm_text_kernel.py`, which asserts on what lands in the returned memory (`type(stuff.content) is MeetingSummary`, the stuff's `concept_ref`) rather than on the signature — a signature assertion would pass on a façade that accepted the arguments and dropped them. No changelog entry: the package is new and unreleased, so there is no shipped behavior to note.
 
-### 2.2 `MethodKernel.llm_object` renders under the wrong model's prompting style
+### 2.2 `PipelexKernel.llm_object` renders under the wrong model's prompting style
 
 **The defect** (against #1081's code). A `PipeLLM` carries two model choices (`model` → for_text, `model_to_structure` → for_object). The interpreter resolves **two** settings and derives the templating style from the **text** one (`pipe_llm.py:219–237` on dev — the pipe's main model governs how the prompt is written; the object path differs only in how the answer comes back). The façade collapses to one choice, drops the object chain's `for_text` fallback rung, and derives the style from the **object** setting. Unlike 2.1 this is not narrowness visible in a signature — it is a wrong value.
 
@@ -147,5 +147,5 @@ Deferred as **KF-16** in `wip/kernel/deferred-follow-ups.md`, with the design in
 ## Out of scope
 
 - The runtime's structureless *promotion* semantics (D-2 option (b)) and the bare-ref *language rule* (D-1 option (b)) — both are author-facing language decisions, flagged for Louis, not taken here.
-- `MethodKernel` growing façade methods for the non-LLM operators — a design conversation for after the kernel PRs settle, not a parity defect.
+- `PipelexKernel` growing façade methods for the non-LLM operators — a design conversation for after the kernel PRs settle, not a parity defect.
 - Anything in the open kernel PRs themselves — they are finalized and stacked; this branch follows them, it does not amend them.

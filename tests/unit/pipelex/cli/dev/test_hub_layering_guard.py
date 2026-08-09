@@ -175,6 +175,29 @@ class TestHubLayeringGuard:
             "fail by design. Declare pipelex.runtime_boot instead; that is the half that stays clean."
         )
 
+    def test_the_pipelex_kernel_stays_declared(self) -> None:
+        """`pipelex.kernel` must stay declared — it is the package the whole extraction exists to keep clean.
+
+        The kernel holds the operator-execution semantics the interpreter's operator classes call
+        into, and its contract is that a programmatic caller can invoke them on a `RuntimeBoot`-only
+        process. One `interpreter_hub` reach anywhere inside it breaks that contract for every
+        caller at once — so this is the package where the "undeclared is unpoliced" failure would
+        cost the most, and it was declared in the same commit that created it rather than after a
+        breach, unlike the four above.
+
+        Deleting the entry is the silent regression: the layer rule and the transitive rule both
+        filter through `is_runtime_layer`, and the `pipelex.exceptions` aggregate gate iterates this
+        very tuple — so removing the entry takes the kernel out of *three* checks at once while
+        every one of them keeps reporting PASSED. Membership is the whole assertion, for the reason
+        the neighbouring tests give.
+        """
+        assert "pipelex.kernel" in RUNTIME_LAYER_PACKAGES, (
+            "pipelex.kernel holds the operator-execution semantics that must stay callable on a "
+            "runtime-only boot, and it is no longer declared runtime-layer. Undeclared means "
+            "unchecked, not flagged — restore the entry, or move whatever made it dirty to the "
+            "layer it belongs to."
+        )
+
     def test_runtime_layer_may_import_runtime_hub(self) -> None:
         """The permitted direction is never flagged — the runtime layer lives on `runtime_hub`."""
         violations = _violate(

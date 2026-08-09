@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Pipelex kernel (`pipelex.kernel`)**: A new public subpackage holding operator-execution semantics as importable functions, so what a `PipeLLM` step *does* — deck resolution, templating-style derivation, prompt assembly, generation, memory write-back — is no longer reachable only through a fully booted interpreter with a loaded library. Every kernel call is servable on a runtime-only boot with zero `.mthds` loaded, which is pinned by a permanent test. This first release covers the LLM operator; the remaining operators follow.
+
+### Changed
+
+- **Prompt reference types moved (Breaking)**: `ImageReference` and `DocumentReference` (with their `*Kind` enums) moved from `pipelex.pipe_operators.shared.image_reference` / `pipelex.pipe_operators.llm.document_reference` to `pipelex.kernel.prompt_references`. They describe how a prompt resolves an image or document out of working memory, which is execution semantics rather than a language artifact.
+- **`LLMPromptBlueprintValueError` replaced (Breaking)**: The error raised when a prompt's image or document reference cannot be resolved is now `pipelex.kernel.exceptions.PromptContentError`, moved with the code that raises it. `LLMPromptBlueprint` keeps its fields, its validation and its `make_llm_prompt` signature.
+- **Keyless-boot forced-DRY rule has one home**: `pipelex.runtime_hub.resolve_run_mode_for_boot` now owns the coercion that a keyless boot (`needs_inference=False`) applies to a requested run mode. Both run-params factories call it — the pipe tier's `PipeRunParamsFactory.make_run_params`, whose behavior is unchanged, and the kernel tier's `PipelexKernel.make`, which previously minted a LIVE `CogtRunParams` on an offline boot. A programmatic kernel caller on a keyless boot now gets the same forced DRY and the same warning as a pipe run.
+
 ### Fixed
 
 - **Cross-domain pipe refs in normalized crates (Breaking)**: A bare pipe ref calling a pipe declared in another domain was normalized by prefixing the *caller's* domain, naming a pipe the crate does not hold — while the live library resolves the same ref by searching every domain. The crate fingerprinted the wrong content and a crate round-trip broke the method at run time with `PipeNotFoundError`, with nothing raised on the way in. Normalization now resolves a bare pipe ref against the whole crate exactly as `PipeLibrary` does, and raises `CrateNormalizationError` when the ref is ambiguous or matches no pipe instead of emitting a dangling ref.

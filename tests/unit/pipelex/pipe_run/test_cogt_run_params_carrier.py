@@ -35,8 +35,8 @@ class TestCogtRunParamsCarrier:
 
     def test_forced_dry_coerces_live_and_warns(self, mocker: MockerFixture) -> None:
         """Keyless boot: a LIVE request is coerced to DRY with a warning."""
-        mocker.patch("pipelex.pipe_run.pipe_run_params_factory.is_dry_run_forced", return_value=True)
-        warning_spy = mocker.patch("pipelex.pipe_run.pipe_run_params_factory.log.warning")
+        mocker.patch("pipelex.runtime_hub.is_dry_run_forced", return_value=True)
+        warning_spy = mocker.patch("pipelex.runtime_hub.log.warning")
 
         run_params = PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE)
 
@@ -47,14 +47,14 @@ class TestCogtRunParamsCarrier:
         """Keyless boot: LIVE + is_mock_usage still fails loud — the factory validates the REQUESTED
         mode first, so the coercion cannot silently turn an illegal request into a reportable dry run.
         """
-        mocker.patch("pipelex.pipe_run.pipe_run_params_factory.is_dry_run_forced", return_value=True)
+        mocker.patch("pipelex.runtime_hub.is_dry_run_forced", return_value=True)
 
         with pytest.raises(ValueError, match="is_mock_usage"):
             PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE, is_mock_usage=True)
 
     def test_forced_dry_keeps_mock_usage_on_dry_request(self, mocker: MockerFixture) -> None:
         """Keyless boot: an explicit DRY + is_mock_usage request is legal and passes through untouched."""
-        mocker.patch("pipelex.pipe_run.pipe_run_params_factory.is_dry_run_forced", return_value=True)
+        mocker.patch("pipelex.runtime_hub.is_dry_run_forced", return_value=True)
 
         run_params = PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY, is_mock_usage=True)
 

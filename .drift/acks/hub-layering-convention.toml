@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:2b509c7efe7ebaa99dcf1fce041dcf141b94e516dd91cda75b13deba982538f9"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-07-30T05:25:03Z"
-rationale = "Trigger is a one-paragraph docstring accuracy fix on RuntimeHub.setup_config's config_dir parameter: it said 'project/global layering is bypassed and only this directory is read', which contradicted config_loader (the package defaults layer always applies) and the two make() docstrings that already said 'package defaults + this directory'. Reviewed docs/contribute/hub-layering.md: it does not describe setup_config, config_dir, or config layering anywhere — grep for config_dir/setup_config/'only this directory' returns nothing — so the page carries no copy of the claim that was wrong and nothing is stale. Re-ran the prescribed mechanical check anyway (every name in the guard's RUNTIME_LAYER_PACKAGES appears under 'The rule'): all fourteen present, including pipelex.runtime_boot from the previous ack, so the enumeration that has been the rot seven rounds running is clean this time. No doc change needed."
+digest = "sha256:3e809663f592cb1454c7f5b1d7c0d480b63a18c6eed7d710970e7866da27c205"
+reviewed_by = "Claude (Opus 5)"
+reviewed_at = "2026-08-09T15:30:30Z"
+rationale = "Trigger is the rename of the kernel façade class to PipelexKernel, which changed exactly one word in runtime_hub.py: the class named in resolve_run_mode_for_boot's docstring. Reviewed docs/contribute/hub-layering.md and it is already current — the rename commit updated the page atomically, so the paragraph under 'Which hub does a new symbol belong to?' already reads PipelexKernel.make; only the ack digest was stale. Ran both prescribed mechanical checks rather than re-reading the tables, per the standing note in the dogfood log: all 15 packages in RUNTIME_LAYER_PACKAGES are named under Enforcement (the enumeration that rotted seven rounds running is clean — it now includes pipelex.kernel and pipelex.runtime_boot), and all 34 + 32 public module-level hub symbols appear in the partition tables. Also verified the page's concrete references still resolve: resolve_run_mode_for_boot sits beside is_dry_run_forced under 'run mode', and tests/unit/pipelex/kernel/test_kernel_boot_contract.py exists at the path the Enforcement section cites. No doc change needed. The review also turned up six references to the class's old name outside this contract's targets, in wip/parity/README.md and wip/parity/parity-gaps-plan.md, which arrived via the dev merge; those were renamed in the same change, so the old name is now gone from the working tree entirely."
 
 [trigger_files]
-"pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:a602008dabb5b1ce81496513c37253ef6f5c0765"
+"pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:151bee2b65ca3717b09f754d2e30aad830894f43"
 "pipelex/interpreter_hub.py" = "blob:b7ac885d348d32f1aa4b1e660da5b03533fb305b"
-"pipelex/runtime_hub.py" = "blob:81fb34f097b440293b8b68f9eefb7289778c911b"
+"pipelex/runtime_hub.py" = "blob:b5eab6810174435eb1e40aa1b1cd29a103af58be"

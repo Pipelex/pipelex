@@ -44,6 +44,7 @@ from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.console_target import ConsoleTarget
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.class_registry_access import get_class_registry as _get_active_class_registry
 from pipelex.system.registries.func_registry import FuncRegistry
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
@@ -524,6 +525,30 @@ def scoped_content_generator(content_generator: ContentGeneratorProtocol) -> Gen
 def is_dry_run_forced() -> bool:
     """True when the boot was keyless (``needs_inference=False``): every run is forced to DRY (D4)."""
     return get_runtime_hub().is_dry_run_forced()
+
+
+def resolve_run_mode_for_boot(*, requested: PipeRunMode) -> PipeRunMode:
+    """Apply the keyless-boot forced-DRY flag to a requested run mode (eng review D4).
+
+    The one place the flag is *applied*, sitting beside the accessor that reads it. Every factory
+    that mints run params for a run **this process initiates** calls it — the pipe tier's
+    ``PipeRunParamsFactory.make_run_params`` and the kernel tier's ``PipelexKernel.make`` — so
+    ``needs_inference=False`` stays a property of the boot rather than of whichever entry point a
+    caller happened to reach for. A second copy of the rule at a second factory is exactly how the
+    two would drift apart.
+
+    Note what this does NOT cover, deliberately: constructing a ``PipeRunParams`` or a
+    ``CogtRunParams`` directly bypasses it, just as it bypasses every other factory-level default.
+    Params handed to a worker over the wire are likewise untouched — the flag is a submitter-side
+    contract, not a constraint on work this process executes for someone else.
+    """
+    if is_dry_run_forced() and requested.is_live:
+        log.warning(
+            "LIVE run requested under a keyless boot (needs_inference=False): forcing run_mode to DRY — "
+            "outputs will be synthetic mocks, not real inference."
+        )
+        return PipeRunMode.DRY
+    return requested
 
 
 def get_content_generator() -> ContentGeneratorProtocol:
