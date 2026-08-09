@@ -11,8 +11,8 @@ This track fixes a family of defects that share one shape: a single authored fac
 | Bare cross-domain pipe refs | `crate_normalization` qualifies with the owner domain; the live `PipeLibrary` searches every domain | now |
 | Structureless concept base class | runtime promotes to a `TextContent` refinement; the `python-structures` projection emits `StructuredContent` + `extra="allow"` | now |
 | Import-block format stability | `render_import_block` never wraps; a consumer's `ruff format` wraps past 88 columns | now |
-| `MethodKernel.llm_text` narrowness | the façade hardcodes concept/class and requires a model; `run_llm_text` and the interpreter take all three | ✅ fixed **in** #1081 |
-| `MethodKernel.llm_object` prompting style | the façade derives style from the object setting and drops the `for_text` rung; the interpreter derives style from the text setting | ⚠️ withdrawn — not a live defect |
+| `PipelexKernel.llm_text` narrowness | the façade hardcodes concept/class and requires a model; `run_llm_text` and the interpreter take all three | ✅ fixed **in** #1081 |
+| `PipelexKernel.llm_object` prompting style | the façade derives style from the object setting and drops the `for_text` rung; the interpreter derives style from the text setting | ⚠️ withdrawn — not a live defect |
 | Img-gen prompt constructor | `kernel/prompt_references.py` says the kernel resolves image references; only the interpreter-layer blueprint can actually build an `ImgGenPrompt` | ✅ fixed **in** #1082 |
 
 ## Phasing
