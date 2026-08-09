@@ -64,14 +64,20 @@ import pytest
 #: sibling declaration already claimed was clean. The import now points at the definition site, per this
 #: repo's "direct full-path imports everywhere" rule, and this entry point is what keeps it there.
 #:
-#: `kernel.pipelex_kernel` is the Pipelex kernel's widest module-level closure: the façade imports the
-#: ops modules that hold the operator-execution semantics, so one entry point covers the package.
-#: It earns a place here for a reason none of the others share — the kernel's *contract* is that a
-#: programmatic caller can invoke these functions on a `RuntimeBoot`-only process with zero `.mthds`
-#: loaded, which is this very property rather than a consequence of it. Note the blind spot the
-#: kernel's own doctrine restates: this test sees module-level imports only, so a function-local
-#: import inside a kernel module is invisible to it *and* to the static graph at once, and reviews
-#: have to catch those by hand.
+#: `kernel.pipelex_kernel` earns a place here for a reason none of the others share — the kernel's
+#: *contract* is that a programmatic caller can invoke its functions on a `RuntimeBoot`-only process
+#: with zero `.mthds` loaded, which is this very property rather than a consequence of it.
+#:
+#: It does **not** cover the kernel package, and no entry point here does: the façade is an LLM-era
+#: one that imports `llm_ops` alone, so the per-operator ops modules are outside every closure this
+#: tuple pins. They are covered instead by `tests/unit/pipelex/kernel/test_kernel_boot_contract.py`,
+#: which imports *and calls* each of them and sweeps afterwards — strictly stronger than this test on
+#: those modules, so listing them here as well would buy only a sharper failure message. Adding a
+#: kernel module to this tuple is therefore worth it only if it is *not* reached by that call path.
+#:
+#: Note the blind spot the kernel's own doctrine restates: this test sees module-level imports only,
+#: so a function-local import inside a kernel module is invisible to it *and* to the static graph at
+#: once. That is precisely the hole the boot-contract test's post-call sweep exists to close.
 RUNTIME_LAYER_ENTRY_POINTS = [
     "pipelex.cogt.content_generation.content_generator",
     "pipelex.runtime_hub",

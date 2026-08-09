@@ -6,7 +6,6 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
-from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -14,10 +13,10 @@ from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErr
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_concept_library, get_native_concept
+from pipelex.kernel.compose_ops import run_compose_template
 from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
 from pipelex.pipe_operators.compose.exceptions import PipeComposeError, StructuredContentComposerValueError
@@ -192,44 +191,30 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             msg = "Template is required for template mode"
             raise ValueError(msg)
 
-        context: dict[str, Any] = working_memory.generate_context()
-        if pipe_run_params:
-            context.update(**pipe_run_params.params)
-        if self.extra_context:
-            context.update(**self.extra_context)
-
-        rendered_template_text = await render_template(
-            template=self.template,
-            category=self.category,
-            context=context,
-            templating_style=self.templating_style,
-        )
-        log.verbose(f"Template rendered text:\n{rendered_template_text}")
-        assert isinstance(rendered_template_text, str)
-
-        # Get the structure class from the registry (might be a subclass of TextContent or HtmlContent)
+        # Resolved here rather than inside the kernel: turning a concept into a class is a library's
+        # business, and handing the class over is what spares the kernel a registry read.
         structure_class = get_class_registry().get_required_subclass(
             name=self.output.concept.structure_class_name,
             base_class=StuffContent,
         )
-
-        # Construct content based on the structure class type
-        if issubclass(structure_class, HtmlContent):
-            the_content = structure_class(inner_html=rendered_template_text, css_class="")
-        else:
-            the_content = structure_class(text=rendered_template_text)
-
-        output_stuff = StuffFactory.make_stuff(concept=self.output.concept, content=the_content, name=output_name)
-
-        working_memory.set_new_main_stuff(
-            stuff=output_stuff,
-            name=output_name,
+        compose_result = await run_compose_template(
+            memory=working_memory,
+            template=self.template,
+            category=self.category,
+            concept=self.output.concept,
+            output_class=structure_class,
+            templating_style=self.templating_style,
+            runtime_params=pipe_run_params.params,
+            extra_context=self.extra_context,
+            result_name=output_name,
         )
+        working_memory = compose_result.memory
+        log.verbose(f"Template rendered text:\n{compose_result.rendered_text}")
 
         # Capture execution data for the graph tracer
         execution_data_dict: dict[str, Any] = {
             "compose_mode": "template",
-            "rendered_text": rendered_template_text,
+            "rendered_text": compose_result.rendered_text,
         }
         self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
 
@@ -264,7 +249,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             output_class=output_class,
             runtime_params=pipe_run_params.params if pipe_run_params else None,
             extra_context=self.extra_context,
-            pipe_run_params=pipe_run_params,
         )
         try:
             the_content = await composer.compose()

@@ -29,9 +29,9 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.kernel.llm_prompt_content import LlmPromptContent, assemble_llm_prompt
 from pipelex.kernel.llm_results import LlmObjectResult, LlmTextResult, StructuringPath
+from pipelex.kernel.memory_ops import store_result
 from pipelex.runtime_hub import get_content_generator, get_model_deck
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.template_category import TemplateCategory
@@ -133,25 +133,6 @@ async def generate_object_content(
         llm_prompt_for_object=llm_prompt,
         llm_setting_for_object=llm_setting,
     )
-
-
-def store_result(
-    *,
-    memory: WorkingMemory,
-    concept: Concept,
-    content: StuffContent,
-    result_name: str | None = None,
-    result_code: str | None = None,
-) -> WorkingMemory:
-    """Write a produced content into memory as the new main stuff, and return the memory.
-
-    Returning it is the contract, not a convenience: the argument is mutated today because inline
-    execution aliases the two, and a caller that relies on that aliasing breaks the moment a
-    serialization boundary sits between them.
-    """
-    stuff = StuffFactory.make_stuff(concept=concept, content=content, name=result_name, code=result_code)
-    memory.set_new_main_stuff(stuff=stuff, name=result_name)
-    return memory
 
 
 async def run_llm_text(

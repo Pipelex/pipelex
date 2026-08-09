@@ -39,7 +39,7 @@ class TestPipeImgGenModelNotFoundReroute:
         )
         fake_content_generator = mocker.MagicMock()
         fake_content_generator.make_single_image = mocker.AsyncMock(side_effect=not_found_error)
-        mocker.patch("pipelex.pipe_operators.img_gen.pipe_img_gen.get_content_generator", return_value=fake_content_generator)
+        mocker.patch("pipelex.kernel.img_gen_ops.get_content_generator", return_value=fake_content_generator)
 
         pipe = PipeFactory[PipeImgGen].make_from_blueprint(
             domain_code="generic",

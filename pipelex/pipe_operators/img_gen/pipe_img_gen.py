@@ -1,16 +1,14 @@
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 from pydantic import Field
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.image.image_size import ImageSize
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, ImgGenSize
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenSize
 from pipelex.cogt.img_gen.img_gen_param_support import ImgGenParamSupport
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting, ImgGenSettingValueError
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck_check import check_img_gen_choice_with_deck
-from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -20,33 +18,18 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.exceptions import StuffContentTypeError
 from pipelex.core.stuffs.image_content import ImageContent
-from pipelex.core.stuffs.list_content import ListContent
-from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_concept_library, get_native_concept
+from pipelex.kernel.exceptions import PromptContentError
+from pipelex.kernel.img_gen_ops import build_img_gen_job_params, resolve_img_gen_setting, run_img_gen
 from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
 from pipelex.pipe_operators.img_gen.exceptions import PipeImgGenFactoryError, PipeImgGenRunError
-from pipelex.pipe_operators.img_gen.img_gen_prompt_blueprint import ImgGenPromptBlueprint, ImgGenPromptBlueprintValueError
+from pipelex.pipe_operators.img_gen.img_gen_prompt_blueprint import ImgGenPromptBlueprint
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
-from pipelex.runtime_hub import get_class_registry, get_content_generator, get_model_deck
+from pipelex.runtime_hub import get_class_registry, get_model_deck
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.misc.image_utils import ImageFormat
-
-if TYPE_CHECKING:
-    from pipelex.core.stuffs.stuff_content import StuffContent
-
-
-def resolve_default_size(*, explicit_aspect_ratio: AspectRatio | None, default_size: ImgGenSize | None) -> ImgGenSize | None:
-    """Resolve the config-level size default applicable to a pipe, honoring exact-size/aspect-ratio exclusivity.
-
-    An exact size implies its own aspect ratio (the blueprint forbids setting both on a pipe), so an
-    exact-size deck default does not apply to a pipe that explicitly sets `aspect_ratio` — the more
-    specific pipe field wins. A tier default composes with any ratio and always applies.
-    """
-    if explicit_aspect_ratio is not None and isinstance(default_size, ImageSize):
-        return None
-    return default_size
 
 
 class PipeImgGenOutput(PipeOutput):
@@ -175,29 +158,18 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeImgGenOutput:
-        content_generator = get_content_generator()
-
         multiplicity_resolution = output_multiplicity_to_apply(
             base_multiplicity=self.output_multiplicity or False,
             override_multiplicity=pipe_run_params.output_multiplicity,
         )
         applied_output_multiplicity = multiplicity_resolution.resolved_multiplicity
 
-        img_gen_config = get_config().cogt.img_gen_config
-        img_gen_param_defaults = img_gen_config.img_gen_param_defaults
-        model_deck = get_model_deck()
-
-        # Get ImgGenSetting either from img_gen choice or legacy settings
-        img_gen_setting: ImgGenSetting
-        if self.img_gen_choice is not None:
-            # New pattern: use img_gen choice (preset or inline setting)
-            img_gen_setting = model_deck.get_img_gen_setting(self.img_gen_choice)
-        else:
-            # Use default from model deck
-            img_gen_setting = model_deck.get_img_gen_setting(model_deck.img_gen_choice_default)
+        # The deck chain is kernel semantics; the setting is resolved per run into a local and never
+        # cached onto `self`, for the reason `pipe_llm.py` states about its own settings.
+        img_gen_setting: ImgGenSetting = resolve_img_gen_setting(img_gen_choice=self.img_gen_choice)
 
         # Get max_prompt_images from model spec for validation
-        model_spec = model_deck.get_optional_inference_model(model_handle=img_gen_setting.model, model_type=ModelType.IMG_GEN)
+        model_spec = get_model_deck().get_optional_inference_model(model_handle=img_gen_setting.model, model_type=ModelType.IMG_GEN)
         max_prompt_images = model_spec.max_prompt_images if model_spec else None
 
         try:
@@ -212,40 +184,25 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         except StuffContentTypeError as stuff_content_type_error:
             msg = f"While runnning the PipeImgGen '{self.code}' some inputs are not of the right type: {stuff_content_type_error}"
             raise PipeImgGenRunError(message=msg) from stuff_content_type_error
-        except ImgGenPromptBlueprintValueError as blueprint_error:
+        except PromptContentError as blueprint_error:
             msg = f"While running the PipeImgGen '{self.code}' image extraction failed: {blueprint_error}"
             raise PipeImgGenRunError(message=msg) from blueprint_error
         except PipeImgGenFactoryError as factory_error:
             msg = f"While running the PipeImgGen '{self.code}' prompt construction failed: {factory_error}"
             raise PipeImgGenRunError(message=msg) from factory_error
 
-        # Process one-time settings
-        seed_setting = self.seed or img_gen_param_defaults.seed
-        seed: int | None
-        if isinstance(seed_setting, str) and seed_setting == "auto":
-            seed = None
-        else:
-            seed = seed_setting
-
-        # Build ImgGenJobParams from ImgGenSetting + one-time settings
-        img_gen_job_params = ImgGenJobParams(
-            aspect_ratio=self.aspect_ratio or img_gen_param_defaults.aspect_ratio,
-            size=self.size or resolve_default_size(explicit_aspect_ratio=self.aspect_ratio, default_size=img_gen_param_defaults.size),
-            background=self.background or img_gen_param_defaults.background,
-            quality=img_gen_setting.quality,
-            nb_steps=img_gen_setting.nb_steps,
-            guidance_scale=img_gen_setting.guidance_scale,
-            is_moderated=img_gen_setting.is_moderated,
-            safety_tolerance=img_gen_setting.safety_tolerance,
-            is_raw=self.is_raw if self.is_raw is not None else img_gen_param_defaults.is_raw,
+        # The three-provenance composition (setting / step field / configured default) is kernel semantics.
+        img_gen_job_params = build_img_gen_job_params(
+            img_gen_setting=img_gen_setting,
+            aspect_ratio=self.aspect_ratio,
+            size=self.size,
+            is_raw=self.is_raw,
+            seed=self.seed,
+            background=self.background,
             output_format=self.output_format,
-            seed=seed,
         )
-        # Get the image generation handle
-        img_gen_handle = img_gen_setting.model
-        log.verbose(f"Using img_gen handle: {img_gen_handle}")
+        log.verbose(f"Using img_gen handle: {img_gen_setting.model}")
 
-        the_content: StuffContent
         nb_images: int
         if isinstance(applied_output_multiplicity, bool):
             if self.output_multiplicity is True:
@@ -260,52 +217,26 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         else:
             nb_images = 1
 
-        # Get the structure class from the registry (must be a subclass of ImageContent)
+        # Resolved here rather than inside the kernel: turning a concept into a class is a library's
+        # business, and handing the class over is what spares the kernel a registry read.
         image_content_subclass = get_class_registry().get_required_subclass(
             name=self.output.concept.structure_class_name,
             base_class=ImageContent,
         )
-        if nb_images > 1:
-            image_content_list = await content_generator.make_image_list(
-                job_metadata=job_metadata,
-                cogt_run_params=pipe_run_params.cogt_run_params,
-                img_gen_handle=img_gen_handle,
-                img_gen_prompt=img_gen_prompt,
-                nb_images=nb_images,
-                img_gen_job_params=img_gen_job_params,
-                img_gen_job_config=img_gen_config.img_gen_job_config,
-            )
-            subclass_content_items: list[ImageContent] = []
-            for image_content in image_content_list:
-                subclass_content = image_content_subclass.model_validate(image_content.smart_dump())
-                subclass_content_items.append(subclass_content)
-            the_content = ListContent(
-                items=subclass_content_items,
-            )
-            log.verbose(the_content, title="List of image contents")
-        else:
-            image_content = await content_generator.make_single_image(
-                job_metadata=job_metadata,
-                cogt_run_params=pipe_run_params.cogt_run_params,
-                img_gen_handle=img_gen_handle,
-                img_gen_prompt=img_gen_prompt,
-                img_gen_job_params=img_gen_job_params,
-                img_gen_job_config=img_gen_config.img_gen_job_config,
-            )
-
-            the_content = image_content_subclass.model_validate(image_content.smart_dump())
-            log.verbose(the_content, title=f"output stuff content of PipeImg {self.code}")
-
-        output_stuff = StuffFactory.make_stuff(
-            name=output_name,
+        img_gen_result = await run_img_gen(
+            memory=working_memory,
+            img_gen_prompt=img_gen_prompt,
+            img_gen_setting=img_gen_setting,
+            img_gen_job_params=img_gen_job_params,
             concept=self.output.concept,
-            content=the_content,
+            output_class=image_content_subclass,
+            job_metadata=job_metadata,
+            cogt_run_params=pipe_run_params.cogt_run_params,
+            nb_images=nb_images,
+            result_name=output_name,
         )
-
-        working_memory.set_new_main_stuff(
-            stuff=output_stuff,
-            name=output_name,
-        )
+        working_memory = img_gen_result.memory
+        log.verbose(img_gen_result.content, title=f"output stuff content of PipeImg {self.code}")
 
         # Capture execution data for the graph tracer
         execution_data_dict: dict[str, Any] = {

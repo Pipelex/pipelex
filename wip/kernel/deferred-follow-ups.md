@@ -62,6 +62,78 @@ So the kernel result is behaving exactly like the type it mirrors, and the proje
 
 **Why it is deferred rather than fixed here.** The right fix depends on a question Phase 2 answers, not this PR: is `"structure"` a *fourth kernel structuring path*, or a pipe-level label that merely shares a dict key? Today it is the latter — `PipeStructure` calls `generate_object_content` directly and builds its own execution data, so the kernel never produces `"structure"` and adding the member now would put a value into a "what the kernel op did" type that no kernel op can return. When Phase 2 re-points `PipeStructure` fully, the answer falls out: either it starts flowing through a kernel entry point that legitimately returns a fourth path (add the member, drop the literal), or it stays a caller-side label (narrow the enum's docstring to say it names the *LLM* paths, not the whole key). Cheap either way; wrong to guess now.
 
+## KF-7 — `PipeCompose`'s construct mode is not kernel-covered, and covering it means relocating an MTHDS blueprint
+
+**Surfaced by** task 2.4 itself. The task read "kernel templating + structured-composition ops"; only the templating half landed.
+
+**Why the construct half did not.** Its semantics are `StructuredContentComposer` over a `ConstructBlueprint`, both under `pipelex/pipe_operators/compose/` — an interpreter package by the closure test's own `INTERPRETER_PACKAGES` predicate, so the kernel cannot import either. There is no adapter shape that avoids this: the composer's *input* is the blueprint. Covering construct mode therefore means moving `construct_blueprint.py` (315 lines of MTHDS field-composition model, with its serializers and validators) and `structured_content_composer.py` (840 lines) into `pipelex/kernel/`, plus the `PipeComposeError` family they raise — which is a `PipelexError` subtree, so it drags `make generate-error-pages` and the `tests/data/errors/error_identity.txt` snapshot with it.
+
+Phase 1's `LLMPromptBlueprint` precedent looks like it points the other way, and does not: there the kernel needed a *small* runtime-layer input model (`LlmPromptContent`) that the blueprint maps down onto. The equivalent here is a near-verbatim second copy of a 315-line blueprint, which is duplication, not layering.
+
+**What the caller loses.** Close to nothing. A programmatic caller holds real Python — it builds its structured object directly rather than describing the construction in a blueprint. The blueprint exists so that `.mthds` can express composition declaratively, which is a language concern with a language-side consumer.
+
+**What was done instead.** The one thing genuinely shared between the two paths — the three-layer context ordering (memory stuffs → run params → step `extra_context`) that both the template path and the construct path's TEMPLATE fields render against — is now single-sourced in `build_compose_context` and called from both. That is the drift this extraction exists to kill; the rest of construct mode was never at risk of forking, because it has exactly one caller.
+
+**When to revisit.** If a second caller of construct-mode composition ever appears, or if `pipelex/kernel/` is packaged as a standalone distribution (a stated non-goal today) and the MTHDS blueprint models get a layer verdict of their own. Note the precedent that would support the move when it comes: `TemplateBlueprint` is also a `.mthds`-parsed artifact and already lives in the runtime layer, under `pipelex/cogt/templating/`.
+
+## KF-8 — `PipeFunc`'s executor seam is not kernel-carried, so a kernel `run_func` always runs in this process
+
+**Surfaced by** task 2.5 itself. The task read "kernel function-call op over the `PipeFuncExecutorProtocol` seam ... the kernel op must carry **both arms**"; the call and the write-back landed, the seam did not.
+
+**Why the seam did not.** Neither arm's type survives the layer boundary. `PipeFuncExecutorProtocol.run_pipe_func` declares `pipe_run_params: PipeRunParams` and `run_pipe_func_transported` is typed on `PipeFuncExecutionRequest`, which carries a `LibraryCrate`. `pipe_run` and `libraries` are both interpreter packages, and the task's own analysis rules out moving those two models as far outside Phase 2. So the kernel cannot name the protocol it was told to take as an argument.
+
+**The two ways to satisfy the letter, and why neither was taken.**
+
+- *Re-type the protocol off `PipeRunParams`.* Cheap in this tree — nothing in it reads the parameter, including `DirectPipeFuncExecutor` — but it is not a cleanup, it is a wire-format change: both out-of-tree implementers (our Daytona sandbox plugin and our Temporal plugin) thread `pipe_run_params` straight onto `PipeFuncExecutionRequest`, which crosses a process boundary. Two repos this tree's CI cannot see would break at the same time, and the honest first question — *does anything downstream ever read it?* — is not answerable from here.
+- *A kernel-side narrow protocol plus an interpreter-side adapter.* Buys a second protocol for one seam, an adapter class binding `pipe_run_params`, and a result-model conversion at the boundary — to compose two calls. Against a "no over-engineering" bar that is the more expensive of the two, not the safer one.
+
+**What was done instead.** The split follows what is actually shared. `call_registered_function` holds what running a function *means* — registry lookup, async-vs-sync dispatch, the str/list→`StuffContent` coercion — and both the in-process executor and the kernel's own `run_func` ride it, so the executor and a programmatic caller cannot fork on it. `store_result` holds the write-back, which `PipeFunc` now rides too. What stays interpreter-side is *where the function runs*, which is configured deployment machinery rather than operator semantics.
+
+**What the caller loses, stated plainly.** A programmatic caller cannot ask the kernel to run its function in a sandbox: `run_func` is the in-process path, full stop. And `run_func` has no in-tree caller — `PipeFunc` rides the pieces, not the composition — which is why it carries its own kernel unit tests rather than leaning on the zero-behavior-change suite.
+
+**When to revisit.** Whenever `pipe_run_params` on the executor seam is settled on its own merits — the question is whether a serialized PipeFunc request needs the run params at all, and it wants an answer coordinated across the three repos, not a drive-by narrowing here. Phase 3's `JobMetadata` task (3.3) is the natural moment: it is already the task that asks what run-scoped state a kernel call carries, and this is the same question asked at the one seam that serializes it.
+
+## KF-9 — Two constructors build `ImgGenJobParams` from the same config defaults with different derivation rules
+
+**Surfaced by** cubic on PR #1082, against `build_img_gen_job_params` in `pipelex/kernel/img_gen_ops.py`: a transparent background with no step-level `output_format` builds params that fail `ImgGenJobParams.validate_background_vs_output_format`.
+
+**The asymmetry is real.** `ImgGenJobParamsDefaults.make_img_gen_job_params` (`pipelex/cogt/img_gen/img_gen_job_components.py`) derives `output_format = ImageFormat.PNG` when `self.background.is_certainly_transparent`; the kernel's `build_img_gen_job_params` passes `output_format` straight through. Both read the same `img_gen_param_defaults`, and both are live — the defaults constructor is the fallback in `content_generator.py` and `img_gen_job_factory.py`.
+
+**Why it is not a regression.** The pre-refactor `PipeImgGen._live_run_operator_pipe` constructed `ImgGenJobParams(...)` inline with the identical `output_format=self.output_format`; the operator path never went through `make_img_gen_job_params`. Verified against `git show refactor/Kernel:pipelex/pipe_operators/img_gen/pipe_img_gen.py`. The behavior moved unchanged.
+
+**Reachability.** The shipped default is `background = "auto"`, so it does not fire out of the box. It fires under a `.pipelex/pipelex.toml` override of `[cogt.img_gen_config.img_gen_param_defaults] background = "transparent"`, which would then break every `PipeImgGen` that omits `output_format`. Note the same failure is already reachable today with no config override at all, via a step-level `background = "transparent"` with no `output_format` — so a fix confined to the config path would not close the case.
+
+**Why it is deferred rather than fixed here.** Re-deriving PNG inside `build_img_gen_job_params` would make a currently-failing configuration start working — a behavior change inside a zero-behavior-change PR — and it is the wrong-shaped fix. The defect is that *two* constructors of the same type read the same defaults with divergent rules, which is precisely the duplication this extraction exists to kill. Single-source them; do not patch one side. Failure today is loud and well-worded, not silent corruption, so nothing is at risk in the meantime.
+
+## KF-10 — `max_results` reaches a provider unvalidated because the constraint sits on the wrong model
+
+**Surfaced by** cubic on PR #1082, against `resolve_search_setting` in `pipelex/kernel/search_ops.py`: `search_setting.model_copy(update={"max_results": max_results_override})` skips validation, because pydantic v2's `model_copy` does no validation by design.
+
+**The chain is genuinely unconstrained end to end.** `PipeSearchBlueprint.max_results` is `int | None = None` with no `ge`; `PipeSearchFactory.make` passes it through to `PipeSearch.max_results_override`, also unconstrained; only `SearchSetting.max_results` carries `Field(default=None, ge=1)`, and the `model_copy` is what bypasses it. So `max_results = 0` in a `.mthds` reaches a search provider.
+
+**Why it is not a regression.** Identical on the base branch, step 4 of `PipeSearch._live_run_operator_pipe`. Verified against `git show refactor/Kernel:pipelex/pipe_operators/search/pipe_search.py`.
+
+**Why it is deferred rather than fixed here, and why the obvious fix is the wrong one.** Revalidating the copy (the bot's suggestion) would raise a pydantic `ValidationError` deep inside the search run path, with no `.mthds` locator to tell the author which step is wrong — trading an unvalidated value for a bad diagnostic. The constraint belongs on `PipeSearchBlueprint.max_results` as `Field(default=None, ge=1)`, where it is caught at validation time with a proper error. That changes the MTHDS JSON Schema and drags the committed downstream copies (`mthds/`, `vscode-pipelex/`, `mthds-ui/`) with it, which is unambiguously outside a zero-behavior-change refactor. Do it as a standalone language-surface change with the schema regeneration and the cross-repo sweep in the same PR.
+
+## KF-11 — `PipeImgGen`'s `seed` is documented language surface that no image-generation provider reads
+
+**Surfaced by** verifying cubic's P2 against `build_img_gen_job_params`, which reported that `seed or img_gen_param_defaults.seed` discarded an explicit `0`. That part was true and is **fixed in PR #1082** — the line now reads `seed if seed is not None else …`, matching the `is_raw` line below it. The larger fact came out of checking the claimed impact.
+
+**The seed is inert.** `seed` is a declared `PipeImgGen` blueprint field (therefore in the published MTHDS JSON Schema), it is validated (`ImgGenJobParams.seed`, `ge=0`), and it is composed into `ImgGenJobParams` on every image-generation run — and no img-gen worker reads it. Grepping `job_params.seed` across every worker under `pipelex/providers/*/` finds exactly one image-generation reference, and it is commented out: `pipelex/providers/google/google_img_gen_worker.py`. (The live hits are all `LLMJobParams.seed`, a different field on a different job type.) Which is why the `0` fix is observationally a no-op and does not dent the PR's zero-behavior-change claim.
+
+**The failure a user hits.** They write `seed = 12345` in a `PipeImgGen` step to reproduce an image, run it twice, and get two different images — no error, no warning, nothing indicating the parameter was discarded.
+
+**Why it is deferred rather than fixed here.** It is pre-existing, entirely outside the kernel extraction, and the fix is per-provider plumbing (each SDK spells the seed differently, and not all of them accept one) plus a decision about what to do for backends that cannot honor it — reject at validation, or document the field as best-effort. Both are product calls. Recorded here because this is where it was found; it belongs in the img-gen backlog rather than the kernel one.
+
+## KF-12 — `run_img_gen` treats a non-positive `nb_images` as one image, and what it *should* do is a Phase-3 question
+
+**Surfaced by** Codex on PR #1082 (P2): `nb_images=0` or a negative count falls through the `if nb_images > 1:` fork to `make_single_image`, so an invalid request generates one billable image instead of being rejected.
+
+**Why it is not a regression.** The fork is byte-identical to the base branch — `git show refactor/Kernel:pipelex/pipe_operators/img_gen/pipe_img_gen.py` has the same `if nb_images > 1:` at line 268, with the same `make_image_list` / `make_single_image` arms. The multiplicity derivation above it also moved unchanged: `nb_images = applied_output_multiplicity` whenever that is an `int`, with no lower bound anywhere on the way in.
+
+**Why it is deferred rather than fixed here, and this one is genuine doubt rather than scope.** There is no zero-behavior-change fix available. Unlike the `run_search` signature narrowing in this PR — where the ignorable fields could simply be removed from the signature — `nb_images` is an `int` and plain Python cannot express `int >= 1` at the boundary, so any fix *adds an error path* to a PR whose contract is that it adds none. And the fix's shape is not obvious: `nb_images=0` could defensibly mean "reject this request" or "produce an empty `ListContent`", and picking between them from a bot comment rather than from the caller experience is exactly the mistake KF-2 records. Phase 3's task 3.1 (`shape_inputs`) is the task that decides what a kernel entry point does with a malformed argument; settle it there, for all the ops at once, rather than one `int` at a time.
+
+**Worth noting on the way.** The interpreter path can reach it too — nothing between a `.mthds` `nb_output` and `nb_images` constrains the value — so if the answer turns out to be "reject", the constraint most likely belongs upstream on the blueprint, the same conclusion KF-10 reaches about `max_results`. The two should be settled together.
 ## KF-16 — The model-derived prompting style is obsolete and should become an explicit choice
 
 **Numbered 16, not 7, deliberately.** This item lands on the *first* PR of a three-PR stack, but the stacked Phase 2 and Phase 3 PRs already add KF-7 through KF-15. Taking the next free number instead of the next sequential one keeps every one of those entries — and the cross-references to them in the plan — exactly as written, so folding this in churns neither of the PRs above it. The gap below is theirs to fill.
