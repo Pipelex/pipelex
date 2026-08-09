@@ -29,7 +29,15 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 
 
 class StructuringPath(StrEnum):
-    """How the output was produced — the tracer's vocabulary, owned here rather than at each caller."""
+    """Which kernel LLM path produced the output, owned here rather than restated at each caller.
+
+    It names the *LLM* paths, not the whole `structuring_path` key the tracer consumes: `PipeStructure`
+    writes a bare `"structure"` into that same key, and deliberately has no member here. It calls the
+    kernel's pieces (`generate_object_content` and friends) rather than an entry point that returns one
+    of these, so no kernel op can produce `"structure"` — adding the member would put a value into a
+    "what the kernel op did" type that nothing here can return. The key is `dict[str, Any]` end to end
+    and this is a `StrEnum`, so both forms are the same JSON string downstream.
+    """
 
     TEXT = "text"
     OBJECT_DIRECT = "object_direct"

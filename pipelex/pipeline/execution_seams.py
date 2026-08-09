@@ -36,6 +36,7 @@ from pipelex.interpreter_hub import (
     resolve_library_dirs,
     set_current_library,
 )
+from pipelex.kernel.memory_ops import shape_inputs
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.pipe_job import PipeJob
@@ -199,9 +200,10 @@ async def prepare_pipe_job(
         else:
             # Thread the pipe's declared inputs so each value is shaped top-down against the
             # signature (Smart Inputs). `pipe.inputs` is the method-boundary contract — the same
-            # source the Optionals pass reads below — not the aggregated `needed_inputs()`.
-            working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
-                pipeline_inputs=inputs,
+            # source the Optionals pass reads below — not the aggregated `needed_inputs()`. Through
+            # the kernel op so the interpreter and a programmatic caller shape inputs identically.
+            working_memory = shape_inputs(
+                inputs=inputs,
                 concept_provider=get_concept_library(),
                 input_specs=pipe.inputs,
                 search_domain_codes=search_domain_codes,

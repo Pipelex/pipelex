@@ -102,6 +102,22 @@ class TestKeylessBootForcedDry:
         finally:
             Pipelex.teardown_if_needed()
 
+    def test_keyless_boot_does_not_legalise_mock_usage_on_a_live_request(self) -> None:
+        """The DRY-only sub-flag is validated against the REQUESTED mode, before the coercion.
+
+        Same rule and same ordering as ``PipeRunParamsFactory.make_run_params``. Without it, the one
+        illegal combination would raise on a keyed boot and pass silently on a keyless one — a
+        contract violation whose visibility depended on whether the process happened to hold keys.
+        """
+        try:
+            self._boot_keyless()
+            assert is_dry_run_forced()
+
+            with pytest.raises(ValueError, match="is_mock_usage"):
+                PipelexKernel.make(run_mode=PipeRunMode.LIVE, user_id="test-user", is_mock_usage=True)
+        finally:
+            Pipelex.teardown_if_needed()
+
     def test_keyed_boot_does_not_force_dry(self) -> None:
         """Control arm: a normal boot leaves the flag unset."""
         try:
