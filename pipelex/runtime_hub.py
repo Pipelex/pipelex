@@ -532,7 +532,7 @@ def resolve_run_mode_for_boot(*, requested: PipeRunMode) -> PipeRunMode:
 
     The one place the flag is *applied*, sitting beside the accessor that reads it. Every factory
     that mints run params for a run **this process initiates** calls it — the pipe tier's
-    ``PipeRunParamsFactory.make_run_params`` and the kernel tier's ``MethodKernel.make`` — so
+    ``PipeRunParamsFactory.make_run_params`` and the kernel tier's ``PipelexKernel.make`` — so
     ``needs_inference=False`` stays a property of the boot rather than of whichever entry point a
     caller happened to reach for. A second copy of the rule at a second factory is exactly how the
     two would drift apart.

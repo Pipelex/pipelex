@@ -42,7 +42,7 @@ from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 
-class MethodKernel:
+class PipelexKernel:
     """Façade over the module-level kernel ops; holds per-run state."""
 
     def __init__(self, *, job_metadata: JobMetadata, cogt_run_params: CogtRunParams) -> None:

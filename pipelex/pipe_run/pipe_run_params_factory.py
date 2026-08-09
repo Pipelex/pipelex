@@ -27,7 +27,7 @@ class PipeRunParamsFactory:
         those fields — so every pipe-tier execution entry point is covered (``prepare_pipe_job``,
         the runtime bridge, ``PipeJobFactory`` defaults), not just the pipeline-API path. The rule
         itself lives in ``resolve_run_mode_for_boot`` rather than inline, because the kernel tier's
-        ``MethodKernel.make`` mints its own ``CogtRunParams`` and must apply the identical rule.
+        ``PipelexKernel.make`` mints its own ``CogtRunParams`` and must apply the identical rule.
 
         The REQUESTED mode is validated before the forced-DRY coercion, so a contract violation
         (``is_mock_usage`` on a LIVE request) fails loud on every boot — the keyless coercion must

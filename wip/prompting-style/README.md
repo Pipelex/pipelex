@@ -41,11 +41,11 @@ Open questions for whoever picks this up:
 
 ## What was silenced in the meantime, and what was not
 
-The parity-gaps plan listed this as gap **2.2 — "`MethodKernel.llm_object` renders under the wrong model's prompting style"**, and called it *a wrong value*. **That was overstated.** Re-verified 2026-08-03 against `refactor/Kernel`:
+The parity-gaps plan listed this as gap **2.2 — "`PipelexKernel.llm_object` renders under the wrong model's prompting style"**, and called it *a wrong value*. **That was overstated.** Re-verified 2026-08-03 against `refactor/Kernel`:
 
 | Call | Style derived from |
 | --- | --- |
-| `MethodKernel.llm_object(model=X)` | `X` |
+| `PipelexKernel.llm_object(model=X)` | `X` |
 | interpreter, pipe declares `for_text = X` only | `X` — **identical** |
 | interpreter, pipe declares `for_object = X` only | the deck's **text** default — differs |
 
@@ -53,6 +53,6 @@ The façade takes one explicit `model`, which wins `resolve_llm_setting_for_obje
 
 So 2.2 is not a wrong value; it is the same **narrowness** as 2.1 — a two-choice form that is inexpressible. It is left alone deliberately: widening the façade to take a second choice would mean building the two-setting derivation this plan is about to delete.
 
-**Recorded in code** as a docstring block on `MethodKernel.llm_object`, including the trap: do *not* "fix" it by deriving the style from an object-only resolution — that would *introduce* the divergence rather than close it.
+**Recorded in code** as a docstring block on `PipelexKernel.llm_object`, including the trap: do *not* "fix" it by deriving the style from an object-only resolution — that would *introduce* the divergence rather than close it.
 
 **Not silenced, still open:** nothing. There is no live defect to carry. This document exists so the obsolete mechanism gets deleted deliberately rather than discovered again by the next person who compares the two readers.

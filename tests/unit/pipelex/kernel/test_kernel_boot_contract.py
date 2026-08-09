@@ -6,7 +6,7 @@ router or a pipeline manager. So it is pinned permanently here rather than prove
 
 Three layers already guard neighbouring properties and none of them covers this one. The static
 hub-layering guard proves no kernel *module* imports `interpreter_hub`.
-`test_runtime_layer_import_closure.py` proves `pipelex.kernel.method_kernel` *imports* clean.
+`test_runtime_layer_import_closure.py` proves `pipelex.kernel.pipelex_kernel` *imports* clean.
 `test_runtime_boot_closure.py` proves `RuntimeBoot.make()` *boots* clean. What none of them does is
 **call** a kernel op on that boot — and a call is where a runtime-only process would actually break:
 by resolving out of a registry the interpreter half fills (`OrchestratorRegistry`,
@@ -61,7 +61,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     from pipelex.core.stuffs.number_content import NumberContent
     from pipelex.core.stuffs.text_content import TextContent
     from pipelex.kernel.llm_results import LlmObjectResult, LlmTextResult
-    from pipelex.kernel.method_kernel import MethodKernel
+    from pipelex.kernel.pipelex_kernel import PipelexKernel
     from pipelex.runtime_boot import RuntimeBoot
     from pipelex.system.pipe_run_mode import PipeRunMode
     from pipelex.system.runtime import IntegrationMode
@@ -75,7 +75,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
 
     RuntimeBoot.make(integration_mode=IntegrationMode.PYTEST, needs_inference=False)
 
-    kernel = MethodKernel.make(run_mode=PipeRunMode.DRY, user_id="kernel-boot-contract")
+    kernel = PipelexKernel.make(run_mode=PipeRunMode.DRY, user_id="kernel-boot-contract")
     model = LLMSetting(model="kernel-boot-contract-model", temperature=0.5)
 
     object_result = asyncio.run(

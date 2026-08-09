@@ -1,4 +1,4 @@
-# Method kernel — working notes
+# Pipelex kernel — working notes
 
 Extraction of operator-execution semantics out of the interpreter's operator classes into a public, hub-free `pipelex/kernel/` subpackage, with the interpreter re-pointed onto it — zero behavior change, single-sourced semantics, callable on a `RuntimeBoot`-only process with no `.mthds` loaded.
 

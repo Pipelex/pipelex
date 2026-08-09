@@ -1,4 +1,4 @@
-"""The method kernel: operator-execution semantics as importable functions.
+"""The Pipelex kernel: operator-execution semantics as importable functions.
 
 What a `PipeLLM` step actually *does* — deck resolution, templating-style derivation, prompt
 assembly, generation, memory write-back — used to be reachable only through a fully booted
@@ -10,7 +10,7 @@ Single-sourcing is the point — two callers with two copies drift.
 The doctrine below is what keeps that true. Each rule exists because its absence has already cost
 this repo something; see ``docs/contribute/hub-layering.md``.
 
-**Layering.** The caller-facing API is hub-free: an explicit :class:`~pipelex.kernel.method_kernel.MethodKernel`
+**Layering.** The caller-facing API is hub-free: an explicit :class:`~pipelex.kernel.pipelex_kernel.PipelexKernel`
 and explicit arguments, never an ambient lookup. Kernel *internals* may use ``pipelex.runtime_hub``
 — never ``pipelex.interpreter_hub``, directly or transitively. ``pipelex.kernel`` is declared in the
 guard's ``RUNTIME_LAYER_PACKAGES`` and pinned by a test, because **an undeclared package is not
@@ -49,7 +49,7 @@ not. This is a design constraint, not a deliverable: it keeps a future distribut
 a re-decoration rather than a rewrite.
 
 **Functions carry the semantics; the class is a façade.** Module-level functions hold the shared
-implementation. ``MethodKernel`` is a thin ergonomic façade over them, holding the per-run state a
+implementation. ``PipelexKernel`` is a thin ergonomic façade over them, holding the per-run state a
 caller would otherwise thread through every call. The interpreter's operators call the functions
 directly.
 

@@ -64,7 +64,7 @@ import pytest
 #: sibling declaration already claimed was clean. The import now points at the definition site, per this
 #: repo's "direct full-path imports everywhere" rule, and this entry point is what keeps it there.
 #:
-#: `kernel.method_kernel` is the method kernel's widest module-level closure: the façade imports the
+#: `kernel.pipelex_kernel` is the Pipelex kernel's widest module-level closure: the façade imports the
 #: ops modules that hold the operator-execution semantics, so one entry point covers the package.
 #: It earns a place here for a reason none of the others share — the kernel's *contract* is that a
 #: programmatic caller can invoke these functions on a `RuntimeBoot`-only process with zero `.mthds`
@@ -76,7 +76,7 @@ RUNTIME_LAYER_ENTRY_POINTS = [
     "pipelex.cogt.content_generation.content_generator",
     "pipelex.runtime_hub",
     "pipelex.runtime_boot",
-    "pipelex.kernel.method_kernel",
+    "pipelex.kernel.pipelex_kernel",
     "pipelex.providers.builtins",
     "pipelex.core.concepts.structure_generation.generator",
     "pipelex.core.memory.input_shaper",

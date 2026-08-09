@@ -20,7 +20,7 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.kernel.method_kernel import MethodKernel
+from pipelex.kernel.pipelex_kernel import PipelexKernel
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 #: Named but never resolved: the dry leaf short-circuits before a worker is looked up.
@@ -39,8 +39,8 @@ class MeetingSummary(TextContent):
     """
 
 
-def _make_dry_kernel() -> MethodKernel:
-    return MethodKernel.make(run_mode=PipeRunMode.DRY, user_id="kernel-unit-test")
+def _make_dry_kernel() -> PipelexKernel:
+    return PipelexKernel.make(run_mode=PipeRunMode.DRY, user_id="kernel-unit-test")
 
 
 class TestLlmTextKernel:

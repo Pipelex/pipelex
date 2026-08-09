@@ -25,7 +25,7 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.kernel.llm_results import StructuringPath
-from pipelex.kernel.method_kernel import MethodKernel
+from pipelex.kernel.pipelex_kernel import PipelexKernel
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.test_extras.registry_test_models import FictionCharacter
 
@@ -44,8 +44,8 @@ FIELD_ONLY_THE_DERIVATION_NAMES = "backstory"
 RESULT_NAME = "character"
 
 
-def _make_dry_kernel() -> MethodKernel:
-    return MethodKernel.make(run_mode=PipeRunMode.DRY, user_id="kernel-unit-test")
+def _make_dry_kernel() -> PipelexKernel:
+    return PipelexKernel.make(run_mode=PipeRunMode.DRY, user_id="kernel-unit-test")
 
 
 class TestLlmObjectKernel:

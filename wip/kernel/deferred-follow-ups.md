@@ -66,7 +66,7 @@ So the kernel result is behaving exactly like the type it mirrors, and the proje
 
 **Numbered 16, not 7, deliberately.** This item lands on the *first* PR of a three-PR stack, but the stacked Phase 2 and Phase 3 PRs already add KF-7 through KF-15. Taking the next free number instead of the next sequential one keeps every one of those entries — and the cross-references to them in the plan — exactly as written, so folding this in churns neither of the PRs above it. The gap below is theirs to fill.
 
-**Surfaced by** folding the parity-gaps track's Phase 2 into this stack. That plan listed a gap 2.2 — *"`MethodKernel.llm_object` renders under the wrong model's prompting style"* — and called it a wrong value. **Re-verified against this branch: that was overstated, and nothing here is broken.**
+**Surfaced by** folding the parity-gaps track's Phase 2 into this stack. That plan listed a gap 2.2 — *"`PipelexKernel.llm_object` renders under the wrong model's prompting style"* — and called it a wrong value. **Re-verified against this branch: that was overstated, and nothing here is broken.**
 
 The façade takes one explicit `model`, which wins `resolve_llm_setting_for_object`'s first rung, so the style is derived from that same setting. That is what an interpreted run derives for a pipe naming only a text model. The two agree for every call this form can express; the divergence needs a pipe naming *both* models, which the façade has no way to say. So 2.2 is the same **narrowness** as the `llm_text` widening that did land here — not a defect.
 
@@ -74,7 +74,7 @@ The façade takes one explicit `model`, which wins `resolve_llm_setting_for_obje
 
 **Where the work is written up.** `wip/prompting-style/README.md` — current mechanism, why it goes, target design, open questions (where the choice lives, what happens to `prompting_target`, whether it needs an MTHDS surface and therefore an `mthds/` spec change), and the measured three-case table behind the "not a defect" verdict.
 
-**Recorded in code** as a docstring block on `MethodKernel.llm_object`, carrying the trap: do *not* "fix" this by deriving the style from an object-only resolution — that would introduce the divergence rather than close it.
+**Recorded in code** as a docstring block on `PipelexKernel.llm_object`, carrying the trap: do *not* "fix" this by deriving the style from an object-only resolution — that would introduce the divergence rather than close it.
 
 ## KF-17 — An empty-string model choice falls through to the deck default instead of failing
 
@@ -86,6 +86,6 @@ The façade takes one explicit `model`, which wins `resolve_llm_setting_for_obje
 
 - **It is not this PR's code.** The chain is verbatim what `pipe_llm.py` has on `dev` (`llm_for_text_choice or model_deck.llm_choice_overrides.for_text or …`). The extraction moved it; it did not write it.
 - **There is no divergence.** The interpreter now calls these very functions, so both readers resolve identically by construction. Changing the rung would change both together — this is not a parity gap, which is the bar the surrounding track set.
-- **Every authored path already rejects it.** `""` reaches a resolver only from a direct Python call. Through pydantic — which is how a `.mthds` model choice, a deck default, and a deck override all arrive — the `parse_model_reference` validator raises `ModelReferenceParseError: Model reference cannot be empty`. The remaining hole is `MethodKernel.llm_text(model="")` in hand-written code.
+- **Every authored path already rejects it.** `""` reaches a resolver only from a direct Python call. Through pydantic — which is how a `.mthds` model choice, a deck default, and a deck override all arrive — the `parse_model_reference` validator raises `ModelReferenceParseError: Model reference cannot be empty`. The remaining hole is `PipelexKernel.llm_text(model="")` in hand-written code.
 
 **What settling it would take.** Not a one-line swap: the object resolver has three rungs, and a faithful `is not None` version of a mixed None/falsy chain reads considerably worse than the `or` it replaces. Worth doing as part of a deliberate pass over model-choice validation — where the real question is whether `LLMModelChoice` should reject `""` at the type boundary once, instead of every consumer re-checking — rather than as a spot fix in a resolver that is only passing the value along.

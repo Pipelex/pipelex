@@ -9,7 +9,7 @@ requested run mode to DRY.
 Both run-params factories call it, and both arms are pinned below, because "covers every execution
 entry point" is a claim about the set of factories rather than about one of them: the pipe tier's
 ``PipeRunParamsFactory.make_run_params`` (pipeline API, runtime bridge, factory defaults) and the
-kernel tier's ``MethodKernel.make``, which mints its own ``CogtRunParams`` for a programmatic caller
+kernel tier's ``PipelexKernel.make``, which mints its own ``CogtRunParams`` for a programmatic caller
 driving kernel ops with no method loaded. The kernel arm is the one that would silently spend real
 money if the rule were applied at the pipe factory alone — its default is ``PipeRunMode.LIVE``, and
 a keyless boot is exactly the boot ``pipelex/kernel/`` documents as its target.
@@ -22,7 +22,7 @@ import pytest
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.kernel.method_kernel import MethodKernel
+from pipelex.kernel.pipelex_kernel import PipelexKernel
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.search.pipe_search import PipeSearch
 from pipelex.pipe_operators.search.pipe_search_blueprint import PipeSearchBlueprint
@@ -88,7 +88,7 @@ class TestKeylessBootForcedDry:
         """The kernel tier's run-params factory honours the same flag — and its default is LIVE.
 
         Asserted on the default rather than on an explicit ``run_mode=LIVE`` because the default is
-        the reachable hazard: a programmatic caller writes ``MethodKernel.make(user_id=...)``,
+        the reachable hazard: a programmatic caller writes ``PipelexKernel.make(user_id=...)``,
         names no mode, and without the coercion gets a LIVE ``CogtRunParams`` that walks straight
         past the leaf's DRY branch into a real provider call.
         """
@@ -96,7 +96,7 @@ class TestKeylessBootForcedDry:
             self._boot_keyless()
             assert is_dry_run_forced()
 
-            kernel = MethodKernel.make(user_id="test-user")
+            kernel = PipelexKernel.make(user_id="test-user")
 
             assert kernel.cogt_run_params.run_mode.is_dry
         finally:

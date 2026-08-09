@@ -382,7 +382,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # applied in ``Pipelex.setup``). Deliberately not guarded here, because every remedy needs a layer
         # signal this layer does not have. Analysed in
         # ``wip/boot-split/runtime-boot-external-interpreter-orchestrator.md``, which the first runtime-only
-        # caller (the method kernel's boot-contract test) has now settled: that caller names no
+        # caller (the Pipelex kernel's boot-contract test) has now settled: that caller names no
         # ``boot_orchestrator``, so this gate is never reached and the hole is not on its path. Reassess
         # when a runtime-only boot is offered to real callers — that is when naming one becomes reachable.
         requested_boot_orchestrator = get_config().plugins.boot_orchestrator
@@ -528,7 +528,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         # Keyless boot forces every run to DRY — applied at runtime_hub.resolve_run_mode_for_boot,
         # which every run-params factory calls (the pipe tier's PipeRunParamsFactory.make_run_params
-        # and the kernel tier's MethodKernel.make), covering every entry point; generator selection is
+        # and the kernel tier's PipelexKernel.make), covering every entry point; generator selection is
         # backend-keyed unconditionally (eng review D4) — a keyless Temporal submitter must still
         # dispatch activities and mock inside them, so `needs_inference` plays no role in picking the
         # generator. Its other boot roles (gateway/model setup, credentials, telemetry) are unchanged.

@@ -175,7 +175,7 @@ class TestHubLayeringGuard:
             "fail by design. Declare pipelex.runtime_boot instead; that is the half that stays clean."
         )
 
-    def test_the_method_kernel_stays_declared(self) -> None:
+    def test_the_pipelex_kernel_stays_declared(self) -> None:
         """`pipelex.kernel` must stay declared — it is the package the whole extraction exists to keep clean.
 
         The kernel holds the operator-execution semantics the interpreter's operator classes call
