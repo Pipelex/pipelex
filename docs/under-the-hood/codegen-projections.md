@@ -17,7 +17,7 @@ An emitter then walks the `ResolvedLibrary` and renders text. Emitters live in `
 
 The `types` projection ranges over the crate's concept set (one type per qualified concept). Three targets ship today:
 
-- **`python-structures`** — Pipelex runtime `StructuredContent` subclasses (the runtime idiom, the successor to `pipelex build structures`). Native references map to the runtime content classes (`TextContent`, …); native concepts themselves are not re-emitted.
+- **`python-structures`** — Pipelex runtime `StuffContent` subclasses (the runtime idiom, the successor to `pipelex build structures`). Native references map to the runtime content classes (`TextContent`, …); native concepts themselves are not re-emitted. Each concept lands on the same content class the runtime would resolve it to: a structured concept on `StructuredContent`, a concept refining a native on that native's content class, a structureless one on `TextContent`.
 - **`python-pydantic`** — plain `pydantic.BaseModel` types with no Pipelex imports. Every concept is emitted uniformly, including the materialized natives, so the module depends only on `pydantic` and the standard library.
 - **`ts-zod`** — a pure TypeScript + Zod types file (`types.ts`, imports only `zod`) plus a `binder.ts` companion. `types.ts` holds Zod schemas and their inferred types; type names are the concept codes; **field keys are the crate's snake_case wire names verbatim**. Concept references use `z.lazy(() => XSchema)` so declaration order is irrelevant and cycles are handled.
 
@@ -91,7 +91,7 @@ The verdict rides the exit code (mirroring `resolve` / `validate`): `0` current,
 
 A stamp's `content_hash` is a raw SHA-256 over the body bytes. So if the emitted code is not already what your formatter wants, the first `ruff check --fix` / `ruff format` (or `prettier --write`) over your tree rewrites those bytes and `pipelex codegen check` reports the file as **hand-edited** — accusing you of the one thing you did not do.
 
-The emitters therefore emit exactly what the formatter would write. Generated Python uses builtin generics (`list[str]`, `dict[str, int]`), `X | None` over `Optional[X]`, double-quoted `Literal` members, and isort-grouped imports; generated TypeScript matches Prettier's blank-line and import-wrapping behavior. Running your formatter over a generated tree is a no-op, and the stamp stays valid.
+The emitters therefore emit exactly what the formatter would write. Generated Python uses builtin generics (`list[str]`, `dict[str, int]`), `X | None` over `Optional[X]`, double-quoted `Literal` members, and isort-grouped imports — merged, sorted, and, past the width threshold below, already wrapped into the parenthesized magic-trailing-comma form ruff itself would produce; generated TypeScript matches Prettier's blank-line and import-wrapping behavior. Running your formatter over a generated tree is a no-op, and the stamp stays valid.
 
 **You should not need to exclude generated paths from your linter.** If you carry such an exclusion from an older version, drop it.
 
@@ -162,10 +162,12 @@ A deterministic tool that guesses is a liability. Where a resolved type carries 
 
 Two concept-level cases are surfaced the same honest way:
 
-- A **structureless** concept (no structure, no refinement) projects as an opaque type (an empty model / `z.unknown()`) with the imprecision stated in its docstring.
-- A **Python-class-backed** concept (`structure = "<ClassName>"`, whose shape lives only in hand-written Python, not in MTHDS) is surfaced as opaque — the bare class name is never silently emitted into a portable crate.
+- A **structureless** concept (no structure, no refinement) projects as an opaque type — an empty model for `python-pydantic`, `z.unknown()` for ts-zod — with the imprecision stated in its docstring. Its *base class* is not a guess, though: `python-structures` emits it on `TextContent`, because that is what the runtime resolves the same declaration to — "describe it in prose and get text back" is what a structureless concept means to an author, and the interpreter's text-vs-object dispatch reads the base class to decide which call to make. A projection that emitted the root base instead would answer that question differently from the runtime for the same authored concept, silently. That inherited `text` field is what makes this target's structureless class the one exception to the pass-through rule below.
+- A **Python-class-backed** concept (`structure = "<ClassName>"`, whose shape lives only in hand-written Python, not in MTHDS) is surfaced as opaque — the bare class name is never silently emitted into a portable crate. This is the one opaque shape that keeps the root base: its content class genuinely is not visible to the crate, so promoting it to `TextContent` would be the guess the rule above forbids.
 
-Opaque is always **pass-through, never lossy**: the ts-zod `z.unknown()` hands the wire object through verbatim, and the Python emitters set `model_config = ConfigDict(extra="allow")` on opaque classes so `model_validate` keeps every field (pydantic's default `extra="ignore"` would silently strip the content). The owner of a Python-class-backed concept recovers the typed object by validating with their own class (`MyLegacyClass.model_validate(payload)`); every other consumer gets the honest untyped object.
+Opaque is **pass-through, never lossy**: the ts-zod `z.unknown()` hands the wire object through verbatim, and the Python emitters set `model_config = ConfigDict(extra="allow")` on opaque classes so `model_validate` keeps every field (pydantic's default `extra="ignore"` would silently strip the content). The owner of a Python-class-backed concept recovers the typed object by validating with their own class (`MyLegacyClass.model_validate(payload)`); every other consumer gets the honest untyped object.
+
+The one exception is the shape described above: a **structureless** concept on `python-structures` inherits `TextContent.text`, which is required, so an object-shaped payload raises instead of landing in `extra`. That is not a regression against the runtime — the class `ConceptFactory` builds for the same declaration is a `TextContent` subclass too, so it rejects the same payload. Matching the runtime is the point; a projection that accepted a payload the runtime refuses would be the more expensive lie. Consumers who want the old permissive behaviour are describing a concept that is not structureless, and should give it a structure.
 
 ## The extension-file story
 
