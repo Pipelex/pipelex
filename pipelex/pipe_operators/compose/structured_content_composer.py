@@ -13,13 +13,13 @@ from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
+from pipelex.kernel.compose_ops import build_compose_context
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint, ConstructFieldBlueprint, ConstructFieldMethod
 from pipelex.pipe_operators.compose.exceptions import (
     StructuredContentComposerTypeError,
     StructuredContentComposerValidationError,
     StructuredContentComposerValueError,
 )
-from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.typing.annotation_utils import unwrap_optional
 from pipelex.tools.typing.class_utils import are_classes_equivalent
@@ -59,7 +59,6 @@ class StructuredContentComposer:
         output_class: The StructuredContent subclass to instantiate
         runtime_params: Additional runtime parameters for template context (from PipeRunParams.params)
         extra_context: Extra context values for template rendering (from PipeCompose.extra_context)
-        pipe_run_params: The pipe run parameters (used to check if we're in dry run mode)
     """
 
     def __init__(
@@ -69,14 +68,12 @@ class StructuredContentComposer:
         output_class: type[StuffContent],
         runtime_params: dict[str, Any] | None = None,
         extra_context: dict[str, Any] | None = None,
-        pipe_run_params: PipeRunParams | None = None,
     ):
         self.construct_blueprint = construct_blueprint
         self.working_memory = working_memory
         self.output_class = output_class
         self.runtime_params = runtime_params or {}
         self.extra_context = extra_context or {}
-        self.pipe_run_params = pipe_run_params
         # Per-field record of how each field was built. Populated as fields resolve.
         # Shape per entry: {"method": ConstructFieldMethod, "rendered": str (templates only)}.
         # Nested fields record only their method; their sub-fields are not surfaced.
@@ -776,21 +773,17 @@ class StructuredContentComposer:
             msg = "template is required for TEMPLATE method"
             raise StructuredContentComposerValueError(msg)
 
-        # Build context consistently with _run_template_mode in PipeCompose:
-        # 1. Working memory context (stuffs as variables)
-        context: dict[str, Any] = self.working_memory.generate_context()
-        # 2. Runtime params (from PipeRunParams.params)
-        if self.runtime_params:
-            context.update(**self.runtime_params)
-        # 3. Extra context (from PipeCompose.extra_context)
-        if self.extra_context:
-            context.update(**self.extra_context)
-
+        # The same three-layer context PipeCompose's template mode renders against, built by the same
+        # kernel function so the layering order cannot fork between the two paths.
         # TODO: dry-run templating is being removed — this direct render_template call is intentional
         return await render_template(
             template=field_blueprint.template,
             category=TemplateCategory.BASIC,
-            context=context,
+            context=build_compose_context(
+                memory=self.working_memory,
+                runtime_params=self.runtime_params,
+                extra_context=self.extra_context,
+            ),
         )
 
     async def _resolve_nested(self, field_blueprint: ConstructFieldBlueprint, *, field_name: str) -> StuffContent:
@@ -817,7 +810,6 @@ class StructuredContentComposer:
             output_class=nested_class,
             runtime_params=self.runtime_params,
             extra_context=self.extra_context,
-            pipe_run_params=self.pipe_run_params,
         )
 
         return await nested_composer.compose()

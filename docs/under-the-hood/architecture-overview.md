@@ -46,6 +46,8 @@ Operators perform concrete actions:
 - **PipeCompose** - Compose content from templates or construct structured objects
 - **PipeSearch** - Search the web for information
 
+What an operator *does* — model-deck resolution, prompt assembly, generation, memory write-back — lives one layer down in [`pipelex/kernel/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/kernel), as plain functions that take everything method-specific as an explicit argument and read only the runtime services a boot stands up, such as the model deck and the content generator. The operator classes above hold what is specific to being a step in a method: blueprint resolution, input validation, error context, and execution-graph tracing. The split exists so the same semantics can be called without a loaded method, and so there is one implementation rather than two that drift. See [The Pipelex Kernel](./pipelex-kernel.md) for the layering contract, what a programmatic caller imports, and how it boots.
+
 ### Core Domain
 
 Located in [`pipelex/core/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/core)

@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 import pytest
 from pytest_mock import MockerFixture
 
@@ -8,6 +10,10 @@ from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.exceptions import CrateNormalizationError
 from pipelex.libraries.library_crate import LibraryCrate
+from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
+from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
+from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
+from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
@@ -82,6 +88,73 @@ def _authored_crate() -> LibraryCrate:
     )
 
 
+def _cross_domain_crate() -> LibraryCrate:
+    """A two-domain crate whose every controller kind calls a *sibling* domain's pipe by bare code.
+
+    The authored shape of `pipelex-cookbook/examples/wip/advisory_board/`: an orchestrator domain
+    driving pipes declared in a presentation domain. The library loads and runs, because
+    `PipeLibrary.get_optional_pipe` resolves a bare code across every domain.
+    """
+    return LibraryCrate(
+        pipes={
+            "orchestrator.run_all": PipeSequenceBlueprint(
+                description="Run the advisory board",
+                output="Text",
+                steps=[SubPipeBlueprint(pipe="present_as_markdown")],
+            ),
+            "orchestrator.fan_out": PipeParallelBlueprint(
+                description="Render both presentations at once",
+                inputs={"data": "Text"},
+                output="Composite",
+                branches=[
+                    SubPipeBlueprint(pipe="present_as_markdown", result="markdown"),
+                    SubPipeBlueprint(pipe="render_html", result="html"),
+                ],
+            ),
+            "orchestrator.route": PipeConditionBlueprint(
+                description="Pick a presentation",
+                inputs={"data": "Text"},
+                output="Text",
+                expression="format",
+                outcomes={"markdown": "present_as_markdown"},
+                default_outcome="render_html",
+            ),
+            "orchestrator.route_to_special": PipeConditionBlueprint(
+                description="Route to the special outcomes",
+                inputs={"data": "Text"},
+                output="Text",
+                expression="format",
+                outcomes={"stop": SpecialOutcome.FAIL},
+                default_outcome=SpecialOutcome.CONTINUE,
+            ),
+            "orchestrator.batch_all": PipeBatchBlueprint(
+                description="Present every document",
+                inputs={"docs": "Text[]"},
+                output="Text[]",
+                branch_pipe_code="present_as_markdown",
+                input_list_name="docs",
+                input_item_name="doc",
+            ),
+            "presentation.present_as_markdown": PipeLLMBlueprint(
+                description="Present as markdown",
+                inputs={"data": "Text"},
+                output="Text",
+                prompt="Present $data as markdown",
+            ),
+            "presentation.render_html": PipeLLMBlueprint(
+                description="Render as HTML",
+                inputs={"data": "Text"},
+                output="Text",
+                prompt="Render $data as HTML",
+            ),
+        },
+        domains={
+            "orchestrator": DomainBlueprint(code="orchestrator", description="Orchestrator domain"),
+            "presentation": DomainBlueprint(code="presentation", description="Presentation domain"),
+        },
+    )
+
+
 def _reverse_refinement_chain_crate(size: int) -> LibraryCrate:
     concepts: dict[str, ConceptBlueprint | str] = {
         f"scale.Node{index:04d}": ConceptBlueprint(description=f"Node {index}", refines=f"Node{index + 1:04d}") for index in range(size - 1)
@@ -124,11 +197,94 @@ class TestCrateNormalization:
         assert listed.output == "scoring.WeightedScore[]"
 
     def test_sequence_step_pipe_refs_qualified(self):
-        """A sequence step's bare pipe ref is qualified with the pipe's owner domain."""
+        """A sequence step's bare pipe ref is qualified with the domain that declares the callee."""
         result = normalize_crate(_authored_crate(), mthds_version=MTHDS_TEST_VERSION)
         pipeline = result.pipes["scoring.pipeline"]
         assert isinstance(pipeline, PipeSequenceBlueprint)
         assert pipeline.steps[0].pipe == "scoring.compute_score"
+
+    @pytest.mark.parametrize("crate_factory", [_authored_crate, _cross_domain_crate])
+    def test_normalized_crate_is_closed_over_its_pipe_refs(self, crate_factory: Callable[[], LibraryCrate]):
+        """Every in-body pipe ref of a normalized crate names a pipe the crate actually holds.
+
+        Driven off `pipe_dependencies` rather than a hand-walk of the controller kinds, so a new kind —
+        or a new `_qualify_pipe_ref` call site on an existing one — is covered the day it lands. An open
+        ref is silent: the crate hashes content nobody can resolve, and a round-trip through
+        `load_from_crate` dies with `PipeNotFoundError` at run time instead of at normalization.
+        """
+        result = normalize_crate(crate_factory(), mthds_version=MTHDS_TEST_VERSION)
+        dangling = {
+            f"{pipe_ref} -> {dependency}"
+            for pipe_ref, blueprint in result.pipes.items()
+            for dependency in blueprint.pipe_dependencies
+            if dependency not in result.pipes
+        }
+        assert not dangling
+
+    def test_bare_cross_domain_pipe_refs_resolve_to_the_declaring_domain(self):
+        """A bare ref to a sibling domain's pipe is the shape the live `PipeLibrary` resolves.
+
+        `get_optional_pipe` falls back to a search across every domain, so this bundle runs. Prefixing
+        the owner domain would name `orchestrator.present_as_markdown`, which does not exist.
+        """
+        result = normalize_crate(_cross_domain_crate(), mthds_version=MTHDS_TEST_VERSION)
+        sequence = result.pipes["orchestrator.run_all"]
+        assert isinstance(sequence, PipeSequenceBlueprint)
+        assert sequence.steps[0].pipe == "presentation.present_as_markdown"
+
+        parallel = result.pipes["orchestrator.fan_out"]
+        assert isinstance(parallel, PipeParallelBlueprint)
+        assert [branch.pipe for branch in parallel.branches] == ["presentation.present_as_markdown", "presentation.render_html"]
+
+        condition = result.pipes["orchestrator.route"]
+        assert isinstance(condition, PipeConditionBlueprint)
+        assert condition.outcomes == {"markdown": "presentation.present_as_markdown"}
+        assert condition.default_outcome == "presentation.render_html"
+
+        batch = result.pipes["orchestrator.batch_all"]
+        assert isinstance(batch, PipeBatchBlueprint)
+        assert batch.branch_pipe_code == "presentation.present_as_markdown"
+
+    def test_special_outcomes_are_left_alone(self):
+        """`fail` / `continue` are outcomes, not pipe refs — they must survive un-qualified."""
+        result = normalize_crate(_cross_domain_crate(), mthds_version=MTHDS_TEST_VERSION)
+        condition = result.pipes["orchestrator.route_to_special"]
+        assert isinstance(condition, PipeConditionBlueprint)
+        assert condition.outcomes == {"stop": SpecialOutcome.FAIL}
+        assert condition.default_outcome == SpecialOutcome.CONTINUE
+
+    def test_ambiguous_bare_pipe_ref_raises(self):
+        """Two domains declaring the same code: the live library raises, so normalization raises too.
+
+        Silently preferring the owner domain would produce a crate that resolves while an interpreted
+        run of the same library dies on the ambiguity — a new disagreement, not a fix.
+        """
+        crate = _cross_domain_crate()
+        crate.pipes["duplicates.present_as_markdown"] = PipeLLMBlueprint(
+            description="A second pipe sharing the callee's code",
+            inputs={"data": "Text"},
+            output="Text",
+            prompt="Present $data",
+        )
+        crate.domains["duplicates"] = DomainBlueprint(code="duplicates", description="Duplicates domain")
+
+        with pytest.raises(CrateNormalizationError, match="Ambiguous pipe ref 'present_as_markdown'"):
+            normalize_crate(crate, mthds_version=MTHDS_TEST_VERSION)
+
+    def test_unresolvable_bare_pipe_ref_raises(self):
+        """A bare ref matching no pipe in the crate is surfaced, not silently qualified into a dangling ref."""
+        crate = LibraryCrate(
+            pipes={
+                "orchestrator.run_all": PipeSequenceBlueprint(
+                    description="Calls a pipe that is not in the crate",
+                    output="Text",
+                    steps=[SubPipeBlueprint(pipe="nowhere_to_be_found")],
+                ),
+            },
+            domains={"orchestrator": DomainBlueprint(code="orchestrator", description="Orchestrator domain")},
+        )
+        with pytest.raises(CrateNormalizationError, match="resolves to no pipe in the crate"):
+            normalize_crate(crate, mthds_version=MTHDS_TEST_VERSION)
 
     def test_refinement_with_structured_base_is_flattened(self):
         """Refining a concept with a structure adopts that (qualified) structure and drops `refines`."""

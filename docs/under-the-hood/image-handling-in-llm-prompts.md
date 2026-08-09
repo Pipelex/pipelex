@@ -437,7 +437,8 @@ Pages:
 
 | File | Purpose |
 |------|---------|
-| `pipelex/pipe_operators/shared/image_reference.py` | `ImageReference` and `ImageReferenceKind` models |
+| `pipelex/kernel/prompt_references.py` | `ImageReference` and `ImageReferenceKind` models |
+| `pipelex/kernel/llm_prompt_content.py` | Run-time prompt assembly — image collection, registry, placeholders |
 | `pipelex/pipe_operators/shared/template_image_analyzer.py` | Factory-time template analysis |
 | `pipelex/tools/jinja2/image_registry.py` | Runtime image tracking |
 | `pipelex/tools/jinja2/jinja2_with_images_filter.py` | The `with_images` filter implementation |
@@ -447,7 +448,7 @@ Pages:
 | File | Purpose |
 |------|---------|
 | `pipelex/tools/jinja2/jinja2_required_variables.py` | `VariableReference` for filter detection |
-| `pipelex/pipe_operators/llm/llm_prompt_blueprint.py` | Prompt building with image collection |
+| `pipelex/pipe_operators/llm/llm_prompt_blueprint.py` | The parsed `.mthds` prompt, holding the image references and mapping down to the kernel |
 
 ---
 

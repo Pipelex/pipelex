@@ -6,7 +6,10 @@ is closed, canonical, and explicit:
 
 1. merge — already done upstream (keys are `domain.Code` / `domain.code`);
 2. fully qualify every *in-body* reference — pipe `inputs` / `output` concept refs, pipe-step / branch
-   / outcome / batch pipe refs, concept `refines`, and structure-field `concept_ref` / `item_concept_ref`;
+   / outcome / batch pipe refs, concept `refines`, and structure-field `concept_ref` / `item_concept_ref`.
+   A bare *pipe* ref resolves crate-wide (`_qualify_pipe_ref`), the way `PipeLibrary.get_optional_pipe`
+   does, so the normalized ref names the pipe an interpreted run would call — including when the callee
+   is declared in a sibling domain;
 3. flatten refinement — a refining concept adopts its **in-crate structured** base's effective
    structure (the `refines` link is dropped once the structure is materialized). A concept whose
    refinement chain bottoms out at a **native** keeps its `refines` link: the native is materialized
@@ -31,6 +34,7 @@ are not yet applied here, mirroring the spec's own "Specification Status" callou
 [Library Crate Format]: mthds/docs/spec/library-crate.md
 """
 
+from collections import defaultdict
 from typing import NamedTuple
 
 from pipelex.codegen.native_expansion import collect_native_refs_from_structure, materialize_native_concept
@@ -71,8 +75,10 @@ def normalize_crate(crate: LibraryCrate, *, mthds_version: str) -> LibraryCrate:
     }
     _flatten_refinement(concepts)
 
+    pipe_refs_by_code = _index_pipe_refs_by_code(pipes=crate.pipes)
     pipes: dict[str, PipeBlueprintUnion] = {
-        pipe_ref: _normalize_pipe(blueprint, owner_domain=_domain_of(pipe_ref)) for pipe_ref, blueprint in crate.pipes.items()
+        pipe_ref: _normalize_pipe(blueprint, owner_domain=_domain_of(pipe_ref), pipe_refs_by_code=pipe_refs_by_code)
+        for pipe_ref, blueprint in crate.pipes.items()
     }
 
     _expand_natives(concepts=concepts, pipes=pipes)
@@ -220,28 +226,43 @@ def _native_effective_structure(native_ref: str) -> dict[str, ConceptStructureBl
 # --------------------------------------------------------------------------------------------------
 
 
-def _normalize_pipe(blueprint: PipeBlueprintUnion, *, owner_domain: str) -> PipeBlueprintUnion:
+def _index_pipe_refs_by_code(*, pipes: dict[str, PipeBlueprintUnion]) -> dict[str, list[str]]:
+    """Group the crate's own pipe refs by bare code — the index a bare in-body ref resolves against.
+
+    Cross-package entries are excluded, mirroring `PipeLibrary.get_optional_pipe`, whose bare-code
+    fallback searches only the entries that are not `alias->…` prefixed.
+    """
+    by_code: dict[str, list[str]] = defaultdict(list)
+    for pipe_ref in pipes:
+        if QualifiedRef.has_cross_package_prefix(pipe_ref):
+            continue
+        by_code[QualifiedRef.parse(pipe_ref).local_code].append(pipe_ref)
+    return by_code
+
+
+def _normalize_pipe(blueprint: PipeBlueprintUnion, *, owner_domain: str, pipe_refs_by_code: dict[str, list[str]]) -> PipeBlueprintUnion:
     updates: dict[str, object] = {}
     if blueprint.inputs:
         updates["inputs"] = {name: _qualify_io_ref(ref, domain=owner_domain) for name, ref in blueprint.inputs.items()}
     if blueprint.output:
         updates["output"] = _qualify_io_ref(blueprint.output, domain=owner_domain)
 
+    def qualify(*, pipe_ref: str) -> str:
+        return _qualify_pipe_ref(pipe_ref, owner_domain=owner_domain, pipe_refs_by_code=pipe_refs_by_code)
+
     match blueprint:
         case PipeSequenceBlueprint():
-            updates["steps"] = [step.model_copy(update={"pipe": _qualify_pipe_ref(step.pipe, domain=owner_domain)}) for step in blueprint.steps]
+            updates["steps"] = [step.model_copy(update={"pipe": qualify(pipe_ref=step.pipe)}) for step in blueprint.steps]
         case PipeParallelBlueprint():
-            updates["branches"] = [
-                branch.model_copy(update={"pipe": _qualify_pipe_ref(branch.pipe, domain=owner_domain)}) for branch in blueprint.branches
-            ]
+            updates["branches"] = [branch.model_copy(update={"pipe": qualify(pipe_ref=branch.pipe)}) for branch in blueprint.branches]
         case PipeConditionBlueprint():
             if blueprint.outcomes:
-                updates["outcomes"] = {key: _qualify_pipe_ref(pipe_ref, domain=owner_domain) for key, pipe_ref in blueprint.outcomes.items()}
+                updates["outcomes"] = {key: qualify(pipe_ref=pipe_ref) for key, pipe_ref in blueprint.outcomes.items()}
             if blueprint.default_outcome:
-                updates["default_outcome"] = _qualify_pipe_ref(blueprint.default_outcome, domain=owner_domain)
+                updates["default_outcome"] = qualify(pipe_ref=blueprint.default_outcome)
         case PipeBatchBlueprint():
             if blueprint.branch_pipe_code:
-                updates["branch_pipe_code"] = _qualify_pipe_ref(blueprint.branch_pipe_code, domain=owner_domain)
+                updates["branch_pipe_code"] = qualify(pipe_ref=blueprint.branch_pipe_code)
         case _:
             pass
 
@@ -266,14 +287,31 @@ def _render_ref_with_markers(concept_ref: str, *, parsed: MultiplicityParseResul
     return f"{concept_ref}{suffix}{parsed.presence.symbol}"
 
 
-def _qualify_pipe_ref(pipe_ref: str, *, domain: str) -> str:
+def _qualify_pipe_ref(pipe_ref: str, *, owner_domain: str, pipe_refs_by_code: dict[str, list[str]]) -> str:
+    """Qualify one in-body pipe ref against the crate, the way the live library resolves it.
+
+    A bare code is **not** the owner domain's by assumption: `PipeLibrary.get_optional_pipe` resolves
+    it by searching every domain, so a pipe legitimately calls a sibling domain's pipe by bare code.
+    Prefixing the owner domain here would name a pipe absent from `crate.pipes` — a crate that
+    fingerprints the wrong content and dies with `PipeNotFoundError` on round-trip, with nothing
+    raised on the way in. The crate-wide search is the same lookup, so the two readers agree; on
+    ambiguity the library raises and so does this, rather than silently picking a winner.
+    """
     if QualifiedRef.has_cross_package_prefix(pipe_ref):
         return pipe_ref  # cross-package deferred
     if pipe_ref in SpecialOutcome.value_list():
         return pipe_ref
     if "." in pipe_ref:
         return pipe_ref
-    return f"{domain}.{pipe_ref}"
+
+    matches = pipe_refs_by_code.get(pipe_ref, [])
+    if len(matches) == 1:
+        return matches[0]
+    if not matches:
+        msg = f"Pipe ref '{pipe_ref}' (in domain '{owner_domain}') resolves to no pipe in the crate."
+        raise CrateNormalizationError(msg)
+    msg = f"Ambiguous pipe ref '{pipe_ref}' (in domain '{owner_domain}') matches {sorted(matches)} in the crate. Use a domain-qualified ref."
+    raise CrateNormalizationError(msg)
 
 
 # --------------------------------------------------------------------------------------------------

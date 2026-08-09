@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Callable
 
-from pipelex.pipe_operators.llm.document_reference import DocumentReferenceKind
+from pipelex.kernel.prompt_references import DocumentReferenceKind
 from pipelex.pipe_operators.llm.template_document_analyzer import TemplateDocumentAnalyzer
 
 

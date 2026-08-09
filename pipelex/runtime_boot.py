@@ -379,10 +379,12 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # ``build_registrar`` discovers external plugins unconditionally, so such a name satisfies this
         # check, and a bare runtime boot would then apply the runtime slot claims while silently never
         # applying the interpreter ones (``PIPE_ROUTER`` / ``PIPE_RUN`` / ``PIPE_FUNC_EXECUTOR``, all
-        # applied in ``Pipelex.setup``). Unreachable today — nothing calls ``RuntimeBoot.make`` yet — and
-        # deliberately not guarded here, because every remedy needs a layer signal this layer does not
-        # have. Analysed in ``wip/boot-split/runtime-boot-external-interpreter-orchestrator.md``; the first
-        # caller of a runtime-only boot is who has to settle it.
+        # applied in ``Pipelex.setup``). Deliberately not guarded here, because every remedy needs a layer
+        # signal this layer does not have. Analysed in
+        # ``wip/boot-split/runtime-boot-external-interpreter-orchestrator.md``, which the first runtime-only
+        # caller (the Pipelex kernel's boot-contract test) has now settled: that caller names no
+        # ``boot_orchestrator``, so this gate is never reached and the hole is not on its path. Reassess
+        # when a runtime-only boot is offered to real callers — that is when naming one becomes reachable.
         requested_boot_orchestrator = get_config().plugins.boot_orchestrator
         if requested_boot_orchestrator is not None and requested_boot_orchestrator not in plugin_registrar.registered_plugin_names:
             raise UnknownBootOrchestratorError(requested=requested_boot_orchestrator)
@@ -524,8 +526,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             storage_provider = storage_provider_registry.get_required(method=storage_config.method)(storage_config)
         self.runtime_hub.set_storage_provider(storage_provider)
 
-        # Keyless boot forces every run to DRY — consumed at PipeRunParamsFactory.make_run_params,
-        # the single writer of run_mode, covering every entry point; generator selection is
+        # Keyless boot forces every run to DRY — applied at runtime_hub.resolve_run_mode_for_boot,
+        # which every run-params factory calls (the pipe tier's PipeRunParamsFactory.make_run_params
+        # and the kernel tier's PipelexKernel.make), covering every entry point; generator selection is
         # backend-keyed unconditionally (eng review D4) — a keyless Temporal submitter must still
         # dispatch activities and mock inside them, so `needs_inference` plays no role in picking the
         # generator. Its other boot roles (gateway/model setup, credentials, telemetry) are unchanged.

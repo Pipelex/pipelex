@@ -261,8 +261,8 @@ class Pipelex(RuntimeBoot):
         Args:
             integration_mode: Integration mode (CLI, FASTAPI, DOCKER, MCP, N8N, PYTHON, PYTEST)
             needs_inference: When False, forces every run THIS process initiates to DRY mode
-                (consumed at PipeRunParamsFactory.make_run_params, the single writer of run_mode:
-                operators dispatch normally and the cogt leaf mocks) and loads backends leniently
+                (applied at runtime_hub.resolve_run_mode_for_boot, which every run-params factory
+                calls: operators dispatch normally and the cogt leaf mocks) and loads backends leniently
                 (skipping those with missing credentials). This skips gateway terms check and model
                 deck validation. Useful for commands like validate/show that don't call inference
                 APIs. Generator selection stays backend-keyed. Submitter-side contract only: it does

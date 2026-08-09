@@ -1,6 +1,6 @@
 import pytest
 
-from pipelex.pipe_operators.llm.document_reference import DocumentReference, DocumentReferenceKind
+from pipelex.kernel.prompt_references import DocumentReference, DocumentReferenceKind
 
 
 class TestDocumentReference:

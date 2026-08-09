@@ -1,10 +1,10 @@
-"""Tests for the config-level size default resolution against a pipe's explicit aspect_ratio."""
+"""Tests for the config-level size default resolution against a step's explicit aspect_ratio."""
 
 import pytest
 
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, SizeTier
-from pipelex.pipe_operators.img_gen.pipe_img_gen import resolve_default_size
+from pipelex.kernel.img_gen_ops import resolve_default_size
 
 
 class TestResolveDefaultSize:
