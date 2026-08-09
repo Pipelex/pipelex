@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:bc7a86460032c9ba507dc6d580bab382077b5d963c891ad1fa525d64beb820a3"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-01T18:35:20Z"
-rationale = "Trigger is the forced-DRY fix adding resolve_run_mode_for_boot to runtime_hub.py. Reviewed docs/contribute/hub-layering.md and made two changes. (1) Added the new symbol to the runtime_hub accessor table under 'run mode', beside is_dry_run_forced. (2) The substantive one: the page opens by defining a hub as a container plus module-level ACCESSOR functions, and resolve_run_mode_for_boot is not an accessor — it applies a boot-scoped flag rather than reading it, so the page's own framing did not accommodate the symbol it now lists. Added a paragraph to 'Which hub does a new symbol belong to?' stating the case: the lifecycle rule still decides placement (a boot-set flag identical for every method makes the rule that interprets it runtime-layer by kind), and what makes the hub module the right home over either caller is that a boot-scoped invariant with two callers drifts if copied. Left the guard and RUNTIME_LAYER_PACKAGES sections alone — this change touched neither."
+digest = "sha256:3e809663f592cb1454c7f5b1d7c0d480b63a18c6eed7d710970e7866da27c205"
+reviewed_by = "Claude (Opus 5)"
+reviewed_at = "2026-08-09T15:19:48Z"
+rationale = "Trigger is the MethodKernel->PipelexKernel rename, which changed exactly one word in runtime_hub.py: the class named in resolve_run_mode_for_boot's docstring. Reviewed docs/contribute/hub-layering.md and it is already current — the rename commit updated the page atomically, so the paragraph under 'Which hub does a new symbol belong to?' already reads PipelexKernel.make; only the ack digest was stale. Ran both prescribed mechanical checks rather than re-reading the tables, per the standing note in the dogfood log: all 15 packages in RUNTIME_LAYER_PACKAGES are named under Enforcement (the enumeration that rotted seven rounds running is clean — it now includes pipelex.kernel and pipelex.runtime_boot), and all 34 + 32 public module-level hub symbols appear in the partition tables. Also verified the page's concrete references still resolve: resolve_run_mode_for_boot sits beside is_dry_run_forced under 'run mode', and tests/unit/pipelex/kernel/test_kernel_boot_contract.py exists at the path the Enforcement section cites. No doc change needed. Noted outside this contract's targets: stale MethodKernel references remain in wip/parity/*.md, which arrived via the dev merge."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:151bee2b65ca3717b09f754d2e30aad830894f43"
 "pipelex/interpreter_hub.py" = "blob:b7ac885d348d32f1aa4b1e660da5b03533fb305b"
-"pipelex/runtime_hub.py" = "blob:f3e2c4248ab13d09e16443e5f60b2b7494eea9f1"
+"pipelex/runtime_hub.py" = "blob:b5eab6810174435eb1e40aa1b1cd29a103af58be"
