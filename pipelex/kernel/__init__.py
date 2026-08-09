@@ -64,7 +64,7 @@ argument.
 ``tests/unit/pipelex/kernel/test_kernel_boot_contract.py`` is what proves it: it boots keyless,
 **calls every entry point**, and sweeps ``sys.modules`` afterwards. Treat that as the gate rather
 than as one of two — ``tests/unit/pipelex/test_runtime_layer_import_closure.py`` covers only what
-its ``pipelex.kernel.method_kernel`` entry point imports, and the façade is LLM-only, so most of
+its ``pipelex.kernel.pipelex_kernel`` entry point imports, and the façade is LLM-only, so most of
 this package sits outside its closure. **Every new entry point here gets an arm in that
 subprocess.** The rule is not ceremony: the sweep is the only gate that can see a function-local
 interpreter import (both static guards read module-level imports, and the blind spot is
