@@ -32,9 +32,9 @@ Guard-ordering constraint (matters, keep tested): the numeric-string epoch guard
 ## Tasks
 
 - [x] Verify the bug report (done — see root cause above)
-- [ ] **`pipelex/core/stuffs/date_content.py`** — in `_reject_lax_temporal`, after the existing guards (datetime object, int/float/numeric-string epoch, datetime-shaped string on `date`), parse remaining `str` values: `datetime.date.fromisoformat` for `date`, `datetime.time.fromisoformat` for `time`. Wrap the `fromisoformat` `ValueError` in a clear message naming the field and the ISO 8601 expectation (must stay `ValueError` so pydantic wraps it into a `ValidationError`). Non-str values (real `date`/`time` objects, e.g. from `--mock-inputs`) pass through unchanged. Rename the validator (`_validate_temporal` or similar) — it no longer only rejects — and update its comment to state the second purpose: returning a real object is what keeps the model valid under the strict validation instructor applies to LLM responses (a before-validator forfeits pydantic's strict-JSON ISO-string acceptance).
-- [ ] **`pipelex/core/stuffs/time_content.py`** — same change for `TimeContent.time`. Note: `fromisoformat` also closes the numeric-string hole (`"3600"`) that this class's guards never covered (DateContent guarded it, TimeContent didn't — flagged in the report as an asymmetry; decide whether to add the explicit epoch guard for the nicer message, mirroring DateContent).
-- [ ] **Tests — red first** (`tests/unit/pipelex/core/stuffs/date_content/`, `.../time_content/`): a strict-mode module simulating the instructor path. Cases:
+- [x] **`pipelex/core/stuffs/date_content.py`** — in `_reject_lax_temporal`, after the existing guards (datetime object, int/float/numeric-string epoch, datetime-shaped string on `date`), parse remaining `str` values: `datetime.date.fromisoformat` for `date`, `datetime.time.fromisoformat` for `time`. Wrap the `fromisoformat` `ValueError` in a clear message naming the field and the ISO 8601 expectation (must stay `ValueError` so pydantic wraps it into a `ValidationError`). Non-str values (real `date`/`time` objects, e.g. from `--mock-inputs`) pass through unchanged. Rename the validator (`_validate_temporal` or similar) — it no longer only rejects — and update its comment to state the second purpose: returning a real object is what keeps the model valid under the strict validation instructor applies to LLM responses (a before-validator forfeits pydantic's strict-JSON ISO-string acceptance).
+- [x] **`pipelex/core/stuffs/time_content.py`** — same change for `TimeContent.time`. Note: `fromisoformat` also closes the numeric-string hole (`"3600"`) that this class's guards never covered (DateContent guarded it, TimeContent didn't — flagged in the report as an asymmetry; decide whether to add the explicit epoch guard for the nicer message, mirroring DateContent).
+- [x] **Tests — red first** (`tests/unit/pipelex/core/stuffs/date_content/`, `.../time_content/`): a strict-mode module simulating the instructor path. Cases:
   - `DateContent.model_validate_json(..., strict=True)` with date-only and date+time payloads — the exact reported inputs (`"2025-03-12"`, `"14:00:00+00:00"`)
   - `TimeContent.model_validate_json(..., strict=True)` — offset preserved on `tzinfo` (fidelity), plus `Z` suffix and fractional seconds
   - strict **Python**-mode (`model_validate(..., strict=True)`) for both — instructor modes that validate parsed dicts
@@ -42,11 +42,19 @@ Guard-ordering constraint (matters, keep tested): the numeric-string epoch guard
   - real `date`/`time` objects still accepted under strict (mock-inputs path)
   - all existing rejections still fire in **both** modes: `86400`, `"86400"`, `"8.64e4"`, `"20250312"` (epoch-lookalike, must NOT be parsed), `datetime` object, `"2026-07-07T00:00:00"` on `date`
   - malformed string (`"not-a-date"`) → `ValidationError` with the clear message
-- [ ] Existing lax-path tests stay green (`test_date_content_serialization.py`, `test_time_content.py`, factory/input-shaper tests)
-- [ ] `make agent-check`
-- [ ] `make agent-test`
-- [ ] **CHANGELOG.md** — `[Unreleased]`, bold-label style: `Date`/`Time` natives failed every live structured-output run (strict-mode validation of the LLM's ISO strings); now parse ISO 8601 in their validators so strict and lax paths agree.
-- [ ] **Docs** — check `docs/` pages describing the `Date`/`Time` natives for anything stating the accepted forms; update if the parsing behavior is documented. No new page needed.
+- [x] Existing lax-path tests stay green (`test_date_content_serialization.py`, `test_time_content.py`, factory/input-shaper tests)
+- [x] `make agent-check`
+- [x] `make agent-test`
+- [x] **CHANGELOG.md** — `[Unreleased]`, bold-label style: `Date`/`Time` natives failed every live structured-output run (strict-mode validation of the LLM's ISO strings); now parse ISO 8601 in their validators so strict and lax paths agree.
+- [x] **Docs** — check `docs/` pages describing the `Date`/`Time` natives for anything stating the accepted forms; update if the parsing behavior is documented. No new page needed.
+
+## Decisions taken while implementing
+
+- **`TimeContent` got the explicit numeric-string guard** (the flagged asymmetry). Not just for the message: `datetime.time.fromisoformat` accepts the basic form, so without the guard `"154000"` would newly parse as `15:40:00` — the DT6 hole the parsing step would otherwise open. Same guard-before-parse ordering as `DateContent`.
+- **The numeric-string predicate moved to `pipelex/tools/misc/string_utils.py`** as `is_numeric_string` (it was private to `date_content.py`), since both temporal natives need it and neither should depend on the other. Its temporal (DT6) rationale stays in the two validators' comments, where it belongs.
+- **The list-wrapper test declares the wrapper inline.** The reported `ListOfDateContent` is built inline in `pipelex/cogt/content_generation/llm_generate.py`, not by `stuff_content_factory` — so the test mirrors that shape (`items: list[DateContent]`) rather than reaching for a factory that does not generate it.
+- **No `docs/` change.** The pages describing `Date`/`Time` (`native-concepts.md`, `provide-inputs.md`) document the ISO 8601 forms accepted and the rendering, both unchanged by the fix — the model-side path simply now honors what they already state.
+- **The model layer stays looser than the input layer on exotic ISO forms.** `StuffContentFactory` pins authored inputs to extended-only ISO (rejecting week-dates) for a clear authoring error; the model-side parsing accepts any valid ISO 8601 a model may answer. The guard that matters (numeric/epoch) fires in both.
 
 ## Follow-ups (out of this repo, after release)
 
