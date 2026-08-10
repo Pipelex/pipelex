@@ -38,7 +38,7 @@ Guard-ordering constraint (matters, keep tested): the numeric-string epoch guard
   - `DateContent.model_validate_json(..., strict=True)` with date-only and date+time payloads — the exact reported inputs (`"2025-03-12"`, `"14:00:00+00:00"`)
   - `TimeContent.model_validate_json(..., strict=True)` — offset preserved on `tzinfo` (fidelity), plus `Z` suffix and fractional seconds
   - strict **Python**-mode (`model_validate(..., strict=True)`) for both — instructor modes that validate parsed dicts
-  - the generated list wrapper (the reported `ListOfDateContent` case): build it via `stuff_content_factory` list-class generation and validate a two-item payload under strict JSON
+  - the generated list wrapper (the reported `ListOfDateContent` case): build it via `stuff_content_factory` list-class generation and validate a two-item payload under strict JSON — *shipped differently, see the decision below: that wrapper is built inline in `llm_generate.py`, not by the factory, so the tests mirror that shape*
   - real `date`/`time` objects still accepted under strict (mock-inputs path)
   - all existing rejections still fire in **both** modes: `86400`, `"86400"`, `"8.64e4"`, `"20250312"` (epoch-lookalike, must NOT be parsed), `datetime` object, `"2026-07-07T00:00:00"` on `date`
   - malformed string (`"not-a-date"`) → `ValidationError` with the clear message
