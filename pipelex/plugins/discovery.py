@@ -182,7 +182,7 @@ def _reject_retired_entry_point_group() -> None:
         raise RetiredPluginEntryPointGroupError(
             plugin_names=stragglers,
             retired_group=RETIRED_ENTRY_POINT_GROUP,
-            groups=[group.value for group in PluginGroup],
+            groups=list(PluginGroup),
         )
 
 

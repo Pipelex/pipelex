@@ -127,7 +127,7 @@ class TestPluginDiscovery:
     def test_the_two_layer_halves_compose_into_one_list(self) -> None:
         """The composition root's list is exactly both halves, and each name appears once.
 
-        The halves are filed by layer — `pipelex.plugins` for the kernel adapters,
+        The halves are filed by layer — `pipelex.providers` for the kernel adapters,
         `pipelex.interpreter_plugins` for the ones that construct interpreter-layer objects — so the
         failure mode this pins is a half silently dropping out of the composition, which would present
         as a plugin quietly missing at boot rather than as an import error.

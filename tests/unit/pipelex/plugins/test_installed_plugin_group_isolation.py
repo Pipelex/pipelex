@@ -69,6 +69,12 @@ _PLUGIN_SOURCE = textwrap.dedent(
     """
 )
 
+#: The kernel-only arm boots through `RuntimeBoot.make()` and passes **no** `entry_point_groups`, so
+#: the group set under test is the production default rather than one the test supplies. That is
+#: deliberate and it is the only place anything asserts it: `KERNEL_ENTRY_POINT_GROUPS` and the
+#: `runtime_boot` call site that reads it are otherwise unreferenced by any test, so a mutation of
+#: either — widening the constant, or passing the composed `ENTRY_POINT_GROUPS` at the call site —
+#: would load every installed interpreter-group plugin and leave the whole suite green.
 _DISCOVERY_SCRIPT = textwrap.dedent(
     """
     import pathlib
@@ -81,29 +87,25 @@ _DISCOVERY_SCRIPT = textwrap.dedent(
 
     from pipelex.plugins.discovery import build_registrar
     from pipelex.plugins.plugin_group import PluginGroup
+    from pipelex.runtime_boot import RuntimeBoot
+    from pipelex.system.runtime import IntegrationMode
 
-    def discover(groups):
-        return build_registrar(
-            config=SimpleNamespace(plugins=SimpleNamespace(disabled=[])),
-            builtin_plugins=[],
-            core_unconditional_plugin_names=frozenset(),
-            entry_point_groups=groups,
-        )
-
-    kernel_only = discover((PluginGroup.KERNEL,))
+    RuntimeBoot.make(integration_mode=IntegrationMode.PYTEST, needs_inference=False)
     if sentinel.exists():
         print("a kernel-only boot imported the interpreter-group plugin's module")
         raise SystemExit(2)
-    if [discovery.name for discovery in kernel_only.discoveries]:
-        print(f"a kernel-only boot discovered: {kernel_only.discoveries}")
-        raise SystemExit(3)
 
-    both = discover((PluginGroup.KERNEL, PluginGroup.INTERPRETER))
+    both = build_registrar(
+        config=SimpleNamespace(plugins=SimpleNamespace(disabled=[])),
+        builtin_plugins=[],
+        core_unconditional_plugin_names=frozenset(),
+        entry_point_groups=(PluginGroup.KERNEL, PluginGroup.INTERPRETER),
+    )
     if not sentinel.exists():
-        print("the fixture is inert: a both-groups boot did not import it either")
+        print("the fixture is inert: a both-groups discovery did not import it either")
         raise SystemExit(4)
     if [discovery.name for discovery in both.discoveries] != [entry_point_name]:
-        print(f"a both-groups boot did not register the plugin: {both.discoveries}")
+        print(f"a both-groups discovery did not register the plugin: {both.discoveries}")
         raise SystemExit(5)
 
     print("group isolation OK")

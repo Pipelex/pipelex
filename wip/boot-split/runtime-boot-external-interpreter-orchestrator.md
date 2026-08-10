@@ -1,6 +1,6 @@
 # A runtime-only boot accepts an external interpreter-side orchestrator, then half-applies it
 
-**Status:** deferred, deliberately. Found by Codex on PR #1073 (the boot split), verified real, not fixed there.
+**Status: RESOLVED** by the plugin entry-point group split (Part A of the kernel track). The analysis below is kept for the rationale trail; read the closing section first — its central premise no longer holds.
 
 ## The hole
 
@@ -58,3 +58,16 @@ That check also subsumes the narrower orchestrator question: it catches *any* ex
 ## What exists today instead
 
 The gate's comment in `runtime_boot.py` states the hole precisely and points here, so the next reader meets the reasoning rather than rediscovering the trap. Nothing silently claims to handle it.
+
+## Resolution — the layer signal arrived, and the hole closed on its own
+
+Everything above rests on one premise: *"every remedy needs a layer signal the runtime layer deliberately does not have."* That premise is now false. An external plugin declares its layer by the entry-point group it publishes under (`pipelex.plugins.kernel` / `pipelex.plugins.interpreter`), and discovery is scoped to the groups the caller asks for.
+
+The consequence is that the hole closed without anyone building either candidate remedy. A kernel-only boot defaults `entry_point_groups` to `KERNEL_ENTRY_POINT_GROUPS`, so an interpreter-group orchestrator plugin is never queried, never loaded, and never registered — its name therefore fails the existing `registered_plugin_names` gate and raises `UnknownBootOrchestratorError`. Loud, at boot, with no new machinery. Note where the fix landed: not in the gate this document is about, but in *what discovery is allowed to see* one step upstream. The gate was never the defect; the unconditional discovery behind it was.
+
+Both candidate remedies are therefore withdrawn rather than deferred:
+
+- **`HubSlot.is_interpreter_slot` + `honours_interpreter_slots`** — half-built, under a different name and for a different job. `HubSlot.is_interpreter_layer` exists (the menu-tier cross-check reads it to decide what a kernel-group plugin may claim), but no `honours_interpreter_slots` class attribute was added and none is needed: a kernel-only boot cannot see an interpreter-group plugin's claims in the first place.
+- **A widened `build_registrar` signature** — this is, in effect, what shipped, but scoped to *discovery* rather than to *policy*. `build_registrar` gained `entry_point_groups`, which says which groups to read; it did not gain a set of applicable slots, so the function stays a pure discover-and-register with no policy in it. The property that made the alternative unattractive is intact.
+
+**One narrower gap survives, and it is a different question.** The group split constrains what a kernel-group plugin may *register*; it does not constrain what its module *imports*. A kernel-group plugin that imports the interpreter at module scope still drags it into a kernel-only boot. That is tracked as its own item — `wip/kernel/plugin-group-split-deferred-items.md`, D-2 — and is not what this document was about.

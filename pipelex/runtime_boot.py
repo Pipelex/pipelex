@@ -380,18 +380,16 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # hub slots, so without this guard the run would silently execute in-process instead of under the
         # requested runtime. Checked here to fail fast, before the telemetry/model work.
         #
-        # On a kernel-only boot this rejects an orchestrator contributed by an interpreter-layer
-        # *built-in*, because ``builtin_plugins`` defaults to the kernel half and the name is therefore
-        # never registered. It does NOT reject an *external* entry-point plugin that is interpreter-side:
-        # ``build_registrar`` discovers external plugins unconditionally, so such a name satisfies this
-        # check, and a bare runtime boot would then apply the runtime slot claims while silently never
-        # applying the interpreter ones (``PIPE_ROUTER`` / ``PIPE_RUN`` / ``PIPE_FUNC_EXECUTOR``, all
-        # applied in ``Pipelex.setup``). Deliberately not guarded here, because every remedy needs a layer
-        # signal this layer does not have. Analysed in
-        # ``wip/boot-split/runtime-boot-external-interpreter-orchestrator.md``, which the first kernel-only
-        # caller (the Pipelex kernel's boot-contract test) has now settled: that caller names no
-        # ``boot_orchestrator``, so this gate is never reached and the hole is not on its path. Reassess
-        # when a kernel-only boot is offered to real callers — that is when naming one becomes reachable.
+        # On a kernel-only boot this rejects an interpreter-side orchestrator from either source, and for
+        # the same reason in both cases: the name was never registered, so it cannot satisfy the check.
+        # A built-in one is absent because ``builtin_plugins`` defaults to the kernel half; an *external*
+        # one is absent because ``entry_point_groups`` defaults to ``KERNEL_ENTRY_POINT_GROUPS``, so its
+        # group is never even queried. The result is a loud ``UnknownBootOrchestratorError`` rather than
+        # the half-application this comment used to defer — a boot that applied the kernel slot claims
+        # while silently never applying the interpreter ones (``PIPE_ROUTER`` / ``PIPE_RUN`` /
+        # ``PIPE_FUNC_EXECUTOR``, all applied in ``Pipelex.setup``). What closed it is the entry-point
+        # group split: the layer signal that remedy needed is now carried by the plugin's own
+        # declaration. Analysed in ``wip/boot-split/runtime-boot-external-interpreter-orchestrator.md``.
         requested_boot_orchestrator = get_config().plugins.boot_orchestrator
         if requested_boot_orchestrator is not None and requested_boot_orchestrator not in plugin_registrar.registered_plugin_names:
             raise UnknownBootOrchestratorError(requested=requested_boot_orchestrator)

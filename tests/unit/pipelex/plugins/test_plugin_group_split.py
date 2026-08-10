@@ -41,6 +41,16 @@ INTERPRETER_TIER_CALLS: dict[str, Callable[[PluginRegistrar], None]] = {
     "hub slot pipe_func_executor": lambda registrar: registrar.claim_pipe_func_executor(object),
 }
 
+#: The other half of `HubSlot.is_interpreter_layer` — the slots a kernel-group plugin may claim.
+#: Asserted explicitly because the exhaustive match forces a *classification* on every new slot but
+#: not a correct one: with only the refusals pinned, moving any of these into the interpreter arm
+#: would silently narrow what a kernel-group plugin can do and no test would object.
+KERNEL_TIER_CLAIMS: dict[str, Callable[[PluginRegistrar], None]] = {
+    "content_generator": lambda registrar: registrar.claim_content_generator(object),
+    "task_manager": lambda registrar: registrar.claim_task_manager(object),
+    "isolated_execution_probe": lambda registrar: registrar.claim_isolated_execution_probe(object),
+}
+
 
 def _noop_make_worker(**_kwargs: object) -> InferenceWorkerAbstract:
     msg = "make_worker is never invoked by discovery tests"
@@ -80,7 +90,7 @@ def _entry_point(*, name: str, plugin: object) -> SimpleNamespace:
 def _discover(
     *,
     mocker: MockerFixture,
-    external: dict[PluginGroup, list[object]] | None = None,
+    external: dict[str, list[object]] | None = None,
     retired: list[object] | None = None,
     groups: Sequence[PluginGroup] = (PluginGroup.KERNEL, PluginGroup.INTERPRETER),
     builtins: Sequence[object] = (),
@@ -91,7 +101,7 @@ def _discover(
     group filtering under test is the real one — a group the caller did not ask for must never
     be read, and that is only observable if discovery does the querying itself.
     """
-    by_group = {group.value: entry_points for group, entry_points in (external or {}).items()}
+    by_group: dict[str, list[object]] = dict(external or {})
     by_group[RETIRED_ENTRY_POINT_GROUP] = retired or []
 
     def _installed(*, group: str) -> list[object]:
@@ -127,6 +137,22 @@ class TestPluginGroupSplit:
         assert "liar" in message
         assert capability in message
         assert PluginGroup.INTERPRETER in message
+
+    @pytest.mark.parametrize("slot", list(KERNEL_TIER_CLAIMS))
+    def test_a_kernel_group_plugin_may_claim_the_kernel_tier_hub_slots(self, slot: str, mocker: MockerFixture) -> None:
+        """Not every hub slot is interpreter-layer, and the permission matters as much as the refusal.
+
+        These three hand back no `Pipe`-aware object and are applied in the kernel boot, so refusing
+        them would push a plugin that needs one into the interpreter group — where a kernel-only boot
+        would never load it at all. That is the silent-absence failure the split exists to remove, so
+        over-restricting here is not a safe direction to err in.
+        """
+        plugin = _ContributingPlugin(name="kernel_claimant", contributions=[KERNEL_TIER_CLAIMS[slot]])
+        registrar = _discover(mocker=mocker, external={PluginGroup.KERNEL: [_entry_point(name="kernel_claimant", plugin=plugin)]})
+
+        discovery = next(discovery for discovery in registrar.discoveries if discovery.name == "kernel_claimant")
+        assert discovery.group == PluginGroup.KERNEL
+        assert slot in str(discovery.contributions)
 
     def test_an_interpreter_group_plugin_may_contribute_both_tiers(self, mocker: MockerFixture) -> None:
         """The tiers are a *menu restriction on the kernel group*, not a partition.

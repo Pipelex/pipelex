@@ -193,7 +193,8 @@ class PluginLayerViolationError(PluginError):
             f"Plugin '{plugin_name}' is published under the entry-point group '{declared_group}' but registered "
             f"an interpreter-layer capability ({capability}). Publish it under '{interpreter_group}' instead — a "
             "kernel-group plugin may only contribute kernel-layer capabilities (inference backends, model listers, "
-            "storage and secrets providers, HTTP-error mappers)."
+            "storage and secrets providers, HTTP-error mappers, teardown callbacks, and the content_generator, "
+            "task_manager and isolated_execution_probe hub slots)."
         )
         super().__init__(message)
 
@@ -219,7 +220,8 @@ class RetiredPluginEntryPointGroupError(PluginError):
         available = " or ".join(f"'{group}'" for group in groups)
         message = (
             f"Plugin(s) {named} advertise themselves under the retired entry-point group '{retired_group}', which is "
-            f"no longer read. Re-publish each under the group matching its layer: {available}. A kernel-layer plugin "
+            f"no longer read. Upgrade each to a release published under {available}, or uninstall it to recover "
+            "startup. If you author it: re-publish under the group matching its layer — a kernel-layer plugin "
             "(inference backend, model lister, storage or secrets provider) goes in the kernel group; anything that "
             "constructs a Pipe-aware object (orchestrator, bundle validator, PipeFunc executor) goes in the "
             "interpreter group."

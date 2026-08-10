@@ -39,13 +39,13 @@ setting below names a model the deck never has to resolve. The settings are buil
 than through the `resolve_*_setting` helpers for that same reason — those read the deck, which is a
 separate question from the one this test asks.
 
-**On the deferred orchestrator question.** `runtime_boot.py`'s orchestrator-rejection comment defers
-the external-interpreter-orchestrator half-application hole to "the first caller of a kernel-only
-boot", which is this test. It is settled, not inherited: this boot names no `boot_orchestrator` and
-its config sets none, so the gate is never reached and the hole is not on this path. The remedy the
-analysis proposes (a `HubSlot.is_interpreter_slot` property plus a `honours_interpreter_slots` class
-attribute) remains unbuilt on purpose — it is real machinery for a path that still has no production
-caller. Recorded in `wip/boot-split/runtime-boot-external-interpreter-orchestrator.md`.
+**On the once-deferred orchestrator question.** `runtime_boot.py`'s orchestrator-rejection comment used
+to defer the external-interpreter-orchestrator half-application hole to "the first caller of a
+kernel-only boot", which is this test. That hole is now closed, and not by this test: the plugin
+entry-point group split scopes a kernel-only boot's discovery to `KERNEL_ENTRY_POINT_GROUPS`, so an
+interpreter-group orchestrator is never registered and the existing gate rejects its name loudly.
+Neither remedy the analysis proposed was built. Recorded in
+`wip/boot-split/runtime-boot-external-interpreter-orchestrator.md`.
 """
 
 import subprocess  # noqa: S404

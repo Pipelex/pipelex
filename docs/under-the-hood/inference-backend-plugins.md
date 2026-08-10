@@ -184,7 +184,7 @@ Declare an entry point in the `pipelex.plugins.kernel` group; discovery finds it
 acme = "my_pkg.acme_plugin:AcmePlugin"
 ```
 
-**The group declares your layer, and the choice is not cosmetic.** An inference backend is kernel-layer — it constructs a worker, never a `Pipe` — so it belongs in `pipelex.plugins.kernel`, and a kernel-only boot reads that group and finds it. Publish the same plugin under `pipelex.plugins.interpreter` and a kernel-only boot never even *imports* your module, so your backend is simply absent. The reverse mistake fails loudly instead: a `pipelex.plugins.kernel` plugin whose `register` reaches an interpreter-layer capability (`add_orchestrator`, `add_bundle_validator`, `add_pipe_func_executor`, or any `claim_*` hub slot) raises `PluginLayerViolationError` naming the capability and the group to move to. The restriction is one-directional — an interpreter-group plugin may contribute kernel-tier capabilities too.
+**The group declares your layer, and the choice is not cosmetic.** An inference backend is kernel-layer — it constructs a worker, never a `Pipe` — so it belongs in `pipelex.plugins.kernel`, and a kernel-only boot reads that group and finds it. Publish the same plugin under `pipelex.plugins.interpreter` and a kernel-only boot never even *imports* your module, so your backend is simply absent. The reverse mistake fails loudly instead: a `pipelex.plugins.kernel` plugin whose `register` reaches an interpreter-layer capability — `add_orchestrator`, `add_bundle_validator`, `add_pipe_func_executor`, or the three hub slots that hand back a `Pipe`-aware object (`claim_pipe_router`, `claim_pipe_run`, `claim_pipe_func_executor`) — raises `PluginLayerViolationError` naming the capability and the group to move to. The other three slots are kernel-tier and a kernel-group plugin may claim them freely: `claim_content_generator`, `claim_task_manager`, `claim_isolated_execution_probe`. The restriction is one-directional — an interpreter-group plugin may contribute kernel-tier capabilities too.
 
 The single pre-split `pipelex.plugins` group is retired. It is not ignored: a plugin still published there fails startup with `RetiredPluginEntryPointGroupError`, because the alternative — being silently undiscovered — is the expensive failure to diagnose.
 
@@ -235,6 +235,8 @@ The SPI is a documented, versioned **module/symbol list** gated by `PLUGIN_API_V
 | Condition | Error |
 |-----------|-------|
 | `targets_api` ≠ `PLUGIN_API_VERSION` | `PluginApiVersionMismatchError` |
+| published under the retired `pipelex.plugins` group | `RetiredPluginEntryPointGroupError` (names the plugins and the group each should move to) |
+| a `pipelex.plugins.kernel` plugin registers an interpreter-layer capability | `PluginLayerViolationError` (names the capability and the group to move to) |
 | duplicate `(family, sdk)` | `DuplicateInferenceBackendError` (names both plugins) |
 | duplicate `sdk` model lister | `DuplicateModelListerError` (names both plugins) |
 | `name` in `plugins.disabled` but core-unconditional | `CoreUnconditionalPluginDisabledError` |

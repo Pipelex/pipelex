@@ -131,6 +131,7 @@ Whether that token names an *installed* provider is validated at **registry look
 | Condition | Error |
 |-----------|-------|
 | `secrets_config.method` names no registered provider | `UnknownSecretsMethodError` (lists the registered methods) |
+| published under the retired `pipelex.plugins` group | `RetiredPluginEntryPointGroupError` (names the plugins and the group each should move to) |
 | two plugins register the same `method` | `DuplicateSecretsProviderError` (names both plugins) |
 | `name` (`"secrets"`) in `plugins.disabled` | `CoreUnconditionalPluginDisabledError` |
 | entry point raises while loading/registering | `BrokenPluginError` |

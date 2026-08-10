@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:0e73e927516b56b9fb5fae4d7a32209958df470c5d8f6384f9942522dd87a3b8"
+digest = "sha256:5caf168f4ee9351e5e24dd1f8e2a836f3038607b1202330e4b2d4c09e39b4273"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-10T04:37:37Z"
-rationale = "Trigger is the kernel-layer rename reaching four kernel modules and the boot-contract test: prose only, no signature, no entry point, no behavior. Reviewed docs/under-the-hood/pipelex-kernel.md against the trigger and found two things genuinely stale, both fixed in the same change. First, the Enforcement table cited the two closure tests by path and both paths moved with the rename (test_runtime_layer_import_closure.py and test_runtime_layer_exceptions_aggregate_gate.py became test_kernel_layer_*); verified all three cited test paths now resolve on disk. Second, the page described the kernel's audience as anyone 'embedding the runtime' and RuntimeBoot.make() as the 'runtime-only' composition root — the exact overloaded word the rename exists to remove — now 'embedding the kernel' and 'kernel-only'. The kernel surface itself is unchanged by this trigger, so the completeness claim the previous ack verified module by module still holds: no function was added, renamed or moved, and the module table needs no new row."
+reviewed_at = "2026-08-10T12:22:48Z"
+rationale = "Trigger is a docstring-only edit to test_kernel_boot_contract.py: its 'On the deferred orchestrator question' paragraph claimed the remedy for the external-interpreter-orchestrator hole 'remains unbuilt on purpose' and named a proposed HubSlot.is_interpreter_slot property. That became stale when the plugin entry-point group split landed — a kernel-only boot now scopes discovery to KERNEL_ENTRY_POINT_GROUPS, so an interpreter-group orchestrator is never registered and the existing gate rejects its name loudly. Rewrote the paragraph to say the hole is closed and by what, and closed out the wip analysis it cites. Reviewed docs/under-the-hood/pipelex-kernel.md against the trigger: nothing is stale. The trigger changed no kernel entry point, no signature and no behavior, so the module table and the completeness claim the previous ack verified module by module both still hold. The page cites test_kernel_boot_contract.py once, in the Enforcement table, for what the test covers ('every kernel entry point runs on a keyless boot, swept afterwards') — that citation describes the test's coverage, which this edit did not touch, and the cited path still resolves. The page says nothing about orchestrators, boot_orchestrator, plugin groups or entry points, so it has no surface that could contradict the trigger. Reviewed, no doc change needed."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -24,4 +24,4 @@ rationale = "Trigger is the kernel-layer rename reaching four kernel modules and
 "pipelex/kernel/prompt_references.py" = "blob:03ec9ef67ae84f141d072ca2d2c3ef888549ccc0"
 "pipelex/kernel/search_ops.py" = "blob:01be4bef28f98342678cba16ac8c4b21fadcaae1"
 "pipelex/kernel/search_results.py" = "blob:101b70dc96cc5ee1721c9f6b1cb725a5ca78ff70"
-"tests/unit/pipelex/kernel/test_kernel_boot_contract.py" = "blob:389e9bfa7cce6969362de51799b8abc0e99ddddf"
+"tests/unit/pipelex/kernel/test_kernel_boot_contract.py" = "blob:78947be625cb143c2a5d76a9761ed637d91a9469"

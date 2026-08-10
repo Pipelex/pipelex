@@ -94,7 +94,7 @@ SCAN_ROOTS: tuple[Path, ...] = (SOURCE_ROOT, TESTS_ROOT)
 #: since nothing in the tuple is a prefix of it. Its closure *is* what the kernel layer means, so an
 #: `interpreter_hub` import there is the one that would break the property outright.
 #:
-#: `pipelex.runtime_boot` is the second module entry, and for the mirror-image reason: it is the runtime
+#: `pipelex.runtime_boot` is the second module entry, and for the mirror-image reason: it is the kernel
 #: layer's *composition root*, so its closure is what "boot the kernel layer" costs. Declaring it is
 #: what puts it inside this rule's domain at all — an undeclared module is not neutral, it is unpoliced,
 #: and this one is the single most tempting place in the tree to reach for an interpreter type, since

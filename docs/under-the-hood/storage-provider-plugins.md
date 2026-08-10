@@ -133,6 +133,7 @@ Whether that token names an *installed* provider is validated at **registry look
 | Condition | Error |
 |-----------|-------|
 | `storage_config.method` names no registered provider | `UnknownStorageMethodError` (lists the registered methods) |
+| published under the retired `pipelex.plugins` group | `RetiredPluginEntryPointGroupError` (names the plugins and the group each should move to) |
 | two plugins register the same `method` | `DuplicateStorageProviderError` (names both plugins) |
 | `name` (`"storage"`) in `plugins.disabled` | `CoreUnconditionalPluginDisabledError` |
 | entry point raises while loading/registering | `BrokenPluginError` |
