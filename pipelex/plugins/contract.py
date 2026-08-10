@@ -16,7 +16,11 @@ if TYPE_CHECKING:
 # process-global provider registries (``storage_config.method`` / ``secrets_config.method`` pick
 # the factory at boot). DX-1 batches both menu additions under this single bump so external plugins
 # re-declare ``targets_api`` only once.
-PLUGIN_API_VERSION: int = 3
+#
+# v4 split the single ``pipelex.plugins`` entry-point group into the two ``PluginGroup`` groups
+# below: a plugin now declares its layer by the group it publishes under, and a kernel-group plugin
+# may no longer reach the interpreter tier of the menu.
+PLUGIN_API_VERSION: int = 4
 
 
 @runtime_checkable
@@ -33,8 +37,12 @@ class PipelexPlugin(Protocol):
     capability that needs both is two plugins, because the built-in ones are filed by layer —
     ``pipelex.providers`` for the kernel half, ``pipelex.interpreter_plugins`` for the interpreter
     half — and a plugin straddling the two would put the method interpreter back into every kernel
-    import closure. External plugins are discovered through an entry point and so live in no declared
-    layer, but the same rule keeps them honest about what they pull in.
+    import closure. An external plugin declares its layer by the ``PluginGroup`` it publishes under,
+    and the registrar enforces the declaration: a kernel-group plugin that registers an
+    interpreter-layer capability fails loud at register time (``PluginLayerViolationError``). The
+    restriction is one-directional — an interpreter-group plugin may contribute kernel-tier
+    capabilities too (ours does: it registers an orchestrator *and* an HTTP-error mapper), because a
+    kernel-only boot never loads the interpreter group at all.
 
     Note that ``pipelex.providers`` is where the built-in *adapters* live, while this module and the
     rest of ``pipelex.plugins`` are the *mechanism* they register through. Both packages are

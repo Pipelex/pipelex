@@ -1,4 +1,5 @@
 from pipelex.plugins.contract import PipelexPlugin
+from pipelex.plugins.plugin_group import PluginGroup
 from pipelex.providers.anthropic.anthropic_plugin import AnthropicPlugin
 from pipelex.providers.azure_rest.azure_rest_plugin import AzureRestPlugin
 from pipelex.providers.bedrock.bedrock_plugin import BedrockPlugin
@@ -59,3 +60,9 @@ KERNEL_BUILTIN_PLUGINS: list[PipelexPlugin] = [
 # disabling it would only break the out-of-the-box experience. The interpreter-layer half of this set
 # lives beside its plugins, in ``pipelex.interpreter_plugins.builtins``.
 KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES: frozenset[str] = frozenset({"storage", "secrets", "openai"})
+
+# The entry-point groups a kernel-only boot reads: its own, and only its own. Sits beside the
+# built-in manifest because it answers the same question for the other half of discovery — what an
+# installation contributes to *this* layer. The interpreter's composed list lives next to its own
+# built-ins, in ``pipelex.interpreter_plugins.builtins``.
+KERNEL_ENTRY_POINT_GROUPS: tuple[PluginGroup, ...] = (PluginGroup.KERNEL,)

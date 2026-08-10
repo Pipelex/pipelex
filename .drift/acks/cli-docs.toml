@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:37b06818f4a4c24d93fd33f5e3bf6e4c344e794e0eeb11333c22f8f32de87f87"
+digest = "sha256:ad647a1d23ee55400c773b372ea72ab805d0b9851f4c1944cf2f17ac219c164a"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-10T04:37:14Z"
-rationale = "Trigger is one comment word in doctor_cmd.py's check_deck_sync, and it is a revert: the kernel-layer rename sweep matched 'runtime layer' inside 'runtime layered resolution', which means the layered config resolution at runtime, not the layer. Restored to 'runtime layered resolution'; the staged file is otherwise byte-identical to the last ack's content. No option, default, choice list, exit code, output shape or error class changed. Grepped both targets (docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md) for 'runtime layer', 'runtime-layer', 'RUNTIME_LAYER', 'RUNTIME_BUILTIN' and 'kernel layer': zero hits, so the sweep reached neither target and neither is stale. No doc change needed."
+reviewed_at = "2026-08-10T06:14:22Z"
+rationale = "Trigger is plugins_cmd.py gaining a Group column and passing the new entry_point_groups argument to build_registrar. Reviewed both targets: docs/tools/cli/ documents init/run/validate/show/fix/update/pkg/build and the agent CLI — it has no page for 'pipelex plugins list' at all, and grep for 'plugin' across docs/tools/cli/ returns zero hits; pipelex/cli/agent_cli/CLAUDE.md's only 'plugin' hits are mthds-plugins skill paths, unrelated to plugin discovery. No option, default, exit code or output contract of any documented command changed. Neither target is stale, so no doc change needed. The docs that ARE now wrong are the SPI pages under docs/under-the-hood/ (they still say to publish under the retired pipelex.plugins entry-point group); those are not this contract's targets and are scheduled with the rest of the Part-A doc sweep."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -104,7 +104,7 @@ rationale = "Trigger is one comment word in doctor_cmd.py's check_deck_sync, and
 "pipelex/cli/commands/init/ui/types.py" = "blob:1361f29ca95bacc90bca90ea6c0e39f44b6734ab"
 "pipelex/cli/commands/login/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/login/command.py" = "blob:ace1db9879626cc1722adaac12761aadaa6b24ed"
-"pipelex/cli/commands/plugins_cmd.py" = "blob:6019e102c644ff6adeee6a5b3f1423efc4af39f1"
+"pipelex/cli/commands/plugins_cmd.py" = "blob:2980268813f1acf67f0f2cc914ccaff6cae6889b"
 "pipelex/cli/commands/resolve_cmd.py" = "blob:2233ab12b7cd5ef0bce697d9599d13a09e242dde"
 "pipelex/cli/commands/run/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/run/_inputs_file_loader.py" = "blob:dde781f846968b667a0acfb4b3e3cea01cef7049"

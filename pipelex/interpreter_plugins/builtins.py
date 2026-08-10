@@ -19,6 +19,7 @@ See ``docs/contribute/hub-layering.md``.
 from pipelex.interpreter_plugins.direct.direct_plugin import DirectOrchestratorPlugin
 from pipelex.interpreter_plugins.pipe_func.pipe_func_plugin import PipeFuncPlugin
 from pipelex.plugins.contract import PipelexPlugin
+from pipelex.plugins.plugin_group import PluginGroup
 from pipelex.providers.builtins import KERNEL_BUILTIN_PLUGINS, KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES
 
 # The interpreter-layer half: plugins whose adapters name the method interpreter. Both are
@@ -39,3 +40,8 @@ BUILTIN_PLUGINS: list[PipelexPlugin] = [*INTERPRETER_BUILTIN_PLUGINS, *KERNEL_BU
 
 # Every built-in plugin core requires unconditionally, both layers.
 CORE_UNCONDITIONAL_PLUGIN_NAMES: frozenset[str] = INTERPRETER_CORE_UNCONDITIONAL_PLUGIN_NAMES | KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES
+
+# The entry-point groups a method-running process reads: both, since it is the layer that may load
+# either half. A kernel-only boot reads ``KERNEL_ENTRY_POINT_GROUPS`` instead — the omission is the
+# guarantee, since a group that is never queried has no entry point to import.
+ENTRY_POINT_GROUPS: tuple[PluginGroup, ...] = (PluginGroup.KERNEL, PluginGroup.INTERPRETER)

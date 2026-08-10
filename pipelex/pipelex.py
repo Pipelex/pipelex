@@ -29,7 +29,7 @@ from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config, get_pipe_func_execution_mode
 from pipelex.interpreter_hub import InterpreterHub, set_interpreter_hub
-from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS, CORE_UNCONDITIONAL_PLUGIN_NAMES
+from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS, CORE_UNCONDITIONAL_PLUGIN_NAMES, ENTRY_POINT_GROUPS
 from pipelex.libraries.library_manager import LibraryManager
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.observer.observer_protocol import ObserverProtocol
@@ -109,7 +109,8 @@ class Pipelex(RuntimeBoot):
 
         # The kernel layer first, with the *composed* plugin manifests: this process will run methods,
         # so it needs the interpreter-touching built-ins (the `direct` orchestrator, the built-in
-        # PipeFunc executor modes) alongside the kernel half a bare RuntimeBoot discovers.
+        # PipeFunc executor modes) alongside the kernel half a bare RuntimeBoot discovers — and, for
+        # installed plugins, both entry-point groups rather than the kernel group alone.
         super().setup(
             integration_mode=integration_mode,
             needs_inference=needs_inference,
@@ -117,6 +118,7 @@ class Pipelex(RuntimeBoot):
             needs_model_specs=needs_model_specs,
             builtin_plugins=BUILTIN_PLUGINS,
             core_unconditional_plugin_names=CORE_UNCONDITIONAL_PLUGIN_NAMES,
+            entry_point_groups=ENTRY_POINT_GROUPS,
             class_registry=class_registry,
             secrets_provider=secrets_provider,
             storage_provider=storage_provider,

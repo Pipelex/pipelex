@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 from pipelex.plugins.contract import PLUGIN_API_VERSION, PipelexPlugin
-from pipelex.plugins.discovery import build_registrar
+from pipelex.plugins.discovery import GroupedEntryPoint, build_registrar
 from pipelex.plugins.exceptions import (
     BrokenPluginError,
     CoreUnconditionalPluginDisabledError,
@@ -21,10 +21,12 @@ from pipelex.plugins.exceptions import (
     PluginApiVersionMismatchError,
 )
 from pipelex.plugins.inference_backend_registry import InferenceFamily
+from pipelex.plugins.plugin_group import PluginGroup
 from pipelex.plugins.registrar import PluginOrigin, PluginRegistrar, PluginStatus
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from importlib.metadata import EntryPoint
 
     from pytest_mock import MockerFixture
 
@@ -36,6 +38,9 @@ DISCOVERY_MODULE = "pipelex.plugins.discovery"
 
 #: The default for tests that exercise no core-unconditional plugin: nothing is undisableable.
 NO_CORE_UNCONDITIONAL: frozenset[str] = frozenset()
+
+#: What a method-running boot reads. The layer split itself is exercised in test_plugin_group_split.
+BOTH_GROUPS: tuple[PluginGroup, ...] = (PluginGroup.KERNEL, PluginGroup.INTERPRETER)
 
 
 def _noop_make_worker(**_kwargs: object) -> InferenceWorkerAbstract:
@@ -106,6 +111,7 @@ def _build_registrar_with(
         config=_fake_config(disabled or []),
         builtin_plugins=cast("Sequence[PipelexPlugin]", plugins),
         core_unconditional_plugin_names=core_unconditional,
+        entry_point_groups=BOTH_GROUPS,
     )
 
 
@@ -190,9 +196,12 @@ class TestPluginDiscovery:
             raise ImportError(msg)
 
         bad_entry_point = SimpleNamespace(name="bad_ep", load=_explode)
-        mocker.patch(f"{DISCOVERY_MODULE}._external_entry_points", return_value=[bad_entry_point])
+        grouped = GroupedEntryPoint(group=PluginGroup.KERNEL, entry_point=cast("EntryPoint", bad_entry_point))
+        mocker.patch(f"{DISCOVERY_MODULE}._external_entry_points", return_value=[grouped])
         with pytest.raises(BrokenPluginError) as exc_info:
-            build_registrar(config=_fake_config([]), builtin_plugins=[], core_unconditional_plugin_names=NO_CORE_UNCONDITIONAL)
+            build_registrar(
+                config=_fake_config([]), builtin_plugins=[], core_unconditional_plugin_names=NO_CORE_UNCONDITIONAL, entry_point_groups=BOTH_GROUPS
+            )
         assert "bad_ep" in str(exc_info.value)
 
     def test_disabled_broken_external_entry_point_is_skipped_before_load(self, mocker: MockerFixture) -> None:
@@ -205,9 +214,12 @@ class TestPluginDiscovery:
             raise ImportError(msg)
 
         bad_entry_point = SimpleNamespace(name="bad_ep", load=_explode)
-        mocker.patch(f"{DISCOVERY_MODULE}._external_entry_points", return_value=[bad_entry_point])
+        grouped = GroupedEntryPoint(group=PluginGroup.KERNEL, entry_point=cast("EntryPoint", bad_entry_point))
+        mocker.patch(f"{DISCOVERY_MODULE}._external_entry_points", return_value=[grouped])
 
-        registrar = build_registrar(config=_fake_config(["bad_ep"]), builtin_plugins=[], core_unconditional_plugin_names=NO_CORE_UNCONDITIONAL)
+        registrar = build_registrar(
+            config=_fake_config(["bad_ep"]), builtin_plugins=[], core_unconditional_plugin_names=NO_CORE_UNCONDITIONAL, entry_point_groups=BOTH_GROUPS
+        )
 
         disabled_discovery = next(discovery for discovery in registrar.discoveries if discovery.name == "bad_ep")
         assert disabled_discovery.status == PluginStatus.DISABLED
@@ -237,6 +249,7 @@ class TestPluginDiscovery:
                 config=_fake_config([plugin_name]),
                 builtin_plugins=BUILTIN_PLUGINS,
                 core_unconditional_plugin_names=CORE_UNCONDITIONAL_PLUGIN_NAMES,
+                entry_point_groups=BOTH_GROUPS,
             )
         assert plugin_name in str(exc_info.value)
 
@@ -248,6 +261,7 @@ class TestPluginDiscovery:
             config=_fake_config([]),
             builtin_plugins=BUILTIN_PLUGINS,
             core_unconditional_plugin_names=CORE_UNCONDITIONAL_PLUGIN_NAMES,
+            entry_point_groups=BOTH_GROUPS,
         )
         by_name = {discovery.name: discovery for discovery in registrar.discoveries}
         assert "openai" in by_name

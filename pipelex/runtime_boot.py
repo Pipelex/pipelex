@@ -86,7 +86,7 @@ from pipelex.plugins.registrar import HubSlot, PluginRegistrar
 from pipelex.plugins.sdk_client_manager import SdkClientManager
 from pipelex.plugins.secrets_provider_registry import SecretsProviderRegistry
 from pipelex.plugins.storage_provider_registry import StorageProviderRegistry
-from pipelex.providers.builtins import KERNEL_BUILTIN_PLUGINS, KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES
+from pipelex.providers.builtins import KERNEL_BUILTIN_PLUGINS, KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES, KERNEL_ENTRY_POINT_GROUPS
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.runtime_hub import RuntimeHub, set_runtime_hub
@@ -127,6 +127,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from pipelex.plugins.contract import PipelexPlugin
+    from pipelex.plugins.plugin_group import PluginGroup
     from pipelex.system.pipelex_service.remote_config import RemoteConfig
     from pipelex.system.pipelex_service.types import RemoteConfigSource
 
@@ -250,6 +251,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         needs_model_specs: bool | None = None,
         builtin_plugins: "Sequence[PipelexPlugin] | None" = None,
         core_unconditional_plugin_names: frozenset[str] | None = None,
+        entry_point_groups: "Sequence[PluginGroup] | None" = None,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
         storage_provider: StorageProviderAbstract | None = None,
@@ -268,7 +270,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         kernel boot never loads the interpreter-touching built-ins; the interpreter boot passes the
         composed list instead. ``core_unconditional_plugin_names`` defaults to the kernel-layer half for
         the same reason, and must describe the same set as ``builtin_plugins``: requiring a name that was
-        never discovered fails boot.
+        never discovered fails boot. ``entry_point_groups`` is the same story for *installed* plugins and
+        defaults to ``KERNEL_ENTRY_POINT_GROUPS``: a bare kernel boot never even queries the interpreter
+        group, so no interpreter-side plugin module is imported into the process.
 
         Every other argument is the kernel subset of the same injections ``Pipelex.make`` documents.
         """
@@ -366,6 +370,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             core_unconditional_plugin_names=(
                 KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES if core_unconditional_plugin_names is None else core_unconditional_plugin_names
             ),
+            entry_point_groups=KERNEL_ENTRY_POINT_GROUPS if entry_point_groups is None else entry_point_groups,
         )
         self._plugin_registrar = plugin_registrar
         # Reject an unknown boot orchestrator before falling through to the core defaults. The requested

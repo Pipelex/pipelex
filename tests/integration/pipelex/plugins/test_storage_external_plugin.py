@@ -1,4 +1,4 @@
-"""End-to-end: an out-of-tree storage plugin discovered through a ``pipelex.plugins`` entry point is
+"""End-to-end: an out-of-tree storage plugin discovered through a ``pipelex.plugins.kernel`` entry point is
 selectable via ``storage_config.method`` and lands on the hub.
 
 This exercises the whole discovery → selection → hub chain the built-in providers ride, with a fake
@@ -9,19 +9,22 @@ config selects that token, and the resolved provider is the one set on the hub.
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from typing_extensions import override
 
 from pipelex.pipelex import Pipelex
 from pipelex.plugins.contract import PLUGIN_API_VERSION
+from pipelex.plugins.discovery import GroupedEntryPoint
+from pipelex.plugins.plugin_group import PluginGroup
 from pipelex.runtime_hub import get_storage_provider, get_storage_provider_registry
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract, StoredData
 
 if TYPE_CHECKING:
     from collections.abc import Generator
+    from importlib.metadata import EntryPoint
 
     from pytest_mock import MockerFixture
 
@@ -86,7 +89,9 @@ class TestStorageExternalPlugin:
         """A fake entry point + a config naming its token boots with that external provider on the hub."""
         # The entry point resolves to the plugin class (a zero-arg factory); discovery instantiates it.
         fake_entry_point = SimpleNamespace(name=EXTERNAL_PLUGIN_NAME, load=lambda: _FakeStoragePlugin)
-        mocker.patch("pipelex.plugins.discovery._external_entry_points", return_value=[fake_entry_point])
+        # A storage provider is a kernel-layer capability, so its dist publishes under the kernel group.
+        grouped = GroupedEntryPoint(group=PluginGroup.KERNEL, entry_point=cast("EntryPoint", fake_entry_point))
+        mocker.patch("pipelex.plugins.discovery._external_entry_points", return_value=[grouped])
 
         Pipelex.make(
             integration_mode=_test_integration_mode(),

@@ -16,11 +16,13 @@ from pipelex.plugins.exceptions import (
     DuplicateSecretsProviderError,
     DuplicateStorageProviderError,
     HubSlotAlreadyClaimedError,
+    PluginLayerViolationError,
 )
 from pipelex.plugins.inference_backend_registry import InferenceFamily, MakeWorkerFn
 from pipelex.plugins.model_lister_registry import ListModelsFn
 from pipelex.plugins.orchestrator_registry import OrchestratorProtocol
 from pipelex.plugins.pipe_func_executor_registry import PipeFuncExecutorFactoryFn
+from pipelex.plugins.plugin_group import PluginGroup
 from pipelex.plugins.secrets_provider_registry import SecretsProviderFactoryFn
 from pipelex.plugins.storage_provider_registry import StorageProviderFactoryFn
 from pipelex.runtime_bridge.orchestration_mode import OrchestrationMode
@@ -71,6 +73,21 @@ class HubSlot(StrEnum):
     TASK_MANAGER = "task_manager"
     ISOLATED_EXECUTION_PROBE = "isolated_execution_probe"
 
+    @property
+    def is_interpreter_layer(self) -> bool:
+        """Whether claiming this slot means handing back a ``Pipe``-aware object.
+
+        Which is also where the claim is *applied*: the interpreter-layer slots are applied in
+        ``Pipelex.setup``, the kernel-layer ones in the kernel boot — so a kernel-only boot would
+        never apply an interpreter claim anyway. The exhaustive match is the point: a new slot
+        cannot be added without classifying it.
+        """
+        match self:
+            case HubSlot.PIPE_FUNC_EXECUTOR | HubSlot.PIPE_ROUTER | HubSlot.PIPE_RUN:
+                return True
+            case HubSlot.CONTENT_GENERATOR | HubSlot.TASK_MANAGER | HubSlot.ISOLATED_EXECUTION_PROBE:
+                return False
+
 
 class PluginOrigin(StrEnum):
     BUILTIN = "builtin"
@@ -90,7 +107,7 @@ class PluginStatus(StrEnum):
 class PluginDiscovery(BaseModel):
     """Observability record of one discovered plugin and what it contributed.
 
-    Populated by ``build_registrar`` (origin/status/targets_api) and the registrar
+    Populated by ``build_registrar`` (origin/status/targets_api/group) and the registrar
     menu methods (one ``contributions`` line per contribution). Read by
     ``pipelex plugins list``.
     """
@@ -99,6 +116,9 @@ class PluginDiscovery(BaseModel):
     origin: PluginOrigin = Field(strict=False)
     status: PluginStatus = Field(strict=False)
     targets_api: int | None = None
+    #: The entry-point group the plugin arrived under, and so the layer it declares. ``None`` for a
+    #: built-in: built-ins are handed in as a list, filed by layer in-tree rather than declared.
+    group: PluginGroup | None = Field(default=None, strict=False)
     contributions: list[str] = Field(default_factory=list)
     detail: str | None = None
 
@@ -148,8 +168,8 @@ class PluginRegistrar:
     # Driven by build_registrar (not by plugins)
     # ------------------------------------------------------------------ #
 
-    def begin_plugin(self, *, name: str, origin: PluginOrigin, targets_api: int) -> PluginDiscovery:
-        discovery = PluginDiscovery(name=name, origin=origin, status=PluginStatus.REGISTERED, targets_api=targets_api)
+    def begin_plugin(self, *, name: str, origin: PluginOrigin, targets_api: int, group: PluginGroup | None) -> PluginDiscovery:
+        discovery = PluginDiscovery(name=name, origin=origin, status=PluginStatus.REGISTERED, targets_api=targets_api, group=group)
         self.discoveries.append(discovery)
         self._active = discovery
         return discovery
@@ -183,6 +203,7 @@ class PluginRegistrar:
         )
 
     def add_orchestrator(self, *, mode: OrchestrationMode, orchestrator: OrchestratorProtocol) -> None:
+        self._require_interpreter_layer(capability=f"orchestrator {mode}")
         self._add(
             store=self.orchestrators,
             sources=self._orchestrator_sources,
@@ -195,6 +216,7 @@ class PluginRegistrar:
         )
 
     def add_bundle_validator(self, *, mode: OrchestrationMode, validator: BundleValidatorProtocol) -> None:
+        self._require_interpreter_layer(capability=f"bundle validator {mode}")
         self._add(
             store=self.bundle_validators,
             sources=self._bundle_validator_sources,
@@ -259,6 +281,7 @@ class PluginRegistrar:
         ``register`` stays import-light. This is the PipeFunc-execution axis, orthogonal to the
         orchestration axis. Fail-loud on a duplicate mode, naming both plugins.
         """
+        self._require_interpreter_layer(capability=f"pipe_func executor {mode}")
         self._add(
             store=self.pipe_func_executors,
             sources=self._pipe_func_executor_sources,
@@ -379,7 +402,26 @@ class PluginRegistrar:
         sources[key] = self._active.name
         self._active.contributions.append(contribution)
 
+    def _require_interpreter_layer(self, *, capability: str) -> None:
+        """Reject an interpreter-layer contribution from a plugin that published itself as kernel-layer.
+
+        One-directional by design: the interpreter group may contribute kernel-tier capabilities too
+        (ours does — an orchestrator *and* an HTTP-error mapper), and nothing is at risk there because
+        a kernel-only boot never reads that group. Built-ins declare no group and are skipped: they
+        are filed by layer in-tree, where the hub-layering guard polices them statically.
+        """
+        group = self._active.group
+        if group is not None and group.is_kernel:
+            raise PluginLayerViolationError(
+                plugin_name=self._active.name,
+                capability=capability,
+                declared_group=group,
+                interpreter_group=PluginGroup.INTERPRETER,
+            )
+
     def _claim(self, *, slot: HubSlot, factory: Callable[[], Any]) -> None:
+        if slot.is_interpreter_layer:
+            self._require_interpreter_layer(capability=f"hub slot {slot}")
         if slot in self.slot_claims:
             raise HubSlotAlreadyClaimedError(slot=slot, first_plugin=self._slot_sources[slot], second_plugin=self._active.name)
         self.slot_claims[slot] = factory

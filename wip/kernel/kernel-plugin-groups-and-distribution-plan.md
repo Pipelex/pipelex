@@ -11,8 +11,8 @@
 | Part | Phase | State |
 | --- | --- | --- |
 | A | A0 naming ruling + inventory | **done** — see [A0 as built](#a0--as-built) |
-| A | A1 group-split mechanism | not started — **next** |
-| A | A2 external-plugin migration | not started |
+| A | A1 group-split mechanism | **done** — see [A1 as built](#a1--as-built) |
+| A | A2 external-plugin migration | not started — **next** |
 | A | A3 gates + checkpoint | not started |
 | B | B0 footprint measurement | not started |
 | B | B1 decisions | not started |
@@ -77,6 +77,24 @@ Done. One commit, no behavior change — identifier and prose renames plus two t
 - **Menu-tier cross-check.** Classify each registrar menu method by tier (kernel-tier: `add_inference_backend`, `add_model_lister`, `add_storage_provider`, `add_secrets_provider`, `add_http_error_mapper`; interpreter-tier: `add_orchestrator`, `add_bundle_validator`, `add_pipe_func_executor`; slot claims classified per-slot). Discovery records which group a plugin arrived under, and the registrar fails loud when a kernel-group plugin calls an interpreter-tier menu method. This catches a plugin lying about its layer at register time — the import-contamination half is caught by the per-plugin guard tests (Part A world) and, in a greenlighted Part C world, by physics.
 - **Legacy-group probe, fail-loud.** Discovery also reads the retired `pipelex.plugins` group; any entry point found there raises with a migration message naming the plugin and the two new groups. Silent nondiscovery is the quiet failure mode this probe exists to prevent.
 - `PLUGIN_API_VERSION` bumps (breaking change to the plugin contract); `pipelex plugins list` gains the layer/group column.
+
+#### A1 — as built
+
+Done. One commit, tests first (the module was red on a missing `PluginGroup` before any mechanism existed), then the mechanism.
+
+`PluginGroup` is a `StrEnum` in its own module `pipelex/plugins/plugin_group.py` rather than in `contract.py`, because the registrar needs it at runtime (it is a `PluginDiscovery` field) while `contract.py` names the registrar back — pyright's `reportImportCycles` is an error here, and a third module is the honest break. `build_registrar` takes `entry_point_groups` as a required parameter, symmetric with `builtin_plugins`; the composed defaults are `KERNEL_ENTRY_POINT_GROUPS` in `providers/builtins.py` and `ENTRY_POINT_GROUPS` in `interpreter_plugins/builtins.py`, each beside the built-in manifest it belongs with.
+
+**Decisions taken**
+
+- **D-A1-1 — the cross-check is one-directional, and the Temporal plugin is what settles it.** A kernel-group plugin may not reach the interpreter tier; an interpreter-group plugin may contribute kernel-tier capabilities freely. A symmetric rule reads tidier but would reject our own Temporal plugin, which is interpreter-side (it contributes an orchestrator) *and* contributes an `add_http_error_mapper` — a kernel-tier capability by the plan's own classification. It would also be rejecting nothing dangerous: the risk is an interpreter-layer object being constructed in a kernel-only boot, and a kernel-only boot never loads the interpreter group at all. Pinned by a test that names the reason.
+- **D-A1-2 — hub-slot tiering is a property of the slot, not a flag at the call site.** `HubSlot.is_interpreter_layer` uses an exhaustive match, so a newly added slot cannot be merged without classifying it. The classification tracks where each claim is *applied* — `PIPE_ROUTER` / `PIPE_RUN` / `PIPE_FUNC_EXECUTOR` in `Pipelex.setup`, the rest in the kernel boot.
+- **D-A1-3 — built-ins carry no group and are exempt from the cross-check.** They are handed in as a list and filed by layer in-tree, where the hub-layering guard polices them statically; a kernel-only boot simply never passes the interpreter half. `PluginDiscovery.group` is `None` for them and `plugins list` shows `—`.
+- **D-A1-4 — `begin_plugin(group=...)` is required, not defaulted.** It costs a mechanical `group=None` at ~30 test call sites that construct a registrar directly, and it buys the guarantee that a future discovery path cannot silently mislabel an external plugin as a built-in and skip the cross-check.
+- **D-A1-5 — the retired-group probe runs on every build, whichever groups were asked for.** A plugin left under `pipelex.plugins` is broken in both boots, and the symptom without the probe — a capability simply absent, no error — is the expensive one to diagnose.
+
+**Verification** — `make agent-check` green end to end. The plugins/providers/cli unit suites, both closure tests and the plugin integration suites: all green. The three new gates were mutation-tested: neutering the tier cross-check killed all six violation cases, ignoring the requested groups killed both kernel-only-boot cases, and neutering the retired probe killed its own case — each restored green after.
+
+⚠ **Owed at A3, and wrong in the tree until then**: every doc that tells a plugin author to publish under `[project.entry-points."pipelex.plugins"]` — `docs/under-the-hood/{inference-backend,orchestrator,storage-provider,secrets-provider}-plugins.md` and `docs/cookbook/using-inference-plugins.md`. A1 makes that group a startup error, so those pages now describe a plugin that cannot boot.
 
 ### A2 — migrate the external plugins
 

@@ -231,6 +231,7 @@ PipelineManagerAlreadyExistsError | Pipeline manager already exists | https://do
 PipelineManagerNotFoundError | Pipeline manager not found | https://docs.pipelex.com/latest/errors/pipeline-manager-not-found-error/
 PluginApiVersionMismatchError | Plugin api version mismatch | https://docs.pipelex.com/latest/errors/plugin-api-version-mismatch-error/
 PluginError | Plugin error | https://docs.pipelex.com/latest/errors/plugin-error/
+PluginLayerViolationError | Plugin layer violation | https://docs.pipelex.com/latest/errors/plugin-layer-violation-error/
 PortkeyCredentialsError | Portkey credentials | https://docs.pipelex.com/latest/errors/portkey-credentials-error/
 PortkeyError | Portkey | https://docs.pipelex.com/latest/errors/portkey-error/
 PortkeyFactoryError | Portkey factory | https://docs.pipelex.com/latest/errors/portkey-factory-error/
@@ -243,6 +244,7 @@ RemoteConfigFetchError | Remote config fetch | https://docs.pipelex.com/latest/e
 RemoteConfigUnavailableError | Remote config unavailable | https://docs.pipelex.com/latest/errors/remote-config-unavailable-error/
 RemoteConfigValidationError | Remote config validation | https://docs.pipelex.com/latest/errors/remote-config-validation-error/
 ReportingManagerError | Reporting manager | https://docs.pipelex.com/latest/errors/reporting-manager-error/
+RetiredPluginEntryPointGroupError | Retired plugin entry point group | https://docs.pipelex.com/latest/errors/retired-plugin-entry-point-group-error/
 RoutingProfileBlueprintValueError | Routing profile blueprint value | https://docs.pipelex.com/latest/errors/routing-profile-blueprint-value-error/
 RoutingProfileDisabledBackendError | Routing profile disabled backend | https://docs.pipelex.com/latest/errors/routing-profile-disabled-backend-error/
 RoutingProfileLibraryError | Routing profile library | https://docs.pipelex.com/latest/errors/routing-profile-library-error/
