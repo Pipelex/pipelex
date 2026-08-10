@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | A | A0 naming ruling + inventory | **done** — see [A0 as built](#a0--as-built) |
 | A | A1 group-split mechanism | **done** — see [A1 as built](#a1--as-built) |
-| A | A2 external-plugin migration | not started — **next** |
+| A | A2 external-plugin migration | **partial** — mistralai-workflows + daytona-sandbox done (local commits); pipelex-temporal 🛑 blocked on a branch decision, see [A2 as built](#a2--as-built-partial-two-of-three-repos) |
 | A | A3 gates + checkpoint | not started |
 | B | B0 footprint measurement | not started |
 | B | B1 decisions | not started |
@@ -99,6 +99,27 @@ Done. One commit, tests first (the module was red on a missing `PluginGroup` bef
 ### A2 — migrate the external plugins
 
 Every currently-published external plugin is interpreter-layer, so all of them move to `pipelex.plugins.interpreter` and bump `targets_api`, each in one commit in its own repo: **pipelex-temporal** (orchestrator + bundle validator + slot claims), **pipelex-mistralai-workflows** (orchestrator), **pipelex-daytona-sandbox** (PipeFunc executor). The `pipelex.plugins.kernel` group starts with no external members — the future `pipelex-secrets-<backend>` / storage / inference-backend plugins are its intended population. Version pairing: each plugin repo's pipelex pin floor becomes the release that carries the new discovery; an older core will not see the new groups, which is acceptable under no-backward-compat but must be stated in each plugin's changelog.
+
+#### A2 — as built (partial: two of three repos)
+
+Two repos done, one commit each, both on a new `refactor/plugin-layer-groups` branch off their `dev`, **neither pushed**:
+
+- **pipelex-mistralai-workflows** — `029b476`. Entry-point group in `pyproject.toml`, the plugin docstring, `docs/reference-activities.md`, and `tests/integration/test_plugin_discovery.py` (which asserts the declared group, so it is the migration's own gate). Changelog entry.
+- **pipelex-daytona-sandbox** — `a08d566`. Entry-point group in `pyproject.toml` and the plugin docstring. Changelog entry.
+
+`targets_api` needed no edit anywhere: all three plugins write `targets_api = PLUGIN_API_VERSION`, so the v4 bump follows the constant.
+
+**Decisions taken**
+
+- **D-A2-1 — the commits stay local until the pipelex release lands.** These plugins are now undiscoverable by *released* pipelex (0.42.0 reads only the retired group), so a pushed PR's CI would install 0.42.0 and go red for a reason no code change can fix. Same for the pipelex pin floor the plan asks for: the release that carries layer-split discovery does not exist yet, so `pipelex>=0.41.0` / `>=0.42.0` stay as they are and the floor bump is owed at release time, together with the push and the PRs.
+
+🛑 **Open — needs Louis' call: which branch takes pipelex-temporal's A2 commit.** The other two repos had an obvious base; this one does not.
+
+- `refactor/Topology` (**PR #18, still OPEN**) is where `tests/unit/pipelex_temporal/test_plugin_interpreter_import_closure.py` lives — the file D-A0-2 says A2 must fix (its `#:` comment and its failure message both still name the pre-A0 `test_runtime_layer_import_closure.py`). That file **does not exist on `dev`**. It also needs `begin_plugin(group=…)`, now a required parameter, in `test_temporal_plugin_http_error_mapper.py`.
+- Branching off `dev` therefore cannot carry the pointer fix at all, and would leave the stale pointer to come back when #18 merges.
+- Branching off `refactor/Topology` stacks a kernel-track commit on an unmerged branch from the Temporal-topology track, so Part A's plugin migration could only land when #18 does — two tracks entangled.
+
+Neither option is clearly right, and picking wrong couples two release trains, so this is deferred rather than guessed. Recorded in full at [`wip/kernel/a2-pipelex-temporal-branch-question.md`](a2-pipelex-temporal-branch-question.md).
 
 ### A3 — gates and checkpoint
 
