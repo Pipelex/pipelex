@@ -62,14 +62,26 @@ class TestTimeContentStrictMode:
             {"time": 56400},
             {"time": "56400"},
             {"time": "5.64e4"},
-            {"time": datetime.datetime(2026, 7, 10, 15, 40)},
         ],
     )
     def test_rejections_hold_in_both_modes(self, payload: dict[str, object]):
-        """Every guard must fire under strict validation exactly as it does under lax."""
-        with pytest.raises(ValidationError):
+        """Every guard must fire under strict validation exactly as it does under lax.
+
+        The message is asserted because it is the numeric guard's whole remaining purpose: the
+        extended-form pin would reject these anyway, so what the guard buys is naming the mistake
+        (an epoch count) instead of reporting a generic malformed-ISO string.
+        """
+        with pytest.raises(ValidationError, match="never a number"):
             TimeContent.model_validate(payload)
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValidationError, match="never a number"):
+            TimeContent.model_validate(payload, strict=True)
+
+    def test_datetime_is_rejected_in_both_modes(self):
+        """A datetime carries a date — that belongs to Date, and the message must say so."""
+        payload = {"time": datetime.datetime(2026, 7, 10, 15, 40)}
+        with pytest.raises(ValidationError, match="not a datetime"):
+            TimeContent.model_validate(payload)
+        with pytest.raises(ValidationError, match="not a datetime"):
             TimeContent.model_validate(payload, strict=True)
 
     @pytest.mark.parametrize("end_of_day", ["24:00", "24:00:00", "24:00:00+02:00"])

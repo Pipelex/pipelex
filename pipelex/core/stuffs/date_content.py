@@ -38,14 +38,14 @@ class DateContent(StuffContent):
         # strings that remain into real date/time objects. All rejections raise ValueError so pydantic
         # wraps them into a ValidationError the input/factory path catches (a raw TypeError would
         # escape model_validate uncaught):
-        #  - a bare int/float, or any purely-numeric string, is read as epoch seconds; a real ISO
-        #    date/time always carries a '-'/':'/ 'T'/space separator, so a numeric string is only ever
-        #    an epoch (DT6). This guard must stay AHEAD of the parsing below, which would otherwise
-        #    read the basic-format "20250312" as a calendar date.
+        #  - a bare int/float would be coerced by pydantic into epoch seconds (DT6). This arm is what
+        #    stops that; the numeric-STRING arm beside it is not load-bearing, since the extended-form
+        #    pin in the parsers below already refuses every all-digit spelling — it only buys the
+        #    accurate "no epoch-seconds" wording in place of a generic malformed-ISO one.
         #  - a datetime on the `date` field is silently truncated to the date, dropping its time and
         #    UTC offset — exactly the fidelity loss DT3 forbids ("no silent midnight").
         if isinstance(value, datetime.datetime):
-            msg = "A Date's `date` field takes a calendar date, not a datetime; put the time and offset in `time` instead."
+            msg = "A Date takes a calendar date and a separate time of day, not a datetime; put the date in `date` and the time and offset in `time`."
             raise ValueError(msg)  # noqa: TRY004 — must be ValueError so pydantic wraps it into a ValidationError
         if isinstance(value, (int, float)) or (isinstance(value, str) and is_numeric_string(value)):  # bool is an int subclass
             msg = "A Date's date/time must be an ISO 8601 string or a date/time object, never a number (no epoch-seconds)."

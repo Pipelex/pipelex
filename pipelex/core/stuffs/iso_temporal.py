@@ -4,7 +4,7 @@ import re
 # The temporal natives accept EXTENDED ISO 8601 only. `date.fromisoformat` / `time.fromisoformat`
 # (3.11+) additionally accept the basic forms ("20260707", "154000") and the week / ordinal calendars
 # ("2026-W27-2", "2026-189"): all of those restate the value in a calendar the source did not use, and
-# the all-digit ones would slip past the no-epoch-seconds guards the natives rely on. Pinning the
+# the ones carrying a suffix ("154000+00:00") slip past the natives' numeric-string guard. Pinning the
 # extended form here — once, for both the content models and `StuffContentFactory` — is what keeps the
 # form a `Date`/`Time` accepts from a model identical to the form it accepts from an author.
 # The fraction separator is either '.' or ',' — ISO 8601 allows both, and `fromisoformat` parses both.

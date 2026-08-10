@@ -75,7 +75,7 @@ class StuffContentFactory:
         try:
             parsed = parse_iso_time(value)
         except ValueError as exc:
-            msg = f"Time input '{value}' is not an extended ISO 8601 time of day (e.g. '15:40:00' or '15:40:00+02:00')."
+            msg = f"Time input '{value}' is not an extended ISO 8601 time of day (e.g. '15:40:00' or '15:40:00+02:00'): {exc}"
             raise StuffContentFactoryError(msg) from exc
         return time_subclass(time=parsed)
 

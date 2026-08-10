@@ -56,18 +56,42 @@ class TestDateContentStrictMode:
             {"date": "86400"},
             {"date": "8.64e4"},
             {"date": "20250312"},  # epoch-lookalike: `fromisoformat` would accept it, the epoch guard must not
-            {"date": datetime.datetime(2026, 7, 7, 15, 40)},
-            {"date": "2026-07-07T00:00:00"},
             {"date": "2026-07-07", "time": 3600},
             {"date": "2026-07-07", "time": "3600"},
         ],
     )
-    def test_rejections_hold_in_both_modes(self, payload: dict[str, object]):
-        """Every guard must fire under strict validation exactly as it does under lax."""
-        with pytest.raises(ValidationError):
+    def test_epoch_rejections_hold_in_both_modes(self, payload: dict[str, object]):
+        """The guard must fire under strict validation exactly as it does under lax.
+
+        The message is asserted because it is the numeric-string arm's whole remaining purpose: the
+        extended-form pin would reject these anyway, so what the guard buys is naming the mistake
+        (an epoch count) instead of reporting a generic malformed-ISO string.
+        """
+        with pytest.raises(ValidationError, match="never a number"):
             DateContent.model_validate(payload)
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValidationError, match="never a number"):
             DateContent.model_validate(payload, strict=True)
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            {"date": datetime.datetime(2026, 7, 7, 15, 40)},
+            {"date": "2026-07-07", "time": datetime.datetime(2026, 7, 7, 15, 40)},
+        ],
+    )
+    def test_datetime_rejection_names_both_fields(self, payload: dict[str, object]):
+        """A datetime would be truncated, dropping the time and offset (DT3). The message must fit
+        whichever field it fires on — this validator guards both.
+        """
+        with pytest.raises(ValidationError, match="not a datetime"):
+            DateContent.model_validate(payload)
+        with pytest.raises(ValidationError, match="not a datetime"):
+            DateContent.model_validate(payload, strict=True)
+
+    def test_datetime_shaped_string_on_date_is_rejected(self):
+        """A datetime-shaped string on `date` would silently become a midnight-less calendar date."""
+        with pytest.raises(ValidationError, match="would drop it"):
+            DateContent.model_validate({"date": "2026-07-07T00:00:00"}, strict=True)
 
     @pytest.mark.parametrize(
         "payload",

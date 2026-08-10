@@ -85,6 +85,17 @@ Nine findings across greptile, codex and cubic; four of them named one real gap,
 
 - **The pattern admitted a lower-case `z` the parser refused (codex P2, cubic P3) — REAL, fixed by honoring the pattern.** `[Zz]` matched `15:40:00z`, but `time.fromisoformat` takes only the upper-case designator, so the value fell through to the generic "not a valid ISO 8601" message. The two bots proposed opposite remedies — normalize it, or drop `z` from the pattern. Chose to admit it: pydantic accepted `z` before this parser existed (verified), so dropping it would regress the live LLM path this PR exists to unblock, and RFC 3339 states the two spellings name the same offset. Case-folding a designator is not normalizing the value the way trimming padding would be, so it does not contradict the round-2 decision to validate the text as given.
 
+## Final independent review (gstack `/review`, no inherited context)
+
+Verdict: ship with nits. No correctness hole; the parser's home and shape were judged right, and the tests were confirmed real by mutation (removing the parse call and flipping the `24:00` sentinel turned both strict-mode modules red). Everything it raised is applied:
+
+- **The "guard must stay AHEAD of the parsing" comments were stale.** The extended-form pin rejects `"20250312"` / `"154000"` before `fromisoformat` is ever reached, so the ordering is correct but no longer load-bearing — and `iso_temporal.py`'s header credited the numeric guard for catches the pin actually makes, while the validators credited the pin's catches to the guard. Both now say what each mechanism does. The numeric guard's `int`/`float` arm **is** load-bearing (pydantic coerces `86400`); only its string arm is message-only.
+- **That message-only arm was untested**, so it could have been deleted with the suite still green. Its wording is now pinned, which is the only thing that justifies keeping it.
+- **`_make_time_content` swallowed the parser's specific message** where its `Date` sibling appended it, so a `Time` author got a generic shape hint instead of "24:00 names the next day's midnight". Now consistent.
+- **The CHANGELOG entry did not carry `(Breaking)`** although authored inputs genuinely got stricter (`"15:40:00+0200"`, `"2026-07-07T154000"`, `"24:00:00"`, padding). Marked, with the refused forms named.
+- **Pre-existing:** the datetime guard fires for both fields but its message named only `date`. Reworded to fit either field.
+- **Deferred to `wip/native-temporal-contract-doc-sweep.md`:** the plugin authoring guidance an LLM reads still says plain "ISO 8601" (cross-repo, release-gated, costs a re-ask not a failure), and a stale `pipelex-app` comment that has no wire impact.
+
 ## Follow-ups (out of this repo, after release)
 
 - [ ] `mthds-ui` (branch `feature/Native-concepts_stories`): `make fixtures-live ONLY=pipeline_32` to replace the placeholder LIVE fixture with real data — the natural end-to-end regression check named in the bug report. Gated on a released pipelex version carrying this fix.

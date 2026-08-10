@@ -28,10 +28,10 @@ class TimeContent(StuffContent):
         # Reject what pydantic would coerce into silently wrong temporal data, then parse the ISO
         # strings that remain into a real time object. All rejections raise ValueError so pydantic
         # wraps them into a ValidationError the input/factory path catches.
-        #  - a bare number, or any purely-numeric string, is read as seconds-since-midnight; a real
-        #    ISO time always carries a ':' separator, so a numeric string is only ever a count of
-        #    seconds. This guard must stay AHEAD of the parsing below, which would otherwise read the
-        #    basic-format "154000" as 15:40:00.
+        #  - a bare number would be coerced by pydantic into seconds-since-midnight. This arm is what
+        #    stops that; the numeric-STRING arm beside it is not load-bearing, since the extended-form
+        #    pin in the parser below already refuses every all-digit spelling — it only buys the
+        #    accurate "no seconds-since-midnight" wording in place of a generic malformed-ISO one.
         if isinstance(value, (int, float)) or (isinstance(value, str) and is_numeric_string(value)):  # bool is an int subclass
             msg = "A Time must be an ISO 8601 string or a time object, never a number (no seconds-since-midnight)."
             raise ValueError(msg)
