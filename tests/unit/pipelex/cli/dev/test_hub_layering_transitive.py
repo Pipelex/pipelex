@@ -1,7 +1,7 @@
 """Unit tests for the hub-layering guard's transitive rule — the one that follows the import graph.
 
 The other two rules are per-file and see one hop, which is exactly how the breach that motivated this
-rule stayed invisible: four modules of the declared runtime-layer `pipelex.plugins` package reached
+rule stayed invisible: four modules of the declared kernel-layer `pipelex.plugins` package reached
 `interpreter_hub` through `runtime_bridge`, `pipeline` and `pipe_operators`, and both gates stayed
 green. So the tests here are about the *graph*: which edges exist, which do not, and which of the
 modules that reach the hub are the guard's business.
@@ -40,7 +40,7 @@ def _write(*, path: Path, source: str) -> None:
 def _make_tree(root: Path) -> None:
     """A miniature repo holding one instance of every case the rule must get right.
 
-    `cogt/` is a declared runtime-layer package; `runtime_bridge/` and `pipeline/` are in no declared
+    `cogt/` is a declared kernel-layer package; `runtime_bridge/` and `pipeline/` are in no declared
     layer, so they may reach the hub freely — which is precisely what makes them usable as
     intermediaries.
     """
@@ -48,7 +48,7 @@ def _make_tree(root: Path) -> None:
     _write(path=root / "pipelex" / "runtime_hub.py", source="def get_console():\n    return None\n")
     _write(path=root / "pipelex" / "runtime_bridge" / "orchestrator.py", source=INTERMEDIARY_SOURCE)
 
-    # The canonical breach: runtime-layer module -> legal intermediary -> the hub.
+    # The canonical breach: kernel-layer module -> legal intermediary -> the hub.
     _write(
         path=root / "pipelex" / "cogt" / "breach.py",
         source="from pipelex.runtime_bridge.orchestrator import DirectOrchestrator\n",
@@ -62,7 +62,7 @@ def _make_tree(root: Path) -> None:
 
 
 class TestHubLayeringTransitiveRule:
-    def test_reports_exactly_the_runtime_layer_modules_that_reach_the_hub(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_reports_exactly_the_kernel_layer_modules_that_reach_the_hub(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """The breacher and its aggregator, with the chain that explains each — and nothing else.
 
         `pipeline/runner.py` reaches the hub by the same edge and is correctly silent: it sits in no
@@ -250,7 +250,7 @@ class TestHubLayeringTransitiveRule:
     def test_a_dynamic_import_in_an_intermediary_is_an_edge(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """A module-level `import_module("pipelex.interpreter_hub")` loads the hub, so it is an edge.
 
-        Rule 1 catches that string in a runtime-layer module; the gap this closes is the same string
+        Rule 1 catches that string in a kernel-layer module; the gap this closes is the same string
         in an intermediary, which sits in no declared layer. Both hub references that actually
         occurred in this repo were strings, not imports.
         """

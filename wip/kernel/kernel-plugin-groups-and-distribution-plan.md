@@ -10,8 +10,8 @@
 
 | Part | Phase | State |
 | --- | --- | --- |
-| A | A0 naming ruling + inventory | not started |
-| A | A1 group-split mechanism | not started |
+| A | A0 naming ruling + inventory | **done** — see [A0 as built](#a0--as-built) |
+| A | A1 group-split mechanism | not started — **next** |
 | A | A2 external-plugin migration | not started |
 | A | A3 gates + checkpoint | not started |
 | B | B0 footprint measurement | not started |
@@ -38,6 +38,37 @@ The layer formerly called the "runtime layer" is the **kernel layer**. Rationale
 ### A0 — naming inventory + sweep
 
 Grep-driven inventory of every "runtime" occurrence in `pipelex/plugins/`, `pipelex/providers/`, `pipelex/interpreter_plugins/`, the closure tests, and the SPI docs; classify each hit into the three buckets above (the bucket table is the ruling; the inventory verifies it found everything and nothing extra). Apply the Part-A bucket as one mechanical commit. `make agent-check` + the renamed closure test green.
+
+#### A0 — as built
+
+Done. One commit, no behavior change — identifier and prose renames plus two test-module renames.
+
+**What the inventory found beyond the ruling's Part-A row**, and why each was folded in rather than deferred (the ruling's test is "one name for one boundary"; leaving any of these behind would have left the canonical statement of the boundary contradicting the code that enforces it):
+
+| Found | Bucket | Rename |
+| --- | --- | --- |
+| `hub_layering_guard.py`'s layer vocabulary | A — pure internal identifiers, pinned by no repo boundary | `RUNTIME_LAYER_PACKAGES` → `KERNEL_LAYER_PACKAGES`, `is_runtime_layer` → `is_kernel_layer` |
+| `docs/contribute/hub-layering.md` | A — the canonical human-readable definition of the layer | all layer prose; plus one new paragraph recording that `runtime_hub` / `runtime_boot` still carry the layer's former name and why they wait for Part B |
+| `tests/unit/pipelex/test_runtime_layer_exceptions_aggregate_gate.py` | A — a closure test, same row as the import-closure one | file + `TestRuntimeLayerExceptionsAggregateGate` → `…Kernel…` |
+| `KERNEL_LAYER_ENTRY_POINTS`, `TestBootedRuntimeLayer`, and ~8 layer-named test functions | A — layer vocabulary in test names | mechanical |
+| layer-sense prose outside the five inventoried areas (`runtime_hub.py`, `runtime_boot.py`, `pipelex.py`, `core/`, `cogt/`, `kernel/`, `architecture-overview.md`, `pipelex-kernel.md`) | A — same vocabulary, same boundary | "runtime layer/-layer", "runtime half", "runtime closure", "runtime-only boot", "runtime adapters", "runtime-contributed" → kernel forms |
+| `.test_durations` — the CI shard-balancing snapshot keys on pytest node IDs, so a renamed file, class or test function makes it stale | A — data, but it names the renamed things | keys rewritten in place |
+
+**Left alone deliberately** (verified hit-by-hit, not by pattern): `runtime_bridge` and every "runtime" meaning the orchestration venue ("boot the process as its runtime", "a host runtime", "the Temporal worker runtime"); `RuntimeError` / `runtime_checkable` / `at runtime` / "an ordinary runtime condition"; `system/runtime.py` and `runtime_manager`; `setup_doctor_runtime`; `docs/under-the-hood/orchestrator-plugins.md`'s host-runtime prose; `CHANGELOG.md`'s released entries and everything under `wip/` (historical records — only the still-`[Unreleased]` kernel entries were re-worded, since they ship describing current reality).
+
+**Decisions taken**
+
+- **D-A0-1 — `runtime_hub` / `runtime_boot` keep their module names through Part A.** They are pinned across repo boundaries (`pipelex.runtime_hub` is in pipelex-transport's `ALLOWED_SURFACE` and its spec) and they move anyway in B2, so renaming them now would churn the transport boundary twice. `hub-layering.md` and `runtime_boot.py`'s header both say so out loud, so the mismatch reads as staged rather than as drift.
+- **D-A0-2 — the pipelex-temporal pointer rides A2's commit.** `pipelex-temporal/tests/unit/pipelex_temporal/test_plugin_interpreter_import_closure.py` names the canonical list's file twice (its `#:` comment and its failure message). That repo gets exactly one commit in Part A (A2), so the pointer fix lands there rather than as a stray commit — same window, per the ruling. ⚠ It is stale between A0 landing and A2 landing.
+
+**Verification** — `make check` green (ruff, plxt, pyright, mypy, pylint 10.00, keyword-only, hub-layering, drift). Full `make agent-test` green. Three drift contracts re-acked in the same commit — `cli-docs`, `hub-layering-convention`, `pipelex-kernel-docs`. The `/code-review` fan-out over A0 was skipped on Louis' instruction; CHECKPOINT A's review covers the whole of Part A.
+
+**Two traps the sweep hit, worth repeating in A1**
+
+- A bulk `runtime layer` → `kernel layer` rewrite also matches *inside* other words: it turned `doctor_cmd.py`'s "mirror runtime **layered** resolution" (the layered *config* resolution, nothing to do with the layer) into "kernel layered". Caught only because that file is a drift trigger and the plan forced a hit-by-hit read. Re-grep for `kernel layered|kernel-layered` after any further bulk pass.
+- **A rename is not done when the tree type-checks — `.test_durations` keys on node IDs.** `make check` and every targeted suite were green with the file still naming `test_runtime_layer_import_closure.py`; only the full `make agent-test` caught it, through `tests/unit/repo/test_test_durations_paths.py`, whose whole job is to notice that CI shards are being balanced against tests that cannot run. Fixed by rewriting the stale keys in place, each new key asserted present in a fresh collection first — regenerating would have rewritten the whole snapshot with fresh timings for a rename. Any A1–A3 rename of a test file, class or function owes the same pass.
+
+**Open** — none.
 
 ### A1 — the group-split mechanism
 

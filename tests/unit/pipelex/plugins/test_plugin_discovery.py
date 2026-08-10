@@ -97,8 +97,8 @@ def _build_registrar_with(
     """Build a registrar over exactly ``plugins``, with external entry points stubbed out.
 
     The built-in list is a *parameter* of ``build_registrar`` rather than a module global it imports:
-    some built-ins adapt interpreter-layer ports, so importing them from the runtime-layer discovery
-    module would put the method interpreter back into every runtime import closure. Which is why these
+    some built-ins adapt interpreter-layer ports, so importing them from the kernel-layer discovery
+    module would put the method interpreter back into every kernel import closure. Which is why these
     tests hand the list in instead of patching a module attribute.
     """
     mocker.patch(f"{DISCOVERY_MODULE}._external_entry_points", return_value=[])
@@ -121,7 +121,7 @@ class TestPluginDiscovery:
     def test_the_two_layer_halves_compose_into_one_list(self) -> None:
         """The composition root's list is exactly both halves, and each name appears once.
 
-        The halves are filed by layer — `pipelex.plugins` for the runtime adapters,
+        The halves are filed by layer — `pipelex.plugins` for the kernel adapters,
         `pipelex.interpreter_plugins` for the ones that construct interpreter-layer objects — so the
         failure mode this pins is a half silently dropping out of the composition, which would present
         as a plugin quietly missing at boot rather than as an import error.
@@ -132,10 +132,10 @@ class TestPluginDiscovery:
             INTERPRETER_BUILTIN_PLUGINS,
             INTERPRETER_CORE_UNCONDITIONAL_PLUGIN_NAMES,
         )
-        from pipelex.providers.builtins import RUNTIME_BUILTIN_PLUGINS, RUNTIME_CORE_UNCONDITIONAL_PLUGIN_NAMES  # noqa: PLC0415
+        from pipelex.providers.builtins import KERNEL_BUILTIN_PLUGINS, KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES  # noqa: PLC0415
 
-        assert [*INTERPRETER_BUILTIN_PLUGINS, *RUNTIME_BUILTIN_PLUGINS] == BUILTIN_PLUGINS
-        assert CORE_UNCONDITIONAL_PLUGIN_NAMES == INTERPRETER_CORE_UNCONDITIONAL_PLUGIN_NAMES | RUNTIME_CORE_UNCONDITIONAL_PLUGIN_NAMES
+        assert [*INTERPRETER_BUILTIN_PLUGINS, *KERNEL_BUILTIN_PLUGINS] == BUILTIN_PLUGINS
+        assert CORE_UNCONDITIONAL_PLUGIN_NAMES == INTERPRETER_CORE_UNCONDITIONAL_PLUGIN_NAMES | KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES
         names = [plugin.name for plugin in BUILTIN_PLUGINS]
         assert len(names) == len(set(names))
         assert set(names) >= CORE_UNCONDITIONAL_PLUGIN_NAMES

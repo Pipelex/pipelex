@@ -66,7 +66,7 @@ class Pipelex(RuntimeBoot):
         config_overrides: dict[str, Any] | None = None,
     ) -> None:
         # Two hubs, two lifecycles: RuntimeHub is process-scoped infrastructure, InterpreterHub is the
-        # library-scoped method machinery. Runtime is constructed first because it is the lower layer,
+        # library-scoped method machinery. The kernel half is constructed first because it is the lower layer,
         # so it reads first — not because installing the InterpreterHub needs it: that install only
         # stores the class-registry scoping resolver, which resolves lazily at call time.
         super().__init__(config_dir=config_dir, config_cls=config_cls, config_overrides=config_overrides)
@@ -107,9 +107,9 @@ class Pipelex(RuntimeBoot):
             msg = f"The Pipelex setup method does not support any additional arguments: {kwargs}"
             raise PipelexSetupError(msg)
 
-        # The runtime layer first, with the *composed* plugin manifests: this process will run methods,
+        # The kernel layer first, with the *composed* plugin manifests: this process will run methods,
         # so it needs the interpreter-touching built-ins (the `direct` orchestrator, the built-in
-        # PipeFunc executor modes) alongside the runtime half a bare RuntimeBoot discovers.
+        # PipeFunc executor modes) alongside the kernel half a bare RuntimeBoot discovers.
         super().setup(
             integration_mode=integration_mode,
             needs_inference=needs_inference,
@@ -133,7 +133,7 @@ class Pipelex(RuntimeBoot):
         # Everything below needs a method to be loadable. Nothing the runtime setup above does
         # consumes any of it, which is what lets these be a tail rather than an interleaving; the two
         # values that cross the seam go the other way (``self._plugin_registrar`` and
-        # ``self.multi_observer``, both built by the runtime half and read here).
+        # ``self.multi_observer``, both built by the kernel half and read here).
 
         plugin_registrar = self._plugin_registrar
         if plugin_registrar is None:

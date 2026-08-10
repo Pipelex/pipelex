@@ -21,7 +21,7 @@ from rich.console import Console
 from pipelex.cli.dev_cli.commands import check_hub_layering_cmd as cmd_mod
 from pipelex.cli.dev_cli.commands.check_hub_layering_cmd import check_hub_layering_cmd
 from pipelex.cli.dev_cli.commands.hub_layering_guard import (
-    RUNTIME_LAYER_PACKAGES,
+    KERNEL_LAYER_PACKAGES,
     HubLayeringViolation,
     HubLayeringViolationKind,
 )
@@ -69,15 +69,15 @@ class TestCheckHubLayeringCmd:
         check_hub_layering_cmd(quiet=True)  # returns normally (exit 0)
         output = console_buffer.getvalue()
         assert "Hub-layering check: PASSED" in output
-        assert "Runtime layer:" not in output
+        assert "Kernel layer:" not in output
 
-    def test_verbose_success_names_every_declared_runtime_package(self, mocker: MockerFixture, console_buffer: io.StringIO) -> None:
+    def test_verbose_success_names_every_declared_kernel_package(self, mocker: MockerFixture, console_buffer: io.StringIO) -> None:
         """The success panel is where a reader learns what the declaration covers, so it must be complete."""
         _patch_scans(mocker)
         check_hub_layering_cmd(quiet=False)
         output = console_buffer.getvalue()
         assert "Hub-layering Check: PASSED" in output
-        for package in RUNTIME_LAYER_PACKAGES:
+        for package in KERNEL_LAYER_PACKAGES:
             assert package in output, package
 
     def test_violations_exit_1_and_locate_every_site(self, mocker: MockerFixture, console_buffer: io.StringIO) -> None:

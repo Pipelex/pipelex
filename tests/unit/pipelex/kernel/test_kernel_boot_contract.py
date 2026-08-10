@@ -6,9 +6,9 @@ router or a pipeline manager. So it is pinned permanently here rather than prove
 
 Three layers already guard neighbouring properties and none of them covers this one. The static
 hub-layering guard proves no kernel *module* imports `interpreter_hub`.
-`test_runtime_layer_import_closure.py` proves `pipelex.kernel.pipelex_kernel` *imports* clean.
+`test_kernel_layer_import_closure.py` proves `pipelex.kernel.pipelex_kernel` *imports* clean.
 `test_runtime_boot_closure.py` proves `RuntimeBoot.make()` *boots* clean. What none of them does is
-**call** a kernel op on that boot — and a call is where a runtime-only process would actually break:
+**call** a kernel op on that boot — and a call is where a kernel-only process would actually break:
 by resolving out of a registry the interpreter half fills (`OrchestratorRegistry`,
 `BundleValidatorRegistry`, the PipeFunc executor modes are all empty here), or by reaching the
 interpreter through a function-local import, which is invisible to the static graph and to the
@@ -21,7 +21,7 @@ memory-boundary ops (`shape_inputs` and the four extraction helpers), with the t
 exists for is per-function, so covering one op says nothing about the next: a function-local import
 inside `run_search` is caught only by calling `run_search`. That also makes this the only gate the
 ops modules other than `llm_ops` have — `PipelexKernel` is an LLM-era façade that does not import
-them, so `test_runtime_layer_import_closure.py`'s `pipelex.kernel.pipelex_kernel` entry point does not
+them, so `test_kernel_layer_import_closure.py`'s `pipelex.kernel.pipelex_kernel` entry point does not
 reach them even at import time.
 
 The memory-boundary arm carries a second proof the operator arms cannot: `shape_inputs` needs a
@@ -40,7 +40,7 @@ than through the `resolve_*_setting` helpers for that same reason — those read
 separate question from the one this test asks.
 
 **On the deferred orchestrator question.** `runtime_boot.py`'s orchestrator-rejection comment defers
-the external-interpreter-orchestrator half-application hole to "the first caller of a runtime-only
+the external-interpreter-orchestrator half-application hole to "the first caller of a kernel-only
 boot", which is this test. It is settled, not inherited: this boot names no `boot_orchestrator` and
 its config sets none, so the gate is never reached and the hole is not on this path. The remedy the
 analysis proposes (a `HubSlot.is_interpreter_slot` property plus a `honours_interpreter_slots` class
@@ -52,14 +52,14 @@ import subprocess  # noqa: S404
 import sys
 import textwrap
 
-from tests.unit.pipelex.test_runtime_layer_import_closure import INTERPRETER_PACKAGES
+from tests.unit.pipelex.test_kernel_layer_import_closure import INTERPRETER_PACKAGES
 
 #: Wall-clock bound on the kernel-call subprocess, matching both sibling harnesses: a boot or a call
 #: that deadlocks must present as a failure, not as a hung suite
 #: (`docs/agents/debugging-hanging-pytest-runs.md`).
 SUBPROCESS_TIMEOUT_SECONDS = 300
 
-#: Boot the runtime layer in a fresh interpreter, run **every** operator's kernel entry point, assert
+#: Boot the kernel layer in a fresh interpreter, run **every** operator's kernel entry point, assert
 #: the typed results, and only then sweep `sys.modules`. The order is the point: a function-local
 #: interpreter import inside a kernel op would land in `sys.modules` during the call and nowhere else.
 #: Both LLM arms run because they share almost nothing below the façade — `resolve_llm_setting_for_text`
@@ -131,7 +131,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
 
     def check_stored(result, label, expected_type):
         # Every op ends by writing what it produced into memory as the new main stuff, and that
-        # write-back is the half a runtime-only caller most depends on — so each arm checks it landed.
+        # write-back is the half a kernel-only caller most depends on — so each arm checks it landed.
         # Checked by type rather than by identity because the two are not universally the same object:
         # `ExtractResult` narrows its `content` field below `StuffContent`, so pydantic revalidates it
         # into a fresh container (see `pipelex/kernel/extract_results.py`).
@@ -141,7 +141,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
 
     class NativeOnlyConceptProvider(ConceptProviderAbstract):
         # A caller without a loaded library still has to answer concept questions, and this is what
-        # that costs on a runtime-only boot: native concepts from the pure factory, compatibility
+        # that costs on a kernel-only boot: native concepts from the pure factory, compatibility
         # from the declaration tier the kernel doctrine routes to, and structure classes from the
         # class registry a RuntimeBoot fills. `shape_inputs` takes the provider explicitly for
         # exactly this reason — the interpreter hands over its library, a programmatic caller hands
@@ -175,7 +175,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     # The input end of the memory boundary, driven the way a library-free caller drives it: raw values
     # plus the specs it declares for them. The shaped memory is then what the first op runs on, so the
     # two ends of the boundary are proven against each other rather than in isolation.
-    SHAPED_TOPIC = "what a runtime-only boot can run"
+    SHAPED_TOPIC = "what a kernel-only boot can run"
     shaped_memory = shape_inputs(
         inputs={"topic": SHAPED_TOPIC},
         concept_provider=NativeOnlyConceptProvider(),
@@ -323,7 +323,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
         fail(f"run_img_gen produced {type(img_gen_result.content).__name__}, not the ImageContent class it was given")
     check_stored(img_gen_result, "run_img_gen", ImageContent)
 
-    search_query = "What runs on a runtime-only boot?"
+    search_query = "What runs on a kernel-only boot?"
     search_result = asyncio.run(
         run_search(
             memory=WorkingMemoryFactory.make_empty(),
@@ -343,7 +343,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
         fail(f"run_search rendered {search_result.rendered_query!r}, not the query it was given")
     check_stored(search_result, "run_search", SearchResultContent)
 
-    composed_text = "Composed on a runtime-only boot."
+    composed_text = "Composed on a kernel-only boot."
     compose_result = asyncio.run(
         run_compose_template(
             memory=WorkingMemoryFactory.make_empty(),
@@ -360,7 +360,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     check_stored(compose_result, "run_compose_template", TextContent)
 
     # Registered here rather than imported, because the func path's whole point is that the function is
-    # the caller's: a runtime-only process has no library to have registered one for it.
+    # the caller's: a kernel-only process has no library to have registered one for it.
     FUNCTION_NAME = "kernel_boot_contract_function"
     FUNCTION_TEXT = "produced by a registered function"
 
@@ -408,7 +408,7 @@ CONTROL_PACKAGE_THE_KERNEL_ALWAYS_LOADS = "cogt"
 
 
 def _run_kernel_call(*, interpreter_packages: tuple[str, ...]) -> subprocess.CompletedProcess[str]:
-    """Boot the runtime layer in a fresh interpreter, call the kernel, and return the verdict."""
+    """Boot the kernel layer in a fresh interpreter, call the kernel, and return the verdict."""
     try:
         return subprocess.run(  # noqa: S603
             [sys.executable, "-c", _KERNEL_CALL_SCRIPT, *interpreter_packages],
@@ -436,7 +436,7 @@ class TestKernelBootContract:
         assert "interpreter module(s)" in result.stdout
         assert "kernel boot contract OK" not in result.stdout
 
-    def test_every_kernel_call_runs_on_a_runtime_only_boot_with_no_library(self) -> None:
+    def test_every_kernel_call_runs_on_a_kernel_only_boot_with_no_library(self) -> None:
         result = _run_kernel_call(interpreter_packages=INTERPRETER_PACKAGES)
 
         assert result.returncode == 0, (

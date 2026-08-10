@@ -1,25 +1,25 @@
 """The composition root's view of the built-in plugins: both layers' halves, welded into one list.
 
-``pipelex.providers`` — the built-in vendor adapters — is a declared runtime-layer package, so it may
+``pipelex.providers`` — the built-in vendor adapters — is a declared kernel-layer package, so it may
 not name anything that reaches ``interpreter_hub``, which the two plugins next door do by
 construction: their job is to construct interpreter-layer objects (a ``DirectOrchestrator``, a
 ``DirectBundleValidator``, a ``DirectPipeFuncExecutor``). This package is the interpreter-side home
 for them, and it is *allowed* to import downward, so composing the two halves here is legal where
-doing it in the runtime adapters' own manifest was the weld that made "the adapters are a runtime
+doing it in the kernel adapters' own manifest was the weld that made "the adapters are a kernel
 layer" false.
 
 There is still exactly one place that answers "what are the built-in plugins, both layers" — it just
 lives in the layer permitted to do the welding. The lists below are what ``Pipelex.setup`` (the
 interpreter boot) and the ``pipelex plugins list`` diagnostic pass into ``build_registrar``. The third
-caller is the runtime layer's own composition root, ``pipelex/runtime_boot.py``, which calls the same
-function but defaults to ``RUNTIME_BUILTIN_PLUGINS`` alone — it may not name this module.
+caller is the kernel layer's own composition root, ``pipelex/runtime_boot.py``, which calls the same
+function but defaults to ``KERNEL_BUILTIN_PLUGINS`` alone — it may not name this module.
 See ``docs/contribute/hub-layering.md``.
 """
 
 from pipelex.interpreter_plugins.direct.direct_plugin import DirectOrchestratorPlugin
 from pipelex.interpreter_plugins.pipe_func.pipe_func_plugin import PipeFuncPlugin
 from pipelex.plugins.contract import PipelexPlugin
-from pipelex.providers.builtins import RUNTIME_BUILTIN_PLUGINS, RUNTIME_CORE_UNCONDITIONAL_PLUGIN_NAMES
+from pipelex.providers.builtins import KERNEL_BUILTIN_PLUGINS, KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES
 
 # The interpreter-layer half: plugins whose adapters name the method interpreter. Both are
 # core-unconditional — in-process execution is required infra.
@@ -35,7 +35,7 @@ INTERPRETER_BUILTIN_PLUGINS: list[PipelexPlugin] = [
 INTERPRETER_CORE_UNCONDITIONAL_PLUGIN_NAMES: frozenset[str] = frozenset({"direct", "pipe_func"})
 
 # The plugins Pipelex ships with — discovered at boot ahead of any external entry-point plugin.
-BUILTIN_PLUGINS: list[PipelexPlugin] = [*INTERPRETER_BUILTIN_PLUGINS, *RUNTIME_BUILTIN_PLUGINS]
+BUILTIN_PLUGINS: list[PipelexPlugin] = [*INTERPRETER_BUILTIN_PLUGINS, *KERNEL_BUILTIN_PLUGINS]
 
 # Every built-in plugin core requires unconditionally, both layers.
-CORE_UNCONDITIONAL_PLUGIN_NAMES: frozenset[str] = INTERPRETER_CORE_UNCONDITIONAL_PLUGIN_NAMES | RUNTIME_CORE_UNCONDITIONAL_PLUGIN_NAMES
+CORE_UNCONDITIONAL_PLUGIN_NAMES: frozenset[str] = INTERPRETER_CORE_UNCONDITIONAL_PLUGIN_NAMES | KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES

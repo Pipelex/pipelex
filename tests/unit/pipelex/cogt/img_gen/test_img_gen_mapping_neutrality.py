@@ -4,7 +4,7 @@
 # adapter (the `openai` and `azure_openai` decks both ship GPT Image models; the gateway worker
 # resolves Gemini geometry through the same mapping the native Google worker uses).
 # Nothing else in the repo can catch a regression here: `pipelex.cogt` and
-# `pipelex.providers` are BOTH runtime-layer, so the hub-layering guard and the import-closure test are
+# `pipelex.providers` are BOTH kernel-layer, so the hub-layering guard and the import-closure test are
 # blind to an edge between them by construction — see docs/contribute/hub-layering.md, "Known inversions".
 #
 # Two complementary checks, because the coupling can come back by two routes. The direct one is a fresh
@@ -114,6 +114,6 @@ class TestImgGenMappingNeutrality:
         assert result.returncode == 0, (
             "an img-gen mapping module reached a provider adapter. The dependency runs the other way: adapters "
             "import inward to these mappings, never the reverse. Neither the hub-layering guard nor the "
-            "import-closure test can see this edge — both packages are runtime-layer.\n"
+            "import-closure test can see this edge — both packages are kernel-layer.\n"
             f"stdout={result.stdout}\nstderr={result.stderr}"
         )

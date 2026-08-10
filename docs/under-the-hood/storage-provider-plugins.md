@@ -79,7 +79,7 @@ The factory is a plain callable stored at registration and **invoked only at the
 
 ## The built-in `StoragePlugin`
 
-`pipelex/providers/storage/storage_plugin.py` is the reference storage plugin. It is **core-unconditional** — storage is required infra, so it joins the runtime layer's `RUNTIME_CORE_UNCONDITIONAL_PLUGIN_NAMES` — composed into `CORE_UNCONDITIONAL_PLUGIN_NAMES` at the boot entrypoint — and cannot be disabled into a boot with no storage:
+`pipelex/providers/storage/storage_plugin.py` is the reference storage plugin. It is **core-unconditional** — storage is required infra, so it joins the kernel layer's `KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES` — composed into `CORE_UNCONDITIONAL_PLUGIN_NAMES` at the boot entrypoint — and cannot be disabled into a boot with no storage:
 
 ```python
 class StoragePlugin:

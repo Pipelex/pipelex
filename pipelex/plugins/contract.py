@@ -27,18 +27,18 @@ class PipelexPlugin(Protocol):
     hub-slot claims, HTTP-error mappers and teardown callbacks by calling the menu
     methods on the ``PluginRegistrar`` it is handed.
 
-    **Invariant — a plugin belongs to exactly one layer.** Its adapters are either all runtime-layer
+    **Invariant — a plugin belongs to exactly one layer.** Its adapters are either all kernel-layer
     (an inference backend, a storage or secrets provider) or all interpreter-layer (anything that
     constructs a `Pipe`-aware object: an orchestrator, a bundle validator, a PipeFunc executor). A
     capability that needs both is two plugins, because the built-in ones are filed by layer —
-    ``pipelex.providers`` for the runtime half, ``pipelex.interpreter_plugins`` for the interpreter
-    half — and a plugin straddling the two would put the method interpreter back into every runtime
+    ``pipelex.providers`` for the kernel half, ``pipelex.interpreter_plugins`` for the interpreter
+    half — and a plugin straddling the two would put the method interpreter back into every kernel
     import closure. External plugins are discovered through an entry point and so live in no declared
     layer, but the same rule keeps them honest about what they pull in.
 
     Note that ``pipelex.providers`` is where the built-in *adapters* live, while this module and the
     rest of ``pipelex.plugins`` are the *mechanism* they register through. Both packages are
-    runtime-layer; the split is about direction, not about layers — adapters depend on the mechanism
+    kernel-layer; the split is about direction, not about layers — adapters depend on the mechanism
     and never the reverse. An external plugin imports ``pipelex.plugins.contract`` and
     ``pipelex.plugins.registrar``, so it is unaffected by where the built-in adapters are filed.
 

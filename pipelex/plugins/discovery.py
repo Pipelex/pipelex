@@ -43,8 +43,8 @@ def build_registrar(
         config: The fully-resolved config; supplies the ``plugins.disabled`` denylist and is handed
             to the registrar for the plugins that read it.
         builtin_plugins: The built-ins to discover, in order. Injected rather than imported: some
-            built-ins adapt interpreter-layer ports, and this module is runtime-layer, so importing
-            the list here would put the method interpreter back into every runtime closure. The
+            built-ins adapt interpreter-layer ports, and this module is kernel-layer, so importing
+            the list here would put the method interpreter back into every kernel closure. The
             composed list lives in ``pipelex.interpreter_plugins.builtins`` — the layer allowed to
             weld the two halves.
         core_unconditional_plugin_names: The built-in names that may not be denylisted. Injected for
