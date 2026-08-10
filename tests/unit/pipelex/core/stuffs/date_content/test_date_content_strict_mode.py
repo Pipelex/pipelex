@@ -69,6 +69,29 @@ class TestDateContentStrictMode:
         with pytest.raises(ValidationError):
             DateContent.model_validate(payload, strict=True)
 
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            {"date": "2026-W27-2"},  # ISO week-date: a different calendar, silently restated as 2026-07-07
+            {"date": "2026-189"},  # ISO ordinal date, same problem
+            {"date": "2026-07-07", "time": "154000+00:00"},  # basic-format time, escapes the numeric guard via its suffix
+        ],
+    )
+    def test_non_extended_iso_is_rejected(self, payload: dict[str, object]):
+        """A `Date` accepts the extended form only, whatever path it arrives by — matching what
+        `StuffContentFactory` already enforces on authored inputs, so both paths hold one contract.
+        """
+        with pytest.raises(ValidationError, match="extended ISO 8601"):
+            DateContent.model_validate(payload, strict=True)
+
+    @pytest.mark.parametrize("end_of_day", ["24:00", "24:00:00"])
+    def test_end_of_day_24h_time_is_rejected(self, end_of_day: str):
+        """ISO 24:00 names the NEXT day's midnight, so storing it against this `date` would move the
+        value back a day — silently, and only on Python 3.14, which parses it where 3.11-3.13 raise.
+        """
+        with pytest.raises(ValidationError, match="end-of-day"):
+            DateContent.model_validate({"date": "2026-07-07", "time": end_of_day}, strict=True)
+
     @pytest.mark.parametrize("payload", [{"date": "not-a-date"}, {"date": "2026-07-07", "time": "not-a-time"}])
     def test_malformed_string_names_the_field(self, payload: dict[str, object]):
         """A string that is neither epoch-shaped nor ISO must fail with a message naming the expectation."""

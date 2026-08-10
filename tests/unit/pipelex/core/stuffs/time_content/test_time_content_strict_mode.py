@@ -68,6 +68,25 @@ class TestTimeContentStrictMode:
         with pytest.raises(ValidationError):
             TimeContent.model_validate(payload, strict=True)
 
+    @pytest.mark.parametrize("end_of_day", ["24:00", "24:00:00", "24:00:00+02:00"])
+    def test_end_of_day_24h_is_rejected(self, end_of_day: str):
+        """ISO 24:00 names the NEXT day's midnight — a time of day alone cannot carry that.
+
+        It must be rejected explicitly rather than left to the parser: Python 3.14 silently returns
+        00:00 for it (3.11-3.13 raise), which would move the value back a full day on part of the
+        supported interpreter range.
+        """
+        with pytest.raises(ValidationError, match="end-of-day"):
+            TimeContent.model_validate({"time": end_of_day}, strict=True)
+
+    @pytest.mark.parametrize("basic_form", ["154000+00:00", "1540Z", "154000.5+02:00"])
+    def test_basic_format_is_rejected(self, basic_form: str):
+        """A `Time` accepts the extended form only, whatever path it arrives by — a compact string
+        carrying a suffix escapes the numeric guard, so the shape pin is what refuses it.
+        """
+        with pytest.raises(ValidationError, match="extended ISO 8601"):
+            TimeContent.model_validate({"time": basic_form}, strict=True)
+
     def test_malformed_string_names_the_expectation(self):
         """A string that is neither epoch-shaped nor ISO must fail with a message naming the expectation."""
         with pytest.raises(ValidationError, match="ISO 8601"):

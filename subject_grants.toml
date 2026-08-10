@@ -2996,6 +2996,14 @@ rationale = "Verb-object: inspects the container type; context stays keyword."
 param = "content_class"
 rationale = "Verb-object: scans the content class; context stays keyword."
 
+["pipelex/core/stuffs/iso_temporal.py::parse_iso_date"]
+param = "text"
+rationale = "parse_iso_date(text) reads as the verb-object sentence it is: one string to parse, no other operand."
+
+["pipelex/core/stuffs/iso_temporal.py::parse_iso_time"]
+param = "text"
+rationale = "parse_iso_time(text) reads as the verb-object sentence it is: one string to parse, no other operand."
+
 ["pipelex/core/stuffs/list_content.py::ListContent.get_items"]
 param = "item_type"
 rationale = "Type-directed accessor: the target item type; single operand."

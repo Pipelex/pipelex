@@ -6,6 +6,7 @@ from pydantic import Field, field_validator
 from rich.json import JSON
 from typing_extensions import override
 
+from pipelex.core.stuffs.iso_temporal import parse_iso_time
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.misc.string_utils import is_numeric_string
@@ -42,13 +43,10 @@ class TimeContent(StuffContent):
         # a mode="before" validator forfeits pydantic's strict-JSON acceptance of ISO strings, because
         # whatever it returns is re-validated as PYTHON input, where strict refuses a `str` outright
         # (time_type). Returning a real object satisfies strict JSON, strict Python and lax alike.
-        # Non-str values — real time objects, e.g. from `--mock-inputs` — pass through.
+        # Non-str values — real time objects, e.g. from `--mock-inputs` — pass through. The parser pins
+        # the extended ISO form, so a model and an author are held to one contract.
         if isinstance(value, str):
-            try:
-                return datetime.time.fromisoformat(value)
-            except ValueError as exc:
-                msg = f"A Time must be an ISO 8601 time of day (e.g. 15:40:00, or 15:40:00+02:00), got {value!r}."
-                raise ValueError(msg) from exc
+            return parse_iso_time(value)
         return value
 
     @property

@@ -54,7 +54,15 @@ Guard-ordering constraint (matters, keep tested): the numeric-string epoch guard
 - **The numeric-string predicate moved to `pipelex/tools/misc/string_utils.py`** as `is_numeric_string` (it was private to `date_content.py`), since both temporal natives need it and neither should depend on the other. Its temporal (DT6) rationale stays in the two validators' comments, where it belongs.
 - **The list-wrapper test declares the wrapper inline.** The reported `ListOfDateContent` is built inline in `pipelex/cogt/content_generation/llm_generate.py`, not by `stuff_content_factory` — so the test mirrors that shape (`items: list[DateContent]`) rather than reaching for a factory that does not generate it.
 - **No `docs/` change.** The pages describing `Date`/`Time` (`native-concepts.md`, `provide-inputs.md`) document the ISO 8601 forms accepted and the rendering, both unchanged by the fix — the model-side path simply now honors what they already state.
-- **The model layer stays looser than the input layer on exotic ISO forms.** `StuffContentFactory` pins authored inputs to extended-only ISO (rejecting week-dates) for a clear authoring error; the model-side parsing accepts any valid ISO 8601 a model may answer. The guard that matters (numeric/epoch) fires in both.
+- **~~The model layer stays looser than the input layer on exotic ISO forms.~~ Reversed after review** (see below): both layers now share one extended-ISO parser.
+
+## Review round 1 — what the bots found and what was done
+
+Greptile: clean (5/5). Codex: one finding. cubic: four. Verdicts, each verified by probe:
+
+- **`24:00` is silently accepted on Python 3.14 (codex, P2) — REAL, fixed.** `time.fromisoformat("24:00:00")` returns `00:00:00` on 3.14 but raises on 3.11-3.13, and `requires-python` is `>=3.11,<3.15` — so `{"date":"2025-03-12","time":"24:00:00"}` would land as March 12 midnight instead of March 13's, on part of the supported range only. Now rejected explicitly, ahead of the parser, with a message naming the end-of-day meaning. Verified by running the new module under both 3.13 and 3.14: identical behavior.
+- **Basic-format and week/ordinal forms reach the models (cubic, P2/P2/P3) — REAL as a contract split, fixed together.** Not corruption (the parsed values were correct), but `StuffContentFactory` pinned authored inputs to *extended* ISO while the new model path accepted `"2026-W27-2"`, `"2026-189"`, `"154000+00:00"`. One native, two accepted vocabularies. Fixed by extracting `pipelex/core/stuffs/iso_temporal.py` — `parse_iso_date` / `parse_iso_time`, owning the extended pin and the 24:00 rejection — and having the models *and* the factory use it. The factory's duplicated regex is gone, and its `_make_time_content` inherited the 24:00 fix it had the same bug in.
+- **`is_numeric_string` also matches `nan`/`inf`/`1_000` (cubic, P3) — DECLINED.** The observation is true but cosmetic: those inputs are rejected either way, only under the "no epoch-seconds" message rather than the malformed-ISO one, and no model emits them. The proposed remedy is worse than the status quo — `int("8.64e4")` and `int("86400.0")` both raise (verified), so switching to `int()` would reopen the exponent/decimal epoch hole the guard exists to close and that `test_numeric_string_is_rejected` pins.
 
 ## Follow-ups (out of this repo, after release)
 

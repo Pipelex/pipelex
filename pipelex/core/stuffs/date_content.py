@@ -7,6 +7,7 @@ from rich.json import JSON
 from typing_extensions import override
 
 from pipelex.core.stuffs.exceptions import DateContentError
+from pipelex.core.stuffs.iso_temporal import parse_iso_date, parse_iso_time
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.misc.string_utils import is_numeric_string
@@ -64,18 +65,11 @@ class DateContent(StuffContent):
         # whatever it returns is re-validated as PYTHON input, where strict refuses a `str` outright
         # (date_type / time_type). Returning a real object satisfies strict JSON, strict Python and lax
         # alike. Non-str values — real date/time objects, e.g. from `--mock-inputs` — pass through.
+        # The parsers pin the extended ISO form, so a model and an author are held to one contract.
         if isinstance(value, str):
             if info.field_name == "date":
-                try:
-                    return datetime.date.fromisoformat(value)
-                except ValueError as exc:
-                    msg = f"A Date's `date` field must be an ISO 8601 calendar date (e.g. 2026-07-07), got {value!r}."
-                    raise ValueError(msg) from exc
-            try:
-                return datetime.time.fromisoformat(value)
-            except ValueError as exc:
-                msg = f"A Date's `time` field must be an ISO 8601 time of day (e.g. 15:40:00, or 15:40:00+02:00), got {value!r}."
-                raise ValueError(msg) from exc
+                return parse_iso_date(value)
+            return parse_iso_time(value)
         return value
 
     def _iso(self) -> str:
