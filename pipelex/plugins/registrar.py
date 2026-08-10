@@ -405,10 +405,12 @@ class PluginRegistrar:
     def _require_interpreter_layer(self, *, capability: str) -> None:
         """Reject an interpreter-layer contribution from a plugin that published itself as kernel-layer.
 
-        One-directional by design: the interpreter group may contribute kernel-tier capabilities too
-        (ours does — an orchestrator *and* an HTTP-error mapper), and nothing is at risk there because
-        a kernel-only boot never reads that group. Built-ins declare no group and are skipped: they
-        are filed by layer in-tree, where the hub-layering guard polices them statically.
+        One-directional by design: an interpreter-group plugin may contribute kernel-tier
+        capabilities alongside its interpreter-tier ones — ours registers an orchestrator
+        (interpreter-tier, guarded here) *and* an HTTP-error mapper (kernel-tier, not) — and nothing
+        is at risk there because a kernel-only boot never reads that group. Built-ins declare no
+        group and are skipped: they are filed by layer in-tree, where the hub-layering guard polices
+        them statically.
         """
         group = self._active.group
         if group is not None and group.is_kernel:
