@@ -229,6 +229,37 @@ class RetiredPluginEntryPointGroupError(PluginError):
         super().__init__(message)
 
 
+class PluginDeclaredInMultipleGroupsError(PluginError):
+    """One installed plugin advertises the same name under more than one entry-point group.
+
+    A boot that reads both groups then finds it twice, loads it twice and runs its ``register``
+    twice. Most menu methods collide on the second pass, but the resulting ``Duplicate*Error``
+    names the same plugin as both parties to the conflict — which reads as a bug in Pipelex rather
+    than as a misdeclared distribution. ``add_teardown`` does not collide at all: it appends, so the
+    callback lands twice and runs twice at shutdown with nothing raised. Neither symptom points at
+    the cause, hence this error.
+
+    The group is how a plugin declares its layer, so declaring two is not an over-declaration to be
+    tolerated — it is the declaration failing to say anything.
+    """
+
+    # The message names the caller's own installed distribution and the exact fix.
+    _authors_caller_facing_message = True
+
+    def __init__(self, *, plugin_name: str, groups: list[str]):
+        self.plugin_name = plugin_name
+        self.groups = groups
+        named = " and ".join(f"'{group}'" for group in sorted(groups))
+        message = (
+            f"Plugin '{plugin_name}' is published under {named}. The entry-point group is how a plugin declares "
+            "which layer it belongs to, so it must appear in exactly one: keep the kernel group if it only "
+            "contributes kernel-layer capabilities (inference backend, model lister, storage or secrets provider, "
+            "HTTP-error mapper), and the interpreter group if it constructs any Pipe-aware object (orchestrator, "
+            "bundle validator, PipeFunc executor). Remove the other declaration and reinstall."
+        )
+        super().__init__(message)
+
+
 class BrokenPluginError(PluginError):
     """A discovered plugin failed while loading or registering itself."""
 

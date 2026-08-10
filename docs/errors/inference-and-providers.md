@@ -122,6 +122,7 @@ own page. Classes are grouped by subsystem.
 - [`HubSlotAlreadyClaimedError`](hub-slot-already-claimed-error.md) — Hub slot already claimed
 - [`InferenceBackendNotFoundError`](inference-backend-not-found-error.md) — Inference backend not found
 - [`PluginApiVersionMismatchError`](plugin-api-version-mismatch-error.md) — Plugin api version mismatch
+- [`PluginDeclaredInMultipleGroupsError`](plugin-declared-in-multiple-groups-error.md) — Plugin declared in multiple groups
 - [`PluginError`](plugin-error.md) — Plugin error
 - [`PluginLayerViolationError`](plugin-layer-violation-error.md) — Plugin layer violation
 - [`RetiredPluginEntryPointGroupError`](retired-plugin-entry-point-group-error.md) — Retired plugin entry point group

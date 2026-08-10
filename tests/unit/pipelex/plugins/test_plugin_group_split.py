@@ -11,7 +11,7 @@ import pytest
 
 from pipelex.plugins.contract import PLUGIN_API_VERSION
 from pipelex.plugins.discovery import RETIRED_ENTRY_POINT_GROUP, build_registrar
-from pipelex.plugins.exceptions import PluginLayerViolationError, RetiredPluginEntryPointGroupError
+from pipelex.plugins.exceptions import PluginDeclaredInMultipleGroupsError, PluginLayerViolationError, RetiredPluginEntryPointGroupError
 from pipelex.plugins.inference_backend_registry import InferenceFamily
 from pipelex.plugins.plugin_group import PluginGroup
 
@@ -80,6 +80,10 @@ def _add_inference_backend(registrar: PluginRegistrar) -> None:
 
 def _add_http_error_mapper(registrar: PluginRegistrar) -> None:
     registrar.add_http_error_mapper(exc_type_provider=lambda: TimeoutError, to_error_report=cast("Callable[..., ErrorReport]", object))
+
+
+def _add_teardown(registrar: PluginRegistrar) -> None:
+    registrar.add_teardown(lambda: None)
 
 
 def _entry_point(*, name: str, plugin: object) -> SimpleNamespace:
@@ -251,3 +255,39 @@ class TestPluginGroupSplit:
         assert PluginGroup.INTERPRETER not in queried
         assert PluginGroup.KERNEL in queried
         assert RETIRED_ENTRY_POINT_GROUP in queried
+
+    def test_a_plugin_declared_under_both_groups_fails_loud(self, mocker: MockerFixture) -> None:
+        """One plugin, two groups: read twice, loaded twice, and `register` run twice.
+
+        The contribution here is a bare teardown callback on purpose — it is the one menu method
+        with neither a key nor a tier guard, so the double registration is *silent*: the callback
+        simply lands in the list twice and runs twice at shutdown. Every other menu method happens
+        to collide on its own, but it does so by naming the same plugin as both parties to the
+        conflict, which reads as a bug in Pipelex rather than as a misdeclared distribution. Neither
+        symptom points at the cause, so discovery names it.
+        """
+        plugin = _ContributingPlugin(name="double_dipper", contributions=[_add_teardown])
+        with pytest.raises(PluginDeclaredInMultipleGroupsError) as exc_info:
+            _discover(
+                mocker=mocker,
+                external={
+                    PluginGroup.KERNEL: [_entry_point(name="double_dipper", plugin=plugin)],
+                    PluginGroup.INTERPRETER: [_entry_point(name="double_dipper", plugin=plugin)],
+                },
+            )
+
+        message = str(exc_info.value)
+        assert "double_dipper" in message
+        assert PluginGroup.KERNEL in message
+        assert PluginGroup.INTERPRETER in message
+
+    def test_the_same_plugin_name_in_one_group_is_untouched(self, mocker: MockerFixture) -> None:
+        """The check is about one name spanning two groups, not about the name itself.
+
+        Guards the obvious over-reach: a dedup keyed on the name alone would also reject the
+        ordinary single-group plugin, and every other test here would still pass.
+        """
+        plugin = _ContributingPlugin(name="honest", contributions=[_add_teardown])
+        registrar = _discover(mocker=mocker, external={PluginGroup.KERNEL: [_entry_point(name="honest", plugin=plugin)]})
+
+        assert [discovery.name for discovery in registrar.discoveries] == ["honest"]

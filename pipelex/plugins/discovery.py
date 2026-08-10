@@ -7,6 +7,7 @@ from pipelex.plugins.exceptions import (
     BrokenPluginError,
     CoreUnconditionalPluginDisabledError,
     PluginApiVersionMismatchError,
+    PluginDeclaredInMultipleGroupsError,
     PluginError,
     RetiredPluginEntryPointGroupError,
 )
@@ -165,9 +166,27 @@ def _external_entry_points(*, groups: "Sequence[PluginGroup]") -> list[GroupedEn
     ``load()`` that would import an interpreter-layer module can never be reached from a kernel-only
     boot.
     """
-    return [
+    grouped = [
         GroupedEntryPoint(group=group, entry_point=entry_point) for group in groups for entry_point in importlib.metadata.entry_points(group=group)
     ]
+    _reject_multi_group_declaration(grouped=grouped)
+    return grouped
+
+
+def _reject_multi_group_declaration(*, grouped: "Sequence[GroupedEntryPoint]") -> None:
+    """Fail loud on one plugin name declared under more than one of the requested groups.
+
+    Scoped to the groups actually read, which is also the only place the harm exists: reading two
+    groups is what loads such a plugin twice and runs its ``register`` twice. A kernel-only boot
+    reads one group, sees the plugin once, and is unaffected — so probing the group it deliberately
+    does not query would buy a diagnostic for a boot that has nothing to diagnose.
+    """
+    groups_by_name: dict[str, set[str]] = {}
+    for candidate in grouped:
+        groups_by_name.setdefault(candidate.entry_point.name, set()).add(candidate.group)
+    for name, declared_groups in groups_by_name.items():
+        if len(declared_groups) > 1:
+            raise PluginDeclaredInMultipleGroupsError(plugin_name=name, groups=list(declared_groups))
 
 
 def _reject_retired_entry_point_group() -> None:

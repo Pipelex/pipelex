@@ -230,6 +230,7 @@ PipelineInputContentError | Pipeline input content | https://docs.pipelex.com/la
 PipelineManagerAlreadyExistsError | Pipeline manager already exists | https://docs.pipelex.com/latest/errors/pipeline-manager-already-exists-error/
 PipelineManagerNotFoundError | Pipeline manager not found | https://docs.pipelex.com/latest/errors/pipeline-manager-not-found-error/
 PluginApiVersionMismatchError | Plugin api version mismatch | https://docs.pipelex.com/latest/errors/plugin-api-version-mismatch-error/
+PluginDeclaredInMultipleGroupsError | Plugin declared in multiple groups | https://docs.pipelex.com/latest/errors/plugin-declared-in-multiple-groups-error/
 PluginError | Plugin error | https://docs.pipelex.com/latest/errors/plugin-error/
 PluginLayerViolationError | Plugin layer violation | https://docs.pipelex.com/latest/errors/plugin-layer-violation-error/
 PortkeyCredentialsError | Portkey credentials | https://docs.pipelex.com/latest/errors/portkey-credentials-error/

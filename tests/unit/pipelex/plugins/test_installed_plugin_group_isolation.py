@@ -104,7 +104,11 @@ _DISCOVERY_SCRIPT = textwrap.dedent(
     if not sentinel.exists():
         print("the fixture is inert: a both-groups discovery did not import it either")
         raise SystemExit(4)
-    if [discovery.name for discovery in both.discoveries] != [entry_point_name]:
+    # Membership, not equality: the subprocess keeps the ambient site-packages, so a developer who
+    # has any real migrated plugin installed would otherwise get a false red here — and that is
+    # exactly the population most likely to run this suite. "Our fixture was discovered" is the
+    # property; "nothing else was" is a fact about the machine.
+    if entry_point_name not in [discovery.name for discovery in both.discoveries]:
         print(f"a both-groups discovery did not register the plugin: {both.discoveries}")
         raise SystemExit(5)
 
