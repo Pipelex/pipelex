@@ -1,6 +1,6 @@
 # A2: which branch takes pipelex-temporal's entry-point-group migration
 
-**Status:** open, needs Louis' call. Blocks the last third of [A2](kernel-plugin-groups-and-distribution-plan.md#a2--migrate-the-external-plugins). The other two plugin repos are done and committed locally.
+**Status: RESOLVED — Louis, 2026-08-10: base on `refactor/Topology`.** Recorded as D-A2-2 in the [plan](kernel-plugin-groups-and-distribution-plan.md#a2--as-built). Built as commit `1ed047a` on a `refactor/plugin-layer-groups` branch **stacked on** `refactor/Topology`, rather than added to PR #18 itself — that keeps #18 untouched and preserves one Part-A commit per repo, while still giving the pointer fix the base it needs. When #18 merges to `dev`, the branch retargets to `dev` cleanly. The analysis below is kept for the rationale trail.
 
 ## What the commit has to contain
 

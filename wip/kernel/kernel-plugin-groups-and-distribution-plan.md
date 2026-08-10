@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | A | A0 naming ruling + inventory | **done** — see [A0 as built](#a0--as-built) |
 | A | A1 group-split mechanism | **done** — see [A1 as built](#a1--as-built) |
-| A | A2 external-plugin migration | **partial** — mistralai-workflows + daytona-sandbox done (local commits); pipelex-temporal 🛑 blocked on a branch decision, see [A2 as built](#a2--as-built-partial-two-of-three-repos) |
+| A | A2 external-plugin migration | **done** — all three repos migrated and verified against the A1 core (local commits, none pushed), see [A2 as built](#a2--as-built) |
 | A | A3 gates + checkpoint | not started |
 | B | B0 footprint measurement | not started |
 | B | B1 decisions | not started |
@@ -100,32 +100,33 @@ Done. One commit, tests first (the module was red on a missing `PluginGroup` bef
 
 Every currently-published external plugin is interpreter-layer, so all of them move to `pipelex.plugins.interpreter` and bump `targets_api`, each in one commit in its own repo: **pipelex-temporal** (orchestrator + bundle validator + slot claims), **pipelex-mistralai-workflows** (orchestrator), **pipelex-daytona-sandbox** (PipeFunc executor). The `pipelex.plugins.kernel` group starts with no external members — the future `pipelex-secrets-<backend>` / storage / inference-backend plugins are its intended population. Version pairing: each plugin repo's pipelex pin floor becomes the release that carries the new discovery; an older core will not see the new groups, which is acceptable under no-backward-compat but must be stated in each plugin's changelog.
 
-#### A2 — as built (partial: two of three repos)
+#### A2 — as built
 
-Two repos done, one commit each, both on a new `refactor/plugin-layer-groups` branch off their `dev`, **neither pushed**:
+All three repos migrated, one commit each, all on a branch named `refactor/plugin-layer-groups`, **none pushed**:
 
-- **pipelex-mistralai-workflows** — `029b476`. Entry-point group in `pyproject.toml`, the plugin docstring, `docs/reference-activities.md`, and `tests/integration/test_plugin_discovery.py` (which asserts the declared group, so it is the migration's own gate). Changelog entry.
-- **pipelex-daytona-sandbox** — `a08d566`. Entry-point group in `pyproject.toml` and the plugin docstring. Changelog entry.
+- **pipelex-mistralai-workflows** — `029b476`, off `dev`. Entry-point group in `pyproject.toml`, the plugin docstring, `docs/reference-activities.md`, and `tests/integration/test_plugin_discovery.py` (which asserts the declared group, so it is the migration's own gate). Changelog entry.
+- **pipelex-daytona-sandbox** — `a08d566`, off `dev`. Entry-point group in `pyproject.toml` and the plugin docstring. Changelog entry.
+- **pipelex-temporal** — `1ed047a`, off `refactor/Topology` per Louis' call (see D-A2-2). Entry-point group, the plugin docstring, `begin_plugin(group=…)` at both call sites in `test_temporal_plugin_http_error_mapper.py` (one of them inside the import-light subprocess script), the D-A0-2 pointer fix, the prose sweep (`README.md`, `AGENTS.md`, `CLAUDE.md`, `docs/index.md`, `docs/installation-and-activation.md`), and a changelog entry.
 
 `targets_api` needed no edit anywhere: all three plugins write `targets_api = PLUGIN_API_VERSION`, so the v4 bump follows the constant.
+
+**Verification** — each repo's suite was run against the A1 core, by installing this worktree editable into that repo's venv (`uv pip install --no-deps -e ../_kernel`) plus a `-e .` reinstall so the dist metadata picks up the new entry-point group, then restoring the pinned pipelex afterwards. pipelex-temporal: full unit suite green, including both subprocess arms (the import-light register and the cold-import closure) — the parts no linter can see. pipelex-mistralai-workflows: full suite green, including the entry-point assertion and the tests that boot pipelex, so the retired-group probe is satisfied by the new metadata. pipelex-daytona-sandbox: suite green, but it never exercises discovery, so its layer claim was checked directly instead (below).
+
+Each plugin's layer classification was also mutation-checked from the consumer side — registering under `PluginGroup.KERNEL` must fail: pipelex-temporal is refused on `orchestrator temporal`, pipelex-daytona-sandbox on `pipe_func executor daytona`. Both register cleanly under the interpreter group, and Temporal does so *while also* contributing its HTTP error mapper — the one-directional rule (D-A1-1) demonstrated end to end rather than argued.
+
+⚠ **Each plugin repo's venv is now red on its migration branch**, and correctly so: the working tree declares the new group while the pinned pipelex reads only the retired one. That is the release gate showing through, not breakage — `uv sync` in each repo once the release lands.
 
 **Decisions taken**
 
 - **D-A2-1 — the commits stay local until the pipelex release lands.** These plugins are now undiscoverable by *released* pipelex (0.42.0 reads only the retired group), so a pushed PR's CI would install 0.42.0 and go red for a reason no code change can fix. Same for the pipelex pin floor the plan asks for: the release that carries layer-split discovery does not exist yet, so `pipelex>=0.41.0` / `>=0.42.0` stay as they are and the floor bump is owed at release time, together with the push and the PRs.
-
-🛑 **Open — needs Louis' call: which branch takes pipelex-temporal's A2 commit.** The other two repos had an obvious base; this one does not.
-
-- `refactor/Topology` (**PR #18, still OPEN**) is where `tests/unit/pipelex_temporal/test_plugin_interpreter_import_closure.py` lives — the file D-A0-2 says A2 must fix (its `#:` comment and its failure message both still name the pre-A0 `test_runtime_layer_import_closure.py`). That file **does not exist on `dev`**. It also needs `begin_plugin(group=…)`, now a required parameter, in `test_temporal_plugin_http_error_mapper.py`.
-- Branching off `dev` therefore cannot carry the pointer fix at all, and would leave the stale pointer to come back when #18 merges.
-- Branching off `refactor/Topology` stacks a kernel-track commit on an unmerged branch from the Temporal-topology track, so Part A's plugin migration could only land when #18 does — two tracks entangled.
-
-Neither option is clearly right, and picking wrong couples two release trains, so this is deferred rather than guessed. Recorded in full at [`wip/kernel/a2-pipelex-temporal-branch-question.md`](a2-pipelex-temporal-branch-question.md).
+- **D-A2-2 — pipelex-temporal's commit is based on `refactor/Topology`** (Louis, 2026-08-10), resolving the question recorded in [`a2-pipelex-temporal-branch-question.md`](a2-pipelex-temporal-branch-question.md). It sits on its **own** `refactor/plugin-layer-groups` branch stacked on that base rather than being added to PR #18 itself: the base is what makes the D-A0-2 pointer fix possible at all (the file it corrects exists only there), while the separate branch keeps PR #18 untouched and preserves the one-Part-A-commit-per-repo property. Since the commit is release-gated anyway and cannot ship before #18, the entanglement costs nothing in practice. Once #18 merges to `dev`, this branch retargets to `dev` cleanly.
+- **D-A2-3 — no new entry-point-declaration test in pipelex-temporal or pipelex-daytona-sandbox.** Only pipelex-mistralai-workflows had one to update. Adding the other two would duplicate what A3's core-side fake-dist gate covers mechanically; the per-repo claim that matters (this plugin is interpreter-layer) is enforced by pipelex at register time, which the mutation check above confirms is live.
 
 ### A3 — gates and checkpoint
 
 - **The mechanical gate:** a subprocess test with a fake interpreter-group plugin dist (entry-point fixture; its module raises or writes a sentinel on import) asserting a kernel-groups-only discovery never imports it, while a both-groups discovery does. Mutation-test it: point the kernel boot at both groups and watch it go red before trusting it.
-- Menu-tier cross-check tests (kernel-group plugin calling `add_orchestrator` → the structured error), legacy-probe test, and the existing suites: `make agent-check`, full `make agent-test`, pipelex-temporal's own gates against an editable core.
-- Changelog entries (core + the three plugin repos). Update the SPI docs and `plugins list` docs.
+- Menu-tier cross-check tests (kernel-group plugin calling `add_orchestrator` → the structured error), legacy-probe test, and the existing suites: `make agent-check`, full `make agent-test`. *(The three plugin repos' own suites against an editable core were already run at A2 — see A2 as built.)*
+- Changelog entry for **core** — the three plugin repos already have theirs. Update the SPI docs and `plugins list` docs: `docs/under-the-hood/{inference-backend,orchestrator,storage-provider,secrets-provider}-plugins.md` and `docs/cookbook/using-inference-plugins.md` all still instruct authors to publish under the now-fatal `pipelex.plugins` group.
 
 🛑 **CHECKPOINT A** — Part A is independently shippable on `dev` as one PR (core) plus one commit per plugin repo. Record status, decisions, and open questions here before starting Part B.
 
