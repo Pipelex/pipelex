@@ -82,6 +82,14 @@ class TestTimeContentStrictMode:
         with pytest.raises(ValidationError, match="end-of-day"):
             TimeContent.model_validate({"time": end_of_day}, strict=True)
 
+    @pytest.mark.parametrize("out_of_range_offset", ["15:40:00+02:60", "15:40:00-02:99"])
+    def test_out_of_range_offset_minutes_are_rejected(self, out_of_range_offset: str):
+        """Offset components are summed into a timedelta, so nothing downstream range-checks the minutes:
+        `+02:60` would arrive as a silent `+03:00`, a stated offset turned into a different one.
+        """
+        with pytest.raises(ValidationError, match="extended ISO 8601"):
+            TimeContent.model_validate({"time": out_of_range_offset}, strict=True)
+
     @pytest.mark.parametrize("basic_form", ["154000+00:00", "1540Z", "154000.5+02:00", "15:40:00+0200", " 15:40:00"])
     def test_basic_format_is_rejected(self, basic_form: str):
         """A `Time` accepts the extended form only, whatever path it arrives by — a compact string

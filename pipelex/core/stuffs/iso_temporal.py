@@ -9,8 +9,11 @@ import re
 # form a `Date`/`Time` accepts from a model identical to the form it accepts from an author.
 # The fraction separator is either '.' or ',' — ISO 8601 allows both, and `fromisoformat` parses both.
 # The offset is `Z`, `±hh` or `±hh:mm`: the colon-less `±hhmm` is the basic spelling, so it is out.
+# The offset's minutes are range-checked here because nothing downstream does it: they are summed into
+# a timedelta, so `+02:60` would arrive as a silent `+03:00` (an out-of-range offset HOUR does raise,
+# and the time's own minute/second components are range-checked by `fromisoformat`).
 _EXTENDED_DATE_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}")
-_EXTENDED_TIME_PATTERN = re.compile(r"(?P<hour>\d{2}):\d{2}(:\d{2}([.,]\d+)?)?([Zz]|[+-]\d{2}(:\d{2})?)?")
+_EXTENDED_TIME_PATTERN = re.compile(r"(?P<hour>\d{2}):\d{2}(:\d{2}([.,]\d+)?)?([Zz]|[+-]\d{2}(:[0-5]\d)?)?")
 
 
 def parse_iso_date(text: str) -> datetime.date:
