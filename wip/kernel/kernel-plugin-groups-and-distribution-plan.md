@@ -12,8 +12,8 @@
 | --- | --- | --- |
 | A | A0 naming ruling + inventory | **done** — see [A0 as built](#a0--as-built) |
 | A | A1 group-split mechanism | **done** — see [A1 as built](#a1--as-built) |
-| A | A2 external-plugin migration | **done** — all three repos migrated and verified against the A1 core (local commits, none pushed), see [A2 as built](#a2--as-built) |
-| A | A3 gates + checkpoint | not started |
+| A | A2 external-plugin migration | **done** — three planned repos + the cookbook example (D-A3-1), verified against the A1 core; local commits, none pushed. See [A2 as built](#a2--as-built) |
+| A | A3 gates + checkpoint | **done** — 🛑 [CHECKPOINT A](#a3--as-built) reached; Part A complete and green, nothing pushed |
 | B | B0 footprint measurement | not started |
 | B | B1 decisions | not started |
 | B | B2 the move + gates | not started |
@@ -94,7 +94,7 @@ Done. One commit, tests first (the module was red on a missing `PluginGroup` bef
 
 **Verification** — `make agent-check` green end to end. The plugins/providers/cli unit suites, both closure tests and the plugin integration suites: all green. The three new gates were mutation-tested: neutering the tier cross-check killed all six violation cases, ignoring the requested groups killed both kernel-only-boot cases, and neutering the retired probe killed its own case — each restored green after.
 
-⚠ **Owed at A3, and wrong in the tree until then**: every doc that tells a plugin author to publish under `[project.entry-points."pipelex.plugins"]` — `docs/under-the-hood/{inference-backend,orchestrator,storage-provider,secrets-provider}-plugins.md` and `docs/cookbook/using-inference-plugins.md`. A1 makes that group a startup error, so those pages now describe a plugin that cannot boot.
+~~⚠ Owed at A3~~ — **discharged at A3**, see [A3 as built](#a3--as-built). Every doc telling a plugin author to publish under `[project.entry-points."pipelex.plugins"]` now names the right group.
 
 ### A2 — migrate the external plugins
 
@@ -128,7 +128,33 @@ Each plugin's layer classification was also mutation-checked from the consumer s
 - Menu-tier cross-check tests (kernel-group plugin calling `add_orchestrator` → the structured error), legacy-probe test, and the existing suites: `make agent-check`, full `make agent-test`. *(The three plugin repos' own suites against an editable core were already run at A2 — see A2 as built.)*
 - Changelog entry for **core** — the three plugin repos already have theirs. Update the SPI docs and `plugins list` docs: `docs/under-the-hood/{inference-backend,orchestrator,storage-provider,secrets-provider}-plugins.md` and `docs/cookbook/using-inference-plugins.md` all still instruct authors to publish under the now-fatal `pipelex.plugins` group.
 
-🛑 **CHECKPOINT A** — Part A is independently shippable on `dev` as one PR (core) plus one commit per plugin repo. Record status, decisions, and open questions here before starting Part B.
+#### A3 — as built
+
+- **The mechanical gate**: `tests/unit/pipelex/plugins/test_installed_plugin_group_isolation.py`. It writes a real `*.dist-info/` with an `entry_points.txt` declaring an interpreter-group plugin, puts it on `sys.path`, and runs discovery in a **cold subprocess**; the plugin module writes a sentinel file when its body executes. A kernel-only boot must leave the sentinel absent and discover nothing; a both-groups boot must produce the sentinel *and* register the plugin. Mutation-tested both ways: making `_external_entry_points` ignore its `groups` argument fails on the kernel-only arm (exit 2), and declaring the fixture under a group nobody queries fails on the vacuity arm (exit 4).
+- **Menu-tier cross-check tests, the legacy-probe test, and the group-filtering test already landed with A1** — the A3 checklist listed them, but building the mechanism without its tests was never on the table. A3 added only the gate A1 could not give: the one that uses real installed metadata instead of a patched `importlib.metadata`.
+- **Docs swept.** Each SPI page now names the group its capability belongs to — kernel for inference backends, storage and secrets; interpreter for orchestrators. `inference-backend-plugins.md` carries the full explanation (what each group means, what a wrong choice costs in each direction, that the retired group is a startup error) and the other pages link to it rather than repeat it. `orchestrator-plugins.md` additionally states the one-directional rule and why Temporal is the case that settles it. The three `pipelex plugins list` references now mention the Group column and that it is the first thing to read when a plugin is missing. The seam diagrams stopped naming the retired group.
+- **Changelog**: nothing owed. A1's entry already describes the split, the enforcement, its direction, the retired-group error and the Group column; A3 added a test and doc corrections, neither of which is release-facing on its own.
+
+**Decisions taken**
+
+- **D-A3-1 — the cookbook example plugin was migrated too, and it was not on the plan's list.** A workspace-wide sweep for `entry-points."pipelex.plugins"` (enumerating every sibling directory rather than trusting the plan's three-repo list) turned up a fourth consumer: `pipelex-cookbook`'s `hello-inference-plugin`. Migrated to `pipelex.plugins.kernel` — an inference backend is kernel-layer — as commit `87c6800` on a `refactor/plugin-layer-groups` branch off `dev`, **not pushed**, release-gated like the others (D-A2-1). Leaving it would also have made the `using-inference-plugins.md` page A3 just corrected describe an example that contradicts it.
+- **D-A3-2 — `pipelex.plugins` the *package* was deliberately left alone.** The retired entry-point group and the kernel-layer Python package share a spelling, and `docs/contribute/hub-layering.md` refers to the package repeatedly (the transitive-breach worked example). A blind sweep would have corrupted that page. Historical `CHANGELOG.md` entries were left alone for the same reason: they record what shipped at the time.
+- **D-A3-3 — no new `plugins list` reference page.** The command has never had one; the three SPI pages mention it in prose. Adding a CLI reference page is a real gap but a separate concern (it was already recorded against the `cli-docs` drift contract at A1), and inventing one here would have widened Part A past its subject.
+
+**Verification** — `make agent-check`, `make drift-check` (staged, since it reads the index) and the **full `make agent-test`** all green on the A3 tip.
+
+🛑 **CHECKPOINT A — reached 2026-08-10. Part A is complete and green; nothing is pushed.**
+
+**State.** Core: four commits on `refactor/Kernel-4` in the `_kernel` worktree — A0 (`283abd7d2`), A1 (`529ca483f`), the A2 record (`47b21887e`, preceded by `b5da2c1fb`), A3 (`f6672b2d1`). Four plugin repos each hold one unpushed commit on a `refactor/plugin-layer-groups` branch: pipelex-mistralai-workflows `029b476`, pipelex-daytona-sandbox `a08d566`, pipelex-temporal `1ed047a` (based on `refactor/Topology`, D-A2-2), pipelex-cookbook `87c6800` (D-A3-1).
+
+**What ships together.** Part A is one core PR plus four plugin-repo PRs, and the plugin PRs **cannot go first**: released pipelex reads only the retired group, so their CI would install it and go red for a reason no code change fixes (D-A2-1). Order: land the core PR, cut the pipelex release, then push the four plugin branches, open their PRs, and bump each repo's pipelex pin floor in the same window. pipelex-temporal additionally waits on PR #18 (its base), which the release gate makes free.
+
+**Open at this checkpoint.**
+
+- The pipelex pin-floor bumps in all four plugin repos — owed at release, deliberately not done now (D-A2-1).
+- Each plugin repo's venv is red on its migration branch until that release; `uv sync` after.
+- No `pipelex plugins list` CLI reference page exists (D-A3-3).
+- Part B's open questions are unchanged and still Louis' — see [Open questions](#open-questions-louis). B is *not* started.
 
 ## Part B — the in-repo `pipelex_kernel` package (unpublished)
 
