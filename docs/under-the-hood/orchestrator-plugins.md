@@ -205,7 +205,7 @@ What an out-of-tree orchestrator imports *is* a contract. The SPI is a documente
 
 The orchestrator itself (`pipelex_temporal/temporal_orchestrators.py`) keeps the `WorkflowExecutionError` catch and the `make_workflow_id` recompute in the blocking `execute` arm. It serializes its `PipeOutput` through `pipelex.runtime_bridge.serialization`, shared with the core DIRECT orchestrator so the boundary shape cannot drift.
 
-The Temporal plugin is **external** — it ships as the `pipelex-temporal` distribution and is discovered through a `pipelex.plugins` entry point in that dist's `pyproject.toml`, not through `BUILTIN_PLUGINS`. Core's built-ins hold only the always-shipped inference and `direct` plugins and explicitly exclude Temporal — split by layer across `pipelex/providers/builtins.py` (the kernel adapters) and `pipelex/interpreter_plugins/builtins.py` (the interpreter-touching `direct` and `pipe_func` plugins, which is also where the two halves are composed); installing `pipelex-temporal` is all it takes to make the `"temporal"` orchestrator available — zero config, no core import of `temporalio`. Its operational `worker` / `setup-namespace` commands ship as the standalone `pipelex-temporal` console script, so they travel with that dist.
+The Temporal plugin is **external** — it ships as the `pipelex-temporal` distribution and is discovered through a `pipelex.plugins.interpreter` entry point in that dist's `pyproject.toml`, not through `BUILTIN_PLUGINS`. Core's built-ins hold only the always-shipped inference and `direct` plugins and explicitly exclude Temporal — split by layer across `pipelex/providers/builtins.py` (the kernel adapters) and `pipelex/interpreter_plugins/builtins.py` (the interpreter-touching `direct` and `pipe_func` plugins, which is also where the two halves are composed); installing `pipelex-temporal` is all it takes to make the `"temporal"` orchestrator available — zero config, no core import of `temporalio`. Its operational `worker` / `setup-namespace` commands ship as the standalone `pipelex-temporal` console script, so they travel with that dist.
 
 ---
 
@@ -215,11 +215,13 @@ A third-party host-runtime plugin is a distribution that:
 
 1. defines a plugin class (`name`, `targets_api`, `register`) whose `register` calls `add_orchestrator(mode=..., orchestrator=...)` for the mode(s) it serves — import-light;
 2. compiles its orchestrator against the Orchestrator SPI above (and nothing outside it);
-3. advertises itself under the `pipelex.plugins` entry-point group:
+3. advertises itself under the `pipelex.plugins.interpreter` entry-point group — an orchestrator constructs `Pipe`-aware objects, so it is interpreter-layer, and the group is how a plugin declares that. Publishing an orchestrator under `pipelex.plugins.kernel` instead raises `PluginLayerViolationError` at register time. See [Inference Backend Plugins](inference-backend-plugins.md#shipping-it-as-an-out-of-tree-plugin) for what each group means; the pre-split `pipelex.plugins` group is retired and now fails startup:
 
 ```toml
-[project.entry-points."pipelex.plugins"]
+[project.entry-points."pipelex.plugins.interpreter"]
 my_runtime = "my_package.my_plugin:MyRuntimePlugin"
 ```
+
+An interpreter-group plugin is *not* restricted to interpreter-layer capabilities — the cross-check runs one way only. Our own Temporal plugin contributes an orchestrator and an HTTP-error mapper (kernel-tier) from the same `register`, which is why the rule is asymmetric.
 
 Installing the distribution makes the mode available; uninstalling removes it. No core change, no central registration list. A discovered plugin can be quarantined without uninstalling via the `plugins.disabled` denylist (see [Inference Backend Plugins](inference-backend-plugins.md) for the shared discovery/denylist machinery).

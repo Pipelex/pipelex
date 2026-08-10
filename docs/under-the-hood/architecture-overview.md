@@ -81,7 +81,7 @@ The COGT layer abstracts AI provider details from business logic:
 
 Two packages, one for the mechanism and one for the built-in adapters:
 
-- [`pipelex/plugins/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/plugins) — the plugin **mechanism**: the `PipelexPlugin` contract, the registrar every plugin registers into, and the capability registries. This is what an out-of-tree plugin imports, and what the `pipelex.plugins` entry point resolves against.
+- [`pipelex/plugins/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/plugins) — the plugin **mechanism**: the `PipelexPlugin` contract, the registrar every plugin registers into, and the capability registries. This is what an out-of-tree plugin imports, and what the `pipelex.plugins.kernel` / `pipelex.plugins.interpreter` entry points resolve against.
 - [`pipelex/providers/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/providers) — the built-in **provider adapters**, one directory per vendor, each handling that vendor's API specifics:
 
     - OpenAI

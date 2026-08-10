@@ -17,7 +17,8 @@ Core names no backend by import or by string. The built-in drivers (OpenAI, Gate
 boot (Pipelex.setup)
   └─ build_registrar(config, builtin_plugins=BUILTIN_PLUGINS, …)   # pure, import-light
        ├─ for each built-in plugin (both layers' halves, composed)
-       └─ for each installed "pipelex.plugins" entry point
+       └─ for each installed entry point in the requested groups
+            #  "pipelex.plugins.kernel" alone on a kernel-only boot; both groups on a full one
             └─ plugin.register(registrar)        # side-effect-free
                  └─ registrar.add_inference_backend(family=…, sdk=…, make_worker=…)
   └─ InferenceBackendRegistry(registrar.inference_backends)   # stored on the hub
@@ -175,13 +176,17 @@ class AcmePlugin:
 
 ### Shipping it as an out-of-tree plugin
 
-Declare an entry point in the `pipelex.plugins` group; discovery finds it automatically once the distribution is installed (no central enable-list — *presence* is the source of truth):
+Declare an entry point in the `pipelex.plugins.kernel` group; discovery finds it automatically once the distribution is installed (no central enable-list — *presence* is the source of truth):
 
 ```toml
 # pyproject.toml of your plugin package
-[project.entry-points."pipelex.plugins"]
+[project.entry-points."pipelex.plugins.kernel"]
 acme = "my_pkg.acme_plugin:AcmePlugin"
 ```
+
+**The group declares your layer, and the choice is not cosmetic.** An inference backend is kernel-layer — it constructs a worker, never a `Pipe` — so it belongs in `pipelex.plugins.kernel`, and a kernel-only boot reads that group and finds it. Publish the same plugin under `pipelex.plugins.interpreter` and a kernel-only boot never even *imports* your module, so your backend is simply absent. The reverse mistake fails loudly instead: a `pipelex.plugins.kernel` plugin whose `register` reaches an interpreter-layer capability (`add_orchestrator`, `add_bundle_validator`, `add_pipe_func_executor`, or any `claim_*` hub slot) raises `PluginLayerViolationError` naming the capability and the group to move to. The restriction is one-directional — an interpreter-group plugin may contribute kernel-tier capabilities too.
+
+The single pre-split `pipelex.plugins` group is retired. It is not ignored: a plugin still published there fails startup with `RetiredPluginEntryPointGroupError`, because the alternative — being silently undiscovered — is the expensive failure to diagnose.
 
 The entry point may resolve to a plugin instance or a zero-argument factory. A broken entry point is isolated and reported as `BrokenPluginError`, never a silent skip.
 
@@ -199,7 +204,7 @@ For external entry points the denylist is matched against the **entry-point name
 
 Disabling a core-unconditional plugin (`openai`) is a configuration error, not a no-op — it raises `CoreUnconditionalPluginDisabledError`. There is intentionally **no** allowlist: a plugin's presence (built-in or installed entry point) is what enables it.
 
-Use `pipelex plugins list` to see every discovered plugin, what each contributed, and its denylist state.
+Use `pipelex plugins list` to see every discovered plugin, the entry-point group it was found under, what each contributed, and its denylist state. The **Group** column is the first thing to read when a plugin is missing: a built-in shows `—`, and an external plugin that resolved to the wrong layer shows it there.
 
 ---
 
