@@ -81,6 +81,10 @@ Nine findings across greptile, codex and cubic; four of them named one real gap,
 - **An out-of-range offset minute was silently normalized (codex P2, cubic P2) — REAL, fixed.** `15:40:00+02:60` arrived as `+03:00`: the offset components are summed into a `timedelta`, so nothing range-checks the minutes (the offset *hour* does raise, and the time's own minute/second are checked by `fromisoformat`). A stated offset silently becoming a different one is exactly the fidelity loss this native exists to prevent. Offset minutes are now pinned to `[0-5]\d`.
 - **The round-1 declined-reason was factually wrong (cubic P3) — accepted, note corrected in place.** The decision stands; the reasoning behind it did not survive scrutiny. See the corrected bullet above.
 
+## Review round 4
+
+- **The pattern admitted a lower-case `z` the parser refused (codex P2, cubic P3) — REAL, fixed by honoring the pattern.** `[Zz]` matched `15:40:00z`, but `time.fromisoformat` takes only the upper-case designator, so the value fell through to the generic "not a valid ISO 8601" message. The two bots proposed opposite remedies — normalize it, or drop `z` from the pattern. Chose to admit it: pydantic accepted `z` before this parser existed (verified), so dropping it would regress the live LLM path this PR exists to unblock, and RFC 3339 states the two spellings name the same offset. Case-folding a designator is not normalizing the value the way trimming padding would be, so it does not contradict the round-2 decision to validate the text as given.
+
 ## Follow-ups (out of this repo, after release)
 
 - [ ] `mthds-ui` (branch `feature/Native-concepts_stories`): `make fixtures-live ONLY=pipeline_32` to replace the placeholder LIVE fixture with real data — the natural end-to-end regression check named in the bug report. Gated on a released pipelex version carrying this fix.

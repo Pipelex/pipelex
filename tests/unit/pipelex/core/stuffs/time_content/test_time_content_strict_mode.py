@@ -24,6 +24,7 @@ class TestTimeContentStrictMode:
         ("iso_time", "expected"),
         [
             ("14:00:00Z", datetime.time(14, 0, tzinfo=datetime.UTC)),
+            ("14:00:00z", datetime.time(14, 0, tzinfo=datetime.UTC)),  # RFC 3339 calls the two spellings equivalent
             ("15:40:00.500", datetime.time(15, 40, 0, 500000)),
             ("15:40:00,500", datetime.time(15, 40, 0, 500000)),  # ISO's other fraction separator
             ("15:40:00+02:00", datetime.time(15, 40, tzinfo=datetime.timezone(datetime.timedelta(hours=2)))),

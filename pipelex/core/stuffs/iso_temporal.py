@@ -66,8 +66,13 @@ def parse_iso_time(text: str) -> datetime.time:
     if match.group("hour") == "24":
         msg = f"'{text}' uses the ISO 8601 end-of-day form 24:00, which names the next day's midnight; state that day with '00:00:00' instead."
         raise ValueError(msg)
+    # `fromisoformat` takes only the upper-case UTC designator, while RFC 3339 states the two spellings
+    # are equivalent and pydantic accepted both before this parser existed. Case-folding the designator
+    # is not normalization of the value — it names the same offset — so admit it rather than refuse a
+    # spelling a model may legitimately answer, and keep the pattern above honest about what it accepts.
+    parsable = f"{text[:-1]}Z" if text.endswith("z") else text
     try:
-        return datetime.time.fromisoformat(text)
+        return datetime.time.fromisoformat(parsable)
     except ValueError as exc:
         msg = f"'{text}' is not a valid ISO 8601 time of day (e.g. '15:40:00' or '15:40:00+02:00')."
         raise ValueError(msg) from exc
