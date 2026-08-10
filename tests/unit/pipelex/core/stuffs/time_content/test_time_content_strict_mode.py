@@ -25,7 +25,10 @@ class TestTimeContentStrictMode:
         [
             ("14:00:00Z", datetime.time(14, 0, tzinfo=datetime.UTC)),
             ("15:40:00.500", datetime.time(15, 40, 0, 500000)),
+            ("15:40:00,500", datetime.time(15, 40, 0, 500000)),  # ISO's other fraction separator
             ("15:40:00+02:00", datetime.time(15, 40, tzinfo=datetime.timezone(datetime.timedelta(hours=2)))),
+            ("15:40:00+02", datetime.time(15, 40, tzinfo=datetime.timezone(datetime.timedelta(hours=2)))),  # hour-only offset
+            ("15:40", datetime.time(15, 40)),
         ],
     )
     def test_strict_json_iso_variants(self, iso_time: str, expected: datetime.time):
@@ -79,7 +82,7 @@ class TestTimeContentStrictMode:
         with pytest.raises(ValidationError, match="end-of-day"):
             TimeContent.model_validate({"time": end_of_day}, strict=True)
 
-    @pytest.mark.parametrize("basic_form", ["154000+00:00", "1540Z", "154000.5+02:00"])
+    @pytest.mark.parametrize("basic_form", ["154000+00:00", "1540Z", "154000.5+02:00", "15:40:00+0200", " 15:40:00"])
     def test_basic_format_is_rejected(self, basic_form: str):
         """A `Time` accepts the extended form only, whatever path it arrives by — a compact string
         carrying a suffix escapes the numeric guard, so the shape pin is what refuses it.

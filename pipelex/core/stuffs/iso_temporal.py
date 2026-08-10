@@ -7,8 +7,10 @@ import re
 # the all-digit ones would slip past the no-epoch-seconds guards the natives rely on. Pinning the
 # extended form here — once, for both the content models and `StuffContentFactory` — is what keeps the
 # form a `Date`/`Time` accepts from a model identical to the form it accepts from an author.
+# The fraction separator is either '.' or ',' — ISO 8601 allows both, and `fromisoformat` parses both.
+# The offset is `Z`, `±hh` or `±hh:mm`: the colon-less `±hhmm` is the basic spelling, so it is out.
 _EXTENDED_DATE_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}")
-_EXTENDED_TIME_PATTERN = re.compile(r"(?P<hour>\d{2}):\d{2}(:\d{2}(\.\d+)?)?([Zz]|[+-]\d{2}(:?\d{2})?)?")
+_EXTENDED_TIME_PATTERN = re.compile(r"(?P<hour>\d{2}):\d{2}(:\d{2}([.,]\d+)?)?([Zz]|[+-]\d{2}(:\d{2})?)?")
 
 
 def parse_iso_date(text: str) -> datetime.date:
@@ -25,12 +27,11 @@ def parse_iso_date(text: str) -> datetime.date:
             validator rely on this staying a ValueError, which pydantic wraps into a ValidationError.
 
     """
-    stripped = text.strip()
-    if not _EXTENDED_DATE_PATTERN.fullmatch(stripped):
+    if not _EXTENDED_DATE_PATTERN.fullmatch(text):
         msg = f"'{text}' is not an extended ISO 8601 calendar date (e.g. '2026-07-07')."
         raise ValueError(msg)
     try:
-        return datetime.date.fromisoformat(stripped)
+        return datetime.date.fromisoformat(text)
     except ValueError as exc:
         msg = f"'{text}' is not a valid ISO 8601 calendar date (e.g. '2026-07-07')."
         raise ValueError(msg) from exc
@@ -51,8 +52,7 @@ def parse_iso_time(text: str) -> datetime.time:
             pydantic wraps into a ValidationError.
 
     """
-    stripped = text.strip()
-    match = _EXTENDED_TIME_PATTERN.fullmatch(stripped)
+    match = _EXTENDED_TIME_PATTERN.fullmatch(text)
     if not match:
         msg = f"'{text}' is not an extended ISO 8601 time of day (e.g. '15:40:00' or '15:40:00+02:00')."
         raise ValueError(msg)
@@ -64,7 +64,7 @@ def parse_iso_time(text: str) -> datetime.time:
         msg = f"'{text}' uses the ISO 8601 end-of-day form 24:00, which names the next day's midnight; state that day with '00:00:00' instead."
         raise ValueError(msg)
     try:
-        return datetime.time.fromisoformat(stripped)
+        return datetime.time.fromisoformat(text)
     except ValueError as exc:
         msg = f"'{text}' is not a valid ISO 8601 time of day (e.g. '15:40:00' or '15:40:00+02:00')."
         raise ValueError(msg) from exc
