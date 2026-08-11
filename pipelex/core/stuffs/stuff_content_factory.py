@@ -5,6 +5,7 @@ from typing import Any
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.exceptions import StuffContentFactoryError
+from pipelex.core.stuffs.iso_temporal import parse_iso_date, parse_iso_time
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.time_content import TimeContent
@@ -45,41 +46,36 @@ class StuffContentFactory:
 
     @classmethod
     def _parse_iso_temporal(cls, value: str) -> tuple[datetime.date, datetime.time | None]:
-        """Parse a strict *extended* ISO 8601 date or datetime, date-first so a bare date never fabricates a midnight time."""
-        # Require the date component to be extended-calendar YYYY-MM-DD (optionally followed by a T/space time
-        # part, which fromisoformat then validates precisely). date.fromisoformat / datetime.fromisoformat (3.11+)
-        # also accept the basic "YYYYMMDD" / "YYYYMMDDTHHMMSS" forms and ISO week-dates ("2026-W27-2"), which would
-        # silently normalize a non-extended input into a DateContent — and let an all-digit epoch string slip past
-        # DateContent's own no-epoch-seconds guard. Pin extended-only (also subsumes the old all-digit reject).
-        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}([Tt ].*)?", value.strip()):
+        """Parse a strict *extended* ISO 8601 date or datetime, keeping a bare date's absent time absent."""
+        # Split on the date/time separator and hand each half to the parser the content models use, so an
+        # authored "2026-07-07T15:40:00" and a model-generated {date, time} pair are held to one contract —
+        # down to the basic spellings and the end-of-day 24:00 form. Splitting rather than calling
+        # datetime.fromisoformat is what makes the time half reachable by that parser at all.
+        match = re.fullmatch(r"(?P<date>\d{4}-\d{2}-\d{2})(?:[Tt ](?P<time>.+))?", value)
+        if not match:
             msg = f"Date input '{value}' is not an extended ISO 8601 date or datetime (e.g. '2026-07-07' or '2026-07-07T15:40:00+02:00')."
             raise StuffContentFactoryError(msg)
+        time_text = match.group("time")
         try:
-            return datetime.date.fromisoformat(value), None
-        except ValueError:
-            pass
-        try:
-            parsed = datetime.datetime.fromisoformat(value)
+            the_date = parse_iso_date(match.group("date"))
+            the_time = parse_iso_time(time_text) if time_text is not None else None
         except ValueError as exc:
-            msg = f"Date input '{value}' is not an ISO 8601 date or datetime (e.g. '2026-07-07' or '2026-07-07T15:40:00+02:00')."
+            msg = f"Date input '{value}' is not an extended ISO 8601 date or datetime (e.g. '2026-07-07' or '2026-07-07T15:40:00+02:00'): {exc}"
             raise StuffContentFactoryError(msg) from exc
-        return parsed.date(), parsed.timetz()
+        return the_date, the_time
 
     @classmethod
     def _make_time_content(cls, time_subclass: type[TimeContent], *, value: datetime.time | str) -> TimeContent:
         """Build a TimeContent (or refining subclass) from a time object or a strict ISO time string."""
         if isinstance(value, datetime.time):
             return time_subclass(time=value)
-        # Require the extended HH:MM[:SS] form (optionally with fractional seconds and a UTC offset).
-        # time.fromisoformat (3.11+) also accepts the basic "HHMMSS" form, which would let an all-digit
-        # string slip past TimeContent's own no-number guard — pin extended-only, mirroring Date.
-        if not re.fullmatch(r"\d{2}:\d{2}(:\d{2}(\.\d+)?)?([Zz]|[+-]\d{2}(:?\d{2})?)?", value.strip()):
-            msg = f"Time input '{value}' is not an extended ISO 8601 time of day (e.g. '15:40:00' or '15:40:00+02:00')."
-            raise StuffContentFactoryError(msg)
+        # Delegate to the parser the content models use, so an authored time and a model-generated one
+        # are held to the same extended-ISO contract (and both reject the end-of-day 24:00 form, which
+        # Python 3.14 would otherwise read as this day's midnight rather than the next day's).
         try:
-            parsed = datetime.time.fromisoformat(value.strip())
+            parsed = parse_iso_time(value)
         except ValueError as exc:
-            msg = f"Time input '{value}' is not an ISO 8601 time of day (e.g. '15:40:00' or '15:40:00+02:00')."
+            msg = f"Time input '{value}' is not an extended ISO 8601 time of day (e.g. '15:40:00' or '15:40:00+02:00'): {exc}"
             raise StuffContentFactoryError(msg) from exc
         return time_subclass(time=parsed)
 

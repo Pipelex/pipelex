@@ -2984,10 +2984,6 @@ rationale = "Verb-object: parses the raw ref string; options stay keyword."
 param = "raw"
 rationale = "Verb-object: splits the raw ref string; single operand."
 
-["pipelex/core/stuffs/date_content.py::_is_numeric_string"]
-param = "text"
-rationale = "Predicate on the text; single operand."
-
 ["pipelex/core/stuffs/html_rendering.py::render_value_html"]
 param = "value"
 rationale = "Verb-object: renders the value; single operand."
@@ -2999,6 +2995,14 @@ rationale = "Verb-object: inspects the container type; context stays keyword."
 ["pipelex/core/stuffs/image_field_search.py::search_for_nested_image_fields"]
 param = "content_class"
 rationale = "Verb-object: scans the content class; context stays keyword."
+
+["pipelex/core/stuffs/iso_temporal.py::parse_iso_date"]
+param = "text"
+rationale = "parse_iso_date(text) reads as the verb-object sentence it is: one string to parse, no other operand."
+
+["pipelex/core/stuffs/iso_temporal.py::parse_iso_time"]
+param = "text"
+rationale = "parse_iso_time(text) reads as the verb-object sentence it is: one string to parse, no other operand."
 
 ["pipelex/core/stuffs/list_content.py::ListContent.get_items"]
 param = "item_type"
@@ -6487,6 +6491,10 @@ rationale = "Predicate on the text; single operand."
 ["pipelex/tools/misc/string_utils.py::is_not_none_and_has_text"]
 param = "text"
 rationale = "Predicate on the text; single operand."
+
+["pipelex/tools/misc/string_utils.py::is_numeric_string"]
+param = "text"
+rationale = "A one-operand string predicate: is_numeric_string(text) reads as the question it answers, like its has_text/is_snake_case neighbours."
 
 ["pipelex/tools/misc/string_utils.py::is_pascal_case"]
 param = "word"

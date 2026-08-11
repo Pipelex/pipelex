@@ -19,6 +19,26 @@ def has_text(text: str) -> bool:
     return bool(re.search(r"\w", text))
 
 
+def is_numeric_string(text: str) -> bool:
+    """Checks if a string is purely a number, in any of the forms ``float()`` accepts.
+
+    Broader than ``str.isdigit()``: it also catches the signed, decimal and exponent forms
+    (``-86400``, ``86400.0``, ``8.64e4``).
+
+    Args:
+        text (str): The string to check.
+
+    Returns:
+        bool: True if the string holds nothing but a number, False otherwise.
+
+    """
+    try:
+        float(text.strip())
+    except ValueError:
+        return False
+    return True
+
+
 def is_none_or_has_text(text: str | None) -> bool:
     """Checks if a string is None or contains alphanumeric characters.
 
