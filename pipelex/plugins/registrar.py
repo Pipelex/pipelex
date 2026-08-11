@@ -75,12 +75,21 @@ class HubSlot(StrEnum):
 
     @property
     def is_interpreter_layer(self) -> bool:
-        """Whether claiming this slot means handing back a ``Pipe``-aware object.
+        """Whether the claim is applied in ``Pipelex.setup`` rather than in the kernel boot.
 
-        Which is also where the claim is *applied*: the interpreter-layer slots are applied in
-        ``Pipelex.setup``, the kernel-layer ones in the kernel boot — so a kernel-only boot would
-        never apply an interpreter claim anyway. The exhaustive match is the point: a new slot
-        cannot be added without classifying it.
+        The apply-point is the criterion because it is the one every slot has: a kernel-only boot
+        runs the kernel boot and not the interpreter tail, so it can never apply an interpreter
+        claim — which is exactly what a kernel-group plugin must not be able to reach.
+
+        For the five slots that hand a value back to core, the returned type corroborates the
+        classification — the interpreter ones yield a ``Pipe``-aware object, the kernel ones do not.
+        ``TASK_MANAGER`` is why that reading cannot govern on its own: its thunk is invoked for its
+        side effects and its return is *discarded*, so there is no handed-back object to classify.
+        Its work is kernel-tier all the same — a worker registering only leaf content-generation
+        activities names no interpreter type, which is precisely the shape of our Temporal plugin's
+        per-backend runner scopes.
+
+        The exhaustive match is the point: a new slot cannot be added without classifying it.
         """
         match self:
             case HubSlot.PIPE_FUNC_EXECUTOR | HubSlot.PIPE_ROUTER | HubSlot.PIPE_RUN:

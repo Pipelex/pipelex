@@ -84,13 +84,19 @@ The docstring claims the violation is caught before any contribution is wired. T
 
 ## Open questions — Louis' to rule on
 
-### OQ-1 — Is `TASK_MANAGER` correctly classified as kernel-tier?
+### OQ-1 — Is `TASK_MANAGER` correctly classified as kernel-tier? — **RESOLVED: yes, and the docstring was what was wrong**
 
-`HubSlot.is_interpreter_layer` gives two criteria and presents them as coinciding: *"whether claiming this slot means handing back a `Pipe`-aware object"* and *"which is also where the claim is applied"*. For `TASK_MANAGER` they arguably do not. The claim is applied in the kernel boot, which says kernel-tier; but the only real claimant stands up a Temporal worker registering workflows over pipes, which reads Pipe-aware.
+`HubSlot.is_interpreter_layer` gave two criteria and presented them as coinciding: *"whether claiming this slot means handing back a `Pipe`-aware object"* and *"which is also where the claim is applied"*. For `TASK_MANAGER` they arguably did not. The claim is applied in the kernel boot, which says kernel-tier; but the only real claimant stands up a Temporal worker registering workflows over pipes, which reads Pipe-aware.
 
-Moot today — our Temporal plugin is interpreter-group and claims all six slots together — but load-bearing for a *third-party* kernel-group plugin, which is permitted to claim `TASK_MANAGER` and have its factory invoked by a kernel-only boot.
+The question was: whether any conceivable task-manager implementation can be built without naming an interpreter type. It can, and one already ships. Three findings:
 
-**What would settle it:** whether any conceivable task-manager implementation can be built without naming an interpreter type. If not, `TASK_MANAGER` moves to the interpreter arm and the docstring should drop the "which is also where it's applied" gloss — the two criteria are independent, and the first should govern.
+- **`TASK_MANAGER` is the only slot whose return core discards.** The kernel boot's apply-point invokes the thunk and drops the result; every other slot flows its value back into core (four through `_resolve_hub_slot`, `ISOLATED_EXECUTION_PROBE` through `set_isolated_execution_probe`). So the "hands back a `Pipe`-aware object" criterion is not False for this slot — it is *inapplicable*. There is no returned object to classify.
+- **Kernel-only worker scopes already exist.** Our Temporal plugin's per-backend runner scopes each disable all workflows, require no task pack, and name only leaf content-generation activities. That is a task manager standing up a worker serving purely kernel-tier work — the one-worker-pool-per-backend-class deployment.
+- **Those activities name only kernel-layer modules** — `pipelex.cogt.content_generation.*`, `pipelex.core.stuffs.image_content`, `pipelex.runtime_hub`. No `Pipe` type on that path.
+
+**Ruling:** `TASK_MANAGER` stays kernel-tier. No code change, no SPI change, nothing release-gated — a kernel-group plugin claiming it to stand up a specialized runner pool is coherent, and a kernel-only boot applying that claim serves real work.
+
+The remedy inverts what this entry proposed. The first criterion cannot govern, because for this slot there is nothing handed back; the apply-point is the only criterion every slot has. The `is_interpreter_layer` docstring now leads with the apply-point and names `TASK_MANAGER` as the reason the returned-type reading corroborates but cannot decide. What made the slot read Pipe-aware is that our plugin's *catalog* names pipe workflows at module import — that is the catalog handed to the task manager, not the slot's contract, and that plugin is interpreter-group anyway.
 
 ### OQ-2 — Should the retired-group probe be permanent?
 
