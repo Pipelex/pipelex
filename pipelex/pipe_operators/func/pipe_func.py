@@ -196,7 +196,9 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         try:
             execution_result = await get_pipe_func_executor().run_pipe_func(
                 job_metadata=job_metadata,
-                pipe_code=self.code,
+                # Qualified: the executor resolves this against the transported library, which is
+                # keyed by pipe_ref. A bare code no longer resolves there.
+                pipe_code=self.pipe_ref,
                 function_name=self.function_name,
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,

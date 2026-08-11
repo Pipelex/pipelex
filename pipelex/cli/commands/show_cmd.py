@@ -19,7 +19,7 @@ from pipelex.cli.error_handlers import ErrorContext
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_lists import ModelLister
-from pipelex.interpreter_hub import get_library_manager, get_pipe_library, get_required_pipe, resolve_library_dirs, set_current_library
+from pipelex.interpreter_hub import get_library_manager, get_pipe_library, get_required_entry_pipe, resolve_library_dirs, set_current_library
 from pipelex.pipelex import Pipelex
 from pipelex.runtime_hub import get_console, get_models_manager, get_secrets_provider, get_telemetry_manager
 from pipelex.system.configuration.config_loader import config_manager
@@ -55,7 +55,7 @@ def do_list_pipes() -> None:
 
 def do_show_pipe(pipe_code: str) -> None:
     """Show a single pipe definition from the library."""
-    pipe = get_required_pipe(pipe_code=pipe_code)
+    pipe = get_required_entry_pipe(pipe_code=pipe_code)
     get_telemetry_manager().track_event(EventName.PIPE_SHOW, properties={EventProperty.PIPE_TYPE: pipe.type})
     pretty_print(pipe, title=f"Pipe '{pipe_code}'")
 

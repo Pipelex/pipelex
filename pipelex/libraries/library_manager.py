@@ -28,6 +28,7 @@ from pipelex.interpreter_hub import get_current_library, get_current_library_id_
 from pipelex.libraries.collision_messages import duplicate_ref_msg
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.concept_reference_validation import validate_concept_references_in_blueprints
+from pipelex.libraries.crate_qualification import qualify_crate
 from pipelex.libraries.exceptions import (
     LibraryError,
     LibraryLoadingError,
@@ -462,9 +463,15 @@ class LibraryManager(LibraryManagerAbstract):
                 if parsed_concept.domain_path is not None:
                     domain_concept_codes.setdefault(parsed_concept.domain_path, []).append(parsed_concept.local_code)
 
+            # Qualify in-body refs before constructing pipes, so a built pipe's sub-pipe refs are the
+            # same qualified refs the normalizer would produce — one rule, stated once, read by both.
+            # Only the pipe half is adopted here: the concept half is served today by
+            # `concept_codes_from_the_same_domain` below, and moving it is its own change.
+            qualified_pipes = qualify_crate(crate).pipes
+
             # Load pipes with domain-filtered concept codes
             all_pipes: list[PipeAbstract] = []
-            for pipe_ref, pipe_blueprint in crate.pipes.items():
+            for pipe_ref, pipe_blueprint in qualified_pipes.items():
                 parsed = QualifiedRef.parse_pipe_ref(raw=pipe_ref)
                 if parsed.domain_path is None:
                     msg = f"Crate pipe_ref '{pipe_ref}' must be domain-qualified"
@@ -1042,8 +1049,12 @@ class LibraryManager(LibraryManagerAbstract):
 
         # Load exported pipes (reconciled by the crate) into child library, ensuring temp concepts
         # are always cleaned up even if an unexpected exception occurs
+        # Same qualification the main load path applies: a dependency package's own in-body refs are
+        # its own domain's, and its child library is keyed by qualified pipe_ref.
+        qualified_dep_pipes = qualify_crate(crate).pipes
+
         try:
-            for pipe_ref, pipe_blueprint in crate.pipes.items():
+            for pipe_ref, pipe_blueprint in qualified_dep_pipes.items():
                 parsed_pipe = QualifiedRef.parse_pipe_ref(raw=pipe_ref)
                 if parsed_pipe.domain_path is None:
                     msg = f"Crate pipe_ref '{pipe_ref}' must be domain-qualified"

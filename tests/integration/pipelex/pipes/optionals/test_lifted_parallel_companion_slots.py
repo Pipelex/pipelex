@@ -97,8 +97,8 @@ def _build_sequence_with_liftable_parallel() -> PipeSequence:
             inputs={"source": "Text"},
             output="Composite",
             branches=[
-                SubPipeBlueprint(pipe="comp_find", result="a_out"),
-                SubPipeBlueprint(pipe="comp_find_many", result="many_out"),
+                SubPipeBlueprint(pipe="test_optionals_companion.comp_find", result="a_out"),
+                SubPipeBlueprint(pipe="test_optionals_companion.comp_find_many", result="many_out"),
             ],
             add_each_output=True,
         ),
@@ -114,8 +114,8 @@ def _build_sequence_with_liftable_parallel() -> PipeSequence:
             inputs={"source": "Text?"},
             output="Text",
             steps=[
-                SubPipeBlueprint(pipe="comp_parallel", result="combined"),
-                SubPipeBlueprint(pipe="comp_sink", result="final_report"),
+                SubPipeBlueprint(pipe="test_optionals_companion.comp_parallel", result="combined"),
+                SubPipeBlueprint(pipe="test_optionals_companion.comp_sink", result="final_report"),
             ],
         ),
     )

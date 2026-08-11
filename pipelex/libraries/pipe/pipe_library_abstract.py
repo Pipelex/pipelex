@@ -12,11 +12,20 @@ class PipeLibraryAbstract(ABC):
     pipe graph — a condition's mapped pipes and a sequence's last step, both in
     `pipe_machinery/rendering/` — are interpreter-layer and call `interpreter_hub.get_required_pipe`
     directly. Split the read half out if and when a runtime-layer caller needs it.
+
+    Two resolution surfaces live here and the split is the point. `get_optional_pipe` /
+    `get_required_pipe` resolve an **in-body** reference — one pipe naming another from inside a
+    method — and are strict: the ref names its own domain or it names nothing. `get_optional_entry_pipe`
+    / `get_required_entry_pipe` resolve a code a **human** supplied at an entry point, where a bare
+    code is still matched across domains because the user is not writing a reference, they are
+    pointing at a pipe. Reaching for the in-body pair to serve a hand-typed code makes the CLI stricter
+    than it should be; reaching for the entry pair from inside a controller reopens the cross-domain
+    hole the strict rule closes.
     """
 
     @abstractmethod
     def get_required_pipe(self, pipe_code: str) -> PipeAbstract:
-        """Resolve a pipe code, raising when it is not known."""
+        """Resolve an in-body pipe reference, raising when it is not known."""
 
     @abstractmethod
     def setup(self) -> None:
@@ -33,7 +42,18 @@ class PipeLibraryAbstract(ABC):
 
     @abstractmethod
     def get_optional_pipe(self, pipe_code: str) -> PipeAbstract | None:
-        pass
+        """Resolve an in-body pipe reference, returning None when it is not known."""
+
+    @abstractmethod
+    def get_optional_entry_pipe(self, pipe_code: str) -> PipeAbstract | None:
+        """Resolve a human-supplied pipe code, returning None when nothing matches.
+
+        Matches a bare code across domains and raises on ambiguity; ignores `[exports]`.
+        """
+
+    @abstractmethod
+    def get_required_entry_pipe(self, pipe_code: str) -> PipeAbstract:
+        """Resolve a human-supplied pipe code, raising when nothing matches."""
 
     @abstractmethod
     def get_pipes(self) -> list[PipeAbstract]:

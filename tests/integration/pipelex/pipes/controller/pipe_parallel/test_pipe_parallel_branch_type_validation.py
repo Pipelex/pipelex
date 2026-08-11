@@ -89,8 +89,8 @@ class TestPipeParallelBranchTypeValidation:
                 inputs={"input_text": "Text"},
                 output=f"{DOMAIN_CODE}.BtvCombinedResult",
                 branches=[
-                    SubPipeBlueprint(pipe="btv_summarize", result="summary"),
-                    SubPipeBlueprint(pipe="btv_scoring", result="score"),
+                    SubPipeBlueprint(pipe="test_btv.btv_summarize", result="summary"),
+                    SubPipeBlueprint(pipe="test_btv.btv_scoring", result="score"),
                 ],
             ),
             concept_codes_from_the_same_domain=["BtvSummary", "BtvScore", "BtvCombinedResult"],

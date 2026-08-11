@@ -7,7 +7,7 @@ from pipelex import log, pretty_print
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.interpreter_hub import get_pipe_router, get_required_pipe
+from pipelex.interpreter_hub import get_pipe_router, get_required_entry_pipe
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.exceptions import PipeStackOverflowError
@@ -37,7 +37,7 @@ class TestPipeRunningVariants:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
         _ = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
-                pipe=get_required_pipe(pipe_code=pipe_code),
+                pipe=get_required_entry_pipe(pipe_code=pipe_code),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
                 job_metadata=job_metadata,
@@ -57,7 +57,7 @@ class TestPipeRunningVariants:
         log.verbose(f"{topic}: just run pipe '{pipe_code}'")
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
-                pipe=get_required_pipe(pipe_code=pipe_code),
+                pipe=get_required_entry_pipe(pipe_code=pipe_code),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=WorkingMemoryFactory.make_empty(),
                 job_metadata=job_metadata,
@@ -83,7 +83,7 @@ class TestPipeRunningVariants:
         log.verbose(f"{topic}: just run pipe '{pipe_code}'")
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
-                pipe=get_required_pipe(pipe_code=pipe_code),
+                pipe=get_required_entry_pipe(pipe_code=pipe_code),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(
                     pipe_run_mode=pipe_run_mode,
                     output_multiplicity=output_multiplicity,
@@ -113,7 +113,7 @@ class TestPipeRunningVariants:
         with pytest.raises(PipeStackOverflowError) as exc:
             await get_pipe_router().run(
                 pipe_job=PipeJobFactory.make_pipe_job(
-                    pipe=get_required_pipe(pipe_code=pipe_code),
+                    pipe=get_required_entry_pipe(pipe_code=pipe_code),
                     pipe_run_params=PipeRunParamsFactory.make_run_params(
                         pipe_stack_limit=6,
                         pipe_run_mode=pipe_run_mode,

@@ -30,8 +30,8 @@ class TestBuildInputsForPipe:
             "set_current_library": mocker.patch(f"{MODULE}.set_current_library"),
             "resolve_library_dirs": mocker.patch(f"{MODULE}.resolve_library_dirs", return_value=([], "defaults")),
             "validate_bundle": mocker.patch(f"{MODULE}.validate_bundle", new=mocker.AsyncMock(return_value=validate_result)),
-            "get_required_pipe": mocker.patch(
-                f"{MODULE}.get_required_pipe", return_value=SimpleNamespace(code="bundle_main", inputs=SimpleNamespace(root={}))
+            "get_required_entry_pipe": mocker.patch(
+                f"{MODULE}.get_required_entry_pipe", return_value=SimpleNamespace(code="bundle_main", inputs=SimpleNamespace(root={}))
             ),
             "render_inputs": mocker.patch(f"{MODULE}.render_inputs", return_value='{\n  "topic": "your topic"\n}'),
         }
@@ -48,7 +48,7 @@ class TestBuildInputsForPipe:
 
         result = asyncio.run(build_inputs_for_pipe(mthds_contents=["mthds content"]))
 
-        ops_mocks["get_required_pipe"].assert_called_once_with(pipe_code="domain.main")
+        ops_mocks["get_required_entry_pipe"].assert_called_once_with(pipe_code="domain.main")
         assert result["pipe_code"] == "domain.main"
 
     def test_mthds_contents_validates_with_allow_signatures(self, ops_mocks: dict[str, Any]) -> None:
@@ -79,7 +79,7 @@ class TestBuildInputsForPipe:
         """An explicit pipe code is used verbatim, ignoring the blueprints' main_pipe declarations."""
         result = asyncio.run(build_inputs_for_pipe(pipe_code="explicit_pipe", mthds_contents=["mthds content"]))
 
-        ops_mocks["get_required_pipe"].assert_called_once_with(pipe_code="explicit_pipe")
+        ops_mocks["get_required_entry_pipe"].assert_called_once_with(pipe_code="explicit_pipe")
         assert result["pipe_code"] == "explicit_pipe"
 
     def test_bundle_path_validates_file_and_qualifies_main_pipe(self, ops_mocks: dict[str, Any], tmp_path: Path) -> None:
@@ -93,7 +93,7 @@ class TestBuildInputsForPipe:
             library_dirs=None,
             allow_signatures=True,
         )
-        ops_mocks["get_required_pipe"].assert_called_once_with(pipe_code="demo_domain.bundle_main")
+        ops_mocks["get_required_entry_pipe"].assert_called_once_with(pipe_code="demo_domain.bundle_main")
         assert result["pipe_code"] == "demo_domain.bundle_main"
 
     def test_bundle_path_without_main_pipe_raises_with_path(self, ops_mocks: dict[str, Any], tmp_path: Path) -> None:
@@ -110,7 +110,7 @@ class TestBuildInputsForPipe:
         """With a bundle path, an explicit pipe code overrides the bundle's main_pipe."""
         result = asyncio.run(build_inputs_for_pipe(pipe_code="explicit_pipe", bundle_path=tmp_path / "demo.mthds"))
 
-        ops_mocks["get_required_pipe"].assert_called_once_with(pipe_code="explicit_pipe")
+        ops_mocks["get_required_entry_pipe"].assert_called_once_with(pipe_code="explicit_pipe")
         assert result["pipe_code"] == "explicit_pipe"
 
     def test_no_bundle_loads_libraries_from_resolved_dirs(self, ops_mocks: dict[str, Any]) -> None:
@@ -138,13 +138,13 @@ class TestBuildInputsForPipe:
         with pytest.raises(ValueError, match="No pipe code specified"):
             asyncio.run(build_inputs_for_pipe())
 
-        ops_mocks["get_required_pipe"].assert_not_called()
+        ops_mocks["get_required_entry_pipe"].assert_not_called()
 
     def test_happy_path_return_shape(self, ops_mocks: dict[str, Any]) -> None:
         """The result carries success, the resolved pipe code, and the parsed inputs dict from render_inputs."""
         result = asyncio.run(build_inputs_for_pipe(pipe_code="my_pipe"))
 
-        the_pipe = ops_mocks["get_required_pipe"].return_value
+        the_pipe = ops_mocks["get_required_entry_pipe"].return_value
         ops_mocks["render_inputs"].assert_called_once_with(the_pipe, indent=2, explicit=False)
         assert result == {
             "success": True,

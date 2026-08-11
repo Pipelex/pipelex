@@ -120,8 +120,8 @@ def _build_parallel(*, output_ref: str, structure_class_names: list[str], add_ea
             inputs={"source": "Text?", "topic": "Text"},
             output=output_ref,
             branches=[
-                SubPipeBlueprint(pipe="opt_par_find", result="found_result"),
-                SubPipeBlueprint(pipe="opt_par_base", result="base_result"),
+                SubPipeBlueprint(pipe="test_optionals_par.opt_par_find", result="found_result"),
+                SubPipeBlueprint(pipe="test_optionals_par.opt_par_base", result="base_result"),
             ],
             add_each_output=add_each_output,
         ),

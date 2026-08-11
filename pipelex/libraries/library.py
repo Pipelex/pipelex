@@ -1,3 +1,4 @@
+from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -13,13 +14,56 @@ from pipelex.libraries.concept.concept_library import ConceptLibrary
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.domain.domain_library import DomainLibrary
 from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError
-from pipelex.libraries.pipe.exceptions import PipeLibraryError
+from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundError
 from pipelex.libraries.pipe.pipe_library import PipeLibrary
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 if TYPE_CHECKING:
     from pipelex.core.concepts.concept import Concept
+
+
+def _describe_unresolved_pipe_dependency(
+    *,
+    referring_pipe_ref: str,
+    missing_ref: str,
+    candidates: dict[str, list[str]],
+    cause: PipeLibraryError,
+) -> str:
+    """Explain an unresolved in-body pipe reference to the person who wrote it.
+
+    The hard part is that the ref named here is not the ref they typed. They wrote a bare code; the
+    compiler qualified it to their own domain. Without saying so, the message names a pipe that
+    appears nowhere in their file and reads like a compiler bug.
+
+    `candidates` comes from the failure-path-only scan in `_index_pipe_refs_by_bare_code`. A hit is a
+    suggestion to a human, never a resolution — reaching a pipe in a domain nobody named is the
+    behaviour this rule removed.
+    """
+    # Not every lookup failure is a miss. An ambiguous cross-package code raises here too, and for it
+    # "does not exist" is false and the qualification story below never happened — so hand back the
+    # real reason rather than a well-written wrong one.
+    if not isinstance(cause, PipeNotFoundError):
+        return f"Pipe '{referring_pipe_ref}' could not resolve its dependency '{missing_ref}': {cause}"
+
+    lines = [f"Pipe '{referring_pipe_ref}' references '{missing_ref}', which does not exist."]
+
+    # Only a plain `domain.code` ref got there by qualification. A cross-package `alias->…` ref is
+    # passed through untouched, so explaining a rewrite that never happened would be a fiction — and
+    # the candidate scan holds host pipes, which are the wrong thing to suggest for a dependency ref.
+    parsed = QualifiedRef.parse(missing_ref)
+    if parsed.domain_path is not None and not QualifiedRef.has_cross_package_prefix(missing_ref):
+        bare_code = parsed.local_code
+        lines.append(
+            f"A bare pipe reference resolves inside its own domain, so '{bare_code}' was read as '{missing_ref}'. "
+            "Referencing a pipe in another domain requires writing that domain out."
+        )
+        elsewhere = sorted(ref for ref in candidates.get(bare_code, []) if ref != missing_ref)
+        if elsewhere:
+            suggestion = "' or '".join(elsewhere)
+            lines.append(f"'{bare_code}' is declared elsewhere in this library — did you mean '{suggestion}'?")
+
+    return " ".join(lines)
 
 
 class Library(BaseModel):
@@ -103,6 +147,15 @@ class Library(BaseModel):
         self.validate_pipe_library_with_libraries()
 
     def validate_pipe_library_with_libraries(self) -> None:
+        # Diagnostic index of bare code -> qualified refs, built at most once per validation run and
+        # ONLY once something has already failed to resolve. This is the same crate-wide scan that was
+        # deleted from `PipeLibrary.get_optional_pipe`; it lives on the FAILURE PATH ONLY and must stay
+        # there. It suggests a spelling to a human — it never resolves a reference. Wiring it into a
+        # lookup would restore the cross-domain fall-through and make `[exports]` unenforceable again.
+        # Built once because the run this matters on is the mass-breakage one right after an upgrade,
+        # where per-error scanning would go quadratic.
+        bare_code_candidates: dict[str, list[str]] | None = None
+
         for pipe_key, pipe in self.pipe_library.root.items():
             # Determine if this pipe comes from a dependency (aliased key like "alias->pipe_code")
             dep_alias: str | None = None
@@ -138,7 +191,14 @@ class Library(BaseModel):
                     try:
                         self.pipe_library.get_required_pipe(pipe_code=sub_pipe_code)
                     except PipeLibraryError as pipe_error:
-                        msg = f"Error validating pipe '{pipe.code}' dependency pipe '{sub_pipe_code}' because of: {pipe_error}"
+                        if bare_code_candidates is None:
+                            bare_code_candidates = self._index_pipe_refs_by_bare_code()
+                        msg = _describe_unresolved_pipe_dependency(
+                            referring_pipe_ref=pipe.pipe_ref,
+                            missing_ref=sub_pipe_code,
+                            candidates=bare_code_candidates,
+                            cause=pipe_error,
+                        )
                         # Carry a structured item so an unresolved dependency surfaces as a categorized
                         # `pipe_validation` item: `pipe_code` is the referencing controller and
                         # `missing_pipe_code` is the dependency that does not resolve, so a machine
@@ -159,6 +219,19 @@ class Library(BaseModel):
             if isinstance(pipe, PipeController) and self._has_unresolved_cross_package_deps(pipe):
                 continue
             pipe.validate_with_libraries()
+
+    def _index_pipe_refs_by_bare_code(self) -> dict[str, list[str]]:
+        """Group every pipe ref in this library by its bare code, for failure-path diagnostics only.
+
+        Aliased dependency entries are excluded: suggesting a pipe that only exists because some
+        unrelated package happens to be installed is worse than suggesting nothing.
+        """
+        by_code: dict[str, list[str]] = defaultdict(list)
+        for pipe_ref in self.pipe_library.root:
+            if QualifiedRef.has_cross_package_prefix(pipe_ref):
+                continue
+            by_code[QualifiedRef.parse(pipe_ref).local_code].append(pipe_ref)
+        return by_code
 
     def _has_unresolved_cross_package_deps(self, pipe: PipeController) -> bool:
         """Check if a pipe controller has cross-package dependencies that aren't loaded.

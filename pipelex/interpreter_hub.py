@@ -350,6 +350,20 @@ def get_optional_pipe(pipe_code: str) -> PipeAbstract | None:
     return get_interpreter_hub().get_required_pipe_library().get_optional_pipe(pipe_code=pipe_code)
 
 
+def get_required_entry_pipe(pipe_code: str) -> PipeAbstract:
+    """Resolve a pipe code a human supplied at an entry point (CLI argument, API field).
+
+    Use this — not `get_required_pipe` — whenever the code came from outside the method rather than
+    from inside another pipe. It matches a bare code across domains and ignores `[exports]`.
+    """
+    return get_interpreter_hub().get_required_pipe_library().get_required_entry_pipe(pipe_code=pipe_code)
+
+
+def get_optional_entry_pipe(pipe_code: str) -> PipeAbstract | None:
+    """`get_required_entry_pipe`'s optional twin, for callers that report a miss themselves."""
+    return get_interpreter_hub().get_required_pipe_library().get_optional_entry_pipe(pipe_code=pipe_code)
+
+
 def get_pipe_source(pipe_code: str) -> str | None:
     """Get the source identifier for a pipe.
 

@@ -75,8 +75,8 @@ def _build_force_pipes() -> tuple[PipeSequence, PipeSequence]:
             inputs={"topic": "Text"},
             output="Text",
             steps=[
-                SubPipeBlueprint(pipe="rf_step_make", result="a_out"),
-                SubPipeBlueprint(pipe="rf_step_force", result="final"),
+                SubPipeBlueprint(pipe="test_redundant_force.rf_step_make", result="a_out"),
+                SubPipeBlueprint(pipe="test_redundant_force.rf_step_force", result="final"),
             ],
         ),
     )
@@ -88,7 +88,7 @@ def _build_force_pipes() -> tuple[PipeSequence, PipeSequence]:
             inputs={"a_out": "Text?"},
             output="Text",
             steps=[
-                SubPipeBlueprint(pipe="rf_step_force", result="final"),
+                SubPipeBlueprint(pipe="test_redundant_force.rf_step_force", result="final"),
             ],
         ),
     )

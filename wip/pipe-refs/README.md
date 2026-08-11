@@ -28,6 +28,8 @@ Two other sections of that same page **depend** on this rule. They are quoted in
 
 ## 2. What this repository does today
 
+> **HISTORICAL as of the pipe-side fix.** The table below records the state that motivated this work, and it is kept as written rather than rewritten — the argument only makes sense against the disagreement it describes. What changed: the pipe readers now qualify a bare in-body ref to its **owner domain** and the live `PipeLibrary` lookup no longer searches across domains, so the two pipe rows agree with each other *and* with the standard. Bare codes a human types at an entry point keep working through a separate, explicitly-named affordance (`get_optional_entry_pipe`), which searches crate-wide and refuses ambiguity. **The concept rows are still accurate** — the concept-side work is not done. Re-measured outcomes are in §3.
+
 Four readers of one authored fact. They do not agree, and only one of them agrees with the standard.
 
 | Reader | Where | Bare ref behaviour |
@@ -101,6 +103,29 @@ And the fall-through itself, for completeness:
 ```
 
 Three demos, three rows of the divergence table, all reproducible in about ten seconds.
+
+### Re-measured after the pipe-side fix
+
+Same three closures, same commands, on the fixed tree. Every prediction in this section held:
+
+| Closure | Before | After |
+| --- | --- | --- |
+| `export-bypass` | exit `0`, bare `helper` reached the non-exported `beta.helper` | exit `1` — **the hole is closed**; the bare form no longer reaches another domain, so `[exports]` is enforceable through every reference form |
+| `fallthrough` | exit `0`, step normalized to `beta.present` | exit `1`, naming the ref that was tried and suggesting the qualified spelling |
+| `ambiguous` | exit `1`, `Ambiguous pipe code 'summarize' found in domains: ['alpha', 'beta']` | exit `0`, normalizes to **`alpha.summarize`** — the standard's answer. Two domains reusing a code is a no-conflict case again |
+
+`export-bypass-control` is unchanged (exit `1`, the export error) — as it must be: that arm never depended on the resolver.
+
+The `fallthrough` and `export-bypass` failures both read:
+
+```
+Pipe 'alpha.run_flow' references 'alpha.present', which does not exist. A bare pipe reference
+resolves inside its own domain, so 'present' was read as 'alpha.present'. Referencing a pipe in
+another domain requires writing that domain out. 'present' is declared elsewhere in this library —
+did you mean 'beta.present'?
+```
+
+The suggestion comes from a crate-wide scan that runs **only** on the failure path. It suggests a spelling to a human; it never resolves a reference. Wiring it into a lookup would restore the bypass this section exists to document.
 
 ## 4. The same divergence is still live for concepts — and that reader is separately broken
 

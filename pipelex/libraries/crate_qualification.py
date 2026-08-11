@@ -8,6 +8,17 @@ form the rest of the system can resolve by key:
 - pipe `inputs` / `output` concept refs, preserving multiplicity and presence markers;
 - pipe-step / branch / outcome / batch pipe refs.
 
+**A bare ref names its own domain.** Both halves follow the same rule — a bare pipe code resolves to
+the domain of the pipe that wrote it, exactly as a bare concept code does. Nothing is searched for
+across the crate. An in-body reference that can silently land in a domain the author never named is
+a reference no `[exports]` rule can constrain, and a visibility rule the resolver reaches around is
+not a visibility rule.
+
+**Existence is deliberately not checked here.** The pass runs once per load batch, and a batch may
+legitimately reference a pipe that a *prior* batch loaded into the same domain — a `-L` library
+directory, a secondary load. Only ordinary dependency validation sees the whole live library, so
+that is where a genuinely missing ref is reported, with the qualified ref it tried.
+
 Two kinds of ref are deliberately left alone: cross-package (`alias->…`) refs, whose canonical form
 is the packaging project's design work, and `SpecialOutcome` values (`fail` / `continue`), which are
 condition outcomes rather than pipe refs.
@@ -24,7 +35,6 @@ makes that contradiction unrepresentable and costs the callers nothing — both 
 crate to read the envelope from, and `normalize_crate` builds a fresh one anyway.
 """
 
-from collections import defaultdict
 from typing import NamedTuple
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprintType
@@ -55,17 +65,15 @@ def qualify_crate(crate: LibraryCrate) -> QualifiedCrateContent:
     """Qualify every in-body reference of a merged, key-qualified crate.
 
     Raises:
-        CrateNormalizationError: A crate key is not domain-qualified, or a bare pipe ref matches no
-            pipe / more than one pipe in the crate.
+        CrateNormalizationError: A crate key is not domain-qualified — the pass was handed something
+            that is not a merged, key-qualified crate.
     """
     concepts: dict[str, _ConceptEntry] = {
         concept_ref: _qualify_concept_entry(value, owner_domain=_domain_of(concept_ref)) for concept_ref, value in crate.concepts.items()
     }
 
-    pipe_refs_by_code = _index_pipe_refs_by_code(pipes=crate.pipes)
     pipes: dict[str, PipeBlueprintUnion] = {
-        pipe_ref: _qualify_pipe_blueprint(blueprint, owner_domain=_domain_of(pipe_ref), pipe_refs_by_code=pipe_refs_by_code)
-        for pipe_ref, blueprint in crate.pipes.items()
+        pipe_ref: _qualify_pipe_blueprint(blueprint, owner_domain=_domain_of(pipe_ref)) for pipe_ref, blueprint in crate.pipes.items()
     }
 
     return QualifiedCrateContent(concepts=concepts, pipes=pipes)
@@ -125,26 +133,7 @@ def _qualify_concept_ref(concept_ref_or_code: str, *, domain: str) -> str:
 # --------------------------------------------------------------------------------------------------
 
 
-def _index_pipe_refs_by_code(*, pipes: dict[str, PipeBlueprintUnion]) -> dict[str, list[str]]:
-    """Group the crate's own pipe refs by bare code — the index a bare in-body ref resolves against.
-
-    Cross-package entries are excluded, mirroring `PipeLibrary.get_optional_pipe`, whose bare-code
-    fallback searches only the entries that are not `alias->…` prefixed.
-    """
-    by_code: dict[str, list[str]] = defaultdict(list)
-    for pipe_ref in pipes:
-        if QualifiedRef.has_cross_package_prefix(pipe_ref):
-            continue
-        by_code[QualifiedRef.parse(pipe_ref).local_code].append(pipe_ref)
-    return by_code
-
-
-def _qualify_pipe_blueprint(
-    blueprint: PipeBlueprintUnion,
-    *,
-    owner_domain: str,
-    pipe_refs_by_code: dict[str, list[str]],
-) -> PipeBlueprintUnion:
+def _qualify_pipe_blueprint(blueprint: PipeBlueprintUnion, *, owner_domain: str) -> PipeBlueprintUnion:
     updates: dict[str, object] = {}
     if blueprint.inputs:
         updates["inputs"] = {name: _qualify_io_ref(ref, domain=owner_domain) for name, ref in blueprint.inputs.items()}
@@ -152,7 +141,7 @@ def _qualify_pipe_blueprint(
         updates["output"] = _qualify_io_ref(blueprint.output, domain=owner_domain)
 
     def qualify(*, pipe_ref: str) -> str:
-        return _qualify_pipe_ref(pipe_ref, owner_domain=owner_domain, pipe_refs_by_code=pipe_refs_by_code)
+        return _qualify_pipe_ref(pipe_ref, owner_domain=owner_domain)
 
     match blueprint:
         case PipeSequenceBlueprint():
@@ -191,15 +180,16 @@ def _render_ref_with_markers(concept_ref: str, *, parsed: MultiplicityParseResul
     return f"{concept_ref}{suffix}{parsed.presence.symbol}"
 
 
-def _qualify_pipe_ref(pipe_ref: str, *, owner_domain: str, pipe_refs_by_code: dict[str, list[str]]) -> str:
-    """Qualify one in-body pipe ref against the crate, the way the live library resolves it.
+def _qualify_pipe_ref(pipe_ref: str, *, owner_domain: str) -> str:
+    """Qualify one in-body pipe ref to the domain of the pipe that wrote it.
 
-    A bare code is **not** the owner domain's by assumption: `PipeLibrary.get_optional_pipe` resolves
-    it by searching every domain, so a pipe legitimately calls a sibling domain's pipe by bare code.
-    Prefixing the owner domain here would name a pipe absent from `crate.pipes` — a crate that
-    fingerprints the wrong content and dies with `PipeNotFoundError` on round-trip, with nothing
-    raised on the way in. The crate-wide search is the same lookup, so the two readers agree; on
-    ambiguity the library raises and so does this, rather than silently picking a winner.
+    The exact twin of `_qualify_concept_ref`, and unconditional: a bare code is the owner domain's,
+    whether or not the owner domain declares it. Nothing is searched for, so nothing can be found
+    somewhere the author did not name — which is what makes `[exports]` mean something.
+
+    A ref that names nothing is not this function's problem. It cannot be: the pass sees one load
+    batch, and a batch may reference a pipe a prior batch put in the same domain. Dependency
+    validation sees the whole live library and reports the miss there, naming the qualified ref.
     """
     if QualifiedRef.has_cross_package_prefix(pipe_ref):
         return pipe_ref  # cross-package deferred
@@ -207,12 +197,4 @@ def _qualify_pipe_ref(pipe_ref: str, *, owner_domain: str, pipe_refs_by_code: di
         return pipe_ref
     if "." in pipe_ref:
         return pipe_ref
-
-    matches = pipe_refs_by_code.get(pipe_ref, [])
-    if len(matches) == 1:
-        return matches[0]
-    if not matches:
-        msg = f"Pipe ref '{pipe_ref}' (in domain '{owner_domain}') resolves to no pipe in the crate."
-        raise CrateNormalizationError(msg)
-    msg = f"Ambiguous pipe ref '{pipe_ref}' (in domain '{owner_domain}') matches {sorted(matches)} in the crate. Use a domain-qualified ref."
-    raise CrateNormalizationError(msg)
+    return f"{owner_domain}.{pipe_ref}"

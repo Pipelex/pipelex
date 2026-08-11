@@ -11,7 +11,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.interpreter_hub import get_pipe_router, get_required_pipe
+from pipelex.interpreter_hub import get_pipe_router, get_required_entry_pipe
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
@@ -38,7 +38,7 @@ class TestPipeConditionSimple:
             inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
             output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}?",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
-            outcomes={"long": "capitalize_long_text", "short": "add_prefix_short_text"},
+            outcomes={"long": "test_integration2.capitalize_long_text", "short": "test_integration2.add_prefix_short_text"},
             default_outcome=SpecialOutcome.CONTINUE,
         )
 
@@ -57,7 +57,10 @@ class TestPipeConditionSimple:
 
         assert pipe_condition.domain_code == "test_integration"
         assert pipe_condition.code == "text_length_condition"
-        assert pipe_condition.outcome_map == {"long": "capitalize_long_text", "short": "add_prefix_short_text"}
+        assert pipe_condition.outcome_map == {
+            "long": "test_integration2.capitalize_long_text",
+            "short": "test_integration2.add_prefix_short_text",
+        }
 
         input_text = working_memory.get_stuff("input_text")
         assert input_text is not None
@@ -114,7 +117,7 @@ class TestPipeConditionSimple:
             inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
             output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}?",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
-            outcomes={"long": "capitalize_long_text", "short": "add_prefix_short_text"},
+            outcomes={"long": "test_integration2.capitalize_long_text", "short": "test_integration2.add_prefix_short_text"},
             default_outcome=SpecialOutcome.CONTINUE,
         )
 
@@ -202,7 +205,7 @@ class TestPipeConditionSimple:
         # Run dry run using the real pipe - this should succeed
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
-                pipe=get_required_pipe(pipe_code="basic_condition_by_category_2"),
+                pipe=get_required_entry_pipe(pipe_code="basic_condition_by_category_2"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
                 job_metadata=job_metadata,
@@ -240,7 +243,7 @@ class TestPipeConditionSimple:
         with pytest.raises(PipeRouterError) as exc_info:
             await get_pipe_router().run(
                 pipe_job=PipeJobFactory.make_pipe_job(
-                    pipe=get_required_pipe(pipe_code="basic_condition_by_category_2"),
+                    pipe=get_required_entry_pipe(pipe_code="basic_condition_by_category_2"),
                     pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                     working_memory=empty_working_memory,
                     job_metadata=job_metadata,
@@ -281,7 +284,7 @@ class TestPipeConditionSimple:
         # Run dry run using the real pipe - this should succeed and validate the 'medium' branch
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
-                pipe=get_required_pipe(pipe_code="basic_condition_by_category_2"),
+                pipe=get_required_entry_pipe(pipe_code="basic_condition_by_category_2"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
                 job_metadata=job_metadata,

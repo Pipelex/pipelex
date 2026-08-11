@@ -11,7 +11,7 @@ from mthds.protocol.pipeline_inputs import PipelineInputs
 from pytest_mock import MockerFixture
 
 from pipelex.config import get_config
-from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_pipe
+from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_entry_pipe
 from pipelex.pipeline import execution_seams as execution_seams_module
 from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
 from pipelex.system.configuration.configs import PipelineExecutionConfig
@@ -59,7 +59,7 @@ class TestExecutionSeams:
             assert qualified_main_pipe == f"{_SEAMS_DOMAIN}.echo_topic"
             # Library is left open + current; the loaded pipe is resolvable.
             assert get_current_library_id_or_none() == library_id
-            assert get_required_pipe(pipe_code=qualified_main_pipe).code == "echo_topic"
+            assert get_required_entry_pipe(pipe_code=qualified_main_pipe).code == "echo_topic"
         finally:
             library_manager.teardown(library_id=library_id)
             clear_current_library()
@@ -101,7 +101,7 @@ class TestExecutionSeams:
             assert qualified_main_pipe == f"{_SEAMS_DOMAIN}.echo_topic"
             # The returned id is the one left open + current and holding the loaded pipe.
             assert get_current_library_id_or_none() == returned_id
-            assert get_required_pipe(pipe_code=qualified_main_pipe).code == "echo_topic"
+            assert get_required_entry_pipe(pipe_code=qualified_main_pipe).code == "echo_topic"
         finally:
             library_manager.teardown(library_id=returned_id)
             clear_current_library()
@@ -141,7 +141,7 @@ class TestExecutionSeams:
         _, qualified_main_pipe = acquire_library(library_id=library_id, mthds_contents=[_SEAMS_MTHDS])
         try:
             assert qualified_main_pipe is not None
-            pipe = get_required_pipe(pipe_code=qualified_main_pipe)
+            pipe = get_required_entry_pipe(pipe_code=qualified_main_pipe)
             pipe_job = await prepare_pipe_job(
                 pipe=pipe,
                 library_id=library_id,
@@ -173,7 +173,7 @@ class TestExecutionSeams:
         _, qualified_main_pipe = acquire_library(library_id=library_id, mthds_contents=[_SEAMS_MTHDS])
         try:
             assert qualified_main_pipe is not None
-            pipe = get_required_pipe(pipe_code=qualified_main_pipe)
+            pipe = get_required_entry_pipe(pipe_code=qualified_main_pipe)
             normalize_spy = mocker.spy(execution_seams_module, "normalize_data_urls_to_storage")
             normalize_config = (
                 get_config()

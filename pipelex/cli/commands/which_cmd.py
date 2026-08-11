@@ -10,7 +10,7 @@ from posthog import tag
 from pipelex import log
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
-from pipelex.interpreter_hub import get_library_manager, get_optional_pipe, get_pipe_source, resolve_library_dirs, set_current_library
+from pipelex.interpreter_hub import get_library_manager, get_optional_entry_pipe, get_pipe_source, resolve_library_dirs, set_current_library
 from pipelex.pipelex import Pipelex
 from pipelex.runtime_hub import get_console, get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
@@ -39,7 +39,7 @@ def do_which_pipe(pipe_code: str, *, library_dirs: list[Path], source_label: str
     console.print("")
 
     # Try to find the pipe
-    pipe = get_optional_pipe(pipe_code=pipe_code)
+    pipe = get_optional_entry_pipe(pipe_code=pipe_code)
 
     if pipe:
         console.print(f"[green]Found:[/green] [bold]{pipe_code}[/bold]")

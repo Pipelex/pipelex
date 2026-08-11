@@ -55,7 +55,7 @@ There is deliberately **no** `pipelex.hub`. It was deleted rather than kept as a
 | --- | --- |
 | container | `InterpreterHub`, `get_interpreter_hub`, `set_interpreter_hub` |
 | library manager | `get_library_manager`, `get_library` |
-| library lookups | `get_concept_library`, `get_required_concept`, `get_native_concept`, `get_required_domain`, `get_optional_domain`, `get_pipe_library`, `get_pipes`, `get_required_pipe`, `get_optional_pipe`, `get_pipe_source` |
+| library lookups | `get_concept_library`, `get_required_concept`, `get_native_concept`, `get_required_domain`, `get_optional_domain`, `get_pipe_library`, `get_pipes`, `get_required_pipe`, `get_optional_pipe`, `get_required_entry_pipe`, `get_optional_entry_pipe`, `get_pipe_source` |
 | current-library contextvar | `set_current_library`, `get_current_library`, `get_current_library_id_or_none`, `clear_current_library`, `scoped_current_library` |
 | library dirs | `resolve_library_dirs`, `get_default_library_dirs` |
 | pipe router | `get_pipe_router`, `set_pipe_router`, `teardown_current_pipe_router`, `scoped_pipe_router` |
@@ -140,6 +140,8 @@ The **write side** stays ambient on purpose: `concept_factory` and `structure_ge
 It is **read-side only**. Managing a library — adding, removing, listing, setup/teardown — stays in the interpreter layer: `ConceptLibraryAbstract` *extends* it, keeping its management half in `libraries/`. Splitting read from write is what lets a core module state its dependency honestly ("I need something that can resolve concepts") without inheriting a library lifecycle it has no business touching.
 
 **There is deliberately no pipe counterpart.** Nothing in core's runtime half resolves a pipe. The two places that follow a pipe reference found *inside* a pipe graph — a condition's mapped pipes, a sequence's last step — live in `pipe_machinery/rendering/`, which is interpreter-layer and calls `interpreter_hub.get_required_pipe` directly; a provider parameter there would buy no closure property. `get_required_pipe` therefore stays on `PipeLibraryAbstract`. Split a read half out when a runtime-layer caller actually needs one, not for symmetry with concepts.
+
+Pipe resolution comes in two flavours on this hub, and picking the wrong one is a correctness bug rather than a style choice. `get_required_pipe` / `get_optional_pipe` resolve an **in-body** reference — one pipe naming another from inside a method — and are strict: the ref names its own domain or it names nothing. `get_required_entry_pipe` / `get_optional_entry_pipe` resolve a code a **human** supplied at an entry point (a CLI argument, an API request field), where a bare code is still matched across domains. A CLI command on the strict pair is needlessly strict; a controller on the entry pair reopens the cross-domain hole that makes `[exports]` unenforceable.
 
 The injection point is the interpreter layer. `pipe_factory`, `input_renderer` and `output_renderer` — already interpreter-bound, so nothing is lost — resolve the concept library themselves and pass it down; `pipeline/execution_seams.py` does the same for `WorkingMemoryFactory`. That is the one-way arrow the whole design rests on, applied inside `core/`: **the half that knows about a loaded method resolves the collaborator and hands it downward.**
 

@@ -58,8 +58,8 @@ class TestPipeStructureInSequence:
             inputs={"restaurant_brief": NativeConceptCode.TEXT},
             output="RestaurantReview",
             steps=[
-                SubPipeBlueprint(pipe="draft_restaurant_review_text", result="draft_text"),
-                SubPipeBlueprint(pipe="structure_restaurant_review", result="restaurant_review"),
+                SubPipeBlueprint(pipe="test_pipe_structure_seq.draft_restaurant_review_text", result="draft_text"),
+                SubPipeBlueprint(pipe="test_pipe_structure_seq.structure_restaurant_review", result="restaurant_review"),
             ],
         )
         sequence_pipe = PipeFactory[PipeSequence].make_from_blueprint(

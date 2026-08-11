@@ -397,10 +397,12 @@ def _is_signature_pipe_section(pipe_section: Any) -> bool:
 def _pipe_codes_by_file(*, entry_path: Path, effective_dirs: Sequence[Path]) -> dict[Path, set[str]]:
     """Concrete pipe declaration keys of every loaded bundle file, keyed by resolved path.
 
-    Cross-domain on purpose: a bare pipe code must resolve unambiguously across the loaded
-    library — ``PipeLibrary.get_optional_pipe`` raises on a bare code declared by two domains —
-    so a rename target colliding with a same-named declaration in ANY other loaded file would
-    leave the library unloadable. Signature-only headers are excluded: a matching concrete
+    Cross-domain, but no longer because it has to be. The original reason was that a bare code had
+    to resolve unambiguously library-wide, since ``PipeLibrary.get_optional_pipe`` raised on a code
+    two domains declared. In-body refs now resolve within their own domain and that lookup never
+    searches, so a same-named declaration in another domain is not a collision at all — this scope
+    is merely conservative and can only over-block, never under-block. Narrowing it to per-domain is
+    tracked with the concept-side work. Signature-only headers are excluded: a matching concrete
     definition is allowed to replace a ``PipeSignature`` during crate merge, so treating the
     header as a hard collision would block a valid fix. Rebuilt each iteration: multiple files
     can now mutate per round. A file that fails to parse contributes nothing here — its own

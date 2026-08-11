@@ -117,7 +117,7 @@ class TestPipeConditionNeededInputs:
             inputs={"selector": "native.Text"},
             output=f"{analysis_concept.concept_ref}?",
             expression="selector",
-            outcomes={"option_a": "pipe_a", "option_b": "pipe_b"},
+            outcomes={"option_a": "test_domain.pipe_a", "option_b": "test_domain.pipe_b"},
             default_outcome=SpecialOutcome.CONTINUE,
         )
 
@@ -184,7 +184,7 @@ class TestPipeConditionNeededInputs:
             inputs={"mode": "native.Text"},
             output=f"{result_concept.concept_ref}?",
             expression="mode",
-            outcomes={"batch": "pipe_with_list"},
+            outcomes={"batch": "test_domain.pipe_with_list"},
             default_outcome=SpecialOutcome.CONTINUE,
         )
 
@@ -269,7 +269,7 @@ class TestPipeConditionOutputValidation:
             inputs={"selector": "native.Text"},
             output=f"{output_concept.concept_ref}?",
             expression="selector",
-            outcomes={"a": "pipe_a", "b": "pipe_b"},
+            outcomes={"a": "test_domain.pipe_a", "b": "test_domain.pipe_b"},
             default_outcome=SpecialOutcome.CONTINUE,
         )
 
@@ -337,7 +337,7 @@ class TestPipeConditionOutputValidation:
             inputs={"selector": "native.Text"},
             output=f"{NativeConceptCode.DYNAMIC.concept_ref}?",
             expression="selector",
-            outcomes={"a": "pipe_a", "b": "pipe_b"},
+            outcomes={"a": "test_domain.pipe_a", "b": "test_domain.pipe_b"},
             default_outcome=SpecialOutcome.CONTINUE,
         )
 
@@ -396,7 +396,7 @@ class TestPipeConditionOutputValidation:
             inputs={"selector": "native.Text"},
             output=f"{NativeConceptCode.ANYTHING.concept_ref}?",
             expression="selector",
-            outcomes={"a": "pipe_a"},
+            outcomes={"a": "test_domain.pipe_a"},
             default_outcome=SpecialOutcome.CONTINUE,
         )
 
@@ -472,7 +472,7 @@ class TestPipeConditionOutputValidation:
             inputs={"selector": "native.Text"},
             output=f"{NativeConceptCode.ANYTHING.concept_ref}?",
             expression="selector",
-            outcomes={"a": "pipe_a", "b": "pipe_b"},
+            outcomes={"a": "test_domain.pipe_a", "b": "test_domain.pipe_b"},
             default_outcome=SpecialOutcome.CONTINUE,
         )
 
@@ -545,7 +545,7 @@ class TestPipeConditionOutputValidation:
             inputs={"selector": "native.Text"},
             output=f"{output_a.concept_ref}?",
             expression="selector",
-            outcomes={"a": "pipe_a", "b": "pipe_b"},
+            outcomes={"a": "test_domain.pipe_a", "b": "test_domain.pipe_b"},
             default_outcome=SpecialOutcome.CONTINUE,
         )
 
@@ -622,7 +622,7 @@ class TestPipeConditionOutputValidation:
             inputs={"selector": "native.Text"},
             output=f"{NativeConceptCode.TEXT.concept_ref}?",
             expression="selector",
-            outcomes={"a": "pipe_a", "b": "pipe_b"},
+            outcomes={"a": "test_domain.pipe_a", "b": "test_domain.pipe_b"},
             default_outcome=SpecialOutcome.CONTINUE,
         )
 
@@ -746,7 +746,7 @@ class TestPipeConditionSpecialOutcomes:
             output=f"{output_concept.concept_ref}?",
             expression="action",
             outcomes={
-                "process": "process_pipe",  # Actual pipe
+                "process": "test_domain.process_pipe",  # Actual pipe
                 "skip": SpecialOutcome.CONTINUE,  # Special outcome
             },
             default_outcome=SpecialOutcome.CONTINUE,
@@ -809,7 +809,7 @@ class TestPipeConditionSpecialOutcomes:
             output=output_concept.concept_ref,
             expression="status",
             outcomes={
-                "success": "success_pipe",  # Actual pipe
+                "success": "test_domain.success_pipe",  # Actual pipe
                 "error": SpecialOutcome.FAIL,  # Special outcome
             },
             default_outcome=SpecialOutcome.FAIL,
@@ -893,7 +893,7 @@ class TestPipeConditionSpecialOutcomes:
             output=f"{output_concept.concept_ref}?",
             expression="mode",
             outcomes={
-                "run": "real_pipe",
+                "run": "test_domain.real_pipe",
                 "skip": SpecialOutcome.CONTINUE,
                 "abort": SpecialOutcome.FAIL,
             },
@@ -907,7 +907,7 @@ class TestPipeConditionSpecialOutcomes:
         )
 
         # pipe_dependencies() should only contain actual pipes, not special outcomes
-        assert pipe_condition.pipe_dependencies() == {"real_pipe"}
+        assert pipe_condition.pipe_dependencies() == {"test_domain.real_pipe"}
         assert SpecialOutcome.CONTINUE not in pipe_condition.pipe_dependencies()
         assert SpecialOutcome.FAIL not in pipe_condition.pipe_dependencies()
 

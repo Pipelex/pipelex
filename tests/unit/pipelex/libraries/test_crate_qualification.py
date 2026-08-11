@@ -22,6 +22,7 @@ from pipelex.libraries.exceptions import CrateNormalizationError
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
+from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
@@ -134,6 +135,70 @@ class TestCrateQualification:
         """A description holds no refs — it must come back as the same string, not a blueprint."""
         assert qualify_crate(_crate()).concepts["alpha.Category"] == "a category"
 
+    # --- the rule itself: a bare ref is its own domain's, whoever else declares the code ---
+
+    def test_bare_pipe_ref_is_the_owner_domains_even_when_only_a_sibling_declares_it(self):
+        """The single-domain fixture above cannot fail this — it needs a competing sibling declaration.
+
+        Owner-domain qualification and the crate-wide search it replaced agree on every input where
+        only one domain exists, so every other test in this module would pass just as happily under
+        the deleted rule. This one is what pins the rule that was actually chosen.
+        """
+        crate = _crate()
+        crate.pipes["beta.only_here"] = PipeLLMBlueprint(description="beta's pipe", output="Text", prompt="go")
+        crate.pipes["alpha.calls_sibling"] = PipeSequenceBlueprint(
+            description="calls a code only beta declares",
+            output="Text",
+            steps=[SubPipeBlueprint(pipe="only_here")],
+        )
+        crate.domains["beta"] = DomainBlueprint(code="beta", description="beta domain")
+
+        sequence = qualify_crate(crate).pipes["alpha.calls_sibling"]
+        assert isinstance(sequence, PipeSequenceBlueprint)
+        assert sequence.steps[0].pipe == "alpha.only_here"
+
+    def test_a_second_domain_declaring_the_code_is_not_an_ambiguity(self):
+        """Ambiguity was a consequence of searching. Nothing is searched for, so nothing is ambiguous —
+        an unrelated domain declaring `leaf` cannot change what `alpha.seq` means.
+        """
+        crate = _crate()
+        crate.pipes["beta.leaf"] = PipeLLMBlueprint(description="beta's own leaf", output="Text", prompt="go")
+        crate.domains["beta"] = DomainBlueprint(code="beta", description="beta domain")
+
+        sequence = qualify_crate(crate).pipes["alpha.seq"]
+        assert isinstance(sequence, PipeSequenceBlueprint)
+        assert sequence.steps[0].pipe == "alpha.leaf"
+
+    def test_cross_package_refs_pass_through_untouched(self):
+        """`alias->…` refs are the packaging project's to canonicalize; this pass must not touch them."""
+        crate = _crate()
+        crate.pipes["alpha.calls_dependency"] = PipeSequenceBlueprint(
+            description="calls into a dependency",
+            output="Text",
+            steps=[SubPipeBlueprint(pipe="dep->helper")],
+        )
+
+        sequence = qualify_crate(crate).pipes["alpha.calls_dependency"]
+        assert isinstance(sequence, PipeSequenceBlueprint)
+        assert sequence.steps[0].pipe == "dep->helper"
+
+    def test_special_outcomes_pass_through_untouched(self):
+        """`fail` / `continue` are outcomes, not pipe refs."""
+        crate = _crate()
+        crate.pipes["alpha.route_special"] = PipeConditionBlueprint(
+            description="route to special outcomes",
+            inputs={"data": "Category"},
+            output="Report",
+            expression="x",
+            outcomes={"stop": SpecialOutcome.FAIL},
+            default_outcome=SpecialOutcome.CONTINUE,
+        )
+
+        condition = qualify_crate(crate).pipes["alpha.route_special"]
+        assert isinstance(condition, PipeConditionBlueprint)
+        assert condition.outcomes == {"stop": SpecialOutcome.FAIL}
+        assert condition.default_outcome == SpecialOutcome.CONTINUE
+
     # --- purity ---
 
     def test_input_crate_is_not_mutated(self):
@@ -177,15 +242,6 @@ class TestCrateQualification:
                 LibraryCrate(pipes={"bare": PipeLLMBlueprint(description="bare", output="Text", prompt="go")}),
                 "not domain-qualified",
                 id="unqualified-pipe-key",
-            ),
-            pytest.param(
-                LibraryCrate(
-                    pipes={
-                        "alpha.seq": PipeSequenceBlueprint(description="seq", output="Text", steps=[SubPipeBlueprint(pipe="ghost")]),
-                    }
-                ),
-                "resolves to no pipe in the crate",
-                id="unresolvable-bare-pipe-ref",
             ),
         ],
     )

@@ -87,9 +87,9 @@ def _build_lift_chain_pipes() -> list[str]:
             inputs={"source": "Text?"},
             output="Text",
             steps=[
-                SubPipeBlueprint(pipe="inv_step_a", result="a_out"),
-                SubPipeBlueprint(pipe="inv_step_b", result="b_out"),
-                SubPipeBlueprint(pipe="inv_sink_c", result="final_report"),
+                SubPipeBlueprint(pipe="test_optionals_inventory.inv_step_a", result="a_out"),
+                SubPipeBlueprint(pipe="test_optionals_inventory.inv_step_b", result="b_out"),
+                SubPipeBlueprint(pipe="test_optionals_inventory.inv_sink_c", result="final_report"),
             ],
         ),
     )
@@ -112,7 +112,7 @@ class TestLiftablePipesInventory:
     def test_sequence_lift_chain_is_inventoried(self, load_empty_library: Callable[[], str]):
         load_empty_library()
         pipe_codes = _build_lift_chain_pipes()
-        pipes = [get_pipe_library().get_required_pipe(pipe_code=pipe_code) for pipe_code in pipe_codes]
+        pipes = [get_pipe_library().get_required_entry_pipe(pipe_code=pipe_code) for pipe_code in pipe_codes]
 
         entries = build_liftable_pipes(collect_controller_taint_analyses(pipes))
 
@@ -160,8 +160,8 @@ class TestLiftablePipesInventory:
                 inputs={"source": "Text?", "topic": "Text"},
                 output="Composite",
                 branches=[
-                    SubPipeBlueprint(pipe="inv_par_find", result="found_result"),
-                    SubPipeBlueprint(pipe="inv_par_base", result="base_result"),
+                    SubPipeBlueprint(pipe="test_optionals_inventory.inv_par_find", result="found_result"),
+                    SubPipeBlueprint(pipe="test_optionals_inventory.inv_par_base", result="base_result"),
                 ],
                 add_each_output=False,
             ),

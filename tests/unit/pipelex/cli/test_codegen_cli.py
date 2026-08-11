@@ -73,7 +73,7 @@ class TestCodegenCli:
         else:
             crate = LibraryCrate(domains={"scoring": DomainBlueprint(code="scoring", description="d", main_pipe="run_scoring")})
             mocker.patch(f"{INPUTS}.load_normalized_crate_or_exit", return_value=crate)
-            mocker.patch(f"{INPUTS}.get_required_pipe")
+            mocker.patch(f"{INPUTS}.get_required_entry_pipe")
             mocker.patch(f"{INPUTS}.render_inputs", return_value="{}")
             codegen_inputs_cmd(
                 pipe=None,
@@ -111,14 +111,14 @@ class TestCodegenCli:
         self._neutralize_boot(mocker, module=INPUTS)
         crate = LibraryCrate(domains={"scoring": DomainBlueprint(code="scoring", description="d", main_pipe="run_scoring")})
         mocker.patch(f"{INPUTS}.load_normalized_crate_or_exit", return_value=crate)
-        get_required_pipe = mocker.patch(f"{INPUTS}.get_required_pipe")
+        get_required_entry_pipe = mocker.patch(f"{INPUTS}.get_required_entry_pipe")
         mocker.patch(f"{INPUTS}.render_inputs", return_value='{"topic": "x"}')
         destination = tmp_path / "inputs.json"
         codegen_inputs_cmd(
             pipe=None, paths=None, template_format=InputsTemplateFormat.JSON, explicit=False, output=str(destination), library_dir=None
         )
         # The single declared main_pipe was selected (qualified) and rendered to the output file.
-        assert get_required_pipe.call_args.kwargs["pipe_code"] == "scoring.run_scoring"
+        assert get_required_entry_pipe.call_args.kwargs["pipe_code"] == "scoring.run_scoring"
         assert destination.read_text(encoding="utf-8") == '{"topic": "x"}'
 
     def test_inputs_write_if_changed_leaves_identical_file_untouched(self, mocker: MockerFixture, tmp_path: Path) -> None:
@@ -128,7 +128,7 @@ class TestCodegenCli:
         self._neutralize_boot(mocker, module=INPUTS)
         crate = LibraryCrate(domains={"scoring": DomainBlueprint(code="scoring", description="d", main_pipe="run_scoring")})
         mocker.patch(f"{INPUTS}.load_normalized_crate_or_exit", return_value=crate)
-        mocker.patch(f"{INPUTS}.get_required_pipe")
+        mocker.patch(f"{INPUTS}.get_required_entry_pipe")
         mocker.patch(f"{INPUTS}.render_inputs", return_value='{"topic": "x"}')
         destination = tmp_path / "inputs.json"
         destination.write_text('{"topic": "x"}', encoding="utf-8")
@@ -162,7 +162,7 @@ class TestCodegenCli:
     def test_inputs_unknown_explicit_pipe_is_exit_1(self, mocker: MockerFixture) -> None:
         self._neutralize_boot(mocker, module=INPUTS)
         mocker.patch(f"{INPUTS}.load_normalized_crate_or_exit", return_value=LibraryCrate())
-        mocker.patch(f"{INPUTS}.get_required_pipe", side_effect=PipeLibraryError("no such pipe"))
+        mocker.patch(f"{INPUTS}.get_required_entry_pipe", side_effect=PipeLibraryError("no such pipe"))
         with pytest.raises(typer.Exit) as exc_info:
             codegen_inputs_cmd(
                 pipe="scoring.missing", paths=None, template_format=InputsTemplateFormat.JSON, explicit=False, output=None, library_dir=None

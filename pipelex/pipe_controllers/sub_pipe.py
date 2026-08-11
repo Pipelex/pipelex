@@ -169,7 +169,10 @@ class SubPipe(BaseModel):
                 },
             )
 
-            pipe_batch_adhoc_pipe_code = f"{self.pipe_code}_batch"
+            # Derived from the resolved pipe's LOCAL code, not from `self.pipe_code` — that is a
+            # qualified ref (`domain.foo`), and suffixing it would name `domain.foo_batch` while
+            # `domain_code` below adds the domain a second time.
+            pipe_batch_adhoc_pipe_code = f"{sub_pipe.code}_batch"
             pipe_batch = PipeFactory[PipeBatch].make_from_blueprint(
                 domain_code=sub_pipe.domain_code,
                 pipe_code=pipe_batch_adhoc_pipe_code,

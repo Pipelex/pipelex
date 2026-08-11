@@ -64,11 +64,16 @@ def normalize_crate(crate: LibraryCrate, *, mthds_version: str) -> LibraryCrate:
     content only, so the envelope is assembled here.
 
     Qualification runs as one complete phase up front, over concepts *and* pipes, rather than
-    interleaved with the steps below. One consequence is worth knowing: a crate carrying two
-    independent defects — say a refinement cycle *and* an ambiguous bare pipe ref — now reports the
-    ref error, where reporting the cycle first was previously an artifact of the two steps being
-    interleaved. Both are `CrateNormalizationError` and the crate is invalid either way; which
+    interleaved with the steps below. So a crate carrying two independent defects — say a refinement
+    cycle *and* an unqualified crate key — reports the key first, where the interleaved version could
+    report the cycle. Both are `CrateNormalizationError` and the crate is invalid either way; which
     defect is named first is not a contract.
+
+    The pass qualifies but does not resolve, so a normalized crate is closed over its pipe refs only
+    because the library it came from validated first. Feed this an unvalidated crate whose pipe
+    references a sibling domain by bare code and you get a crate naming a pipe that does not exist —
+    which is the point: that ref was never resolvable by the rule, and validation is where it is
+    reported.
     """
     qualified = qualify_crate(crate)
 

@@ -64,7 +64,7 @@ class TestOptionalGateToleratesMissing:
                 description="Single guarded step",
                 inputs={"topic": "Text", "maybe_note": "Text?"},
                 output="Text",
-                steps=[SubPipeBlueprint(pipe="gate_compose_sink", result="final_report")],
+                steps=[SubPipeBlueprint(pipe="test_optionals_gate.gate_compose_sink", result="final_report")],
             ),
         )
         get_pipe_library().add_new_pipe(pipe=sequence)
@@ -92,7 +92,7 @@ class TestOptionalGateToleratesMissing:
                 inputs={"topic": "Text", "maybe_note": "Text?"},
                 output="Text",
                 expression="'go'",
-                outcomes={"go": "gate_compose_sink"},
+                outcomes={"go": "test_optionals_gate.gate_compose_sink"},
                 default_outcome="fail",
             ),
         )

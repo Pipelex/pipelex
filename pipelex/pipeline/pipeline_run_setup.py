@@ -12,6 +12,7 @@ from pipelex.interpreter_hub import (
     get_current_library_id_or_none,
     get_library_manager,
     get_pipeline_manager,
+    get_required_entry_pipe,
     get_required_pipe,
     set_current_library,
 )
@@ -179,11 +180,14 @@ async def pipeline_run_setup(
         )
         library_acquired = True
 
-        # Resolve the pipe to execute against the now-open library.
+        # Resolve the pipe to execute against the now-open library. A caller-supplied `pipe_code` is
+        # entry-shaped — it comes from a CLI argument or an API request field, not from inside a
+        # method — so a bare code still resolves across domains. `qualified_main_pipe` is already
+        # domain-qualified and goes through the strict lookup.
         pipe: PipeAbstract
         if mthds_contents:
             if pipe_code:
-                pipe = get_required_pipe(pipe_code=pipe_code)
+                pipe = get_required_entry_pipe(pipe_code=pipe_code)
             elif qualified_main_pipe:
                 # main_pipe is validated as snake_case (no dots), so acquire_library returns it already
                 # domain-qualified. See PipelexBundleBlueprint.validate_main_pipe_syntax.
@@ -192,7 +196,7 @@ async def pipeline_run_setup(
                 msg = "No pipe_code provided and no main_pipe found in any of the MTHDS contents."
                 raise PipeExecutionError(message=msg)
         elif pipe_code:
-            pipe = get_required_pipe(pipe_code=pipe_code)
+            pipe = get_required_entry_pipe(pipe_code=pipe_code)
         else:
             msg = "Either provide pipe_code or mthds_contents to the pipeline API."
             raise PipeExecutionError(message=msg)

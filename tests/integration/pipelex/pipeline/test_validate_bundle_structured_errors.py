@@ -185,6 +185,13 @@ class TestValidateBundleStructuredErrors:
         self,
         load_empty_library: Callable[[], str],
     ) -> None:
+        """`missing_pipe_code` names the ref that was actually tried — the QUALIFIED one.
+
+        The author wrote `second_step_missing`; the compiler read it as
+        `structured_missing_dep.second_step_missing`, because a bare ref names its own domain. Reporting
+        the bare spelling back would hide the only interesting part. This field is a structured field
+        machine consumers read, so its value changing is a wire-visible change, not a cosmetic one.
+        """
         load_empty_library()
         items = await _validation_errors_for(_MISSING_DEPENDENCY_MTHDS)
         dependency_items = [item for item in items if item.error_type == PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY]
@@ -192,8 +199,11 @@ class TestValidateBundleStructuredErrors:
         item = dependency_items[0]
         assert item.category == ValidationErrorCategory.PIPE_VALIDATION
         assert item.pipe_code == "do_two_steps"
-        assert item.missing_pipe_code == "second_step_missing"
-        assert "second_step_missing" in item.message
+        assert item.missing_pipe_code == "structured_missing_dep.second_step_missing"
+        # The message has to bridge the gap between what they wrote and what was tried, or it names a
+        # pipe that appears nowhere in their file and reads like a compiler bug.
+        assert "structured_missing_dep.second_step_missing" in item.message
+        assert "own domain" in item.message
 
     async def test_unknown_pipe_type_is_a_categorized_blueprint_item(
         self,

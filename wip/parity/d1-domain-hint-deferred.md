@@ -1,6 +1,16 @@
 # D-1 follow-up — the `domain_hint` conversation, deferred
 
-**Status:** deferred, deliberately. Raised at 1.1 (Phase 1), not taken.
+**Status: CLOSED — subsumed, not implemented.** The `domain_hint` parameter will never be built, because the question it was going to answer stopped existing.
+
+`domain_hint` was a way to make a *search* prefer the caller's domain when a bare code matched several. In-body pipe refs are now qualified to their owner domain at library build time and `PipeLibrary.get_optional_pipe` no longer searches at all, so a bare in-body code never reaches a lookup that could be ambiguous. The `TODO` quoted below is gone with the fall-through it described.
+
+Note which row of the table settled it: the "both `A.foo` and `B.foo` exist" case now resolves to `A.foo` — the answer the `own-domain-first` column proposed and this note argued against. The argument was sound at the time and its conclusion has been overtaken: own-domain-first was wrong *while* the live library still searched, because it would have made the normalizer disagree with the runtime. Moving both readers together is what made it right. Ambiguity survives only in the entry affordance (`get_optional_entry_pipe`), where a human typed the code and guessing on their behalf would be the wrong favour — there it raises and names the candidates.
+
+Everything below is the original note, preserved.
+
+---
+
+**Status (original):** deferred, deliberately. Raised at 1.1 (Phase 1), not taken.
 
 ## What 1.1 actually landed, and how it differs from the plan's recommendation
 

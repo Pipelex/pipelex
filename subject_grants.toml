@@ -3396,6 +3396,10 @@ rationale = "Hub getter: the native concept being fetched; single operand."
 param = "domain_code"
 rationale = "Hub getter keyed by the domain code; single operand."
 
+["pipelex/interpreter_hub.py::get_optional_entry_pipe"]
+param = "pipe_code"
+rationale = "Hub accessor keyed by the human-supplied pipe code; single operand, mirroring get_optional_pipe."
+
 ["pipelex/interpreter_hub.py::get_optional_pipe"]
 param = "pipe_code"
 rationale = "Hub getter keyed by the pipe code; single operand."
@@ -3415,6 +3419,10 @@ rationale = "Hub getter keyed by the concept ref; single operand."
 ["pipelex/interpreter_hub.py::get_required_domain"]
 param = "domain_code"
 rationale = "Hub getter keyed by the domain code; single operand."
+
+["pipelex/interpreter_hub.py::get_required_entry_pipe"]
+param = "pipe_code"
+rationale = "Hub accessor keyed by the human-supplied pipe code; single operand, mirroring get_required_pipe."
 
 ["pipelex/interpreter_hub.py::get_required_pipe"]
 param = "pipe_code"
@@ -3848,9 +3856,17 @@ rationale = "Verb-object: adds the pipe; single operand."
 param = "pipes"
 rationale = "Verb-object: adds the pipes; single operand."
 
+["pipelex/libraries/pipe/pipe_library_abstract.py::PipeLibraryAbstract.get_optional_entry_pipe"]
+param = "pipe_code"
+rationale = "Entry-point getter keyed by the human-supplied pipe code; single operand."
+
 ["pipelex/libraries/pipe/pipe_library_abstract.py::PipeLibraryAbstract.get_optional_pipe"]
 param = "pipe_code"
 rationale = "Library getter keyed by the pipe code; single operand."
+
+["pipelex/libraries/pipe/pipe_library_abstract.py::PipeLibraryAbstract.get_required_entry_pipe"]
+param = "pipe_code"
+rationale = "Entry-point resolver keyed by the human-supplied pipe code; single operand."
 
 ["pipelex/libraries/pipe/pipe_library_abstract.py::PipeLibraryAbstract.get_required_pipe"]
 param = "pipe_code"

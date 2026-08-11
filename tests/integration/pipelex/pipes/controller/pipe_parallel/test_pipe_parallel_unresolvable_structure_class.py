@@ -68,7 +68,7 @@ class TestPipeParallelUnresolvableStructureClass:
                 inputs={"input_text": "Text"},
                 output=f"{DOMAIN_CODE}.{output_concept_code}",
                 branches=[
-                    SubPipeBlueprint(pipe="usc_branch", result="summary"),
+                    SubPipeBlueprint(pipe="test_usc.usc_branch", result="summary"),
                 ],
             ),
             concept_codes_from_the_same_domain=[output_concept_code, branch_output_concept_code],

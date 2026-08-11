@@ -136,7 +136,9 @@ class TestDirectExecutorWorkdir:
         request = PipeFuncExecutionRequest(
             crate=crate_with_func,
             working_memory_raw=WorkingMemoryFactory.make_empty().dump_for_transport(),
-            pipe_code="greet",
+            # Qualified, as PipeFunc now sends it: the transported library is keyed by pipe_ref and
+            # its lookup is strict, so a bare code would not resolve on the far side.
+            pipe_code="greet_demo.greet",
             function_name="greet_it",
             job_metadata=JobMetadata(user_id="user", pipeline_run_id="run"),
             pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10),
