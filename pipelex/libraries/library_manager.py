@@ -465,8 +465,14 @@ class LibraryManager(LibraryManagerAbstract):
 
             # Qualify in-body refs before constructing pipes, so a built pipe's sub-pipe refs are the
             # same qualified refs the normalizer would produce — one rule, stated once, read by both.
-            # Only the pipe half is adopted here: the concept half is served today by
-            # `concept_codes_from_the_same_domain` below, and moving it is its own change.
+            #
+            # Note what this does to `concept_codes_from_the_same_domain` below: the pass also rewrites
+            # each pipe's inputs/output into `domain.Code` form, and PipeFactory only runs its
+            # declared-in-this-domain check for refs with NO dot — so on this path that parameter is
+            # now never consulted. Nothing is lost: an undeclared same-domain concept is still caught,
+            # earlier, by `validate_concept_references_in_blueprints`, which runs on the blueprints
+            # before this. The parameter is vestigial here rather than load-bearing; removing it is a
+            # signature change across PipeFactory and belongs with the concept-side work.
             qualified_pipes = qualify_crate(crate).pipes
 
             # Load pipes with domain-filtered concept codes

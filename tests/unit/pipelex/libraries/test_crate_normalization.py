@@ -155,6 +155,46 @@ def _cross_domain_crate() -> LibraryCrate:
     )
 
 
+def _closed_all_kinds_crate() -> LibraryCrate:
+    """Every controller kind calling a pipe in its OWN domain, so the crate is closed.
+
+    `_cross_domain_crate` used to carry the closure test's coverage of parallel / condition / batch,
+    but it stopped being closed the moment bare refs started qualifying to their own domain — that is
+    the whole point of it. Dropping it from the parametrize would have quietly narrowed the closure
+    walk to sequences, so this fixture takes over: same four kinds, all resolvable in-domain.
+    """
+    return LibraryCrate(
+        pipes={
+            "solo.leaf": PipeLLMBlueprint(description="The callee", inputs={"data": "Text"}, output="Text", prompt="Handle $data"),
+            "solo.other_leaf": PipeLLMBlueprint(description="A second callee", inputs={"data": "Text"}, output="Text", prompt="Handle $data"),
+            "solo.run_all": PipeSequenceBlueprint(description="seq", output="Text", steps=[SubPipeBlueprint(pipe="leaf")]),
+            "solo.fan_out": PipeParallelBlueprint(
+                description="par",
+                inputs={"data": "Text"},
+                output="Composite",
+                branches=[SubPipeBlueprint(pipe="leaf", result="one"), SubPipeBlueprint(pipe="other_leaf", result="two")],
+            ),
+            "solo.route": PipeConditionBlueprint(
+                description="cond",
+                inputs={"data": "Text"},
+                output="Text",
+                expression="format",
+                outcomes={"a": "leaf"},
+                default_outcome="other_leaf",
+            ),
+            "solo.batch_all": PipeBatchBlueprint(
+                description="batch",
+                inputs={"docs": "Text[]"},
+                output="Text[]",
+                branch_pipe_code="leaf",
+                input_list_name="docs",
+                input_item_name="doc",
+            ),
+        },
+        domains={"solo": DomainBlueprint(code="solo", description="Solo domain")},
+    )
+
+
 def _reverse_refinement_chain_crate(size: int) -> LibraryCrate:
     concepts: dict[str, ConceptBlueprint | str] = {
         f"scale.Node{index:04d}": ConceptBlueprint(description=f"Node {index}", refines=f"Node{index + 1:04d}") for index in range(size - 1)
@@ -203,7 +243,7 @@ class TestCrateNormalization:
         assert isinstance(pipeline, PipeSequenceBlueprint)
         assert pipeline.steps[0].pipe == "scoring.compute_score"
 
-    @pytest.mark.parametrize("crate_factory", [_authored_crate])
+    @pytest.mark.parametrize("crate_factory", [_authored_crate, _closed_all_kinds_crate])
     def test_normalized_crate_is_closed_over_its_pipe_refs(self, crate_factory: Callable[[], LibraryCrate]):
         """Every in-body pipe ref of a normalized crate names a pipe the crate actually holds.
 

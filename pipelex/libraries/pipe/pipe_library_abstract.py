@@ -13,6 +13,11 @@ class PipeLibraryAbstract(ABC):
     `pipe_machinery/rendering/` — are interpreter-layer and call `interpreter_hub.get_required_pipe`
     directly. Split the read half out if and when a runtime-layer caller needs it.
 
+    One caveat before the split: "strict" describes same-package refs. A cross-package
+    `alias->bare_code` ref is still resolved by searching that alias's entries, because the
+    qualification pass leaves `alias->…` refs untouched and there is no canonical spelling to point
+    an author at yet. It is alias-scoped, so it cannot reach a host pipe.
+
     Two resolution surfaces live here and the split is the point. `get_optional_pipe` /
     `get_required_pipe` resolve an **in-body** reference — one pipe naming another from inside a
     method — and are strict: the ref names its own domain or it names nothing. `get_optional_entry_pipe`

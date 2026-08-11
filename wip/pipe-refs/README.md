@@ -116,7 +116,7 @@ Same three closures, same commands, on the fixed tree. Every prediction in this 
 
 `export-bypass-control` is unchanged (exit `1`, the export error) — as it must be: that arm never depended on the resolver.
 
-The `fallthrough` and `export-bypass` failures both read:
+Both failures take the same shape; the codes differ because the demos reference different pipes. `fallthrough`'s reads:
 
 ```
 Pipe 'alpha.run_flow' references 'alpha.present', which does not exist. A bare pipe reference
@@ -124,6 +124,8 @@ resolves inside its own domain, so 'present' was read as 'alpha.present'. Refere
 another domain requires writing that domain out. 'present' is declared elsewhere in this library —
 did you mean 'beta.present'?
 ```
+
+`export-bypass` is the same sentence with its own codes — `'helper' was read as 'alpha.helper'`, suggesting `'beta.helper'` — because the message is pieced together from the specific ref that failed rather than being a fixed string.
 
 The suggestion comes from a crate-wide scan that runs **only** on the failure path. It suggests a spelling to a human; it never resolves a reference. Wiring it into a lookup would restore the bypass this section exists to document.
 

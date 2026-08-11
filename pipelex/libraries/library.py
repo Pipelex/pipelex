@@ -9,7 +9,7 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import PipeValidationErrorType
-from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
 from pipelex.libraries.concept.concept_library import ConceptLibrary
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.domain.domain_library import DomainLibrary
@@ -48,11 +48,24 @@ def _describe_unresolved_pipe_dependency(
 
     lines = [f"Pipe '{referring_pipe_ref}' references '{missing_ref}', which does not exist."]
 
-    # Only a plain `domain.code` ref got there by qualification. A cross-package `alias->…` ref is
-    # passed through untouched, so explaining a rewrite that never happened would be a fiction — and
-    # the candidate scan holds host pipes, which are the wrong thing to suggest for a dependency ref.
-    parsed = QualifiedRef.parse(missing_ref)
-    if parsed.domain_path is not None and not QualifiedRef.has_cross_package_prefix(missing_ref):
+    # Everything below explains a rewrite, so it must only run on refs that could actually have been
+    # rewritten. Three ways a ref reaches here without that being true:
+    #   - a cross-package `alias->…` ref, which the pass leaves untouched;
+    #   - a ref the author qualified themselves to ANOTHER domain — telling them their bare code was
+    #     read as `beta.foo` when they typed `beta.foo` is a fiction, and the candidate scan holds
+    #     host pipes that are the wrong thing to suggest for it;
+    #   - a malformed ref, which does not parse at all. Parsing it to build a nicer message would
+    #     replace a categorized validation error with a raw QualifiedRefError, turning bad user input
+    #     into a crash on the way to reporting bad user input.
+    if QualifiedRef.has_cross_package_prefix(missing_ref):
+        return " ".join(lines)
+    try:
+        parsed = QualifiedRef.parse(missing_ref)
+    except QualifiedRefError:
+        return " ".join(lines)
+
+    referring_domain = QualifiedRef.parse(referring_pipe_ref).domain_path
+    if parsed.domain_path is not None and parsed.domain_path == referring_domain:
         bare_code = parsed.local_code
         lines.append(
             f"A bare pipe reference resolves inside its own domain, so '{bare_code}' was read as '{missing_ref}'. "

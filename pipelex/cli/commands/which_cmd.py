@@ -11,6 +11,7 @@ from pipelex import log
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.interpreter_hub import get_library_manager, get_optional_entry_pipe, get_pipe_source, resolve_library_dirs, set_current_library
+from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.pipelex import Pipelex
 from pipelex.runtime_hub import get_console, get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
@@ -38,8 +39,16 @@ def do_which_pipe(pipe_code: str, *, library_dirs: list[Path], source_label: str
 
     console.print("")
 
-    # Try to find the pipe
-    pipe = get_optional_entry_pipe(pipe_code=pipe_code)
+    # Try to find the pipe. An ambiguous bare code raises rather than guessing, and `which` is
+    # precisely the command someone runs to sort that out — so report the candidates instead of
+    # letting the error escape as a traceback.
+    try:
+        pipe = get_optional_entry_pipe(pipe_code=pipe_code)
+    except PipeLibraryError as exc:
+        console.print(f"[red]Ambiguous:[/red] [bold]{pipe_code}[/bold]")
+        console.print(f"  {exc}")
+        console.print("")
+        return False
 
     if pipe:
         console.print(f"[green]Found:[/green] [bold]{pipe_code}[/bold]")

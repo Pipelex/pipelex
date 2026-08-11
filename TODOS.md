@@ -160,13 +160,15 @@ The normalizer and the live library must never disagree in a committed state, so
 
 The pipe rule is complete and self-consistent: canonical form and runtime agree, and hand-typed codes still work through a named door.
 
-- [ ] Update the Status block (OQ2/OQ3 rulings, the DRY ruling, surprises, corpus fallout).
-- [ ] Record status in the design doc's Phase 2 section.
-- [ ] Update README §2's table — it describes the pre-change state and becomes historical at this point; mark it as such rather than rewriting history.
-- [ ] Update the `docs/` pages that describe bare-ref resolution, pipe lookup, or the entry surfaces touched here.
-- [ ] Changelog entry under `[Unreleased]` noting the breaking language-behavior change (write "breaking", not "pre-1.0 breaking"). Use the Phase 0 corpus number to say what breaks rather than that something might.
-- [ ] Commit on `fix/Pipe-refs`.
-- [ ] STOP. End the session. Next session starts at Phase 3.
+- [x] Update the Status block (OQ2/OQ3 rulings, the DRY ruling, surprises, corpus fallout).
+- [x] Record status in the design doc's Phase 2 section (`build-time-qualification.md` → "Phase 2 outcome (C2)").
+- [x] Update README §2's table — marked HISTORICAL with a banner rather than rewritten, and §3 gained a re-measured table.
+- [x] Update the `docs/` pages that describe bare-ref resolution, pipe lookup, or the entry surfaces touched here. `docs/building-methods/libraries.md` gained a "How a pipe reference resolves" section; `docs/contribute/hub-layering.md` gained the two new hub symbols and the in-body-vs-entry guidance (that page is a drift contract target and was reviewed and acked).
+- [x] Changelog entry under `[Unreleased]` noting the breaking language-behavior change. Also **removed** the superseded `[Unreleased]` entry describing the crate-wide rule this phase deletes — it never shipped, so leaving both would have published two contradictory claims.
+- [x] Commit on `fix/Pipe-refs` — landed on the stacked `fix/Pipe-refs-2` (PR #1092) rather than the base branch, since PR #1091 carries Phase 0+1 and the two merge together.
+- [x] STOP. Next session starts at Phase 3.
+
+⚠ **These boxes sat unticked while the Status block above declared C2 passed** — caught by a PR bot, not by me. A checkpoint that reports itself complete from one place while its own checklist says otherwise is exactly the contradiction a cold-starting session cannot resolve. Tick the checklist in the same edit that updates the Status block.
 
 ---
 

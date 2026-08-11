@@ -439,8 +439,11 @@ def _colliding_op_name(
     Two op shapes can write a bare pipe code that another loaded file already declares:
 
     - a ``[pipe]`` ``rename_table_key`` whose ``new_key`` is declared elsewhere — applying it
-      would create a duplicate declaration (same domain) or a bare-code ambiguity (another
-      domain) that the loop can never repair;
+      would create a duplicate declaration (same domain) that the loop can never repair. The
+      *other-domain* half of that reasoning has expired: a bare in-body code no longer searches
+      across domains, so a same-named pipe in another domain is not an ambiguity at all. Those
+      fixes are still dropped, but the scope is now knowingly over-conservative rather than
+      required — see ``_pipe_codes_by_file``, which builds the set this checks against;
     - a root ``main_pipe`` ``set_key`` whose value is declared elsewhere while the target file
       does NOT declare that value — its paired declaration rename is exactly the case above
       (dropped), so applying the ``set_key`` alone would write an orphaned ``main_pipe``

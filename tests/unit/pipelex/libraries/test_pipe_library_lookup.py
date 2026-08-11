@@ -66,10 +66,15 @@ class TestPipeLibraryLookup:
         assert library.get_optional_entry_pipe("scoring.compute_score") is mock_pipe
 
     def test_entry_pipe_bare_code_matches_across_domains(self, mocker: MockerFixture):
-        """`pipelex run compute_score` keeps working: the user is pointing at a pipe, not writing a ref."""
+        """`pipelex run compute_score` keeps working: the user is pointing at a pipe, not writing a ref.
+
+        The library holds a second domain with a different code, so the search genuinely has to look
+        past a non-match in another domain rather than find the only pipe there is.
+        """
         library = PipeLibrary.make_empty()
         mock_pipe = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
         library.root["scoring.compute_score"] = mock_pipe
+        library.root["analytics.summarize"] = _make_stub_pipe(mocker, code="summarize", domain_code="analytics")
         assert library.get_optional_entry_pipe("compute_score") is mock_pipe
 
     def test_entry_pipe_ambiguous_bare_code_raises(self, mocker: MockerFixture):
