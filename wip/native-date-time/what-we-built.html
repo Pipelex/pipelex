@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Date &amp; Time natives: one ISO 8601 contract</title>
+<style>
+  :root {
+    --bg: #fbfbfa;
+    --surface: #ffffff;
+    --surface-2: #f4f4f2;
+    --ink: #1a1a18;
+    --ink-soft: #55554f;
+    --ink-faint: #85857c;
+    --rule: #e2e2dc;
+    --accent: #9a3412;
+    --accent-soft: #fdf0e8;
+    --bad: #b42318;
+    --bad-soft: #fdf1f0;
+    --good: #2b6a45;
+    --good-soft: #edf6f0;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, -apple-system, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16171a;
+      --surface: #1d1f23;
+      --surface-2: #24262b;
+      --ink: #e9e9e4;
+      --ink-soft: #b3b3ab;
+      --ink-faint: #85857c;
+      --rule: #33363c;
+      --accent: #f0a072;
+      --accent-soft: #2c2018;
+      --bad: #f0837a;
+      --bad-soft: #2d1c1b;
+      --good: #7cc59b;
+      --good-soft: #172a20;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 60rem; margin: 0 auto; padding: 3rem 1.25rem 6rem; }
+  header.masthead { border-bottom: 2px solid var(--ink); padding-bottom: 1.25rem; margin-bottom: 2.5rem; }
+  .eyebrow {
+    font-family: var(--mono); font-size: .72rem; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 .6rem;
+  }
+  h1 { font-size: clamp(1.7rem, 4.4vw, 2.5rem); line-height: 1.15; margin: 0 0 .7rem; letter-spacing: -.02em; }
+  .standfirst { font-size: 1.08rem; color: var(--ink-soft); margin: 0; max-width: 46rem; }
+  .meta { font-family: var(--mono); font-size: .78rem; color: var(--ink-faint); margin-top: 1.1rem; display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; }
+  h2 {
+    font-size: 1.32rem; margin: 3.2rem 0 1rem; letter-spacing: -.01em;
+    padding-top: 1.2rem; border-top: 1px solid var(--rule);
+  }
+  h3 { font-size: 1.02rem; margin: 2rem 0 .6rem; }
+  p { margin: 0 0 1rem; }
+  a { color: var(--accent); text-underline-offset: .18em; }
+  code {
+    font-family: var(--mono); font-size: .875em;
+    background: var(--surface-2); padding: .1em .34em; border-radius: 3px;
+  }
+  pre {
+    font-family: var(--mono); font-size: .8rem; line-height: 1.55;
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 6px;
+    padding: 1rem; overflow-x: auto; margin: 0 0 1.2rem;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  .add { color: var(--good); }
+  .del { color: var(--bad); }
+  .dim { color: var(--ink-faint); }
+  .tldr {
+    background: var(--accent-soft); border: 1px solid var(--accent);
+    border-radius: 8px; padding: 1.4rem 1.5rem; margin: 0 0 2rem;
+  }
+  .tldr h2 { margin: 0 0 .7rem; border: none; padding: 0; font-size: 1.05rem; letter-spacing: .06em; text-transform: uppercase; font-family: var(--mono); }
+  .tldr ul { margin: 0; padding-left: 1.15rem; }
+  .tldr li { margin-bottom: .55rem; }
+  .tldr li:last-child { margin-bottom: 0; }
+  figure { margin: 1.6rem 0 2rem; }
+  figure svg { width: 100%; height: auto; display: block; }
+  figcaption { font-size: .85rem; color: var(--ink-faint); margin-top: .7rem; padding-left: .2rem; border-left: 2px solid var(--rule); padding-left: .8rem; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .9rem; margin-bottom: 1.2rem; min-width: 34rem; }
+  th, td { text-align: left; padding: .6rem .7rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-family: var(--mono); font-size: .74rem; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-faint); font-weight: 600; }
+  tbody tr:last-child td { border-bottom: none; }
+  details {
+    border: 1px solid var(--rule); border-radius: 6px; padding: .1rem 1rem;
+    margin-bottom: .8rem; background: var(--surface);
+  }
+  details[open] { padding-bottom: .8rem; }
+  summary { cursor: pointer; padding: .75rem 0; font-weight: 600; font-size: .95rem; }
+  summary::marker { color: var(--accent); }
+  .tabs { margin: 1.5rem 0 2rem; }
+  .tabs input { position: absolute; opacity: 0; pointer-events: none; }
+  .tabbar { display: flex; flex-wrap: wrap; gap: .3rem; border-bottom: 1px solid var(--rule); }
+  .tabbar label {
+    font-family: var(--mono); font-size: .78rem; padding: .5rem .85rem; cursor: pointer;
+    color: var(--ink-faint); border: 1px solid transparent; border-bottom: none;
+    border-radius: 5px 5px 0 0; margin-bottom: -1px;
+  }
+  .tabbar label:hover { color: var(--ink); }
+  .panel { display: none; padding-top: 1.2rem; }
+  #t1:checked ~ .tabbar label[for="t1"],
+  #t2:checked ~ .tabbar label[for="t2"],
+  #t3:checked ~ .tabbar label[for="t3"] {
+    color: var(--ink); background: var(--surface); border-color: var(--rule); font-weight: 600;
+  }
+  #t1:checked ~ .panels .p1,
+  #t2:checked ~ .panels .p2,
+  #t3:checked ~ .panels .p3 { display: block; }
+  .callout {
+    border-left: 3px solid var(--accent); background: var(--surface);
+    padding: .9rem 1.1rem; margin: 1.4rem 0; font-size: .95rem;
+  }
+  .callout.warn { border-left-color: var(--bad); }
+  .callout strong { color: var(--accent); }
+  .callout.warn strong { color: var(--bad); }
+  .pill {
+    display: inline-block; font-family: var(--mono); font-size: .68rem; letter-spacing: .05em;
+    text-transform: uppercase; padding: .15em .5em; border-radius: 3px; vertical-align: .1em;
+  }
+  .pill.bad { background: var(--bad-soft); color: var(--bad); }
+  .pill.good { background: var(--good-soft); color: var(--good); }
+  ul.tight li { margin-bottom: .4rem; }
+  .linkgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: .8rem; margin: 1.2rem 0; }
+  .linkcard { border: 1px solid var(--rule); border-radius: 6px; padding: .9rem 1rem; background: var(--surface); }
+  .linkcard .k { font-family: var(--mono); font-size: .7rem; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); display: block; margin-bottom: .3rem; }
+  .linkcard .d { font-size: .85rem; color: var(--ink-soft); margin-top: .3rem; }
+  footer { margin-top: 4rem; padding-top: 1.2rem; border-top: 1px solid var(--rule); font-size: .82rem; color: var(--ink-faint); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Pipelex · core / stuffs</p>
+  <h1><code style="font-size:.82em;background:none;padding:0">Date</code> and <code style="font-size:.82em;background:none;padding:0">Time</code> natives: one ISO 8601 contract</h1>
+  <p class="standfirst">Two pinned MTHDS natives could not be produced by the primary operator. They validated, they dry-ran green, and then they failed on every paid call. Here is what broke, why it hid so well, and what we changed.</p>
+  <div class="meta">
+    <span>PR #1089 → <code>dev</code></span>
+    <span>branch <code>fix/Native-date-time</code></span>
+    <span>~430 lines, 8 files</span>
+  </div>
+</header>
+
+<div class="tldr">
+  <h2>TL;DR</h2>
+  <ul>
+    <li><strong>A <code>PipeLLM</code> with <code>output = "Date"</code>, <code>Date[]</code> or <code>"Time"</code> failed 100% of live runs.</strong> The model answered <code>"2025-03-12"</code> — the only thing JSON can carry — and pydantic refused it with <code>date_type</code>.</li>
+    <li><strong>Cause: a <code>mode="before"</code> validator silently forfeits pydantic's strict-JSON acceptance of ISO strings.</strong> Instructor validates every structured response with <code>strict=True</code>; whatever a before-validator returns is re-validated as <em>Python</em> input, where a <code>str</code> is refused outright. <code>YesNo</code> survived only because <code>bool</code> is a JSON type.</li>
+    <li><strong>Fix: the validators now parse the ISO string themselves</strong> and return a real <code>date</code>/<code>time</code>, so strict-JSON, strict-Python and lax all agree.</li>
+    <li><strong>Then the review found the natives had two contracts</strong> — authored inputs were pinned to extended ISO, model output was not. A new <code>iso_temporal.py</code> now owns what these natives accept, and both paths parse through it.</li>
+    <li><strong>Three silent-corruption bugs fell out of that unification</strong>, including one that only appears on Python 3.14: <code>"24:00:00"</code> parsed as <em>this</em> day's midnight instead of the next day's.</li>
+    <li><span class="pill bad">Breaking</span> Non-extended spellings authors could previously write (<code>"15:40:00+0200"</code>, <code>"2026-07-07T154000"</code>, <code>"24:00:00"</code>, padded strings) are now refused.</li>
+  </ul>
+</div>
+
+<h2>1. The symptom</h2>
+
+<p>Reported from <code>mthds-ui</code> while adding native-concept fixture coverage. Deterministic, on every repeat, on the gateway backend:</p>
+
+<pre><code>Error generating single object with direct method in pipe 'read_one_time':
+  1 validation error for TimeContent
+  time
+    Input should be a valid time [type=time_type, input_value='14:00:00+00:00', input_type=str]
+
+Error generating list of objects with direct method in pipe 'read_dates':
+  2 validation errors for ListOfDateContent
+  items.0.date
+    Input should be a valid date [type=date_type, input_value='2025-03-12', input_type=str]</code></pre>
+
+<p>Two things made this worth a careful look rather than a quick patch.</p>
+
+<p><strong>The input was correct.</strong> A JSON document has no date type, so <code>"2025-03-12"</code> is the only representation a model <em>can</em> produce — and the field's own description tells it to answer exactly that. <strong>And the same string worked from <code>inputs.json</code>.</strong> Identical value, identical field, opposite outcome depending on which door it came through.</p>
+
+<p>The error code was the tell. Pydantic emits <code>date_parsing</code> when a lax coercion fails on a malformed string, and <code>date_type</code> when <em>strict</em> mode refuses a string outright. We were getting <code>date_type</code> on well-formed input, so something upstream was validating in strict mode.</p>
+
+<div class="callout">
+  <strong>Why nothing caught it.</strong> <code>--mock-inputs</code> fabricates real <code>datetime</code> objects, which sail past the broken path. So the method validated, dry-ran green, and failed on the first real call — the dry-run/live gap at its worst.
+</div>
+
+<h2>2. Root cause</h2>
+
+<p>Three facts had to line up.</p>
+
+<ol>
+  <li><strong>Instructor validates structured outputs strictly.</strong> Every <code>create</code>/<code>create_with_completion</code> signature defaults to <code>strict: bool = True</code>, and our workers never pass <code>strict</code> — so every provider's response is validated with <code>model_validate_json(..., strict=True)</code>.</li>
+  <li><strong>Strict <em>JSON</em> mode would have been fine.</strong> Pydantic knowingly accepts ISO strings for <code>date</code>/<code>time</code> fields when the input is JSON, precisely because JSON has no temporal type. Plain <code>datetime.date</code> fields in user structures survive strict validation for this reason.</li>
+  <li><strong>A <code>mode="before"</code> validator destroys that acceptance.</strong> Its return value is re-validated as <em>Python</em> input — where strict refuses a <code>str</code>. The two temporal natives were the only ones carrying a before-validator on a non-JSON-native field.</li>
+</ol>
+
+<figure>
+<svg viewBox="0 0 860 340" role="img" aria-label="Two lanes showing how a before-validator turns strict-JSON validation into strict-Python validation">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <g font-family="ui-monospace, Menlo, monospace" font-size="12.5" color="currentColor">
+
+    <text x="0" y="16" font-size="11.5" font-weight="700" letter-spacing="1.2" fill="#2b6a45">WITHOUT A BEFORE-VALIDATOR — e.g. YesNo, or a plain date field</text>
+    <rect x="0" y="30" width="150" height="46" rx="5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+    <text x="75" y="50" text-anchor="middle" fill="currentColor">JSON from LLM</text>
+    <text x="75" y="66" text-anchor="middle" fill="currentColor" opacity=".65">"2025-03-12"</text>
+    <line x1="152" y1="53" x2="222" y2="53" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar)"/>
+    <rect x="226" y="30" width="200" height="46" rx="5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+    <text x="326" y="50" text-anchor="middle" fill="currentColor">strict JSON validation</text>
+    <text x="326" y="66" text-anchor="middle" fill="currentColor" opacity=".65">input is still JSON</text>
+    <line x1="428" y1="53" x2="498" y2="53" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar)"/>
+    <rect x="502" y="30" width="290" height="46" rx="5" fill="#edf6f0" stroke="#2b6a45" stroke-width="1.4"/>
+    <text x="647" y="50" text-anchor="middle" fill="#2b6a45" font-weight="700">accepted → date(2025, 3, 12)</text>
+    <text x="647" y="66" text-anchor="middle" fill="#2b6a45" opacity=".8">JSON has no date type, so ISO is allowed</text>
+
+    <line x1="0" y1="112" x2="860" y2="112" stroke="currentColor" stroke-width="1" opacity=".18"/>
+
+    <text x="0" y="146" font-size="11.5" font-weight="700" letter-spacing="1.2" fill="#b42318">WITH A BEFORE-VALIDATOR — Date and Time, before the fix</text>
+    <rect x="0" y="160" width="150" height="46" rx="5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+    <text x="75" y="180" text-anchor="middle" fill="currentColor">JSON from LLM</text>
+    <text x="75" y="196" text-anchor="middle" fill="currentColor" opacity=".65">"2025-03-12"</text>
+    <line x1="152" y1="183" x2="222" y2="183" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar)"/>
+    <rect x="226" y="160" width="200" height="46" rx="5" fill="none" stroke="#b42318" stroke-width="1.4"/>
+    <text x="326" y="180" text-anchor="middle" fill="#b42318">before-validator</text>
+    <text x="326" y="196" text-anchor="middle" fill="#b42318" opacity=".8">returns the str unchanged</text>
+    <line x1="428" y1="183" x2="498" y2="183" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar)"/>
+    <rect x="502" y="160" width="290" height="46" rx="5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+    <text x="647" y="180" text-anchor="middle" fill="currentColor">re-validated as PYTHON input</text>
+    <text x="647" y="196" text-anchor="middle" fill="currentColor" opacity=".65">the JSON-ness is gone</text>
+    <line x1="647" y1="208" x2="647" y2="242" stroke="#b42318" stroke-width="1.4" marker-end="url(#ar)" color="#b42318"/>
+    <rect x="452" y="246" width="390" height="42" rx="5" fill="#fdf1f0" stroke="#b42318" stroke-width="1.4"/>
+    <text x="647" y="272" text-anchor="middle" fill="#b42318" font-weight="700">refused → date_type: "Input should be a valid date"</text>
+
+    <text x="0" y="316" font-size="12" fill="currentColor" opacity=".7">The validator never rejected the value. It simply moved it into a lane where a string is illegal.</text>
+  </g>
+</svg>
+<figcaption>The before-validator was written to <em>allow</em> ISO strings — it rejected numbers and datetimes, then returned everything else untouched. Returning the value is what killed it.</figcaption>
+</figure>
+
+<p>We verified the mechanism in isolation, with no pipelex involved: a bare <code>class Plain(BaseModel): date: datetime.date</code> passes <code>model_validate_json('{"date":"2025-03-12"}', strict=True)</code>; adding a <strong>no-op</strong> before-validator to the same field makes the identical call fail.</p>
+
+<details>
+<summary>Why we did not just pass <code>strict=False</code> to instructor</summary>
+<p>It was the obvious one-liner and it was the wrong call. The blast radius is every provider and <em>every user structure</em>, not just these two classes — it would re-open the silent lax coercions that strict currently blocks on all LLM output, and weaken instructor's re-ask signal. Strict stays the inference-path policy; the natives were the smallest correct surface.</p>
+<p>We also checked whether field-level <code>Field(strict=False)</code> could opt out locally. It cannot — the call-level <code>strict=True</code> wins.</p>
+</details>
+
+<h2>3. The fix</h2>
+
+<p>Have the before-validators finish the job: after the existing guards, parse the string into a real object, so the inner validation always receives something already correct. That satisfies strict-JSON, strict-Python and lax alike.</p>
+
+<pre><code>     @field_validator("time", mode="before")
+     @classmethod
+<span class="del">-    def _reject_lax_temporal(cls, value: Any) -> Any:</span>
+<span class="add">+    def _validate_temporal(cls, value: Any) -> Any:</span>
+         ...guards: no bare number, no datetime...
+<span class="add">+        # Returning a real object is what keeps this model valid under the strict validation</span>
+<span class="add">+        # instructor applies to every LLM response. Non-str values — real time objects, e.g.</span>
+<span class="add">+        # from `--mock-inputs` — pass through.</span>
+<span class="add">+        if isinstance(value, str):</span>
+<span class="add">+            return parse_iso_time(value)</span>
+         return value</code></pre>
+
+<p>That is the whole behavioural fix: about ten lines across the two validators. Everything below is what the review turned up once we started looking.</p>
+
+<h2>4. One contract, not two</h2>
+
+<p>The first review round asked a sharp question: the model path now parses ISO strings — <em>which</em> ISO strings? Because <code>StuffContentFactory</code>, which handles authored inputs, had already pinned itself to <strong>extended</strong> ISO for a documented reason, and the new model path had inherited none of it.</p>
+
+<p>That mattered because <code>fromisoformat</code> is far more permissive than people expect. It accepts the basic spellings (<code>"20260707"</code>, <code>"154000"</code>) and the week and ordinal calendars (<code>"2026-W27-2"</code>, <code>"2026-189"</code>). None of those corrupt a value, but all of them restate it in a calendar the source never used — and the all-digit ones collide with the epoch guard the natives depend on.</p>
+
+<figure>
+<svg viewBox="0 0 860 300" role="img" aria-label="Before: two paths with two contracts. After: both paths through one shared parser.">
+  <defs>
+    <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <g font-family="ui-monospace, Menlo, monospace" font-size="12" color="currentColor">
+
+    <text x="0" y="14" font-size="11.5" font-weight="700" letter-spacing="1.2" fill="#b42318">BEFORE — two doors, two vocabularies</text>
+
+    <rect x="0" y="28" width="168" height="40" rx="5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+    <text x="84" y="53" text-anchor="middle">LLM output</text>
+    <rect x="0" y="80" width="168" height="40" rx="5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+    <text x="84" y="105" text-anchor="middle">inputs.json / TOML</text>
+
+    <line x1="170" y1="48" x2="246" y2="48" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar2)"/>
+    <line x1="170" y1="100" x2="246" y2="100" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar2)"/>
+
+    <rect x="250" y="28" width="250" height="40" rx="5" fill="none" stroke="#b42318" stroke-width="1.3"/>
+    <text x="375" y="53" text-anchor="middle" fill="#b42318">content model validator</text>
+    <rect x="250" y="80" width="250" height="40" rx="5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+    <text x="375" y="105" text-anchor="middle">StuffContentFactory regex</text>
+
+    <line x1="502" y1="48" x2="578" y2="48" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar2)"/>
+    <line x1="502" y1="100" x2="578" y2="100" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar2)"/>
+
+    <rect x="582" y="28" width="278" height="40" rx="5" fill="#fdf1f0" stroke="#b42318" stroke-width="1.3"/>
+    <text x="721" y="53" text-anchor="middle" fill="#b42318">any ISO fromisoformat swallows</text>
+    <rect x="582" y="80" width="278" height="40" rx="5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+    <text x="721" y="105" text-anchor="middle">extended ISO only</text>
+
+    <line x1="0" y1="146" x2="860" y2="146" stroke="currentColor" stroke-width="1" opacity=".18"/>
+
+    <text x="0" y="176" font-size="11.5" font-weight="700" letter-spacing="1.2" fill="#2b6a45">AFTER — one parser owns the answer</text>
+
+    <rect x="0" y="190" width="168" height="40" rx="5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+    <text x="84" y="215" text-anchor="middle">LLM output</text>
+    <rect x="0" y="240" width="168" height="40" rx="5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+    <text x="84" y="265" text-anchor="middle">inputs.json / TOML</text>
+
+    <path d="M170,210 L250,210 L250,232" fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar2)"/>
+    <path d="M170,260 L250,260 L250,242" fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar2)"/>
+
+    <rect x="272" y="214" width="288" height="52" rx="5" fill="#edf6f0" stroke="#2b6a45" stroke-width="1.5"/>
+    <text x="416" y="236" text-anchor="middle" fill="#2b6a45" font-weight="700">iso_temporal.py</text>
+    <text x="416" y="254" text-anchor="middle" fill="#2b6a45" opacity=".85">parse_iso_date · parse_iso_time</text>
+
+    <line x1="562" y1="240" x2="632" y2="240" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar2)"/>
+    <rect x="636" y="220" width="224" height="40" rx="5" fill="none" stroke="#2b6a45" stroke-width="1.3"/>
+    <text x="748" y="245" text-anchor="middle" fill="#2b6a45">extended ISO, no 24:00</text>
+  </g>
+</svg>
+<figcaption>The new module is stdlib-only and sits beside its consumers. The dependency runs one way — models and factory both depend on the parser, never on each other.</figcaption>
+</figure>
+
+<pre><code><span class="dim"># pipelex/core/stuffs/iso_temporal.py</span>
+_EXTENDED_DATE_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}")
+_EXTENDED_TIME_PATTERN = re.compile(r"(?P&lt;hour&gt;\d{2}):\d{2}(:\d{2}([.,]\d+)?)?([Zz]|[+-]\d{2}(:[0-5]\d)?)?")</code></pre>
+
+<p>Every character of that time pattern was argued for. Fractional seconds take <code>.</code> <em>or</em> <code>,</code> because ISO 8601 permits both. The offset takes <code>Z</code>, <code>±hh</code> or <code>±hh:mm</code> — but not <code>±hhmm</code>, which is the basic spelling. And the offset minutes are range-checked in the pattern, for a reason worth its own section.</p>
+
+<h2>5. What the unification uncovered</h2>
+
+<p>Three of these were silent-corruption bugs. None was hypothetical — each was reproduced before we touched anything.</p>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>Input</th><th>Became</th><th>Should be</th><th>Where</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>"24:00:00"</code></td>
+      <td><code>00:00</code> <span class="dim">same day</span></td>
+      <td>next day's midnight</td>
+      <td>Python 3.14 only</td>
+    </tr>
+    <tr>
+      <td><code>"15:40:00+02:60"</code></td>
+      <td><code>+03:00</code></td>
+      <td>rejected</td>
+      <td>all versions</td>
+    </tr>
+    <tr>
+      <td><code>"2026-W27-2"</code></td>
+      <td><code>2026-07-07</code></td>
+      <td>rejected <span class="dim">(right date, wrong calendar)</span></td>
+      <td>model path only</td>
+    </tr>
+    <tr>
+      <td><code>"2026-07-07T154000"</code></td>
+      <td>accepted</td>
+      <td>rejected <span class="dim">(model path already refused it)</span></td>
+      <td>author path only</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="tabs">
+  <input type="radio" name="tabs" id="t1" checked><input type="radio" name="tabs" id="t2"><input type="radio" name="tabs" id="t3">
+  <div class="tabbar">
+    <label for="t1">The 3.14 day-shift</label>
+    <label for="t2">The offset that drifted</label>
+    <label for="t3">The half-finished unification</label>
+  </div>
+  <div class="panels">
+    <div class="panel p1">
+      <p>ISO 8601's <code>24:00</code> names the <em>end</em> of a day — that is, the next day's midnight. Python disagrees with itself about it:</p>
+      <pre><code><span class="dim"># Python 3.13.9</span>
+&gt;&gt;&gt; datetime.time.fromisoformat("24:00:00")
+ValueError: hour must be in 0..23
+
+<span class="dim"># Python 3.14.0</span>
+&gt;&gt;&gt; datetime.time.fromisoformat("24:00:00")
+datetime.time(0, 0)          <span class="del">← silently this day's midnight</span></code></pre>
+      <p>Our <code>requires-python</code> is <code>&gt;=3.11,&lt;3.15</code>, so 3.14 is squarely in range. A <code>Date</code> carrying <code>{"date": "2025-03-12", "time": "24:00:00"}</code> would land on <strong>March 12th</strong> midnight instead of the 13th — a full day early, silently, on some of our supported interpreters and not others.</p>
+      <p>We reject it rather than rolling the date forward: a <code>Time</code> has no date to roll, and fixing only <code>Date</code> would make the two natives disagree. The error message names what the form means so an author can fix it. We verified the guard by loading the new module under both 3.13 and 3.14 — identical behaviour.</p>
+      <p class="dim">Worth noting what is <em>not</em> affected: <code>datetime.fromisoformat("2026-07-07T24:00:00")</code> rolls correctly to the 8th on 3.14. Two review bots claimed corruption there; the probe says otherwise. Only the bare time-of-day parse was at risk.</p>
+    </div>
+    <div class="panel p2">
+      <p>An offset's components are summed into a <code>timedelta</code>, so nothing range-checks the minutes:</p>
+      <pre><code>&gt;&gt;&gt; datetime.time.fromisoformat("15:40:00+02:60")
+datetime.time(15, 40, tzinfo=timezone(timedelta(seconds=10800)))
+                                                      <span class="del">↑ +03:00</span></code></pre>
+      <p>A stated offset silently becoming a <em>different</em> offset is precisely the fidelity loss these natives exist to prevent. What makes it easy to miss is that every neighbouring check works: an out-of-range offset <em>hour</em> raises, and the time's own minute and second raise. Only the offset minutes slip through, so the pattern pins them to <code>[0-5]\d</code>.</p>
+    </div>
+    <div class="panel p3">
+      <p>Round one routed the factory's bare-time path through the shared parser and declared the contract unified. It wasn't. <code>_parse_iso_temporal</code> still handed the <em>whole</em> string to <code>datetime.fromisoformat</code>, so the time half never reached the pin:</p>
+      <pre><code><span class="del">-        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}([Tt ].*)?", value.strip()):</span>
+<span class="dim">                                                  ↑ ".*" — anything goes after the T</span>
+<span class="del">-        parsed = datetime.datetime.fromisoformat(value)</span>
+<span class="del">-        return parsed.date(), parsed.timetz()</span>
+<span class="add">+        match = re.fullmatch(r"(?P&lt;date&gt;\d{4}-\d{2}-\d{2})(?:[Tt ](?P&lt;time&gt;.+))?", value)</span>
+<span class="add">+        the_date = parse_iso_date(match.group("date"))</span>
+<span class="add">+        the_time = parse_iso_time(time_text) if time_text is not None else None</span></code></pre>
+      <p>So <code>"2026-07-07T154000"</code> was accepted from an author while <code>{"date": …, "time": "154000"}</code> was refused from a model. Splitting the string first — rather than delegating to <code>datetime.fromisoformat</code> — is what makes the time half reachable at all.</p>
+    </div>
+  </div>
+</div>
+
+<h2>6. What we deliberately did not do</h2>
+
+<p>Three reported issues were declined. Recording them matters as much as the fixes, because each is the kind of thing that gets re-reported later.</p>
+
+<details>
+<summary>Sub-microsecond precision is truncated</summary>
+<p><code>"15:40:00.1234567"</code> becomes <code>…123456</code>. True — but <code>datetime.time</code> cannot represent more, so the only alternative is failing a live run over precision no real source states. Truncating to what the type holds is what every Python consumer of that string does. The natives' fidelity rules are about not <em>inventing</em> or <em>shifting</em> a value; sub-microsecond rounding is a different thing.</p>
+</details>
+
+<details>
+<summary>The numeric guard also matches <code>nan</code> / <code>inf</code></summary>
+<p><code>is_numeric_string</code> uses <code>float()</code>, which parses those tokens. They get the "no epoch-seconds" message rather than the malformed-ISO one. Both are rejected either way, no model emits them, and the proposed remedy — switch to <code>int()</code> — would make the accurate epoch message stop covering <code>8.64e4</code> and <code>86400.0</code>, since <code>int()</code> raises on both.</p>
+<p class="dim">Worth flagging honestly: the first version of this rationale claimed the swap would "reopen an epoch hole" and fail the suite. A reviewer challenged it and was right — with the extended pin in front of the parse, anything <code>int()</code> declines is rejected by the parser anyway. The decision held; the reasoning did not, and was corrected on the record.</p>
+</details>
+
+<details>
+<summary>The numeric-string guard itself, now that the pin exists</summary>
+<p>Nearly cut. The extended-form pattern rejects every all-digit spelling before <code>fromisoformat</code> is reached, so the string arm of that guard is no longer load-bearing — it only buys a better message ("never a number (no epoch-seconds)") in place of a generic one. We kept it and <em>pinned the wording in a test</em>, because a branch justified solely by its message and not asserting that message is a branch that can be deleted with the suite still green.</p>
+<p>The <code>int</code>/<code>float</code> arm beside it <strong>is</strong> load-bearing: pydantic will happily coerce a bare <code>86400</code> into a date.</p>
+</details>
+
+<h2>7. What changes for you</h2>
+
+<div class="callout warn">
+  <strong>Breaking for authored inputs.</strong> These parsed on <code>dev</code> and are refused now. All four are non-extended spellings; if you have any in a bundle or an <code>inputs.json</code>, they will fail loudly with a message naming the expected shape.
+</div>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>No longer accepted</th><th>Write instead</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td><code>"15:40:00+0200"</code></td><td><code>"15:40:00+02:00"</code></td><td>basic offset spelling</td></tr>
+    <tr><td><code>"2026-07-07T154000"</code></td><td><code>"2026-07-07T15:40:00"</code></td><td>basic time spelling</td></tr>
+    <tr><td><code>"24:00:00"</code></td><td>next day + <code>"00:00:00"</code></td><td>end-of-day form, ambiguous across Python versions</td></tr>
+    <tr><td><code>" 15:40:00"</code></td><td><code>"15:40:00"</code></td><td>padding is not part of the value</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Everything ISO calls <em>extended</em> still works, including the shapes a model plausibly answers: <code>Z</code> and lowercase <code>z</code>, <code>+02</code> and <code>+02:00</code>, both fraction separators, and <code>HH:MM</code> without seconds.</p>
+
+<p><strong>Nothing changes for Python callers</strong> holding real <code>date</code>/<code>time</code> objects — they pass through the validators untouched, which is also why the <code>--mock-inputs</code> path was unaffected throughout. kajson round-trips were verified to still rebuild typed objects, so distributed execution is unaffected.</p>
+
+<h2>8. Testing</h2>
+
+<p>Both strict-mode test modules were written red-first and reproduce the reported failure verbatim before the fix. They cover the exact reported payloads under strict JSON, strict Python mode, the generated <code>ListOf…</code> wrapper, offset fidelity, real objects still accepted, and every rejection firing in <em>both</em> validation modes.</p>
+
+<p>The independent final review mutation-tested them rather than trusting them: removing the parse call and flipping the <code>24:00</code> sentinel turned 23 tests red across the two modules. It also swept the time pattern's whole language — 560 pattern-admitted strings, zero of which <code>fromisoformat</code> then refused — confirming the round-4 bug class (pattern and parser disagreeing) is closed.</p>
+
+<h2>9. Links</h2>
+
+<div class="linkgrid">
+  <div class="linkcard">
+    <span class="k">Pull request</span>
+    <a href="https://github.com/Pipelex/pipelex/pull/1089">Pipelex/pipelex #1089</a>
+    <div class="d">Open against <code>dev</code>. Six automated review rounds plus an independent final review, all threads resolved.</div>
+  </div>
+  <div class="linkcard">
+    <span class="k">Origin of the report</span>
+    <a href="https://github.com/Pipelex/mthds-ui">Pipelex/mthds-ui</a>
+    <div class="d">Filed from branch <code>feature/Native-concepts_stories</code> while adding native-concept fixtures. Its <code>pipeline_32</code> LIVE fixture is a placeholder — <code>make fixtures-live ONLY=pipeline_32</code> replaces it once a released pipelex carries this fix. That is the natural end-to-end regression check.</div>
+  </div>
+  <div class="linkcard">
+    <span class="k">Deferred, release-gated</span>
+    <a href="https://github.com/mthds-ai/mthds-plugins">mthds-ai/mthds-plugins</a>
+    <div class="d">The authoring guidance an LLM is prompted with still says plain "ISO 8601", with no mention of extended-only or the <code>24:00</code> refusal. Costs a re-ask rather than a failed run, so it is a sweep, not a blocker.</div>
+  </div>
+</div>
+
+<footer>
+  Written 2026-08-11 · <code>wip/native-date-time/</code> · The decision record for every accept and decline across the review rounds lives alongside this file.
+</footer>
+
+</div>
+</body>
+</html>

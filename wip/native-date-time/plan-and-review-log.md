@@ -1,6 +1,8 @@
 # Fix: `Date` and `Time` natives cannot be produced by a live `PipeLLM`
 
-Bug report: `wip/native-date-time-live-run.md` — **verified 2026-08-10**, reproduced locally without any LLM call. Branch: `fix/Native-date-time`.
+> **Archived 2026-08-11 — shipped.** This was the working plan at the repo root (`TODOS.md`) while PR [#1089](https://github.com/Pipelex/pipelex/pull/1089) was built. Kept as the decision record: every accept/decline across six bot rounds and the final independent review is argued here. The reader-facing write-up is `what-we-built.html` in this folder.
+
+Bug report: `bug-report.md` (this folder) — **verified 2026-08-10**, reproduced locally without any LLM call. Branch: `fix/Native-date-time`.
 
 ## Root cause (established, do not re-derive)
 
@@ -94,7 +96,7 @@ Verdict: ship with nits. No correctness hole; the parser's home and shape were j
 - **`_make_time_content` swallowed the parser's specific message** where its `Date` sibling appended it, so a `Time` author got a generic shape hint instead of "24:00 names the next day's midnight". Now consistent.
 - **The CHANGELOG entry did not carry `(Breaking)`** although authored inputs genuinely got stricter (`"15:40:00+0200"`, `"2026-07-07T154000"`, `"24:00:00"`, padding). Marked, with the refused forms named.
 - **Pre-existing:** the datetime guard fires for both fields but its message named only `date`. Reworded to fit either field.
-- **Deferred to `wip/native-temporal-contract-doc-sweep.md`:** the plugin authoring guidance an LLM reads still says plain "ISO 8601" (cross-repo, release-gated, costs a re-ask not a failure), and a stale `pipelex-app` comment that has no wire impact.
+- **Deferred to `doc-sweep-deferred.md` (this folder):** the plugin authoring guidance an LLM reads still says plain "ISO 8601" (cross-repo, release-gated, costs a re-ask not a failure), and a stale `pipelex-app` comment that has no wire impact.
 
 ## Follow-ups (out of this repo, after release)
 
