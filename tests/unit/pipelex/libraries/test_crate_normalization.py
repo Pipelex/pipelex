@@ -208,9 +208,10 @@ class TestCrateNormalization:
         """Every in-body pipe ref of a normalized crate names a pipe the crate actually holds.
 
         Driven off `pipe_dependencies` rather than a hand-walk of the controller kinds, so a new kind —
-        or a new `_qualify_pipe_ref` call site on an existing one — is covered the day it lands. An open
-        ref is silent: the crate hashes content nobody can resolve, and a round-trip through
-        `load_from_crate` dies with `PipeNotFoundError` at run time instead of at normalization.
+        or a new `crate_qualification._qualify_pipe_ref` call site on an existing one — is covered the
+        day it lands. An open ref is silent: the crate hashes content nobody can resolve, and a
+        round-trip through `load_from_crate` dies with `PipeNotFoundError` at run time instead of at
+        normalization.
         """
         result = normalize_crate(crate_factory(), mthds_version=MTHDS_TEST_VERSION)
         dangling = {

@@ -7,9 +7,8 @@ is closed, canonical, and explicit:
 1. merge — already done upstream (keys are `domain.Code` / `domain.code`);
 2. fully qualify every *in-body* reference — pipe `inputs` / `output` concept refs, pipe-step / branch
    / outcome / batch pipe refs, concept `refines`, and structure-field `concept_ref` / `item_concept_ref`.
-   A bare *pipe* ref resolves crate-wide (`_qualify_pipe_ref`), the way `PipeLibrary.get_optional_pipe`
-   does, so the normalized ref names the pipe an interpreted run would call — including when the callee
-   is declared in a sibling domain;
+   Delegated to `qualify_crate` (see `crate_qualification`), which owns the reference-resolution rule
+   so it is stated once rather than mirrored per consumer;
 3. flatten refinement — a refining concept adopts its **in-crate structured** base's effective
    structure (the `refines` link is dropped once the structure is materialized). A concept whose
    refinement chain bottoms out at a **native** keeps its `refines` link: the native is materialized
@@ -25,7 +24,7 @@ Deferred normalization steps (the spec's [Library Crate Format] "Normalization P
 are not yet applied here, mirroring the spec's own "Specification Status" callout):
 
 - materialize defaults and multiplicity (spec step 5): multiplicity markers already present on a ref are
-  preserved (`_render_ref_with_markers`), but a bare singular ref is not rewritten to an explicit form,
+  preserved by the qualification pass, but a bare singular ref is not rewritten to an explicit form,
   and default values are not yet materialized;
 - cross-package (`alias->…`) references: the referenced dependency content is not folded into this crate
   yet, so those refs are left intact rather than rewritten to a canonical ref that would dangle. A
@@ -34,25 +33,19 @@ are not yet applied here, mirroring the spec's own "Specification Status" callou
 [Library Crate Format]: mthds/docs/spec/library-crate.md
 """
 
-from collections import defaultdict
 from typing import NamedTuple
 
 from pipelex.codegen.native_expansion import collect_native_refs_from_structure, materialize_native_concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
-from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
 from pipelex.core.concepts.helpers import normalize_structure_blueprint
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.pipes.variable_multiplicity import MultiplicityParseResult, parse_concept_with_multiplicity
+from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.libraries.crate_qualification import qualify_crate
 from pipelex.libraries.exceptions import CrateNormalizationError
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipeBlueprintUnion
-from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
-from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
-from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
-from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
-from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 
 _ConceptEntry = ConceptBlueprint | str
 
@@ -67,19 +60,24 @@ def normalize_crate(crate: LibraryCrate, *, mthds_version: str) -> LibraryCrate:
 
     The input crate must already be assembled and key-qualified (e.g. from
     `LibraryCrateFactory.make_from_blueprints` over a validated library, per D6). The output carries
-    the normalized `fingerprint` (D2 scope) and the `mthds_version` stamp.
+    the normalized `fingerprint` (D2 scope) and the `mthds_version` stamp; `qualify_crate` returns
+    content only, so the envelope is assembled here.
+
+    Qualification runs as one complete phase up front, over concepts *and* pipes, rather than
+    interleaved with the steps below. One consequence is worth knowing: a crate carrying two
+    independent defects — say a refinement cycle *and* an ambiguous bare pipe ref — now reports the
+    ref error, where reporting the cycle first was previously an artifact of the two steps being
+    interleaved. Both are `CrateNormalizationError` and the crate is invalid either way; which
+    defect is named first is not a contract.
     """
+    qualified = qualify_crate(crate)
+
     concepts: dict[str, _ConceptEntry] = {
-        concept_ref: _normalize_concept(value, owner_domain=_domain_of(concept_ref), source=crate.source_map.get(concept_ref))
-        for concept_ref, value in crate.concepts.items()
+        concept_ref: _normalize_concept(value, source=crate.source_map.get(concept_ref)) for concept_ref, value in qualified.concepts.items()
     }
     _flatten_refinement(concepts)
 
-    pipe_refs_by_code = _index_pipe_refs_by_code(pipes=crate.pipes)
-    pipes: dict[str, PipeBlueprintUnion] = {
-        pipe_ref: _normalize_pipe(blueprint, owner_domain=_domain_of(pipe_ref), pipe_refs_by_code=pipe_refs_by_code)
-        for pipe_ref, blueprint in crate.pipes.items()
-    }
+    pipes = qualified.pipes
 
     _expand_natives(concepts=concepts, pipes=pipes)
 
@@ -94,48 +92,21 @@ def normalize_crate(crate: LibraryCrate, *, mthds_version: str) -> LibraryCrate:
     )
 
 
-def _domain_of(qualified_ref: str) -> str:
-    domain_path = QualifiedRef.parse(qualified_ref).domain_path
-    if domain_path is None:
-        msg = f"Crate key '{qualified_ref}' is not domain-qualified; the normalizer expects a merged, key-qualified crate."
-        raise CrateNormalizationError(msg)
-    return domain_path
-
-
 # --------------------------------------------------------------------------------------------------
 # Concepts
 # --------------------------------------------------------------------------------------------------
 
 
-def _normalize_concept(value: _ConceptEntry, *, owner_domain: str, source: str | None) -> _ConceptEntry:
+def _normalize_concept(value: _ConceptEntry, *, source: str | None) -> _ConceptEntry:
+    """Materialize the authoring shorthands. In-body refs are already qualified by `qualify_crate`."""
     # String-described concept -> explicit description-only ConceptBlueprint (structureless).
     if isinstance(value, str):
         return ConceptBlueprint(source=source, description=value)
 
-    updates: dict[str, object] = {}
-    if value.refines:
-        updates["refines"] = ConceptFactory.make_refine(value.refines, domain_code=owner_domain)
-    if isinstance(value.structure, dict):
-        normalized_structure = normalize_structure_blueprint(value.structure)
-        updates["structure"] = {
-            field_name: _qualify_structure_field(field_blueprint, domain=owner_domain) for field_name, field_blueprint in normalized_structure.items()
-        }
-    return value.model_copy(update=updates) if updates else value
-
-
-def _qualify_structure_field(field_blueprint: ConceptStructureBlueprint, *, domain: str) -> ConceptStructureBlueprint:
-    field_updates: dict[str, object] = {}
-    if field_blueprint.concept_ref:
-        field_updates["concept_ref"] = _qualify_concept_ref(field_blueprint.concept_ref, domain=domain)
-    if field_blueprint.item_concept_ref:
-        field_updates["item_concept_ref"] = _qualify_concept_ref(field_blueprint.item_concept_ref, domain=domain)
-    return field_blueprint.model_copy(update=field_updates) if field_updates else field_blueprint
-
-
-def _qualify_concept_ref(concept_ref_or_code: str, *, domain: str) -> str:
-    # make_concept_ref_with_domain_from_concept_ref_or_code resolves natives to `native.<Code>`,
-    # bare refs to `domain.<Code>`, and preserves cross-package `alias->domain.Code` as-is (deferred).
-    return ConceptFactory.make_concept_ref_with_domain_from_concept_ref_or_code(domain_code=domain, concept_ref_or_code=concept_ref_or_code)
+    if not isinstance(value.structure, dict):
+        return value
+    # String structure fields -> explicit `text` fields.
+    return value.model_copy(update={"structure": normalize_structure_blueprint(value.structure)})
 
 
 def _flatten_refinement(concepts: dict[str, _ConceptEntry]) -> None:
@@ -219,99 +190,6 @@ def _native_effective_structure(native_ref: str) -> dict[str, ConceptStructureBl
     if not isinstance(materialized.structure, dict):
         return None
     return {field_name: field for field_name, field in materialized.structure.items() if isinstance(field, ConceptStructureBlueprint)}
-
-
-# --------------------------------------------------------------------------------------------------
-# Pipes
-# --------------------------------------------------------------------------------------------------
-
-
-def _index_pipe_refs_by_code(*, pipes: dict[str, PipeBlueprintUnion]) -> dict[str, list[str]]:
-    """Group the crate's own pipe refs by bare code — the index a bare in-body ref resolves against.
-
-    Cross-package entries are excluded, mirroring `PipeLibrary.get_optional_pipe`, whose bare-code
-    fallback searches only the entries that are not `alias->…` prefixed.
-    """
-    by_code: dict[str, list[str]] = defaultdict(list)
-    for pipe_ref in pipes:
-        if QualifiedRef.has_cross_package_prefix(pipe_ref):
-            continue
-        by_code[QualifiedRef.parse(pipe_ref).local_code].append(pipe_ref)
-    return by_code
-
-
-def _normalize_pipe(blueprint: PipeBlueprintUnion, *, owner_domain: str, pipe_refs_by_code: dict[str, list[str]]) -> PipeBlueprintUnion:
-    updates: dict[str, object] = {}
-    if blueprint.inputs:
-        updates["inputs"] = {name: _qualify_io_ref(ref, domain=owner_domain) for name, ref in blueprint.inputs.items()}
-    if blueprint.output:
-        updates["output"] = _qualify_io_ref(blueprint.output, domain=owner_domain)
-
-    def qualify(*, pipe_ref: str) -> str:
-        return _qualify_pipe_ref(pipe_ref, owner_domain=owner_domain, pipe_refs_by_code=pipe_refs_by_code)
-
-    match blueprint:
-        case PipeSequenceBlueprint():
-            updates["steps"] = [step.model_copy(update={"pipe": qualify(pipe_ref=step.pipe)}) for step in blueprint.steps]
-        case PipeParallelBlueprint():
-            updates["branches"] = [branch.model_copy(update={"pipe": qualify(pipe_ref=branch.pipe)}) for branch in blueprint.branches]
-        case PipeConditionBlueprint():
-            if blueprint.outcomes:
-                updates["outcomes"] = {key: qualify(pipe_ref=pipe_ref) for key, pipe_ref in blueprint.outcomes.items()}
-            if blueprint.default_outcome:
-                updates["default_outcome"] = qualify(pipe_ref=blueprint.default_outcome)
-        case PipeBatchBlueprint():
-            if blueprint.branch_pipe_code:
-                updates["branch_pipe_code"] = qualify(pipe_ref=blueprint.branch_pipe_code)
-        case _:
-            pass
-
-    return blueprint.model_copy(update=updates)
-
-
-def _qualify_io_ref(io_ref: str, *, domain: str) -> str:
-    if QualifiedRef.has_cross_package_prefix(io_ref):
-        return io_ref  # cross-package deferred
-    parsed = parse_concept_with_multiplicity(io_ref)
-    qualified = _qualify_concept_ref(parsed.concept_ref_or_code, domain=domain)
-    return _render_ref_with_markers(qualified, parsed=parsed)
-
-
-def _render_ref_with_markers(concept_ref: str, *, parsed: MultiplicityParseResult) -> str:
-    if parsed.multiplicity is True:
-        suffix = "[]"
-    elif isinstance(parsed.multiplicity, int):
-        suffix = f"[{parsed.multiplicity}]"
-    else:
-        suffix = ""
-    return f"{concept_ref}{suffix}{parsed.presence.symbol}"
-
-
-def _qualify_pipe_ref(pipe_ref: str, *, owner_domain: str, pipe_refs_by_code: dict[str, list[str]]) -> str:
-    """Qualify one in-body pipe ref against the crate, the way the live library resolves it.
-
-    A bare code is **not** the owner domain's by assumption: `PipeLibrary.get_optional_pipe` resolves
-    it by searching every domain, so a pipe legitimately calls a sibling domain's pipe by bare code.
-    Prefixing the owner domain here would name a pipe absent from `crate.pipes` — a crate that
-    fingerprints the wrong content and dies with `PipeNotFoundError` on round-trip, with nothing
-    raised on the way in. The crate-wide search is the same lookup, so the two readers agree; on
-    ambiguity the library raises and so does this, rather than silently picking a winner.
-    """
-    if QualifiedRef.has_cross_package_prefix(pipe_ref):
-        return pipe_ref  # cross-package deferred
-    if pipe_ref in SpecialOutcome.value_list():
-        return pipe_ref
-    if "." in pipe_ref:
-        return pipe_ref
-
-    matches = pipe_refs_by_code.get(pipe_ref, [])
-    if len(matches) == 1:
-        return matches[0]
-    if not matches:
-        msg = f"Pipe ref '{pipe_ref}' (in domain '{owner_domain}') resolves to no pipe in the crate."
-        raise CrateNormalizationError(msg)
-    msg = f"Ambiguous pipe ref '{pipe_ref}' (in domain '{owner_domain}') matches {sorted(matches)} in the crate. Use a domain-qualified ref."
-    raise CrateNormalizationError(msg)
 
 
 # --------------------------------------------------------------------------------------------------
