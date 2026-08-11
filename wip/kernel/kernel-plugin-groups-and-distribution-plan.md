@@ -14,7 +14,7 @@
 | A | A1 group-split mechanism | **done** — see [A1 as built](#a1--as-built) |
 | A | A2 external-plugin migration | **done** — three planned repos + the cookbook example (D-A3-1), verified against the A1 core; local commits, none pushed. See [A2 as built](#a2--as-built) |
 | A | A3 gates + checkpoint | **done** — 🛑 [CHECKPOINT A](#a3--as-built) reached; Part A complete and green, nothing pushed |
-| B | B0 footprint measurement | not started |
+| B | B0 footprint measurement | **done** — measured 2026-08-11; deliverable [`kernel-distribution-footprint.md`](kernel-distribution-footprint.md). Read-only, no source changed. See [B0 as built](#b0--as-built) |
 | B | B1 decisions | not started |
 | B | B2 the move + gates | not started |
 | C | C0 the greenlight | hypothetical — no decision taken |
@@ -165,6 +165,19 @@ The kernel layer moves out of `pipelex/` into a top-level `pipelex_kernel/` pack
 ### B0 — footprint measurement (read-only, can start any time)
 
 Compute what the kernel package would actually contain and require: the kernel layer's module set (seeded by the kernel-layer import-closure test and the kernel boot contract's `sys.modules` sweep), its third-party dependency closure, and an install-size estimate. Deliverable: `wip/kernel/kernel-distribution-footprint.md`. This drives B1's content line now, and would inform a Part C greenlight and its extras design later: if the hard dependency set is small, the eventual headline ("look how little you need") is an asset; if provider plumbing drags heavy deps, extras (`pipelex-kernel[<backend>]`) would get designed before any publish, not after.
+
+#### B0 — as built
+
+Measured 2026-08-11 at the Part A end-state, three ways that agree where they overlap: a static import graph over every `pipelex/**/*.py`, a runtime `sys.modules` sweep of four boot scenarios in fresh subprocesses, and a dependency/size closure over installed distributions. Full numbers, method and caveats in [`kernel-distribution-footprint.md`](kernel-distribution-footprint.md) — not inlined here, per this plan's Checkpoint-B instruction.
+
+Four results change decisions this plan had already written down:
+
+- **The dependency headline is not "look how little you need."** A kernel core install is about two thirds of a full one, and its floor is dominated by four dependencies that owe nothing to the interpreter. A small headline for a hypothetical Part C has to be bought by extras design, not by the layer split — which reframes OQ-2 from "do we want extras" to "the core is where the weight is".
+- **D-B2's "the tools subset the closure actually reaches" should be retired.** Nearly all of `pipelex.tools` has a kernel-layer importer; the exceptions are a handful of modules. `pipelex.tools` moves whole.
+- **The content line gains four boundary decisions the plan did not name** — `pipelex.cli.exceptions` (which also blocks D-B4's "no CLI in the kernel package"), `pipelex.language.mthds_config` (a config-composition problem, not a file move), `pipelex.runtime_bridge.orchestration_mode`, and `pipelex.kit.paths` — alongside the top-level modules D-B2 did anticipate.
+- **The strongest argument for Part B turned out to be a gate argument, not a legibility one.** The declared kernel layer and the closure test's named interpreter packages do not partition the tree; every current cross-layer import lands in the unnamed remainder, which is precisely why every gate is green. D-B5's ban is the first rule stated over the package boundary rather than over a curated set of names, so it is the first one that closes that gap. One live breach found and deferred (KF-18 in [`deferred-follow-ups.md`](deferred-follow-ups.md)); two undeclared direct dependencies found, which are a latent break in `pipelex` today independent of Part B.
+
+B1 is unblocked: its content line is the declared kernel layer whole, plus five top-level modules, minus the four decisions above.
 
 ### B1 — decisions
 
