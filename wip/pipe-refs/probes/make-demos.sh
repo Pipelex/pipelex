@@ -10,7 +10,10 @@
 
 set -euo pipefail
 
-TARGET="${1:-$(mktemp -d -t bare-ref-demos)}"
+# POSIX-portable form. `mktemp -d -t bare-ref-demos` works on BSD/macOS but GNU coreutils reads the
+# argument as a template needing X's and aborts — which, under `set -e`, kills the script before it
+# writes a single demo.
+TARGET="${1:-$(mktemp -d "${TMPDIR:-/tmp}/bare-ref-demos.XXXXXX")}"
 mkdir -p "$TARGET"
 
 # --- 1. ambiguous: two domains declare `summarize`; alpha calls it bare -----------------------

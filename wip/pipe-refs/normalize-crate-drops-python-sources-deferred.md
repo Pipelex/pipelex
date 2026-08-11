@@ -20,7 +20,9 @@ So the fix moves customer Python source into a CLI stdout stream and an HTTP res
 
 ## Why Phase 1 could leave it alone safely
 
-The extracted qualification pass does **not** reproduce the bug: `qualify_crate` copies the envelope with `crate.model_copy(update=...)` rather than reconstructing it field by field, so every field it does not name survives by construction — including this one. That is the structural reason to prefer `model_copy` over a constructor in a pass that is meant to be envelope-preserving, and it is why this note is a deferral rather than a blocker.
+The extracted qualification pass does **not** reproduce the bug, and for a stronger reason than the one first written here: `qualify_crate` returns a `QualifiedCrateContent` — just the rewritten `concepts` and `pipes` — never a `LibraryCrate`. There is no envelope for it to rebuild, so there is no field for it to drop. The class of bug is unrepresentable in the pass rather than merely avoided by it, which is why this note is a deferral and not a blocker.
+
+*(An earlier draft of this paragraph credited `crate.model_copy(update=…)` for preserving the envelope. That described the pass's first cut, which returned a crate; review pushed back on that return type and it changed. The claim is recorded here as corrected rather than silently swapped, because "why the pass is safe" is exactly the sentence a future reader will lean on.)*
 
 ## What a fix would need
 

@@ -34,10 +34,10 @@ Four readers of one authored fact. They do not agree, and only one of them agree
 
 | Reader | Where | Bare ref behaviour |
 | --- | --- | --- |
-| `PipeLibrary.get_optional_pipe` | `pipelex/libraries/pipe/pipe_library.py:81-93` | Searches **every** domain (`# 3. Bare code fallback — search across domains`); one match wins, several raise `PipeLibraryError` |
-| `_qualify_pipe_ref` | `pipelex/libraries/crate_normalization.py:290` | Same crate-wide search, **deliberately** mirrored onto the normalizer so the two readers agree (PR #1085) |
-| `_qualify_concept_ref` | `pipelex/libraries/crate_normalization.py:135` | Qualifies as `<owner domain>.<Code>`, no search — **this one matches the standard** |
-| `ConceptLibrary.get_required_concept_from_concept_ref_or_code` | `pipelex/libraries/concept/concept_library.py:200-210` | With `search_domain_codes=None`, walks every concept in the library and raises on a collision — the same shape as the pipe fallback |
+| `PipeLibrary.get_optional_pipe` | `pipelex/libraries/pipe/pipe_library.py` (step 3, since deleted) | Searches **every** domain (`# 3. Bare code fallback — search across domains`); one match wins, several raise `PipeLibraryError` |
+| `_qualify_pipe_ref` | then `crate_normalization.py`, now `crate_qualification.py` | Same crate-wide search, **deliberately** mirrored onto the normalizer so the two readers agree (PR #1085) |
+| `_qualify_concept_ref` | then `crate_normalization.py`, now `crate_qualification.py` | Qualifies as `<owner domain>.<Code>`, no search — **this one matches the standard** |
+| `ConceptLibrary.get_required_concept_from_concept_ref_or_code` | `pipelex/libraries/concept/concept_library.py` | With `search_domain_codes=None`, walks every concept in the library and raises on a collision — the same shape as the pipe fallback |
 
 So: **pipes** agree with each other and disagree with the standard. **Concepts** disagree with each other — the normalizer complies, the live library does not. The pipe fix chose which reader to move; it moved the normalizer *away* from the standard, and it did not touch concepts.
 
@@ -253,7 +253,7 @@ python wip/pipe-refs/probes/classify-bare-refs.py ../pipelex-cookbook ../pipelex
     ../conformance ../pipelex-platform
 
 # concept lookup matrix (§4)
-python wip/pipe-refs/probes/concept-lookup-matrix.py
+.venv/bin/python wip/pipe-refs/probes/concept-lookup-matrix.py   # needs the venv: this probe imports pipelex
 
 # the five demo closures (§3, §4)
 DEMOS=$(./wip/pipe-refs/probes/make-demos.sh | tail -1)

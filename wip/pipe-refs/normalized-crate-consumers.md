@@ -9,7 +9,7 @@ This was the plan's stated worry — "if formatting persists a qualified ref int
 The one command that *does* rewrite user `.mthds` files is `pipelex fix`, and it does not go through a crate at all: `fix_loop` edits a tomlkit DOM of the user's own file, applying ops planned from validation-error data. Two properties keep it clear of this change:
 
 - The ops that write a ref (`SET_KEY` into `["pipe", <code>, "inputs"]`) write **concept** refs, which are already qualified at build time today and are unaffected by Phase 2.
-- **No fix op writes a pipe ref.** `RENAME_TABLE_KEY` renames a pipe's own table key; nothing sets a `steps[].pipe`, a branch, an outcome, or a `branch_pipe_code`.
+- **No fix op writes an *in-body* pipe ref.** `RENAME_TABLE_KEY` renames a pipe's own table key; nothing sets a `steps[].pipe`, a branch, an outcome, or a `branch_pipe_code`. One fix op *does* write a pipe ref, and it is worth naming rather than glossing: `strip-namespace` plans a root `SET_KEY` of `main_pipe`. That is an **entry-point** ref, not an in-body one, and it *strips* a same-domain prefix rather than adding one — so it cannot rewrite an author's bare in-body spelling into a qualified one, which is the hazard this section is actually about. (`planner.py`'s `_plan_strip_namespace` says so in its own docstring: only the declaration key and `main_pipe` are ever stripped, because internal refs keep resolving without a rewrite.)
 
 That second property is load-bearing and worth restating in Phase 2: it holds today, and a new fix kind that writes a pipe ref would newly rewrite an author's bare spelling into a qualified one. It is a property to re-check, not an invariant to assume.
 

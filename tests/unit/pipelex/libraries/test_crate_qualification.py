@@ -182,8 +182,26 @@ class TestCrateQualification:
         assert isinstance(sequence, PipeSequenceBlueprint)
         assert sequence.steps[0].pipe == "dep->helper"
 
+    def test_a_step_naming_a_pipe_called_continue_is_still_qualified(self):
+        """`continue` is a legal snake_case pipe code, so it is only special in a condition outcome.
+
+        Exempting it everywhere — which is what the pass did until a review caught it — leaves a real
+        reference unqualified, and under the strict lookup an unqualified ref resolves to nothing.
+        """
+        crate = _crate()
+        crate.pipes["alpha.continue"] = PipeLLMBlueprint(description="a pipe genuinely named continue", output="Text", prompt="go")
+        crate.pipes["alpha.calls_continue"] = PipeSequenceBlueprint(
+            description="a step naming that pipe",
+            output="Text",
+            steps=[SubPipeBlueprint(pipe="continue")],
+        )
+
+        sequence = qualify_crate(crate).pipes["alpha.calls_continue"]
+        assert isinstance(sequence, PipeSequenceBlueprint)
+        assert sequence.steps[0].pipe == "alpha.continue"
+
     def test_special_outcomes_pass_through_untouched(self):
-        """`fail` / `continue` are outcomes, not pipe refs."""
+        """`fail` / `continue` are outcomes, not pipe refs — in a condition, and only there."""
         crate = _crate()
         crate.pipes["alpha.route_special"] = PipeConditionBlueprint(
             description="route to special outcomes",
