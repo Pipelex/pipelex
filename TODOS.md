@@ -175,13 +175,21 @@ The pipe rule is complete and self-consistent: canonical form and runtime agree,
 Same root cause as Phase 2 — crate-wide search where owner scope was meant — but an independent surface with its own caller sweep. Kept separate so the pipe fix has a finish line that does not depend on it.
 
 - [ ] Collapse `ConceptLibrary.get_required_concept_from_concept_ref_or_code`'s `search_domain_codes` machinery (`pipelex/libraries/concept/concept_library.py` + `concept_provider_abstract.py`) into the entry-affordance shape decided in Phase 2. Reached only from run-setup input shaping (`stuff_factory` ← `working_memory_factory` / `input_shaper` / `kernel/memory_ops`).
-- [ ] **Scope the concept lookup by package, not just domain.** After resolving `alias->dep.domain.pipe`, `pipeline_run_setup` retains only `pipe.domain_code` and `pipe.code` (`pipelex/pipeline/pipeline_run_setup.py:200`), while dependency concepts are stored under `alias->domain.Concept` (`pipelex/libraries/concept/concept_library.py:225`). "Prefer the entry pipe's domain" therefore misses the dependency-local concept and can fall through to an ambiguous host-wide scan. Domain is not enough — the lookup needs package / child-library scope. This is the concept twin of OQ1; reuse that answer.
+- [ ] **Scope the concept lookup by package, not just domain.** After resolving `alias->dep.domain.pipe`, `pipeline_run_setup` retains only `pipe.domain_code` and `pipe.code` (where it builds `search_domain_codes`), while dependency concepts are stored under `alias->domain.Concept` (by `ConceptLibrary.add_dependency_concept`). "Prefer the entry pipe's domain" therefore misses the dependency-local concept and can fall through to an ambiguous host-wide scan. Domain is not enough — the lookup needs package / child-library scope. This is the concept twin of OQ1; reuse that answer.
 - [ ] Exclude aliased dependency keys from the concept crate-wide search too (same reasoning as Phase 2).
 - [ ] Delete the latent defects README §4 documents: the multi-domain list dying on the first miss, and the miss escaping as the wrong exception class.
 - [ ] Decide whether `pipeline_run_setup`'s own-domain-first ordering becomes meaningful or gets deleted along with the list parameter; sweep the callers (`pipeline_run_setup.py`, `runner.py`, `execution_seams.py`, `working_memory_factory.py`, `input_shaper.py`, `stuff_factory.py`, `kernel/memory_ops.py`) for the signature change.
-- [ ] Relax `_pipe_codes_by_file`'s rename collision scope in `pipelex/pipeline/fixes/fix_loop.py` from crate-wide to per-domain (it can only over-block today, but it is part of the rule's footprint).
+- [ ] Relax `_pipe_codes_by_file`'s rename collision scope in `pipelex/pipeline/fixes/fix_loop.py` from crate-wide to per-domain (it can only over-block today, but it is part of the rule's footprint). ⚠ Phase 2 already corrected that function's **docstring**, whose stated justification ("`get_optional_pipe` raises on a bare code declared by two domains") stopped being true when the fall-through was deleted. The behaviour change itself is still open here.
 - [ ] Tests: the resolution rows for concepts on the two-domain fixture; the ambiguity behavior settled in Phase 2; the package-scoped dependency-concept case; and two same-named pipes in different domains renaming independently after the `fix_loop` relaxation.
 - [ ] Gates checklist clean (all five items).
+
+**Carry these forward from Phase 2 — each cost real time to learn:**
+
+- **A single-domain fixture cannot discriminate this rule.** Owner-scope and the crate-wide search agree on every input where only one domain exists, so a concept test without a competing sibling declaration passes just as happily under the rule being deleted. Mutation-check every resolution row: put the old rule back and confirm the row goes red.
+- **Mutate the wiring, not just the rule.** Removing the qualification from the *dependency* load path reddened nothing in the entire suite — every other test loads a single-domain library. Assume the same blind spot exists on the concept side and go looking for it deliberately.
+- **Run the whole suite, including `tests/e2e`.** Phase 2's fixture sweep collected failures from `tests/unit` + `tests/integration` only and shipped two e2e failures into a "green" checkpoint.
+- **A review finding that names a file and a line is a claim to verify.** Phase 2's batched-derivation item predicted the wrong consequence, and the first test written for it passed against the bug.
+- **Do not touch the working tree while `agent-test` runs**, and read the run's log rather than the harness's exit-code summary — one reported success over a log ending in `Error 1`.
 
 ### ⛔ CHECKPOINT C3 — MANDATORY STOP
 
