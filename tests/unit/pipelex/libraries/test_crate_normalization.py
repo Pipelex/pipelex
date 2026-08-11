@@ -327,10 +327,36 @@ class TestCrateNormalization:
             output="Text",
             prompt="Present $data",
         )
+        crate.pipes["orchestrator.render_html"] = PipeLLMBlueprint(
+            description="The orchestrator's own renderer",
+            inputs={"data": "Text"},
+            output="Text",
+            prompt="Render $data",
+        )
         result = normalize_crate(crate, mthds_version=MTHDS_TEST_VERSION)
+
+        # All four kinds, matching the sibling-only row: a cross-domain fall-through would hide in a
+        # branch, an outcome or a batch ref just as readily as in a step, so a row that checks only
+        # steps is a row that only half-holds.
         sequence = result.pipes["orchestrator.run_all"]
         assert isinstance(sequence, PipeSequenceBlueprint)
         assert sequence.steps[0].pipe == "orchestrator.present_as_markdown"
+
+        parallel = result.pipes["orchestrator.fan_out"]
+        assert isinstance(parallel, PipeParallelBlueprint)
+        assert [branch.pipe for branch in parallel.branches] == ["orchestrator.present_as_markdown", "orchestrator.render_html"]
+
+        condition = result.pipes["orchestrator.route"]
+        assert isinstance(condition, PipeConditionBlueprint)
+        assert condition.outcomes == {"markdown": "orchestrator.present_as_markdown"}
+        assert condition.default_outcome == "orchestrator.render_html"
+
+        batch = result.pipes["orchestrator.batch_all"]
+        assert isinstance(batch, PipeBatchBlueprint)
+        assert batch.branch_pipe_code == "orchestrator.present_as_markdown"
+
+        # And the sibling's own pipes are untouched — qualification is per declaring pipe.
+        assert "presentation.present_as_markdown" in result.pipes
 
     def test_bare_pipe_ref_matching_nothing_is_qualified_not_raised(self):
         """Resolution row `nowhere`: the pass qualifies and moves on; it does not check existence.
