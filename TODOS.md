@@ -55,10 +55,10 @@ Entry-shaped lookups (a human typing a pipe code at a CLI) do NOT follow that ru
 
 ## Status
 
-- **Current phase:** not started. Plan written 2026-08-11; reviewed and restructured 2026-08-11 (see `## GSTACK REVIEW REPORT` at the end of this file).
-- **Last completed item:** —
-- **Decisions taken:** phase structure reworked so no checkpoint rests on a self-contradicting tree; OQ1 promoted to a Phase 0 go/no-go gate; breaking-change posture held (no deprecation period) but preceded by a bounded corpus measurement.
-- **Surprises / fallout:** —
+- **Current phase:** Phase 0 COMPLETE (checkpoint C0 passed 2026-08-11). Next session starts at Phase 1.
+- **Last completed item:** C0 — OQ1 ruling and corpus measurement recorded and committed.
+- **Decisions taken:** phase structure reworked so no checkpoint rests on a self-contradicting tree; OQ1 promoted to a Phase 0 go/no-go gate; breaking-change posture held (no deprecation period) but preceded by a bounded corpus measurement. **OQ1 ruled GO** — owner-domain qualification is neutral-to-better for dependency packages; the dependency lookup-scope defect it exposed is pre-existing and deferred to the packaging project (`wip/pipe-refs/dependency-subpipe-scope-deferred.md`).
+- **Surprises / fallout:** (1) the dependency execution path has **no** child-library scoping at all — a dependency package using a controller internally either fails to load or silently binds a host pipe of the same bare code; the child-library special case in `Library.validate_pipe_library_with_libraries`'s first loop is neutralized by `pipe.validate_with_libraries()` in the second. Worse in the shape a package actually ships: with a manifest `[exports]`, the authored helper is dropped from the dependency's own child library and the load fails earlier still. (2) README §5's corpus scan used a hardcoded repo list that reached under a fifth of the bundles outside this repo; the widened scan is in `wip/pipe-refs/corpus-measurement.md`, and the second breaking reference lives in `cocode` — a shipped CLI, not an examples directory.
 - **Open risks carried in:** four latent defects surfaced by the outside-voice pass are folded into Phases 1–3 below (batched sub-pipe code derivation, transported `PipeFunc` bare codes, the crate fingerprint contract, aliased dependency keys polluting the crate-wide search). None of them is speculative; each names a file.
 
 ---
@@ -67,15 +67,15 @@ Entry-shaped lookups (a human typing a pipe code at a CLI) do NOT follow that ru
 
 Nothing here writes product code. Both items exist because their answers can change what gets built, and both are cheaper now than later.
 
-- [ ] **OQ1 — dependency-pipe lookup scoping (GO/NO-GO).** Dependency pipes are keyed `alias->domain.code` in the host library, and `pipelex/libraries/library.py` consults per-dependency child libraries during validation. Establish precisely which library a dep pipe's lazy sub-pipe lookup consults at execution time, and confirm the qualified refs produced by the pass resolve correctly in that scope. **If they do not, STOP and re-open the design** — owner-domain qualification would be wrong for dependency packages, and the strict lookup would remove the fallback currently hiding that. Record the answer in the design doc; the packaging work needs it regardless.
-- [ ] **Measure the fall-through corpus.** `wip/pipe-refs/README.md` scopes its evidence to in-workspace bundles, so the size of the break is currently unknown. Scan every reachable `.mthds` corpus — cookbook, hub, starters, and any customer bundles you have access to — for bare in-body refs that resolve cross-domain today. This does **not** gate shipping: the repo's no-backward-compatibility principle stands and there is no deprecation period. It feeds the changelog wording and calibrates how much to invest in the error message.
+- [x] **OQ1 — dependency-pipe lookup scoping (GO/NO-GO).** **Answered: GO.** Measured with `wip/pipe-refs/probes/dep-subpipe-scope.py` across three package shapes. Execution consults the **host** library unconditionally, and its bare-code fall-through skips `alias->` entries — so a dependency's own bare sub-pipe ref never reaches the dependency's own pipe *today*: a plain host fails to load, a host declaring the same bare code loads and silently binds the host's pipe, and a dependency with a real `[exports]` manifest fails earlier still because the export filter drops the authored helper from the child library. Owner-domain qualification does not regress that (the qualified ref resolves to `None` in the host exactly as the bare one does), converts the silent capture into a deterministic not-found, and makes the eventual package-scoped lookup a direct key hit in the child library. The pre-existing defect is written up in `wip/pipe-refs/dependency-subpipe-scope-deferred.md` and deferred to the packaging project.
+- [x] **Measure the fall-through corpus.** **Two bare pipe refs break across every `.mthds` tree in the workspace**, each fixed by one qualified spelling. Recorded with the full table, the reproduction command and the denominator's caveats in `wip/pipe-refs/corpus-measurement.md`. README §5's scan used a hardcoded ten-repo list and missed most of the workspace; enumerating instead multiplies the corpus several times over and finds a second `sibling-only` case in `cocode` — a shipped CLI, not a sample. The `sibling-only` *concept* refs found are vscode-pipelex editor fixtures that already fail to load today, so they are not new breakage.
 
 ### ⛔ CHECKPOINT C0 — MANDATORY STOP
 
-- [ ] Record the OQ1 ruling and the corpus number in the Status block and the design doc.
-- [ ] If OQ1 came back negative, do not proceed — write up what broke the premise and end the session for a design conversation.
-- [ ] Commit the investigation notes.
-- [ ] STOP. Next session starts at Phase 1.
+- [x] Record the OQ1 ruling and the corpus number in the Status block and the design doc.
+- [x] If OQ1 came back negative, do not proceed — write up what broke the premise and end the session for a design conversation. *(Came back positive — proceeding.)*
+- [x] Commit the investigation notes.
+- [x] STOP. Next session starts at Phase 1.
 
 ---
 
@@ -123,7 +123,7 @@ The normalizer and the live library must never disagree in a committed state, so
 - [ ] **Exclude aliased dependency keys from the crate-wide bare search.** `PipeLibrary.root` also holds `alias->…` dependency entries (`pipelex/libraries/pipe/pipe_library.py:81`), so "crate-wide" is not "every value in root". Without this exclusion, installing an unrelated dependency package can make a host pipe ambiguous — reintroducing, through the new affordance, exactly the contextual instability this branch exists to eliminate. Applies to the concept affordance in Phase 3 too.
 - [ ] **Decide and record the share-vs-duplicate question** between this pipe affordance and the concept affordance built in Phase 3. They are near-twins — the concept one adds a domain-preference step, and its spec currently stops at "unique match" without saying what happens when the match is not unique. Decide now whether they share a helper or stay deliberately separate, and settle whether the concept one raises on ambiguity. A written "separate, because X" is a valid answer; an accidental copy discovered in Phase 3 is not.
 - [ ] Expose the affordance through a new `pipelex/interpreter_hub.py` accessor (additive; the transport spec/conformance update for it happens in Phase 4b).
-- [ ] Migrate the in-repo entry-shaped call sites to the affordance: the CLI commands (`which`, `show`, `validate`, the `build`/`codegen` groups), `pipeline_run_setup`, and the builder operations. Controllers, `sub_pipe`, `signature_walk`, and `library` validation need NO edit — they look up refs stored on built objects, which now arrive qualified.
+- [ ] Migrate the in-repo entry-shaped call sites to the affordance: the CLI commands (`which`, `show`, `validate`, the `build`/`codegen` groups), `pipeline_run_setup`, and the builder operations. Controllers, `sub_pipe`, `signature_walk`, and `library` validation need NO edit — they look up refs stored on built objects, which now arrive qualified. ⚠ That is true *only because this phase lands as one change*: `Library.validate_pipe_library_with_libraries`'s first loop looks up a bare sub-pipe code against the child library, whose keys are qualified, so it is served today solely by the step-3 fall-through being deleted below. Deleting the fall-through without qualifying the dependency load path breaks it.
 - [ ] **Qualify the transported `PipeFunc` code.** `PipeFunc` sends `self.code` (`pipelex/pipe_operators/func/pipe_func.py:197`) and the sandbox later calls the now-strict lookup with it (`pipelex/pipe_operators/func/direct_pipe_func_executor.py:170`). Under the strict lookup **every** transported `PipeFunc` fails, not merely ambiguous ones. The DTO must carry a qualified ref; handle the wire change explicitly.
 
 ### The break message

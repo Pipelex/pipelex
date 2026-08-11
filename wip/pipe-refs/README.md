@@ -129,6 +129,8 @@ Three things fall out of that table, and the last two are defects nobody has fil
 
 ## 5. The corpus — which direction is actually expensive
 
+> **Superseded and widened (2026-08-11).** The scan below passes a hardcoded list of ten sibling repos, which turns out to reach under a fifth of the bundles outside this repo. Enumerating the workspace instead multiplies the corpus several times over and finds a **second** breaking reference, in `cocode` — a shipped CLI, not a samples directory. The numbers in this section remain accurate *for the roots it scanned*; read [corpus-measurement.md](corpus-measurement.md) for the current figures, what inflates them, and the reproduction command.
+
 The deferred note's decisive reason was migration cost: *"Every `.mthds` in the wild that leans on cross-domain bare resolution stops loading."* That is the claim the probe was written to check.
 
 `probes/classify-bare-refs.py` reads TOML and nothing else — no `pipelex` import, no library load — so it classifies what the corpus **asks for**, independent of what any resolver does with it. For each merge unit it builds `code -> {domains that declare it}` and sorts every bare in-body reference into four buckets.
