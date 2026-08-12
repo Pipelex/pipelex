@@ -26,10 +26,11 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory, resolve_batch_max_concurrency
+from pipelex.pipe_run.pipe_run_params_factory import resolve_batch_max_concurrency
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.func_registry import func_registry
+from tests.integration.pipelex.fixtures.pipe_job_helpers import make_mode_guarded_run_params
 
 _DOMAIN_CODE = "test_optionals_batch"
 
@@ -48,7 +49,7 @@ def _make_live_run_params() -> PipeRunParams:
     exercising the setting in the one test suite where the bound changes behavior. The field is
     required now, so the omission cannot recur silently — the factory is the single writer.
     """
-    return PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE)
+    return make_mode_guarded_run_params(pipe_run_mode=PipeRunMode.LIVE)
 
 
 def _build_compacting_batch() -> PipeBatch:

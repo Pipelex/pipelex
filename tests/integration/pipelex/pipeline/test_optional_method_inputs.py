@@ -18,11 +18,11 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
-from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.execution_seams import prepare_pipe_job
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.func_registry import func_registry
+from tests.integration.pipelex.fixtures.pipe_job_helpers import make_mode_guarded_run_params
 
 
 def optionals_method_report(working_memory: WorkingMemory) -> TextContent:
@@ -150,7 +150,7 @@ class TestOptionalMethodInputs:
         """
         load_empty_library()
         pipe = _make_method_pipe()
-        run_params = PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE)
+        run_params = make_mode_guarded_run_params(pipe_run_mode=PipeRunMode.LIVE)
 
         with pytest.raises(PipeRunInputsError) as exc_info:
             await pipe.run_pipe(

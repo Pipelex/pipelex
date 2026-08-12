@@ -24,9 +24,9 @@ from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeCond
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
+from tests.integration.pipelex.fixtures.pipe_job_helpers import make_mode_guarded_run_params
 
 
 def _make_continue_only_condition() -> PipeCondition:
@@ -55,16 +55,7 @@ def _make_input_text_stuff():
 
 
 def _make_run_params(run_mode: PipeRunMode) -> PipeRunParams:
-    run_params = PipeRunParamsFactory.make_run_params(pipe_run_mode=run_mode)
-    # The factory is the single writer of the run-mode and fan-out-bound fields, so the fixture goes
-    # through it rather than hand-building params. Assert the mode survived: under a keyless boot the
-    # factory coerces LIVE to DRY, which would silently swap which controller path the test exercises.
-    match run_mode:
-        case PipeRunMode.LIVE:
-            assert run_params.run_mode.is_live, f"This test must run the live controller path — the boot coerced it to {run_params.run_mode}"
-        case PipeRunMode.DRY:
-            assert run_params.run_mode.is_dry, f"This test must run the dry controller path — the boot coerced it to {run_params.run_mode}"
-    return run_params
+    return make_mode_guarded_run_params(pipe_run_mode=run_mode)
 
 
 @pytest.mark.asyncio(loop_scope="class")

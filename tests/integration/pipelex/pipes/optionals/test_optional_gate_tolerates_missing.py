@@ -21,15 +21,15 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
+from tests.integration.pipelex.fixtures.pipe_job_helpers import make_mode_guarded_run_params
 
 _DOMAIN_CODE = "test_optionals_gate"
 
 
 def _make_live_run_params() -> PipeRunParams:
-    return PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE)
+    return make_mode_guarded_run_params(pipe_run_mode=PipeRunMode.LIVE)
 
 
 def _register_guarded_compose() -> None:

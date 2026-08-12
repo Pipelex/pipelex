@@ -24,10 +24,10 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.func_registry import func_registry
+from tests.integration.pipelex.fixtures.pipe_job_helpers import make_mode_guarded_run_params
 
 _DOMAIN_CODE = "test_optionals_companion"
 
@@ -51,7 +51,7 @@ _TEST_FUNCS = [optionals_comp_find, optionals_comp_find_many, optionals_comp_sin
 
 
 def _make_live_run_params() -> PipeRunParams:
-    return PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE)
+    return make_mode_guarded_run_params(pipe_run_mode=PipeRunMode.LIVE)
 
 
 def _build_sequence_with_liftable_parallel() -> PipeSequence:
