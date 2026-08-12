@@ -2,7 +2,7 @@
 
 Deferred out of the `fix/Native-date-time` work (PR #1089). Cross-repo and release-gated — not a code defect in `pipelex`, and it does not block that PR. A second deferred item from the same review concerns another repo entirely and is tracked at workspace level.
 
-Background: the fix gave the `Date` and `Time` natives one ISO 8601 contract, owned by `pipelex/core/stuffs/iso_temporal.py` and shared by the content models and `StuffContentFactory`. The natives now accept the **extended** forms only, and refuse the end-of-day `24:00` spelling. See `TODOS.md` in this repo for the full plan and the round-by-round review decisions.
+Background: the fix gave the `Date` and `Time` natives one ISO 8601 contract, owned by `pipelex/core/stuffs/iso_temporal.py` and shared by the content models and `StuffContentFactory`. The natives now accept the **extended** forms only, and refuse the end-of-day `24:00` spelling. See [plan-and-review-log.md](plan-and-review-log.md) for the full plan and the round-by-round review decisions.
 
 ## The authoring guidance still says plain "ISO 8601"
 

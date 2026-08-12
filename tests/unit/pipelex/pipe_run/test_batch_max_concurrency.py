@@ -6,6 +6,8 @@ tests pin the resolution table and the write-once discipline. (The field is `fro
 post-construction write is a *type* error — no runtime test needed for what the checkers block.)
 """
 
+from typing import Literal
+
 import pytest
 
 from pipelex.config import get_config
@@ -25,7 +27,7 @@ class TestBatchMaxConcurrency:
     )
     def test_setting_translates_to_gather_bounded_argument(
         self,
-        max_concurrency_setting: int | str,
+        max_concurrency_setting: int | Literal["unbounded"],
         expected_bound: int | None,
     ) -> None:
         """The literal "unbounded" config maps to None (gather_bounded's no-bound sentinel); an int passes through.

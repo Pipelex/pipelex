@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pipelex.cogt.content_generation.cogt_run_params import check_mock_usage_requires_dry
 from pipelex.config import get_config
@@ -8,7 +8,7 @@ from pipelex.runtime_hub import resolve_run_mode_for_boot
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 
-def resolve_batch_max_concurrency(max_concurrency_setting: int | str) -> int | None:
+def resolve_batch_max_concurrency(max_concurrency_setting: int | Literal["unbounded"]) -> int | None:
     """Translate the ``pipeline_execution_config.max_concurrency`` setting into a ``gather_bounded`` bound.
 
     The config exposes the explicit literal ``"unbounded"``; ``gather_bounded`` takes ``None`` for no

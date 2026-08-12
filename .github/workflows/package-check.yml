@@ -20,7 +20,7 @@ jobs:
           if ! grep -qE "^[[:space:]]*requires-python[[:space:]]*=[[:space:]]*['\"][^'\"]*>=3\.11([^0-9A-Za-z][^'\"]*)?['\"]" pyproject.toml; then
             echo "❌ requires-python must start at >=3.11 — pipelex core supports Python 3.11+."
             echo "The Mistral Workflows orchestration integration that needs Python 3.12 ships as a"
-            echo "separate package; do not raise pipelex's own floor for it."
+            echo "separate package — see docs/distributed-execution/ ; do not raise pipelex's own floor for it."
             exit 1
           fi
           echo "✅ requires-python floor is >=3.11"

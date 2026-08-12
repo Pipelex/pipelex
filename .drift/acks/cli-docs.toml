@@ -1,8 +1,8 @@
 contract = "cli-docs"
 digest = "sha256:447e5b76aca175977a2001577a3499453d659641d94c5807ef1dbe23c46f9909"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-12T10:21:04Z"
-rationale = "Trigger is a docstring-pointer removal across seven CLI modules: each said 'see ', a path that lives in a private sibling repo and does not exist in this one, so every line was both a leak and a dead pointer for an OSS reader. They now say 'the codegen spec' and keep the section name, so the reader still learns which concept governs. No option, default, exit code, output contract or behavior changed — the diff is comment-only. Reviewed both targets: docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md contain no reference to docs/specs/, to any private repo, or to any of the removed pointers (grepped), and nothing they document about resolve/codegen/build was touched. Neither target is stale; no doc change needed."
+reviewed_at = "2026-08-12T12:00:19Z"
+rationale = "Trigger is a docstring-pointer removal across seven CLI modules: each ended with a see-the-spec tail naming a path in a private sibling repo that does not exist in this one, so every line was both a leak and a dead pointer for an OSS reader. They now say 'the codegen spec' and keep the section name, so the reader still learns which concept governs. No option, default, exit code, output contract or behavior changed - the diff is comment-only. Reviewed both targets: docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md carry no reference to that private path, to any private repo, or to any of the removed pointers (grepped), and nothing they document about resolve/codegen/build was touched. Neither target is stale; no doc change needed. (Re-recorded 2026-08-12: the original rationale was written with backticked paths, which the shell command-substituted away, and it quoted the private path verbatim.)"
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
