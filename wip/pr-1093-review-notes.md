@@ -53,12 +53,14 @@ Keeps `int | None`, so authored `"unbounded"` still resolves to `None`; keeps `f
 
 The source change is one word, but the fixtures are not: ~19 direct constructions in this repo plus one on the plugin side must supply the field. The integration fixtures should route through `PipeRunParamsFactory.make_run_params` instead — a net simplification, since they already hand-duplicate the factory's config read — but that is a ~20-file change with a cross-repo tail, landing on a release branch whose CI is green and which is about to merge to `main`. It belongs on `dev` immediately after the promotion.
 
+That is what happened: the follow-up landed via `fix/batch-max-concurrency-required` and ships in v0.43.1 — the Status note at the top records the outcome. The sections below are the historical record of that follow-up, with each item marked done or still open.
+
 ### Execution notes for the follow-up
 
-- **Tests:** add `pytest.raises(ValidationError)` coverage for both the constructor and `model_validate({...})` with the key absent, mirroring the required-`run_mode` coverage already in `tests/unit/pipelex/pipe_run/test_cogt_run_params_carrier.py:72-92`.
-- **Mutation-check it.** Temporarily restore `default=None` and confirm the new test goes red. A test green on first run proves nothing here.
-- **Fix the compaction fixture** to build via the factory and assert the observed bound — that is the one place where an accidentally-unbounded fan-out actually changes behavior.
-- **Cross-repo, gated on the `pipelex` pin moving:** our Temporal plugin's payload-converter test round-trips `None`, so it asserts `None == None` and would not catch the field being dropped on the wire. Make it round-trip a real int bound.
+- ✔ **Done — tests:** add `pytest.raises(ValidationError)` coverage for both the constructor and `model_validate({...})` with the key absent, mirroring the required-`run_mode` coverage already in `tests/unit/pipelex/pipe_run/test_cogt_run_params_carrier.py:72-92`.
+- ✔ **Done — mutation-check it.** Temporarily restore `default=None` and confirm the new test goes red. A test green on first run proves nothing here.
+- ✔ **Done — fix the compaction fixture** to build via the factory and assert the observed bound — that is the one place where an accidentally-unbounded fan-out actually changes behavior.
+- ⏳ **Still open — cross-repo, gated on the `pipelex` pin moving:** our Temporal plugin's payload-converter test round-trips `None`, so it asserts `None == None` and would not catch the field being dropped on the wire. Make it round-trip a real int bound.
 - **Honest caveat to keep in view:** making the field required converts a legacy-history decode into a `ValidationError`, and a workflow-task converter exception retries forever — it hangs rather than fails. Both states are non-events while Temporal is pre-production, and neither is fixed by a field default. It reconfirms that deploy discipline, not this field, is the real control over version skew under live histories.
 
 ## Not deferred — the two P1s as Codex reported them

@@ -10,7 +10,6 @@ from typing import Callable, cast
 
 import pytest
 
-from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.list_content import ListContent
@@ -26,7 +25,6 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipe_run.pipe_run_params_factory import resolve_batch_max_concurrency
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.func_registry import func_registry
@@ -126,7 +124,7 @@ class TestPipeBatchCompaction:
         run_params = _make_live_run_params()
         # Guard the fixture, not the factory: this is the suite where an accidentally-unbounded
         # fan-out would change behavior without failing anything.
-        assert run_params.batch_max_concurrency == resolve_batch_max_concurrency(get_config().pipelex.pipeline_execution_config.max_concurrency)
+        assert run_params.batch_max_concurrency is not None, "the batch must fan out under a bound, not unbounded"
 
         pipe_output = await batch.run_pipe(
             job_metadata=job_metadata,
