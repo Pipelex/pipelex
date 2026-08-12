@@ -59,7 +59,11 @@ def _make_run_params(run_mode: PipeRunMode) -> PipeRunParams:
     # The factory is the single writer of the run-mode and fan-out-bound fields, so the fixture goes
     # through it rather than hand-building params. Assert the mode survived: under a keyless boot the
     # factory coerces LIVE to DRY, which would silently swap which controller path the test exercises.
-    assert run_params.run_mode == run_mode, f"This test must run the {run_mode} controller path — the boot coerced it to {run_params.run_mode}"
+    match run_mode:
+        case PipeRunMode.LIVE:
+            assert run_params.run_mode.is_live, f"This test must run the live controller path — the boot coerced it to {run_params.run_mode}"
+        case PipeRunMode.DRY:
+            assert run_params.run_mode.is_dry, f"This test must run the dry controller path — the boot coerced it to {run_params.run_mode}"
     return run_params
 
 
