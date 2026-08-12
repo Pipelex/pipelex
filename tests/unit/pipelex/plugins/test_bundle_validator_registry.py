@@ -49,7 +49,7 @@ class TestBundleValidatorRegistry:
     def test_registered_validator_is_retrievable_by_mode(self) -> None:
         """A validator registered for a mode is the exact instance the built registry returns for it."""
         registrar = _make_registrar()
-        registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
+        registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION, group=None)
         validator = _FakeBundleValidator()
 
         registrar.add_bundle_validator(mode=DIRECT_ORCHESTRATION_MODE, validator=validator)
@@ -62,7 +62,7 @@ class TestBundleValidatorRegistry:
     def test_contribution_recorded_on_the_active_plugin(self) -> None:
         """Registering a validator records a ``bundle validator <mode>`` contribution line on the plugin's discovery."""
         registrar = _make_registrar()
-        discovery = registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
+        discovery = registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION, group=None)
 
         registrar.add_bundle_validator(mode="temporal", validator=_FakeBundleValidator())
 
@@ -71,9 +71,9 @@ class TestBundleValidatorRegistry:
     def test_duplicate_mode_fails_loud_naming_both_plugins(self) -> None:
         """Two plugins registering a validator for the same mode is a fail-loud conflict naming both."""
         registrar = _make_registrar()
-        registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
+        registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION, group=None)
         registrar.add_bundle_validator(mode=DIRECT_ORCHESTRATION_MODE, validator=_FakeBundleValidator())
-        registrar.begin_plugin(name="beta", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
+        registrar.begin_plugin(name="beta", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION, group=None)
 
         with pytest.raises(DuplicateBundleValidatorError) as exc_info:
             registrar.add_bundle_validator(mode=DIRECT_ORCHESTRATION_MODE, validator=_FakeBundleValidator())

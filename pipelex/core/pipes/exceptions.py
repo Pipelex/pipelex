@@ -62,9 +62,9 @@ class PipeRunError(PipelexError):
     """A pipe failed while running, with the run mode and the pipe it failed in.
 
     Base of the run-failure family, and it sits here rather than with the pipe-run machinery because
-    the runtime layer subclasses it: `PipeRunInputsError` and `OptionalValueAbsentError` in
+    the kernel layer subclasses it: `PipeRunInputsError` and `OptionalValueAbsentError` in
     `core.pipes.inputs.exceptions` derive from it, so filing the base with the machinery put a
-    module of `pipe_run` — and its whole import chain — inside every runtime import closure.
+    module of `pipe_run` — and its whole import chain — inside every kernel import closure.
     """
 
     def __init__(self, message: str, run_mode: PipeRunMode, pipe_code: str):

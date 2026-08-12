@@ -2,7 +2,7 @@
 
 The semantics live in the module-level ops functions beside this one; the interpreter's operator
 classes call those directly, because they already hold everything the façade would supply. This
-class exists for the *other* caller — the programmatic one, embedding the runtime — and it holds
+class exists for the *other* caller — the programmatic one, embedding the kernel — and it holds
 exactly two things, both of them run-scoped identity:
 
 - ``job_metadata`` — the **run-level** metadata. It is not what a step runs under: each call mints
@@ -25,7 +25,7 @@ every step's :class:`JobMetadata`, which is what the cogt leaf reads to decide w
 emit a usage event. Opening the event log, registering it (``get_report_delegate().set_event_log``),
 reading the events back and clearing the registration stay the caller's, and they are the whole of
 what stands between a kernel run and the interpreter's cost reporting. ``pipelex/tracing/`` holds
-both halves a caller needs (``make_event_log``, ``UsageAggregator``) and is runtime-layer, so none of
+both halves a caller needs (``make_event_log``, ``UsageAggregator``) and is kernel-layer, so none of
 this costs the boot contract. See ``docs/under-the-hood/pipelex-kernel.md``.
 """
 

@@ -33,7 +33,7 @@ class PipelexBundleBlueprintValidationErrorData(BaseModel):
     blueprint validation (before pipe instantiation).
 
     Lives here rather than beside the parser that raises it: `pipeline/` and `libraries/`
-    carry it into every runtime-layer import closure, so an interpreter-layer home would
+    carry it into every kernel-layer import closure, so an interpreter-layer home would
     make the boundary the closure test guards unenforceable. It is the third of the three
     structured error-data models in this module, all keyed on `PipeValidationErrorType`.
     """

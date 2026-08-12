@@ -5,12 +5,12 @@ description: "Operator semantics as importable functions — what pipelex/kernel
 
 # The Pipelex Kernel
 
-This page is for contributors working on Pipelex internals, and for anyone embedding the runtime directly rather than running `.mthds` methods. For how the operator classes above it fit into the whole, see [Architecture Overview](./architecture-overview.md).
+This page is for contributors working on Pipelex internals, and for anyone embedding the kernel directly rather than running `.mthds` methods. For how the operator classes above it fit into the whole, see [Architecture Overview](./architecture-overview.md).
 
 What a `PipeLLM` step actually *does* — resolve a model off the deck, derive a prompting style, assemble the prompt, generate, write the result into memory — used to be reachable only through a fully booted interpreter with a method loaded. [`pipelex/kernel/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/kernel) holds that semantics as plain functions, so it has **one implementation with two kinds of caller**:
 
 - the interpreter's operator classes (`PipeLLM`, `PipeExtract`, `PipeImgGen`, `PipeSearch`, `PipeCompose`, `PipeFunc`), which resolve blueprints, validate inputs, wrap errors and trace, then call the kernel;
-- any **programmatic caller** embedding the runtime, which calls the same functions on a process with zero `.mthds` loaded.
+- any **programmatic caller** embedding the kernel, which calls the same functions on a process with zero `.mthds` loaded.
 
 Single-sourcing is the whole point. Two callers with two copies of "what an LLM step means" drift, and nothing tells you when they have.
 
@@ -18,7 +18,7 @@ Single-sourcing is the whole point. Two callers with two copies of "what an LLM 
 
 ## The boot contract
 
-Every kernel call must be servable on `RuntimeBoot.make()` ([`pipelex/runtime_boot.py`](https://github.com/Pipelex/pipelex/blob/main/pipelex/runtime_boot.py)) — the **runtime-only** composition root, with no interpreter constructed and no library loaded.
+Every kernel call must be servable on `RuntimeBoot.make()` ([`pipelex/runtime_boot.py`](https://github.com/Pipelex/pipelex/blob/main/pipelex/runtime_boot.py)) — the **kernel-only** composition root, with no interpreter constructed and no library loaded.
 
 ```python
 from pipelex.runtime_boot import RuntimeBoot
@@ -50,8 +50,8 @@ Four gates hold this, and each covers something the others miss — see [Hub Lay
 | Gate | What it proves |
 |---|---|
 | `pipelex-dev check-hub-layering` | No kernel *module* imports the interpreter hub |
-| `tests/unit/pipelex/test_runtime_layer_import_closure.py` | A kernel entry point *imports* clean |
-| `tests/unit/pipelex/test_runtime_layer_exceptions_aggregate_gate.py` | No kernel module reaches the exceptions aggregate — imports and bare strings alike |
+| `tests/unit/pipelex/test_kernel_layer_import_closure.py` | A kernel entry point *imports* clean |
+| `tests/unit/pipelex/test_kernel_layer_exceptions_aggregate_gate.py` | No kernel module reaches the exceptions aggregate — imports and bare strings alike |
 | `tests/unit/pipelex/kernel/test_kernel_boot_contract.py` | Every kernel entry point **runs** on a keyless boot, swept afterwards — except the three `resolve_*_setting` helpers, which read the model deck (a separate question from this one) |
 
 Only the last one can see a function-local interpreter import, and it is **per-function**: it catches one inside `run_search` only by calling `run_search`. Every new kernel entry point owes it an arm.
@@ -148,7 +148,7 @@ finally:
 
 Passing a `trace_context` adopts its `graph_id` as the run's `pipeline_run_id`. The two are one identity: letting them diverge would scatter a single run's usage events across two ids, because the registered-context emit path stamps the event log's id while the runner fallback stamps the metadata's — and a read-back keyed on either would silently miss the other's.
 
-`pipelex.tracing` holds both halves a caller needs (`make_event_log` for a configured backend, `UsageAggregator` for the read-back) and is runtime-layer, so none of this costs the boot contract. The records that come out are the same [`TokensUsage` wire records](./tokens-usage-wire-records.md) an `/execute` response carries — pinned by an integration test that runs the same step through both callers and compares them.
+`pipelex.tracing` holds both halves a caller needs (`make_event_log` for a configured backend, `UsageAggregator` for the read-back) and is kernel-layer, so none of this costs the boot contract. The records that come out are the same [`TokensUsage` wire records](./tokens-usage-wire-records.md) an `/execute` response carries — pinned by an integration test that runs the same step through both callers and compares them.
 
 ---
 

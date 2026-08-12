@@ -2,7 +2,7 @@
 
 These describe a *resolution* — "the variable at this path holds an `ImageContent`, fetch it and
 register it" — which is execution semantics, not language. They live here rather than under
-`pipe_operators/` because the kernel is what resolves them, and a runtime-layer module may not
+`pipe_operators/` because the kernel is what resolves them, and a kernel-layer module may not
 import an interpreter-layer one; the blueprints that parse `.mthds` into them import upward, which
 is the sanctioned direction. Same move `core/` made with `ConceptProviderAbstract`: the semantics
 migrate to the layer that owns them, and the language artifact keeps its parse-and-validate role.

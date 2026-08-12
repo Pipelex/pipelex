@@ -1,26 +1,26 @@
-"""Importing the Pipelex runtime loads zero interpreter modules — the property, not the rule.
+"""Importing the Pipelex kernel layer loads zero interpreter modules — the property, not the rule.
 
-`pipelex-dev check-hub-layering` guards the *rule* (no runtime-layer module imports `pipelex.interpreter_hub`).
+`pipelex-dev check-hub-layering` guards the *rule* (no kernel-layer module imports `pipelex.interpreter_hub`).
 This guards the *property* the rule exists to buy: importing the inference layer, or the runtime hub
 itself, must pull in zero interpreter modules. The distinction matters because a stray import somewhere
-else entirely — a runtime-layer module reaching into `pipe_operators` directly, without touching a hub —
+else entirely — a kernel-layer module reaching into `pipe_operators` directly, without touching a hub —
 would break the property while the lint stays green.
 
 "Interpreter module" used to need spelling out twice, because core's Pipe-machinery modules were
-interpreter-layer while living under a runtime-named package — so the predicate carried a second tuple
-naming them one by one, plus an exclusion for the one leaf model that landed in every runtime closure.
+interpreter-layer while living under a package declared kernel-layer — so the predicate carried a second tuple
+naming them one by one, plus an exclusion for the one leaf model that landed in every kernel closure.
 It does not any more: every one of those modules now lives under `pipe_machinery` or `mthds_parsing`,
 so the top-level package set says exactly what it means, with no per-module list and no exclusion. A
 package-granular predicate is only honest once the packages match the layers, which is what M1 bought.
 
 The set below now names every interpreter package, with no exclusion and no qualification. `pipeline`
 and `pipe_run` were the last two absent, and their absence was a *placement* problem rather than a
-broken hub arrow: four leaf models of theirs landed in every runtime closure, so naming them here
+broken hub arrow: four leaf models of theirs landed in every kernel closure, so naming them here
 would have failed every entry point over an address. The remedy was the one `mthds_parsing` used —
-move the leaves to a runtime-layer home, then widen the predicate. `SpecialPipelineId` is now in
+move the leaves to a kernel-layer home, then widen the predicate. `SpecialPipelineId` is now in
 `system.job_metadata` beside the `pipeline_run_id` it names, `PipeRunMode` and `PipeRunParamKey` are
 `system.pipe_run_mode` / `system.pipe_run_param_key`, and `PipeRunError` sits in
-`core.pipes.exceptions` with the runtime-layer subclasses that derive from it. Moving the leaf is
+`core.pipes.exceptions` with the kernel-layer subclasses that derive from it. Moving the leaf is
 what buys the clean predicate; excluding it would only have recorded the problem.
 
 Run in a subprocess so the closure is exactly what the entry point pulls in: an in-process
@@ -39,16 +39,16 @@ from pathlib import Path
 import pytest
 
 #: Entry points that must never load the interpreter: the inference layer, the runtime hub itself, the
-#: built-in plugin aggregator, and the heaviest module of each runtime-layer `core/` package — the ones
+#: built-in plugin aggregator, and the heaviest module of each kernel-layer `core/` package — the ones
 #: that historically reached for a library and now take a `ConceptProviderAbstract` instead. There is no
 #: longer a Pipe-touching remainder of `core/` to leave out: all of it moved to `pipe_machinery` and
 #: `mthds_parsing`, which is what let `pipelex.core` be declared wholesale (see the guard's
-#: `RUNTIME_LAYER_PACKAGES` note).
+#: `KERNEL_LAYER_PACKAGES` note).
 #:
 #: `providers.builtins` earns its place by history, under its former name `plugins.builtins`: it and
 #: three neighbours reached `interpreter_hub` transitively — through `runtime_bridge`, `pipeline` and
 #: `pipe_operators` — while both gates stayed green, because the guard was one hop deep and
-#: `pipelex.plugins`, the largest declared runtime-layer package, had no entry point here. The guard
+#: `pipelex.plugins`, the largest declared kernel-layer package, had no entry point here. The guard
 #: now follows the import graph, but that is *static* analysis: it cannot see a dynamic import, so the
 #: package that bit us gets a runtime-truth check too. It instantiates every built-in vendor adapter,
 #: so importing it pulls in every one of them — the broadest single entry point into `pipelex.providers`,
@@ -56,7 +56,7 @@ import pytest
 #: in `pipelex.plugins` and is reached from here, so one entry point still covers both halves.
 #:
 #: `providers.anthropic.anthropic_list` is here because `providers.builtins` turned out **not** to cover
-#: it: the vendor plugins import their `*_list` modules inside a function (`# noqa: PLC0415`), so a
+#: it: the vendor plugins import their `*_list` modules inside a function (under a `PLC0415` noqa), so a
 #: deferred import hides them from the static graph *and* from the aggregator's own closure. Five of
 #: them imported `MissingDependencyError` from the top-level `pipelex.exceptions` aggregate rather than
 #: from its definition site in `pipelex.system.exceptions`, and since that aggregate re-exports every
@@ -78,7 +78,7 @@ import pytest
 #: Note the blind spot the kernel's own doctrine restates: this test sees module-level imports only,
 #: so a function-local import inside a kernel module is invisible to it *and* to the static graph at
 #: once. That is precisely the hole the boot-contract test's post-call sweep exists to close.
-RUNTIME_LAYER_ENTRY_POINTS = [
+KERNEL_LAYER_ENTRY_POINTS = [
     "pipelex.cogt.content_generation.content_generator",
     "pipelex.runtime_hub",
     "pipelex.runtime_boot",
@@ -156,7 +156,7 @@ _CLOSURE_SCRIPT = textwrap.dedent(
         print(f"{target} loaded {len(offenders)} interpreter module(s): {offenders}")
         raise SystemExit(1)
 
-    # The interpreter hub must not be reachable from the runtime layer at all — the forbidden arrow, measured.
+    # The interpreter hub must not be reachable from the kernel layer at all — the forbidden arrow, measured.
     if "pipelex.interpreter_hub" in sys.modules:
         print(f"{target} loaded pipelex.interpreter_hub")
         raise SystemExit(1)
@@ -192,7 +192,7 @@ class TestHubImportClosure:
     @pytest.mark.parametrize(
         ("entry_point", "expected_returncode"),
         [
-            *((entry_point, 0) for entry_point in RUNTIME_LAYER_ENTRY_POINTS),
+            *((entry_point, 0) for entry_point in KERNEL_LAYER_ENTRY_POINTS),
             # The negative control: same detector, opposite verdict. See DIRTY_ENTRY_POINT above.
             (DIRTY_ENTRY_POINT, 1),
         ],
@@ -202,7 +202,7 @@ class TestHubImportClosure:
         assert result.returncode == expected_returncode, (
             f"unexpected hub import-closure verdict for {entry_point} (wanted exit {expected_returncode}).\n"
             "Exit 0 means the entry point loaded no interpreter module; exit 1 means the detector found one. "
-            "A runtime-layer entry point failing is a real breach — see docs/contribute/hub-layering.md for how "
+            "A kernel-layer entry point failing is a real breach — see docs/contribute/hub-layering.md for how "
             "to find the shortest import path to an offender. The dirty entry point passing instead means the "
             "detector has stopped detecting, and every other case above is now vacuous.\n"
             f"stdout={result.stdout}\nstderr={result.stderr}"

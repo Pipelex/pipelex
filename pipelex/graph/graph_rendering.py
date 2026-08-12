@@ -1,6 +1,6 @@
 """Rendering a run graph to disk, from a spec that already exists.
 
-Runtime-layer: everything here takes a :class:`GraphSpec` and turns it into files. Producing that
+Kernel-layer: everything here takes a :class:`GraphSpec` and turns it into files. Producing that
 spec from a *bundle* needs a loaded method, so those helpers live one layer up, in
 ``pipelex.pipeline.bundle_graph_rendering``.
 """

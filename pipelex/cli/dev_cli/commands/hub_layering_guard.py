@@ -1,25 +1,25 @@
 """Pure-stdlib AST core for the two-hub layering boundary guard.
 
 Pipelex has two layers and one hub each. The **interpreter** layer reads a method and executes it; the
-**runtime** layer is the machinery present at execution time whatever is loaded. `interpreter_hub` may
+**kernel** layer is the machinery present at execution time whatever is loaded. `interpreter_hub` may
 import `runtime_hub`; **`runtime_hub` must never import `interpreter_hub`**. That single arrow is the
-whole architecture, and the property it buys is measurable: importing the Pipelex runtime loads zero
+whole architecture, and the property it buys is measurable: importing the Pipelex kernel layer loads zero
 interpreter modules. The canonical human-readable specification lives in
 ``docs/contribute/hub-layering.md``.
 
 This module holds the AST collection logic that mechanically enforces three rules:
 
-1. **The layer rule.** A module in the declared runtime layer (:data:`RUNTIME_LAYER_PACKAGES`) may not
-   import ``pipelex.interpreter_hub``. Since `runtime_hub`'s own closure is what the runtime layer is,
+1. **The layer rule.** A module in the declared kernel layer (:data:`KERNEL_LAYER_PACKAGES`) may not
+   import ``pipelex.interpreter_hub``. Since `runtime_hub`'s own closure is what the kernel layer is,
    an import anywhere in it puts the interpreter back into every inference consumer.
 2. **The dead-module rule.** *No* scanned module may reference ``pipelex.hub``. That module was
    deleted rather than kept as an alias for either half, precisely so a stale import fails loudly —
    this rule closes the one hole in that guarantee (see below).
-3. **The transitive rule.** No runtime-layer module may *reach* ``pipelex.interpreter_hub`` through
+3. **The transitive rule.** No kernel-layer module may *reach* ``pipelex.interpreter_hub`` through
    any chain of module-level imports either. Rules 1 and 2 are per-file and see one hop; this one
    resolves the whole module-level import graph of ``pipelex/`` and does reachability over it. It
    exists because the one-hop rules missed a live breach: four modules under the declared
-   runtime-layer ``pipelex.plugins`` package loaded ``interpreter_hub`` (and ~67 interpreter modules)
+   kernel-layer ``pipelex.plugins`` package loaded ``interpreter_hub`` (and ~67 interpreter modules)
    through ``runtime_bridge``, ``pipeline`` and ``pipe_operators`` while both gates stayed green. The
    remedy relocated those plugins, and this rule is what stops the next one recurring. The graph
    models the ancestor ``__init__.py`` files an import executes on the way to its target, so a breach
@@ -38,7 +38,7 @@ prose is not a reference and is not flagged. A path assembled at runtime from f-
 concatenation is out of reach of any AST scan; nothing in the tree does that today.
 
 Note that ``runtime_hub`` is unrelated to the ``pipelex.runtime_bridge`` package despite the shared
-word: the hub is the runtime layer's service container, while ``runtime_bridge`` is a transport.
+word: the hub is the kernel layer's service container, while ``runtime_bridge`` is a transport.
 
 Two deliberate carve-outs, applying to every rule that is about what *loads*:
 
@@ -87,15 +87,15 @@ TESTS_ROOT = Path("tests")
 #: The roots the full-tree check scans.
 SCAN_ROOTS: tuple[Path, ...] = (SOURCE_ROOT, TESTS_ROOT)
 
-#: The declared runtime layer: packages that must stay importable without loading the method interpreter.
+#: The declared kernel layer: packages that must stay importable without loading the method interpreter.
 #:
 #: Entries are matched exact-or-dotted-prefix, so a bare *module* is a legal entry alongside the packages.
 #: `pipelex.runtime_hub` is one: the module at the centre of the rule would otherwise be exempt from it,
-#: since nothing in the tuple is a prefix of it. Its closure *is* what the runtime layer means, so an
+#: since nothing in the tuple is a prefix of it. Its closure *is* what the kernel layer means, so an
 #: `interpreter_hub` import there is the one that would break the property outright.
 #:
-#: `pipelex.runtime_boot` is the second module entry, and for the mirror-image reason: it is the runtime
-#: layer's *composition root*, so its closure is what "boot the runtime layer" costs. Declaring it is
+#: `pipelex.runtime_boot` is the second module entry, and for the mirror-image reason: it is the kernel
+#: layer's *composition root*, so its closure is what "boot the kernel layer" costs. Declaring it is
 #: what puts it inside this rule's domain at all — an undeclared module is not neutral, it is unpoliced,
 #: and this one is the single most tempting place in the tree to reach for an interpreter type, since
 #: the class it defines is subclassed by the boot that does need them. Its interpreter half,
@@ -119,22 +119,22 @@ SCAN_ROOTS: tuple[Path, ...] = (SOURCE_ROOT, TESTS_ROOT)
 #: rather than contradicts.
 #:
 #: `pipelex.plugins` and `pipelex.providers` are two entries for what used to be one package, and
-#: both are runtime-layer: `plugins` is the plugin *mechanism* (the contract, the registrar, the
+#: both are kernel-layer: `plugins` is the plugin *mechanism* (the contract, the registrar, the
 #: capability registries), `providers` the built-in vendor *adapters* that register through it.
 #: Splitting them did not move the boundary — it made the one-way dependency legible — so leaving
-#: `pipelex.providers` undeclared would silently un-declare the largest runtime-layer package.
+#: `pipelex.providers` undeclared would silently un-declare the largest kernel-layer package.
 #:
 #: `pipelex.graph`, `pipelex.tracing`, `pipelex.observer` and `pipelex.errors` are the four packages
 #: that were measured clean and left undeclared anyway, and the omission cost something: **an
 #: undeclared package is not neutral, it is unpoliced.** Omitting an entry makes this guard
 #: **quieter**, not louder — the transitive rule below filters its candidates through
-#: :func:`is_runtime_layer`, so an undeclared package is excluded from the rule's domain rather than
+#: :func:`is_kernel_layer`, so an undeclared package is excluded from the rule's domain rather than
 #: reported by it. That is exactly how `graph.graph_rendering` came to reach `interpreter_hub`
 #: through `pipeline.dry_run_pipeline` with every gate green; the bundle-driven half of that module
 #: is now `pipelex.pipeline.bundle_graph_rendering`, and `graph` is declared. What each entry is:
 #: `graph` is the run-graph data model, tracer and renderers, `tracing` the trace-event assembler
 #: feeding them, `observer` the run-observation hooks, `errors` the error taxonomy — all machinery
-#: present at execution time whatever is loaded, which is the runtime layer's own definition.
+#: present at execution time whatever is loaded, which is the kernel layer's own definition.
 #: `pipelex.test_extras` is here for the same reason: it ships, `pipelex.py` imports it at boot, and it
 #: measures clean — leaving it out would repeat the omission this entry documents.
 #:
@@ -150,7 +150,7 @@ SCAN_ROOTS: tuple[Path, ...] = (SOURCE_ROOT, TESTS_ROOT)
 #: top-level package accounted for.
 #: That the declaration is a claim rather than a hope is why it is asserted by a test.
 #: See the "Where core splits" section of ``docs/contribute/hub-layering.md``.
-RUNTIME_LAYER_PACKAGES: tuple[str, ...] = (
+KERNEL_LAYER_PACKAGES: tuple[str, ...] = (
     "pipelex.cogt",
     "pipelex.core",
     "pipelex.errors",
@@ -164,12 +164,12 @@ RUNTIME_LAYER_PACKAGES: tuple[str, ...] = (
     "pipelex.test_extras",
     "pipelex.tools",
     "pipelex.tracing",
-    # the runtime layer's own hub and its composition root — modules, not packages; see the note above
+    # the kernel layer's own hub and its composition root — modules, not packages; see the note above
     "pipelex.runtime_hub",
     "pipelex.runtime_boot",
 )
 
-#: The interpreter layer's hub, which no runtime-layer module may import — directly or transitively.
+#: The interpreter layer's hub, which no kernel-layer module may import — directly or transitively.
 #: Marked like :data:`DELETED_HUB_MODULE` below, for the same reason and against a different rule:
 #: this line *declares* the path rather than importing it, so without the marker rule 3 would read the
 #: guard's own configuration as a dynamic import and give the module a phantom edge to the hub.
@@ -217,18 +217,18 @@ class HubLayeringViolationKind(StrEnum):
         match self:
             case HubLayeringViolationKind.INTERPRETER_HUB_IMPORT:
                 return (
-                    "a runtime-layer module may not import `pipelex.interpreter_hub` — take the value as an argument, "
+                    "a kernel-layer module may not import `pipelex.interpreter_hub` — take the value as an argument, "
                     "or have the interpreter layer install it downward at boot (the `class_registry_scoping` pattern)"
                 )
             case HubLayeringViolationKind.INTERPRETER_HUB_TRANSITIVE:
                 return (
-                    "a runtime-layer module may not *reach* `pipelex.interpreter_hub` through its module-level imports "
+                    "a kernel-layer module may not *reach* `pipelex.interpreter_hub` through its module-level imports "
                     "either — take the collaborator as an argument, or move the module to the layer it actually belongs "
                     "to (the `interpreter_plugins` relocation)"
                 )
             case HubLayeringViolationKind.INTERPRETER_HUB_REFERENCE:
                 return (
-                    "a runtime-layer module may not name `pipelex.interpreter_hub` in a string either — a dynamic "
+                    "a kernel-layer module may not name `pipelex.interpreter_hub` in a string either — a dynamic "
                     "import or patch target is the same dependency, just invisible to the import graph"
                 )
             case HubLayeringViolationKind.DEAD_HUB_REFERENCE:
@@ -263,18 +263,18 @@ def references_module(*, candidate: str, target: str) -> bool:
     return candidate == target or candidate.startswith((f"{target}.", f"{target}:"))
 
 
-def is_runtime_layer(*, module_qname: str) -> bool:
-    """Whether a module sits in the declared runtime layer.
+def is_kernel_layer(*, module_qname: str) -> bool:
+    """Whether a module sits in the declared kernel layer.
 
-    Matching is exact-or-dotted-prefix, so despite its name :data:`RUNTIME_LAYER_PACKAGES` may hold a
+    Matching is exact-or-dotted-prefix, so despite its name :data:`KERNEL_LAYER_PACKAGES` may hold a
     bare module as well as a package — an entry covers itself and everything under it.
     """
-    return any(module_qname == package or module_qname.startswith(f"{package}.") for package in RUNTIME_LAYER_PACKAGES)
+    return any(module_qname == package or module_qname.startswith(f"{package}.") for package in KERNEL_LAYER_PACKAGES)
 
 
 def targets_for(*, module_qname: str) -> frozenset[str]:
-    """The forbidden module paths for one module: the dead hub always, plus the interpreter hub in the runtime layer."""
-    if is_runtime_layer(module_qname=module_qname):
+    """The forbidden module paths for one module: the dead hub always, plus the interpreter hub in the kernel layer."""
+    if is_kernel_layer(module_qname=module_qname):
         return frozenset({DELETED_HUB_MODULE, INTERPRETER_HUB_MODULE})
     return frozenset({DELETED_HUB_MODULE})
 
@@ -487,7 +487,7 @@ class _ImportGraphCollector(ast.NodeVisitor):
     exactly as rules 1 and 2 match only their forbidden targets: an arbitrary ``pipelex.*`` string is
     as likely a plugin name or a config value, but a string that *is* the hub path is an
     ``import_module`` or patch target in all but name. Rule 1 already catches such a string in a
-    runtime-layer module; what this closes is the same string in an *intermediary*, which sits in no
+    kernel-layer module; what this closes is the same string in an *intermediary*, which sits in no
     declared layer and so is rule 1's business for the dead hub only.
     """
 
@@ -694,13 +694,13 @@ def shortest_import_path(*, graph: ImportGraph, start: str, target: str) -> list
 
 
 def collect_transitive_violations(*, root: Path) -> list[HubLayeringViolation]:
-    """Every runtime-layer module that *reaches* the interpreter hub through its module-level imports.
+    """Every kernel-layer module that *reaches* the interpreter hub through its module-level imports.
 
     A **direct** import is reported by the one-hop layer rule instead, with its own remedy, so a chain
     of one hop is skipped here rather than double-reported. A finding cannot be silenced where it is
     reported: the escape hatch marks a single *import* as reviewed (which removes that edge from the
     graph, exactly as a ``TYPE_CHECKING`` deferral does), never a module's transitive reach. This rule
-    fires when the declaration claims a module is runtime-layer while the import graph says otherwise,
+    fires when the declaration claims a module is kernel-layer while the import graph says otherwise,
     and the fix is to move the module or invert the dependency.
 
     Args:
@@ -723,7 +723,7 @@ def collect_transitive_violations(*, root: Path) -> list[HubLayeringViolation]:
     reaching = modules_reaching(graph=graph, target=INTERPRETER_HUB_MODULE)
 
     violations: list[HubLayeringViolation] = []
-    for qname in sorted(module for module in reaching if is_runtime_layer(module_qname=module)):
+    for qname in sorted(module for module in reaching if is_kernel_layer(module_qname=module)):
         chain = shortest_import_path(graph=graph, start=qname, target=INTERPRETER_HUB_MODULE)
         if len(chain) < 3:
             continue

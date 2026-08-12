@@ -13,7 +13,7 @@ This example shows how Pipelex discovers **inference-backend plugins**: installa
 
 ## What it demonstrates
 
-- What a plugin **is**: a package exposing a `pipelex.plugins` entry point that resolves to a `PipelexPlugin` — an object with a `name`, a `targets_api` version, and a side-effect-free `register(registrar)` method
+- What a plugin **is**: a package exposing a `pipelex.plugins.kernel` entry point that resolves to a `PipelexPlugin` — an object with a `name`, a `targets_api` version, and a side-effect-free `register(registrar)` method
 - Registration through the registrar: `register` contributes an inference backend for `(family="llm", sdk="hello")`, plus an optional model lister
 - Discovery by presence: installing the package is the whole integration — no enable-list, no config switch
 - The model-config side: how a model handle in a `.mthds` file resolves to the plugin's worker through `.pipelex/inference/`
@@ -27,7 +27,7 @@ The plugin lives inside the example directory as its own installable package:
 examples/c_advanced/using_inference_plugins/
 ├── hello_plugin.mthds                  # the method that uses the plugin-served model
 └── hello_inference_plugin/             # the plugin package
-    ├── pyproject.toml                  # declares the `pipelex.plugins` entry point
+    ├── pyproject.toml                  # declares the `pipelex.plugins.kernel` entry point
     └── hello_inference_plugin/
         ├── hello_plugin.py             # HelloInferencePlugin: name, targets_api, register()
         ├── hello_llm_worker.py         # HelloLLMWorker(LLMWorkerAbstract): the actual "model"
@@ -37,7 +37,7 @@ examples/c_advanced/using_inference_plugins/
 The entry point in `pyproject.toml` is the single line that wires everything:
 
 ```toml
-[project.entry-points."pipelex.plugins"]
+[project.entry-points."pipelex.plugins.kernel"]
 hello_inference = "hello_inference_plugin.hello_plugin:HelloInferencePlugin"
 ```
 

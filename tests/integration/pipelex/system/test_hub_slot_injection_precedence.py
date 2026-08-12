@@ -50,7 +50,7 @@ def _fake_registrar(mocker: MockerFixture) -> PluginRegistrar:
     than provider/executor selection.
     """
     registrar = PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(temporal=SimpleNamespace(is_enabled=False))))
-    registrar.begin_plugin(name="pipe_func", origin=PluginOrigin.BUILTIN, targets_api=PLUGIN_API_VERSION)
+    registrar.begin_plugin(name="pipe_func", origin=PluginOrigin.BUILTIN, targets_api=PLUGIN_API_VERSION, group=None)
     PipeFuncPlugin().register(registrar)
     mocker.patch("pipelex.runtime_boot.build_registrar", return_value=registrar)
     return registrar

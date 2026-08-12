@@ -1,8 +1,8 @@
-"""No declared runtime-layer module may import the `pipelex.exceptions` aggregate — mechanically.
+"""No declared kernel-layer module may import the `pipelex.exceptions` aggregate — mechanically.
 
 `pipelex/exceptions.py` is the public all-errors aggregate: it re-exports every interpreter
 package's exceptions, so importing anything from it loads `pipelex.libraries`, `pipelex.pipeline`,
-`pipelex.pipe_operators` and more. From a runtime-layer module that is a layer breach, and it is
+`pipelex.pipe_operators` and more. From a kernel-layer module that is a layer breach, and it is
 exactly the breach neither existing gate can see: `check-hub-layering`'s rules only chase
 `pipelex.interpreter_hub`, which the aggregate never reaches, and the import-closure test only
 covers module-level imports under its declared entry points — a function-local import is invisible
@@ -10,7 +10,7 @@ to both. Five vendor adapters once loaded interpreter modules apiece through pre
 with both gates green (see `docs/contribute/hub-layering.md`, the aggregate section).
 
 Until now the rule was prose — *import from the definition site, never from the aggregate*. This
-test makes it mechanical for every package declared in `RUNTIME_LAYER_PACKAGES`: it AST-walks each
+test makes it mechanical for every package declared in `KERNEL_LAYER_PACKAGES`: it AST-walks each
 module and fails on any import of `pipelex.exceptions`, module-level or function-local, absolute or
 relative — and on any bare string literal naming it, because `importlib.import_module`,
 `__import__` and a `mocker.patch` target all load the aggregate through a path no import node
@@ -20,14 +20,14 @@ the aggregate is not a reference. The fix for a violation is always the same and
 import the error class from the `exceptions.py` module that defines it.
 
 Interpreter-side code and tests are out of scope on purpose — the aggregate is a legitimate public
-surface for callers *outside* the runtime layer; the ban is on the layer whose import closure it
+surface for callers *outside* the kernel layer; the ban is on the layer whose import closure it
 would silently widen.
 """
 
 import ast
 from pathlib import Path
 
-from pipelex.cli.dev_cli.commands.hub_layering_guard import RUNTIME_LAYER_PACKAGES, references_module
+from pipelex.cli.dev_cli.commands.hub_layering_guard import KERNEL_LAYER_PACKAGES, references_module
 
 _TESTS_ROOT = next(parent for parent in Path(__file__).resolve().parents if parent.name == "tests")
 _REPO_ROOT = _TESTS_ROOT.parent
@@ -80,7 +80,7 @@ def find_aggregate_references(*, module_path: Path, module_dotted: str) -> list[
 
 
 def _module_paths_for(*, dotted_package: str) -> list[Path]:
-    """Yield the .py files a `RUNTIME_LAYER_PACKAGES` entry covers — a package directory or a lone module."""
+    """Yield the .py files a `KERNEL_LAYER_PACKAGES` entry covers — a package directory or a lone module."""
     base_path = _REPO_ROOT / Path(*dotted_package.split("."))
     if base_path.is_dir():
         return sorted(base_path.rglob("*.py"))
@@ -95,15 +95,15 @@ def _dotted_for(*, module_path: Path) -> str:
     return ".".join(relative_parts)
 
 
-class TestRuntimeLayerExceptionsAggregateGate:
-    def test_no_runtime_layer_module_imports_the_exceptions_aggregate(self) -> None:
+class TestKernelLayerExceptionsAggregateGate:
+    def test_no_kernel_layer_module_imports_the_exceptions_aggregate(self) -> None:
         violations: list[str] = []
-        for dotted_package in RUNTIME_LAYER_PACKAGES:
+        for dotted_package in KERNEL_LAYER_PACKAGES:
             for module_path in _module_paths_for(dotted_package=dotted_package):
                 violations.extend(find_aggregate_references(module_path=module_path, module_dotted=_dotted_for(module_path=module_path)))
         assert not violations, (
-            "Runtime-layer modules reference the `pipelex.exceptions` aggregate, which drags interpreter packages "
-            "into the runtime closure. Import each error class from the `exceptions.py` module that defines it instead:\n" + "\n".join(violations)
+            "Kernel-layer modules reference the `pipelex.exceptions` aggregate, which drags interpreter packages "
+            "into the kernel closure. Import each error class from the `exceptions.py` module that defines it instead:\n" + "\n".join(violations)
         )
 
     def test_the_gate_detects_every_banned_reference_shape(self, tmp_path: Path) -> None:
