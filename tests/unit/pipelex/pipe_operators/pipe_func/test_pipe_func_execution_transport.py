@@ -47,6 +47,6 @@ class TestPipeFuncExecutionTransport:
                 pipe_code="my_pipe",
                 function_name="my_func",
                 job_metadata=JobMetadata(user_id="user", pipeline_run_id="run"),
-                pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10),
+                pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10, batch_max_concurrency=None),
                 timeout_seconds=float("inf"),
             )

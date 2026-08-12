@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **`PipeRunParams.batch_max_concurrency` is required (Breaking)**: The fan-out bound has no default any more, joining `run_mode` and `pipe_stack_limit` as a field whose omission fails loud. `None` is not only what a default would give — it is also what an authored `max_concurrency = "unbounded"` resolves to, so a default made "never written" indistinguishable from "authored unbounded", and pointed the omission at the dangerous direction: launch every branch at once. Breaking for code constructing `PipeRunParams` directly or decoding a payload that predates the field; build through `PipeRunParamsFactory.make_run_params`, the single writer of all three fields.
+
 ## [v0.43.0] - 2026-08-12
 
 ### Highlights

@@ -10,7 +10,6 @@ from typing import Callable, cast
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
@@ -25,6 +24,7 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
+from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.func_registry import func_registry
@@ -83,9 +83,12 @@ def _make_seeded_absence() -> AbsenceRecord:
 
 
 def _make_live_run_params() -> PipeRunParams:
-    # Constructed directly (not via the factory) so a keyless boot's forced-DRY coercion cannot
-    # silently swap which code path (live vs dry) the test exercises.
-    return PipeRunParams(run_mode=PipeRunMode.LIVE, pipe_stack_limit=get_config().pipelex.pipe_run_config.pipe_stack_limit)
+    run_params = PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE)
+    # The factory is the single writer of the run-mode and fan-out-bound fields, so the fixture goes
+    # through it rather than hand-building params. Assert the mode survived: under a keyless boot the
+    # factory coerces LIVE to DRY, which would silently swap which code path the test exercises.
+    assert run_params.run_mode.is_live, "This test must run the live controller path — the boot coerced it to DRY"
+    return run_params
 
 
 @pytest.mark.asyncio(loop_scope="class")

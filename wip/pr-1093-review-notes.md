@@ -8,6 +8,10 @@ Both were verified against the code. **Neither is a live bug** — one is a fals
 
 ## Deferred — `batch_max_concurrency` should be required, not defaulted
 
+> **Status (2026-08-12): done in `pipelex`, on `fix/batch-max-concurrency-required`.** The field is required, the integration fixtures route through `PipeRunParamsFactory.make_run_params`, both omission paths (constructor and `model_validate`) have `ValidationError` coverage, and the mutation check was run — restoring `default=None` turns both new tests red and nothing else. The compaction fixture builds through the factory and asserts the configured bound.
+>
+> **Still open — the cross-repo wire test, and it *is* gated.** `pipelex-server/temporal/tests/integration/pipelex_temporal/data_converter/test_data_conv_pipe_run_params.py` round-trips `PipeRunParams` without the field, so it asserts `None == None` and would not catch the bound being dropped on the wire. It cannot be fixed ahead of the pin: `pipelex-server` pins `pipelex==0.42.0`, which predates the field entirely, and `PipeRunParams` is `extra="forbid"` — passing `batch_max_concurrency` there today fails. When the pin moves to ≥ the release carrying this change, make that test round-trip a real int bound.
+
 - **Origin:** surfaced while verifying Codex's second P1 on `pipelex/pipe_run/pipe_run_params.py:160`. It is *not* the defect Codex described (see "Not deferred" below for why that one is a false positive) — it is the weakness underneath it.
 - **Where:** `pipelex/pipe_run/pipe_run_params.py`, the `batch_max_concurrency: int | None = Field(default=None, frozen=True)` field.
 

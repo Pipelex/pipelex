@@ -23,6 +23,7 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
+from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.execution_seams import prepare_pipe_job
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -51,7 +52,7 @@ _TEST_FUNCS = [optionals_seq_echo_source, optionals_seq_echo_a_out, optionals_se
 
 
 def _make_live_run_params() -> PipeRunParams:
-    return PipeRunParams(run_mode=PipeRunMode.LIVE, pipe_stack_limit=get_config().pipelex.pipe_run_config.pipe_stack_limit)
+    return PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE)
 
 
 def _build_lift_sequence() -> PipeSequence:
