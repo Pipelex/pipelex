@@ -5,7 +5,7 @@ Inputs light shape by default, `--explicit` for the ceremonial `{concept, conten
 is selected by qualified `--pipe` ref and defaults to the closure's declared `main_pipe`. The crate
 loader leaves the library open and current, so the live pipe is rendered directly.
 
-See `docs/specs/pipelex-codegen.md` -> "CLI: codegen".
+See the codegen spec -> "CLI: codegen".
 """
 
 from pathlib import Path

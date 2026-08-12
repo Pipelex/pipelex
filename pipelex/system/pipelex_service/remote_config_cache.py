@@ -7,7 +7,7 @@ optimisation. Layout::
 
 The on-disk payload is the raw JSON returned by the remote endpoint (not a re-serialised
 Pydantic dump), so the cache is stable across minor schema drift. Schema-breaking changes
-require bumping both the remote-config URL version (in ``pipelex-back-office``) and
+require bumping both the remote-config URL version (server-side) and
 ``CACHE_SCHEMA_VERSION`` here; older caches are then rejected on load and re-primed on the
 next successful fetch.
 """

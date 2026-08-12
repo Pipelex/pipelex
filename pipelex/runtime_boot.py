@@ -389,7 +389,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # while silently never applying the interpreter ones (``PIPE_ROUTER`` / ``PIPE_RUN`` /
         # ``PIPE_FUNC_EXECUTOR``, all applied in ``Pipelex.setup``). What closed it is the entry-point
         # group split: the layer signal that remedy needed is now carried by the plugin's own
-        # declaration. Analysed in ``wip/boot-split/runtime-boot-external-interpreter-orchestrator.md``.
+        # declaration.
         requested_boot_orchestrator = get_config().plugins.boot_orchestrator
         if requested_boot_orchestrator is not None and requested_boot_orchestrator not in plugin_registrar.registered_plugin_names:
             raise UnknownBootOrchestratorError(requested=requested_boot_orchestrator)
@@ -467,8 +467,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             # properties, because pinning them requires the path overrides that exist on the *concrete*
             # ``ModelManager`` and not on ``ModelManagerAbstract`` — which is what this attribute is
             # typed as, and which is a public injection point. Widening that interface is a decision of
-            # its own, so the gap is documented rather than half-closed:
-            # ``wip/boot-split/config-dir-does-not-scope-inference-paths.md``. The docstrings say exactly
+            # its own, so the gap is documented rather than half-closed. The docstrings say exactly
             # this; do not read ``config_dir`` as "only this directory is read" for inference.
             self.models_manager.setup(
                 secrets_provider=secrets_provider,
@@ -665,8 +664,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         reporting buffer unflushed, the previous boot's ``func_registry`` entries carried forward.
         Everything that would instead **poison** the next boot moved into the ``finally``, so the two
         release paths guarantee the same set. Closing the dangling half means collapsing this path and
-        ``_release_after_failed_boot`` into one list —
-        ``wip/boot-split/failed-boot-does-not-release-every-resource.md``.
+        ``_release_after_failed_boot`` into one list.
         """
         try:
             if self.telemetry_manager:
@@ -748,7 +746,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         ``setup()`` may not have assigned, which is the reason this path exists at all. Adding any of
         them here would widen a second hand-maintained copy of the teardown list that is bound to
         drift from the real one. Collapsing the two paths is the right fix and is a lifecycle decision of
-        its own — ``wip/boot-split/failed-boot-does-not-release-every-resource.md``.
+        its own.
 
         Without this, the next boot raises "LogConfig is already set" and serves a stale, half-populated
         class registry (the ``KajsonManager`` singleton ignores a fresh registry once created).

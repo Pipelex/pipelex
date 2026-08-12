@@ -6,7 +6,7 @@ Design accepted and implemented (engine in Phase 1, wiring/seeds/docs in Phase 2
 
 ## Problem
 
-CLAUDE.md already states the policy ("document at every iteration", "keep the toml files and configs.py in sync", "keep specs and conformance in sync"), but prose policy is advisory: nothing tells a PR author — human or agent — *which* docs and tests are stale relative to *this* change, and nothing records that the check happened. The research brief proposes a deterministic traceability tool for this. This design adapts that proposal to what the Pipelex repo already has, and deliberately simplifies it in several places.
+CLAUDE.md already states the policy ("document at every iteration", "keep the toml files and configs.py in sync", "keep specs and their verifying tests in sync"), but prose policy is advisory: nothing tells a PR author — human or agent — *which* docs and tests are stale relative to *this* change, and nothing records that the check happened. The research brief proposes a deterministic traceability tool for this. This design adapts that proposal to what the Pipelex repo already has, and deliberately simplifies it in several places.
 
 ## What the repo already has — and the actual gap
 
@@ -15,7 +15,7 @@ The brief describes a greenfield. We are not greenfield. Three synchronization t
 | Tier | Mechanism | Judgment needed | Status in this repo |
 |---|---|---|---|
 | **Derived** | Regenerate + diff: `check-config-sync`, `check-mthds-schema`, `check-gateway-models`, `check-rules`, `generate-error-pages` | None — output is a pure function of sources | **Exists**, wired into `make check` and CI |
-| **Linkage** | Referential integrity of declared cross-references: `conformance/scripts/check-spec-links.py` (spec `> Verified by:` ↔ test `pytest.mark.spec`) | None — links either resolve or they don't | **Exists** for the spec/conformance pair |
+| **Linkage** | Referential integrity of declared cross-references: the spec-link checker (spec `> Verified by:` ↔ test `pytest.mark.spec`) | None — links either resolve or they don't | **Exists** for the spec ↔ verifying-test pair |
 | **Review** | "This code changed → these docs/tests must be *looked at* against this exact change, and the look must be recorded" | Yes — a human or agent must judge whether the prose/tests still hold | **Missing** — this is the gap |
 
 This framing yields the first design principle: **the new tool covers only the review tier**. Derived checks stay exactly where they are (Makefile + `pipelex-dev` commands); they are strictly better than review contracts because they need no judgment and can't be rubber-stamped. Whenever a review contract turns out to be mechanizable — the doc section could be generated, the sync could be checked structurally — the right move is to *delete the review contract and write a derived check*. The best review contract is one you eventually mechanize out of existence.
@@ -173,7 +173,7 @@ Unchanged from the brief, and worth restating because they bound the tool's prom
 - It does not trace the whole repo. Contracts are added one at a time, where staleness has actually hurt.
 - It does not replace the CLAUDE.md documentation culture; it enforces the culture's floor on the few surfaces where silent drift is most expensive.
 
-And one addition: it does not handle cross-repo contracts. The spec/conformance pair spans the workspace root and the `conformance/` repo and already has a purpose-built checker (`check-spec-links.py`) doing linkage-tier validation with in-file markers; `drift` is per-repo and should not absorb it. If cross-repo review contracts become pressing, that is a separate design.
+And one addition: it does not handle cross-repo contracts. The spec ↔ verifying-test pair spans two sibling repos and already has a purpose-built checker doing linkage-tier validation with in-file markers; `drift` is per-repo and should not absorb it. If cross-repo review contracts become pressing, that is a separate design.
 
 ## Failure modes, honestly
 
@@ -191,7 +191,7 @@ Start with three, all in the `pipelex` repo, all places where prose has already 
 - **cli-docs** — triggers: `pipelex/cli/**/*.py` excluding `dev_cli/`; review: `docs/tools/cli/`, `pipelex/cli/agent_cli/CLAUDE.md`. The agent-CLI output-format contract doc is load-bearing for the whole workspace's surface conventions.
 - **keyword-only-convention** — triggers: `pipelex/cli/dev_cli/commands/keyword_only_guard.py`; review: `docs/contribute/keyword-only-arguments.md`. Small, sharp, and the doc is explicitly the convention's specification.
 
-Candidates deliberately *not* seeded: anything under `wip/` (not release-facing), generated pages (derived tier), broad feature docs (too noisy to start), spec/conformance (covered, cross-repo).
+Candidates deliberately *not* seeded: anything under `wip/` (not release-facing), generated pages (derived tier), broad feature docs (too noisy to start), the spec ↔ verifying-test pair (covered, cross-repo).
 
 ## Rollout plan
 
@@ -215,7 +215,7 @@ Polish the `plan` packet for agent consumption, add `--format json` for software
 
 - Symbol-level triggers via griffe; markdown-anchor targets; pytest node-ID validation via `--collect-only`.
 - Unifying the derived-tier checks into `drift plan` output as read-only `kind = "derived"` entries, so one command shows the full sync map. Nice-to-have; duplicates Makefile wiring today.
-- Cross-repo contracts (workspace-root specs, conformance, downstream consumers).
+- Cross-repo contracts (the protocol specs, their verifying suite, downstream consumers).
 - Semantic assistance: `cocode`'s doc/code drift proofreading could consume the plan packet as its work list — the deterministic layer decides *what* to look at, cocode helps judge *whether* it drifted.
 - Extraction into a standalone tool for the other workspace repos, if the pipelex-repo dogfood earns it.
 

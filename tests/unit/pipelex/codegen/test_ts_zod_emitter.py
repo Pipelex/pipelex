@@ -8,7 +8,7 @@ from pipelex.libraries.library_crate import LibraryCrate
 class TestTsZodEmitter:
     """Unit tests for the ts-zod pure types-file emitter.
 
-    The `tsc --strict` compile gate on emitted TS lives in the `conformance/` cross-repo harness (D7);
+    The `tsc --strict` compile gate on emitted TS lives in our cross-repo spec suite (D7);
     here we assert the structural contract of the pure types file.
     """
 

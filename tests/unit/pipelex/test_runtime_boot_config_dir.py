@@ -11,7 +11,7 @@ two apart without writing a whole valid config tree.
 Scope note: `config_dir` scopes the main TOML load only — the inference file paths still resolve
 through the layered `config_manager.*` properties, because pinning them needs overrides that live on
 the concrete `ModelManager` rather than on the `ModelManagerAbstract` this boot is typed against. That
-gap is deliberate and documented (`wip/boot-split/config-dir-does-not-scope-inference-paths.md`), which is
+gap is deliberate and documented in the boot docstrings, which is
 why this module asserts the main-config leaf and nothing about backends or decks.
 """
 

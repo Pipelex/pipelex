@@ -9,7 +9,7 @@ verdict. `load_normalized_crate` is the presentation-free core (typed exceptions
 wrapper `load_normalized_crate_or_exit` maps them to the 1/2 exit codes, and the agent CLI maps the
 same exceptions to its structured error envelope.
 
-See `docs/specs/pipelex-codegen.md` → "CLI: resolve" and the standard's `library-crate.md`.
+See the codegen spec → "CLI: resolve" and the standard's `library-crate.md`.
 """
 
 from pathlib import Path

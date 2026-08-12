@@ -1,6 +1,6 @@
 # Storage provider → `pipelex.plugins` plugin
 
-Status: **COMPLETE.** All phases delivered — this vertical (Phases 1–2 of the master plan) defines the shared "keyed registry + config-selected singleton" mechanism (§ The new mechanism) that the secrets plan reuses. See [TODOS.md](../../TODOS.md) for the execution record (Phases 1–2 code + tests + docs, Phase 5 release gating).
+Status: **COMPLETE.** All phases delivered — this vertical (Phases 1–2 of the master plan) defines the shared "keyed registry + config-selected singleton" mechanism (§ The new mechanism) that the secrets plan reuses. The execution record (Phases 1–2 code + tests + docs, Phase 5 release gating) lived in the branch's root tracker.
 
 Goal: turn the storage provider into a formal plugin seam so third parties can ship `pipelex-storage-<backend>` packages discovered via the `pipelex.plugins` entry-point group and selected at deploy time by `storage_config.method`. The built-in providers (local / in_memory / s3 / gcp) become a single unconditional builtin plugin registering their factories — exactly as `OpenAIPlugin` registers several inference backends.
 
@@ -123,7 +123,7 @@ Net effect: `make_storage_provider_from_config` and its `match` are deleted; the
 - [ ] Manual: `pipelex plugins list`; a real run with `method="local"`; flip to `method="in_memory"` and confirm selection.
 
 ## Cross-repo consequence (release-gated, not this PR)
-- `pipelex-mistralai-workflows` must bump `targets_api` to 3 (DX-1); it registers no storage provider and imports none of the removed symbols, so the bump is its only change. `pipelex-temporal` needs the bump **and** a code migration: its payload-codec factory (`pipelex_temporal/codec/codec_factory.py`) imports the now-removed `make_storage_provider_from_config` and must switch to `get_storage_provider_registry().get_required(method=...)`. Do both when the pipelex version carrying this lands, not before.
+- Our Mistral Workflows plugin must bump `targets_api` to 3 (DX-1); it registers no storage provider and imports none of the removed symbols, so the bump is its only change. Our Temporal plugin needs the bump **and** a code migration: it imports the now-removed `make_storage_provider_from_config` and must switch to `get_storage_provider_registry().get_required(method=...)`. Do both when the pipelex version carrying this lands, not before.
 
 ## Follow-ups (do not build now)
 - **D3 external config passthrough** — generic `extra` sub-config on `StorageProviderConfig` for out-of-tree providers. This must also fix the **`uri_format` gap**: `StorageProviderConfig.uri_format` (read by `GeneratedContentFactory._build_storage_key` on every content store) is defined only for the four built-in methods and raises `StorageConfigError` on the `case _:` arm for any external token — so an external provider selects and boots cleanly but crashes on the first *generated-content* store. D3 must give external methods a `uri_format` (e.g. promote it to a top-level field, or a passthrough default). Until then the docs page flags external providers as usable for their own storage API but not yet as the generated-content backing store.

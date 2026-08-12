@@ -118,7 +118,7 @@ The re-verification the plan asked for happened against each PR's own branch rat
 
 *The mechanism is obsolete.* Model-derived prompting style dates from when models were genuinely sensitive to prompt markup. Louis' ruling: rather than widen the derivation, the style becomes an explicit user choice defaulting to XML, and the derivation goes away. Building `model_for_object` here would mean constructing the two-setting derivation that refactor deletes.
 
-Deferred as **KF-16** in `wip/kernel/deferred-follow-ups.md`, with the design in `wip/prompting-style/README.md` — both ship on [PR #1081](https://github.com/Pipelex/pipelex/pull/1081), not on this branch, hence plain paths rather than links (they resolve once that PR merges to `dev`). Silenced in #1081 by *number the prompting-style follow-up KF-16 to keep the stack's* — a docstring on `llm_object` recording why its single `model` is correct, carrying the trap explicitly: *do not "fix" this by deriving the style from an object-only resolution, which would introduce the divergence rather than close it.*
+Deferred as **KF-16** in the kernel track's deferred-follow-ups doc (now tracked at workspace level), with the design in [`../prompting-style/README.md`](../prompting-style/README.md) — that design landed with [PR #1081](https://github.com/Pipelex/pipelex/pull/1081) and is present on this branch. Silenced in #1081 by *number the prompting-style follow-up KF-16 to keep the stack's* — a docstring on `llm_object` recording why its single `model` is correct, carrying the trap explicitly: *do not "fix" this by deriving the style from an object-only resolution, which would introduce the divergence rather than close it.*
 
 ### 2.3 Nothing in the kernel can build an `ImgGenPrompt`
 

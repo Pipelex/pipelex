@@ -86,11 +86,11 @@ State: **reached 2026-07-07.** All four phases committed on `feature/Smart-input
 
 ## Deferred to the release-wave sweep / follow-ups (NOT this plan's scope — listed so nothing is lost)
 
-Shared per-release wave with Datetime + Smart Inputs (see `README.md`): the Smart Inputs D5 matrix row (bare `true`/`false` against a YesNo-declared input) and D10 protocol widening (`mthds-python` `StuffContentOrData`); schema-copy sync via the `mthds-schema-sync` skill; MTHDS spec merge (drafted in Phase 4); `mthds-js` mirrors; conformance rows; `mthds-plugins` skills (`mthds-inputs`, `mthds-build`); vscode-pipelex completion lists; the `ConceptSpec.refines` authoring-hint native list (drifts from `NativeConceptCode` — derive it from the enum during this sweep; see `refines-hint-native-list-drift.md`).
+Shared per-release wave with Datetime + Smart Inputs (see `README.md`): the Smart Inputs D5 matrix row (bare `true`/`false` against a YesNo-declared input) and D10 protocol widening (`mthds-python` `StuffContentOrData`); schema-copy sync via the `mthds-schema-sync` skill; MTHDS spec merge (drafted in Phase 4); `mthds-js` mirrors; cross-repo spec-suite rows; `mthds-plugins` skills (`mthds-inputs`, `mthds-build`); vscode-pipelex completion lists; the `ConceptSpec.refines` authoring-hint native list (drifts from `NativeConceptCode` — derive it from the enum during this sweep; see `refines-hint-native-list-drift.md`).
 
 Follow-up off the critical path (shared with Date): **LLM-output ergonomics for scalar natives** — how PipeLLM produces a `YesNo`/`Date` more leanly than the generic object path (cousin of the Optionals maybe-wrapper).
 
-`pipelex-temporal` (private plugin repo): no code change expected — `bool` is JSON-native and the codec binds classes through the registry. At pin-bump time, add a `YesNo` case to its converter round-trip tests anyway (the failure mode over there is a hang, not an error; coverage is cheap insurance).
+Our Temporal plugin (private repo): no code change expected — `bool` is JSON-native and the codec binds classes through the registry. At pin-bump time, add a `YesNo` case to its converter round-trip tests anyway (the failure mode over there is a hang, not an error; coverage is cheap insurance).
 
 ## Micro-decisions log
 

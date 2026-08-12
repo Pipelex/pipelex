@@ -1,14 +1,14 @@
 from typing import ClassVar
 
 # The CV batch screening bundle is shared test data: the direct-mode e2e here, the
-# Temporal integration suite (in pipelex-temporal), and the /temporal-e2e-validate skill
-# all exercise the same .mthds. Each repo keeps its own copy of the crate so neither
+# Temporal integration suite (in our Temporal plugin), and our distributed validation
+# harness all exercise the same .mthds. Each repo keeps its own copy of the crate so neither
 # depends on the other's test tree.
 _CRATE_DIR: str = "tests/e2e/pipelex/cv_batch_screening/library_crate"
 
 
 class CvBatchScreeningTemporalTestData:
-    """Nested-controller CV batch screening pipeline sourced from pipelex-demos example 21.
+    """Nested-controller CV batch screening pipeline.
 
     Exercises PipeSequence -> PipeSequence -> PipeBatch -> PipeSequence with PipeExtract +
     PipeLLM operators in both the inner job-offer branch and the per-CV batch branch.

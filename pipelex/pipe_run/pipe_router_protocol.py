@@ -78,6 +78,23 @@ class PipeRouterProtocol(Protocol):
 
         return pipe_output
 
+    async def run_batch_branch(
+        self,
+        pipe_job: PipeJob,
+    ) -> PipeOutput:
+        """Run ``pipe_job`` as one fan-out branch of a ``PipeBatch``.
+
+        This is the ONE dispatch site in the pipe tree that carries "this dispatch is a
+        per-item fan-out branch" as semantics rather than as a data shape: the branch job
+        carries the branch pipe and the per-item memory, which is indistinguishable from any
+        other dispatch. A distributed router MAY use that signal to isolate the branch (own
+        retry, own history partition); every other dispatch it receives runs inline.
+
+        The default body IS the behavior for in-process routers: a branch is just a run.
+        Implementations only override this when isolation is something they can offer.
+        """
+        return await self.run(pipe_job)
+
     @abstractmethod
     async def _run_pipe_job(
         self,

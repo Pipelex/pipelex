@@ -20,9 +20,9 @@ gstack pre-landing review finding, deferred. The no-progress fingerprint in `fix
 
 Once released, `suggested_fix` surfaces in `/validate` API payloads (additive, `exclude_none`). The master-plan step 3 changelog entry should call out the new optional field so API consumers know about it.
 
-## 2. Conformance fixture regeneration (cross-repo sync wave)
+## 2. Cross-repo fixture regeneration (sync wave)
 
-`conformance/validate-error-qa/generated/invalid_inadequate_output_multiplicity.json` pins the exact JSON body of an `INADEQUATE_OUTPUT_MULTIPLICITY` error from a live `pipelex-api`. Once this enrichment (`suggested_fix` on `ValidationErrorItem`, `expected_output_ref`) reaches the runner API via a pipelex release + pin bump, that fixture needs regeneration. Belongs to the already-tracked cross-repo schema-sync step (master plan) — nothing to do in this repo now.
+A fixture in our cross-repo spec suite pins the exact JSON body of an `INADEQUATE_OUTPUT_MULTIPLICITY` error from a live `pipelex-api`. Once this enrichment (`suggested_fix` on `ValidationErrorItem`, `expected_output_ref`) reaches the runner API via a pipelex release + pin bump, that fixture needs regeneration. Belongs to the already-tracked cross-repo schema-sync step (master plan) — nothing to do in this repo now.
 
 ## 3. Accepted as-is: unconditional `expected_output_ref` computation
 

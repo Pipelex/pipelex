@@ -51,7 +51,7 @@ def _noop_make_worker(**_kwargs: object) -> InferenceWorkerAbstract:
 def _fake_config(disabled: list[str]) -> PipelexConfig:
     # Discovery reads ``config.plugins.disabled`` to apply the denylist. No builtin's
     # register() reads config: Temporal — the only plugin that did, via ``temporal.is_enabled``
-    # — now ships as the external pipelex-temporal dist.
+    # — now ships as our external Temporal plugin.
     return cast("PipelexConfig", SimpleNamespace(plugins=SimpleNamespace(disabled=disabled)))
 
 

@@ -6,7 +6,7 @@ emits the normalized crate to stdout in the selected encoding. The success strea
 verdict rides the exit code, mirroring the bare `validate` group — `0` resolved, `1` produced a negative
 verdict (the library is invalid), `2` no verdict could be produced (nothing to resolve / load failure).
 
-See `docs/specs/pipelex-codegen.md` → "CLI: resolve" and the standard's `library-crate.md`.
+See the codegen spec → "CLI: resolve" and the standard's `library-crate.md`.
 """
 
 from pathlib import Path

@@ -23,7 +23,7 @@ The mechanism: one shaper (`pipelex/core/memory/input_shaper.py`, `InputShaper`)
 Shared across YesNo + Date + Smart Inputs, done **per-release, not per-feature**:
 
 - **D10 protocol widening** — `mthds/protocol/pipeline_inputs.py` `StuffContentOrData` widens to admit bare scalars / lists-of-dicts / empty lists ("any JSON value | StuffContent forms"), with the interpretation semantics spec'd MTHDS-side. Release-gated (Optionals/TOML-inputs de-gate pattern). Runtime already works; this is type-honesty for typed SDK/API callers.
-- **Downstream mirrors** — `mthds-python` + `mthds-js` `PipelineInputs` types, conformance rows, JSON-schema copies (`mthds-schema-sync` skill), MTHDS spec native-concept + inputs-format sections.
+- **Downstream mirrors** — `mthds-python` + `mthds-js` `PipelineInputs` types, cross-repo spec-suite rows, JSON-schema copies (`mthds-schema-sync` skill), MTHDS spec native-concept + inputs-format sections.
 - **Authoring-guidance surfaces** — `mthds-plugins` skills (`mthds-inputs`, `mthds-build`), `vscode-pipelex` completion lists, and the `ConceptSpec.refines` native-list hint (derive from `NativeConceptCode` — see `refines-hint-native-list-drift.md`).
 - **Off critical path** — LLM-assisted input adaptation (design §8, opt-in); the shared YesNo/Date scalar-native LLM-output ergonomics.
 

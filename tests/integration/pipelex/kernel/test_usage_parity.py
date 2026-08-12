@@ -12,13 +12,12 @@ So this measures rather than asserts. Both sides run the same step (one LLM text
 shape ``/execute`` returns on ``pipe_output.tokens_usages`` and durable runs persist as
 ``tokens_usages.json`` — are then compared field by field.
 
-``pipe_code`` is the one field that would legitimately differ — a kernel call has no pipe to name —
-and this measurement cannot see it: the interpreter stamps it in ``live_run_pipe``, which a DRY run
-never reaches, so both sides report ``None``. That is asserted rather than excluded quietly, because
-it is the honest scope of what the comparison proves, and it is a pre-existing interpreter gap in its
-own right (a ``--dry-run --mock-usage`` cost report has no pipe attribution — see KF-13 in
-``wip/kernel/deferred-follow-ups.md``). Timestamps differ because the two runs happen at different
-times.
+``pipe_code`` is the one field that legitimately differs: the interpreter names the pipe it ran, and a
+kernel call has no pipe to name. Both halves are asserted rather than excluded quietly, because that
+difference is the honest scope of what the comparison proves. It only reads that way because
+``dry_run_pipe`` stamps the running pipe onto the metadata it hands down — until it did, the field was
+``None`` on both sides and this measurement could not observe it at all (KF-13). Timestamps differ
+because the two runs happen at different times.
 
 Transport ownership is visible in the setup itself. The interpreter half needs NDJSON tracing enabled
 because its run machinery builds the event log off the config; the kernel half hands its own
@@ -60,15 +59,16 @@ output = "Text"
 prompt = "{_USER_PROMPT}"
 """
 
-#: The record fields that carry the run's identity or its wall-clock, which two separate runs cannot
-#: share. Everything else is the shape parity is measured on.
-_RUN_SPECIFIC_FIELDS = ("pipe_code", "started_at", "completed_at")
+#: The fields two separate runs cannot share — the wall-clock ones — plus ``pipe_code``, which the two
+#: callers fill differently by design rather than by accident. Everything else is the shape parity is
+#: measured on, and each excluded field is asserted on its own below.
+_UNCOMPARABLE_FIELDS = ("pipe_code", "started_at", "completed_at")
 
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestKernelUsageParity:
     def _comparable(self, record: TokensUsageRecord) -> dict[str, Any]:
-        return {key: value for key, value in record.model_dump().items() if key not in _RUN_SPECIFIC_FIELDS}
+        return {key: value for key, value in record.model_dump().items() if key not in _UNCOMPARABLE_FIELDS}
 
     def _records(self, tokens_usages: list[AnyTokensUsage]) -> list[TokensUsageRecord]:
         return [make_tokens_usage_record(tokens_usage) for tokens_usage in tokens_usages]
@@ -138,8 +138,8 @@ class TestKernelUsageParity:
             assert record.inference_model_name == MOCK_USAGE_MODEL_NAME
             assert sum(record.nb_tokens_by_category.values()) > 0
 
-        # The scope of what was measured, pinned rather than left implicit: the field a kernel run
-        # could never fill is also unfilled on the interpreter's DRY path, so parity here does not
-        # cover it (KF-13).
-        assert interpreter_records[0].pipe_code is None
+        # The scope of what was measured, pinned rather than left implicit: the one field excluded
+        # from the comparison above is excluded because the two callers fill it differently — the
+        # interpreter names the pipe it ran, a kernel call has no pipe to name.
+        assert interpreter_records[0].pipe_code == _PIPE_CODE
         assert kernel_records[0].pipe_code is None

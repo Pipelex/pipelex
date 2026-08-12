@@ -5,7 +5,7 @@ Design for deterministic auto-fixing of `.mthds` bundles. Supersedes [old-plan-t
 ## Decisions taken (2026-07-07, with Louis)
 
 - **D1 — Fixes attach to diagnostics.** Each fixable `ValidationErrorItem` carries a structured `suggested_fix`. The `fix` command is just "apply what validate found", in a loop. No standalone fix engine that re-derives problems.
-- **D2 — Runtime-only wire first.** `suggested_fix` is an additive, optional, pipelex-owned field. Formal promotion into the MTHDS protocol (spec + conformance + downstream schema copies in mthds / mthds-js / mthds-python) is a later wave, once the shape is proven.
+- **D2 — Runtime-only wire first.** `suggested_fix` is an additive, optional, pipelex-owned field. Formal promotion into the MTHDS protocol (spec + cross-repo spec suite + downstream schema copies in mthds / mthds-js / mthds-python) is a later wave, once the shape is proven.
 - **D3 — Wave 1 consumer = agent CLI + skills.** `pipelex-agent fix` with the convergence loop, consumed by the `mthds-fix` skill and hooks. API `POST /fix`, MCP `mthds_fix` tool, and VS Code quick fixes are later waves.
 - **D4 — Pruning rules cut from wave 1.** `prune-unreachable` / `prune-unused-concepts` are cleanups, not fixes — nothing is broken when they'd fire. Salvage the graph-walk logic later as opt-in lint warnings with attached fixes. Wave 1 is purely "make invalid bundles valid".
 
@@ -15,7 +15,7 @@ The old branch built a separate fix engine that re-implemented the validation pi
 
 The decisive observation: **the validator already knows the correct value at detection time.** `PipeSequence.validate_output_with_library` (`pipelex/pipe_controllers/sequence/pipe_sequence.py:63-115`) compares the declared output against the last step's output and already ships the correct concept in the error (`provided_concept_code`). `generic_validate_inputs_with_library` (`pipelex/core/pipes/pipe_abstract.py:264`) compares declared inputs against `needed_inputs()`. So fixability comes from **richer typed errors**, not from a smarter fixer: enrich the error to carry the expected value, and fix construction becomes a mechanical translation that cannot drift from the validator.
 
-This also matches the workspace's presentation-vs-contract principle (`docs/specs/pipelex-mthds-protocol.md`): the fix ops are contract data on the structured report; any rendered diff is presentation. One validation engine keeps feeding every surface.
+This also matches the workspace's presentation-vs-contract principle (the MTHDS protocol spec): the fix ops are contract data on the structured report; any rendered diff is presentation. One validation engine keeps feeding every surface.
 
 ## Architecture
 
@@ -51,7 +51,7 @@ class SuggestedFix(BaseModel):
 
 `ValidationErrorItem` gains `suggested_fix: SuggestedFix | None = None`. Serialization stays `exclude_none`, so nothing changes for non-fixable errors. Naming is brand-neutral (language-level concept — no `pipelex_` prefixes in field names).
 
-Note `ValidationErrorItem` flows through the hosted API's `InvalidReport` too, so the field will *appear* on the API wire as soon as it exists — that's fine and additive; what D2 defers is the formal contract work (spec sections, conformance tests, downstream schema mirrors), not hiding the field.
+Note `ValidationErrorItem` flows through the hosted API's `InvalidReport` too, so the field will *appear* on the API wire as soon as it exists — that's fine and additive; what D2 defers is the formal contract work (spec sections, spec-suite tests, downstream schema mirrors), not hiding the field.
 
 ### The applier
 
@@ -209,7 +209,7 @@ So the human-CLI gate (master-plan step 5, bar 1 — "the abstraction has been s
 
 ### Wave 2 (separate plan, not scoped here)
 
-Protocol promotion (spec sections in `docs/specs/`, conformance arm, schema sync to mthds / mthds-js / mthds-python), API `POST /fix`, MCP `mthds_fix` tool, VS Code `CodeActionProvider` (first code action in the LSP — keyed on `diag.code = error_type`, fix payloads already ride the validation backends), `mthds-fix` / pipelex-plugins skill updates, pruning rules as lint warnings with attached fixes.
+Protocol promotion (protocol-spec sections, a cross-repo spec-suite arm, schema sync to mthds / mthds-js / mthds-python), API `POST /fix`, MCP `mthds_fix` tool, VS Code `CodeActionProvider` (first code action in the LSP — keyed on `diag.code = error_type`, fix payloads already ride the validation backends), `mthds-fix` / pipelex-plugins skill updates, pruning rules as lint warnings with attached fixes.
 
 ## Salvage map from `feature/Bundle-fixer`
 

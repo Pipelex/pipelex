@@ -13,8 +13,7 @@ the write-back; `run_func` is the in-process composition of the two, and the ent
 programmatic caller wants.
 
 One seam is deliberately *not* here: **choosing where the function runs.** Executor selection is
-configured deployment machinery, and its protocol is typed on interpreter models — see
-`wip/kernel/deferred-follow-ups.md`.
+configured deployment machinery, and its protocol is typed on interpreter models.
 """
 
 import asyncio

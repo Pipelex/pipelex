@@ -12,7 +12,7 @@ corrupt arbitrary keys inside a `z.record()` / `z.unknown()` value (a camelCase 
 tell a schema-declared field key from arbitrary data — e.g. `native.JSON`'s `json_obj` map). The
 inferred `z.infer` types therefore carry snake_case keys. (This departs from a camelCase-TS convention;
 if camelCase ergonomics are later wanted they must ride a *schema-aware* transform, not a blind deep
-key remap — see D10 in `_codegen/TODOS.md`.) Concept references use `z.lazy(() => XSchema)` so schema
+key remap.) Concept references use `z.lazy(() => XSchema)` so schema
 declaration order is irrelevant and reference cycles are handled.
 
 TypeScript customization is by declaration merging (augment the generated `interface`/module from a

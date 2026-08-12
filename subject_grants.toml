@@ -3984,10 +3984,6 @@ rationale = "Verb-object: scans the pipe for taint triggers; slot_taints is cont
 param = "item_input_stuff"
 rationale = "Verb-object: runs the branch for the item stuff; invoked positionally via functools.partial."
 
-["pipelex/pipe_controllers/batch/pipe_batch.py::resolve_batch_max_concurrency"]
-param = "max_concurrency_setting"
-rationale = "Verb-object: resolves the config setting value; single operand, callers pass a labelled config read."
-
 ["pipelex/pipe_controllers/condition/special_outcome.py::SpecialOutcome.is_continue"]
 param = "outcome"
 rationale = "Predicate on the outcome string; single operand."
@@ -4312,6 +4308,10 @@ rationale = "Protocol hook: runs the pipe job; single operand."
 param = "pipe_job"
 rationale = "Protocol method: runs the pipe job; single operand across implementations."
 
+["pipelex/pipe_run/pipe_router_protocol.py::PipeRouterProtocol.run_batch_branch"]
+param = "pipe_job"
+rationale = "Protocol hook: the pipe job being dispatched as a fan-out branch; single operand."
+
 ["pipelex/pipe_run/pipe_run_params.py::PipeRunParams.copy_by_injecting_multiplicity"]
 param = "pipe_run_params"
 rationale = "Verb-object: copies the given run params; multiplicity stays keyword."
@@ -4327,6 +4327,10 @@ rationale = "Verb-object: pushes the pipe named by the code; single operand."
 ["pipelex/pipe_run/pipe_run_params.py::PipeRunParams.push_pipe_to_stack"]
 param = "pipe_code"
 rationale = "Verb-object: pushes the pipe named by the code; single operand."
+
+["pipelex/pipe_run/pipe_run_params_factory.py::resolve_batch_max_concurrency"]
+param = "max_concurrency_setting"
+rationale = "Verb-object: resolves the config setting value; single operand, callers pass a labelled config read."
 
 ["pipelex/pipe_run/pipe_run_protocol.py::PipeRunProtocol.run"]
 param = "pipe_job"

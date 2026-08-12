@@ -100,7 +100,7 @@
             "args": [
                 "run",
                 "bundle",
-                "/Users/lchoquel/repos/Pipelex/pipelex-demos/mthds-wip/fashion_moodboard",
+                "${workspaceFolder}/tests/e2e/pipelex/cv_batch_screening/library_crate",
             ],
             "console": "integratedTerminal",
             "justMyCode": false

@@ -44,7 +44,7 @@ def build_builtin_inference_backend_registry() -> InferenceBackendRegistry:
     plugin closures through the real registry lookup.
     """
     # No builtin's register() reads config: Temporal — the only plugin that did, via
-    # ``temporal.is_enabled`` — now ships as the external pipelex-temporal dist. A bare
+    # ``temporal.is_enabled`` — now ships as our external Temporal plugin. A bare
     # stub config suffices.
     stub_config = cast("PipelexConfig", SimpleNamespace())
     registrar = PluginRegistrar(config=stub_config)

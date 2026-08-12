@@ -1,6 +1,6 @@
 # Secrets provider → `pipelex.plugins` plugin
 
-Status: **COMPLETE.** All phases delivered — this vertical (Phases 3–4 of the master plan) mirrors the storage pattern ([storage-provider-plugin.md](storage-provider-plugin.md), which defines the shared "keyed registry + config-selected singleton" mechanism this plan reuses wholesale). See [TODOS.md](../../TODOS.md) for the execution record (Phases 3–4 code + tests + docs, Phase 5 release gating). This plan reads as "mirror storage, swap the nouns."
+Status: **COMPLETE.** All phases delivered — this vertical (Phases 3–4 of the master plan) mirrors the storage pattern ([storage-provider-plugin.md](storage-provider-plugin.md), which defines the shared "keyed registry + config-selected singleton" mechanism this plan reuses wholesale). The execution record (Phases 3–4 code + tests + docs, Phase 5 release gating) lived in the branch's root tracker. This plan reads as "mirror storage, swap the nouns."
 
 Goal: turn the secrets provider into a formal plugin seam so third parties can ship `pipelex-secrets-<backend>` packages (Vault, AWS Secrets Manager, GCP Secret Manager, …) discovered via `pipelex.plugins` and selected at deploy time. The built-in `EnvSecretsProvider` becomes an unconditional builtin plugin.
 
@@ -127,7 +127,7 @@ Because there's only one built-in method, introducing a config selector for a si
 - [ ] Manual: `pipelex plugins list`; a run with default `method="env"`; confirm `get_secret(...)` still resolves env vars.
 
 ## Cross-repo consequence (release-gated)
-- Same as storage: `pipelex-temporal` / `pipelex-mistralai-workflows` bump `targets_api` to 3 (only once, if batched with storage per DX-1).
+- Same as storage: our Temporal and Mistral Workflows plugins bump `targets_api` to 3 (only once, if batched with storage per DX-1).
 
 ## Follow-ups (do not build now)
 - **S4 external config passthrough** for out-of-tree secrets providers.

@@ -1,6 +1,6 @@
 """Agent CLI codegen subcommand group.
 
-The agent-CLI mirror of the bare `pipelex codegen` family (see `docs/specs/pipelex-codegen.md` →
+The agent-CLI mirror of the bare `pipelex codegen` family (see the codegen spec →
 "CLI: codegen"): the same engine, presented through the agent CLI's two-stream envelopes
 (`--format` / `--error-format`, markdown default). `inputs` has no mirror here — the existing
 `pipelex-agent inputs` group already surfaces that projection.
