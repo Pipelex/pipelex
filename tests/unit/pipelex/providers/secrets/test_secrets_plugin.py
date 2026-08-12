@@ -36,7 +36,7 @@ class TestSecretsPlugin:
         assert plugin.targets_api == PLUGIN_API_VERSION
 
         registrar = PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(plugins=SimpleNamespace(disabled=[]))))
-        discovery = registrar.begin_plugin(name="secrets", origin=PluginOrigin.BUILTIN, targets_api=PLUGIN_API_VERSION)
+        discovery = registrar.begin_plugin(name="secrets", origin=PluginOrigin.BUILTIN, targets_api=PLUGIN_API_VERSION, group=None)
         plugin.register(registrar)
 
         assert set(registrar.secrets_providers) == {"env"}

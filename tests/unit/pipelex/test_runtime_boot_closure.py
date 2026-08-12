@@ -1,7 +1,7 @@
-"""Booting the runtime layer loads zero interpreter modules — the boot-time half of the property.
+"""Booting the kernel layer loads zero interpreter modules — the boot-time half of the property.
 
-`pipelex-dev check-hub-layering` proves no runtime-layer *module* imports `interpreter_hub`, and
-`test_runtime_layer_import_closure.py` proves the declared runtime-layer entry points *import* clean.
+`pipelex-dev check-hub-layering` proves no kernel-layer *module* imports `interpreter_hub`, and
+`test_kernel_layer_import_closure.py` proves the declared kernel-layer entry points *import* clean.
 Neither says anything about *booting*: until `RuntimeBoot` existed, the only composition root in the
 tree built an `InterpreterHub`, a `LibraryManager`, a `PipelineManager`, a `PipeRouter` and a
 `PipeRun` whether the caller would ever load a method or not.
@@ -13,8 +13,8 @@ deliberately does not clear — so once anything in this process has booted a `P
 pass vacuously. A fresh interpreter is the only place the question is answerable.
 
 It is also strictly stronger than the import-closure entry point it complements: that one *imports*
-`pipelex.runtime_boot`, this one *runs* `RuntimeBoot.make()`. A runtime-only boot builds its plugin
-registrar from `RUNTIME_BUILTIN_PLUGINS` alone, so `OrchestratorRegistry`, `BundleValidatorRegistry`
+`pipelex.runtime_boot`, this one *runs* `RuntimeBoot.make()`. A kernel-only boot builds its plugin
+registrar from `KERNEL_BUILTIN_PLUGINS` alone, so `OrchestratorRegistry`, `BundleValidatorRegistry`
 and the PipeFunc executor modes are all empty on it — an import-time check cannot notice a boot step
 that tries to resolve out of one of them.
 """
@@ -23,14 +23,14 @@ import subprocess  # noqa: S404
 import sys
 import textwrap
 
-from tests.unit.pipelex.test_runtime_layer_import_closure import INTERPRETER_PACKAGES
+from tests.unit.pipelex.test_kernel_layer_import_closure import INTERPRETER_PACKAGES
 
 #: Wall-clock bound on the booted-runtime subprocess, matching the import-closure harness: a boot
 #: that deadlocks must present as a failure, not as a hung suite
 #: (`docs/agents/debugging-hanging-pytest-runs.md`).
 SUBPROCESS_TIMEOUT_SECONDS = 300
 
-#: Boot the runtime layer in a fresh interpreter, then answer the three questions this module exists
+#: Boot the kernel layer in a fresh interpreter, then answer the three questions this module exists
 #: to ask. `needs_inference=False` keeps it offline: no gateway terms gate, no model-deck validation.
 #: The `sys.modules` sweep runs *before* `pipelex.interpreter_hub` is imported for the hub assertion,
 #: so importing it to ask the question cannot be what makes the answer wrong.
@@ -76,7 +76,7 @@ _BOOTED_RUNTIME_SCRIPT = textwrap.dedent(
     # The documented degradation: with no InterpreterHub installed, class-registry scoping stays at
     # its unscoped default rather than raising (docs/contribute/hub-layering.md).
     if class_registry_scoping.resolve() is not None:
-        print("class_registry_scoping resolved a scoped registry on a runtime-only boot")
+        print("class_registry_scoping resolved a scoped registry on a kernel-only boot")
         raise SystemExit(1)
 
     print("runtime boot OK")
@@ -101,7 +101,7 @@ CONTROL_PACKAGE_THE_RUNTIME_ALWAYS_LOADS = "cogt"
 
 
 def _run_booted_runtime(*, interpreter_packages: "tuple[str, ...]") -> subprocess.CompletedProcess[str]:
-    """Boot the runtime layer in a fresh interpreter and return the sweep's verdict."""
+    """Boot the kernel layer in a fresh interpreter and return the sweep's verdict."""
     try:
         return subprocess.run(  # noqa: S603
             [sys.executable, "-c", _BOOTED_RUNTIME_SCRIPT, *interpreter_packages],
@@ -115,7 +115,7 @@ def _run_booted_runtime(*, interpreter_packages: "tuple[str, ...]") -> subproces
         raise AssertionError(message) from exc
 
 
-class TestBootedRuntimeLayer:
+class TestBootedKernelLayer:
     def test_the_sweep_still_detects_a_package_the_runtime_boot_really_loads(self) -> None:
         """The control: same script, opposite verdict. Without this, every other case is vacuous."""
         result = _run_booted_runtime(interpreter_packages=(CONTROL_PACKAGE_THE_RUNTIME_ALWAYS_LOADS,))
@@ -129,10 +129,10 @@ class TestBootedRuntimeLayer:
         assert "interpreter module(s)" in result.stdout
         assert "runtime boot OK" not in result.stdout
 
-    def test_booting_the_runtime_layer_loads_no_interpreter_module_and_installs_no_interpreter_hub(self) -> None:
+    def test_booting_the_kernel_layer_loads_no_interpreter_module_and_installs_no_interpreter_hub(self) -> None:
         result = _run_booted_runtime(interpreter_packages=INTERPRETER_PACKAGES)
         assert result.returncode == 0, (
-            "booting the runtime layer must load zero interpreter modules and install no InterpreterHub.\n"
+            "booting the kernel layer must load zero interpreter modules and install no InterpreterHub.\n"
             "This is the boot-time half of the hub-layering property — see docs/contribute/hub-layering.md "
             "for how to find the shortest import path to an offender.\n"
             f"stdout={result.stdout}\nstderr={result.stderr}"

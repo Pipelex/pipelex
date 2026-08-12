@@ -57,7 +57,7 @@ verify_commands = []
 
 [contracts.hub-layering-convention]
 description = "The hub-layering doc is the boundary's specification and must track the guard and the two hubs."
-# The guard owns the rule (declared runtime layer, violation kinds, carve-outs); the two hub
+# The guard owns the rule (declared kernel layer, violation kinds, carve-outs); the two hub
 # modules own the symbol partition the doc tabulates accessor by accessor. A symbol added to or
 # moved between them silently falsifies those tables, which is the staleness this contract exists
 # to catch. No verify command: `check-hub-layering` already gates `make check` and CI, so re-running

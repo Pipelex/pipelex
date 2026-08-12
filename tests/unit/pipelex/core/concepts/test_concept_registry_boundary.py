@@ -12,7 +12,7 @@
 # Pinned as a golden set rather than as a rule, for the reason the `cogt` boundary test gives: there is no
 # predicate separating the sanctioned write-side reads from a new read-side one, and a golden set needs
 # none — it turns the third module into a diff a reviewer sees. Nothing else can see this: both the
-# accessor and its users are runtime-layer, so the hub-layering guard is blind to the edge by construction.
+# accessor and its users are kernel-layer, so the hub-layering guard is blind to the edge by construction.
 
 from __future__ import annotations
 

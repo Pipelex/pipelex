@@ -1,6 +1,6 @@
 """Prompt assembly: templates plus memory-borne images and documents, into one `LLMPrompt`.
 
-This is the runtime-layer home of what `LLMPromptBlueprint.make_llm_prompt` used to do inline.
+This is the kernel-layer home of what `LLMPromptBlueprint.make_llm_prompt` used to do inline.
 `LLMPromptBlueprint` stays where it is — it is a language artifact, what `.mthds` parses into, and it
 keeps its parse-and-validate role — but it now maps down onto :func:`assemble_llm_prompt` rather than
 holding the semantics, so the interpreter and a programmatic caller assemble prompts through the

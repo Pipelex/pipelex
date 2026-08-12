@@ -41,7 +41,7 @@ class TestPipeFuncExecutorRegistry:
     def test_registered_factory_is_retrievable_by_mode(self) -> None:
         """A factory registered for a mode is the exact callable the built registry returns for it."""
         registrar = _make_registrar()
-        registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
+        registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION, group=None)
         registrar.add_pipe_func_executor(mode="daytona", factory=_fake_factory)
 
         registry = PipeFuncExecutorRegistry(registrar.pipe_func_executors)
@@ -52,7 +52,7 @@ class TestPipeFuncExecutorRegistry:
     def test_contribution_recorded_on_the_active_plugin(self) -> None:
         """Registering an executor records a ``pipe_func executor <mode>`` contribution on the plugin's discovery."""
         registrar = _make_registrar()
-        discovery = registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
+        discovery = registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION, group=None)
 
         registrar.add_pipe_func_executor(mode="daytona", factory=_fake_factory)
 
@@ -61,7 +61,7 @@ class TestPipeFuncExecutorRegistry:
     def test_get_required_miss_raises_listing_registered_modes(self) -> None:
         """A miss names the requested mode and lists the registered ones (the boot-time actionable error)."""
         registrar = _make_registrar()
-        registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
+        registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION, group=None)
         registrar.add_pipe_func_executor(mode="direct", factory=_fake_factory)
         registrar.add_pipe_func_executor(mode="local_sandbox", factory=_fake_factory)
         registry = PipeFuncExecutorRegistry(registrar.pipe_func_executors)
@@ -87,9 +87,9 @@ class TestPipeFuncExecutorRegistry:
     def test_duplicate_mode_fails_loud_naming_both_plugins(self) -> None:
         """Two plugins registering an executor for the same mode is a fail-loud conflict naming both."""
         registrar = _make_registrar()
-        registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
+        registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION, group=None)
         registrar.add_pipe_func_executor(mode="daytona", factory=_fake_factory)
-        registrar.begin_plugin(name="beta", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
+        registrar.begin_plugin(name="beta", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION, group=None)
 
         with pytest.raises(DuplicatePipeFuncExecutorError) as exc_info:
             registrar.add_pipe_func_executor(mode="daytona", factory=_fake_factory)
@@ -101,7 +101,7 @@ class TestPipeFuncExecutorRegistry:
     def test_builtin_plugin_registers_only_direct(self) -> None:
         """The core PipeFuncPlugin contributes exactly ``direct`` (in-process); sandbox modes are out of tree."""
         registrar = _make_registrar()
-        registrar.begin_plugin(name="pipe_func", origin=PluginOrigin.BUILTIN, targets_api=PLUGIN_API_VERSION)
+        registrar.begin_plugin(name="pipe_func", origin=PluginOrigin.BUILTIN, targets_api=PLUGIN_API_VERSION, group=None)
         PipeFuncPlugin().register(registrar)
 
         registry = PipeFuncExecutorRegistry(registrar.pipe_func_executors)
