@@ -1,5 +1,7 @@
 # Changelog
 
+## [Unreleased]
+
 ## [v0.43.1] - 2026-08-12
 
 ### Changed
@@ -7,10 +9,6 @@
 - **`PipeRunParams.batch_max_concurrency` is now required (Breaking)**: The field no longer defaults to `None`, which previously made an omitted value indistinguishable from an explicitly authored unbounded concurrency (`max_concurrency = "unbounded"`). Omitting it now raises a `ValidationError` early—on both direct construction and payload decoding—to prevent accidental unbounded fan-outs.
     - **Migration:** Construct `PipeRunParams` via `PipeRunParamsFactory.make_run_params()`, the single writer for run-scoped invariants (`run_mode`, `pipe_stack_limit`, `batch_max_concurrency`). Integration test fixtures now route through the factory via a new `make_mode_guarded_run_params` helper.
     - **Docs:** Added a warning to `docs/under-the-hood/pipe-routing-and-execution.md` on using the factory method.
-
-### Changed
-
-- **`PipeRunParams.batch_max_concurrency` is required (Breaking)**: The fan-out bound has no default any more, joining `run_mode` and `pipe_stack_limit` as a field whose omission fails loud. `None` is not only what a default would give — it is also what an authored `max_concurrency = "unbounded"` resolves to, so a default made "never written" indistinguishable from "authored unbounded", and pointed the omission at the dangerous direction: launch every branch at once. Breaking for code constructing `PipeRunParams` directly or decoding a payload that predates the field; build through `PipeRunParamsFactory.make_run_params`, the single writer of all three fields.
 
 ### Fixed
 
