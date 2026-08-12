@@ -52,11 +52,12 @@ Contributors adding a new dependency should read [Hub Layering](../contribute/hu
 
 All custom implementations MUST:
 
-1. Implement ALL methods defined in their respective protocols
-2. Match the exact method signatures (parameter names and types)
-3. Follow the protocol's documented behavior
-4. Handle errors appropriately
-5. Clean up resources when needed
+1. Subclass the protocol rather than rely on structural conformance — a protocol carrying concrete default bodies (`PipeRouterProtocol.run_batch_branch`) hands them down by inheritance only
+2. Implement ALL methods defined in their respective protocols
+3. Match the exact method signatures (parameter names and types)
+4. Follow the protocol's documented behavior
+5. Handle errors appropriately
+6. Clean up resources when needed
 
 ## Available Injectable Components
 
