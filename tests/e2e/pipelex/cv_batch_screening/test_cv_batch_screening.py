@@ -1,9 +1,9 @@
 """Direct-mode e2e test for the CV batch screening pipeline.
 
-Runs the pipelex-demos example 21 pipeline through ``PipelexMTHDSProtocol`` without any
-Temporal layer. The same bundle is also exercised by the temporal in-process test in the
-``pipelex-temporal`` package and by the ``/temporal-e2e-validate`` skill (distributed
-3-process validation). Each repo keeps its own copy of the crate (see ``test_data.py``).
+Runs the CV batch screening pipeline through ``PipelexMTHDSProtocol`` without any
+Temporal layer. The same bundle is also exercised by the in-process Temporal test in
+our Temporal plugin and by the ``/temporal-e2e-validate`` skill (distributed 3-process
+validation). Each repo keeps its own copy of the crate (see ``test_data.py``).
 """
 
 from pathlib import Path

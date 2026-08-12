@@ -25,4 +25,4 @@ Triage record for the SWE-agent review threads on [PR #1059](https://github.com/
 
 ## Out of scope for this PR (other repo)
 
-- **`pipelex-platform` stale API-response docstring.** `pipelex-platform/src/pipelex_platform/routers/v1/runs.py:101-102` still describes `tokens_usages` as "token counts by category + **unit costs** + model id" — stale against the v0.40 `TokensUsageRecord` wire shape (which drops `unit_costs` and carries a server-computed `cost`). Unlike the wip trackers above, that one is a live API-response docstring. Fix belongs in the `pipelex-platform` repo; flagged here so it is not lost.
+One item, a stale API-response docstring in another repo — tracked at workspace level, since nothing about it belongs to `pipelex`.

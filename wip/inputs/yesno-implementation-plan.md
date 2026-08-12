@@ -90,7 +90,7 @@ Shared per-release wave with Datetime + Smart Inputs (see `README.md`): the Smar
 
 Follow-up off the critical path (shared with Date): **LLM-output ergonomics for scalar natives** — how PipeLLM produces a `YesNo`/`Date` more leanly than the generic object path (cousin of the Optionals maybe-wrapper).
 
-`pipelex-temporal` (private plugin repo): no code change expected — `bool` is JSON-native and the codec binds classes through the registry. At pin-bump time, add a `YesNo` case to its converter round-trip tests anyway (the failure mode over there is a hang, not an error; coverage is cheap insurance).
+Our Temporal plugin (private repo): no code change expected — `bool` is JSON-native and the codec binds classes through the registry. At pin-bump time, add a `YesNo` case to its converter round-trip tests anyway (the failure mode over there is a hang, not an error; coverage is cheap insurance).
 
 ## Micro-decisions log
 

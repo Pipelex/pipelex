@@ -4,7 +4,7 @@
 
 ## Goal (use this as the /goal)
 
-Perfect, clear validation-error reports and fix reports on every surface: every validation error must state — in MTHDS author syntax, never internal repr — what is wrong, where it is, and exactly what to write to fix it; and every surface (human `pipelex validate` / `pipelex fix`, agent `pipelex-agent validate` / `pipelex-agent fix` in markdown and JSON, the API `/validate` payload) must present that explanation at full strength, with an actionable next step, verified hands-on against the `pipelex-demos/bad_bundles` playground.
+Perfect, clear validation-error reports and fix reports on every surface: every validation error must state — in MTHDS author syntax, never internal repr — what is wrong, where it is, and exactly what to write to fix it; and every surface (human `pipelex validate` / `pipelex fix`, agent `pipelex-agent validate` / `pipelex-agent fix` in markdown and JSON, the API `/validate` payload) must present that explanation at full strength, with an actionable next step, verified hands-on against the internal bad-bundles playground.
 
 ## Where this work lives
 
@@ -13,12 +13,12 @@ Perfect, clear validation-error reports and fix reports on every surface: every 
 
 ## The test bed (built 2026-07-09, session before this plan)
 
-`/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/` — a playground of deliberately broken `.mthds` bundles, one scenario per directory, covering every autofix rule plus an unfixable-collision safety case and a kitchen-sink combo. Its `README.md` documents every scenario and the exact commands; `_pristine/` holds backups and `./restore.sh` re-breaks everything, so it can be exercised repeatedly. **This is where every before/after comparison in this plan gets verified.**
+An internal **bad-bundles playground** — deliberately broken `.mthds` bundles, one scenario per directory, covering every autofix rule plus an unfixable-collision safety case and a kitchen-sink combo. Its `README.md` documents every scenario and the exact commands; `_pristine/` holds backups and `./restore.sh` re-breaks everything, so it can be exercised repeatedly. **This is where every before/after comparison in this plan gets verified.** Its location is recorded at workspace level.
 
-Run everything from the `pipelex-demos` repo root with its own venv (the user fixed it; it has the `fix` command):
+Run everything from that repo's root with its own venv (the user fixed it; it has the `fix` command):
 
 ```bash
-cd /Users/lchoquel/repos/Pipelex/pipelex-demos
+cd <bad-bundles playground repo>
 source .venv/bin/activate
 export PIPELEX_NO_DECK_NOTICE=1
 pipelex validate bundle bad_bundles/01_wrong_sequence_output/bundle.mthds
@@ -110,7 +110,7 @@ The intended architecture for Phase 2 (agent surfaces catch up), converged after
 
 - [x] Restored the playground and re-captured every scenario × every surface → `wip/validation-reporting/after/`. **The only per-scenario delta vs Phase 2 is the JSON `message` line (now clean) on all 10**; human validate, agent-md, human fix `--diff`, and agent fix are byte-identical — zero regressions. Zero leak fragments (`Value errors:` / `multiplicity=None` / `Could not load …` / json-fence) remain in any capture. Goal-bar spot-check on scenario 03 (the Phase-0 worst offender): human/agent-md/agent-json all state the problem AND the concrete author-syntax action; scenario 09's collision bail renders the remaining error as prose + the actionable bail reason + tip.
 - [ ] **Regenerate `conformance/validate-error-qa/` corpus — DEFERRED, release-gated (belongs to step 6).** All 40 `invalid_*.json` + `invalid_*.md` fixtures pin the old leaky top-line `message`; the freshness guard (`conformance/tests/validate_error_qa/test_corpus_fresh.py`) asserts them byte-for-byte against the **live** `/validate`, and the conformance repo pins a *released* pipelex — so the corpus can only be regenerated (`make validate-error-qa`) once these wordings ship. Coordinate with the step-6 `suggested_fix` fixture regen already owed (guardrail: "coordinate, don't collide"). The `invalid_*.agentcli.md` channel is unaffected (it already renders items via `format_validation_error_items_markdown`, ungated).
-- [x] Docs: CHANGELOG `[Unreleased]` gained the validation-error-reporting entries (author-syntax messages, agent prose rendering, clean summary message on every surface + API `rendered_markdown` 💡 lines, no-progress bail wording). The CLI docs (`docs/tools/cli/validate.md`, `fix.md`, `agent-cli.md`) describe the 💡 line / fix command / error envelope **generically and remain accurate** — no stale reprs were embedded, so no edits were needed. `pipelex-demos/bad_bundles/README.md` embeds no error-output strings (commands unchanged), so it needs no update.
+- [x] Docs: CHANGELOG `[Unreleased]` gained the validation-error-reporting entries (author-syntax messages, agent prose rendering, clean summary message on every surface + API `rendered_markdown` 💡 lines, no-progress bail wording). The CLI docs (`docs/tools/cli/validate.md`, `fix.md`, `agent-cli.md`) describe the 💡 line / fix command / error envelope **generically and remain accurate** — no stale reprs were embedded, so no edits were needed. The bad-bundles playground's own `README.md` embeds no error-output strings (commands unchanged), so it needs no update.
 - [x] `make agent-check` green. `make agent-test` (full suite — run because the change touches the shared `ValidateBundleError` base) — see status log for result. Final status update below.
 
 ## Status log

@@ -142,7 +142,7 @@ The plan's finalize step ran: gstack `/review` (Opus 4.8) with a testing + maint
 
 Shared per-release wave with YesNo + Smart Inputs (see `README.md`): MTHDS spec native-concepts tables (`mthds/docs/language/concepts.md`, `mthds/docs/spec/mthds-format.md`); schema-copy sync via the `mthds-schema-sync` skill; `mthds-python` protocol widening for bare temporal scalars (rides Smart Inputs D10) + any native-list mirrors; `mthds-js` mirrors; conformance rows; `mthds-plugins` skills (`mthds-inputs`, `mthds-build`); editor tooling completion lists (vscode-pipelex). Plus the YesNo/Date shared follow-up: LLM-output ergonomics for scalar natives.
 
-`pipelex-temporal` (private plugin repo): **no code change expected** — its codec serializes the `dump_for_transport` dict via kajson and binds classes through the registry, so `DateContent` flows in with the pipelex version-pin bump. At pin-bump time, add a `Date` case to its converter round-trip tests anyway: the failure mode over there is a hang, not an error, so coverage is cheap insurance.
+Our Temporal plugin (private repo): **no code change expected** — its codec serializes the `dump_for_transport` dict via kajson and binds classes through the registry, so `DateContent` flows in with the pipelex version-pin bump. At pin-bump time, add a `Date` case to its converter round-trip tests anyway: the failure mode over there is a hang, not an error, so coverage is cheap insurance.
 
 ## Micro-decisions log
 

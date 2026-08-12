@@ -127,7 +127,7 @@ Because there's only one built-in method, introducing a config selector for a si
 - [ ] Manual: `pipelex plugins list`; a run with default `method="env"`; confirm `get_secret(...)` still resolves env vars.
 
 ## Cross-repo consequence (release-gated)
-- Same as storage: `pipelex-temporal` / `pipelex-mistralai-workflows` bump `targets_api` to 3 (only once, if batched with storage per DX-1).
+- Same as storage: our Temporal and Mistral Workflows plugins bump `targets_api` to 3 (only once, if batched with storage per DX-1).
 
 ## Follow-ups (do not build now)
 - **S4 external config passthrough** for out-of-tree secrets providers.

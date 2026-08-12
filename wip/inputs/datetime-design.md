@@ -66,7 +66,7 @@ departure = 2026-07-07T15:40:00+02:00  # a Date — with time and offset, faithf
 
 `NativeConceptCode.DATE = "Date"`, concept ref `native.Date`, description: *"A calendar date, optionally with a time of day — as precise as its source states."* One new native, not two or three (§2). The track keeps its colloquial "Datetime" name in the roadmap; the concept an author sees is `Date`.
 
-Breaking consequence (native codes are reserved): a bundle declaring its own `[concept.Date]` becomes an error. Workspace grep (pipelex, cookbook, methods, test-bed) finds no such concept today. Changelog: breaking.
+Breaking consequence (native codes are reserved): a bundle declaring its own `[concept.Date]` becomes an error. Workspace grep across every repo finds no such concept today. Changelog: breaking.
 
 ### DT2 — Content shape: `DateContent` with `date` + optional `time`
 
