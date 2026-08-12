@@ -19,6 +19,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # A manual run can target any ref that contains this workflow, and every
+      # job below builds and publishes whatever it checks out — so an unguarded
+      # dispatch could push a feature branch to production PyPI and tag it.
+      # guard-branches.yml cannot help: it only runs on pull_request_target.
+      # Restrict manual runs to the refs a publish can legitimately come from;
+      # pull_request runs are already constrained by their base branch.
+      - name: Verify the dispatched ref may publish
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          echo "Dispatched from $REF"
+          if [[ "$REF" != "refs/heads/main" ]] \
+            && [[ ! "$REF" =~ ^refs/heads/release/v[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+            && [[ ! "$REF" =~ ^refs/heads/pre-release/v ]]; then
+            echo "::error::Manual publish is allowed only from main, release/vX.Y.Z or pre-release/v*. Got: $REF"
+            exit 1
+          fi
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
