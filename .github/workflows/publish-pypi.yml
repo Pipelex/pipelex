@@ -6,11 +6,16 @@ on:
     branches:
       - main
       - "pre-release/v*"
+  # Manual retry. A publish that fails after the merge (a rejected upload, an
+  # expired token) is otherwise unrecoverable: re-running a run replays the
+  # workflow file it started with, and the only other trigger is merging a PR
+  # into main — which the branch guard restricts to release/vX.Y.Z branches.
+  workflow_dispatch:
 
 jobs:
   build:
     name: Build distribution 📦
-    if: github.event.pull_request.merged == true
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
 
     steps:
@@ -38,7 +43,7 @@ jobs:
   publish-to-pypi:
     name: >-
       Publish Python 🐍 distribution 📦 to PyPI
-    if: github.event.pull_request.merged == true
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     needs:
       - build
     runs-on: ubuntu-latest
@@ -55,12 +60,15 @@ jobs:
           name: python-package-distributions
           path: dist/
       - name: Publish distribution 📦 to PyPI
-        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1
+        # v1.13.0+ bundles Twine 7, which accepts core metadata 2.5. The
+        # previous pin did not, so the first v0.43.0 upload was rejected on a
+        # wheel hatchling had built correctly.
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
 
   github-release:
     name: >-
       Create GitHub Release with Changelog
-    if: github.event.pull_request.merged == true
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     needs:
       - build
       - publish-to-pypi
