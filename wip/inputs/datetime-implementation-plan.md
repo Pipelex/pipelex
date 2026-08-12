@@ -35,7 +35,7 @@ Status: **COMPLETE 2026-07-07.** All phases shipped, gates green. Design: `datet
 
 **The one guard worth understanding** (`date_content.py` `_reject_lax_temporal`): pydantic's lax mode would silently corrupt data against the concept's own fidelity contract — a bare `int`/`float` or an **all-digit string** read as epoch seconds, and a `datetime` on the `date` field silently truncated (dropping its time + offset). The validator rejects all three (raising `ValueError` so pydantic wraps it into a `ValidationError` the input path catches). The factory's ISO parser rejects all-digit strings too, for consistency.
 
-**Deferred (nothing lost):** `wip/inputs/scalar-envelope-arm-asymmetry.md` and `wip/inputs/loader-vs-factory-date-split-duplication.md` (design tradeoffs to resolve when Smart Inputs unifies the input paths); the shared YesNo/Date LLM-output-ergonomics follow-up; and the per-release cross-repo sweep (schema copies, MTHDS spec tables, mthds-python/mthds-js mirrors, conformance, skills, cookbook `type = "date"` regen). See "Deferred to the release-wave sweep" at the bottom.
+**Deferred (nothing lost):** `wip/inputs/scalar-envelope-arm-asymmetry.md` and `wip/inputs/loader-vs-factory-date-split-duplication.md` (design tradeoffs to resolve when Smart Inputs unifies the input paths); the shared YesNo/Date LLM-output-ergonomics follow-up; and the per-release cross-repo sweep (schema copies, MTHDS spec tables, mthds-python/mthds-js mirrors, the cross-repo spec suite, skills, cookbook `type = "date"` regen). See "Deferred to the release-wave sweep" at the bottom.
 
 How the log below reads: each phase is checked off, and each CHECKPOINT's "state" line records what landed, the commit, decisions taken, and anything that fought back.
 
@@ -120,7 +120,7 @@ State: **LANDED 2026-07-07.** DT8 shipped (not dropped). `type = "date"` → `da
 
 ### CHECKPOINT 4 — track complete, hand off to the next train car
 
-State: **track complete 2026-07-07.** The native `Date` concept ships end to end on `feature/Smart-inputs` (Phases 1–4, commits `0b6d201bb` → `6dd17e452`, plus this Phase 5 docs/wrap commit). All gates green. Deferred (in `wip/inputs/`): the scalar-envelope arm asymmetry and the loader-vs-factory date-split duplication (both design tradeoffs to resolve when Smart Inputs unifies the input paths); the shared YesNo/Date LLM-output-ergonomics follow-up; and the release-wave cross-repo sweep (schema copies, MTHDS spec tables, mthds-python/mthds-js mirrors, conformance, skills, cookbook `type = "date"` regen). Next train car: the Smart Inputs step (`smart-inputs-design.md`).
+State: **track complete 2026-07-07.** The native `Date` concept ships end to end on `feature/Smart-inputs` (Phases 1–4, commits `0b6d201bb` → `6dd17e452`, plus this Phase 5 docs/wrap commit). All gates green. Deferred (in `wip/inputs/`): the scalar-envelope arm asymmetry and the loader-vs-factory date-split duplication (both design tradeoffs to resolve when Smart Inputs unifies the input paths); the shared YesNo/Date LLM-output-ergonomics follow-up; and the release-wave cross-repo sweep (schema copies, MTHDS spec tables, mthds-python/mthds-js mirrors, the cross-repo spec suite, skills, cookbook `type = "date"` regen). Next train car: the Smart Inputs step (`smart-inputs-design.md`).
 
 ### PR round — #1029 (stacked on YesNo #1028), bot-review pass
 
@@ -140,7 +140,7 @@ The plan's finalize step ran: gstack `/review` (Opus 4.8) with a testing + maint
 
 ## Deferred to the release-wave sweep (NOT this plan's scope — listed so nothing is lost)
 
-Shared per-release wave with YesNo + Smart Inputs (see `README.md`): MTHDS spec native-concepts tables (`mthds/docs/language/concepts.md`, `mthds/docs/spec/mthds-format.md`); schema-copy sync via the `mthds-schema-sync` skill; `mthds-python` protocol widening for bare temporal scalars (rides Smart Inputs D10) + any native-list mirrors; `mthds-js` mirrors; conformance rows; `mthds-plugins` skills (`mthds-inputs`, `mthds-build`); editor tooling completion lists (vscode-pipelex). Plus the YesNo/Date shared follow-up: LLM-output ergonomics for scalar natives.
+Shared per-release wave with YesNo + Smart Inputs (see `README.md`): MTHDS spec native-concepts tables (`mthds/docs/language/concepts.md`, `mthds/docs/spec/mthds-format.md`); schema-copy sync via the `mthds-schema-sync` skill; `mthds-python` protocol widening for bare temporal scalars (rides Smart Inputs D10) + any native-list mirrors; `mthds-js` mirrors; cross-repo spec-suite rows; `mthds-plugins` skills (`mthds-inputs`, `mthds-build`); editor tooling completion lists (vscode-pipelex). Plus the YesNo/Date shared follow-up: LLM-output ergonomics for scalar natives.
 
 Our Temporal plugin (private repo): **no code change expected** — its codec serializes the `dump_for_transport` dict via kajson and binds classes through the registry, so `DateContent` flows in with the pipelex version-pin bump. At pin-bump time, add a `Date` case to its converter round-trip tests anyway: the failure mode over there is a hang, not an error, so coverage is cheap insurance.
 

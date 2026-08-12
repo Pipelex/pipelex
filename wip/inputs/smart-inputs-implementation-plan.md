@@ -165,8 +165,8 @@ State: **REACHED (2026-07-08).** Smart Inputs track complete. **Docs** rewritten
 
 Shared per-release wave with YesNo + Date (see `wip/inputs/README.md`), done once, not per-feature:
 
-- **D10 protocol widening** — `mthds/protocol/pipeline_inputs.py` `StuffContentOrData` widens to admit bare scalars / lists-of-dicts / empty lists (converges to "any JSON value | StuffContent forms"), with the interpretation semantics spec'd MTHDS-side (`docs/specs/` + the `mthds` repo). Release-gated (Optionals/TOML-inputs de-gate pattern). Runtime already works; this is type-honesty for typed callers.
-- **Downstream mirrors** — `mthds-python` + `mthds-js` `PipelineInputs` types, conformance rows, JSON schema copies (`mthds-schema-sync` skill), MTHDS spec native-concept + inputs-format sections.
+- **D10 protocol widening** — `mthds/protocol/pipeline_inputs.py` `StuffContentOrData` widens to admit bare scalars / lists-of-dicts / empty lists (converges to "any JSON value | StuffContent forms"), with the interpretation semantics spec'd MTHDS-side (the protocol spec + the `mthds` repo). Release-gated (Optionals/TOML-inputs de-gate pattern). Runtime already works; this is type-honesty for typed callers.
+- **Downstream mirrors** — `mthds-python` + `mthds-js` `PipelineInputs` types, cross-repo spec-suite rows, JSON schema copies (`mthds-schema-sync` skill), MTHDS spec native-concept + inputs-format sections.
 - **Authoring-guidance surfaces** — `mthds-plugins` skills (`mthds-inputs`, `mthds-build`), `vscode-pipelex` completion lists, and the `ConceptSpec.refines` native-list hint (derive from `NativeConceptCode` — `refines-hint-native-list-drift.md`).
 - **Off critical path** — LLM-assisted input adaptation (design §8, opt-in); the shared YesNo/Date scalar-native LLM-output ergonomics.
 

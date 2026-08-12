@@ -130,7 +130,7 @@ Discovered while grounding this design: the structure-field type `date` (`Concep
 - Schema regen (`pipelex-dev generate-mthds-schema`) — note the native ref itself doesn't change the schema shape; DT8 does (field-type enum).
 - Docs: `docs/building-methods/concepts/native-concepts.md` table entry; inputs docs mention of TOML literals; `inline-structures.md` if DT8 ships.
 - Tests: content-class unit tests (render matrix, offset round-trip), inputs-loader tests replacing the four-flavor rejection parametrization (date ✓, local datetime ✓, offset datetime ✓, local time ✗ narrowed), e2e `.mthds` with TOML date inputs, LLM-output smoke via existing structured-gen harness.
-- Downstream wave (per-release, shared with YesNo/Smart Inputs): MTHDS spec native table (`mthds/docs/language/concepts.md`, `spec/mthds-format.md`), schema sync, mthds-python/mthds-js mirrors, conformance, skills, editor tooling completion lists.
+- Downstream wave (per-release, shared with YesNo/Smart Inputs): MTHDS spec native table (`mthds/docs/language/concepts.md`, `spec/mthds-format.md`), schema sync, mthds-python/mthds-js mirrors, the cross-repo spec suite, skills, editor tooling completion lists.
 
 ## 7. Abandonability check
 

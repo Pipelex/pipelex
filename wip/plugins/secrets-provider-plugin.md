@@ -1,6 +1,6 @@
 # Secrets provider → `pipelex.plugins` plugin
 
-Status: **COMPLETE.** All phases delivered — this vertical (Phases 3–4 of the master plan) mirrors the storage pattern ([storage-provider-plugin.md](storage-provider-plugin.md), which defines the shared "keyed registry + config-selected singleton" mechanism this plan reuses wholesale). See [TODOS.md](../../TODOS.md) for the execution record (Phases 3–4 code + tests + docs, Phase 5 release gating). This plan reads as "mirror storage, swap the nouns."
+Status: **COMPLETE.** All phases delivered — this vertical (Phases 3–4 of the master plan) mirrors the storage pattern ([storage-provider-plugin.md](storage-provider-plugin.md), which defines the shared "keyed registry + config-selected singleton" mechanism this plan reuses wholesale). The execution record (Phases 3–4 code + tests + docs, Phase 5 release gating) lived in the branch's root tracker. This plan reads as "mirror storage, swap the nouns."
 
 Goal: turn the secrets provider into a formal plugin seam so third parties can ship `pipelex-secrets-<backend>` packages (Vault, AWS Secrets Manager, GCP Secret Manager, …) discovered via `pipelex.plugins` and selected at deploy time. The built-in `EnvSecretsProvider` becomes an unconditional builtin plugin.
 

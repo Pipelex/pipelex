@@ -65,6 +65,6 @@ The verdicts are asymmetric on purpose, and the docstrings say so: at the declar
 
 ## Verification
 
-`make agent-check` green (ruff, plxt, pyright, mypy, keyword-only, hub-layering). Full `make agent-test` green. Cross-repo usage of the four removed member names is **zero in code** (enumerated the workspace directory rather than a hardcoded list). Two live *documents* in other repos cite them and will want a follow-up when their tracks resume — tracked at workspace level; no code in either repo is affected. The transport boundary's `ALLOWED_SURFACE` names none of the touched symbols and no module moved, so no spec/conformance edit is due.
+`make agent-check` green (ruff, plxt, pyright, mypy, keyword-only, hub-layering). Full `make agent-test` green. Cross-repo usage of the four removed member names is **zero in code** (enumerated the workspace directory rather than a hardcoded list). Two live *documents* in other repos cite them and will want a follow-up when their tracks resume — tracked at workspace level; no code in either repo is affected. The transport boundary spec names none of the touched symbols and no module moved, so no spec or spec-suite edit is due.
 
 One registry hygiene note: `is_valid_structure_class` was demoted to keyword-only when it moved, so its now-dead entry was deleted from `subject_grants.toml` — the guard hard-fails on a stale grant, which is how it surfaced.

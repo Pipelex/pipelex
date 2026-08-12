@@ -30,7 +30,7 @@ This branch delivers **step 1 of the autofix master plan**: the whole suggested-
 
 ## Known deferrals (deliberate, not gaps)
 
-See `wip/autofix/deferred-checkpoint-0-review-items.md`: real multi-file fix targeting (thread `file_path` from raise sites — Phase 1); conformance fixture regeneration in the sibling `conformance/` repo (cross-repo sync wave, after a release reaches `pipelex-api`); `expected_output_ref` computed on the happy validation path too (accepted: trivial cost, laziness would duplicate code). One deleted surface: the empty, unreferenced `PipelexBundleBlueprintFixableErrorType` stub enum. Changelog entry is deferred to master-plan step 3 (ship wave) — the spike introduces no user-facing surface.
+See `wip/autofix/deferred-checkpoint-0-review-items.md`: real multi-file fix targeting (thread `file_path` from raise sites — Phase 1); fixture regeneration in our cross-repo spec suite (cross-repo sync wave, after a release reaches `pipelex-api`); `expected_output_ref` computed on the happy validation path too (accepted: trivial cost, laziness would duplicate code). One deleted surface: the empty, unreferenced `PipelexBundleBlueprintFixableErrorType` stub enum. Changelog entry is deferred to master-plan step 3 (ship wave) — the spike introduces no user-facing surface.
 
 ## Next steps (not in this PR)
 

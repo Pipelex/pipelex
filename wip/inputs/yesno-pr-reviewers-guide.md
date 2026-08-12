@@ -31,7 +31,7 @@ The change is small and purely **additive** — it adds one native code and the 
 ## Cross-repo (release-wave, not in this PR)
 
 - **MTHDS spec:** the `YesNo` native-concept rows + field listing are drafted in the sibling **`mthds`** repo (`docs/language/concepts.md`, `docs/spec/mthds-format.md`) on side branch `feature/native-yes-no-concept` (not pushed). Merge vehicle is the shared release wave.
-- **Deferred to the per-release downstream sweep:** schema-copy sync (`mthds-schema-sync` skill), `mthds-js`/`mthds-python` mirrors, conformance rows, skills, editor completion lists — all shared with the Datetime + Smart Inputs tracks per `wip/inputs/README.md`.
+- **Deferred to the per-release downstream sweep:** schema-copy sync (`mthds-schema-sync` skill), `mthds-js`/`mthds-python` mirrors, cross-repo spec-suite rows, skills, editor completion lists — all shared with the Datetime + Smart Inputs tracks per `wip/inputs/README.md`.
 - **Our Temporal plugin** (private repo): no code change expected (`bool` is JSON-native, classes bind via the registry); add a `YesNo` converter round-trip test at pin-bump time as cheap insurance.
 
 ## Breaking change

@@ -45,7 +45,7 @@ Backups to roll back to: `backup/parity-pre-round3` and `backup/kernel-{,phase2-
 **Next actions, in order:**
 
 1. Read the bot feedback on all four — **review bodies and inline comments, not check states** (see the cubic trap below). Greptile posts as *issue comments*; cubic posts *reviews* + issue comments; Codex posts reviews. If Greptile and Codex stay silent again, decide whether to chase them or proceed on cubic alone.
-2. Fan out an **Opus 5** sub-agent to dedupe, verify each item, and arbitrate — fixing **only clear wins**, no over-engineering, no guarding impossible scenarios. Anything doubtful becomes a `.md` in `wip/parity/` (or `wip/kernel/` for stack items). Tell the sub-agent it is **STRICTLY READ-ONLY**.
+2. Fan out an **Opus 5** sub-agent to dedupe, verify each item, and arbitrate — fixing **only clear wins**, no over-engineering, no guarding impossible scenarios. Anything doubtful becomes a `.md` in `wip/parity/`. Tell the sub-agent it is **STRICTLY READ-ONLY**.
 3. Merge in order **#1081 → #1082 → #1083**. #1085 is independent of the stack and can merge whenever Louis chooses.
 
 **A trap this round taught, now written into the kernel plan:** a doc that lives *on* a stacked branch must name commits **by subject, never by SHA**. Every rebase of the parent rewrites every hash on the child, so the SHAs are dead before anyone reads them — including the "corrected" ones a reviewer suggests. Cubic's proposed replacements were themselves already stale when the fix was written.

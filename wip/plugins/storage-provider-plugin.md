@@ -1,6 +1,6 @@
 # Storage provider → `pipelex.plugins` plugin
 
-Status: **COMPLETE.** All phases delivered — this vertical (Phases 1–2 of the master plan) defines the shared "keyed registry + config-selected singleton" mechanism (§ The new mechanism) that the secrets plan reuses. See [TODOS.md](../../TODOS.md) for the execution record (Phases 1–2 code + tests + docs, Phase 5 release gating).
+Status: **COMPLETE.** All phases delivered — this vertical (Phases 1–2 of the master plan) defines the shared "keyed registry + config-selected singleton" mechanism (§ The new mechanism) that the secrets plan reuses. The execution record (Phases 1–2 code + tests + docs, Phase 5 release gating) lived in the branch's root tracker.
 
 Goal: turn the storage provider into a formal plugin seam so third parties can ship `pipelex-storage-<backend>` packages discovered via the `pipelex.plugins` entry-point group and selected at deploy time by `storage_config.method`. The built-in providers (local / in_memory / s3 / gcp) become a single unconditional builtin plugin registering their factories — exactly as `OpenAIPlugin` registers several inference backends.
 

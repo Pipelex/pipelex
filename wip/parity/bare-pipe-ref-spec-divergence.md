@@ -40,11 +40,11 @@ See [`d1-domain-hint-deferred.md`](d1-domain-hint-deferred.md) for the narrower 
 Three reasons, and the third is decisive.
 
 1. **It is a behavior change to the language, not to a reader.** Every `.mthds` in the wild that leans on cross-domain bare resolution stops loading. That is the opposite of a zero-behavior-change parity fix.
-2. **It is cross-repo.** The rule lives in `mthds/` (the standard) and is implemented in `pipelex/`; `conformance/` would need the case, and any bundle in `pipelex-cookbook/`, the demo repos or the hub that relies on the fall-through would need qualifying. A one-line resolver change does not scope it.
+2. **It is cross-repo.** The rule lives in `mthds/` (the standard) and is implemented in `pipelex/`; our cross-repo spec suite would need the case, and any bundle in `pipelex-cookbook/`, the demo repos or the hub that relies on the fall-through would need qualifying. A one-line resolver change does not scope it.
 3. **The direction of the fix is genuinely open, and it is not this track's call.** Either the runtime tightens to the spec, or the spec loosens to describe what every implementation actually does. The second is not obviously wrong — cross-domain bare resolution inside a single crate is convenient and has evidently been relied on. Picking one is a language-owner decision.
 
 ## What to do with it
 
-Raise it with whoever owns the MTHDS spec, together with D-1. Whichever way it settles, the change lands in one PR carrying: the resolver, the crate normalizer (they must move together — that is this track's whole lesson), the spec page, a `conformance/` case, and the sweep of any bundle that relied on the old behavior.
+Raise it with whoever owns the MTHDS spec, together with D-1. Whichever way it settles, the change lands in one PR carrying: the resolver, the crate normalizer (they must move together — that is this track's whole lesson), the spec page, a cross-repo spec-suite case, and the sweep of any bundle that relied on the old behavior.
 
 **Do not fix one reader and not the other.** That is the defect class this entire track exists to remove, and it would be an unusually ironic way to reintroduce it.
