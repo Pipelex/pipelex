@@ -1,8 +1,8 @@
 """The D7 quality gate: emitted Python passes strict pyright and execs into real classes.
 
-Per decision D7 (see `_codegen/TODOS.md`), the pyright gate on emitted Python lives in pipelex (the
-toolchain is already present); the `tsc --strict` gate on emitted TypeScript lives in the
-`conformance/` cross-repo harness. This module projects a rich crate — one exercising every
+Per decision D7, the pyright gate on emitted Python lives in pipelex (the toolchain is already
+present); the `tsc --strict` gate on emitted TypeScript lives in our cross-repo spec suite. This
+module projects a rich crate — one exercising every
 `ResolvedType` kind, a literal-with-default, an optional, a native reference, and a refines-native
 concept — into `python-structures` and `python-pydantic`, then (1) runs strict pyright over the
 generated files and asserts zero errors, and (2) imports them so the classes are actually built.

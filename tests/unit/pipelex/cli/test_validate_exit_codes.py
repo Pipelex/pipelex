@@ -2,14 +2,14 @@
 
 Policy: exit 0 = valid; exit 1 = a produced NEGATIVE VERDICT (invalid bundle, or
 valid-but-not-runnable without ``--allow-signatures``); exit 2 = NO VERDICT (bad
-args, unresolvable target, file-not-found, unexpected). See
-``docs/specs/pipelex-validation-api.md`` (CLI exit-code policy) and
-``docs/specs/pipelex-mthds-protocol.md`` (Agent-CLI validate envelope).
+args, unresolvable target, file-not-found, unexpected). See the
+validation-API spec (CLI exit-code policy) and the MTHDS protocol spec
+(Agent-CLI validate envelope).
 
 The pre-boot argument/target-resolution cases are pure (they raise before any
 Pipelex boot); the negative-verdict / no-verdict / signature-gate cases mock the
 validate core (mirroring ``test_agent_validate_cmd.py``). The real end-to-end
-exit codes against the binary are pinned by the conformance suite.
+exit codes against the binary are pinned by our cross-repo spec suite.
 """
 
 from __future__ import annotations

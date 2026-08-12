@@ -8,8 +8,7 @@ text is pure rendering over the memory it is handed.
 Its semantics are `StructuredContentComposer` over a `ConstructBlueprint`, and the blueprint is a
 language artifact that `.mthds` parses into — moving both into the kernel would relocate the MTHDS
 field-composition model and its error family for a caller shape that has no programmatic use (a caller
-holding real Python would build the object, not describe it in a blueprint). See
-`wip/kernel/deferred-follow-ups.md`.
+holding real Python would build the object, not describe it in a blueprint).
 """
 
 from typing import Any

@@ -1,7 +1,7 @@
 """Unit tests for the `pipelex show` report logic (pipelex/cli/commands/show_cmd.py).
 
 Covers the do_* functions directly with mocked hub getters — the Typer wrappers
-(arg parsing, --help) are owned by the conformance suite.
+(arg parsing, --help) are owned by our cross-repo spec suite.
 """
 
 from __future__ import annotations

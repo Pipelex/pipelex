@@ -299,7 +299,7 @@ class Pipelex(RuntimeBoot):
                 inference files — backends, routing profiles and the model deck — still resolve through
                 the layered paths, and the gateway consent/onboarding state is read from the global
                 config dir outright. So this does not fully isolate a boot from the surrounding
-                project. See ``wip/boot-split/config-dir-does-not-scope-inference-paths.md``.
+                project.
             config_overrides: Optional dict deep-merged on top of all TOML config layers
                 as the highest-priority override. Useful for tests that need specific
                 config without editing TOML files.

@@ -44,8 +44,7 @@ to defer the external-interpreter-orchestrator half-application hole to "the fir
 kernel-only boot", which is this test. That hole is now closed, and not by this test: the plugin
 entry-point group split scopes a kernel-only boot's discovery to `KERNEL_ENTRY_POINT_GROUPS`, so an
 interpreter-group orchestrator is never registered and the existing gate rejects its name loudly.
-Neither remedy the analysis proposed was built. Recorded in
-`wip/boot-split/runtime-boot-external-interpreter-orchestrator.md`.
+Neither remedy the earlier analysis proposed was built.
 """
 
 import subprocess  # noqa: S404

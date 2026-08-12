@@ -2,8 +2,7 @@
 
 Runs the CV batch screening pipeline through ``PipelexMTHDSProtocol`` without any
 Temporal layer. The same bundle is also exercised by the in-process Temporal test in
-our Temporal plugin and by the ``/temporal-e2e-validate`` skill (distributed 3-process
-validation). Each repo keeps its own copy of the crate (see ``test_data.py``).
+our Temporal plugin and by our distributed 3-process validation harness. Each repo keeps its own copy of the crate (see ``test_data.py``).
 """
 
 from pathlib import Path

@@ -399,7 +399,7 @@
 ### Added
 
 - **`is_valid` on the canonical validation report**: `PipelexValidationReport` gains `is_valid: Literal[True] = True`, the always-true discriminant of the valid arm of the hosted `/validate` response union (mirrored by pipelex-api's `InvalidReport`'s `Literal[False]`). It sits beside `is_runnable`: a sound bundle may still be not-yet-runnable.
-- **Offline CLI unit tests**: Coverage for the pipelex-internal logic behind the CLI commands — `doctor` diagnostics, `run` execution and its sync wrapper, the `build` codegen cores, the readiness gate, `show`/`which`, and the gateway/telemetry/signature error handlers (the spec'd CLI interface stays owned by the conformance suite).
+- **Offline CLI unit tests**: Coverage for the pipelex-internal logic behind the CLI commands — `doctor` diagnostics, `run` execution and its sync wrapper, the `build` codegen cores, the readiness gate, `show`/`which`, and the gateway/telemetry/signature error handlers (the spec'd CLI interface stays owned by our cross-repo spec suite).
 - **Offline inference & runtime unit tests**: Coverage for layers that can break without a provider — structured-output↔instructor mode mapping, model-deck reference checks, the image-gen argument and worker-routing factories, gateway request-shaping and extract parsing, the Mistral factory, the local observer sink, the output renderer, builder spec validation / `to_blueprint()`, the pipeline runner's error paths, the TOML config-sync engine, and the storage config validators.
 
 ### Changed
