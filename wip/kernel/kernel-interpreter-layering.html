@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kernel / Interpreter Layering</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-soft: #f6f7f9;
+    --bg-code: #f4f5f7;
+    --fg: #1c1f24;
+    --fg-soft: #5b6472;
+    --border: #dfe3e8;
+    --border-strong: #c3cad3;
+    --accent: #2f6f4e;
+    --accent-soft: #e8f2ec;
+    --interp: #7a4fa3;
+    --interp-soft: #f1e9f8;
+    --kernel: #1f6f8b;
+    --kernel-soft: #e4f0f5;
+    --warn: #9a5b12;
+    --warn-soft: #fbf0e2;
+    --del: #a03030;
+    --del-soft: #fbecec;
+    --add: #256b3f;
+    --add-soft: #eaf5ee;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14171b;
+      --bg-soft: #1b1f25;
+      --bg-code: #1c2027;
+      --fg: #e6e9ee;
+      --fg-soft: #9aa4b2;
+      --border: #2b313a;
+      --border-strong: #3c444f;
+      --accent: #6fc39a;
+      --accent-soft: #1c2b24;
+      --interp: #c39ae6;
+      --interp-soft: #251d2e;
+      --kernel: #6fbcd8;
+      --kernel-soft: #16262d;
+      --warn: #e0a760;
+      --warn-soft: #2b2318;
+      --del: #e08a8a;
+      --del-soft: #2b1d1d;
+      --add: #82c9a1;
+      --add-soft: #1a2620;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14171b;
+    --bg-soft: #1b1f25;
+    --bg-code: #1c2027;
+    --fg: #e6e9ee;
+    --fg-soft: #9aa4b2;
+    --border: #2b313a;
+    --border-strong: #3c444f;
+    --accent: #6fc39a;
+    --accent-soft: #1c2b24;
+    --interp: #c39ae6;
+    --interp-soft: #251d2e;
+    --kernel: #6fbcd8;
+    --kernel-soft: #16262d;
+    --warn: #e0a760;
+    --warn-soft: #2b2318;
+    --del: #e08a8a;
+    --del-soft: #2b1d1d;
+    --add: #82c9a1;
+    --add-soft: #1a2620;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 3rem 1.25rem 6rem; }
+
+  h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 .35rem; letter-spacing: -.02em; }
+  h2 {
+    font-size: 1.3rem; margin: 3rem 0 1rem; padding-top: 1.25rem;
+    border-top: 1px solid var(--border); letter-spacing: -.01em;
+  }
+  h3 { font-size: 1.02rem; margin: 2rem 0 .6rem; }
+  h4 { font-size: .95rem; margin: 1.4rem 0 .4rem; color: var(--fg-soft); }
+  p { margin: 0 0 1rem; }
+  a { color: var(--accent); }
+  ul, ol { margin: 0 0 1rem; padding-left: 1.35rem; }
+  li { margin: .3rem 0; }
+  code {
+    font-family: var(--mono); font-size: .875em;
+    background: var(--bg-code); border: 1px solid var(--border);
+    border-radius: 4px; padding: .08em .32em;
+  }
+  pre {
+    background: var(--bg-code); border: 1px solid var(--border); border-radius: 8px;
+    padding: .9rem 1rem; overflow-x: auto; font-family: var(--mono);
+    font-size: .82rem; line-height: 1.55; margin: 0 0 1rem;
+  }
+  pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+
+  .subtitle { color: var(--fg-soft); margin: 0 0 .25rem; font-size: 1.02rem; }
+  .meta { color: var(--fg-soft); font-size: .83rem; margin: 0 0 2rem; font-family: var(--mono); }
+
+  .tldr {
+    background: var(--accent-soft); border: 1px solid var(--accent);
+    border-radius: 10px; padding: 1.1rem 1.35rem; margin: 0 0 2.5rem;
+  }
+  .tldr h2 {
+    margin: 0 0 .6rem; padding: 0; border: 0; font-size: .8rem;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--accent);
+  }
+  .tldr ul { margin: 0; padding-left: 1.15rem; }
+  .tldr li { margin: .45rem 0; }
+
+  .note {
+    border-left: 3px solid var(--border-strong); background: var(--bg-soft);
+    padding: .7rem 1rem; margin: 0 0 1.25rem; border-radius: 0 6px 6px 0;
+    font-size: .93rem;
+  }
+  .note.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+
+  .fig { margin: 1.5rem 0 1.75rem; overflow-x: auto; }
+  .fig svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+  .caption { color: var(--fg-soft); font-size: .84rem; text-align: center; margin-top: .5rem; }
+
+  .tbl-scroll { overflow-x: auto; margin: 0 0 1.25rem; }
+  table { border-collapse: collapse; width: 100%; font-size: .89rem; }
+  th, td { text-align: left; padding: .5rem .7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-weight: 600; color: var(--fg-soft); font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; }
+  td code { font-size: .82em; white-space: nowrap; }
+  .num { text-align: right; font-family: var(--mono); white-space: nowrap; }
+
+  details {
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: .1rem .95rem; margin: 0 0 .8rem; background: var(--bg-soft);
+  }
+  details[open] { padding-bottom: .5rem; }
+  summary {
+    cursor: pointer; padding: .65rem 0; font-weight: 600; font-size: .93rem;
+    list-style-position: outside;
+  }
+  summary::marker { color: var(--fg-soft); }
+  details pre { background: var(--bg-code); }
+
+  .diff .d { color: var(--del); background: var(--del-soft); display: block; }
+  .diff .a { color: var(--add); background: var(--add-soft); display: block; }
+  .diff .c { color: var(--fg-soft); display: block; }
+
+  .pill {
+    display: inline-block; font-family: var(--mono); font-size: .74rem;
+    padding: .1rem .45rem; border-radius: 999px; border: 1px solid currentColor;
+    vertical-align: middle;
+  }
+  .pill.k { color: var(--kernel); background: var(--kernel-soft); }
+  .pill.i { color: var(--interp); background: var(--interp-soft); }
+
+  .prs { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .6rem; margin-bottom: 1.25rem; }
+  .pr {
+    border: 1px solid var(--border); border-radius: 8px; padding: .6rem .8rem;
+    background: var(--bg-soft); font-size: .86rem;
+  }
+  .pr .n { font-family: var(--mono); font-weight: 600; }
+  .pr .t { color: var(--fg-soft); display: block; margin-top: .15rem; line-height: 1.4; }
+
+  .svg-box { fill: var(--bg-soft); stroke: var(--border-strong); }
+  .svg-k { fill: var(--kernel-soft); stroke: var(--kernel); }
+  .svg-i { fill: var(--interp-soft); stroke: var(--interp); }
+  .svg-t { fill: var(--fg); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .svg-ts { fill: var(--fg-soft); font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .svg-line { stroke: var(--fg-soft); fill: none; }
+  .svg-ok { stroke: var(--accent); fill: none; }
+  .svg-no { stroke: var(--del); fill: none; }
+  .svg-no-t { fill: var(--del); }
+  .svg-ok-t { fill: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Kernel / Interpreter Layering</h1>
+<p class="subtitle">What we refactored, why the boundary exists, and what it measurably bought.</p>
+<p class="meta">pipelex &middot; PRs #1081 #1082 #1083 #1090, all merged to <code>dev</code> &middot; written 2026-08-12</p>
+
+<div class="tldr">
+  <h2>TL;DR</h2>
+  <ul>
+    <li><strong>Pipelex now has two named layers and exactly one arrow between them.</strong> The <em>interpreter</em> reads a <code>.mthds</code> method and drives it. The <em>kernel</em> is the machinery present at execution time whatever is loaded — inference, models, memory, storage, tracing. The interpreter may import the kernel; <strong>the kernel may never import the interpreter</strong>, directly or transitively.</li>
+    <li><strong>Operator semantics moved out of the operator classes into <code>pipelex/kernel/</code>.</strong> What a <code>PipeLLM</code> step actually <em>does</em> — deck resolution, style derivation, prompt assembly, generation, memory write-back — used to live inside <code>PipeLLM._live_run_operator_pipe</code> and be reachable only through a fully booted interpreter with a library loaded. It is now plain keyword-only functions with the operator class as one caller among others.</li>
+    <li><strong>The point is single-sourcing, not reuse.</strong> Two callers with two copies of "what an LLM step means" drift, and nothing tells you when they have. There is now one implementation and a build that fails when a second one is smuggled in.</li>
+    <li><strong>Four gates hold the boundary, and each sees something the others miss.</strong> The strongest one <em>runs</em> every kernel entry point on a keyless boot with zero <code>.mthds</code> loaded and sweeps <code>sys.modules</code> afterwards — it is the only gate that can see a function-local interpreter import. Each gate was mutation-tested, not just asserted.</li>
+    <li><strong>Zero behavior change was the bar, and the full suite was the gate at every phase.</strong> One real bug surfaced on the way and was fixed: a keyless boot could reach a live inference provider through the new kernel factory.</li>
+    <li><strong>Measured</strong> (2026-08-11): 560 of 981 modules are declared kernel-layer; a kernel-only boot loads 1511 modules / 91.7 MiB RSS against 1884 / 108.7 MiB for a full boot; a kernel-only install would shed 32 distributions and 32.4 MiB (~35%).</li>
+    <li><strong>Not done, deliberately:</strong> the kernel is still a subpackage of <code>pipelex</code>, not its own distribution; two operator arms stayed interpreter-side on cost grounds (both recorded). See <a href="#limits">Honest limits</a>.</li>
+  </ul>
+</div>
+
+<h2 id="problem">1. The two problems this fixes</h2>
+
+<h3>Problem A — the semantics were trapped inside the operator classes</h3>
+
+<p>Before this work, "what a <code>PipeLLM</code> step means" existed once, as a 100-line stretch inside <code>PipeLLM._live_run_operator_pipe</code>: walk the model-deck chain, derive the prompting style, assemble the prompt (text, images, documents), generate, coerce into the output class, write the result into working memory. That code was only reachable by constructing a <code>PipeLLM</code>, which requires a library, which requires an interpreter, which requires a full boot.</p>
+
+<p>Any second caller therefore had two options, both bad: boot the entire interpreter to run one inference step, or reimplement the semantics. Reimplementation is the expensive one — not because writing it is hard, but because the copy and the original drift silently and nothing in CI can tell. This is not hypothetical for us: a distributed activity, an SDK-style embedding, and a host that only wants inference are all callers we either have or want.</p>
+
+<h3>Problem B — the layer was a claim, not a boundary</h3>
+
+<p>The layer split existed on paper before this arc (<code>runtime_hub</code> / <code>interpreter_hub</code>, #1062), but it was <em>real for importing and vacuous for booting</em>: the only composition root in the tree constructed an <code>InterpreterHub</code>, a <code>PipelineManager</code>, a <code>PipeRouter</code> and a <code>PipeRun</code> whether the caller would ever load a method or not. And it leaked in ways that were invisible to review:</p>
+
+<ul>
+  <li>Four modules in a declared-clean package reached <code>interpreter_hub</code> through a three-hop import chain while both gates stayed green (fixed by the transitive rule, #1064).</li>
+  <li>Five vendor adapters dragged interpreter modules in by importing from the <code>pipelex.exceptions</code> re-export aggregate rather than from definition sites — a cross-layer aggregate is a layer boundary with the sign filed off (fixed by a mechanical ban, #1080).</li>
+  <li>Merely <em>installing</em> our Temporal plugin pulled the whole interpreter into every pipelex process in the venv, because plugin discovery imports every installed plugin's module regardless of what the boot needs (fixed by the entry-point group split, #1090).</li>
+</ul>
+
+<p class="note">The pattern worth internalising: <strong>an undeclared package is not neutral, it is unpoliced.</strong> Both guard rules filter their candidates through the layer declaration, so omitting a package from it makes the guard <em>quieter</em>, not louder. Every one of the leaks above was green on every gate at the time.</p>
+
+<h2 id="layers">2. The two layers</h2>
+
+<div class="fig">
+<svg viewBox="0 0 800 430" role="img" aria-label="Diagram of the interpreter layer above the kernel layer, with a permitted downward import arrow and a forbidden upward one.">
+  <rect x="20" y="20" width="520" height="150" rx="10" class="svg-i" stroke-width="1.5"/>
+  <text x="40" y="48" class="svg-t" font-size="15" font-weight="700">Interpreter layer</text>
+  <text x="40" y="68" class="svg-ts" font-size="11">reads a .mthds method and drives it</text>
+  <text x="40" y="96" class="svg-ts" font-size="11.5">libraries/ &nbsp; mthds_parsing/ &nbsp; pipe_operators/ &nbsp; pipe_controllers/</text>
+  <text x="40" y="114" class="svg-ts" font-size="11.5">pipe_run/ &nbsp; pipeline/ &nbsp; builder/ &nbsp; runtime_bridge/ &nbsp; interpreter_plugins/</text>
+  <rect x="40" y="128" width="180" height="26" rx="5" class="svg-box" stroke-width="1"/>
+  <text x="52" y="146" class="svg-ts" font-size="12">interpreter_hub</text>
+  <rect x="232" y="128" width="180" height="26" rx="5" class="svg-box" stroke-width="1"/>
+  <text x="244" y="146" class="svg-ts" font-size="12">Pipelex.make()</text>
+
+  <rect x="20" y="250" width="520" height="160" rx="10" class="svg-k" stroke-width="1.5"/>
+  <text x="40" y="278" class="svg-t" font-size="15" font-weight="700">Kernel layer</text>
+  <text x="40" y="298" class="svg-ts" font-size="11">present at execution time whatever is loaded</text>
+  <text x="40" y="326" class="svg-ts" font-size="11.5">kernel/ &nbsp; cogt/ &nbsp; core/ &nbsp; providers/ &nbsp; tools/ &nbsp; system/</text>
+  <text x="40" y="344" class="svg-ts" font-size="11.5">tracing/ &nbsp; graph/ &nbsp; plugins/ &nbsp; reporting/ &nbsp; observer/ &nbsp; errors/</text>
+  <rect x="40" y="358" width="180" height="26" rx="5" class="svg-box" stroke-width="1"/>
+  <text x="52" y="376" class="svg-ts" font-size="12">runtime_hub</text>
+  <rect x="232" y="358" width="180" height="26" rx="5" class="svg-box" stroke-width="1"/>
+  <text x="244" y="376" class="svg-ts" font-size="12">RuntimeBoot.make()</text>
+
+  <path d="M 170 172 L 170 246" class="svg-ok" stroke-width="2" marker-end="url(#ok-arrow)"/>
+  <text x="182" y="200" class="svg-ok-t" font-size="12.5" font-weight="600">may import</text>
+  <text x="182" y="218" class="svg-ok-t" font-size="11" opacity=".8">imports downward, freely</text>
+
+  <path d="M 400 246 L 400 172" class="svg-no" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#no-arrow)"/>
+  <line x1="386" y1="223" x2="414" y2="195" class="svg-no" stroke-width="2"/>
+  <text x="418" y="200" class="svg-no-t" font-size="12.5" font-weight="600">may never import</text>
+  <text x="418" y="218" class="svg-no-t" font-size="11" opacity=".8">directly or transitively</text>
+
+  <rect x="562" y="20" width="218" height="150" rx="10" class="svg-box" stroke-width="1"/>
+  <text x="578" y="46" class="svg-t" font-size="12.5" font-weight="700">A full boot stands up</text>
+  <text x="578" y="70" class="svg-ts" font-size="11">library manager</text>
+  <text x="578" y="88" class="svg-ts" font-size="11">pipe router</text>
+  <text x="578" y="106" class="svg-ts" font-size="11">pipeline manager</text>
+  <text x="578" y="124" class="svg-ts" font-size="11">+ everything below</text>
+  <text x="578" y="152" class="svg-ts" font-size="10.5" opacity=".8">1884 modules / 108.7 MiB</text>
+
+  <rect x="562" y="250" width="218" height="160" rx="10" class="svg-box" stroke-width="1"/>
+  <text x="578" y="276" class="svg-t" font-size="12.5" font-weight="700">A kernel boot stands up</text>
+  <text x="578" y="300" class="svg-ts" font-size="11">model deck, content generator</text>
+  <text x="578" y="318" class="svg-ts" font-size="11">class + func registries</text>
+  <text x="578" y="336" class="svg-ts" font-size="11">storage, secrets, telemetry</text>
+  <text x="578" y="354" class="svg-ts" font-size="11">reporting, observers</text>
+  <text x="578" y="382" class="svg-ts" font-size="10.5" opacity=".8">1511 modules / 91.7 MiB</text>
+  <text x="578" y="398" class="svg-ts" font-size="10.5" opacity=".8">0 interpreter modules</text>
+
+  <defs>
+    <marker id="ok-arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 z" fill="var(--accent)"/>
+    </marker>
+    <marker id="no-arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 z" fill="var(--del)"/>
+    </marker>
+  </defs>
+</svg>
+<p class="caption">One arrow is the whole architecture. The property it buys is measurable, not rhetorical: importing or booting the kernel layer loads zero interpreter modules.</p>
+</div>
+
+<p><code>Pipelex</code> subclasses <code>RuntimeBoot</code> and appends the interpreter constructions, so there is one composition root with two entry points rather than two roots that can drift. Module counts and RSS above are measured on a booted process, not estimated.</p>
+
+<h2 id="extraction">3. What moved, and where the cut line falls</h2>
+
+<div class="fig">
+<svg viewBox="0 0 820 340" role="img" aria-label="Before and after: operator semantics moving from inside PipeLLM into kernel functions with two callers.">
+  <text x="20" y="22" class="svg-ts" font-size="11" font-weight="700" letter-spacing="1">BEFORE</text>
+  <rect x="20" y="36" width="330" height="230" rx="9" class="svg-i" stroke-width="1.5"/>
+  <text x="38" y="62" class="svg-t" font-size="13" font-weight="700">PipeLLM._live_run_operator_pipe</text>
+  <line x1="38" y1="74" x2="332" y2="74" class="svg-line" stroke-width="1" opacity=".4"/>
+  <text x="38" y="96" class="svg-ts" font-size="11.5">blueprint resolution</text>
+  <text x="38" y="116" class="svg-ts" font-size="11.5">text-vs-object dispatch</text>
+  <text x="38" y="136" class="svg-ts" font-size="11.5">model-deck chain</text>
+  <text x="38" y="156" class="svg-ts" font-size="11.5">prompting-style derivation</text>
+  <text x="38" y="176" class="svg-ts" font-size="11.5">prompt assembly</text>
+  <text x="38" y="196" class="svg-ts" font-size="11.5">generation</text>
+  <text x="38" y="216" class="svg-ts" font-size="11.5">memory write-back</text>
+  <text x="38" y="236" class="svg-ts" font-size="11.5">error wrapping + tracing</text>
+  <text x="20" y="288" class="svg-ts" font-size="10.5" opacity=".85">One copy, one caller.</text>
+  <text x="20" y="304" class="svg-ts" font-size="10.5" opacity=".85">Reachable only through a booted interpreter</text>
+  <text x="20" y="320" class="svg-ts" font-size="10.5" opacity=".85">with a library loaded.</text>
+
+  <text x="430" y="22" class="svg-ts" font-size="11" font-weight="700" letter-spacing="1">AFTER</text>
+  <rect x="430" y="36" width="180" height="110" rx="9" class="svg-i" stroke-width="1.5"/>
+  <text x="444" y="60" class="svg-t" font-size="12" font-weight="700">PipeLLM</text>
+  <text x="444" y="80" class="svg-ts" font-size="10.5">blueprint resolution</text>
+  <text x="444" y="97" class="svg-ts" font-size="10.5">text-vs-object dispatch</text>
+  <text x="444" y="114" class="svg-ts" font-size="10.5">error wrapping</text>
+  <text x="444" y="131" class="svg-ts" font-size="10.5">execution-graph tracing</text>
+
+  <rect x="640" y="36" width="165" height="110" rx="9" class="svg-box" stroke-width="1.5" stroke-dasharray="5 3"/>
+  <text x="654" y="60" class="svg-t" font-size="12" font-weight="700">Programmatic</text>
+  <text x="654" y="76" class="svg-t" font-size="12" font-weight="700">caller</text>
+  <text x="654" y="98" class="svg-ts" font-size="10.5">RuntimeBoot only</text>
+  <text x="654" y="115" class="svg-ts" font-size="10.5">0 .mthds loaded</text>
+  <text x="654" y="132" class="svg-ts" font-size="10.5">no library, no router</text>
+
+  <path d="M 520 150 L 520 196" class="svg-line" stroke-width="1.8" marker-end="url(#a2)"/>
+  <path d="M 722 150 L 722 196" class="svg-line" stroke-width="1.8" marker-end="url(#a2)"/>
+
+  <rect x="430" y="200" width="375" height="118" rx="9" class="svg-k" stroke-width="1.5"/>
+  <text x="446" y="224" class="svg-t" font-size="12.5" font-weight="700">pipelex/kernel/ &mdash; the semantics, once</text>
+  <line x1="446" y1="234" x2="789" y2="234" class="svg-line" stroke-width="1" opacity=".4"/>
+  <text x="446" y="254" class="svg-ts" font-size="10.5">model-deck chain &nbsp;&middot;&nbsp; prompting-style derivation</text>
+  <text x="446" y="272" class="svg-ts" font-size="10.5">prompt assembly &nbsp;&middot;&nbsp; job-params assembly</text>
+  <text x="446" y="290" class="svg-ts" font-size="10.5">generation &nbsp;&middot;&nbsp; memory write-back &nbsp;&middot;&nbsp; typed results</text>
+  <text x="446" y="308" class="svg-ts" font-size="10.5">memory boundary: shape in, read out</text>
+
+  <defs>
+    <marker id="a2" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 z" fill="var(--fg-soft)"/>
+    </marker>
+  </defs>
+</svg>
+<p class="caption">The operator class did not shrink into a shell — it kept everything that genuinely needs a loaded method, and became a caller for the rest.</p>
+</div>
+
+<p>The cut line is the load-bearing design decision, and it is stated so nobody has to find it by trial:</p>
+
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>Concern</th><th>Owner</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>Blueprint resolution, input validation</td><td><span class="pill i">interpreter</span></td><td>Blueprints are what <code>.mthds</code> parses into — language artifacts.</td></tr>
+    <tr><td>Text-vs-object dispatch</td><td><span class="pill i">interpreter</span></td><td>It is a question about the declared output concept; answering it is what a loaded library is for. The kernel's two entry points <em>are</em> that fork made explicit.</td></tr>
+    <tr><td>Error context (<code>PipeRunError</code> + pipe stack)</td><td><span class="pill i">interpreter</span></td><td>The kernel raises the same cogt-level errors the moved code raised; it has no pipe to name.</td></tr>
+    <tr><td>Concept &rarr; concrete class</td><td><span class="pill i">interpreter</span></td><td>A registry read. Handing the class over is what spares the kernel one.</td></tr>
+    <tr><td>Deck chain, style derivation, prompt/job-params assembly, generation, write-back</td><td><span class="pill k">kernel</span></td><td>These are what a step <em>does</em>; they need no method and no library.</td></tr>
+    <tr><td>Structure-prompt derivation</td><td><span class="pill k">kernel</span></td><td>Only the concept&rarr;class hop needed a registry, and the kernel already holds the class. Leaving derivation outside would have forked the two callers' <em>default</em> behavior — exactly the drift this exists to kill.</td></tr>
+    <tr><td>Memory boundary (shape in, store, typed read-out)</td><td><span class="pill k">kernel</span></td><td>Both ends of one boundary belong together.</td></tr>
+    <tr><td>Usage/trace <em>lifecycle</em></td><td>caller</td><td>A kernel call has no run boundary to hang a <code>finally</code> on — it is one step and a caller may make one or a thousand. The kernel owns the <em>stamp</em> (a <code>TraceContext</code> onto every step's metadata); opening and closing the event log stays outside.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>The resulting package is 19 modules / ~2 200 lines under <code>pipelex/kernel/</code>: the six operator families (<code>llm</code>, <code>extract</code>, <code>img_gen</code>, <code>search</code>, <code>compose</code>, <code>func</code>) as <code>*_ops.py</code> + <code>*_results.py</code> pairs, the memory boundary, the prompt-content models, and a thin <code>PipelexKernel</code> façade holding per-run state.</p>
+
+<h2 id="code">4. The critical code</h2>
+
+<p>Four diffs carry the substance. Everything else in the four PRs is mechanical churn behind these.</p>
+
+<details>
+<summary>A. The re-point — <code>PipeLLM</code> stops owning the semantics and starts calling them</summary>
+<p>The diff below is condensed from <code>pipelex/pipe_operators/llm/pipe_llm.py</code> in #1081. The whole deck-chain-plus-style block, and the generate-then-coerce-then-store block, become two calls. Note what is <em>not</em> deleted: the dispatch, the error wrap, and the class resolution stay.</p>
+<pre class="diff"><code><span class="c">@@ pipelex/pipe_operators/llm/pipe_llm.py</span>
+<span class="d">-        model_deck = get_model_deck()
+-        llm_setting_or_preset_id_for_text: LLMModelChoice = (
+-            llm_for_text_choice or model_deck.llm_choice_overrides.for_text or model_deck.llm_choice_defaults.for_text
+-        )
+-        llm_setting_main: LLMSetting = model_deck.get_llm_setting(llm_choice=llm_setting_or_preset_id_for_text)
+-        llm_setting_or_preset_id_for_object: LLMModelChoice = (
+-            llm_for_object_choice or llm_for_text_choice
+-            or model_deck.llm_choice_overrides.for_object or model_deck.llm_choice_defaults.for_object
+-        )
+-        llm_setting_for_object: LLMSetting = model_deck.get_llm_setting(llm_choice=llm_setting_or_preset_id_for_object)
+-        templating_style: TemplatingStyle | None = None
+-        if inference_model := model_deck.get_optional_inference_model(model_handle=llm_setting_main.model, ...):
+-            prompting_target = llm_setting_main.prompting_target or inference_model.prompting_target
+-            templating_style = get_config().pipelex.prompting_config.get_prompting_style(...)</span>
+<span class="a">+        llm_setting_main: LLMSetting = resolve_llm_setting_for_text(llm_choice=llm_for_text_choice)
++        llm_setting_for_object: LLMSetting = resolve_llm_setting_for_object(
++            llm_choice=llm_for_object_choice,
++            llm_choice_for_text=llm_for_text_choice,
++        )
++        templating_style = derive_templating_style(llm_setting=llm_setting_main)</span>
+
+<span class="c">         # The library-backed text-vs-object dispatch stays here.</span>
+<span class="c">         if get_concept_library().is_compatible(...) and not is_multiple_output:</span>
+<span class="d">-            llm_prompt_1_for_text = await self.llm_prompt_spec.make_llm_prompt(...)
+-            generated_text: str = await content_generator.make_llm_text(...)
+-            structure_class = get_class_registry().get_required_subclass(...)
+-            the_content = structure_class(text=generated_text)</span>
+<span class="a">+            text_result = await run_llm_text(
++                memory=working_memory,
++                prompt_content=prompt_content,
++                llm_setting=llm_setting_main,
++                concept=output_stuff_spec.concept,
++                output_class=output_class,
++                job_metadata=job_metadata,
++                cogt_run_params=pipe_run_params.cogt_run_params,
++                templating_style=templating_style,
++                result_name=output_name,
++            )</span>
+<span class="c">             except LLMCompletionError as exc:      # unchanged: the interpreter still wraps</span>
+<span class="c">                 raise PipeRunError(message=msg, pipe_code=self.code) from exc</span>
+<span class="a">+            working_memory = text_result.memory
++            rendered_llm_prompt = text_result.rendered_prompt</span>
+</code></pre>
+<p class="note">The result envelope is not decoration. The interpreter's execution-graph tracer consumes the rendered prompt, the resolved setting and the structuring path <em>after</em> generation. Returning them from the kernel is what lets the tracer ride the same functions instead of keeping a second assembly path — which would be the drift, reintroduced.</p>
+</details>
+
+<details>
+<summary>B. The op shape — activity-shaped, keyword-only, memory in and out</summary>
+<p>Every kernel entry point has the same shape, and each property is a deliberate constraint rather than a style choice.</p>
+<pre><code>async def run_llm_text(
+    *,                                        # fully keyword-only: zero subject grants in this package
+    memory: WorkingMemory,                    # threaded state, taken and returned
+    prompt_content: LlmPromptContent,         # a kernel-layer model, not the language-layer blueprint
+    llm_setting: LLMSetting,
+    concept: Concept,
+    output_class: type[StuffContent],         # handed over, so the kernel needs no registry
+    job_metadata: JobMetadata,
+    cogt_run_params: CogtRunParams,
+    templating_style: TemplatingStyle | None = None,
+    result_name: str | None = None,
+) -> LlmTextResult: ...                       # typed envelope: memory + the intermediates a tracer needs
+
+
+def store_result(*, memory: WorkingMemory, concept: Concept, content: StuffContent, ...) -> WorkingMemory:
+    """Write a produced content into memory as the new main stuff, and return the memory.
+
+    Returning it is the contract, not a convenience: the argument is mutated today because inline
+    execution aliases the two, and a caller that relies on that aliasing breaks the moment a
+    serialization boundary sits between them.
+    """</code></pre>
+<ul>
+  <li><strong>Keyword-only, no exceptions.</strong> <code>pipelex/kernel/</code> records zero entries in <code>subject_grants.toml</code> — a bar stricter than the repo-wide rubric, and one the auto-fixer produces mechanically, so there is no ordering trap.</li>
+  <li><strong>Explicit, serializable-leaning arguments; no ambient lookups in the caller-facing API.</strong> This is a design constraint, not a shipped feature: it keeps a future distributed-activity wrapping a re-decoration rather than a rewrite.</li>
+  <li><strong>The memory contract is stated once, in the package doctrine</strong>, so both classes of caller read the same sentence. Today inline execution aliases argument and return; a serialization boundary will not, and a test that pinned <code>result.memory is memory</code> would have made the very change the contract permits look like a regression. The tests deliberately assert the returned memory carries the result, and nothing about identity.</li>
+</ul>
+</details>
+
+<details>
+<summary>C. The plugin layer split — a plugin declares its layer through its entry-point group</summary>
+<p>Measurement showed that merely installing an interpreter-side plugin dragged the whole interpreter into every pipelex process in the venv: discovery imports each installed plugin's module before anything can inspect it. Making that plugin well-behaved fixes our own plugins and nothing else. The mechanism (#1090) makes a kernel-only boot never query the interpreter group at all:</p>
+<pre><code>class PluginGroup(StrEnum):
+    KERNEL = "pipelex.plugins.kernel"
+    INTERPRETER = "pipelex.plugins.interpreter"
+
+# providers/builtins.py            — what a kernel-only boot asks for
+KERNEL_ENTRY_POINT_GROUPS = (PluginGroup.KERNEL,)
+
+# interpreter_plugins/builtins.py  — what a full boot asks for
+ENTRY_POINT_GROUPS = (PluginGroup.KERNEL, PluginGroup.INTERPRETER)</code></pre>
+<pre class="diff"><code><span class="c">@@ pipelex/runtime_boot.py</span>
+<span class="c">     def make(</span>
+<span class="c">         *,</span>
+<span class="c">         builtin_plugins: "Sequence[PipelexPlugin] | None" = None,</span>
+<span class="a">+        entry_point_groups: "Sequence[PluginGroup] | None" = None,   # symmetric with builtin_plugins</span>
+</code></pre>
+<p>Three further properties came with it, each closing a specific silent-failure mode:</p>
+<ul>
+  <li><strong>A tier cross-check at register time.</strong> A kernel-group plugin calling an interpreter-tier menu method (<code>add_orchestrator</code>, <code>add_bundle_validator</code>, <code>add_pipe_func_executor</code>) fails loud. The rule is deliberately one-directional — an interpreter-group plugin may contribute kernel-tier capabilities freely, because a kernel-only boot never loads that group anyway. Our own Temporal plugin is what settles it: it is interpreter-side and also contributes an HTTP error mapper.</li>
+  <li><strong>Slot tiering is a property of the slot</strong>, via an exhaustive <code>match</code>, so a newly added hub slot cannot be merged without being classified.</li>
+  <li><strong>A fail-loud probe on the retired <code>pipelex.plugins</code> group.</strong> Without it, a plugin left behind is simply <em>absent</em> — no error, a capability that quietly does not exist. That is the expensive failure to diagnose.</li>
+</ul>
+</details>
+
+<details>
+<summary>D. The one real bug the refactor found — and what it teaches</summary>
+<p>Review caught it before merge; it was the PR's only behavior change. <code>PipelexKernel.make</code> minted a LIVE <code>CogtRunParams</code> on a keyless boot, bypassing the forced-DRY coercion the pipe tier applies. Reachable, not theoretical: <code>run_mode</code> alone gates mocking, so the call reached a real provider, and <code>needs_inference=False</code> loads backends <em>leniently</em> rather than credential-free. The hazard was the default — <code>PipelexKernel.make(user_id=…)</code> names no mode.</p>
+<p>The root cause is the refactor's own doing: <code>PipeRunParamsFactory</code>'s docstring called itself "the single writer" of <code>run_mode</code>, and that stopped being true the moment the kernel became a second run-params factory.</p>
+<pre class="diff"><code><span class="c">@@ pipelex/pipe_run/pipe_run_params_factory.py</span>
+<span class="d">-        if is_dry_run_forced() and pipe_run_mode.is_live:
+-            log.warning("LIVE run requested under a keyless boot ... forcing run_mode to DRY")
+-            pipe_run_mode = PipeRunMode.DRY</span>
+<span class="a">+        pipe_run_mode = resolve_run_mode_for_boot(requested=pipe_run_mode)</span>
+
+<span class="c">@@ pipelex/runtime_hub.py  (new — the rule, once, beside the accessor that reads the flag)</span>
+<span class="a">+def resolve_run_mode_for_boot(*, requested: PipeRunMode) -> PipeRunMode:
++    if is_dry_run_forced() and requested.is_live:
++        log.warning("LIVE run requested under a keyless boot (needs_inference=False): forcing DRY ...")
++        return PipeRunMode.DRY
++    return requested</span>
+
+<span class="c">@@ pipelex/kernel/pipelex_kernel.py</span>
+<span class="a">+        check_mock_usage_requires_dry(run_mode=run_mode, is_mock_usage=is_mock_usage)   # validates the REQUESTED mode
++        cogt_run_params=CogtRunParams(run_mode=resolve_run_mode_for_boot(requested=run_mode), ...)</span>
+</code></pre>
+<p class="note warn"><strong>The generalisable lesson, and it applies to any layering work:</strong> a new lower-tier factory of run-scoped state silently skips every process-wide invariant the upper tier applied. When you add one, ask explicitly which invariants the tier above enforces that yours now bypasses. Note also the ordering: the <em>requested</em> mode is validated <em>before</em> the coercion, otherwise the one illegal combination would raise on a keyed boot and pass silently on a keyless one — a contract whose visibility depended on whether the process held API keys.</p>
+</details>
+
+<h2 id="gates">5. What holds the boundary</h2>
+
+<p>A layering rule that is only in a doc decays. Four gates enforce this one, and the honest framing is that <strong>each covers something the others structurally cannot see</strong> — the reason there are four is that we found each blind spot the hard way.</p>
+
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>Gate</th><th>Proves</th><th>Blind to</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>pipelex-dev check-hub-layering</code></td>
+      <td>No kernel <em>module</em> imports the interpreter hub — per-file, plus a transitive pass over the whole module-level import graph, plus a dead-module rule matching bare string literals.</td>
+      <td>Function-local imports. Runtime-assembled module paths.</td>
+    </tr>
+    <tr>
+      <td><code>test_kernel_layer_import_closure.py</code></td>
+      <td>A kernel entry point <em>imports</em> clean, in a subprocess.</td>
+      <td>Anything outside the listed entry points' closure — the façade is LLM-only, so most of the package sits outside it. Function-local imports.</td>
+    </tr>
+    <tr>
+      <td><code>test_kernel_layer_exceptions_aggregate_gate.py</code></td>
+      <td>No kernel module reaches the <code>pipelex.exceptions</code> re-export aggregate — imports and bare strings, module-level or function-local.</td>
+      <td>Aggregates other than the declared one.</td>
+    </tr>
+    <tr>
+      <td><code>test_kernel_boot_contract.py</code></td>
+      <td><strong>Every kernel entry point <em>runs</em></strong> on a keyless <code>RuntimeBoot</code> with zero <code>.mthds</code> loaded, then <code>sys.modules</code> is swept. The only gate that sees a function-local interpreter import.</td>
+      <td>It is <em>per-function</em>: a breach inside <code>run_search</code> is caught only by calling <code>run_search</code>. Nothing tells you when it has fallen behind.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>That last blind spot is not hypothetical either — it is exactly what happened mid-refactor. Phase 2 added five operator ops; the boot contract was <em>asserted</em> for all of them and <em>tested</em> for the LLM pair alone, and both static gates stayed green while covering none of the five. A cold review found it. The standing rule now reads: <strong>every new kernel entry point owes an arm in that subprocess</strong>, and it is written into the package docstring rather than into a plan nobody will re-read.</p>
+
+<p class="note">Every gate above was <strong>mutation-tested rather than asserted</strong>: a function-local <code>pipe_operators</code> import planted in <code>run_search</code> leaves the static guard at exit 0 and the closure test at all-passed, and turns only the boot-contract test red. The usage-parity test was checked the same way — dropping the trace-context stamp turns 1 record into 0. A test that is green on its first run has proven nothing yet.</p>
+
+<h2 id="impact">6. Measured impact</h2>
+
+<p>Measured 2026-08-11 at the current end-state; reproducible, and a snapshot rather than a contract.</p>
+
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>Measurement</th><th class="num">Value</th><th>Reading</th></tr></thead>
+  <tbody>
+    <tr><td>Declared kernel-layer modules</td><td class="num">560 / 981</td><td>57% of modules, 52% of source bytes. The boundary splits the tree roughly in half — it is not a thin veneer over a monolith.</td></tr>
+    <tr><td>Non-kernel modules a kernel-only boot loads</td><td class="num">11</td><td>The concrete remaining coupling: <code>config</code>, <code>base_exceptions</code>, <code>urls</code>, <code>kit.paths</code>, <code>language.mthds_config</code> and a few others. Each has a named disposition.</td></tr>
+    <tr><td>Booted process: modules</td><td class="num">1511 vs 1884</td><td>Kernel-only against full.</td></tr>
+    <tr><td>Booted process: max RSS</td><td class="num">91.7 vs 108.7 MiB</td><td>~16% lighter. Real but modest — the floor is dominated by dependencies unrelated to the interpreter.</td></tr>
+    <tr><td>Kernel-only install (deps, no extras)</td><td class="num">57 dists / 61.1 MiB</td><td>Against 89 dists / 93.5 MiB for a full core install.</td></tr>
+    <tr><td>Shed by dropping interpreter-only deps</td><td class="num">32 dists / 32.4 MiB</td><td>~35%.</td></tr>
+    <tr><td>Kernel package itself</td><td class="num">19 modules / 2 181 lines</td><td>The extracted semantics.</td></tr>
+    <tr><td>Diff size across the four PRs</td><td class="num">+6 614 / &minus;2 070</td><td>Planning docs included. The bulk of the source half is moves and re-points, not new logic.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p class="note warn"><strong>The honest reading of the size numbers.</strong> A kernel install is roughly two-thirds of a full one, and the ~61 MiB floor is dominated by four dependencies with nothing to do with the interpreter (<code>pillow</code>, <code>faker</code> via <code>polyfactory</code>, <code>pypdfium2</code>, <code>portkey-ai</code>). "Look how little you need" is not a claim this refactor earns — a small footprint would have to be bought by extras design, not by the layer split. The layering's value is elsewhere.</p>
+
+<h3>Where the value actually is</h3>
+
+<ul>
+  <li><strong>Drift becomes a build failure instead of a discovery.</strong> The specific risk this removes: an SDK-shaped caller and the interpreter computing the model-deck chain, the structure prompt, or the memory write-back <em>slightly</em> differently, with no test capable of noticing. Before, that outcome was prevented by discipline. Now the second copy has nowhere to live.</li>
+  <li><strong>"Where does this change go?" has a mechanical answer.</strong> Language rule &rarr; blueprint, interpreter-side. Authoring convenience &rarr; spec. What a step <em>does</em> &rarr; kernel. Reviewers apply it rather than negotiate it, and a wrong answer trips a gate rather than a reviewer's memory.</li>
+  <li><strong>The layering property became testable at all.</strong> "The kernel does not depend on the interpreter" used to be an import-time claim about a process that could not actually be booted that way. It is now a property of a process that boots, runs every kernel entry point, and is swept afterwards.</li>
+  <li><strong>A whole class of silent failure got a loud failure mode.</strong> Cross-layer re-export aggregates, transitive leaks, plugins that lie about their layer, plugins left under a retired entry-point group — each of these used to manifest as a mystery import or an absent capability. Each now names itself at build or boot time.</li>
+  <li><strong>Refactoring pressure now points the right way.</strong> The remaining coupling is 11 modules and a static leak census with a named disposition each, instead of an unbounded "the interpreter is entangled with everything" feeling. That is what makes a later distribution split a decision rather than a project.</li>
+  <li><strong>Cost/usage reporting reaches parity for a kernel-driven run</strong>, measured rather than argued: an equivalent step run through the interpreter and through direct kernel calls produces matching <code>TokensUsageRecord</code> lists.</li>
+</ul>
+
+<h2 id="limits">7. Honest limits</h2>
+
+<p>What this refactor did <em>not</em> do, stated plainly so nobody reads more into it than it earns:</p>
+
+<ul>
+  <li><strong>The kernel is still a subpackage of <code>pipelex</code>, not a separate distribution.</strong> The trust-base story ("this process contains only the kernel") is a per-<em>venue</em> claim today, holding for plugins we author and vet. A separate <code>pipelex_kernel/</code> top-level package (Part B, same repo and same wheel) is planned and measured but not started; a published <code>pipelex-kernel</code> distribution (Part C) is explicitly hypothetical and requires its own decision.</li>
+  <li><strong>Two operator arms stayed interpreter-side, on cost grounds, both recorded.</strong> <code>PipeCompose</code>'s <em>construct</em> mode would require relocating an 840-line composer, a 315-line MTHDS blueprint and its error family into the kernel — for a caller-side gain near nil, since a programmatic caller holding real Python builds the object directly. <code>PipeFunc</code>'s pluggable executor seam is typed on interpreter models (<code>PipeRunParams</code>, <code>LibraryCrate</code>); re-typing it breaks two out-of-tree plugin repos over a parameter neither reads. Consequence to hold onto: a programmatic caller cannot dispatch a kernel <code>run_func</code> to a sandbox. The template path and the function call itself <em>are</em> single-sourced.</li>
+  <li><strong>Controllers were out of scope.</strong> <code>pipelex/pipe_controllers/</code> is untouched — this covers operator semantics only.</li>
+  <li><strong>The three external plugin repos are migrated but unpushed.</strong> Local commits on <code>refactor/plugin-layer-groups</code> in pipelex-temporal, pipelex-mistralai-workflows and pipelex-daytona-sandbox. Each repo's venv is currently red on that branch, and correctly so: the working tree declares the new entry-point group while the pinned <code>pipelex</code> reads only the retired one. That is the release gate showing through, not breakage — they land once a <code>pipelex</code> release carries the new discovery.</li>
+  <li><strong>The remaining kernel&rarr;non-kernel couplings are catalogued, not fixed.</strong> The structural one is that <code>MthdsConfig</code> — an interpreter-layer submodel — is a field of the kernel-layer main config model. That is a config-composition decision, not a file move.</li>
+  <li><strong>One live finding is still open</strong> (KF-18): <code>core/memory/working_memory_factory.py</code> — kernel-layer — imports two <code>pipelex.builder.pipe</code> modules inside a dry-run mocking helper, under a "avoid circular imports" comment, pulling 6 interpreter modules. Both static gates are green and each is answering its own question correctly; the boot-contract sweep does not reach it because no op calls that helper. It is a real instance of the blind spot documented above, and the reason Part B's package-level ban (<em>nothing under <code>pipelex_kernel/</code> may import <code>pipelex</code></em>) is worth more than the instance fix.</li>
+</ul>
+
+<h2 id="prs">8. Pull requests</h2>
+
+<h4>This repo — the extraction</h4>
+<div class="prs">
+  <div class="pr"><span class="n"><a href="https://github.com/Pipelex/pipelex/pull/1081">#1081</a></span> &middot; merged<span class="t">1/3 — the <code>pipelex.kernel</code> package and the LLM vertical slice</span></div>
+  <div class="pr"><span class="n"><a href="https://github.com/Pipelex/pipelex/pull/1082">#1082</a></span> &middot; merged<span class="t">2/3 — the remaining operators (extract, img-gen, search, compose, func)</span></div>
+  <div class="pr"><span class="n"><a href="https://github.com/Pipelex/pipelex/pull/1083">#1083</a></span> &middot; merged<span class="t">3/3 — the memory boundary and run-scoped state parity</span></div>
+  <div class="pr"><span class="n"><a href="https://github.com/Pipelex/pipelex/pull/1090">#1090</a></span> &middot; merged<span class="t">Plugins declare their layer through their entry-point group (+ the "runtime layer" &rarr; "kernel layer" rename)</span></div>
+</div>
+
+<h4>This repo — the arc that made it possible</h4>
+<div class="prs">
+  <div class="pr"><span class="n"><a href="https://github.com/Pipelex/pipelex/pull/1062">#1062</a></span><span class="t">Split <code>pipelex.hub</code> into <code>runtime_hub</code> + <code>interpreter_hub</code></span></div>
+  <div class="pr"><span class="n"><a href="https://github.com/Pipelex/pipelex/pull/1064">#1064</a></span><span class="t">Move interpreter-touching built-in plugins out of the layer; make the guard transitive</span></div>
+  <div class="pr"><span class="n"><a href="https://github.com/Pipelex/pipelex/pull/1071">#1071</a></span><span class="t">Complete the layer boundary — placement, so the predicate can say what it means</span></div>
+  <div class="pr"><span class="n"><a href="https://github.com/Pipelex/pipelex/pull/1072">#1072</a></span><span class="t">Evict ambient class-registry reads from the <code>Concept</code> wire model</span></div>
+  <div class="pr"><span class="n"><a href="https://github.com/Pipelex/pipelex/pull/1073">#1073</a></span><span class="t">Give the composition root the layer seam every other package has (<code>RuntimeBoot</code>)</span></div>
+  <div class="pr"><span class="n"><a href="https://github.com/Pipelex/pipelex/pull/1074">#1074</a></span><span class="t">Keep the prompting style run-scoped so rendering cannot mutate the library-held pipe</span></div>
+  <div class="pr"><span class="n"><a href="https://github.com/Pipelex/pipelex/pull/1076">#1076</a></span><span class="t">Stop the runtime silently substituting a caller's class and a caller's function</span></div>
+  <div class="pr"><span class="n"><a href="https://github.com/Pipelex/pipelex/pull/1080">#1080</a></span><span class="t">Mechanically ban <code>pipelex.exceptions</code> aggregate imports in kernel-layer packages</span></div>
+</div>
+
+<h4>Other repos</h4>
+<p>One commit each, on <code>refactor/plugin-layer-groups</code>, <strong>local and unpushed</strong> — no PRs yet, gated on the <code>pipelex</code> release that carries the new discovery:</p>
+<div class="prs">
+  <div class="pr"><span class="n">pipelex-temporal</span><span class="t">Publish under <code>pipelex.plugins.interpreter</code> (orchestrator + bundle validator + slot claims); also contributes a kernel-tier HTTP error mapper</span></div>
+  <div class="pr"><span class="n">pipelex-mistralai-workflows</span><span class="t">Publish under <code>pipelex.plugins.interpreter</code> (orchestrator)</span></div>
+  <div class="pr"><span class="n">pipelex-daytona-sandbox</span><span class="t">Publish under <code>pipelex.plugins.interpreter</code> (PipeFunc executor)</span></div>
+</div>
+
+<h2 id="rules">9. The rules worth carrying into your next change</h2>
+
+<ol>
+  <li><strong>An undeclared package is unpoliced, not neutral.</strong> If you add a top-level package, place it on one side of the line in <code>KERNEL_LAYER_PACKAGES</code> and pin the declaration with a test. Omitting it makes every gate quieter.</li>
+  <li><strong>Every new kernel entry point owes an arm in <code>test_kernel_boot_contract.py</code>.</strong> It is a few lines; noticing it was never added took a cold review, twice.</li>
+  <li><strong>Import from definition sites.</strong> A module that re-exports across layers is a layer boundary with the sign filed off.</li>
+  <li><strong>No function-local imports in kernel code.</strong> They are invisible to the static graph and to the closure test at the same time. If one seems necessary, the placement is wrong and the type should move.</li>
+  <li><strong>A new factory of run-scoped state skips the tier above's invariants.</strong> Enumerate them explicitly before shipping it.</li>
+  <li><strong>Moving code has consequences no compiler reports.</strong> Sweep <code>subject_grants.toml</code>, <code>.test_durations</code> node IDs, <code>docs/</code> for file paths you moved, and <code>docs/errors/</code> pages when a <code>PipelexError</code> subclass changes module. Two of those four fail a build; the other two fail silently.</li>
+  <li><strong>Mutate your own test before believing it.</strong> Green on the first run proves nothing about what a test guards.</li>
+</ol>
+
+</div>
+</body>
+</html>
