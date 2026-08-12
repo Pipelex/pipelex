@@ -5,7 +5,7 @@ normalize the closure into a crate, project its concept set for the chosen `--ta
 emitted file under the output root. The verdict (resolved / invalid library) rides the resolve exit
 codes via `load_normalized_crate_or_exit`; the success stream is the list of written files.
 
-See `docs/specs/pipelex-codegen.md` -> "CLI: codegen" and "Two axes".
+See the codegen spec -> "CLI: codegen" and "Two axes".
 """
 
 from pathlib import Path

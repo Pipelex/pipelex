@@ -1,28 +1,22 @@
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 from pydantic import model_validator
 from typing_extensions import Self, override
 
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.extract.extract_input import ExtractInput
-from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
-from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
+from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 from pipelex.cogt.models.model_deck_check import check_extract_choice_with_deck
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.stuffs.list_content import ListContent
-from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_concept_library, get_native_concept
+from pipelex.kernel.extract_ops import build_extract_job_params, resolve_extract_setting, run_extract
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.runtime_hub import get_content_generator, get_model_deck
 from pipelex.system.job_metadata import JobMetadata
-
-if TYPE_CHECKING:
-    from pipelex.core.stuffs.page_content import PageContent
 
 
 class PipeExtractOutput(PipeOutput):
@@ -119,8 +113,6 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeExtractOutput:
-        content_generator = get_content_generator()
-
         image_uri: str | None = None
         pdf_uri: str | None = None
         if self.image_stuff_name:
@@ -130,46 +122,30 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
             document_stuff = working_memory.get_stuff_as_document(name=self.document_stuff_name)
             pdf_uri = document_stuff.url
 
-        extract_choice: ExtractModelChoice = self.extract_choice or get_model_deck().extract_choice_default
-        extract_setting: ExtractSetting = get_model_deck().get_extract_setting(extract_choice=extract_choice)
-
-        # MTHDS-level max_page_images takes precedence if set, otherwise use ExtractSetting
-        max_nb_images = self.max_page_images if self.max_page_images is not None else extract_setting.max_nb_images
-
-        extract_job_params = ExtractJobParams(
+        # The deck chain and the job-params composition are kernel semantics; the setting is resolved
+        # per run into a local and never cached onto `self`, for the reason `pipe_llm.py` states about
+        # its own settings — the pipe instance is the one the library holds and hands out.
+        extract_setting = resolve_extract_setting(extract_choice=self.extract_choice)
+        extract_job_params = build_extract_job_params(
+            extract_setting=extract_setting,
             should_caption_images=self.should_caption_images,
             should_include_page_views=self.should_include_page_views,
             page_views_dpi=self.page_views_dpi,
-            max_nb_images=max_nb_images,
-            image_min_size=extract_setting.image_min_size,
+            max_page_images=self.max_page_images,
             render_js=self.render_js,
             include_raw_html=self.include_raw_html,
         )
-        extract_input = ExtractInput(
-            image_uri=image_uri,
-            document_uri=pdf_uri,
-        )
-        page_contents = await content_generator.make_extract_pages(
-            extract_input=extract_input,
-            cogt_run_params=pipe_run_params.cogt_run_params,
-            extract_handle=extract_setting.model,
-            job_metadata=job_metadata,
+        extract_result = await run_extract(
+            memory=working_memory,
+            extract_input=ExtractInput(image_uri=image_uri, document_uri=pdf_uri),
+            extract_setting=extract_setting,
             extract_job_params=extract_job_params,
-            extract_job_config=ExtractJobConfig(),
-        )
-
-        content: ListContent[PageContent] = ListContent(items=page_contents)
-
-        output_stuff = StuffFactory.make_stuff(
-            name=output_name,
             concept=self.output.concept,
-            content=content,
+            job_metadata=job_metadata,
+            cogt_run_params=pipe_run_params.cogt_run_params,
+            result_name=output_name,
         )
-
-        working_memory.set_new_main_stuff(
-            stuff=output_stuff,
-            name=output_name,
-        )
+        working_memory = extract_result.memory
 
         # Capture execution data for the graph tracer
         execution_data_dict: dict[str, Any] = {

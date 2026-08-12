@@ -11,7 +11,7 @@ class PipeLibraryAbstract(ABC):
     takes pipe resolution as a parameter. The two places that follow a pipe reference found *inside* a
     pipe graph — a condition's mapped pipes and a sequence's last step, both in
     `pipe_machinery/rendering/` — are interpreter-layer and call `interpreter_hub.get_required_pipe`
-    directly. Split the read half out if and when a runtime-layer caller needs it.
+    directly. Split the read half out if and when a kernel-layer caller needs it.
     """
 
     @abstractmethod

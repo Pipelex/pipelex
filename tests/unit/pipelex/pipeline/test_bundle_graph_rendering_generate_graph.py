@@ -33,7 +33,7 @@ class TestGenerateGraphForBundle:
         """Create the bundle file and patch the bundle_graph_rendering collaborators.
 
         The renderer is patched as a whole: since the split, `render_graph_from_spec` lives in the
-        runtime-layer `pipelex.graph.graph_rendering` and is this module's collaborator, not its
+        kernel-layer `pipelex.graph.graph_rendering` and is this module's collaborator, not its
         internals. How it maps the inclusion flags onto the graph config is its own test's business
         (`tests/unit/pipelex/graph/test_graph_rendering.py`); what belongs here is the dispatch.
         """

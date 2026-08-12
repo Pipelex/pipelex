@@ -1000,8 +1000,17 @@ class PipeAbstract(ABC, BaseModel):
     ) -> PipeOutput:
         log.verbose(f"Dry run of {self.type}: '{self.code}'")
         assert pipe_run_params.run_mode.is_dry, f"Dry run of {self.type} '{self.code}' called with run_mode = {pipe_run_params.run_mode}"
+        # Stamp the running pipe onto the metadata handed down, exactly as `live_run_pipe` does.
+        # Without it a dry run's `job_metadata.pipe_code` stays whatever the caller passed — usually
+        # unset — so everything downstream that identifies a step by it (leaf-activity labelling in a
+        # distributed backend, log correlation) sees an anonymous step in DRY and a named one in LIVE.
+        # Telemetry stays live-only on purpose: `pipe_run_id` and `otel_context` belong to a real run.
+        # `otel_context=None` matches what `live_run_pipe` itself computes in dry mode, and clearing
+        # it explicitly is the point of that parameter being required — inheriting the parent's would
+        # attach a dry step to a live span.
+        child_metadata = job_metadata.copy_with_update(otel_context=None, pipe_code=self.code)
         return await self._dry_run_pipe(
-            job_metadata=job_metadata,
+            job_metadata=child_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params,
             output_name=output_name,

@@ -6,13 +6,13 @@ import textwrap
 from pathlib import Path
 
 from pipelex.cli.dev_cli.commands.hub_layering_guard import (
-    RUNTIME_LAYER_PACKAGES,
+    KERNEL_LAYER_PACKAGES,
     HubLayeringViolation,
     HubLayeringViolationKind,
     find_violations_in_source,
-    is_runtime_layer,
+    is_kernel_layer,
 )
-from tests.unit.pipelex.test_runtime_layer_import_closure import INTERPRETER_PACKAGES
+from tests.unit.pipelex.test_kernel_layer_import_closure import INTERPRETER_PACKAGES
 
 #: Anchored on `tests/` by name rather than by a parent count. A depth index is not merely fragile
 #: here, it is *silent*: `parents[6]` is the workspace root, which holds a sibling `pipelex/` checkout,
@@ -20,7 +20,7 @@ from tests.unit.pipelex.test_runtime_layer_import_closure import INTERPRETER_PAC
 #: pass. That is the failure this track already hit once, in the golden-renderer test.
 _REPO_ROOT = next(parent for parent in Path(__file__).resolve().parents if parent.name == "tests").parent
 
-#: A runtime-layer module path, and a interpreter-layer one, for the same snippet.
+#: A kernel-layer module path, and a interpreter-layer one, for the same snippet.
 RUNTIME_PATH = "pipelex/cogt/sample/worker.py"
 INTERPRETER_PATH = "pipelex/pipeline/sample/runner.py"
 TEST_PATH = "tests/helpers/sample_helpers.py"
@@ -40,62 +40,62 @@ def _kinds(violations: list[HubLayeringViolation]) -> set[HubLayeringViolationKi
 
 
 class TestHubLayeringGuard:
-    def test_runtime_layer_membership(self) -> None:
-        """The declared runtime layer is matched on package boundaries, and `pipeline` is outside it."""
-        assert is_runtime_layer(module_qname="pipelex.cogt.llm.llm_worker_abstract")
-        assert is_runtime_layer(module_qname="pipelex.tools")
-        assert not is_runtime_layer(module_qname="pipelex.pipeline.runner")
-        # A package whose name merely starts with a runtime-layer name is not in the runtime layer.
-        assert not is_runtime_layer(module_qname="pipelex.toolsmith.thing")
+    def test_kernel_layer_membership(self) -> None:
+        """The declared kernel layer is matched on package boundaries, and `pipeline` is outside it."""
+        assert is_kernel_layer(module_qname="pipelex.cogt.llm.llm_worker_abstract")
+        assert is_kernel_layer(module_qname="pipelex.tools")
+        assert not is_kernel_layer(module_qname="pipelex.pipeline.runner")
+        # A package whose name merely starts with a kernel-layer name is not in the kernel layer.
+        assert not is_kernel_layer(module_qname="pipelex.toolsmith.thing")
 
     def test_core_is_declared_as_one_whole_package(self) -> None:
         """`core/` is declared wholesale — one entry, no sub-entries — because nothing interpreter-layer
         is left inside it.
 
         Stated as a property of the declaration rather than as a list of member modules. Once
-        `pipelex.core` is a single prefix entry, `is_runtime_layer` answers True for *any* string
+        `pipelex.core` is a single prefix entry, `is_kernel_layer` answers True for *any* string
         under it, so asserting ten real module names would carry the same one bit as asserting ten
         invented ones — an inventory, not an invariant. What is worth pinning is the shape that took
         the whole M1 track to reach: re-introducing a `pipelex.core.<sub>` entry would mean core has
         split again, and that is what fails here.
         """
-        assert "pipelex.core" in RUNTIME_LAYER_PACKAGES
-        resplit = [package for package in RUNTIME_LAYER_PACKAGES if package.startswith("pipelex.core.")]
+        assert "pipelex.core" in KERNEL_LAYER_PACKAGES
+        resplit = [package for package in KERNEL_LAYER_PACKAGES if package.startswith("pipelex.core.")]
         assert not resplit, (
             f"`pipelex.core` is declared wholesale, but these sub-package entries are declared too: {resplit}. "
             "A sub-entry means some of `core/` is being carved out again — either move the interpreter-layer "
             "module to `pipe_machinery`/`mthds_parsing` as M1 did, or record why the split is back."
         )
 
-    def test_no_interpreter_package_is_declared_runtime_layer(self) -> None:
+    def test_no_interpreter_package_is_declared_kernel_layer(self) -> None:
         """The two layer declarations are disjoint — derived from both, so neither can drift alone.
 
-        `RUNTIME_LAYER_PACKAGES` (this guard) and `INTERPRETER_PACKAGES` (the import-closure test) are
+        `KERNEL_LAYER_PACKAGES` (this guard) and `INTERPRETER_PACKAGES` (the import-closure test) are
         the two halves of one partition, maintained in separate modules and never previously compared.
         Declaring a package in both would make the guard vouch for a package the closure test flags —
         each check would keep passing while contradicting the other.
         """
         for package in INTERPRETER_PACKAGES:
             qname = f"pipelex.{package}"
-            assert not is_runtime_layer(module_qname=qname), (
+            assert not is_kernel_layer(module_qname=qname), (
                 f"{qname} is named by the import-closure test's INTERPRETER_PACKAGES *and* matched by "
-                "this guard's RUNTIME_LAYER_PACKAGES. The two declarations describe opposite layers."
+                "this guard's KERNEL_LAYER_PACKAGES. The two declarations describe opposite layers."
             )
-            assert not is_runtime_layer(module_qname=f"{qname}.some_module")
+            assert not is_kernel_layer(module_qname=f"{qname}.some_module")
 
-    def test_declared_runtime_layer_names_only_real_packages(self) -> None:
-        """Every declared entry resolves on disk — `is_runtime_layer` is a string predicate that cannot tell.
+    def test_declared_kernel_layer_names_only_real_packages(self) -> None:
+        """Every declared entry resolves on disk — `is_kernel_layer` is a string predicate that cannot tell.
 
         A renamed or deleted package leaves its entry matching nothing, which makes the declaration
         quietly *narrower* than it reads: the transitive rule filters its domain through this predicate,
         so an entry that matches nothing removes modules from the check rather than adding them.
         """
         source_root = _REPO_ROOT / "pipelex"
-        for package in RUNTIME_LAYER_PACKAGES:
+        for package in KERNEL_LAYER_PACKAGES:
             relative = package.removeprefix("pipelex.").replace(".", "/")
             target = source_root / relative
             assert target.is_dir() or target.with_suffix(".py").is_file(), (
-                f"RUNTIME_LAYER_PACKAGES names {package!r}, which resolves to neither a package directory "
+                f"KERNEL_LAYER_PACKAGES names {package!r}, which resolves to neither a package directory "
                 f"nor a module file under {source_root}. A declared entry that matches nothing silently "
                 f"shrinks the layer rule's domain instead of failing."
             )
@@ -104,23 +104,23 @@ class TestHubLayeringGuard:
         """Splitting one declared package into two must leave two declarations, not one.
 
         `plugins/` was carved in half: the mechanism stayed, the built-in adapters became `providers/`.
-        Both halves are runtime-layer, so the split moved no boundary — but it introduced one silent
+        Both halves are kernel-layer, so the split moved no boundary — but it introduced one silent
         failure mode, and it runs the opposite way to intuition. Omitting an entry does not make the
         guard complain; it makes the guard go *quiet*. The transitive rule iterates only modules
-        `is_runtime_layer` already accepts, so an undeclared package leaves the rule's domain rather
-        than being reported by it, and the largest runtime-layer package would stop being checked
+        `is_kernel_layer` already accepts, so an undeclared package leaves the rule's domain rather
+        than being reported by it, and the largest kernel-layer package would stop being checked
         while every gate stayed green. Nothing else in the suite catches that.
 
-        Membership is the whole assertion, deliberately. `is_runtime_layer` matches by dotted prefix,
+        Membership is the whole assertion, deliberately. `is_kernel_layer` matches by dotted prefix,
         so once an entry is present it answers True for *any* string beneath it — enumerating the
         adapters on disk would carry the same one bit as enumerating invented names, and would add a
         second failure mode (an adapter without an `__init__.py` is importable as a namespace package
         but would be silently skipped). See `test_core_is_declared_as_one_whole_package` above.
         """
         for package in ("pipelex.plugins", "pipelex.providers"):
-            assert package in RUNTIME_LAYER_PACKAGES, (
+            assert package in KERNEL_LAYER_PACKAGES, (
                 f"{package} is one half of the plugin mechanism/adapter split and is not declared "
-                "runtime-layer. Undeclared means unchecked, not flagged — add the covering entry."
+                "kernel-layer. Undeclared means unchecked, not flagged — add the covering entry."
             )
 
     def test_the_measured_clean_packages_stay_declared(self) -> None:
@@ -129,7 +129,7 @@ class TestHubLayeringGuard:
         `graph`, `tracing`, `observer` and `errors` load zero interpreter modules and always did —
         yet leaving them out of the tuple is what let `graph.graph_rendering` reach `interpreter_hub`
         through `pipeline.dry_run_pipeline` for a whole release with every gate green. Both the layer
-        rule and the transitive rule filter their candidates through `is_runtime_layer`, so an
+        rule and the transitive rule filter their candidates through `is_kernel_layer`, so an
         undeclared package sits outside the rules' domain rather than being reported by them: **an
         undeclared package is not neutral, it is unpoliced.**
 
@@ -137,46 +137,69 @@ class TestHubLayeringGuard:
         The neighbouring checks all *iterate* the tuple — every entry resolves on disk, no entry is
         also an interpreter package — so they say nothing about a name that is simply gone. Same
         shape and same reasoning as `test_the_plugin_split_left_both_halves_declared` above, and
-        membership is likewise the whole assertion: `is_runtime_layer` matches by dotted prefix, so
+        membership is likewise the whole assertion: `is_kernel_layer` matches by dotted prefix, so
         the entry's presence is the one bit that matters.
         """
         for package in ("pipelex.graph", "pipelex.tracing", "pipelex.observer", "pipelex.errors"):
-            assert package in RUNTIME_LAYER_PACKAGES, (
-                f"{package} was measured clean and declared runtime-layer, and is no longer in the "
+            assert package in KERNEL_LAYER_PACKAGES, (
+                f"{package} was measured clean and declared kernel-layer, and is no longer in the "
                 "declaration. Undeclared means unchecked, not flagged — restore the entry, or move "
                 "whatever made it dirty to the layer it belongs to."
             )
 
-    def test_the_boot_split_left_the_runtime_half_declared(self) -> None:
-        """The runtime composition root must stay declared — and its interpreter half must not be.
+    def test_the_boot_split_left_the_kernel_half_declared(self) -> None:
+        """The kernel composition root must stay declared — and its interpreter half must not be.
 
         `pipelex.py` was carved in half the way the plugin manifests were: the runtime boot became
         `pipelex/runtime_boot.py`, and `Pipelex` became the interpreter boot that subclasses it. Only
-        the runtime half is declarable, and declaring it is the entire reason the rule reaches it:
+        the kernel half is declarable, and declaring it is the entire reason the rule reaches it:
         both halves were undeclared before the split, which made the composition root — the one module
         that constructs *both* layers — the single largest unpoliced surface in the tree.
 
         The negative half of the assertion matters just as much. `pipelex.pipelex` imports
         `interpreter_hub` by construction, so declaring it would make the layer rule fail by design;
-        a well-meaning "the boot should be runtime-layer, surely" edit is a plausible future mistake
+        a well-meaning "the boot should be kernel-layer, surely" edit is a plausible future mistake
         and this is what catches it.
 
-        Membership is the whole assertion, for the same reason as the two tests above: `is_runtime_layer`
+        Membership is the whole assertion, for the same reason as the two tests above: `is_kernel_layer`
         matches by dotted prefix, so presence is the one bit that matters.
         """
-        assert "pipelex.runtime_boot" in RUNTIME_LAYER_PACKAGES, (
-            "pipelex.runtime_boot is the runtime layer's composition root and is not declared "
-            "runtime-layer. Undeclared means unchecked, not flagged — restore the entry, or move "
+        assert "pipelex.runtime_boot" in KERNEL_LAYER_PACKAGES, (
+            "pipelex.runtime_boot is the kernel layer's composition root and is not declared "
+            "kernel-layer. Undeclared means unchecked, not flagged — restore the entry, or move "
             "whatever made it dirty to the layer it belongs to."
         )
-        assert "pipelex.pipelex" not in RUNTIME_LAYER_PACKAGES, (
+        assert "pipelex.pipelex" not in KERNEL_LAYER_PACKAGES, (
             "pipelex.pipelex is the *interpreter* half of the boot — it installs the InterpreterHub "
-            "and constructs the method machinery — so declaring it runtime-layer makes the layer rule "
+            "and constructs the method machinery — so declaring it kernel-layer makes the layer rule "
             "fail by design. Declare pipelex.runtime_boot instead; that is the half that stays clean."
         )
 
-    def test_runtime_layer_may_import_runtime_hub(self) -> None:
-        """The permitted direction is never flagged — the runtime layer lives on `runtime_hub`."""
+    def test_the_pipelex_kernel_stays_declared(self) -> None:
+        """`pipelex.kernel` must stay declared — it is the package the whole extraction exists to keep clean.
+
+        The kernel holds the operator-execution semantics the interpreter's operator classes call
+        into, and its contract is that a programmatic caller can invoke them on a `RuntimeBoot`-only
+        process. One `interpreter_hub` reach anywhere inside it breaks that contract for every
+        caller at once — so this is the package where the "undeclared is unpoliced" failure would
+        cost the most, and it was declared in the same commit that created it rather than after a
+        breach, unlike the four above.
+
+        Deleting the entry is the silent regression: the layer rule and the transitive rule both
+        filter through `is_kernel_layer`, and the `pipelex.exceptions` aggregate gate iterates this
+        very tuple — so removing the entry takes the kernel out of *three* checks at once while
+        every one of them keeps reporting PASSED. Membership is the whole assertion, for the reason
+        the neighbouring tests give.
+        """
+        assert "pipelex.kernel" in KERNEL_LAYER_PACKAGES, (
+            "pipelex.kernel holds the operator-execution semantics that must stay callable on a "
+            "kernel-only boot, and it is no longer declared kernel-layer. Undeclared means "
+            "unchecked, not flagged — restore the entry, or move whatever made it dirty to the "
+            "layer it belongs to."
+        )
+
+    def test_kernel_layer_may_import_runtime_hub(self) -> None:
+        """The permitted direction is never flagged — the kernel layer lives on `runtime_hub`."""
         violations = _violate(
             """
             from pipelex.runtime_hub import get_console, get_model_deck
@@ -184,8 +207,8 @@ class TestHubLayeringGuard:
         )
         assert violations == []
 
-    def test_runtime_layer_importing_interpreter_hub_is_a_violation(self) -> None:
-        """`from pipelex.interpreter_hub import …` in the runtime layer is the forbidden arrow."""
+    def test_kernel_layer_importing_interpreter_hub_is_a_violation(self) -> None:
+        """`from pipelex.interpreter_hub import …` in the kernel layer is the forbidden arrow."""
         violations = _violate(
             """
             from pipelex.interpreter_hub import get_pipe_router
@@ -262,7 +285,7 @@ class TestHubLayeringGuard:
         assert violations == []
 
     def test_interpreter_layer_may_import_interpreter_hub(self) -> None:
-        """Outside the declared runtime layer the layer rule does not apply."""
+        """Outside the declared kernel layer the layer rule does not apply."""
         violations = _violate(
             """
             from pipelex.interpreter_hub import get_pipe_router

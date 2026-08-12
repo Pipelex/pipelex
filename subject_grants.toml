@@ -2984,10 +2984,6 @@ rationale = "Verb-object: parses the raw ref string; options stay keyword."
 param = "raw"
 rationale = "Verb-object: splits the raw ref string; single operand."
 
-["pipelex/core/stuffs/date_content.py::_is_numeric_string"]
-param = "text"
-rationale = "Predicate on the text; single operand."
-
 ["pipelex/core/stuffs/html_rendering.py::render_value_html"]
 param = "value"
 rationale = "Verb-object: renders the value; single operand."
@@ -2999,6 +2995,14 @@ rationale = "Verb-object: inspects the container type; context stays keyword."
 ["pipelex/core/stuffs/image_field_search.py::search_for_nested_image_fields"]
 param = "content_class"
 rationale = "Verb-object: scans the content class; context stays keyword."
+
+["pipelex/core/stuffs/iso_temporal.py::parse_iso_date"]
+param = "text"
+rationale = "parse_iso_date(text) reads as the verb-object sentence it is: one string to parse, no other operand."
+
+["pipelex/core/stuffs/iso_temporal.py::parse_iso_time"]
+param = "text"
+rationale = "parse_iso_time(text) reads as the verb-object sentence it is: one string to parse, no other operand."
 
 ["pipelex/core/stuffs/list_content.py::ListContent.get_items"]
 param = "item_type"
@@ -3980,10 +3984,6 @@ rationale = "Verb-object: scans the pipe for taint triggers; slot_taints is cont
 param = "item_input_stuff"
 rationale = "Verb-object: runs the branch for the item stuff; invoked positionally via functools.partial."
 
-["pipelex/pipe_controllers/batch/pipe_batch.py::resolve_batch_max_concurrency"]
-param = "max_concurrency_setting"
-rationale = "Verb-object: resolves the config setting value; single operand, callers pass a labelled config read."
-
 ["pipelex/pipe_controllers/condition/special_outcome.py::SpecialOutcome.is_continue"]
 param = "outcome"
 rationale = "Predicate on the outcome string; single operand."
@@ -4200,34 +4200,6 @@ rationale = "Verb-object: validates the item; expectations stay keyword."
 param = "response"
 rationale = "Converter: rebinds a transported response into a result; single self-labelling operand."
 
-["pipelex/pipe_operators/img_gen/img_gen_prompt_blueprint.py::ImgGenPromptBlueprint._extract_direct_image"]
-param = "image_ref"
-rationale = "Verb-object: extracts from the image ref; context stays keyword."
-
-["pipelex/pipe_operators/img_gen/img_gen_prompt_blueprint.py::ImgGenPromptBlueprint._extract_direct_list_images"]
-param = "image_ref"
-rationale = "Verb-object: extracts from the image ref; context stays keyword."
-
-["pipelex/pipe_operators/llm/helpers.py::get_output_structure_prompt"]
-param = "concept_ref"
-rationale = "Derivation keyed by the concept ref; single operand."
-
-["pipelex/pipe_operators/llm/llm_prompt_blueprint.py::LLMPromptBlueprint._extract_direct_document"]
-param = "doc_ref"
-rationale = "Verb-object: extracts from the document ref; context stays keyword."
-
-["pipelex/pipe_operators/llm/llm_prompt_blueprint.py::LLMPromptBlueprint._extract_direct_image"]
-param = "image_ref"
-rationale = "Verb-object: extracts from the image ref; context stays keyword."
-
-["pipelex/pipe_operators/llm/llm_prompt_blueprint.py::LLMPromptBlueprint._extract_direct_list_documents"]
-param = "doc_ref"
-rationale = "Verb-object: extracts from the document ref; context stays keyword."
-
-["pipelex/pipe_operators/llm/llm_prompt_blueprint.py::LLMPromptBlueprint._extract_direct_list_images"]
-param = "image_ref"
-rationale = "Verb-object: extracts from the image ref; context stays keyword."
-
 ["pipelex/pipe_operators/llm/pipe_llm.py::PipeLLM._format_error_location"]
 param = "pipe_run_params"
 rationale = "Derivation from the run params; single operand."
@@ -4336,6 +4308,10 @@ rationale = "Protocol hook: runs the pipe job; single operand."
 param = "pipe_job"
 rationale = "Protocol method: runs the pipe job; single operand across implementations."
 
+["pipelex/pipe_run/pipe_router_protocol.py::PipeRouterProtocol.run_batch_branch"]
+param = "pipe_job"
+rationale = "Protocol hook: the pipe job being dispatched as a fan-out branch; single operand."
+
 ["pipelex/pipe_run/pipe_run_params.py::PipeRunParams.copy_by_injecting_multiplicity"]
 param = "pipe_run_params"
 rationale = "Verb-object: copies the given run params; multiplicity stays keyword."
@@ -4351,6 +4327,10 @@ rationale = "Verb-object: pushes the pipe named by the code; single operand."
 ["pipelex/pipe_run/pipe_run_params.py::PipeRunParams.push_pipe_to_stack"]
 param = "pipe_code"
 rationale = "Verb-object: pushes the pipe named by the code; single operand."
+
+["pipelex/pipe_run/pipe_run_params_factory.py::resolve_batch_max_concurrency"]
+param = "max_concurrency_setting"
+rationale = "Verb-object: resolves the config setting value; single operand, callers pass a labelled config read."
 
 ["pipelex/pipe_run/pipe_run_protocol.py::PipeRunProtocol.run"]
 param = "pipe_job"
@@ -6515,6 +6495,10 @@ rationale = "Predicate on the text; single operand."
 ["pipelex/tools/misc/string_utils.py::is_not_none_and_has_text"]
 param = "text"
 rationale = "Predicate on the text; single operand."
+
+["pipelex/tools/misc/string_utils.py::is_numeric_string"]
+param = "text"
+rationale = "A one-operand string predicate: is_numeric_string(text) reads as the question it answers, like its has_text/is_snake_case neighbours."
 
 ["pipelex/tools/misc/string_utils.py::is_pascal_case"]
 param = "word"

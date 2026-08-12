@@ -8,7 +8,7 @@ the set was generated against, so the offline check can spot a file on disk that
 
 `codegen.lock` is Pipelex-owned and distinct from the standard's `methods.lock` (which pins remote
 dependency versions): different owner, location, content, and lifecycle — see
-`docs/specs/pipelex-codegen.md` → "Lock format". It is encoded as human-diffable TOML, artifacts
+the codegen spec → "Lock format". It is encoded as human-diffable TOML, artifacts
 sorted by path so version-control diffs stay minimal.
 """
 # tomlkit is not fully typed (`tomlkit.dumps`), so its member access reads as unknown here.

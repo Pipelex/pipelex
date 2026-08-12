@@ -1,5 +1,5 @@
 # `pipelex.cogt` is the vendor-neutral inference engine: it owns the taxonomies, the worker protocols and
-# the model registry, and it is the half of the runtime you can embed without the MTHDS interpreter. Two
+# the model registry, and it is the kernel-layer half you can embed without the MTHDS interpreter. Two
 # facts make that neutrality real rather than aspirational, and neither is visible to any other gate:
 #
 #   1. `cogt` imports no vendor SDK. Its third-party surface is framework and infrastructure only.
@@ -12,7 +12,7 @@
 # the sanctioned edges from a new one. A golden set needs none — it turns the sixth edge into a diff a
 # reviewer sees, which is exactly what happened by hand three times during the modularity track.
 #
-# Why nothing else can see this: `pipelex.cogt` and `pipelex.providers` are BOTH runtime-layer, so the
+# Why nothing else can see this: `pipelex.cogt` and `pipelex.providers` are BOTH kernel-layer, so the
 # hub-layering guard and the import-closure test are blind to an edge between them by construction. See
 # docs/contribute/hub-layering.md, "Known inversions", which documents the same list in prose.
 #
@@ -226,7 +226,7 @@ class TestCogtDependencyBoundaries:
             "the set of `cogt -> pipelex.providers` import statements changed.\n"
             f"  added:   {sorted(actual_edges - EXPECTED_PROVIDER_EDGES)}\n"
             f"  removed: {sorted(EXPECTED_PROVIDER_EDGES - actual_edges)}\n"
-            "No other gate in this repo can see this: both packages are runtime-layer, so the hub-layering guard "
+            "No other gate in this repo can see this: both packages are kernel-layer, so the hub-layering guard "
             "and the import-closure test are blind to an edge between them by construction. A NEW edge means the "
             "vendor-neutral engine grew a sixth reason to name a specific vendor — route it through "
             "`inference_backend_registry`, or move the code to the provider side and import inward, before "

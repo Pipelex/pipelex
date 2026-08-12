@@ -6,8 +6,10 @@ from pydantic import Field, field_validator
 from rich.json import JSON
 from typing_extensions import override
 
+from pipelex.core.stuffs.iso_temporal import parse_iso_time
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.tools.misc.string_utils import is_numeric_string
 
 
 class TimeContent(StuffContent):
@@ -22,16 +24,29 @@ class TimeContent(StuffContent):
 
     @field_validator("time", mode="before")
     @classmethod
-    def _reject_lax_temporal(cls, value: Any) -> Any:
-        # Close pydantic's lax-mode coercion of a bare number into seconds-since-midnight, which
-        # would silently produce wrong temporal data — a real ISO time always carries a ':' separator.
-        # Raise ValueError so pydantic wraps it into a ValidationError the input/factory path catches.
-        if isinstance(value, (int, float)):  # bool is an int subclass
+    def _validate_temporal(cls, value: Any) -> Any:
+        # Reject what pydantic would coerce into silently wrong temporal data, then parse the ISO
+        # strings that remain into a real time object. All rejections raise ValueError so pydantic
+        # wraps them into a ValidationError the input/factory path catches.
+        #  - a bare number would be coerced by pydantic into seconds-since-midnight. This arm is what
+        #    stops that; the numeric-STRING arm beside it is not load-bearing, since the extended-form
+        #    pin in the parser below already refuses every all-digit spelling — it only buys the
+        #    accurate "no seconds-since-midnight" wording in place of a generic malformed-ISO one.
+        if isinstance(value, (int, float)) or (isinstance(value, str) and is_numeric_string(value)):  # bool is an int subclass
             msg = "A Time must be an ISO 8601 string or a time object, never a number (no seconds-since-midnight)."
-            raise ValueError(msg)  # noqa: TRY004 — must be ValueError so pydantic wraps it into a ValidationError
+            raise ValueError(msg)
         if isinstance(value, datetime.datetime):
             msg = "A Time takes a time of day alone, not a datetime; use Date for a date with a time."
             raise ValueError(msg)  # noqa: TRY004 — must be ValueError so pydantic wraps it into a ValidationError
+        # Parsing the ISO string here — rather than leaving it to the field's own validation — is what
+        # keeps this model usable under the strict validation instructor applies to every LLM response:
+        # a mode="before" validator forfeits pydantic's strict-JSON acceptance of ISO strings, because
+        # whatever it returns is re-validated as PYTHON input, where strict refuses a `str` outright
+        # (time_type). Returning a real object satisfies strict JSON, strict Python and lax alike.
+        # Non-str values — real time objects, e.g. from `--mock-inputs` — pass through. The parser pins
+        # the extended ISO form, so a model and an author are held to one contract.
+        if isinstance(value, str):
+            return parse_iso_time(value)
         return value
 
     @property

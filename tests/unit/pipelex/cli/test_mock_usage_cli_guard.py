@@ -1,7 +1,7 @@
 """Unit tests for the hidden ``--mock-usage`` CLI surface on the run subcommands.
 
 Two cheap, no-boot checks: every run subcommand declares the option (hidden — for the
-``temporal-e2e-validate`` Mode-2 scripts, not for ``--help``), and each rejects ``--mock-usage``
+distributed-execution validation scripts, not for ``--help``), and each rejects ``--mock-usage``
 without ``--dry-run`` (it is a sub-flag of the dry run). The guard runs at the top of each command,
 before any filesystem access or Pipelex boot, so calling the command function directly is enough.
 """

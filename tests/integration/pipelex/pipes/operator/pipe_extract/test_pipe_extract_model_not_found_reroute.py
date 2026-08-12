@@ -43,7 +43,7 @@ class TestPipeExtractModelNotFoundReroute:
         )
         fake_content_generator = mocker.MagicMock()
         fake_content_generator.make_extract_pages = mocker.AsyncMock(side_effect=not_found_error)
-        mocker.patch("pipelex.pipe_operators.extract.pipe_extract.get_content_generator", return_value=fake_content_generator)
+        mocker.patch("pipelex.kernel.extract_ops.get_content_generator", return_value=fake_content_generator)
 
         pipe = PipeFactory[PipeExtract].make_from_blueprint(
             domain_code="generic",

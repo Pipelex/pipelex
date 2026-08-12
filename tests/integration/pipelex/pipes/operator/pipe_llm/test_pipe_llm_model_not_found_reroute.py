@@ -40,7 +40,7 @@ class TestPipeLLMModelNotFoundReroute:
         )
         fake_content_generator = mocker.MagicMock()
         fake_content_generator.make_llm_text = mocker.AsyncMock(side_effect=not_found_error)
-        mocker.patch("pipelex.pipe_operators.llm.pipe_llm.get_content_generator", return_value=fake_content_generator)
+        mocker.patch("pipelex.kernel.llm_ops.get_content_generator", return_value=fake_content_generator)
 
         pipe = PipeFactory[PipeLLM].make_from_blueprint(
             domain_code="documents",

@@ -6,7 +6,6 @@ Working notes for the `refactor/Concept-purity` track: getting the process-globa
 | --- | --- |
 | [`concept-purity-explained.html`](concept-purity-explained.html) | **Start here.** The architecture note for co-developers: TL;DR, before/after diagrams, the five critical diffs, the three bugs closed, and every judgement call with its reasoning. |
 | [`concept-purity-tracker.md`](concept-purity-tracker.md) | The as-built tracker, written as the PR reviewer's guide. Phase-by-phase state, the surprises log, and the deliberate non-goals. |
-| [`ts-port-handoff.md`](ts-port-handoff.md) | Heads-up for the `pipelex-js` port: invariant `CONCEPT-6` cites the compatibility block this track restructured. Three semantics to port deliberately, two Python-specific things not to. |
 
 ## What shipped, in one paragraph
 

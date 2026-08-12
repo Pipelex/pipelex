@@ -169,6 +169,39 @@ class TestStuffContentFactory:
         with pytest.raises(StuffContentFactoryError):
             StuffContentFactory.make_content_from_value(stuff_content_subclass=DateContent, value=date_string)
 
+    @pytest.mark.parametrize(
+        "date_string",
+        [
+            "2026-07-07T154000",  # basic time inside a combined datetime — the half `datetime.fromisoformat` used to swallow
+            "2026-07-07T15:40:00+0200",  # basic UTC offset
+            "2026-07-07T24:00:00",  # end-of-day form: accepted by Python 3.14, rejected by 3.11-3.13
+            " 2026-07-07",  # padding is not part of the value
+        ],
+    )
+    def test_make_content_from_value_date_rejects_non_extended_time_half(self, date_string: str):
+        """The time half of an authored datetime is held to the same contract as a model-generated one.
+
+        It reaches `parse_iso_time` only because the string is split first — handing the whole value to
+        `datetime.fromisoformat` is what let the basic and end-of-day spellings through.
+        """
+        with pytest.raises(StuffContentFactoryError):
+            StuffContentFactory.make_content_from_value(stuff_content_subclass=DateContent, value=date_string)
+
+    @pytest.mark.parametrize(
+        ("date_string", "expected_time"),
+        [
+            ("2026-07-07T15:40:00,500", datetime.time(15, 40, 0, 500000)),  # ISO's comma fraction separator
+            ("2026-07-07T15:40:00+02", datetime.time(15, 40, tzinfo=datetime.timezone(datetime.timedelta(hours=2)))),  # hour-only offset
+            ("2026-07-07T15:40:00Z", datetime.time(15, 40, tzinfo=datetime.UTC)),
+        ],
+    )
+    def test_make_content_from_value_date_accepts_extended_iso_variants(self, date_string: str, expected_time: datetime.time):
+        """Every spelling ISO 8601 calls extended stays accepted — the pin narrows to basic forms, not to these."""
+        content = StuffContentFactory.make_content_from_value(stuff_content_subclass=DateContent, value=date_string)
+        assert isinstance(content, DateContent)
+        assert content.date == datetime.date(2026, 7, 7)
+        assert content.time == expected_time
+
     def test_make_stuffcontent_from_concept_code_required_text_content(self):
         """Test required method with native.Text concept (should work)."""
         result = StuffContentFactory.make_stuff_content_from_concept_required(

@@ -6,7 +6,7 @@ action). The verdict rides the structured `CodegenCheckReport`; the exit code mi
 `validate`/`resolve` group — `0` current, `1` drift present (a negative verdict), `2` no lock found (no
 verdict).
 
-See `docs/specs/pipelex-codegen.md` → "Offline check algorithm".
+See the codegen spec → "Offline check algorithm".
 """
 
 from pathlib import Path

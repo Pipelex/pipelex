@@ -57,7 +57,7 @@ verify_commands = []
 
 [contracts.hub-layering-convention]
 description = "The hub-layering doc is the boundary's specification and must track the guard and the two hubs."
-# The guard owns the rule (declared runtime layer, violation kinds, carve-outs); the two hub
+# The guard owns the rule (declared kernel layer, violation kinds, carve-outs); the two hub
 # modules own the symbol partition the doc tabulates accessor by accessor. A symbol added to or
 # moved between them silently falsifies those tables, which is the staleness this contract exists
 # to catch. No verify command: `check-hub-layering` already gates `make check` and CI, so re-running
@@ -69,5 +69,22 @@ triggers = [
 ]
 review = [
   "docs/contribute/hub-layering.md",
+]
+verify_commands = []
+
+[contracts.pipelex-kernel-docs]
+description = "The pipelex-kernel doc is the kernel's specification for programmatic callers and must track the kernel surface."
+# The page tabulates the surface module by module (every entry point a caller imports) and states
+# what each of the four layering gates covers. A kernel function added, renamed or moved silently
+# falsifies the first table; a change to the boot-contract script's coverage silently falsifies the
+# second. Neither is mechanizable — "does this prose still describe the surface" is a judgement — so
+# it is a review obligation rather than a derived check. No verify command: the gates the page
+# describes already run in `make check` and CI.
+triggers = [
+  "pipelex/kernel/**/*.py",
+  "tests/unit/pipelex/kernel/test_kernel_boot_contract.py",
+]
+review = [
+  "docs/under-the-hood/pipelex-kernel.md",
 ]
 verify_commands = []

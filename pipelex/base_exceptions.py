@@ -196,8 +196,8 @@ class ErrorDomain(StrEnum):
 def error_domain_to_http_status(error_domain: ErrorDomain | str | None) -> int:
     """Map an error domain to an HTTP status code.
 
-    Domain-level building block for downstream HTTP APIs (``pipelex-relay``,
-    ``pipelex-back-office``). When you have a full :class:`ErrorReport`, prefer
+    Domain-level building block for downstream HTTP APIs that render an
+    :class:`ErrorReport` as a response. When you have a full report, prefer
     :attr:`ErrorReport.http_status` — it layers the provider 429 (rate-limit)
     passthrough on top of this mapping. The library itself stays HTTP-agnostic —
     no web-framework import lives here, only the mapping table.

@@ -3,22 +3,18 @@ from typing import TYPE_CHECKING, Any, Literal
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.content_generation.assignment_models import SearchAssignment
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
-from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck_check import check_search_choice_with_deck
-from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
+from pipelex.cogt.search.search_setting import SearchModelChoice
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
-from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_concept_library
+from pipelex.kernel.search_ops import resolve_search_setting, run_search
 from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.runtime_hub import get_content_generator, get_model_deck
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
@@ -91,76 +87,46 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeSearchOutput:
-        content_generator = get_content_generator()
-
-        # 0. Log the search run
         search_choice_desc = self.search_choice or "default"
         log.dev(f"✨ PipeSearch '{self.code}' running with search choice '{search_choice_desc}' ✨")
 
-        # 1. Render the prompt template against working memory context
-        query_text = await render_template(
-            template=self.prompt_blueprint.template,
-            category=self.prompt_blueprint.category,
-            context=working_memory.generate_context(),
+        # The deck chain, the handle resolution and the override application are kernel semantics; the
+        # setting is resolved per run into a local and never cached onto `self`, for the reason
+        # `pipe_llm.py` states about its own settings.
+        search_setting = resolve_search_setting(
+            search_choice=self.search_choice,
+            include_images_override=self.include_images_override,
+            max_results_override=self.max_results_override,
         )
 
-        # 2. Resolve SearchSetting from deck
-        model_deck = get_model_deck()
-        search_choice: SearchModelChoice = self.search_choice or model_deck.search_choice_default
-        search_setting: SearchSetting = model_deck.get_search_setting(search_choice=search_choice)
+        # The sourced-answer / structured fork stays here: it is declared on the pipe, and resolving the
+        # output concept to a structure class is what a loaded library is for. Handing the class over
+        # is what spares the kernel a library read.
+        output_structure_class: type[StuffContent] | None = None
+        if self.is_structured_output:
+            output_structure_class = get_concept_library().get_structure_class(concept=self.output.concept)
 
-        # 3. Resolve the model handle (waterfalls/aliases → actual provider/variant handle). Pin
-        # search_setting.model to the resolved handle so it doubles as the Temporal routing key.
-        inference_model = model_deck.get_required_inference_model(model_handle=search_setting.model, model_type=ModelType.SEARCH)
-        resolved_model_handle = inference_model.name
-        if resolved_model_handle != search_setting.model:
-            search_setting = search_setting.model_copy(update={"model": resolved_model_handle})
-
-        # 4. Apply pipe-level overrides
-        if self.include_images_override is not None:
-            search_setting = search_setting.model_copy(update={"include_images": self.include_images_override})
-        if self.max_results_override is not None:
-            search_setting = search_setting.model_copy(update={"max_results": self.max_results_override})
-
-        # 5. Build the serializable assignment and run the search behind the content-generation seam.
-        # The leaf goes through the same swappable generator as LLM/img-gen/extract: direct inline, a
-        # Temporal activity when in-workflow, or a dry mock. That makes search-on-Temporal replay-safe
-        # and lets its failures cross the workflow boundary as classified errors instead of hanging.
-        search_assignment = SearchAssignment(
+        search_result = await run_search(
+            memory=working_memory,
+            template=self.prompt_blueprint.template,
+            category=self.prompt_blueprint.category,
+            search_setting=search_setting,
+            concept=self.output.concept,
             job_metadata=job_metadata,
             cogt_run_params=pipe_run_params.cogt_run_params,
-            query=query_text,
-            search_setting=search_setting,
+            output_structure_class=output_structure_class,
             include_domains=self.include_domains,
             exclude_domains=self.exclude_domains,
             from_date=self.from_date,
             to_date=self.to_date,
+            result_name=output_name,
         )
+        working_memory = search_result.memory
 
-        content: StuffContent
-        if not self.is_structured_output:
-            content = await content_generator.make_search_sourced_answer(search_assignment=search_assignment)
-        else:
-            output_structure_class = get_concept_library().get_structure_class(concept=self.output.concept)
-            content = await content_generator.make_search_structured(
-                output_structure_class=output_structure_class,
-                search_assignment=search_assignment,
-            )
-
-        # 6. Create Stuff, set in working memory, and return output
-        output_stuff = StuffFactory.make_stuff(
-            name=output_name,
-            concept=self.output.concept,
-            content=content,
-        )
-        working_memory.set_new_main_stuff(
-            stuff=output_stuff,
-            name=output_name,
-        )
         # Capture execution data for the graph tracer
         execution_data_dict: dict[str, Any] = {
-            "rendered_query": query_text,
-            "resolved_model": search_setting.model,
+            "rendered_query": search_result.rendered_query,
+            "resolved_model": search_result.search_setting.model,
             "is_structured_output": self.is_structured_output,
         }
 

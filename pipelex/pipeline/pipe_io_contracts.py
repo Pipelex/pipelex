@@ -16,8 +16,7 @@ That silent-stale reading used to be the hazard this note warned about: bundle-d
 structure classes are registered in the process-global registry during library load and
 are never unregistered (the registry has no unregister mechanism), so the classes outlive
 the library that defined them. They still do — what changed is that this builder no longer
-reaches them behind the library's back. (Registry teardown hygiene is tracked in the
-workspace-root `wip/library-lifecycle-hygiene.md`.)
+reaches them behind the library's back. (Registry teardown hygiene is tracked separately.)
 """
 
 from enum import StrEnum

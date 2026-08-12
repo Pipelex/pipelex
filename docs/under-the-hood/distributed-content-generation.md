@@ -165,7 +165,7 @@ What gets stored vs. what crosses the boundary, by content type:
 | Search sourced answer | Nothing (answer + source refs are small) | `SearchResultContent` (answer + `DocumentContent` sources) |
 | Search structured | Nothing (JSON is small) | Raw `dict`, re-validated against the output class on the submitter |
 
-Each host-runtime plugin dispatches these through its own activities and queue routing; for the Temporal realization (the `act_*` activity set, per-activity task queues), see the `pipelex-temporal` plugin's docs.
+Each host-runtime plugin dispatches these through its own activities and queue routing; for the Temporal realization (the `act_*` activity set, per-activity task queues), see our Temporal plugin's own docs.
 
 ---
 

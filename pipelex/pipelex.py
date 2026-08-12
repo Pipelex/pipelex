@@ -29,7 +29,7 @@ from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config, get_pipe_func_execution_mode
 from pipelex.interpreter_hub import InterpreterHub, set_interpreter_hub
-from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS, CORE_UNCONDITIONAL_PLUGIN_NAMES
+from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS, CORE_UNCONDITIONAL_PLUGIN_NAMES, ENTRY_POINT_GROUPS
 from pipelex.libraries.library_manager import LibraryManager
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.observer.observer_protocol import ObserverProtocol
@@ -66,7 +66,7 @@ class Pipelex(RuntimeBoot):
         config_overrides: dict[str, Any] | None = None,
     ) -> None:
         # Two hubs, two lifecycles: RuntimeHub is process-scoped infrastructure, InterpreterHub is the
-        # library-scoped method machinery. Runtime is constructed first because it is the lower layer,
+        # library-scoped method machinery. The kernel half is constructed first because it is the lower layer,
         # so it reads first — not because installing the InterpreterHub needs it: that install only
         # stores the class-registry scoping resolver, which resolves lazily at call time.
         super().__init__(config_dir=config_dir, config_cls=config_cls, config_overrides=config_overrides)
@@ -107,9 +107,10 @@ class Pipelex(RuntimeBoot):
             msg = f"The Pipelex setup method does not support any additional arguments: {kwargs}"
             raise PipelexSetupError(msg)
 
-        # The runtime layer first, with the *composed* plugin manifests: this process will run methods,
+        # The kernel layer first, with the *composed* plugin manifests: this process will run methods,
         # so it needs the interpreter-touching built-ins (the `direct` orchestrator, the built-in
-        # PipeFunc executor modes) alongside the runtime half a bare RuntimeBoot discovers.
+        # PipeFunc executor modes) alongside the kernel half a bare RuntimeBoot discovers — and, for
+        # installed plugins, both entry-point groups rather than the kernel group alone.
         super().setup(
             integration_mode=integration_mode,
             needs_inference=needs_inference,
@@ -117,6 +118,7 @@ class Pipelex(RuntimeBoot):
             needs_model_specs=needs_model_specs,
             builtin_plugins=BUILTIN_PLUGINS,
             core_unconditional_plugin_names=CORE_UNCONDITIONAL_PLUGIN_NAMES,
+            entry_point_groups=ENTRY_POINT_GROUPS,
             class_registry=class_registry,
             secrets_provider=secrets_provider,
             storage_provider=storage_provider,
@@ -133,7 +135,7 @@ class Pipelex(RuntimeBoot):
         # Everything below needs a method to be loadable. Nothing the runtime setup above does
         # consumes any of it, which is what lets these be a tail rather than an interleaving; the two
         # values that cross the seam go the other way (``self._plugin_registrar`` and
-        # ``self.multi_observer``, both built by the runtime half and read here).
+        # ``self.multi_observer``, both built by the kernel half and read here).
 
         plugin_registrar = self._plugin_registrar
         if plugin_registrar is None:
@@ -261,8 +263,8 @@ class Pipelex(RuntimeBoot):
         Args:
             integration_mode: Integration mode (CLI, FASTAPI, DOCKER, MCP, N8N, PYTHON, PYTEST)
             needs_inference: When False, forces every run THIS process initiates to DRY mode
-                (consumed at PipeRunParamsFactory.make_run_params, the single writer of run_mode:
-                operators dispatch normally and the cogt leaf mocks) and loads backends leniently
+                (applied at runtime_hub.resolve_run_mode_for_boot, which every run-params factory
+                calls: operators dispatch normally and the cogt leaf mocks) and loads backends leniently
                 (skipping those with missing credentials). This skips gateway terms check and model
                 deck validation. Useful for commands like validate/show that don't call inference
                 APIs. Generator selection stays backend-keyed. Submitter-side contract only: it does
@@ -297,7 +299,7 @@ class Pipelex(RuntimeBoot):
                 inference files — backends, routing profiles and the model deck — still resolve through
                 the layered paths, and the gateway consent/onboarding state is read from the global
                 config dir outright. So this does not fully isolate a boot from the surrounding
-                project. See ``wip/boot-split/config-dir-does-not-scope-inference-paths.md``.
+                project.
             config_overrides: Optional dict deep-merged on top of all TOML config layers
                 as the highest-priority override. Useful for tests that need specific
                 config without editing TOML files.

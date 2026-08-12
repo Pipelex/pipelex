@@ -33,7 +33,7 @@ DEAD_HUB_PATCH = f'mocker.patch("{DEAD_HUB}.get_console")\n'
 def _make_tree(root: Path) -> None:
     """A miniature repo covering every branch the walk has to get right.
 
-    `cogt/` is a declared runtime-layer package, so its breach is a violation; `pipeline/` is not, so
+    `cogt/` is a declared kernel-layer package, so its breach is a violation; `pipeline/` is not, so
     the identical import there is legal and must stay unreported; `__pycache__` holds a stale copy of
     the offender; and `tests/` is scanned for the dead-module rule only.
     """
@@ -86,7 +86,7 @@ class TestHubLayeringGuardFilesystem:
             "pipelex/pipeline/runner.py",
         ]
 
-    def test_a_runtime_layer_package_init_is_inside_its_own_layer(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_a_kernel_layer_package_init_is_inside_its_own_layer(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """`__init__`-stripping is load-bearing: without it `pipelex/cogt/__init__.py` would resolve to
         `pipelex.cogt.__init__`, still match the layer by prefix — but a top-level `pipelex/__init__.py`
         would resolve to `pipelex.__init__` and land in no layer at all. Pin the package form end to end.

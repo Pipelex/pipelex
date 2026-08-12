@@ -3,7 +3,7 @@
 Policy: exit 0 = resolved (crate emitted); exit 1 = a produced NEGATIVE VERDICT (the library is
 invalid, so no crate can be produced); exit 2 = NO VERDICT (empty closure, file-not-found). The
 verdict cases mock the resolve internals — boot/teardown are neutralized so no real Pipelex is made.
-The real end-to-end exit codes against the binary are pinned by the conformance suite.
+The real end-to-end exit codes against the binary are pinned by our cross-repo spec suite.
 """
 
 from __future__ import annotations

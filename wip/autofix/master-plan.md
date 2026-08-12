@@ -12,7 +12,7 @@ Deterministic auto-fixing of `.mthds` validation errors. Full rationale and arch
 
 **Steps 3 (hardened loop) and 4 (agent apply surface) are DONE** — merged together as PR #1035 (`feature/Autofix-step4-Agnt-Apply`). Step 3 replaced the spike's drop-everything scoping guard with real multi-file targeting (source backfill at the translate funnel, resolved-dirs single-file gate, write-scope policy, per-file apply with `files_written`); step 4 shipped `pipelex-agent fix bundle` with the CLI-free markdown renderer and full test coverage. The PR review triage fixed two confirmed bugs and deferred one inert finding to [pr-1035-review-notes.md](pr-1035-review-notes.md).
 
-**Step 5 (human CLI surfacing) is DONE** — `pipelex fix bundle` (including the `--diff` preview), the `💡 Suggested fix:` lines + actionable footer in `pipelex validate`, docs, and changelog all landed on branch `feature/Autofix-step5`; detailed plan + decisions: [step5-human-cli-surfacing.md](step5-human-cli-surfacing.md). The CHECKPOINT B exit review fixed five confirmed bugs on the branch and deferred five tradeoffs — triage in [deferred-checkpoint-e-review-items.md](deferred-checkpoint-e-review-items.md). The branch is PR-ready; **step 6 (release train) is next**, and its CHANGELOG must still name the additive `suggested_fix` wire field in `/validate` payloads (deferred item 1c) plus regenerate the conformance fixture (deferred item 2).
+**Step 5 (human CLI surfacing) is DONE** — `pipelex fix bundle` (including the `--diff` preview), the `💡 Suggested fix:` lines + actionable footer in `pipelex validate`, docs, and changelog all landed on branch `feature/Autofix-step5`; detailed plan + decisions: [step5-human-cli-surfacing.md](step5-human-cli-surfacing.md). The CHECKPOINT B exit review fixed five confirmed bugs on the branch and deferred five tradeoffs — triage in [deferred-checkpoint-e-review-items.md](deferred-checkpoint-e-review-items.md). The branch is PR-ready; **step 6 (release train) is next**, and its CHANGELOG must still name the additive `suggested_fix` wire field in `/validate` payloads (deferred item 1c) plus regenerate the cross-repo error-QA fixture (deferred item 2).
 
 ## Sequencing doctrine (decided 2026-07-07)
 
@@ -71,7 +71,7 @@ Exit: a human can see the suggestion in `validate` and apply it with `fix`, with
 
 ### 6. Ship wave 1
 
-Release train: CHANGELOG entry (must mention the **additive `suggested_fix` wire field** now surfacing in `/validate` API payloads — deferred item 1c — plus the new commands), docs page in `docs/`, cut the pipelex release. Post-release follow-through: regenerate the conformance fixture that pins the `/validate` error body (deferred item 2, sibling `conformance/` repo) and bump the pipelex-api pin when the runner picks the version up. Exit (**CHECKPOINT 2**): released; hand-off list for wave 2 recorded.
+Release train: CHANGELOG entry (must mention the **additive `suggested_fix` wire field** now surfacing in `/validate` API payloads — deferred item 1c — plus the new commands), docs page in `docs/`, cut the pipelex release. Post-release follow-through: regenerate the fixture in our cross-repo spec suite that pins the `/validate` error body (deferred item 2) and bump the pipelex-api pin when the runner picks the version up. Exit (**CHECKPOINT 2**): released; hand-off list for wave 2 recorded.
 
 ### 7. Skills uptake
 
@@ -79,7 +79,7 @@ Update the `mthds-fix` skill (and the pipelex-plugins equivalent) to run determi
 
 ### 8–10. Wave 2 (each gets its own plan when it starts)
 
-- **Protocol promotion**: `suggested_fix` becomes a formal MTHDS protocol surface — spec sections in `docs/specs/`, conformance arm, schema sync to downstream copies (mthds, mthds-js, mthds-python).
+- **Protocol promotion**: `suggested_fix` becomes a formal MTHDS protocol surface — protocol-spec sections, a cross-repo spec-suite arm, schema sync to downstream copies (mthds, mthds-js, mthds-python).
 - **Remote surfaces**: API `POST /fix` on pipelex-api, MCP `mthds_fix` tool — thin wrappers over the same engine/report; the markdown renderer already lives CLI-free for this reason.
 - **Editor**: VS Code `CodeActionProvider` (first code action in the extension), quick fixes keyed on `diag.code = error_type` with fix payloads riding the existing validation backends.
 

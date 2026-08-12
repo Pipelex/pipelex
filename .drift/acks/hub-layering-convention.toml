@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:2b509c7efe7ebaa99dcf1fce041dcf141b94e516dd91cda75b13deba982538f9"
+digest = "sha256:3e934627754b382f5fc30bb5ebc920c258d7f8056283b4d7b1cdcd748710fb21"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-07-30T05:25:03Z"
-rationale = "Trigger is a one-paragraph docstring accuracy fix on RuntimeHub.setup_config's config_dir parameter: it said 'project/global layering is bypassed and only this directory is read', which contradicted config_loader (the package defaults layer always applies) and the two make() docstrings that already said 'package defaults + this directory'. Reviewed docs/contribute/hub-layering.md: it does not describe setup_config, config_dir, or config layering anywhere — grep for config_dir/setup_config/'only this directory' returns nothing — so the page carries no copy of the claim that was wrong and nothing is stale. Re-ran the prescribed mechanical check anyway (every name in the guard's RUNTIME_LAYER_PACKAGES appears under 'The rule'): all fourteen present, including pipelex.runtime_boot from the previous ack, so the enumeration that has been the rot seven rounds running is clean this time. No doc change needed."
+reviewed_at = "2026-08-10T12:22:31Z"
+rationale = "Trigger is a one-word rename leftover in hub_layering_guard.py's module-entry comment: it called pipelex.runtime_boot 'the runtime layer's composition root' while the same sentence went on to say what 'boot the kernel layer' costs — two names for one boundary in one sentence, in the file that defines the boundary. It survived the A0 sweep because the phrase spans a line break, so a line-oriented grep for 'runtime layer' could not see it. Reviewed docs/contribute/hub-layering.md end to end against the guard. The page carries no stale layer vocabulary (verified: zero hits for 'runtime layer' / 'runtime-layer'), and its declared-package list still matches KERNEL_LAYER_PACKAGES. One substantive edit, and it was a genuine contradiction rather than vocabulary: the paragraph on external plugins stated they are 'discovered through the pipelex.plugins entry-point group — a group identifier, not a module path, and unchanged', which is now false twice over (that group is retired and fails startup, and plugins declare their layer by choosing between two successors). The A3 doc sweep had deliberately left pipelex.plugins alone on this page because it is also the kernel-layer package name, and that carve-out over-applied to the one sentence that was explicitly about the group. Rewrote it to name both successor groups and added a parenthetical warning the reader that every OTHER mention of pipelex.plugins on the page is the package sense, since the collision is exactly the trap the carve-out was protecting against."
 
 [trigger_files]
-"pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:a602008dabb5b1ce81496513c37253ef6f5c0765"
-"pipelex/interpreter_hub.py" = "blob:b7ac885d348d32f1aa4b1e660da5b03533fb305b"
-"pipelex/runtime_hub.py" = "blob:81fb34f097b440293b8b68f9eefb7289778c911b"
+"pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:2dbadcbab7d44364a7b5f1d16268b23b26700a00"
+"pipelex/interpreter_hub.py" = "blob:5db8f932bfb7161c86c4a3ea68e2a918b40b0b67"
+"pipelex/runtime_hub.py" = "blob:7f538d2acb10f263d7e1b6907b42d37199cbc654"

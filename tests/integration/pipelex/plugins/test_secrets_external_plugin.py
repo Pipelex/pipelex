@@ -3,7 +3,7 @@ and the storage↔secrets ordering guard.
 
 The built-in ``env`` method is the default and is selected onto the hub by an ordinary boot; an
 explicit ``setup(secrets_provider=...)`` still wins ahead of registry selection; a fake external
-method token discovered through a ``pipelex.plugins`` entry point is selectable via
+method token discovered through a ``pipelex.plugins.kernel`` entry point is selectable via
 ``secrets_config.method``. The final test is the ordering guard: with a non-env secrets method AND
 ``gcp`` storage, storage's gcp factory reads the config-selected secrets provider from the hub —
 proving secrets is resolved and set on the hub before storage selection runs.
@@ -12,13 +12,15 @@ proving secrets is resolved and set on the hub before storage selection runs.
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from typing_extensions import override
 
 from pipelex.pipelex import Pipelex
 from pipelex.plugins.contract import PLUGIN_API_VERSION
+from pipelex.plugins.discovery import GroupedEntryPoint
+from pipelex.plugins.plugin_group import PluginGroup
 from pipelex.runtime_hub import get_secrets_provider, get_secrets_provider_registry, get_storage_provider
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
@@ -27,6 +29,7 @@ from pipelex.tools.storage.gcp_storage_provider import GcpStorageProvider
 
 if TYPE_CHECKING:
     from collections.abc import Generator
+    from importlib.metadata import EntryPoint
 
     from pytest_mock import MockerFixture
 
@@ -97,7 +100,9 @@ def _test_integration_mode() -> IntegrationMode:
 def _patch_external_secrets_plugin(mocker: MockerFixture) -> None:
     # The entry point resolves to the plugin class (a zero-arg factory); discovery instantiates it.
     fake_entry_point = SimpleNamespace(name=EXTERNAL_PLUGIN_NAME, load=lambda: _FakeSecretsPlugin)
-    mocker.patch("pipelex.plugins.discovery._external_entry_points", return_value=[fake_entry_point])
+    # A secrets provider is a kernel-layer capability, so its dist publishes under the kernel group.
+    grouped = GroupedEntryPoint(group=PluginGroup.KERNEL, entry_point=cast("EntryPoint", fake_entry_point))
+    mocker.patch("pipelex.plugins.discovery._external_entry_points", return_value=[grouped])
 
 
 class TestSecretsExternalPlugin:

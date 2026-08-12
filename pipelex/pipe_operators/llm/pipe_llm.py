@@ -5,13 +5,9 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.base_exceptions import iter_cause_chain
-from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.exceptions import LLMCompletionError
-from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingChoices
-from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
-from pipelex.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
@@ -22,26 +18,31 @@ from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsF
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
-from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_concept_library, get_native_concept, get_required_concept
+from pipelex.kernel.llm_ops import (
+    derive_templating_style,
+    resolve_llm_setting_for_object,
+    resolve_llm_setting_for_text,
+    run_llm_object,
+    run_llm_text,
+)
 from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
 from pipelex.pipe_machinery.validation import is_input_used_by_variables, is_variable_satisfied_by_inputs
-from pipelex.pipe_operators.llm.helpers import get_output_structure_prompt
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import (
     PipeRunParams,
     output_multiplicity_to_apply,
 )
-from pipelex.runtime_hub import get_class_registry, get_content_generator, get_model_deck
+from pipelex.runtime_hub import get_class_registry
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_param_key import PipeRunParamKey
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 if TYPE_CHECKING:
-    from pipelex.tools.templating.templating_style import TemplatingStyle
+    from pipelex.cogt.llm.llm_prompt import LLMPrompt
+    from pipelex.kernel.llm_results import StructuringPath
 
 
 class PipeLLMOutput(PipeOutput):
@@ -190,7 +191,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeLLMOutput:
-        content_generator = get_content_generator()
         # interpret / unwrap the arguments
         output_stuff_spec = self.resolve_dynamic_output_stuff_spec(pipe_run_params=pipe_run_params)
 
@@ -209,43 +209,36 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             llm_for_text_choice = self.llm_choices.for_text
             llm_for_object_choice = self.llm_choices.for_object
 
-        model_deck = get_model_deck()
-
-        # Choice of main LLM for text first from this PipeLLM setting (self.llm_choices)
-        # or from the llm_choice_overrides or fallback on the llm_choice_defaults
-        llm_setting_or_preset_id_for_text: LLMModelChoice = (
-            llm_for_text_choice or model_deck.llm_choice_overrides.for_text or model_deck.llm_choice_defaults.for_text
+        # The deck chain and the style derivation are kernel semantics; the settings are derived per
+        # run into locals and never cached onto `self`, because the pipe instance is the one the
+        # library holds and hands out — a write-back would make its serialized form depend on run
+        # order and shadow any later config/deck change with the first run's value.
+        llm_setting_main: LLMSetting = resolve_llm_setting_for_text(llm_choice=llm_for_text_choice)
+        llm_setting_for_object: LLMSetting = resolve_llm_setting_for_object(
+            llm_choice=llm_for_object_choice,
+            llm_choice_for_text=llm_for_text_choice,
         )
-        llm_setting_main: LLMSetting = model_deck.get_llm_setting(llm_choice=llm_setting_or_preset_id_for_text)
-
-        # Choice of main LLM for object from this PipeLLM setting (self.llm_choices)
-        # OR FROM THE llm_for_text_choice (if any)
-        # then fallback on the llm_choice_overrides or llm_choice_defaults
-        llm_setting_or_preset_id_for_object: LLMModelChoice = (
-            llm_for_object_choice or llm_for_text_choice or model_deck.llm_choice_overrides.for_object or model_deck.llm_choice_defaults.for_object
-        )
-        llm_setting_for_object: LLMSetting = model_deck.get_llm_setting(llm_choice=llm_setting_or_preset_id_for_object)
-
-        # Derived per run into a local, never cached onto `self`: the pipe instance is the one the
-        # library holds and hands out, so a write-back here would make its serialized form depend on
-        # run order and would shadow any later config/deck change with the first run's value.
-        templating_style: TemplatingStyle | None = None
-        if inference_model := model_deck.get_optional_inference_model(model_handle=llm_setting_main.model, model_type=ModelType.LLM):
-            # Note: the case where we don't get an inference model corresponds to the use of an external LLM plugin
-            # TODO: improve this by making it possible to get the inference model for external LLM plugins
-            prompting_target = llm_setting_main.prompting_target or inference_model.prompting_target
-            templating_style = get_config().pipelex.prompting_config.get_prompting_style(
-                prompting_target=prompting_target,
-            )
+        # Both paths render under the *text* setting's style: it is the pipe's main model, and the
+        # object path differs only in how the answer comes back, not in how the prompt is written.
+        templating_style = derive_templating_style(llm_setting=llm_setting_main)
 
         llm_prompt_run_params = PipeRunParams.copy_by_injecting_multiplicity(
             pipe_run_params=pipe_run_params,
             applied_output_multiplicity=applied_output_multiplicity,
         )
 
-        the_content: StuffContent
-        rendered_llm_prompt: LLMPrompt | None = None
+        # Resolved here rather than inside the kernel: turning a concept into a class is a library's
+        # business, and handing the class over is what spares the kernel a registry read.
+        output_class = get_class_registry().get_required_subclass(
+            name=output_stuff_spec.concept.structure_class_name,
+            base_class=StuffContent,
+        )
+        prompt_content = self.llm_prompt_spec.to_prompt_content()
+        rendered_llm_prompt: LLMPrompt
+        structuring_path: StructuringPath
 
+        # The library-backed text-vs-object dispatch stays here: the kernel's two entry points are
+        # this fork made explicit, and answering it needs a loaded library.
         if (
             get_concept_library().is_compatible(
                 tested_concept=output_stuff_spec.concept,
@@ -254,158 +247,80 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             )
             and not is_multiple_output
         ):
-            llm_prompt_1_for_text = await self.llm_prompt_spec.make_llm_prompt(
-                output_concept_ref=output_stuff_spec.concept.concept_ref,
-                context_provider=working_memory,
-                output_structure_prompt=None,
-                extra_params=llm_prompt_run_params.params,
-                templating_style=templating_style,
-            )
-            rendered_llm_prompt = llm_prompt_1_for_text
             try:
-                generated_text: str = await content_generator.make_llm_text(
+                text_result = await run_llm_text(
+                    memory=working_memory,
+                    prompt_content=prompt_content,
+                    llm_setting=llm_setting_main,
+                    concept=output_stuff_spec.concept,
+                    output_class=output_class,
                     job_metadata=job_metadata,
                     cogt_run_params=pipe_run_params.cogt_run_params,
-                    llm_prompt_for_text=llm_prompt_1_for_text,
-                    llm_setting_main=llm_setting_main,
+                    templating_style=templating_style,
+                    extra_params=llm_prompt_run_params.params,
+                    result_name=output_name,
+                    result_code=pipe_run_params.final_stuff_code,
                 )
             except LLMCompletionError as exc:
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
                 error_details = self._format_llm_error(exc=exc, settings=[llm_setting_main])
                 msg = f"Error generating text with LLM {location}: {error_details}"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
-
-            structure_class = get_class_registry().get_required_subclass(
-                name=output_stuff_spec.concept.structure_class_name,
-                base_class=StuffContent,
-            )
-
-            try:
-                the_content = structure_class(
-                    text=generated_text,
-                )
             except ValidationError as exc:
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
                 error_details = format_pydantic_validation_error(exc)
                 msg = f"Error generating text content in PipeLLM {location}: {error_details}"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
+            working_memory = text_result.memory
+            rendered_llm_prompt = text_result.rendered_prompt
+            structuring_path = text_result.structuring_path
         else:
             if is_multiple_output:
                 log.verbose(f"PipeLLM generating {fixed_nb_output} output(s)" if fixed_nb_output else "PipeLLM generating a list of output(s)")
             else:
                 log.verbose(f"PipeLLM generating a single object output, class name: '{output_stuff_spec.concept.structure_class_name}'")
 
-            output_structure_prompt: str | None = None
-            if get_config().cogt.llm_config.is_structure_prompt_enabled:
-                output_structure_prompt = await get_output_structure_prompt(
-                    concept_ref=output_stuff_spec.concept.concept_ref,
+            try:
+                object_result = await run_llm_object(
+                    memory=working_memory,
+                    prompt_content=prompt_content,
+                    llm_setting=llm_setting_for_object,
+                    concept=output_stuff_spec.concept,
+                    output_class=output_class,
+                    job_metadata=job_metadata,
+                    cogt_run_params=pipe_run_params.cogt_run_params,
+                    is_multiple_output=is_multiple_output,
+                    fixed_nb_output=fixed_nb_output,
+                    templating_style=templating_style,
+                    extra_params=llm_prompt_run_params.params,
+                    result_name=output_name,
+                    result_code=pipe_run_params.final_stuff_code,
                 )
-            llm_prompt_for_object = await self.llm_prompt_spec.make_llm_prompt(
-                output_concept_ref=output_stuff_spec.concept.concept_ref,
-                context_provider=working_memory,
-                output_structure_prompt=output_structure_prompt,
-                extra_params=llm_prompt_run_params.params,
-                templating_style=templating_style,
-            )
-            rendered_llm_prompt = llm_prompt_for_object
-            the_content = await self._llm_gen_object_stuff_content(
-                job_metadata=job_metadata,
-                pipe_run_params=pipe_run_params,
-                is_multiple_output=is_multiple_output,
-                fixed_nb_output=fixed_nb_output,
-                output_class_name=output_stuff_spec.concept.structure_class_name,
-                llm_setting_for_object=llm_setting_for_object,
-                llm_prompt_for_object=llm_prompt_for_object,
-                content_generator=content_generator,
-            )
-
-        output_stuff = StuffFactory.make_stuff(
-            name=output_name,
-            concept=output_stuff_spec.concept,
-            content=the_content,
-            code=pipe_run_params.final_stuff_code,
-        )
-        working_memory.set_new_main_stuff(
-            stuff=output_stuff,
-            name=output_name,
-        )
+            except LLMCompletionError as exc:
+                location = self._format_error_location(pipe_run_params=pipe_run_params)
+                error_details = self._format_llm_error(exc=exc, settings=[llm_setting_for_object])
+                what_failed = "list of objects" if is_multiple_output else "single object"
+                msg = f"Error generating {what_failed} with direct method {location}: {error_details}"
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
+            working_memory = object_result.memory
+            rendered_llm_prompt = object_result.rendered_prompt
+            structuring_path = object_result.structuring_path
 
         # Capture execution data for the graph tracer
         execution_data_dict: dict[str, Any] = {
             "resolved_model": llm_setting_main.model,
             "resolved_model_for_object": llm_setting_for_object.model,
             "is_multiple_output": is_multiple_output,
+            "rendered_system_prompt": rendered_llm_prompt.system_text,
+            "rendered_user_prompt": rendered_llm_prompt.user_text,
+            "structuring_path": structuring_path,
         }
-        execution_data_dict["rendered_system_prompt"] = rendered_llm_prompt.system_text
-        execution_data_dict["rendered_user_prompt"] = rendered_llm_prompt.user_text
-        if is_multiple_output:
-            execution_data_dict["structuring_path"] = "object_list"
-        else:
-            output_is_text = get_concept_library().is_compatible(
-                tested_concept=output_stuff_spec.concept,
-                wanted_concept=get_native_concept(NativeConceptCode.TEXT),
-                strict=True,
-            )
-            execution_data_dict["structuring_path"] = "text" if output_is_text else "object_direct"
 
         self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
         return PipeLLMOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
         )
-
-    async def _llm_gen_object_stuff_content(
-        self,
-        *,
-        job_metadata: JobMetadata,
-        pipe_run_params: PipeRunParams,
-        is_multiple_output: bool,
-        fixed_nb_output: int | None,
-        output_class_name: str,
-        llm_setting_for_object: LLMSetting,
-        llm_prompt_for_object: LLMPrompt,
-        content_generator: ContentGeneratorProtocol,
-    ) -> StuffContent:
-        content_class: type[StuffContent] = get_class_registry().get_required_subclass(name=output_class_name, base_class=StuffContent)
-
-        if is_multiple_output:
-            if fixed_nb_output:
-                task_desc = f"{self.__class__.__name__}_gen_{fixed_nb_output}x{content_class.__name__}"
-            else:
-                task_desc = f"{self.__class__.__name__}_gen_list_{content_class.__name__}"
-            log.verbose(f"{task_desc} by object_direct")
-            try:
-                generated_objects = await content_generator.make_object_list(
-                    job_metadata=job_metadata,
-                    cogt_run_params=pipe_run_params.cogt_run_params,
-                    object_class=content_class,
-                    llm_prompt_for_object_list=llm_prompt_for_object,
-                    llm_setting_for_object_list=llm_setting_for_object,
-                    nb_items=fixed_nb_output,
-                )
-            except LLMCompletionError as exc:
-                location = self._format_error_location(pipe_run_params=pipe_run_params)
-                error_details = self._format_llm_error(exc=exc, settings=[llm_setting_for_object])
-                msg = f"Error generating list of objects with direct method {location}: {error_details}"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
-
-            return ListContent(items=generated_objects)
-
-        task_desc = f"{self.__class__.__name__}_gen_single_{content_class.__name__}"
-        log.verbose(f"{task_desc} by object_direct")
-        try:
-            return await content_generator.make_object(
-                job_metadata=job_metadata,
-                cogt_run_params=pipe_run_params.cogt_run_params,
-                object_class=content_class,
-                llm_prompt_for_object=llm_prompt_for_object,
-                llm_setting_for_object=llm_setting_for_object,
-            )
-        except LLMCompletionError as exc:
-            location = self._format_error_location(pipe_run_params=pipe_run_params)
-            error_details = self._format_llm_error(exc=exc, settings=[llm_setting_for_object])
-            msg = f"Error generating single object with direct method {location}: {error_details}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
     def _format_error_location(self, pipe_run_params: PipeRunParams) -> str:
         return f"in pipe '{pipe_run_params.pipe_stack_str}'"

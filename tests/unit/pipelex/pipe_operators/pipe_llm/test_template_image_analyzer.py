@@ -5,7 +5,7 @@ from typing import Callable
 
 import pytest
 
-from pipelex.pipe_operators.llm.image_reference import ImageReferenceKind
+from pipelex.kernel.prompt_references import ImageReferenceKind
 from pipelex.pipe_operators.shared.exceptions import UnusedInputError, WithImagesFilterError
 from pipelex.pipe_operators.shared.template_image_analyzer import TemplateImageAnalyzer
 

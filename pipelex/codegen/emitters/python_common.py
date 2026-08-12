@@ -255,9 +255,10 @@ def literal_annotation(*, choices: list[str] | None, imports: set[str]) -> str:
 def render_import_block(imports: set[str]) -> str:
     """Render the collected imports the way isort would, so the artifact is lint-clean on arrival.
 
-    A flat `sorted()` over the raw statements is not isort order. Two things it misses: `from X import a`
-    and `from X import b` have to merge into one line, and stdlib has to be separated from third-party by
-    a blank line.
+    A flat `sorted()` over the raw statements is not isort order. Three things it misses: `from X import a`
+    and `from X import b` have to merge into one line, stdlib has to be separated from third-party by
+    a blank line, and a merged line past `PY_EXPLODE_WIDTH` has to arrive already exploded (see
+    `_import_statement`) or the consumer's formatter explodes it for us.
 
     Grouping targets the **consumer's** tree, where `pipelex` is an installed dependency and therefore
     third-party. In this repo `pipelex` is first-party, so ruff here wants the opposite order — but no
@@ -273,11 +274,27 @@ def render_import_block(imports: set[str]) -> str:
     stdlib: list[str] = []
     third_party: list[str] = []
     for module in sorted(names_by_module):
-        line = f"from {module} import {', '.join(sorted(names_by_module[module]))}"
+        statement = _import_statement(module=module, names=sorted(names_by_module[module]))
         group = stdlib if module.partition(".")[0] in sys.stdlib_module_names else third_party
-        group.append(line)
+        group.append(statement)
 
     return "\n\n".join("\n".join(group) for group in (stdlib, third_party) if group)
+
+
+def _import_statement(*, module: str, names: list[str]) -> str:
+    """One `from … import …` statement, pre-exploded past `PY_EXPLODE_WIDTH` like its sibling renderers.
+
+    A flat import line is a formatter's business exactly like a flat `Field(...)` call: past the
+    consumer's `line-length`, `ruff format` rewrites it into this parenthesized, magic-trailing-comma
+    form — which changes the body bytes and makes `codegen check` report the file as hand-edited.
+    Emitting the exploded form ourselves makes the artifact a fixed point at any width >= the
+    threshold. Ruff wraps a single overlong name the same way, so the rule needs no name-count arm.
+    """
+    flat = f"from {module} import {', '.join(names)}"
+    if len(flat) <= PY_EXPLODE_WIDTH:
+        return flat
+    rendered = "".join(f"{_PY_INDENT}{name},\n" for name in names)
+    return f"from {module} import (\n{rendered})"
 
 
 def python_module_body(*, header: str, imports: set[str], blocks: list[str]) -> str:

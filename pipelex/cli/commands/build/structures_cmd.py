@@ -3,7 +3,7 @@
 The legacy per-file generator (one always-qualified class file per concept) was deleted when the
 codegen engine landed (D9): this command now delegates verbatim to the engine, which emits a single
 stamped `structures.py` (bare-when-unique class names, declared imprecision, `codegen.lock` beside
-it). See `docs/specs/pipelex-codegen.md` -> "CLI: codegen".
+it). See the codegen spec -> "CLI: codegen".
 """
 
 from pathlib import Path

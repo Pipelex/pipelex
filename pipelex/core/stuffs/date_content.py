@@ -7,22 +7,10 @@ from rich.json import JSON
 from typing_extensions import override
 
 from pipelex.core.stuffs.exceptions import DateContentError
+from pipelex.core.stuffs.iso_temporal import parse_iso_date, parse_iso_time
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.misc.pretty import PrettyPrintable
-
-
-def _is_numeric_string(text: str) -> bool:
-    """Whether a string is purely a number (an epoch), so it must never be read as a date/time.
-
-    Every legitimate ISO date/time string carries a '-', ':', 'T', or space separator, so ``float()``
-    raises on it; only a bare number parses — including the signed / decimal / exponent forms
-    (``-86400``, ``86400.0``, ``8.64e4``) that a plain ``.isdigit()`` check lets slip past (DT6).
-    """
-    try:
-        float(text.strip())
-    except ValueError:
-        return False
-    return True
+from pipelex.tools.misc.string_utils import is_numeric_string
 
 
 class DateContent(StuffContent):
@@ -45,19 +33,21 @@ class DateContent(StuffContent):
 
     @field_validator("date", "time", mode="before")
     @classmethod
-    def _reject_lax_temporal(cls, value: Any, info: ValidationInfo) -> Any:
-        # Close pydantic's lax-mode coercions that would silently produce wrong temporal data — all
-        # raise ValueError so pydantic wraps them into a ValidationError the input/factory path catches
-        # (a raw TypeError would escape model_validate uncaught):
-        #  - a bare int/float, or any purely-numeric string, is read as epoch seconds; a real ISO
-        #    date/time always carries a '-'/':'/ 'T'/space separator, so a numeric string is only ever
-        #    an epoch (DT6).
+    def _validate_temporal(cls, value: Any, info: ValidationInfo) -> Any:
+        # Reject what pydantic would coerce into silently wrong temporal data, then parse the ISO
+        # strings that remain into real date/time objects. All rejections raise ValueError so pydantic
+        # wraps them into a ValidationError the input/factory path catches (a raw TypeError would
+        # escape model_validate uncaught):
+        #  - a bare int/float would be coerced by pydantic into epoch seconds (DT6). This arm is what
+        #    stops that; the numeric-STRING arm beside it is not load-bearing, since the extended-form
+        #    pin in the parsers below already refuses every all-digit spelling — it only buys the
+        #    accurate "no epoch-seconds" wording in place of a generic malformed-ISO one.
         #  - a datetime on the `date` field is silently truncated to the date, dropping its time and
         #    UTC offset — exactly the fidelity loss DT3 forbids ("no silent midnight").
         if isinstance(value, datetime.datetime):
-            msg = "A Date's `date` field takes a calendar date, not a datetime; put the time and offset in `time` instead."
+            msg = "A Date takes a calendar date and a separate time of day, not a datetime; put the date in `date` and the time and offset in `time`."
             raise ValueError(msg)  # noqa: TRY004 — must be ValueError so pydantic wraps it into a ValidationError
-        if isinstance(value, (int, float)) or (isinstance(value, str) and _is_numeric_string(value)):  # bool is an int subclass
+        if isinstance(value, (int, float)) or (isinstance(value, str) and is_numeric_string(value)):  # bool is an int subclass
             msg = "A Date's date/time must be an ISO 8601 string or a date/time object, never a number (no epoch-seconds)."
             raise ValueError(msg)
         # A datetime-shaped STRING on the `date` field would be truncated to the calendar date (silently
@@ -69,6 +59,17 @@ class DateContent(StuffContent):
                 "(e.g. '2026-07-07T00:00:00') would drop it — put the time and offset in `time` instead."
             )
             raise ValueError(msg)
+        # Parsing the ISO string here — rather than leaving it to the field's own validation — is what
+        # keeps this model usable under the strict validation instructor applies to every LLM response:
+        # a mode="before" validator forfeits pydantic's strict-JSON acceptance of ISO strings, because
+        # whatever it returns is re-validated as PYTHON input, where strict refuses a `str` outright
+        # (date_type / time_type). Returning a real object satisfies strict JSON, strict Python and lax
+        # alike. Non-str values — real date/time objects, e.g. from `--mock-inputs` — pass through.
+        # The parsers pin the extended ISO form, so a model and an author are held to one contract.
+        if isinstance(value, str):
+            if info.field_name == "date":
+                return parse_iso_date(value)
+            return parse_iso_time(value)
         return value
 
     def _iso(self) -> str:

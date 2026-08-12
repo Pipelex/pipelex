@@ -1,4 +1,4 @@
-"""Name-derivation rules shared by every types emitter (see `docs/specs/pipelex-codegen.md`).
+"""Name-derivation rules shared by every types emitter (see the codegen spec).
 
 A qualified concept `domain.Code` yields a type named from `Code` (already PascalCase) when that
 code is unique across the crate; when the code collides across domains, the domain disambiguates.

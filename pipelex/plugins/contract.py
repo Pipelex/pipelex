@@ -16,7 +16,11 @@ if TYPE_CHECKING:
 # process-global provider registries (``storage_config.method`` / ``secrets_config.method`` pick
 # the factory at boot). DX-1 batches both menu additions under this single bump so external plugins
 # re-declare ``targets_api`` only once.
-PLUGIN_API_VERSION: int = 3
+#
+# v4 split the single ``pipelex.plugins`` entry-point group into the two ``PluginGroup`` groups
+# below: a plugin now declares its layer by the group it publishes under, and a kernel-group plugin
+# may no longer reach the interpreter tier of the menu.
+PLUGIN_API_VERSION: int = 4
 
 
 @runtime_checkable
@@ -27,18 +31,30 @@ class PipelexPlugin(Protocol):
     hub-slot claims, HTTP-error mappers and teardown callbacks by calling the menu
     methods on the ``PluginRegistrar`` it is handed.
 
-    **Invariant — a plugin belongs to exactly one layer.** Its adapters are either all runtime-layer
-    (an inference backend, a storage or secrets provider) or all interpreter-layer (anything that
-    constructs a `Pipe`-aware object: an orchestrator, a bundle validator, a PipeFunc executor). A
-    capability that needs both is two plugins, because the built-in ones are filed by layer —
-    ``pipelex.providers`` for the runtime half, ``pipelex.interpreter_plugins`` for the interpreter
-    half — and a plugin straddling the two would put the method interpreter back into every runtime
-    import closure. External plugins are discovered through an entry point and so live in no declared
-    layer, but the same rule keeps them honest about what they pull in.
+    **Invariant — a plugin belongs to exactly one layer, and it is the highest tier it contributes
+    to.** A plugin that contributes *any* interpreter-layer capability — anything constructing a
+    `Pipe`-aware object: an orchestrator, a bundle validator, a PipeFunc executor — is an
+    interpreter-layer plugin and publishes under ``PluginGroup.INTERPRETER``. It may contribute
+    kernel-tier capabilities alongside them, and ours does: it registers an orchestrator
+    (interpreter-tier) *and* an HTTP-error mapper (kernel-tier). Do not split such a plugin in two.
+    A plugin contributing only kernel-tier capabilities — an inference backend, a model lister, a
+    storage or secrets provider, an HTTP-error mapper — is a kernel-layer plugin and publishes under
+    ``PluginGroup.KERNEL``.
+
+    An external plugin declares its layer by the group it publishes under, and the registrar enforces
+    the declaration in the one direction that matters: a kernel-group plugin registering an
+    interpreter-layer capability fails loud at register time (``PluginLayerViolationError``), because
+    a kernel-only boot reads the kernel group and must never end up constructing a `Pipe`-aware
+    object. The reverse needs no rule — a kernel-only boot never reads the interpreter group at all.
+    Publishing the same plugin under *both* groups is its own error
+    (``PluginDeclaredInMultipleGroupsError``): the group is the declaration, so declaring two says
+    nothing. Built-ins carry no group and are filed by layer in-tree instead — ``pipelex.providers``
+    for the kernel half, ``pipelex.interpreter_plugins`` for the interpreter half — where the
+    hub-layering guard polices the same boundary statically.
 
     Note that ``pipelex.providers`` is where the built-in *adapters* live, while this module and the
     rest of ``pipelex.plugins`` are the *mechanism* they register through. Both packages are
-    runtime-layer; the split is about direction, not about layers — adapters depend on the mechanism
+    kernel-layer; the split is about direction, not about layers — adapters depend on the mechanism
     and never the reverse. An external plugin imports ``pipelex.plugins.contract`` and
     ``pipelex.plugins.registrar``, so it is unaffected by where the built-in adapters are filed.
 
