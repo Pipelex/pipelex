@@ -191,6 +191,11 @@ inputs = {
 
 A list of content objects (`[MyConcept(...), MyConcept(...)]`) or an already-wrapped `ListContent(items=[...])` is accepted for a declared-multiple input; a `DictStuff(concept=..., content=...)` is the object form of the explicit envelope. All are compatibility-checked against the declaration.
 
+!!! note "Nothing to provide for a list input? Send the empty list."
+    A plural slot is never *absent* — when nothing is found, it **is** the empty list (see [Understanding Multiplicity](understanding-multiplicity.md)). So a caller with no pictures provides `"photos": []`, in either spelling — bare, or as the envelope `{"concept": "native.Image", "content": []}`. Both build an empty `ListContent` typed with the declared item concept, and a template that guards its use (`{% if photos %}`) renders nothing.
+
+    **Omitting the key is not the same thing**, and fails the run with *"missing required inputs"*: the presence markers are for singular values, and `Image[]?` is rejected outright (`optional_marker_invalid`) precisely because a plural slot has no absence to declare. See [Understanding Optionality](understanding-optionality.md).
+
 !!! note "Bare numbers and booleans from strictly-typed Python"
     A bare number or boolean (`"priority": 3`) is accepted at runtime, but the `PipelineInputs` protocol type does not yet admit bare scalars, so a strict static type-checker may flag it until that type is widened. If your codebase runs a type-checker, type the inputs dict as `dict[str, Any]`, or pass the value through the explicit envelope (`{"concept": "...", "content": 3}`).
 
