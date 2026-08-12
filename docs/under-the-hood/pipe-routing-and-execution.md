@@ -51,6 +51,9 @@ The `PipeJob` is the universal unit of execution. It carries everything needed t
 
 `PipeJob` is created by `pipeline_run_setup()`, which handles library loading, pipe resolution, working memory initialization, and telemetry setup. For distributed dispatch, a transport-prep step outside open core moves `working_memory` to `working_memory_raw` (deferred hydration) and ensures the crate is attached.
 
+!!! warning "Build `PipeRunParams` through its factory"
+    `PipeRunParamsFactory.make_run_params()` is the single writer of the fields that carry a run-scoped invariant: `run_mode`, `pipe_stack_limit` and `batch_max_concurrency`. None of the three has a default — for each, a silently-defaulted value would point at the dangerous direction (real spend, an unbounded pipe stack, a fan-out that launches every branch at once), and for `batch_max_concurrency` the would-be default `None` is *also* the resolved value of an authored `max_concurrency = "unbounded"`, so "never written" and "authored unbounded" would be indistinguishable. Constructing `PipeRunParams` by hand and omitting any of them raises a `ValidationError` — at the constructor and at the wire boundary alike.
+
 ---
 
 ## Library Loading

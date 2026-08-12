@@ -1,5 +1,22 @@
 # Changelog
 
+## [v0.43.1] - 2026-08-12
+
+### Changed
+
+- **`PipeRunParams.batch_max_concurrency` is now required (Breaking)**: The field no longer defaults to `None`, which previously made an omitted value indistinguishable from an explicitly authored unbounded concurrency (`max_concurrency = "unbounded"`). Omitting it now raises a `ValidationError` early—on both direct construction and payload decoding—to prevent accidental unbounded fan-outs.
+    - **Migration:** Construct `PipeRunParams` via `PipeRunParamsFactory.make_run_params()`, the single writer for run-scoped invariants (`run_mode`, `pipe_stack_limit`, `batch_max_concurrency`). Integration test fixtures now route through the factory via a new `make_mode_guarded_run_params` helper.
+    - **Docs:** Added a warning to `docs/under-the-hood/pipe-routing-and-execution.md` on using the factory method.
+
+### Fixed
+
+- **Empty lists in concept envelopes are now parsed as values, not errors**: The bottom-up factory previously raised _"Cannot create Stuff from empty list in content"_ when given an empty list inside a concept envelope (e.g., `{"concept": "native.Image", "content": []}`). Since the envelope names the concept, item-type inference is unnecessary, so it now correctly yields an empty `ListContent`. This aligns the bottom-up factory with the top-down shaper; callers can pass `[]` or `{"concept": "...", "content": []}` to represent an empty plural slot. A bare empty list with no concept still raises an error, as its type cannot be inferred.
+    - **Docs:** Added a note to `docs/building-methods/pipes/provide-inputs.md` clarifying that an empty list represents an empty plural slot, whereas omitting the key fails with a _"missing required inputs"_ error.
+
+### Security
+
+- **`uv.lock` refreshed onto patched dependency versions**: A targeted lock refresh clears the open Dependabot alerts, with no `pyproject.toml` constraint changes — every declared range already permitted the patched version, so this was stale-lock drift rather than a constraint problem. Bumps `aiohttp`, `cryptography`, `datamodel-code-generator`, `pillow`, `pyasn1`, `pymdown-extensions` and `soupsieve`. The alerts left open are held by `torch`, reachable only through the optional `docling` extra, whose upgrade would drag `torchvision`, `triton` and the NVIDIA CUDA stack along with it.
+
 ## [v0.43.0] - 2026-08-12
 
 ### Highlights

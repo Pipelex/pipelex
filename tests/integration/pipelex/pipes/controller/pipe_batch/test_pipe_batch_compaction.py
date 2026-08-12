@@ -10,7 +10,6 @@ from typing import Callable, cast
 
 import pytest
 
-from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.list_content import ListContent
@@ -29,6 +28,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.func_registry import func_registry
+from tests.integration.pipelex.fixtures.pipe_job_helpers import make_mode_guarded_run_params
 
 _DOMAIN_CODE = "test_optionals_batch"
 
@@ -41,7 +41,13 @@ _TEST_FUNCS = [optionals_batch_shout_item]
 
 
 def _make_live_run_params() -> PipeRunParams:
-    return PipeRunParams(run_mode=PipeRunMode.LIVE, pipe_stack_limit=get_config().pipelex.pipe_run_config.pipe_stack_limit)
+    """Build through the factory so the batch fans out under the *configured* bound.
+
+    Hand-built params used to omit `batch_max_concurrency` and fan out unbounded, quietly not
+    exercising the setting in the one test suite where the bound changes behavior. The field is
+    required now, so the omission cannot recur silently — the factory is the single writer.
+    """
+    return make_mode_guarded_run_params(pipe_run_mode=PipeRunMode.LIVE)
 
 
 def _build_compacting_batch() -> PipeBatch:
@@ -115,10 +121,15 @@ class TestPipeBatchCompaction:
         )
         working_memory = WorkingMemoryFactory.make_from_single_stuff(items_stuff)
 
+        run_params = _make_live_run_params()
+        # Guard the fixture, not the factory: this is the suite where an accidentally-unbounded
+        # fan-out would change behavior without failing anything.
+        assert run_params.batch_max_concurrency is not None, "the batch must fan out under a bound, not unbounded"
+
         pipe_output = await batch.run_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
-            pipe_run_params=_make_live_run_params(),
+            pipe_run_params=run_params,
         )
 
         list_content = pipe_output.main_stuff.content

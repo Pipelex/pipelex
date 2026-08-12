@@ -90,7 +90,7 @@ class TestPipeFuncHostedMode:
         pipe_output = await pipe_func._dry_run_operator_pipe(  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
             job_metadata=JobMetadata(user_id="user", pipeline_run_id="run"),
             working_memory=WorkingMemoryFactory.make_empty(),
-            pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10),
+            pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10, batch_max_concurrency=None),
         )
 
         content = pipe_output.working_memory.get_main_stuff().content
