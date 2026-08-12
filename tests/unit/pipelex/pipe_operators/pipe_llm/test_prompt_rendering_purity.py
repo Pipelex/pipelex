@@ -144,7 +144,7 @@ class TestPromptRenderingPurity:
         await pipe_llm._dry_run_operator_pipe(  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
             job_metadata=JobMetadata(user_id="pytest", pipeline_run_id="test_prompt_rendering_purity"),
             working_memory=_make_working_memory(),
-            pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10),
+            pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10, batch_max_concurrency=None),
         )
 
         assert pipe_llm.model_dump() == snapshot

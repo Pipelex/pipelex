@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **`PipeRunParams.batch_max_concurrency` is required (Breaking)**: The fan-out bound has no default any more, joining `run_mode` and `pipe_stack_limit` as a field whose omission fails loud. `None` is not only what a default would give — it is also what an authored `max_concurrency = "unbounded"` resolves to, so a default made "never written" indistinguishable from "authored unbounded", and pointed the omission at the dangerous direction: launch every branch at once. Breaking for code constructing `PipeRunParams` directly or decoding a payload that predates the field; build through `PipeRunParamsFactory.make_run_params`, the single writer of all three fields.
+
 ### Fixed
 
 - **A `{concept, content}` envelope carrying an empty list is now a value, not an error**: a plural slot is never _absent_ — when nothing is found it is the empty list — and the top-down shaper has always honoured that for a bare `[]` (D2). The bottom-up factory did not: it infers a list's item type from the first item, so an empty list raised _"Cannot create Stuff from empty list in content"_. The two spellings of one input therefore disagreed — a caller with no pictures could send `[]` and run, or send `{"concept": "native.Image", "content": []}` and fail — which made a plural input with nothing in it unrunnable for every caller that wraps its inputs. The envelope names the concept, so there was never anything to infer; it now builds an empty `ListContent`. Case 1.5 (a bare empty `ListContent`, no concept anywhere) still raises, and must: nothing there says what the items would have been.

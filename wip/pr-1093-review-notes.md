@@ -8,6 +8,10 @@ Both were verified against the code. **Neither is a live bug** — one is a fals
 
 ## Deferred — `batch_max_concurrency` should be required, not defaulted
 
+> **Status (2026-08-12): done in `pipelex`, on `fix/batch-max-concurrency-required`.** The field is required, the integration fixtures route through `PipeRunParamsFactory.make_run_params`, both omission paths (constructor and `model_validate`) have `ValidationError` coverage, and the mutation check was run — restoring `default=None` turns both new tests red and nothing else. The compaction fixture builds through the factory and asserts the configured bound.
+>
+> **Still open — the cross-repo wire test, and it *is* gated.** Our Temporal plugin's payload-converter test round-trips `PipeRunParams` without the field, so it asserts `None == None` and would not catch the bound being dropped on the wire. It cannot be fixed ahead of the pin: that side pins a `pipelex` version predating the field entirely, and `PipeRunParams` is `extra="forbid"` — passing `batch_max_concurrency` there today fails. When the pin moves to ≥ the release carrying this change, make that test round-trip a real int bound. Path and pin live in the workspace-level private notes.
+
 - **Origin:** surfaced while verifying Codex's second P1 on `pipelex/pipe_run/pipe_run_params.py:160`. It is *not* the defect Codex described (see "Not deferred" below for why that one is a false positive) — it is the weakness underneath it.
 - **Where:** `pipelex/pipe_run/pipe_run_params.py`, the `batch_max_concurrency: int | None = Field(default=None, frozen=True)` field.
 
@@ -47,14 +51,14 @@ Keeps `int | None`, so authored `"unbounded"` still resolves to `None`; keeps `f
 
 ### Why it was deferred rather than done here
 
-The source change is one word, but the fixtures are not: ~19 direct constructions in this repo plus one in `pipelex-server` must supply the field. The integration fixtures should route through `PipeRunParamsFactory.make_run_params` instead — a net simplification, since they already hand-duplicate the factory's config read — but that is a ~20-file change with a cross-repo tail, landing on a release branch whose CI is green and which is about to merge to `main`. It belongs on `dev` immediately after the promotion.
+The source change is one word, but the fixtures are not: ~19 direct constructions in this repo plus one on the plugin side must supply the field. The integration fixtures should route through `PipeRunParamsFactory.make_run_params` instead — a net simplification, since they already hand-duplicate the factory's config read — but that is a ~20-file change with a cross-repo tail, landing on a release branch whose CI is green and which is about to merge to `main`. It belongs on `dev` immediately after the promotion.
 
 ### Execution notes for the follow-up
 
 - **Tests:** add `pytest.raises(ValidationError)` coverage for both the constructor and `model_validate({...})` with the key absent, mirroring the required-`run_mode` coverage already in `tests/unit/pipelex/pipe_run/test_cogt_run_params_carrier.py:72-92`.
 - **Mutation-check it.** Temporarily restore `default=None` and confirm the new test goes red. A test green on first run proves nothing here.
 - **Fix the compaction fixture** to build via the factory and assert the observed bound — that is the one place where an accidentally-unbounded fan-out actually changes behavior.
-- **Cross-repo, gated on the `pipelex` pin moving:** `pipelex-server/temporal/tests/integration/pipelex_temporal/data_converter/test_data_conv_pipe_run_params.py:22` round-trips `None`, so it asserts `None == None` and would not catch the field being dropped on the wire. Make it round-trip a real int bound.
+- **Cross-repo, gated on the `pipelex` pin moving:** our Temporal plugin's payload-converter test round-trips `None`, so it asserts `None == None` and would not catch the field being dropped on the wire. Make it round-trip a real int bound.
 - **Honest caveat to keep in view:** making the field required converts a legacy-history decode into a `ValidationError`, and a workflow-task converter exception retries forever — it hangs rather than fails. Both states are non-events while Temporal is pre-production, and neither is fixed by a field default. It reconfirms that deploy discipline, not this field, is the real control over version skew under live histories.
 
 ## Not deferred — the two P1s as Codex reported them
@@ -67,7 +71,7 @@ Codex argued that `Pipelex.make` given a router that satisfies `PipeRouterProtoc
 
 The language claim is correct. Everything downstream of it is not:
 
-- **No such router exists.** Every implementer in the workspace inherits nominally — `PipeRouter` (`pipelex/pipe_run/pipe_router.py`), `TemporalPipeRouter` in `pipelex-server/temporal/`, `MistralWorkflowsPipeRouter`, and every test stub. `pipelex-api` and `pipelex-server/transport/` contain no router at all.
+- **No such router exists.** Every implementer in the workspace inherits nominally — `PipeRouter` (`pipelex/pipe_run/pipe_router.py`), the routers in our Temporal and Mistral Workflows plugins, and every test stub. `pipelex-api` and the transport layer that is not open core contain no router at all.
 - **The failure mode is static, not runtime.** The protocol is not `@runtime_checkable`, and injection performs no isinstance check — but pyright rejects a structural non-conformer at the injection boundary with `"run_batch_branch" is not present (reportArgumentType)`. Every consumer in this workspace is type-checked.
 - **Structural conformance was never viable here.** `PipeRouterProtocol` declares an attribute, three concrete observer hooks, a concrete template-method `run`, and an `@abstractmethod _run_pipe_job`. Conforming without inheriting would mean reimplementing `run`'s entire error-wrapping template. Inheritance is not one supported pattern — it is the only one.
 - **The cited convention says the opposite.** Codex referenced `AGENTS.md:255-258`; that section actually reads *"When extending the `Protocol`, also update every implementation (including no-op / null implementations) so structural typing is satisfied"* — a rule pointing away from the claim it was cited for.
@@ -82,11 +86,11 @@ No test was added either. A test injecting a non-inheriting router would assert 
 
 Codex argued that a worker resuming a `PipeRunParams` serialized before `batch_max_concurrency` existed would decode it as `None`, read as unbounded, changing both concurrency and replay grouping mid-flight.
 
-The mechanism is real: `PipeRunParams` does ride a Temporal workflow argument (`pipelex-server/temporal/pipelex_temporal/tprl_pipe/wf_pipe_router.py:204`), workflow arguments are recorded in history and re-decoded on replay, and `gather_bounded`'s chunk size does determine command grouping — which `pipelex-server/temporal/docs/temporal-replay-determinism.md` places on the replay-unsafe side of its own table.
+The mechanism is real: `PipeRunParams` does ride a Temporal workflow argument in our Temporal plugin's router workflow, workflow arguments are recorded in history and re-decoded on replay, and `gather_bounded`'s chunk size does determine command grouping — which that plugin's own replay-determinism notes place on the replay-unsafe side of their table.
 
 The scenario is not:
 
-- **The Temporal integration is not in this package.** `pipelex/temporal/**` was removed in *Refactor/plugins 5* (#1006) and lives in the private `pipelex-server/temporal/` plugin; `pyproject.toml` carries no `temporalio` dependency. No OSS consumer of `pipelex` can have an in-flight durable batch.
+- **The Temporal integration is not in this package.** It lives in our Temporal plugin, and `pyproject.toml` carries no `temporalio` dependency. No OSS consumer of `pipelex` can have an in-flight durable batch.
 - **The only exposed party is our own hosted plane, which is pre-production.** Temporal has never shipped to prod.
 - **A field default cannot fix the general case.** Bumping `pipelex` on a Temporal worker is a workflow-code change, and this same release lands the kernel extraction and the plugin entry-point-group split. There is no `workflow.patched` or worker-versioning machinery. Hot-swapping any pipelex version under live histories is unsafe with or without this field; the control is deploy discipline (drain, build IDs).
 - **The remedy is what the workspace rules out.** "No backward compatibility… no deprecation transition period." A legacy-payload sentinel is exactly the speculative back-compat machinery that policy exists to prevent, and the change is already recorded as breaking in the changelog.

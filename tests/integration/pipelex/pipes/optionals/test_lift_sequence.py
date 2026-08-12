@@ -27,6 +27,7 @@ from pipelex.pipeline.execution_seams import prepare_pipe_job
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.func_registry import func_registry
+from tests.integration.pipelex.fixtures.pipe_job_helpers import make_mode_guarded_run_params
 
 _DOMAIN_CODE = "test_optionals_seq"
 
@@ -51,7 +52,7 @@ _TEST_FUNCS = [optionals_seq_echo_source, optionals_seq_echo_a_out, optionals_se
 
 
 def _make_live_run_params() -> PipeRunParams:
-    return PipeRunParams(run_mode=PipeRunMode.LIVE, pipe_stack_limit=get_config().pipelex.pipe_run_config.pipe_stack_limit)
+    return make_mode_guarded_run_params(pipe_run_mode=PipeRunMode.LIVE)
 
 
 def _build_lift_sequence() -> PipeSequence:
