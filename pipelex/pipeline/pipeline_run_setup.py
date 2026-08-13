@@ -181,6 +181,9 @@ async def pipeline_run_setup(
         # entry-shaped — it comes from a CLI argument or an API request field, not from inside a
         # method — so a bare code still resolves across domains. `qualified_main_pipe` is already
         # domain-qualified and goes through the strict lookup.
+        # Captured now because `pipe_code` is rebound to the resolved pipe's own code below, and
+        # only the raw form carries a dependency alias prefix (`alias->…`).
+        raw_entry_ref: str | None = pipe_code
         pipe: PipeAbstract
         if mthds_contents:
             if pipe_code:
@@ -202,8 +205,8 @@ async def pipeline_run_setup(
         # When the caller invoked a dependency pipe (`alias->…`), the scope carries the package
         # alias too, so the dependency's own concepts — keyed under the alias — stay reachable.
         search_scope: str = pipe.domain_code
-        if pipe_code and QualifiedRef.has_cross_package_prefix(pipe_code):
-            entry_alias, _ = QualifiedRef.split_cross_package_ref(pipe_code)
+        if raw_entry_ref and QualifiedRef.has_cross_package_prefix(raw_entry_ref):
+            entry_alias, _ = QualifiedRef.split_cross_package_ref(raw_entry_ref)
             search_scope = f"{entry_alias}->{pipe.domain_code}"
 
         pipe_code = pipe.code

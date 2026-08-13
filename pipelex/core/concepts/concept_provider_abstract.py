@@ -35,9 +35,10 @@ class ConceptProviderAbstract(ABC):
 
         Entry-shaped lookup, not in-body reference resolution: natives resolve first, a
         fully-specified ref is a direct hit, and a bare code prefers `search_scope` (the entry
-        pipe's own domain, `alias->domain` when the entry pipe came from a dependency package)
-        before falling back to a crate-wide unique match. Raises when nothing matches or when a
-        bare code is ambiguous.
+        pipe's own domain, `alias->domain` when the entry pipe came from a dependency package —
+        in which case the rest of that package is searched next) before falling back to a
+        crate-wide unique match. Every refusal — invalid string, no match, ambiguous bare code —
+        raises the same exception class, so entry boundaries catch one thing.
         """
 
     @abstractmethod

@@ -629,7 +629,7 @@ async def fix_bundle_file(
                 colliding = ", ".join(f"'{name}'" for name in sorted(set(colliding_names)))
                 bail_reason = (
                     f"cross-file collision: every remaining fix would write a pipe code ({colliding}) "
-                    "already declared in a same-domain sibling bundle"
+                    "already declared in a same-domain sibling bundle (or a sibling whose domain could not be read)"
                 )
                 return FixBundleResult(
                     is_valid=False,

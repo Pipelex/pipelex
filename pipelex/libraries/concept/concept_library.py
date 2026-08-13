@@ -186,28 +186,39 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         wip/pipe-refs/entry-affordance-share-vs-duplicate.md). Natives resolve first, per the
         standard's own step 1. A fully-specified ref (`domain.Concept`, `alias->domain.Concept`)
         is a direct hit or a miss. A bare code prefers `search_scope` — the entry pipe's own
-        domain, carried as `alias->domain` when the entry pipe came from a dependency package, so
-        the preference is package-scoped, not just domain-scoped — then falls back to a crate-wide
-        unique match. An ambiguous bare code raises rather than picking a winner.
+        domain, carried as `alias->domain` when the entry pipe came from a dependency package —
+        then, under an aliased scope, the rest of that dependency package (which may span several
+        domains, all keyed under its one alias), then a crate-wide unique match. Dotted refs obey
+        the same precedence: under an aliased scope the dependency's own `domain.Concept` wins
+        over a host concept spelled identically. An ambiguous bare code raises rather than
+        picking a winner.
 
         Aliased dependency entries are excluded from the crate-wide search: installing an
         unrelated package must not make a host concept's bare code ambiguous. They stay reachable
         through `search_scope` (the dependency the entry pipe belongs to) or an explicit
-        `alias->domain.Concept` ref.
+        `alias->…` ref.
 
         Raises:
-            ConceptLibraryError: the string is not a valid concept ref or code.
-            ConceptLibraryConceptNotFoundError: a bare code matches concepts in several domains.
+            ConceptLibraryConceptNotFoundError: the string is not a valid concept ref or code,
+                or a bare code matches concepts in several domains. One class for every refusal,
+                so entry boundaries catch a single exception.
         """
         try:
             validate_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code)
         except ConceptStringError as exc:
             msg = f"Could not validate concept string or code '{concept_ref_or_code}': {exc}"
-            raise ConceptLibraryError(msg) from exc
+            raise ConceptLibraryConceptNotFoundError(msg) from exc
 
-        # Fully specified with a package alias: direct hit or miss, nothing to search.
+        # Aliased ref: resolve within that package only. `alias->domain.Concept` is a direct hit;
+        # `alias->Concept` searches the package the way a bare code searches the host crate.
         if QualifiedRef.has_cross_package_prefix(concept_ref_or_code):
-            return self.root.get(concept_ref_or_code)
+            the_concept = self.root.get(concept_ref_or_code)
+            if the_concept is not None:
+                return the_concept
+            ref_alias, remainder = QualifiedRef.split_cross_package_ref(concept_ref_or_code)
+            if "." not in remainder:
+                return self._search_dependency_package(alias=ref_alias, concept_code=remainder)
+            return None
 
         if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code):
             native_concept_ref = NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=concept_ref_or_code)
@@ -222,14 +233,15 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
                 scope_domain = search_scope
 
         if "." in concept_ref_or_code:
-            the_concept = self.root.get(concept_ref_or_code)
-            if the_concept is not None:
-                return the_concept
             if scope_alias:
-                # The entry pipe came from a dependency package: that package's concepts are keyed
-                # under its alias, so a ref naming one of the dependency's own domains must reach it.
-                return self.root.get(f"{scope_alias}->{concept_ref_or_code}")
-            return None
+                # Scope wins for dotted refs too: the entry pipe came from a dependency package
+                # whose concepts are keyed under the alias, so a ref naming one of that package's
+                # own domains reaches the package's concept even when the host declares the same
+                # `domain.Concept` spelling — same precedence as the bare-code arm below.
+                the_concept = self.root.get(f"{scope_alias}->{concept_ref_or_code}")
+                if the_concept is not None:
+                    return the_concept
+            return self.root.get(concept_ref_or_code)
 
         # Bare code: the entry pipe's own scope wins before any search.
         if scope_domain:
@@ -237,6 +249,14 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
             if scope_alias:
                 scoped_ref = f"{scope_alias}->{scoped_ref}"
             the_concept = self.root.get(scoped_ref)
+            if the_concept is not None:
+                return the_concept
+
+        # A dependency entry pipe then searches the rest of its own package: a multi-domain
+        # dependency keys every concept under its one alias, so the bare code may be declared in
+        # a sibling domain of the same package.
+        if scope_alias:
+            the_concept = self._search_dependency_package(alias=scope_alias, concept_code=concept_ref_or_code)
             if the_concept is not None:
                 return the_concept
 
@@ -258,6 +278,29 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
             msg = f"Concept '{concept_ref_or_code}' not found in the library. Check for typos and make sure its bundle is loaded."
             raise ConceptLibraryConceptNotFoundError(msg)
         return the_concept
+
+    def _search_dependency_package(self, *, alias: str, concept_code: str) -> Concept | None:
+        """Search one dependency package's aliased entries for a bare concept code.
+
+        The package-scoped twin of the crate-wide bare-code search: a dependency may span several
+        domains, all keyed under its one alias. Alias-scoped by construction, so it can never
+        reach a host concept.
+
+        Raises:
+            ConceptLibraryConceptNotFoundError: the code is declared in several of the package's domains.
+        """
+        prefix = f"{alias}->"
+        matches = [concept for key, concept in self.root.items() if key.startswith(prefix) and concept.code == concept_code]
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            candidates = sorted(f"{prefix}{match.concept_ref}" for match in matches)
+            msg = (
+                f"Concept code '{concept_code}' is ambiguous within dependency '{alias}' — it is declared by {candidates}. "
+                "Name one of them explicitly."
+            )
+            raise ConceptLibraryConceptNotFoundError(msg)
+        return None
 
     def add_dependency_concept(self, *, alias: str, concept: Concept) -> None:
         """Add a concept from a dependency package with an aliased key.

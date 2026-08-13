@@ -245,6 +245,26 @@ class StuffFactory:
         return list_content_from_csv(Path(resolved.path), row_model=row_model)
 
     @classmethod
+    def _resolve_entry_concept(
+        cls,
+        *,
+        concept_provider: ConceptProviderAbstract,
+        concept_ref_or_code: str,
+        search_scope: str | None,
+        context_msg: str,
+    ) -> Concept:
+        """Resolve a human-supplied concept string, wrapping any refusal with the caller's context.
+
+        The one place the entry-concept boundary is caught: every input shape funnels through
+        here, so a change to what the lookup raises or how the failure reads is a single edit.
+        """
+        try:
+            return concept_provider.get_required_entry_concept(concept_ref_or_code=concept_ref_or_code, search_scope=search_scope)
+        except ConceptLibraryConceptNotFoundError as exc:
+            msg = f"{context_msg} the concept of name '{concept_ref_or_code}' could not be resolved: {exc}"
+            raise StuffFactoryError(msg) from exc
+
+    @classmethod
     def make_stuff_from_stuff_content_or_data(
         cls,
         stuff_content_or_data: StuffContentOrData,
@@ -329,14 +349,12 @@ class StuffFactory:
                 ):
                     concept = concept_provider.get_native_concept(native_concept=NativeConceptCode(content_class_name.split("Content")[0]))
                 else:
-                    try:
-                        concept = concept_provider.get_required_entry_concept(concept_ref_or_code=content_class_name, search_scope=search_scope)
-                    except ConceptLibraryConceptNotFoundError as exc:
-                        msg = (
-                            f"Trying to create a Stuff '{name}' from a ListContent but "
-                            f"the concept of name '{content_class_name}' could not be resolved: {exc}"
-                        )
-                        raise StuffFactoryError(msg) from exc
+                    concept = cls._resolve_entry_concept(
+                        concept_provider=concept_provider,
+                        concept_ref_or_code=content_class_name,
+                        search_scope=search_scope,
+                        context_msg=f"Trying to create a Stuff '{name}' from a ListContent but",
+                    )
 
                 return cls.make_stuff(
                     concept=concept,
@@ -358,14 +376,12 @@ class StuffFactory:
                     concept = concept_provider.get_native_concept(native_concept=NativeConceptCode(content_class_name.split("Content")[0]))
                 else:
                     # It's a StructuredContent, try to find the concept
-                    try:
-                        concept = concept_provider.get_required_entry_concept(concept_ref_or_code=content_class_name, search_scope=search_scope)
-                    except ConceptLibraryConceptNotFoundError as exc:
-                        msg = (
-                            f"Trying to create a Stuff '{name}' from a StuffContent '{content_class_name}' "
-                            f"but the concept of name '{content_class_name}' could not be resolved: {exc}"
-                        )
-                        raise StuffFactoryError(msg) from exc
+                    concept = cls._resolve_entry_concept(
+                        concept_provider=concept_provider,
+                        concept_ref_or_code=content_class_name,
+                        search_scope=search_scope,
+                        context_msg=f"Trying to create a Stuff '{name}' from a StuffContent '{content_class_name}' but",
+                    )
 
                 return cls.make_stuff(
                     concept=concept,
@@ -421,14 +437,12 @@ class StuffFactory:
                     ):
                         concept = concept_provider.get_native_concept(native_concept=NativeConceptCode(content_class_name.split("Content")[0]))
                     else:
-                        try:
-                            concept = concept_provider.get_required_entry_concept(concept_ref_or_code=content_class_name, search_scope=search_scope)
-                        except ConceptLibraryConceptNotFoundError as exc:
-                            msg = (
-                                f"Trying to create a Stuff '{name}' from a list of StuffContent but "
-                                f"the concept of name '{content_class_name}' could not be resolved: {exc}"
-                            )
-                            raise StuffFactoryError(msg) from exc
+                        concept = cls._resolve_entry_concept(
+                            concept_provider=concept_provider,
+                            concept_ref_or_code=content_class_name,
+                            search_scope=search_scope,
+                            context_msg=f"Trying to create a Stuff '{name}' from a list of StuffContent but",
+                        )
 
                     return cls.make_stuff(
                         concept=concept,
@@ -470,14 +484,12 @@ class StuffFactory:
         content = stuff_content_or_data["content"]
 
         # Get the concept from the library
-        try:
-            concept = concept_provider.get_required_entry_concept(concept_ref_or_code=concept_ref, search_scope=search_scope)
-        except ConceptLibraryConceptNotFoundError as exc:
-            msg = (
-                f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
-                f"but the concept of name '{concept_ref}' could not be resolved: {exc}"
-            )
-            raise StuffFactoryError(msg) from exc
+        concept = cls._resolve_entry_concept(
+            concept_provider=concept_provider,
+            concept_ref_or_code=concept_ref,
+            search_scope=search_scope,
+            context_msg=f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData but",
+        )
 
         # Case 2.1d: content is a bool → YesNoContent for a YesNo-compatible concept.
         # Checked BEFORE the str/int-ish arms (bool is a subclass of int) so a boolean never falls through to

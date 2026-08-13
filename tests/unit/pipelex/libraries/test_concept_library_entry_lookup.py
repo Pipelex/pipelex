@@ -12,7 +12,6 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError
 from pipelex.libraries.concept.concept_library import ConceptLibrary
-from pipelex.libraries.concept.exceptions import ConceptLibraryError
 
 
 def _make_concept(*, code: str, domain_code: str) -> Concept:
@@ -97,9 +96,12 @@ class TestConceptLibraryEntryLookup:
         with pytest.raises(ConceptLibraryConceptNotFoundError, match="not found"):
             library.get_required_entry_concept("Memo")
 
-    def test_invalid_string_raises_library_error(self):
+    def test_invalid_string_raises_the_one_catchable_class(self):
+        """Every entry refusal — invalid string included — is ConceptLibraryConceptNotFoundError,
+        so the input-shaping boundary catches a single exception class.
+        """
         library = ConceptLibrary.make_empty()
-        with pytest.raises(ConceptLibraryError, match="not a valid"):
+        with pytest.raises(ConceptLibraryConceptNotFoundError, match="not a valid"):
             library.get_optional_entry_concept("not_pascal_case")
 
     # ── Aliased dependency entries ──────────────────────────────────
@@ -126,13 +128,48 @@ class TestConceptLibraryEntryLookup:
 
     def test_dotted_ref_with_aliased_scope_reaches_the_dependency_domain(self):
         """A dependency package can span several domains: a dotted ref naming one of them
-        resolves through the scope's alias when no host concept holds that exact ref.
+        resolves through the scope's alias — and the scope wins even when the host declares the
+        same `domain.Concept` spelling, mirroring the bare-code arm's precedence. Without an
+        aliased scope, the host concept is the only reachable one.
         """
         library = ConceptLibrary.make_empty()
         dep_note = _make_concept(code="Note", domain_code="dep_other")
         library.add_dependency_concept(alias="lib", concept=dep_note)
         assert library.get_optional_entry_concept("dep_other.Note", search_scope="lib->dep_domain") is dep_note
-        # A host concept under the exact ref wins over the aliased one (deterministic host-first).
         host_note = _make_concept(code="Note", domain_code="dep_other")
         library.add_new_concept(concept=host_note)
-        assert library.get_optional_entry_concept("dep_other.Note", search_scope="lib->dep_domain") is host_note
+        assert library.get_optional_entry_concept("dep_other.Note", search_scope="lib->dep_domain") is dep_note
+        assert library.get_optional_entry_concept("dep_other.Note") is host_note
+
+    def test_bare_code_reaches_a_sibling_domain_of_the_dependency_package(self):
+        """A multi-domain dependency keys every concept under its one alias: an entry pipe in one
+        of its domains can still resolve a bare code declared in a sibling domain of the same
+        package — the package search that the alias-excluding crate-wide scan cannot perform.
+        """
+        library = ConceptLibrary.make_empty()
+        dep_memo = _make_concept(code="Memo", domain_code="dep_b")
+        library.add_dependency_concept(alias="lib", concept=dep_memo)
+        assert library.get_optional_entry_concept("Memo", search_scope="lib->dep_a") is dep_memo
+        # A same-code host concept does not shadow the package's own concept under an aliased scope.
+        library.add_new_concept(concept=_make_concept(code="Memo", domain_code="host_domain"))
+        assert library.get_optional_entry_concept("Memo", search_scope="lib->dep_a") is dep_memo
+
+    def test_bare_code_ambiguous_within_the_dependency_package_raises(self):
+        library = ConceptLibrary.make_empty()
+        library.add_dependency_concept(alias="lib", concept=_make_concept(code="Memo", domain_code="dep_a"))
+        library.add_dependency_concept(alias="lib", concept=_make_concept(code="Memo", domain_code="dep_b"))
+        with pytest.raises(ConceptLibraryConceptNotFoundError, match="ambiguous") as exc_info:
+            library.get_optional_entry_concept("Memo", search_scope="lib->dep_c")
+        assert "lib->dep_a.Memo" in str(exc_info.value)
+        assert "lib->dep_b.Memo" in str(exc_info.value)
+
+    def test_aliased_bare_ref_searches_that_package_only(self):
+        """`alias->Concept` is the explicit spelling of the package search: it resolves a bare
+        code within the named dependency and never reaches a host concept.
+        """
+        library = ConceptLibrary.make_empty()
+        dep_memo = _make_concept(code="Memo", domain_code="dep_b")
+        library.add_dependency_concept(alias="lib", concept=dep_memo)
+        library.add_new_concept(concept=_make_concept(code="Memo", domain_code="host_domain"))
+        assert library.get_optional_entry_concept("lib->Memo") is dep_memo
+        assert library.get_optional_entry_concept("other->Memo") is None
