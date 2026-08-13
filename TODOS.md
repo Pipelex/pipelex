@@ -1,6 +1,6 @@
 # Pipe-refs build-time qualification — implementation plan
 
-Source of truth for the design: [wip/pipe-refs/build-time-qualification.md](wip/pipe-refs/build-time-qualification.md) (decided 2026-08-11). Evidence and pre-change state: [wip/pipe-refs/README.md](wip/pipe-refs/README.md). Branch: `fix/Pipe-refs` in the `_refs` worktree — treat this worktree as the repo root.
+Source of truth for the design: [wip/pipe-refs/build-time-qualification.md](wip/pipe-refs/build-time-qualification.md) (decided 2026-08-11). Evidence and pre-change state: [wip/pipe-refs/README.md](wip/pipe-refs/README.md). Venue: the `_refs` worktree — treat this worktree as the repo root.
 
 **What we are doing in one sentence:** bare in-body references (pipe steps, branches, outcomes, batch refs, concept I/O refs) get qualified to their owner domain once, at library build time, via one shared crate pass consumed by both the normalizer and `library_manager`; the live library lookup becomes strict; the crate-wide bare search survives only as an explicitly-named entry-point affordance for user-supplied codes.
 
@@ -104,7 +104,7 @@ A pure refactor has landed. The tree is fully self-consistent and the suite is u
 
 - [x] Update the Status block (phase done, the consumer inventory, the fingerprint ruling).
 - [x] Record status in the design doc's Phase 1 section.
-- [x] Commit on `fix/Pipe-refs` with a clear message. ⚠ **This item's own wording had to change:** it said "say plainly that this commit changes no behavior", and that turned out not to be true. The message states the extraction is behavior-preserving *with one documented exception* and names it. An instruction to assert a property is not a licence to assert it unverified.
+- [x] Commit with a clear message. ⚠ **This item's own wording had to change:** it said "say plainly that this commit changes no behavior", and that turned out not to be true. The message states the extraction is behavior-preserving *with one documented exception* and names it. An instruction to assert a property is not a licence to assert it unverified.
 - [x] Gates run at the checkpoint: `agent-check` clean, full `agent-test` green, `drift-check` passed against the staged index, `.test_durations` N/A (path-existence gate; nothing renamed or moved), subject grants recorded ahead of the first check.
 - [x] Reviewed by a no-context `/code-review` fan-out; findings triaged and verified individually rather than deferred to. Three of the reviewer's claims held up, two against claims I had written down myself.
 
@@ -165,7 +165,7 @@ The pipe rule is complete and self-consistent: canonical form and runtime agree,
 - [x] Update README §2's table — marked HISTORICAL with a banner rather than rewritten, and §3 gained a re-measured table.
 - [x] Update the `docs/` pages that describe bare-ref resolution, pipe lookup, or the entry surfaces touched here. `docs/building-methods/libraries.md` gained a "How a pipe reference resolves" section; `docs/contribute/hub-layering.md` gained the two new hub symbols and the in-body-vs-entry guidance (that page is a drift contract target and was reviewed and acked).
 - [x] Changelog entry under `[Unreleased]` noting the breaking language-behavior change. Also **removed** the superseded `[Unreleased]` entry describing the crate-wide rule this phase deletes — it never shipped, so leaving both would have published two contradictory claims.
-- [x] Commit on `fix/Pipe-refs` — landed on the stacked `fix/Pipe-refs-2` (PR #1092) rather than the base branch, since PR #1091 carries Phase 0+1 and the two merge together.
+- [x] Commit — landed on a stacked branch (PR #1092) rather than the base one, since PR #1091 carries Phase 0+1 and the two merge together.
 - [x] STOP. Next session starts at Phase 3.
 
 ⚠ **These boxes sat unticked while the Status block above declared C2 passed** — caught by a PR bot, not by me. A checkpoint that reports itself complete from one place while its own checklist says otherwise is exactly the contradiction a cold-starting session cannot resolve. Tick the checklist in the same edit that updates the Status block.
@@ -200,7 +200,7 @@ The runtime is fully spec-compliant and self-consistent; only cross-repo work re
 - [ ] Update the Status block and the design doc's Phase 3 section.
 - [ ] Re-run the README's probes and demos and confirm the post-change behavior matches the design's predictions.
 - [ ] Changelog entry for the concept-side behavior change.
-- [ ] Commit on `fix/Pipe-refs`.
+- [ ] Commit.
 - [ ] STOP. End the session. Next session starts at Phase 4a.
 
 ---
