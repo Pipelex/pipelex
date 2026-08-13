@@ -2380,10 +2380,6 @@ rationale = "Cost report op on the records; single operand."
 param = "tokens_usage"
 rationale = "Verb-object: compute the cost of one usage record; the single obvious operand is the usage."
 
-["pipelex/cogt/usage/cost_registry.py::compute_tokens_usage_costs"]
-param = "tokens_usage"
-rationale = "Verb-object: compute the component costs of one usage record; the single obvious operand is the usage."
-
 ["pipelex/core/concepts/concept.py::Concept.is_native_concept"]
 param = "concept"
 rationale = "Predicate on the concept; single operand."

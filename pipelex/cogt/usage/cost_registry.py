@@ -24,30 +24,15 @@ TokenCostReport = LLMTokenCostReport | ImgGenTokenCostReport | ExtractTokenCostR
 CostRegistryRoot = list[TokenCostReport]
 
 
-class TokensUsageCost(NamedTuple):
-    """The component USD costs of one inference call, and their total.
-
-    ``input`` is the joined input cost (non-cached + cached), matching the
-    ``INPUT_JOINED`` column of the cost table — the cached part is a discount on a
-    subset of the input tokens, not a separate stream, so splitting them apart in a
-    summary would invite double-counting the way the token categories do.
-    """
-
-    input: float
-    output: float
-    total: float
-
-
-def compute_tokens_usage_costs(tokens_usage: TokensUsage) -> TokensUsageCost | None:
-    """Component USD costs of a single inference call, or None when unrated.
-
-    The one place per-call cost is computed. ``compute_tokens_usage_cost`` returns just
-    the total of this, so a consumer that wants the input/output split and one that
-    wants the headline can never disagree about either.
+def compute_tokens_usage_cost(tokens_usage: TokensUsage) -> float | None:
+    """Compute the canonical USD cost of a single inference call, or None when unrated.
 
     Returns ``None`` when the usage carries no rate table (``unit_costs`` is empty:
-    own-GPU models, dry/mock runs). Categories the cost engine excludes from totals
-    (audio, reasoning, prediction) are excluded here too: one cost engine, one total.
+    own-GPU models, dry/mock runs). Otherwise returns the same canonical total the cost
+    table reports for the call — input_non_cached + input_cached + output component
+    costs, with the cached-discount fallback from ``model_cost_per_token``. Categories
+    the cost engine excludes from totals (audio, reasoning, prediction) are excluded
+    here too: one cost engine, one total.
     """
     if not tokens_usage.unit_costs:
         return None
@@ -67,25 +52,11 @@ def compute_tokens_usage_costs(tokens_usage: TokensUsage) -> TokensUsageCost | N
         costs=tokens_usage.unit_costs,
         cost_category=CostCategory.OUTPUT,
     )
-    return TokensUsageCost(
-        input=input_non_cached_cost + input_cached_cost,
-        output=output_cost,
-        total=CostRegistry.compute_total_cost(
-            input_non_cached_cost=input_non_cached_cost,
-            input_cached_cost=input_cached_cost,
-            output_cost=output_cost,
-        ),
+    return CostRegistry.compute_total_cost(
+        input_non_cached_cost=input_non_cached_cost,
+        input_cached_cost=input_cached_cost,
+        output_cost=output_cost,
     )
-
-
-def compute_tokens_usage_cost(tokens_usage: TokensUsage) -> float | None:
-    """The canonical USD total of a single inference call, or None when unrated.
-
-    The same total the cost table reports for the call. Thin wrapper over
-    ``compute_tokens_usage_costs`` so there is exactly one cost computation.
-    """
-    costs = compute_tokens_usage_costs(tokens_usage)
-    return None if costs is None else costs.total
 
 
 class AggregatedCosts(NamedTuple):
