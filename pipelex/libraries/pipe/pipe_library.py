@@ -134,7 +134,10 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
     def get_required_entry_pipe(self, pipe_code: str) -> PipeAbstract:
         the_pipe = self.get_optional_entry_pipe(pipe_code=pipe_code)
         if not the_pipe:
-            msg = f"Pipe '{pipe_code}' not found in any domain. Check for typos and make sure it is declared in a MTHDS file in an imported package."
+            msg = (
+                f"Pipe '{pipe_code}' could not be resolved. Check for typos and make sure its bundle is loaded. "
+                "A bare code only matches this library's own domains — a pipe from a dependency package must be named 'alias->pipe_code'."
+            )
             raise PipeNotFoundError(msg)
         return the_pipe
 

@@ -161,7 +161,10 @@ class SubPipe(BaseModel):
             pipe_batch_blueprint = PipeBatchBlueprint(
                 description=f"Batch processing for {self.pipe_code}",
                 branch_pipe_code=self.pipe_code,
-                output=sub_pipe.output.concept.code,
+                # The full concept_ref, not the bare code: the factory resolves a bare code in
+                # `domain_code` below (the sub-pipe's own domain), so a sub-pipe whose output concept
+                # lives in another domain would resolve to the wrong concept — or to nothing.
+                output=sub_pipe.output.concept.concept_ref,
                 input_list_name=batch_params.input_list_stuff_name,
                 input_item_name=batch_params.input_item_stuff_name,
                 inputs={

@@ -100,8 +100,8 @@ def _backfill_pipe_error_source(pipe_error: PipeValidationError) -> None:
     runs. Intercepting once at this catch boundary covers every raise site, present and future.
 
     Lookup is by the full ``domain.pipe_code`` ref only — never the bare-code suffix fallback
-    (bare codes are ambiguous across domains, exactly what the fix loop's cross-file guard
-    defends against). A miss leaves ``file_path`` as ``None``: the fix stays source-less and
+    (under the strict own-domain resolution rule, a bare-code suffix match would guess a file
+    where the qualified ref did not resolve). A miss leaves ``file_path`` as ``None``: the fix stays source-less and
     falls under the conservative single-file rule, which is the safe direction.
     """
     if pipe_error.file_path is not None:

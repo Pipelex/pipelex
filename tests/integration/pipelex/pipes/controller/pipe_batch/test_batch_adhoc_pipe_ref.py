@@ -88,3 +88,52 @@ class TestBatchAdhocPipeRef:
         # `test_integration1.uppercase_transformer_batch` as a code; the `PipeAbstract.code` validator
         # strips it back and warns — every batched run, about a code the user never wrote.
         assert "namespace prefix" not in caplog.text
+
+    async def test_batching_a_pipe_with_a_cross_domain_output_keeps_the_output_concept(
+        self,
+        mocker: MockerFixture,
+        job_metadata: JobMetadata,
+        load_test_library: Callable[[list[Path]], None],
+    ):
+        """The ad-hoc batch blueprint carries the output as a full concept_ref, not a bare code.
+
+        The blueprint is built with the sub-pipe's own ``domain_code``, so a bare output code would
+        be re-resolved in that domain — a `StuffSpecFactoryError` when the concept only exists in
+        the sibling domain, or silently the WRONG concept when the sub-pipe's domain happens to
+        declare the same code. This test reddens under `output=sub_pipe.output.concept.code`.
+        """
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_batch")])
+
+        branch_pipe = get_required_entry_pipe(pipe_code="cross_domain_reporter")
+        item_spec = branch_pipe.inputs.get_required_stuff_spec(variable_name="text_item")
+        items_stuff = StuffFactory.make_stuff(
+            concept=item_spec.concept,
+            content=ListContent[TextContent](items=[TextContent(text="one"), TextContent(text="two")]),
+            name="texts",
+        )
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=items_stuff)
+
+        captured: list[Any] = []
+        real_make_pipe_job = PipeJobFactory.make_pipe_job
+
+        def capture(**kwargs: Any) -> Any:
+            captured.append(kwargs["pipe"])
+            return real_make_pipe_job(**kwargs)
+
+        mocker.patch.object(PipeJobFactory, "make_pipe_job", side_effect=capture)
+
+        sub_pipe = SubPipe(
+            pipe_code=branch_pipe.pipe_ref,
+            output_name="reported",
+            batch_params=BatchParams(input_list_stuff_name="texts", input_item_stuff_name="text_item"),
+        )
+        await sub_pipe.run_pipe(
+            calling_pipe_code="test_caller",
+            working_memory=working_memory,
+            job_metadata=job_metadata,
+            sub_pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+        )
+
+        assert captured, "SubPipe did not build a batch job"
+        batch_pipe = captured[0]
+        assert batch_pipe.output.concept.concept_ref == "test_integration1.UppercaseText"

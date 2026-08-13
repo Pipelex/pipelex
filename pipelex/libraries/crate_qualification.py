@@ -82,8 +82,8 @@ def qualify_crate(crate: LibraryCrate) -> QualifiedCrateContent:
 def _domain_of(qualified_ref: str) -> str:
     domain_path = QualifiedRef.parse(qualified_ref).domain_path
     if domain_path is None:
-        # "the normalizer" would be wrong now: the library build calls this pass too, and is the
-        # busier caller of the two.
+        # Both the normalizer and the library build call this pass, so the message names the pass
+        # rather than either caller.
         msg = f"Crate key '{qualified_ref}' is not domain-qualified; this pass expects a merged, key-qualified crate."
         raise CrateNormalizationError(msg)
     return domain_path

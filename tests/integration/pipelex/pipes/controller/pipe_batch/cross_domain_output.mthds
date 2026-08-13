@@ -1,0 +1,17 @@
+domain      = "test_integration_batch_xdom"
+description = "A pipe whose output concept lives in ANOTHER domain, for the ad-hoc batch output test"
+
+[pipe]
+
+[pipe.cross_domain_reporter]
+type = "PipeLLM"
+description = "Produce an uppercase report typed by a concept from a sibling domain"
+inputs = { text_item = "Text" }
+output = "test_integration1.UppercaseText"
+prompt = """
+Transform the following text to uppercase:
+
+@text_item
+
+Just return the transformed text, nothing else.
+"""

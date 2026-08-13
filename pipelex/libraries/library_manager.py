@@ -447,13 +447,11 @@ class LibraryManager(LibraryManagerAbstract):
             # Detect cycles in concept references (A -> B -> A is forbidden)
             self._detect_concept_cycles(all_concepts)
 
-            # Precompute domain -> concept local codes mapping (avoids O(N*M) re-parsing per pipe).
-            # Sourced from the LIVE library (native concepts + concepts from prior load batches + this
-            # batch's concepts, already added above), not just this crate — so a pipe can reference, by
-            # bare code, a same-domain concept that a prior batch (e.g. a -L library directory) loaded.
-            # This is the pipe-factory counterpart to the loader's cross-batch concept-reference check:
-            # without it, that check would pass a bare cross-batch ref only for the factory to reject
-            # it. Cross-package aliased entries ('alias->...') are skipped — they resolve through the
+            # Precompute domain -> concept local codes mapping. VESTIGIAL on this path — see the note
+            # on the qualification pass below: every io ref reaching PipeFactory is dotted, and the
+            # factory only consults this parameter for dot-free refs. Kept until the PipeFactory
+            # signature change that removes it (deferred with the concept-side work).
+            # Cross-package aliased entries ('alias->...') are skipped — they resolve through the
             # dependency resolver, not by bare code, and would not parse as a concept ref.
             domain_concept_codes: dict[str, list[str]] = {}
             for concept_ref in library.concept_library.root:
@@ -1045,8 +1043,10 @@ class LibraryManager(LibraryManagerAbstract):
                 library.concept_library.add_new_concept(concept=concept)
                 temp_concept_refs.append(concept.concept_ref)
 
-        # Per-domain concept codes let a pipe resolve a same-domain concept by bare code, mirroring
-        # load_from_crate. A multi-file dependency may span several domains.
+        # Per-domain concept codes, mirroring load_from_crate — and VESTIGIAL for the same reason:
+        # the qualification pass below rewrites every io ref to dotted form, and PipeFactory only
+        # consults this parameter for dot-free refs. Kept until the deferred PipeFactory signature
+        # change removes it on both paths together.
         domain_concept_codes: dict[str, list[str]] = {}
         for concept in dep_concepts:
             parsed_concept = QualifiedRef.parse_concept_ref(raw=concept.concept_ref)
