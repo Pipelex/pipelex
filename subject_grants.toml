@@ -7059,3 +7059,15 @@ rationale = "Derivation: encodes the workflow id into a file name; writer_id sta
 ["pipelex/tracing/usage_aggregator.py::UsageAggregator.aggregate"]
 param = "events"
 rationale = "Verb-object: aggregates the events; single operand."
+
+["pipelex/tracing/usage_attribution.py::_merge_token_categories"]
+param = "usages"
+rationale = "Verb-object: operates on one list of usage records; the single obvious operand is the usages."
+
+["pipelex/tracing/usage_attribution.py::_rated_count"]
+param = "usages"
+rationale = "Verb-object: operates on one list of usage records; the single obvious operand is the usages."
+
+["pipelex/tracing/usage_attribution.py::make_self_contained_spec"]
+param = "usages"
+rationale = "Verb-object: operates on one list of usage records; the single obvious operand is the usages."

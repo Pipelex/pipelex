@@ -44,7 +44,7 @@ from pipelex.tracing.trace_events import (
     TraceEvent,
     UsageReportEvent,
 )
-from pipelex.tracing.usage_attribution import UsageAccumulator, attribute_usage
+from pipelex.tracing.usage_attribution import NodeUsages, attribute_usage, make_self_contained_spec
 
 
 class _AssemblerNodeData:
@@ -183,9 +183,10 @@ class _AssemblerState:
         # Edges generated in Pass 2 (DATA, BATCH_ITEM, etc.)
         self._generated_edges: list[EdgeSpec] = []
 
-        # Usage accumulation, keyed by the node_id the event named — resolved against
-        # the real node set in pass 2 (see the class docstring).
-        self._usage_by_reported_node: dict[str, UsageAccumulator] = {}
+        # Usage records, keyed by the node_id the event named — resolved against the
+        # real node set in pass 2 (see the class docstring). Raw records, not totals:
+        # the arithmetic is the cost engine's, applied once in usage_attribution.
+        self._usage_by_reported_node: dict[str, NodeUsages] = {}
         self._graph_usage: GraphUsageSpec | None = None
 
     def pass_one(self, events: Sequence[TraceEvent]) -> None:
@@ -375,11 +376,7 @@ class _AssemblerState:
         started yet as far as this stream is concerned. Resolution happens in
         ``_attribute_usage``.
         """
-        accumulator = self._usage_by_reported_node.get(event.node_id)
-        if accumulator is None:
-            accumulator = UsageAccumulator()
-            self._usage_by_reported_node[event.node_id] = accumulator
-        accumulator.fold(tokens_usage=event.tokens_usage)
+        self._usage_by_reported_node.setdefault(event.node_id, []).append(event.tokens_usage)
 
     def _handle_execution_data(self, event: ExecutionDataEvent) -> None:
         node_data = self._nodes.get(event.node_id)
@@ -573,19 +570,21 @@ class _AssemblerState:
         if not self._usage_by_reported_node:
             return
 
-        own_usage_by_node: dict[str, UsageAccumulator] = {node_id: UsageAccumulator() for node_id in self._nodes}
-        unattributed_usage = UsageAccumulator()
-        for reported_node_id, accumulator in self._usage_by_reported_node.items():
-            own_usage = own_usage_by_node.get(reported_node_id)
-            if own_usage is None:
+        own_usages_by_node: dict[str, NodeUsages] = {node_id: [] for node_id in self._nodes}
+        unattributed_usages: NodeUsages = []
+        all_usages: NodeUsages = []
+        for reported_node_id, usages in self._usage_by_reported_node.items():
+            all_usages.extend(usages)
+            own_usages = own_usages_by_node.get(reported_node_id)
+            if own_usages is None:
                 if reported_node_id != UNATTRIBUTED_NODE_ID:
                     log.warning(f"UsageReportEvent for unknown node: {reported_node_id}")
-                unattributed_usage.absorb(other=accumulator)
+                unattributed_usages.extend(usages)
                 continue
-            own_usage.absorb(other=accumulator)
+            own_usages.extend(usages)
 
         usage_specs = attribute_usage(
-            own_usage_by_node=own_usage_by_node,
+            own_usages_by_node=own_usages_by_node,
             parent_by_node={node_id: node_data.parent_node_id for node_id, node_data in self._nodes.items()},
         )
         for node_id, usage_spec in usage_specs.items():
@@ -593,10 +592,7 @@ class _AssemblerState:
 
         # The run total counts every usage the stream reported, attributed or not — it is
         # what the cost report's own total must agree with.
-        total_usage = UsageAccumulator()
-        for accumulator in self._usage_by_reported_node.values():
-            total_usage.absorb(other=accumulator)
         self._graph_usage = GraphUsageSpec(
-            total=total_usage.to_self_contained_spec(),
-            unattributed=unattributed_usage.to_self_contained_spec(),
+            total=make_self_contained_spec(all_usages),
+            unattributed=make_self_contained_spec(unattributed_usages),
         )
