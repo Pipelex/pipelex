@@ -7,7 +7,7 @@
    ```bash
    make agent-check
    # If the current system doesn't have the `make` command,
-   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports fix-keyword-only format generate-mthds-schema lint pyright mypy check-keyword-only)
+   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports fix-keyword-only format lint pyright mypy check-keyword-only check-hub-layering drift-check)
    ```
 
    This runs multiple code quality tools:
@@ -15,6 +15,7 @@
    - Ruff: Fix unused imports, lint, format  
    - Mypy: Static type checker
    - plxt: Format and lint TOML, MTHDS, and PLX files
+   - Drift contracts: open code↔docs review obligations fail the gate (note the digest reads the git index, so stage your changes for the check to see them)
 
    Always fix any issues reported by these tools before proceeding.
 
