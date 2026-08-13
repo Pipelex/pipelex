@@ -154,7 +154,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
             return ConceptFactory.make_native_concept(native_concept_code=native_concept)
 
         @override
-        def get_required_concept_from_concept_ref_or_code(self, concept_ref_or_code, *, search_domain_codes=None):
+        def get_required_entry_concept(self, concept_ref_or_code, *, search_scope=None):
             return self.get_required_concept(concept_ref_or_code)
 
         @override

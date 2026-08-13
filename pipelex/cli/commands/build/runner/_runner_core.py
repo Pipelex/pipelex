@@ -22,7 +22,7 @@ from pipelex.codegen.resolved_concepts import resolve_concepts_from_crate
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.interpreter_hub import get_current_library_id_or_none, get_library_manager, get_required_pipe
+from pipelex.interpreter_hub import get_current_library_id_or_none, get_library_manager, get_required_entry_pipe
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION
@@ -83,10 +83,10 @@ async def _prepare_runner_core(
         raise typer.Exit(1)
 
     try:
-        the_pipe = get_required_pipe(pipe_code=pipe_code)
+        the_pipe = get_required_entry_pipe(pipe_code=pipe_code)
     except Exception as exc:
         # CLI command boundary: any failure resolving the pipe is reported to the user and exits via typer.Exit.
-        typer.secho(f"Error: Could not find pipe '{pipe_code}': {exc}", fg=typer.colors.RED)
+        typer.secho(f"Error: Failed to resolve pipe '{pipe_code}': {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
     if output_path:

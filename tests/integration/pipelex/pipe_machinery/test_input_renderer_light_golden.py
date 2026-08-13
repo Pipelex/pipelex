@@ -21,7 +21,13 @@ from typing import TYPE_CHECKING, Any, cast
 import pytest
 import tomli
 
-from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_pipe, set_current_library
+from pipelex.interpreter_hub import (
+    clear_current_library,
+    get_current_library_id_or_none,
+    get_library_manager,
+    get_required_entry_pipe,
+    set_current_library,
+)
 from pipelex.pipe_machinery.rendering.input_renderer import render_inputs, render_inputs_toml
 from pipelex.pipeline.validate_bundle import validate_bundle
 
@@ -51,7 +57,7 @@ class TestInputRendererLightGolden:
     async def _load_pipe(self, bundle_path: Path, *, pipe_ref: str, load_empty_library: Callable[[], str]) -> tuple[Any, str]:
         outer_library_id = load_empty_library()
         await validate_bundle(mthds_file_path=bundle_path)
-        the_pipe = get_required_pipe(pipe_code=pipe_ref)
+        the_pipe = get_required_entry_pipe(pipe_code=pipe_ref)
         return the_pipe, outer_library_id
 
     async def test_triage_light_json_default(self, load_empty_library: Callable[[], str]) -> None:

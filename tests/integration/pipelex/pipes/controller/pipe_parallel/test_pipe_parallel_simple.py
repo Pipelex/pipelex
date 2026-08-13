@@ -34,9 +34,9 @@ class TestPipeParallelSimple:
             inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
             output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.COMPOSITE}",
             branches=[
-                SubPipeBlueprint(pipe="analyze_sentiment", result="sentiment_result"),
-                SubPipeBlueprint(pipe="count_words", result="word_count_result"),
-                SubPipeBlueprint(pipe="extract_keywords", result="keywords_result"),
+                SubPipeBlueprint(pipe="test_integration3.analyze_sentiment", result="sentiment_result"),
+                SubPipeBlueprint(pipe="test_integration3.count_words", result="word_count_result"),
+                SubPipeBlueprint(pipe="test_integration3.extract_keywords", result="keywords_result"),
             ],
             add_each_output=True,
         )
@@ -63,11 +63,11 @@ class TestPipeParallelSimple:
         assert pipe_parallel.add_each_output is True
 
         # Verify sub-pipes configuration
-        assert pipe_parallel.parallel_sub_pipes[0].pipe_code == "analyze_sentiment"
+        assert pipe_parallel.parallel_sub_pipes[0].pipe_code == "test_integration3.analyze_sentiment"
         assert pipe_parallel.parallel_sub_pipes[0].output_name == "sentiment_result"
-        assert pipe_parallel.parallel_sub_pipes[1].pipe_code == "count_words"
+        assert pipe_parallel.parallel_sub_pipes[1].pipe_code == "test_integration3.count_words"
         assert pipe_parallel.parallel_sub_pipes[1].output_name == "word_count_result"
-        assert pipe_parallel.parallel_sub_pipes[2].pipe_code == "extract_keywords"
+        assert pipe_parallel.parallel_sub_pipes[2].pipe_code == "test_integration3.extract_keywords"
         assert pipe_parallel.parallel_sub_pipes[2].output_name == "keywords_result"
 
         # Verify the working memory has the correct structure
@@ -152,9 +152,9 @@ class TestPipeParallelSimple:
             inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
             output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.COMPOSITE}",
             branches=[
-                SubPipeBlueprint(pipe="analyze_sentiment", result="sentiment_result"),
-                SubPipeBlueprint(pipe="count_words", result="word_count_result"),
-                SubPipeBlueprint(pipe="extract_keywords", result="keywords_result"),
+                SubPipeBlueprint(pipe="test_integration3.analyze_sentiment", result="sentiment_result"),
+                SubPipeBlueprint(pipe="test_integration3.count_words", result="word_count_result"),
+                SubPipeBlueprint(pipe="test_integration3.extract_keywords", result="keywords_result"),
             ],
             add_each_output=True,
         )

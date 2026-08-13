@@ -18,7 +18,13 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_pipe, set_current_library
+from pipelex.interpreter_hub import (
+    clear_current_library,
+    get_current_library_id_or_none,
+    get_library_manager,
+    get_required_entry_pipe,
+    set_current_library,
+)
 from pipelex.pipe_machinery.rendering.input_renderer import render_inputs
 from pipelex.pipeline.pipeline_response import RunState
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
@@ -47,7 +53,7 @@ class TestSmartInputsLightRoundTrip:
         outer_library_id = load_empty_library()
         try:
             await validate_bundle(mthds_file_path=_BUNDLE)
-            the_pipe = get_required_pipe(pipe_code="smart_inputs_demo.triage_case")
+            the_pipe = get_required_entry_pipe(pipe_code="smart_inputs_demo.triage_case")
             light_inputs: dict[str, Any] = json.loads(render_inputs(the_pipe))
         finally:
             _teardown_validation_library(outer_library_id)

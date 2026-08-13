@@ -33,7 +33,7 @@ class TestGenerateInputsCore:
         validate_result = SimpleNamespace(blueprints=[SimpleNamespace(main_pipe="bundle_main")])
         return {
             "validate_bundle": mocker.patch(f"{MODULE}.validate_bundle", new=mocker.AsyncMock(return_value=validate_result)),
-            "get_required_pipe": mocker.patch(f"{MODULE}.get_required_pipe", return_value=SimpleNamespace(code="bundle_main")),
+            "get_required_entry_pipe": mocker.patch(f"{MODULE}.get_required_entry_pipe", return_value=SimpleNamespace(code="bundle_main")),
             "render_inputs": mocker.patch(f"{MODULE}.render_inputs", return_value='{\n  "topic": "your topic"\n}'),
         }
 
@@ -43,7 +43,7 @@ class TestGenerateInputsCore:
 
         asyncio.run(_generate_inputs_core(pipe_code=None, bundle_path=bundle_path))
 
-        core_mocks["get_required_pipe"].assert_called_once_with(pipe_code="bundle_main")
+        core_mocks["get_required_entry_pipe"].assert_called_once_with(pipe_code="bundle_main")
         inputs_file = tmp_path / "inputs.json"
         assert inputs_file.read_text(encoding="utf-8") == '{\n  "topic": "your topic"\n}'
 
@@ -53,7 +53,7 @@ class TestGenerateInputsCore:
 
         asyncio.run(_generate_inputs_core(pipe_code="my_pipe", bundle_path=bundle_path))
 
-        core_mocks["get_required_pipe"].assert_called_once_with(pipe_code="my_pipe")
+        core_mocks["get_required_entry_pipe"].assert_called_once_with(pipe_code="my_pipe")
 
     def test_bundle_without_main_pipe_exits(self, core_mocks: dict[str, Any], tmp_path: Path) -> None:
         """A bundle without main_pipe and no --pipe is an error."""

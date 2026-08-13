@@ -9,7 +9,7 @@ from pipelex.interpreter_hub import (
     get_current_library_id_or_none,
     get_library_manager,
     get_pipe_library,
-    get_required_pipe,
+    get_required_entry_pipe,
     resolve_library_dirs,
     set_current_library,
 )
@@ -156,7 +156,7 @@ async def validate_pipe_core(
         if effective_dirs:
             library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
 
-        the_pipe = get_required_pipe(pipe_code=pipe_code)
+        the_pipe = get_required_entry_pipe(pipe_code=pipe_code)
         dry_run_results = await BundleValidator().validate_pipes(pipes=[the_pipe], library_id=library_id, allow_signatures=allow_signatures)
 
         return {

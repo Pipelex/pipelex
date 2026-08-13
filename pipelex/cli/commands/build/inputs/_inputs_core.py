@@ -15,7 +15,7 @@ from pipelex.cli.error_handlers import (
 )
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
-from pipelex.interpreter_hub import get_library_manager, get_required_pipe, resolve_library_dirs, set_current_library
+from pipelex.interpreter_hub import get_library_manager, get_required_entry_pipe, resolve_library_dirs, set_current_library
 from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat, NoInputsRequiredError, render_inputs, render_inputs_toml
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION
@@ -82,10 +82,10 @@ async def _generate_inputs_core(
         raise typer.Exit(1)
 
     try:
-        the_pipe = get_required_pipe(pipe_code=pipe_code)
+        the_pipe = get_required_entry_pipe(pipe_code=pipe_code)
     except Exception as exc:
         # CLI command boundary: any failure resolving the pipe is reported to the user and exits via typer.Exit.
-        typer.secho(f"Error: Could not find pipe '{pipe_code}': {exc}", fg=typer.colors.RED)
+        typer.secho(f"Error: Failed to resolve pipe '{pipe_code}': {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
     inputs_template_str: str

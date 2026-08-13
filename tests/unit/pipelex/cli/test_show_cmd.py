@@ -102,12 +102,12 @@ class TestShowCmd:
     def test_do_show_pipe_pretty_prints_pipe(self, mocker: MockerFixture, telemetry: Any) -> None:
         """Showing a pipe fetches it from the hub and pretty-prints it."""
         fake_pipe = SimpleNamespace(type="PipeLLM")
-        get_required_pipe_mock = mocker.patch("pipelex.cli.commands.show_cmd.get_required_pipe", return_value=fake_pipe)
+        get_required_entry_pipe_mock = mocker.patch("pipelex.cli.commands.show_cmd.get_required_entry_pipe", return_value=fake_pipe)
         pretty_print_mock = mocker.patch("pipelex.cli.commands.show_cmd.pretty_print")
 
         do_show_pipe(pipe_code="my_pipe")
 
-        get_required_pipe_mock.assert_called_once_with(pipe_code="my_pipe")
+        get_required_entry_pipe_mock.assert_called_once_with(pipe_code="my_pipe")
         pretty_print_mock.assert_called_once_with(fake_pipe, title="Pipe 'my_pipe'")
         telemetry.track_event.assert_called_once()
 

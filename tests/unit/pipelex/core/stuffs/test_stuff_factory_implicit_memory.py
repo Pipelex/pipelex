@@ -142,13 +142,13 @@ class TestStuffFactoryImplicitMemory:
 
 
 class TestStuffFactoryImplicitMemoryWithSearchDomains:
-    """Test StuffFactory with search_domains parameter.
+    """Test StuffFactory with the search_scope parameter.
 
-    This tests that search_domain_codes correctly resolves concepts.
+    This tests that search_scope correctly resolves concepts.
     """
 
     @pytest.mark.parametrize(
-        ("test_name", "stuff_content_or_data", "stuff_name", "stuff_code", "search_domain_codes", "expected_stuff"),
+        ("test_name", "stuff_content_or_data", "stuff_name", "stuff_code", "search_scope", "expected_stuff"),
         SEARCH_DOMAIN_TEST_CASES,
     )
     def test_search_domain_case(
@@ -158,7 +158,7 @@ class TestStuffFactoryImplicitMemoryWithSearchDomains:
         stuff_content_or_data: StuffContentOrData,
         stuff_name: str | None,
         stuff_code: str,
-        search_domain_codes: list[str],
+        search_scope: str,
         expected_stuff: Stuff,
     ):
         log.info(f"Testing search domain case: {test_name}")
@@ -167,7 +167,7 @@ class TestStuffFactoryImplicitMemoryWithSearchDomains:
             name=stuff_name,
             code=stuff_code,
             stuff_content_or_data=stuff_content_or_data,
-            search_domain_codes=search_domain_codes,
+            search_scope=search_scope,
             concept_provider=get_concept_library(),
         )
 
@@ -184,7 +184,7 @@ class TestStuffFactoryImplicitMemoryErrors:
     """
 
     @pytest.mark.parametrize(
-        ("test_name", "stuff_content_or_data", "stuff_name", "stuff_code", "search_domain_codes", "expected_exception", "error_match"),
+        ("test_name", "stuff_content_or_data", "stuff_name", "stuff_code", "search_scope", "expected_exception", "error_match"),
         ERROR_TEST_CASES,
     )
     def test_error_case(
@@ -194,7 +194,7 @@ class TestStuffFactoryImplicitMemoryErrors:
         stuff_content_or_data: StuffContentOrData,
         stuff_name: str | None,
         stuff_code: str,
-        search_domain_codes: list[str] | None,
+        search_scope: str | None,
         expected_exception: type[Exception],
         error_match: str,
     ):
@@ -206,6 +206,6 @@ class TestStuffFactoryImplicitMemoryErrors:
                 name=stuff_name,
                 code=stuff_code,
                 stuff_content_or_data=stuff_content_or_data,
-                search_domain_codes=search_domain_codes,
+                search_scope=search_scope,
                 concept_provider=get_concept_library(),
             )

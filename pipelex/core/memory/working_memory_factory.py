@@ -75,7 +75,7 @@ class WorkingMemoryFactory(BaseModel):
         *,
         concept_provider: ConceptProviderAbstract,
         input_specs: InputStuffSpecs | None = None,
-        search_domain_codes: list[str] | None = None,
+        search_scope: str | None = None,
         inputs_base_dir: Path | None = None,
     ) -> WorkingMemory:
         """Create a WorkingMemory from a pipeline inputs dictionary.
@@ -93,7 +93,8 @@ class WorkingMemoryFactory(BaseModel):
                 than looked up so this module stays out of the method interpreter's import closure
                 (see hub-layering); the caller holds the loaded method's library.
             input_specs: The entry pipe's declared inputs; ``None`` disables signature-driven shaping
-            search_domain_codes: List of domain codes to search for concepts
+            search_scope: The entry pipe's own scope (its domain, `alias->domain` for a dependency
+                entry pipe), preferred when resolving a bare concept code
             inputs_base_dir: Directory that bare *relative local* file paths resolve against (D3);
                 the inputs file's parent when inputs were file-loaded by a CLI. ``None`` for API/SDK
                 and in-process callers (they pass absolute urls / storage uris). Only consulted by
@@ -108,7 +109,7 @@ class WorkingMemoryFactory(BaseModel):
                 pipeline_inputs,
                 concept_provider=concept_provider,
                 input_specs=input_specs,
-                search_domain_codes=search_domain_codes,
+                search_scope=search_scope,
                 inputs_base_dir=inputs_base_dir,
             )
 
@@ -119,7 +120,7 @@ class WorkingMemoryFactory(BaseModel):
                 name=stuff_key,
                 stuff_content_or_data=stuff_content_or_data,
                 concept_provider=concept_provider,
-                search_domain_codes=search_domain_codes,
+                search_scope=search_scope,
             )
             working_memory.add_new_stuff(name=stuff_key, stuff=stuff)
         return working_memory

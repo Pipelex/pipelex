@@ -14,7 +14,7 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.interpreter_hub import get_native_concept, get_pipe_router, get_required_pipe
+from pipelex.interpreter_hub import get_native_concept, get_pipe_router, get_required_entry_pipe
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
@@ -49,7 +49,7 @@ class TestImageInputsInference:
 
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
-                pipe=get_required_pipe(pipe_code="extract_article_from_image"),
+                pipe=get_required_entry_pipe(pipe_code="extract_article_from_image"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
                 job_metadata=job_metadata,
@@ -92,7 +92,7 @@ class TestImageInputsInference:
 
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
-                pipe=get_required_pipe(pipe_code="describe_page"),
+                pipe=get_required_entry_pipe(pipe_code="describe_page"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
                 job_metadata=job_metadata,
@@ -136,7 +136,7 @@ class TestImageInputsInference:
 
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
-                pipe=get_required_pipe(pipe_code="analyze_image_collection"),
+                pipe=get_required_entry_pipe(pipe_code="analyze_image_collection"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
                 job_metadata=job_metadata,
@@ -187,7 +187,7 @@ class TestImageInputsInference:
 
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
-                pipe=get_required_pipe(pipe_code="compare_two_image_collections"),
+                pipe=get_required_entry_pipe(pipe_code="compare_two_image_collections"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
                 job_metadata=job_metadata,
@@ -223,7 +223,7 @@ class TestImageInputsInference:
 
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
-                pipe=get_required_pipe(pipe_code="describe_image"),
+                pipe=get_required_entry_pipe(pipe_code="describe_image"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
                 job_metadata=job_metadata,

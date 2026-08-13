@@ -37,6 +37,28 @@ Libraries enforce specific uniqueness constraints to maintain consistency:
 
 Pipes are identified by their domain-qualified reference (e.g. `marketing.generate_tagline`), so different domains within the same library can have pipes with the same code.
 
+## How a pipe reference resolves
+
+A reference written **inside** a pipe — a sequence step, a parallel branch, a condition outcome, a `batch_over` target — resolves within its own domain:
+
+- `generate_tagline` written inside a `marketing` pipe means `marketing.generate_tagline`.
+- To reference a pipe in another domain, write that domain out: `sales.generate_tagline`.
+
+A bare reference never reaches another domain. This is what makes a domain a real boundary: adding a pipe to one domain cannot change what a pipe in another domain means, and `[exports]` — which deliberately exempts bare references from its check, because they were never supposed to leave home — is enforceable through every reference form.
+
+If a bare reference names nothing in its own domain, validation says so, names the reference it actually tried, and points at the domain that does declare that code:
+
+```
+Pipe 'marketing.run_campaign' references 'marketing.render_html', which does not exist. A pipe
+reference resolves inside its own domain, so 'render_html' is looked for in domain 'marketing'.
+Referencing a pipe in another domain requires writing that domain out. 'render_html' is declared
+elsewhere in this library — did you mean 'presentation.render_html'?
+```
+
+**Pipe codes you type yourself are a different matter.** `pipelex run generate_tagline`, `pipelex show generate_tagline`, `pipelex which generate_tagline`, and the pipe code in an API request all accept a bare code and find it in whichever domain declares it — you are pointing at a pipe, not writing a reference. If two domains declare the same code, these commands ask you to say which one rather than picking for you.
+
+**Concept codes you supply in inputs follow the same entry rule.** A bare code in an input envelope (`{"concept": "Memo", "content": ...}`) is resolved against the entry pipe's own domain first; if that domain does not declare it, a code unique across the library is found wherever it lives, and a code two domains declare raises an error asking you to qualify it (`marketing.Memo`). Concept references written **inside** a bundle never search at all — they are qualified to their own domain when the library is built, exactly like pipe references.
+
 ## Local vs Remote Libraries
 
 ### Local Libraries (Current)

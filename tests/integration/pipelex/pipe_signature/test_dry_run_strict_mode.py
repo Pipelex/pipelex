@@ -37,6 +37,8 @@ def _make_bundle_with_signature() -> PipelexBundleBlueprint:
                 description="Sequence step calling the signature.",
                 inputs={"doc": "BundleDoc"},
                 output="BundleSummary",
+                # Bare on purpose: this is a bundle blueprint, so it goes through the crate
+                # qualification pass and picks up this bundle's own domain, not SIGNATURES_DOMAIN_CODE.
                 steps=[SubPipeBlueprint(pipe="bundle_sig_step", result="summary")],
             ),
         },
@@ -79,7 +81,7 @@ class TestDryRunStrictMode:
                 description="Pure-operator sequence.",
                 inputs={"doc": "SigTestDoc"},
                 output="SigTestSummary",
-                steps=[SubPipeBlueprint(pipe="strict_real_step", result="summary")],
+                steps=[SubPipeBlueprint(pipe=f"{SIGNATURES_DOMAIN_CODE}.strict_real_step", result="summary")],
             ),
             concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
         )
@@ -111,7 +113,7 @@ class TestDryRunStrictMode:
                 description="Sequence containing a signature.",
                 inputs={"doc": "SigTestDoc"},
                 output="SigTestSummary",
-                steps=[SubPipeBlueprint(pipe="strict_sig_step", result="summary")],
+                steps=[SubPipeBlueprint(pipe=f"{SIGNATURES_DOMAIN_CODE}.strict_sig_step", result="summary")],
             ),
             concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
         )
@@ -142,7 +144,7 @@ class TestDryRunStrictMode:
                 description="Sequence with a signature, but lenient mode.",
                 inputs={"doc": "SigTestDoc"},
                 output="SigTestSummary",
-                steps=[SubPipeBlueprint(pipe="lenient_sig_step", result="summary")],
+                steps=[SubPipeBlueprint(pipe=f"{SIGNATURES_DOMAIN_CODE}.lenient_sig_step", result="summary")],
             ),
             concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
         )

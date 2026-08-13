@@ -152,9 +152,13 @@ class TestPipeNamespace:
             assert analytics_pipe.code == "process"
             assert analytics_pipe.domain_code == "analytics"
 
-            # Bare code is ambiguous
-            with pytest.raises(PipeLibraryError, match="Ambiguous pipe code"):
-                library.pipe_library.get_optional_pipe("process")
+            # A bare code is not an in-body reference the library will chase across domains, so it
+            # simply does not resolve there. Ambiguity is now the entry affordance's problem, because
+            # searching is the only thing that can produce it.
+            assert library.pipe_library.get_optional_pipe("process") is None
+
+            with pytest.raises(PipeLibraryError, match="is ambiguous"):
+                library.pipe_library.get_optional_entry_pipe("process")
 
     def test_multi_bundle_same_domain(self, load_test_library: Callable[[list[Path]], None]):
         """Multiple .mthds files contributing to the same domain load successfully."""
@@ -207,7 +211,10 @@ class TestPipeNamespace:
                 )
 
     def test_bare_code_lookup_from_mthds(self, load_test_library: Callable[[list[Path]], None]):
-        """Bare code lookup works when pipe code is unambiguous (single domain)."""
+        """A hand-typed bare code still reaches the pipe — through the entry affordance, not the
+        in-body resolver. `pipelex which compute_score` must keep working; a pipe reaching another
+        domain by bare code must not.
+        """
         with tempfile.TemporaryDirectory() as tmp_dir:
             (Path(tmp_dir) / "scoring.mthds").write_text(SINGLE_DOMAIN_MTHDS, encoding="utf-8")
 
@@ -215,12 +222,14 @@ class TestPipeNamespace:
 
             library = get_library_manager().get_current_library()
 
-            # Both bare code and pipe_ref lookup work
             pipe_by_ref = library.pipe_library.get_required_pipe("scoring.compute_score")
-            pipe_by_code = library.pipe_library.get_required_pipe("compute_score")
+            pipe_by_code = library.pipe_library.get_required_entry_pipe("compute_score")
 
             assert pipe_by_ref is pipe_by_code
             assert pipe_by_ref.pipe_ref == "scoring.compute_score"
+
+            # The in-body resolver does not accept the bare form at all.
+            assert library.pipe_library.get_optional_pipe("compute_score") is None
 
     def test_wrong_domain_lookup_returns_not_found(self, load_test_library: Callable[[list[Path]], None]):
         """Looking up a pipe with the wrong domain raises PipeNotFoundError."""
