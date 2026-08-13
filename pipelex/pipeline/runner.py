@@ -112,7 +112,6 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         bundle_uris: list[str] | None = None,
         pipe_run_mode: PipeRunMode | None = None,
         is_mock_usage: bool = False,
-        search_domain_codes: list[str] | None = None,
         user_id: str | None = None,
         execution_config: PipelineExecutionConfig | None = None,
         pipe_run: PipeRunProtocol | None = None,
@@ -123,7 +122,6 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         self.bundle_uris = bundle_uris
         self.pipe_run_mode = pipe_run_mode
         self.is_mock_usage = is_mock_usage
-        self.search_domain_codes = search_domain_codes
         self.user_id = user_id
         self.execution_config = execution_config
         self._pipe_run = pipe_run
@@ -223,7 +221,6 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 dynamic_output_concept_ref=dynamic_output_concept_ref,
                 pipe_run_mode=self.pipe_run_mode,
                 is_mock_usage=self.is_mock_usage,
-                search_domain_codes=self.search_domain_codes,
                 user_id=self.user_id,
                 inputs_base_dir=self.inputs_base_dir,
             )

@@ -2420,9 +2420,9 @@ rationale = "Resolver getter: the native concept being fetched; single operand."
 param = "concept_ref"
 rationale = "Resolver getter keyed by the concept ref; single operand."
 
-["pipelex/core/concepts/concept_provider_abstract.py::ConceptProviderAbstract.get_required_concept_from_concept_ref_or_code"]
+["pipelex/core/concepts/concept_provider_abstract.py::ConceptProviderAbstract.get_required_entry_concept"]
 param = "concept_ref_or_code"
-rationale = "Resolver getter keyed by the ref-or-code; single operand."
+rationale = "Entry affordance keyed by the human-supplied concept string; single operand, the concept twin of get_required_entry_pipe."
 
 ["pipelex/core/concepts/concept_representation_generator.py::ConceptRepresentationGenerator._format_python_value"]
 param = "value"
@@ -3587,6 +3587,10 @@ rationale = "Verb-object: formats the text; formatting options stay keyword."
 ["pipelex/libraries/concept/concept_library.py::ConceptLibrary.get_optional_concept"]
 param = "concept_ref"
 rationale = "Library getter keyed by the concept ref; single operand."
+
+["pipelex/libraries/concept/concept_library.py::ConceptLibrary.get_optional_entry_concept"]
+param = "concept_ref_or_code"
+rationale = "Entry affordance keyed by the human-supplied concept string; single operand, mirroring get_optional_entry_pipe."
 
 ["pipelex/libraries/concept/concept_library.py::ConceptLibrary.is_concept_exists"]
 param = "concept_ref"

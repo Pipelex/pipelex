@@ -6,6 +6,7 @@ from mthds.protocol.pipeline_inputs import PipelineInputs
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import (
     clear_current_library,
@@ -53,7 +54,6 @@ async def pipeline_run_setup(
     dynamic_output_concept_ref: str | None = None,
     pipe_run_mode: PipeRunMode | None = None,
     is_mock_usage: bool = False,
-    search_domain_codes: list[str] | None = None,
     user_id: str | None = None,
     pipeline_run_id: str | None = None,
     request_id: str | None = None,
@@ -114,9 +114,6 @@ async def pipeline_run_setup(
         the cheap, deterministic cross-worker cost-report validation affordance. Threaded onto
         :attr:`CogtRunParams.is_mock_usage`, which rides every assignment to the leaf in both
         direct and Temporal modes. Requires a DRY run; setting it on a LIVE run fails validation.
-    search_domain_codes:
-        List of domain codes to search for pipes. The executed pipe's domain is automatically
-        added if not already present.
     user_id:
         Unique identifier for the user (optional).
     pipeline_run_id:
@@ -201,11 +198,15 @@ async def pipeline_run_setup(
             msg = "Either provide pipe_code or mthds_contents to the pipeline API."
             raise PipeExecutionError(message=msg)
 
-        pipe_code = pipe.code
+        # The entry pipe's own scope, preferred when input shaping resolves a bare concept code.
+        # When the caller invoked a dependency pipe (`alias->…`), the scope carries the package
+        # alias too, so the dependency's own concepts — keyed under the alias — stay reachable.
+        search_scope: str = pipe.domain_code
+        if pipe_code and QualifiedRef.has_cross_package_prefix(pipe_code):
+            entry_alias, _ = QualifiedRef.split_cross_package_ref(pipe_code)
+            search_scope = f"{entry_alias}->{pipe.domain_code}"
 
-        search_domain_codes = search_domain_codes or []
-        if pipe.domain_code not in search_domain_codes:
-            search_domain_codes.insert(0, pipe.domain_code)
+        pipe_code = pipe.code
 
         # Initialize the tracing context if graph OR cost reporting is requested (after pipe is loaded so we
         # have domain info). The two concerns share one event-log transport and one in-memory tracer; the
@@ -280,7 +281,7 @@ async def pipeline_run_setup(
             pipeline_run_id=pipeline_run_id,
             user_id=user_id,
             inputs=inputs,
-            search_domain_codes=search_domain_codes,
+            search_scope=search_scope,
             trace_context=trace_context,
             otel_context=otel_context,
             output_name=output_name,

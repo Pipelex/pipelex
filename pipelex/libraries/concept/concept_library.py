@@ -178,49 +178,86 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         """Create all native concepts from the hardcoded data"""
         return [self.get_native_concept(native_concept=native_concept) for native_concept in NativeConceptCode.values_list()]
 
-    @override
-    def get_required_concept_from_concept_ref_or_code(self, concept_ref_or_code: str, *, search_domain_codes: list[str] | None = None) -> Concept:
+    def get_optional_entry_concept(self, concept_ref_or_code: str, *, search_scope: str | None = None) -> Concept | None:
+        """Resolve a concept string a **human** supplied — an input payload's `concept` field, a CLI argument.
+
+        Entry-shaped lookup, the concept twin of `PipeLibrary.get_optional_entry_pipe` — kept a
+        deliberate near-copy rather than a shared helper (see
+        wip/pipe-refs/entry-affordance-share-vs-duplicate.md). Natives resolve first, per the
+        standard's own step 1. A fully-specified ref (`domain.Concept`, `alias->domain.Concept`)
+        is a direct hit or a miss. A bare code prefers `search_scope` — the entry pipe's own
+        domain, carried as `alias->domain` when the entry pipe came from a dependency package, so
+        the preference is package-scoped, not just domain-scoped — then falls back to a crate-wide
+        unique match. An ambiguous bare code raises rather than picking a winner.
+
+        Aliased dependency entries are excluded from the crate-wide search: installing an
+        unrelated package must not make a host concept's bare code ambiguous. They stay reachable
+        through `search_scope` (the dependency the entry pipe belongs to) or an explicit
+        `alias->domain.Concept` ref.
+
+        Raises:
+            ConceptLibraryError: the string is not a valid concept ref or code.
+            ConceptLibraryConceptNotFoundError: a bare code matches concepts in several domains.
+        """
         try:
             validate_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code)
         except ConceptStringError as exc:
             msg = f"Could not validate concept string or code '{concept_ref_or_code}': {exc}"
             raise ConceptLibraryError(msg) from exc
 
-        # Cross-package refs are looked up via get_required_concept which handles them
+        # Fully specified with a package alias: direct hit or miss, nothing to search.
         if QualifiedRef.has_cross_package_prefix(concept_ref_or_code):
-            return self.get_required_concept(concept_ref=concept_ref_or_code)
+            return self.root.get(concept_ref_or_code)
 
         if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code):
             native_concept_ref = NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=concept_ref_or_code)
             return self.get_native_concept(native_concept=NativeConceptCode(native_concept_ref.split(".")[1]))
-        elif "." in concept_ref_or_code:
-            return self.get_required_concept(concept_ref=concept_ref_or_code)
-        else:
-            found_concepts: list[Concept] = []
-            if search_domain_codes is None:
-                for concept in self.root.values():
-                    if concept_ref_or_code == concept.code:
-                        found_concepts.append(concept)
-                if len(found_concepts) == 0:
-                    msg = f"Concept '{concept_ref_or_code}' not found in the library and no search domains were provided"
-                    raise ConceptLibraryConceptNotFoundError(msg)
-                if len(found_concepts) > 1:
-                    msg = f"Multiple concepts found for '{concept_ref_or_code}': {found_concepts}. Please specify the domain."
-                    raise ConceptLibraryConceptNotFoundError(msg)
-                return found_concepts[0]
+
+        scope_alias: str | None = None
+        scope_domain: str | None = None
+        if search_scope:
+            if QualifiedRef.has_cross_package_prefix(search_scope):
+                scope_alias, scope_domain = QualifiedRef.split_cross_package_ref(search_scope)
             else:
-                for domain_code in search_domain_codes:
-                    if found_concept := self.get_required_concept(
-                        concept_ref=ConceptFactory.make_concept_ref_with_domain(domain_code=domain_code, concept_code=concept_ref_or_code),
-                    ):
-                        found_concepts.append(found_concept)
-                if len(found_concepts) == 0:
-                    msg = f"Concept '{concept_ref_or_code}' not found in the library and no search domains were provided"
-                    raise ConceptLibraryConceptNotFoundError(msg)
-                if len(found_concepts) > 1:
-                    msg = f"Multiple concepts found for '{concept_ref_or_code}': {found_concepts}. Please specify the domain."
-                    raise ConceptLibraryConceptNotFoundError(msg)
-                return found_concepts[0]
+                scope_domain = search_scope
+
+        if "." in concept_ref_or_code:
+            the_concept = self.root.get(concept_ref_or_code)
+            if the_concept is not None:
+                return the_concept
+            if scope_alias:
+                # The entry pipe came from a dependency package: that package's concepts are keyed
+                # under its alias, so a ref naming one of the dependency's own domains must reach it.
+                return self.root.get(f"{scope_alias}->{concept_ref_or_code}")
+            return None
+
+        # Bare code: the entry pipe's own scope wins before any search.
+        if scope_domain:
+            scoped_ref = ConceptFactory.make_concept_ref_with_domain(domain_code=scope_domain, concept_code=concept_ref_or_code)
+            if scope_alias:
+                scoped_ref = f"{scope_alias}->{scoped_ref}"
+            the_concept = self.root.get(scoped_ref)
+            if the_concept is not None:
+                return the_concept
+
+        matches = [
+            concept for key, concept in self.root.items() if not QualifiedRef.has_cross_package_prefix(key) and concept.code == concept_ref_or_code
+        ]
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            candidates = sorted(match.concept_ref for match in matches)
+            msg = f"Concept code '{concept_ref_or_code}' is ambiguous — it is declared by {candidates}. Name one of them explicitly."
+            raise ConceptLibraryConceptNotFoundError(msg)
+        return None
+
+    @override
+    def get_required_entry_concept(self, concept_ref_or_code: str, *, search_scope: str | None = None) -> Concept:
+        the_concept = self.get_optional_entry_concept(concept_ref_or_code=concept_ref_or_code, search_scope=search_scope)
+        if not the_concept:
+            msg = f"Concept '{concept_ref_or_code}' not found in the library. Check for typos and make sure its bundle is loaded."
+            raise ConceptLibraryConceptNotFoundError(msg)
+        return the_concept
 
     def add_dependency_concept(self, *, alias: str, concept: Concept) -> None:
         """Add a concept from a dependency package with an aliased key.

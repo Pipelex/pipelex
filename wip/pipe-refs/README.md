@@ -131,7 +131,9 @@ The suggestion comes from a crate-wide scan that runs **only** on the failure pa
 
 ## 4. The same divergence is still live for concepts — and that reader is separately broken
 
-`probes/concept-lookup-matrix.py` builds a two-domain library in memory and asks for a bare code under each shape of `search_domain_codes`. Measured output, verbatim:
+> **HISTORICAL — closed by Phase 3 (2026-08-13).** The table below measures the `search_domain_codes` machinery this section was written about, which no longer exists: `get_required_concept_from_concept_ref_or_code` was replaced by the entry affordance `get_required_entry_concept(code, search_scope=...)`, taking both defects (2) and (3) with it. The probe was rewritten against the replacement; its re-measured table is at the end of this section. The wording below is preserved as the record of what was wrong.
+
+`probes/concept-lookup-matrix.py` built a two-domain library in memory and asked for a bare code under each shape of `search_domain_codes`. Measured output at the time, verbatim:
 
 | Library | `search_domain_codes` | Result |
 | --- | --- | --- |
@@ -152,7 +154,20 @@ Three things fall out of that table, and the last two are defects nobody has fil
 
 **How live is (2) and (3)?** Latent, not live, today: the `pipeline_run_setup` insert produces a single-element list, and no production call site passes a longer one (`grep -rn "search_domain_codes=\[" pipelex tests` finds only test call sites). That is worth stating plainly rather than dressing up — but it also means the multi-domain list is unusable the moment anyone reaches for it, and the standard's rule is exactly what makes the whole `search_domain_codes` parameter unnecessary.
 
-**One thing to confirm rather than assume:** `search_domain_codes` is fixed once from the *entry* pipe's domain and carried on the runner (the `search_domain_codes` constructor field in `pipelex/pipeline/runner.py` and its pass-through into the pipe job). Whether a sub-pipe in another domain can reach a concept-shaping path with the entry domain in hand — and therefore fail to resolve its own bare concept ref — was not established here. It is a good first question for whoever picks this up.
+**One thing to confirm rather than assume:** `search_domain_codes` is fixed once from the *entry* pipe's domain and carried on the runner (the `search_domain_codes` constructor field in `pipelex/pipeline/runner.py` and its pass-through into the pipe job). Whether a sub-pipe in another domain can reach a concept-shaping path with the entry domain in hand — and therefore fail to resolve its own bare concept ref — was not established here. It is a good first question for whoever picks this up. *(Answered during the design phase: it cannot — sub-pipe concept refs are qualified or rejected at build, so the defects were latent, entry-only. See the design doc's "The concept side".)*
+
+**Re-measured after Phase 3 (2026-08-13).** The lookup is now `get_required_entry_concept(code, search_scope=...)`, where the scope is derived from the resolved entry pipe (its domain, `alias->domain` when the entry pipe came from a dependency package) instead of being a caller-supplied list. Same probe, same library shapes:
+
+| Library | `search_scope` | Result |
+| --- | --- | --- |
+| `alpha.Memo` + `beta.Memo` | `None` | `ConceptLibraryConceptNotFoundError: Concept code 'Memo' is ambiguous — it is declared by ['alpha.Memo', 'beta.Memo']. Name one of them explicitly.` |
+| `beta.Memo` only | `None` | resolved `beta.Memo` — unique crate-wide match |
+| `alpha.Memo` + `beta.Memo` | `alpha` | resolved **`alpha.Memo`** — the entry pipe's own domain wins (row 3's dead preference, now live) |
+| `beta.Memo` only | `alpha` | resolved `beta.Memo` — a scope lacking the code falls back instead of dying on the miss |
+| `beta.Memo` only | `beta` | resolved `beta.Memo` |
+| empty library | `alpha` | `ConceptLibraryConceptNotFoundError: Concept 'Memo' not found in the library. …` |
+
+Every escape is `ConceptLibraryConceptNotFoundError` — the class the `stuff_factory` handlers actually catch — so defect (2)'s wrong-exception-class bypass is structurally gone, and the walk cannot die mid-scan because there is no scan-per-domain walk left. Note this is the **entry** affordance: a hand-supplied code deliberately still searches crate-wide (excluding aliased dependency entries) when the scope misses, because a human pointing at a concept is not an in-body reference. In-body concept refs were already owner-domain-qualified at build time before this branch.
 
 ## 5. The corpus — which direction is actually expensive
 

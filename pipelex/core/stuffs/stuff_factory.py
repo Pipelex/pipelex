@@ -252,7 +252,7 @@ class StuffFactory:
         concept_provider: ConceptProviderAbstract,
         name: str | None = None,
         code: str | None = None,
-        search_domain_codes: list[str] | None = None,
+        search_scope: str | None = None,
     ) -> Stuff:
         """Create a Stuff from StuffContentOrData covering all pipeline inputs cases.
 
@@ -330,13 +330,11 @@ class StuffFactory:
                     concept = concept_provider.get_native_concept(native_concept=NativeConceptCode(content_class_name.split("Content")[0]))
                 else:
                     try:
-                        concept = concept_provider.get_required_concept_from_concept_ref_or_code(
-                            concept_ref_or_code=content_class_name, search_domain_codes=search_domain_codes
-                        )
+                        concept = concept_provider.get_required_entry_concept(concept_ref_or_code=content_class_name, search_scope=search_scope)
                     except ConceptLibraryConceptNotFoundError as exc:
                         msg = (
                             f"Trying to create a Stuff '{name}' from a ListContent but "
-                            f"the concept of name '{content_class_name}' is not found in the library"
+                            f"the concept of name '{content_class_name}' could not be resolved: {exc}"
                         )
                         raise StuffFactoryError(msg) from exc
 
@@ -361,13 +359,11 @@ class StuffFactory:
                 else:
                     # It's a StructuredContent, try to find the concept
                     try:
-                        concept = concept_provider.get_required_concept_from_concept_ref_or_code(
-                            concept_ref_or_code=content_class_name, search_domain_codes=search_domain_codes
-                        )
+                        concept = concept_provider.get_required_entry_concept(concept_ref_or_code=content_class_name, search_scope=search_scope)
                     except ConceptLibraryConceptNotFoundError as exc:
                         msg = (
                             f"Trying to create a Stuff '{name}' from a StuffContent '{content_class_name}' "
-                            f"but the concept of name '{content_class_name}' is not found in the library"
+                            f"but the concept of name '{content_class_name}' could not be resolved: {exc}"
                         )
                         raise StuffFactoryError(msg) from exc
 
@@ -426,13 +422,11 @@ class StuffFactory:
                         concept = concept_provider.get_native_concept(native_concept=NativeConceptCode(content_class_name.split("Content")[0]))
                     else:
                         try:
-                            concept = concept_provider.get_required_concept_from_concept_ref_or_code(
-                                concept_ref_or_code=content_class_name, search_domain_codes=search_domain_codes
-                            )
+                            concept = concept_provider.get_required_entry_concept(concept_ref_or_code=content_class_name, search_scope=search_scope)
                         except ConceptLibraryConceptNotFoundError as exc:
                             msg = (
                                 f"Trying to create a Stuff '{name}' from a list of StuffContent but "
-                                f"the concept of name '{content_class_name}' is not found in the library"
+                                f"the concept of name '{content_class_name}' could not be resolved: {exc}"
                             )
                             raise StuffFactoryError(msg) from exc
 
@@ -477,13 +471,11 @@ class StuffFactory:
 
         # Get the concept from the library
         try:
-            concept = concept_provider.get_required_concept_from_concept_ref_or_code(
-                concept_ref_or_code=concept_ref, search_domain_codes=search_domain_codes
-            )
+            concept = concept_provider.get_required_entry_concept(concept_ref_or_code=concept_ref, search_scope=search_scope)
         except ConceptLibraryConceptNotFoundError as exc:
             msg = (
                 f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
-                f"but the concept of name '{concept_ref}' is not found in the library"
+                f"but the concept of name '{concept_ref}' could not be resolved: {exc}"
             )
             raise StuffFactoryError(msg) from exc
 

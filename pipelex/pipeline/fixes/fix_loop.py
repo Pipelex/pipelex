@@ -394,37 +394,47 @@ def _is_signature_pipe_section(pipe_section: Any) -> bool:
     return "type" not in typed_section and all(key in SIGNATURE_ONLY_KEYS for key in typed_section)
 
 
-def _pipe_codes_by_file(*, entry_path: Path, effective_dirs: Sequence[Path]) -> dict[Path, set[str]]:
-    """Concrete pipe declaration keys of every loaded bundle file, keyed by resolved path.
+class _FilePipeCodes(NamedTuple):
+    """One loaded bundle file's declared domain and its concrete pipe declaration keys."""
 
-    Cross-domain, but no longer because it has to be. The original reason was that a bare code had
-    to resolve unambiguously library-wide, since ``PipeLibrary.get_optional_pipe`` raised on a code
-    two domains declared. In-body refs now resolve within their own domain and that lookup never
-    searches, so a same-named declaration in another domain is not a collision at all — this scope
-    is merely conservative and can only over-block, never under-block. Narrowing it to per-domain is
-    tracked with the concept-side work. Signature-only headers are excluded: a matching concrete
-    definition is allowed to replace a ``PipeSignature`` during crate merge, so treating the
-    header as a hard collision would block a valid fix. Rebuilt each iteration: multiple files
-    can now mutate per round. A file that fails to parse contributes nothing here — its own
-    problems surface through validation, not this scan.
+    domain: str | None
+    codes: set[str]
+
+
+def _pipe_codes_by_file(*, entry_path: Path, effective_dirs: Sequence[Path]) -> dict[Path, _FilePipeCodes]:
+    """Concrete pipe declaration keys (with the declaring domain) of every loaded bundle file.
+
+    The domain is recorded because the collision scope is **per-domain**: in-body refs resolve
+    within their own domain and the library keys pipes by ``domain.code``, so a same-named
+    declaration in another domain is not a collision at all — only two files of the same domain
+    writing the same bare code can create a state the loop cannot repair. A file whose ``domain``
+    cannot be read keeps the conservative cross-domain behavior (``None`` collides with
+    everything). Signature-only headers are excluded: a matching concrete definition is allowed
+    to replace a ``PipeSignature`` during crate merge, so treating the header as a hard collision
+    would block a valid fix. Rebuilt each iteration: multiple files can now mutate per round. A
+    file that fails to parse contributes nothing here — its own problems surface through
+    validation, not this scan.
     """
     all_paths: set[Path] = {entry_path}
     all_paths.update(mthds_path.resolve() for mthds_path in get_pipelex_mthds_files_from_dirs(dirs=set(effective_dirs)))
-    codes_by_file: dict[Path, set[str]] = {}
+    codes_by_file: dict[Path, _FilePipeCodes] = {}
     for mthds_path in all_paths:
         try:
             toml_doc = load_toml_from_path(mthds_path)
         except TomlError:
             continue
+        raw_domain = toml_doc.get("domain")
+        file_domain = raw_domain if isinstance(raw_domain, str) else None
         pipe_section = toml_doc.get("pipe")
         if isinstance(pipe_section, dict):
-            codes_by_file[mthds_path] = {
+            file_codes = {
                 key
                 for key, section in cast("dict[Any, Any]", pipe_section).items()
                 if isinstance(key, str) and not _is_signature_pipe_section(section)
             }
         else:
-            codes_by_file[mthds_path] = set()
+            file_codes = set[str]()
+        codes_by_file[mthds_path] = _FilePipeCodes(domain=file_domain, codes=file_codes)
     return codes_by_file
 
 
@@ -436,14 +446,12 @@ def _colliding_op_name(
 ) -> str | None:
     """The pipe code this op would collide with across files, or ``None`` when it cannot.
 
-    Two op shapes can write a bare pipe code that another loaded file already declares:
+    Two op shapes can write a bare pipe code that another loaded file of the same domain already
+    declares (``other_file_pipe_codes`` is built domain-scoped by the caller — see
+    ``_split_cross_file_collisions``):
 
     - a ``[pipe]`` ``rename_table_key`` whose ``new_key`` is declared elsewhere — applying it
-      would create a duplicate declaration (same domain) that the loop can never repair. The
-      *other-domain* half of that reasoning has expired: a bare in-body code no longer searches
-      across domains, so a same-named pipe in another domain is not an ambiguity at all. Those
-      fixes are still dropped, but the scope is now knowingly over-conservative rather than
-      required — see ``_pipe_codes_by_file``, which builds the set this checks against;
+      would create a duplicate declaration (same domain) that the loop can never repair;
     - a root ``main_pipe`` ``set_key`` whose value is declared elsewhere while the target file
       does NOT declare that value — its paired declaration rename is exactly the case above
       (dropped), so applying the ``set_key`` alone would write an orphaned ``main_pipe``
@@ -473,28 +481,38 @@ def _colliding_op_name(
 def _split_cross_file_collisions(
     fixes: list[_BoundFix],
     *,
-    codes_by_file: dict[Path, set[str]],
+    codes_by_file: dict[Path, _FilePipeCodes],
 ) -> tuple[list[_BoundFix], list[str]]:
     """Split ``fixes`` into (kept, colliding pipe codes of the dropped ones).
 
     The raise-site collision gate only sees the one file being validated; in a multi-file run a
-    bare pipe of the same name may live in another loaded file, where writing it (as a ``[pipe]``
-    key rename or a ``main_pipe`` value) would create a state the loop can never repair. Each
-    fix is checked against the pipe codes of every loaded file OTHER than its own target.
-    Dropped fixes simply leave their error unfixed (still reported in ``remaining_errors``).
+    bare pipe of the same name may live in another loaded file **of the same domain**, where
+    writing it (as a ``[pipe]`` key rename or a ``main_pipe`` value) would create a duplicate
+    declaration the loop can never repair. Each fix is checked against the pipe codes of every
+    loaded same-domain file OTHER than its own target — a same-named pipe in another domain is
+    not a collision, since the library keys pipes by ``domain.code`` and in-body refs never
+    search across domains. A file whose domain could not be read is checked against every file
+    (conservative). Dropped fixes simply leave their error unfixed (still reported in
+    ``remaining_errors``).
     """
     kept: list[_BoundFix] = []
     colliding_names: list[str] = []
     other_codes_cache: dict[Path, set[str]] = {}
     for fix in fixes:
         target_path = fix.target_path
-        target_codes = codes_by_file.get(target_path, set())
+        target_entry = codes_by_file.get(target_path)
+        target_codes = target_entry.codes if target_entry else set[str]()
+        target_domain = target_entry.domain if target_entry else None
         other_codes = other_codes_cache.get(target_path)
         if other_codes is None:
             other_codes = set[str]()
-            for file_path, file_codes in codes_by_file.items():
-                if file_path != target_path:
-                    other_codes.update(file_codes)
+            for file_path, file_entry in codes_by_file.items():
+                if file_path == target_path:
+                    continue
+                same_domain = file_entry.domain == target_domain
+                domain_unknown = file_entry.domain is None or target_domain is None
+                if same_domain or domain_unknown:
+                    other_codes.update(file_entry.codes)
             other_codes_cache[target_path] = other_codes
         fix_collisions = [
             name
@@ -609,7 +627,10 @@ async def fix_bundle_file(
             in_scope_fixes, colliding_names = _split_cross_file_collisions(in_scope_fixes, codes_by_file=codes_by_file)
             if not in_scope_fixes:
                 colliding = ", ".join(f"'{name}'" for name in sorted(set(colliding_names)))
-                bail_reason = f"cross-file collision: every remaining fix would write a pipe code ({colliding}) already declared in a sibling bundle"
+                bail_reason = (
+                    f"cross-file collision: every remaining fix would write a pipe code ({colliding}) "
+                    "already declared in a same-domain sibling bundle"
+                )
                 return FixBundleResult(
                     is_valid=False,
                     iterations=apply_rounds,
