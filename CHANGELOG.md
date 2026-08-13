@@ -15,6 +15,7 @@
 ### Fixed
 
 - **Pipe-lookup CLI failures no longer claim "not found" for every failure**: `pipelex codegen inputs` and the `build runner`/`build inputs`/`build output` commands printed a "not found"/"Could not find" prefix on any lookup failure, including an ambiguous bare code — contradicting the ambiguity message printed underneath. The prefix is now verdict-neutral and the underlying error states whether the code was missing or ambiguous.
+- **`Time` now converts in the `PipeCompose` whole-stuff matrix**: A whole `Time` stuff copied into a `time`-typed construct field (`start = { from = "start_time" }`) handed over the `TimeContent` wrapper instead of the time. `Time` was introduced after the conversion matrix was written and was simply never added to it — no rationale ever excluded it. `TimeContent → time` now joins `Text → str`, `Number → float|int`, `YesNo → bool` and `Date → date`, and the plural `Time[] → list[time]` form is covered too. Unlike `Date`, the conversion needs no fidelity guard: a `Time` holds a single value carrying its UTC offset inside its own `tzinfo`, so the copy is lossless. A whole `Date` still does not convert into a bare `time` field, since that would drop the date — the dotted path `{ from = "deadline.time" }` is the route to that value.
 
 ## [v0.43.1] - 2026-08-12
 
