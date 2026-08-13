@@ -5191,6 +5191,28 @@ Libraries enforce specific uniqueness constraints to maintain consistency:
 
 Pipes are identified by their domain-qualified reference (e.g. `marketing.generate_tagline`), so different domains within the same library can have pipes with the same code.
 
+## How a pipe reference resolves
+
+A reference written **inside** a pipe — a sequence step, a parallel branch, a condition outcome, a `batch_over` target — resolves within its own domain:
+
+- `generate_tagline` written inside a `marketing` pipe means `marketing.generate_tagline`.
+- To reference a pipe in another domain, write that domain out: `sales.generate_tagline`.
+
+A bare reference never reaches another domain. This is what makes a domain a real boundary: adding a pipe to one domain cannot change what a pipe in another domain means, and `[exports]` — which deliberately exempts bare references from its check, because they were never supposed to leave home — is enforceable through every reference form.
+
+If a bare reference names nothing in its own domain, validation says so, names the reference it actually tried, and points at the domain that does declare that code:
+
+```
+Pipe 'marketing.run_campaign' references 'marketing.render_html', which does not exist. A pipe
+reference resolves inside its own domain, so 'render_html' is looked for in domain 'marketing'.
+Referencing a pipe in another domain requires writing that domain out. 'render_html' is declared
+elsewhere in this library — did you mean 'presentation.render_html'?
+```
+
+**Pipe codes you type yourself are a different matter.** `pipelex run generate_tagline`, `pipelex show generate_tagline`, `pipelex which generate_tagline`, and the pipe code in an API request all accept a bare code and find it in whichever domain declares it — you are pointing at a pipe, not writing a reference. If two domains declare the same code, these commands ask you to say which one rather than picking for you.
+
+**Concept codes you supply in inputs follow the same entry rule.** A bare code in an input envelope (`{"concept": "Memo", "content": ...}`) is resolved against the entry pipe's own domain first; if that domain does not declare it, a code unique across the library is found wherever it lives, and a code two domains declare raises an error asking you to qualify it (`marketing.Memo`). Concept references written **inside** a bundle never search at all — they are qualified to their own domain when the library is built, exactly like pipe references.
+
 ## Local vs Remote Libraries
 
 ### Local Libraries (Current)
@@ -8164,7 +8186,7 @@ The referenced value must be a list, and every item must carry the key attribute
 
 ### Copying Whole Inputs Into Native Fields
 
-The `from` reference is not limited to dotted paths like `"customer.name"` — it can name a whole input variable. When the referenced input is a native stuff (`Text`, `Number`, `YesNo`, `Date`, or a list of them) and the target field is native-typed, the composer automatically converts the content wrapper into the field's native value. This works for required and optional fields alike.
+The `from` reference is not limited to dotted paths like `"customer.name"` — it can name a whole input variable. When the referenced input is a native stuff (`Text`, `Number`, `YesNo`, `Date`, `Time`, or a list of them) and the target field is native-typed, the composer automatically converts the content wrapper into the field's native value. This works for required and optional fields alike.
 
 Conversion matrix:
 
@@ -8174,14 +8196,18 @@ Conversion matrix:
 | `Number` | `type = "number"` | the number |
 | `YesNo` | `type = "boolean"` | the boolean |
 | `Date` | `type = "date"` | the date |
+| `Time` | `type = "time"` | the time of day |
 | `Text[]` | `type = "list"`, `item_type = "text"` | the list of strings |
 | `Number[]` | `type = "list"`, `item_type = "number"` | the list of numbers |
 | `YesNo[]` | `type = "list"`, `item_type = "boolean"` | the list of booleans |
 | `Date[]` | `type = "list"`, `item_type = "date"` | the list of dates |
+| `Time[]` | `type = "list"`, `item_type = "time"` | the list of times of day |
 
 When the target field expects a content object rather than a native value (e.g. a field typed with a concept), the object is kept as-is — the conversion only fires when the field expects the native type.
 
 One fidelity guard: a `Date` stuff that carries a time of day cannot be copied into a bare `date` field — that would silently drop the time and its UTC offset, so the composer raises an error instead. Target a `Date`-typed field to keep the full timestamp. The same guard applies per item when copying a `Date[]` into a list of `date` items.
+
+`Time` needs no such guard, and the asymmetry is deliberate: a `Time` is a single value that carries its UTC offset inside the time itself, so copying it into a `time` field is lossless and nothing can be dropped. In the other direction, a whole `Date` does not convert into a `time` field at all — that would drop the date. Use a dotted path instead, `{ from = "deadline.time" }`, to take the time of day out of a `Date`.
 
 Worked example — assembling a report from whole stuffs produced by earlier steps:
 
@@ -20405,7 +20431,7 @@ There is deliberately **no** `pipelex.hub`. It was deleted rather than kept as a
 | --- | --- |
 | container | `InterpreterHub`, `get_interpreter_hub`, `set_interpreter_hub` |
 | library manager | `get_library_manager`, `get_library` |
-| library lookups | `get_concept_library`, `get_required_concept`, `get_native_concept`, `get_required_domain`, `get_optional_domain`, `get_pipe_library`, `get_pipes`, `get_required_pipe`, `get_optional_pipe`, `get_pipe_source` |
+| library lookups | `get_concept_library`, `get_required_concept`, `get_native_concept`, `get_required_domain`, `get_optional_domain`, `get_pipe_library`, `get_pipes`, `get_required_pipe`, `get_optional_pipe`, `get_required_entry_pipe`, `get_optional_entry_pipe`, `get_pipe_source` |
 | current-library contextvar | `set_current_library`, `get_current_library`, `get_current_library_id_or_none`, `clear_current_library`, `scoped_current_library` |
 | library dirs | `resolve_library_dirs`, `get_default_library_dirs` |
 | pipe router | `get_pipe_router`, `set_pipe_router`, `teardown_current_pipe_router`, `scoped_pipe_router` |
@@ -20490,6 +20516,10 @@ The **write side** stays ambient on purpose: `concept_factory` and `structure_ge
 It is **read-side only**. Managing a library — adding, removing, listing, setup/teardown — stays in the interpreter layer: `ConceptLibraryAbstract` *extends* it, keeping its management half in `libraries/`. Splitting read from write is what lets a core module state its dependency honestly ("I need something that can resolve concepts") without inheriting a library lifecycle it has no business touching.
 
 **There is deliberately no pipe counterpart.** Nothing in core's kernel half resolves a pipe. The two places that follow a pipe reference found *inside* a pipe graph — a condition's mapped pipes, a sequence's last step — live in `pipe_machinery/rendering/`, which is interpreter-layer and calls `interpreter_hub.get_required_pipe` directly; a provider parameter there would buy no closure property. `get_required_pipe` therefore stays on `PipeLibraryAbstract`. Split a read half out when a kernel-layer caller actually needs one, not for symmetry with concepts.
+
+Pipe resolution comes in two flavours on this hub, and picking the wrong one is a correctness bug rather than a style choice. `get_required_pipe` / `get_optional_pipe` resolve an **in-body** reference — one pipe naming another from inside a method — and are strict: the ref names its own domain or it names nothing. `get_required_entry_pipe` / `get_optional_entry_pipe` resolve a code a **human** supplied at an entry point (a CLI argument, an API request field), where a bare code is still matched across domains. A CLI command on the strict pair is needlessly strict; a controller on the entry pair reopens the cross-domain hole that makes `[exports]` unenforceable.
+
+One caveat on "strict", so nobody relies on it absolutely: a **cross-package** `alias->bare_code` ref is still resolved by searching the aliased entries, because the qualification pass leaves `alias->…` refs alone — it cannot know a dependency's domain layout, so there would be no canonical spelling to migrate such a ref to. That search is alias-scoped and cannot reach a host pipe, so it does not reopen the hole; it is a deferral to the packaging design, not an exception to the rule.
 
 The injection point is the interpreter layer. `pipe_factory`, `input_renderer` and `output_renderer` — already interpreter-bound, so nothing is lost — resolve the concept library themselves and pass it down; `pipeline/execution_seams.py` does the same for `WorkingMemoryFactory`. That is the one-way arrow the whole design rests on, applied inside `core/`: **the half that knows about a loaded method resolves the collaborator and hands it downward.**
 
@@ -20741,7 +20771,7 @@ Three pieces:
 
 - **`drift.toml`** (repo root, human-authored) declares the contracts: `triggers` (globs over tracked files), optional `exclude`, `review` targets, and optional `verify_commands`.
 - **`.drift/acks/<contract-id>.toml`** (tool-written, committed) records the last fulfilled review: a content digest, the reviewer, a timestamp, a rationale, and the per-file trigger snapshot.
-- **`pipelex-dev drift plan|check|ack`** computes obligations, checks them, and records acks. Make wrappers: `make drift-plan`, `make drift-check` (in the `make check` aggregate; in CI it currently runs as an **advisory** job that is visible on the PR but does not block merges — it will be promoted to a required check), `make drift-ack CONTRACT=… RATIONALE="…"`.
+- **`pipelex-dev drift plan|check|ack`** computes obligations, checks them, and records acks. Make wrappers: `make drift-plan`, `make drift-check` (in the `make agent-check` and `make check` aggregates; in CI it currently runs as an **advisory** job that is visible on the PR but does not block merges — it will be promoted to a required check), `make drift-ack CONTRACT=… RATIONALE="…"`.
 
 The validity rule is a single equality, with no base ref, no git diff, and no timestamps:
 
@@ -20756,7 +20786,7 @@ One view of every surface the contract system touches, from the working tree to 
 | Surface | What happens there |
 |---|---|
 | **Make targets** | `make drift-check` (alias `dc`) is the pass/fail gate; `make drift-plan` (`dp`) is the read-only diagnosis; `make drift-ack CONTRACT=… RATIONALE="…"` (`da`, optional `BY=` for agents) records the review. All three wrap `pipelex-dev drift`. |
-| **Quality checks** | `drift-check` runs inside the `make check` aggregate, alongside the other repo gates — a full local check cannot pass with an open contract or a rotten manifest. |
+| **Quality checks** | `drift-check` runs inside the `make agent-check` and `make check` aggregates, alongside the other repo gates — a local check cannot pass with an open contract or a rotten manifest, so an open contract surfaces before CI. Mind the index: the digest reads staged content, so unstaged trigger edits are invisible to the gate until `git add`. |
 | **Commits** | The digest is computed from the **git index**, and `drift ack` stages the ack file it writes — so the ack, the code change, and any doc fix land in the same commit, reviewed as one diff. |
 | **Branches / merges** | After a merge, `drift check` recomputes the digest over the merged tree. An ack that was valid on either side but does not cover the merged trigger content fails the check until the merged state is reviewed and re-acked (see [Merges](#merges)). |
 | **PRs / CI** | The `lint-drift` CI job runs `make drift-check` on every PR — currently advisory (visible, not merge-blocking; promotion to a required check is planned). The committed ack file appears in the PR diff, so the reviewer sees the rationale next to the change it covers. |
