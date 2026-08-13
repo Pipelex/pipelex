@@ -45,17 +45,19 @@ Pass 2 then does three things: resolves each accumulated total onto its node (or
 
 ## The three states of a usage number
 
-This is the part that matters for anything rendering a graph. A missing number means one of three things, and they must not be conflated — `$0.00` on an unrated node is a lie, and a blank controller card reads as a bug.
+This is the part that matters for anything rendering a graph. A missing number means one of three things, and they must not be conflated — `$0.00` on an unrated node is a lie, and a controller that reports nothing because it was read through the wrong half looks like a bug.
 
-| State | How it is encoded | What a UI should show |
+| State | How it is encoded | What a consumer may claim |
 |---|---|---|
-| **Not collected** | `usage is None` | nothing |
-| **Ran no inference** | `usage` present, `inference_calls == 0` | nothing (or the subtree, for a controller) |
-| **Unrated** | `cost is None` with `inference_calls > 0` | the token count, no `$` |
-| **Partial** | `inference_calls > rated_inference_calls > 0` | a marked lower bound: `≥ $0.0043` |
-| **Rated** | `rated_inference_calls == inference_calls > 0` | `$0.0043` |
+| **Not collected** | `usage is None` | nothing — no measurement was taken |
+| **Ran no inference** | `usage` present, `inference_calls == 0` | nothing (a controller may still report its subtree) |
+| **Unrated** | `cost is None` with `inference_calls > 0` | that calls were made; **no price** |
+| **Partial** | `inference_calls > rated_inference_calls > 0` | a price marked as a lower bound: `≥ $0.0043` |
+| **Rated** | `rated_inference_calls == inference_calls > 0` | the price: `$0.0043` |
 
-Unrated is not an edge case: `compute_tokens_usage_cost` returns `None` whenever the model carries no rate table, and dry/mock runs hardcode an empty rate table — so **every dry-run graph is unrated**, tokens and all.
+Unrated is not an edge case: `compute_tokens_usage_cost` returns `None` whenever the model carries no rate table, and dry/mock runs hardcode an empty rate table — so **every dry-run graph is unrated**.
+
+**A note on token counts, for anyone rendering them.** The counts are faithful to what the run reported, which is not the same as being meaningful to a reader. Two cases to handle before putting a number on screen: a dry run reports one synthetic call per would-be inference with zero tokens (or, under `--mock-usage`, with *invented* non-zero tokens — never display those, they measure nothing), and a `PipeSearch` reports its provider's billing unit in the token field, so a single search shows ~2,000,000 "tokens" for a correct price of $0.005. The `cost` is the number that survives both; `mthds-ui` accordingly displays cost only, and only for a real run.
 
 ## The invariants
 
@@ -66,9 +68,25 @@ Unrated is not an edge case: `compute_tokens_usage_cost` returns `None` whenever
 3. **`inference_calls > rated_inference_calls > 0` means `cost` is a lower bound**, not a total — some of this node's calls carried no rate table. A UI that renders it as a complete figure is silently wrong about money.
 4. **`total_tokens` is input_joined + output**, the same definition as `AggregatedCosts.total_nb_tokens`. It is **not** the sum of `nb_tokens_by_category`: `input_cached` is a *subset* of `input`, not additive, so summing the dict double-counts. Never sum the dict; read `total_tokens`.
 
+## The model that ran, vs the model that was asked for
+
+A GraphSpec names a model in three places, and only one of them is the outcome:
+
+| Rung | Where | Example |
+|---|---|---|
+| Authored choice | pipe blueprint `llm_choices.for_text` | `$writing-factual` (a preset) |
+| Requested handle | `execution_data.resolved_model` | `@default-premium` (still an alias) |
+| **What actually ran** | `NodeUsageSpec.by_model[].inference_model_name` | `claude-4.6-sonnet` |
+
+`execution_data.resolved_model` is captured from `LLMSetting.model` (`pipe_llm.py`), which is a *handle*: alias resolution happens later, at inference time. The name overstates what it holds — roughly a third of the nodes in a typical corpus carry an unresolved `@alias` there. Only `by_model` survives alias resolution, deck defaults, and any fallback or retry that landed somewhere other than what was requested.
+
+**`by_model` is a list because one node routinely uses more than one model.** A `PipeLLM`'s text pass and its object-structuring pass resolve separately (that is what `resolved_model_for_object` is about), and a retry can land elsewhere again. Collapsing them into "the model" would be wrong in exactly the way a single `cost` across mixed rated and unrated calls is wrong. Entries are ordered most-used first, ties broken by name, so a consumer can take `by_model[0]` as the dominant model without sorting. Per-model `cost` follows invariant 2: `None` iff no call to that model was priced.
+
+The same breakdown rolls up: `subtree_by_model` tells you every model a controller's whole branch used.
+
 ## Own and subtree
 
-Every node carries both halves: its own inference, and its own plus every descendant's (`subtree_*`). A controller (`PipeSequence`, `PipeBatch`, `PipeParallel`) runs no inference itself, so its own numbers are always zero and only the subtree half says anything. Subtree tokens matter as much as subtree cost — in a dry-run corpus, which is entirely unrated, tokens are the *only* number a controller can show.
+Every node carries both halves: its own inference, and its own plus every descendant's (`subtree_*`). A controller (`PipeSequence`, `PipeBatch`, `PipeParallel`) runs no inference itself, so its own numbers are always zero and only the subtree half says anything — read a controller through its own half and it reports nothing at all. Both tokens and cost roll up, so a consumer that shows either one has the branch figure available without walking the graph.
 
 The rollup is computed once, in the assembler, for the same reason `AggregatedCosts` computes its totals once: several consumers read the same GraphSpec, and they must not each re-derive it and disagree.
 

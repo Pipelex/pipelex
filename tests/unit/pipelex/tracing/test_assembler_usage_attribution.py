@@ -42,7 +42,7 @@ def _base(sequence: int) -> dict[str, Any]:
     }
 
 
-def _make_usage(*, unit_costs: CostsByCategoryDict) -> AnyTokensUsage:
+def _make_usage(*, unit_costs: CostsByCategoryDict, model_name: str = "test-model") -> AnyTokensUsage:
     return LLMTokensUsage(
         job_metadata=JobMetadata(
             user_id="user_test",
@@ -51,8 +51,8 @@ def _make_usage(*, unit_costs: CostsByCategoryDict) -> AnyTokensUsage:
             unit_job_id=UnitJobId.LLM_GEN_TEXT,
             job_category=JobCategory.LLM_JOB,
         ),
-        inference_model_name="test-model",
-        inference_model_id="test-model-id",
+        inference_model_name=model_name,
+        inference_model_id=f"{model_name}-id",
         unit_costs=unit_costs,
         nb_tokens_by_category={TokenCategory.INPUT: 100, TokenCategory.OUTPUT: 50},
     )
@@ -73,8 +73,12 @@ def _pipe_end(*, sequence: int, node_id: str) -> PipeEndSuccessEvent:
     return PipeEndSuccessEvent(**_base(sequence), node_id=node_id, ended_at=_T0 + timedelta(seconds=sequence))
 
 
-def _usage_event(*, sequence: int, node_id: str, unit_costs: CostsByCategoryDict) -> UsageReportEvent:
-    return UsageReportEvent(**_base(sequence), node_id=node_id, tokens_usage=_make_usage(unit_costs=unit_costs))
+def _usage_event(*, sequence: int, node_id: str, unit_costs: CostsByCategoryDict, model_name: str = "test-model") -> UsageReportEvent:
+    return UsageReportEvent(
+        **_base(sequence),
+        node_id=node_id,
+        tokens_usage=_make_usage(unit_costs=unit_costs, model_name=model_name),
+    )
 
 
 def _skeleton_events() -> list[TraceEvent]:
@@ -264,3 +268,27 @@ class TestAssemblerUsageAttribution:
         assert llm_usage is not None
         assert llm_usage.cost is None
         assert llm_usage.total_tokens == 150
+
+    def test_by_model_records_the_models_that_actually_ran(self) -> None:
+        """The graph's only record of the model that RAN, as opposed to the one requested."""
+        events = [
+            *_skeleton_events(),
+            _usage_event(sequence=6, node_id=_LLM_NODE_ID, unit_costs=_RATES, model_name="claude-4.6-sonnet"),
+            _usage_event(sequence=7, node_id=_LLM_NODE_ID, unit_costs=_RATES, model_name="structurer"),
+        ]
+
+        graph_spec = GraphSpecAssembler.assemble(events=events, graph_id=_GRAPH_ID)
+
+        llm_usage = _node_by_id(graph_spec, node_id=_LLM_NODE_ID).usage
+        assert llm_usage is not None
+        assert [entry.inference_model_name for entry in llm_usage.by_model] == ["claude-4.6-sonnet", "structurer"]
+        assert [entry.inference_model_id for entry in llm_usage.by_model] == ["claude-4.6-sonnet-id", "structurer-id"]
+
+        # The controller carries none of its own but reports the branch's models.
+        controller_usage = _node_by_id(graph_spec, node_id=_CONTROLLER_NODE_ID).usage
+        assert controller_usage is not None
+        assert controller_usage.by_model == []
+        assert {entry.inference_model_name for entry in controller_usage.subtree_by_model} == {
+            "claude-4.6-sonnet",
+            "structurer",
+        }

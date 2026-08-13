@@ -1,6 +1,6 @@
 # Per-node cost and token usage in the GraphSpec
 
-Status: **implemented through Phase 5** (T1-T12). Phase 6 (LIVE regeneration, real money) not run — it is a spend decision, and it is the only way to see a real dollar on a card.
+Status: **implemented and verified, all six phases.** Not yet shipped: nothing reaches users until `@pipelex/mthds-ui` is published and `make refresh-graph-ui-sri` bumps the pinned bundle.
 
 Revision 2 — absorbs the Codex outside-voice pass. See "Outside voice absorbed" at the end for what changed and why.
 
@@ -13,13 +13,26 @@ Revision 2 — absorbs the Codex outside-voice pass. See "Outside voice absorbed
 | 3 — pipelex docs + changelog | done (T8, new `docs/under-the-hood/per-node-usage-attribution.md`) |
 | 4 — DRY fixtures with `--mock-usage` | done (T10, T11 — full corpus regenerated, all green) |
 | 5 — mthds-ui | done (T9, T12 + `usageFormat.ts`, `UsageSection.tsx`, `docs/usage-attribution.md`) |
-| 6 — LIVE regeneration | **not run** — costs real inference; CHECKPOINT 3 is the human's call |
+| 6 — LIVE regeneration | done — all 32 pipelines, $2.85, zero failures |
 
 **CHECKPOINT 1 findings.** The rollup is correct on the deepest fixture: `pipeline_24` (DEEP_NESTING, 12 nodes, containment depth 3) matches an independent recomputation from the CONTAINS edges on every node, and its root subtree equals `graph.usage.total`. Nothing in the corpus is deep or wide enough to *measure* the memoization — the walk is memoized and uses an explicit stack, so the O(n) claim and the recursion-limit independence are structural, not benchmarked. `GraphSpec.usage.unattributed.inference_calls` is **0 on every one of the 32 DRY fixtures** — nothing escapes attribution on a local in-process run.
 
 **CHECKPOINT 2.** pipelex is shippable as-is: Phases 1-3 are self-contained and the API, the MCP and `vscode-pipelex` get per-node usage whether or not a card renders it.
 
-**CHECKPOINT 3.** Not reached. The card treatment is implemented and unit-tested, but it has only been *rendered* against the unrated DRY corpus — the rated (`$0.0043`) and partial (`≥ $0.0043`) chips have no fixture. Storybook review + `make fixtures-live ONLY=…` is the remaining human step, before the npm publish + `make refresh-graph-ui-sri` bump.
+**CHECKPOINT 3.** Reached and reviewed in Storybook against the real LIVE corpus. The treatment changed substantially from the plan under review — see "What review changed" below. Remaining: commit both repos, publish `@pipelex/mthds-ui`, and `make refresh-graph-ui-sri` to bump the pinned bundle. Until that publish, the standalone `reactflow.html` pipelex emits still loads the old bundle and shows no cost.
+
+### What review changed (post-implementation)
+
+The plan's UI design did not survive contact with the screen. Four reversals, all in the same direction — showing less, and only what was actually measured:
+
+1. **No cost on the cards at all.** The plan put a chip in the card's annotation row. Removed entirely — the card is for structure; a price on every node turns the graph into a spreadsheet. Cost lives only in the side panel.
+2. **Cost sits on the status line**, formatted exactly like the duration beside it (`● Succeeded  8.37s  $0.0268 ⌄`), not as a labelled block. They are three facts of the same kind about one run.
+3. **No token counts anywhere.** The decisive finding: extract, search and image generation are billed per request, and pipelex encodes that price by putting exactly `1_000_000` in each token category (rates are per-million, so the arithmetic reproduces the per-request price — `linkup_extract_worker.py:89`, `linkup_search_worker.py:92`, `gateway_extract_worker.py:182`). A one-page extract reports 2,000,000 "tokens". Worse, a controller's `subtree_total_tokens` sums those sentinels with real LLM tokens, so **no token figure is trustworthy at any level of a graph**. Cost is the only number that survives the encoding.
+4. **`--mock-usage` reverted out of the DRY fixtures.** It makes a dry run report invented token counts; a dry run executes nothing, so those were fabrications rendered as measurements. DRY specs now carry zero tokens and a null cost, which is the truth, and the cost surface is gated on a real run.
+
+### New defect found, not fixed (out of scope)
+
+The `1_000_000` sentinel is not confined to the graph. It rides the `/execute` API's `tokens_usages` records and the CLI cost table's token columns, and `AggregatedCosts.total_nb_tokens` sums it — so any client computing token usage from the API gets nonsense as soon as a method touches extract or search. The fix is a `billing_unit` discriminator on the usage record so per-request prices stop masquerading as token counts. That is an API-contract change and needs its own plan.
 
 ### Where the plan was refined during implementation
 

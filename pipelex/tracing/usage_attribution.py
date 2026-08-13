@@ -12,10 +12,25 @@ one place, and cost is never re-derived: every dollar comes from
 from collections.abc import Mapping
 
 from pipelex import log
-from pipelex.cogt.usage.cost_registry import compute_tokens_usage_cost
+from pipelex.cogt.usage.cost_registry import compute_tokens_usage_costs
 from pipelex.cogt.usage.token_category import TokenCategory
-from pipelex.graph.graphspec import NodeUsageSpec
+from pipelex.graph.graphspec import ModelUsageSpec, NodeUsageSpec
 from pipelex.reporting.reporting_types import AnyTokensUsage
+
+
+class _ModelTotals:
+    """One model's running totals inside a UsageAccumulator."""
+
+    def __init__(self) -> None:
+        self.inference_calls: int = 0
+        self.rated_inference_calls: int = 0
+        self.cost: float | None = None
+
+    def absorb(self, *, other: "_ModelTotals") -> None:
+        self.inference_calls += other.inference_calls
+        self.rated_inference_calls += other.rated_inference_calls
+        if other.cost is not None:
+            self.cost = (self.cost or 0.0) + other.cost
 
 
 class UsageAccumulator:
@@ -33,6 +48,10 @@ class UsageAccumulator:
       - ``total_tokens`` is accumulated as input_joined + output, never as a sum over
         ``nb_tokens_by_category`` — ``input_cached`` is a subset of ``input`` and
         summing double-counts (invariant 4).
+      - ``by_model`` keys on (name, id) so the models that actually RAN are kept
+        distinct, rather than collapsed into one that would be wrong whenever a node
+        used two — which a PipeLLM does routinely, its text pass and its object pass
+        resolving separately (invariant 5).
     """
 
     def __init__(self) -> None:
@@ -41,6 +60,10 @@ class UsageAccumulator:
         self.nb_tokens_by_category: dict[str, int] = {}
         self.total_tokens: int = 0
         self.cost: float | None = None
+        self.cost_input: float | None = None
+        self.cost_output: float | None = None
+        # (inference_model_name, inference_model_id, model_type) -> that model's totals.
+        self.by_model: dict[tuple[str, str, str], _ModelTotals] = {}
 
     def fold(self, *, tokens_usage: AnyTokensUsage) -> None:
         """Fold one inference call's usage into this total."""
@@ -52,14 +75,25 @@ class UsageAccumulator:
         nb_tokens_output = tokens_usage.nb_tokens_by_category.get(TokenCategory.OUTPUT, 0)
         self.total_tokens += nb_tokens_input_joined + nb_tokens_output
 
-        cost = compute_tokens_usage_cost(tokens_usage)
-        if cost is None:
+        model_key = (tokens_usage.inference_model_name, tokens_usage.inference_model_id, tokens_usage.model_type)
+        model_totals = self.by_model.get(model_key)
+        if model_totals is None:
+            model_totals = _ModelTotals()
+            self.by_model[model_key] = model_totals
+        model_totals.inference_calls += 1
+
+        costs = compute_tokens_usage_costs(tokens_usage)
+        if costs is None:
             # Unrated call (no rate table: own-GPU model, dry/mock run). It still counts
             # as an inference call, which is what tells "made no call" apart from "made
             # only unrated calls".
             return
         self.rated_inference_calls += 1
-        self.cost = (self.cost or 0.0) + cost
+        self.cost = (self.cost or 0.0) + costs.total
+        self.cost_input = (self.cost_input or 0.0) + costs.input
+        self.cost_output = (self.cost_output or 0.0) + costs.output
+        model_totals.rated_inference_calls += 1
+        model_totals.cost = (model_totals.cost or 0.0) + costs.total
 
     def absorb(self, *, other: "UsageAccumulator") -> None:
         """Merge another total into this one (subtree rollup, run total)."""
@@ -70,6 +104,14 @@ class UsageAccumulator:
         self.total_tokens += other.total_tokens
         if other.cost is not None:
             self.cost = (self.cost or 0.0) + other.cost
+            self.cost_input = (self.cost_input or 0.0) + (other.cost_input or 0.0)
+            self.cost_output = (self.cost_output or 0.0) + (other.cost_output or 0.0)
+        for model_key, other_totals in other.by_model.items():
+            model_totals = self.by_model.get(model_key)
+            if model_totals is None:
+                model_totals = _ModelTotals()
+                self.by_model[model_key] = model_totals
+            model_totals.absorb(other=other_totals)
 
     def to_node_usage_spec(self, *, subtree: "UsageAccumulator") -> NodeUsageSpec:
         """Pair this node's own total with its subtree total into the wire shape."""
@@ -79,12 +121,34 @@ class UsageAccumulator:
             nb_tokens_by_category=dict(self.nb_tokens_by_category),
             total_tokens=self.total_tokens,
             cost=self.cost,
+            cost_input=self.cost_input,
+            cost_output=self.cost_output,
+            by_model=self._model_specs(),
             subtree_inference_calls=subtree.inference_calls,
             subtree_rated_inference_calls=subtree.rated_inference_calls,
             subtree_nb_tokens_by_category=dict(subtree.nb_tokens_by_category),
             subtree_total_tokens=subtree.total_tokens,
             subtree_cost=subtree.cost,
+            subtree_cost_input=subtree.cost_input,
+            subtree_cost_output=subtree.cost_output,
+            subtree_by_model=subtree._model_specs(),  # noqa: SLF001 — same class, private by convention only
         )
+
+    def _model_specs(self) -> list[ModelUsageSpec]:
+        """Per-model breakdown, most-used model first (ties broken by name, for stability)."""
+        specs = [
+            ModelUsageSpec(
+                inference_model_name=name,
+                inference_model_id=model_id,
+                model_type=model_type,
+                inference_calls=totals.inference_calls,
+                rated_inference_calls=totals.rated_inference_calls,
+                cost=totals.cost,
+            )
+            for (name, model_id, model_type), totals in self.by_model.items()
+        ]
+        specs.sort(key=lambda spec: (-spec.inference_calls, spec.inference_model_name, spec.inference_model_id))
+        return specs
 
     def to_self_contained_spec(self) -> NodeUsageSpec:
         """Wire shape for a total that has no subtree distinct from itself.

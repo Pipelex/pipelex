@@ -24,6 +24,7 @@ def _make_usage(
     *,
     unit_costs: CostsByCategoryDict,
     nb_tokens_by_category: NbTokensByCategoryDict | None = None,
+    model_name: str = "test-model",
 ) -> AnyTokensUsage:
     return LLMTokensUsage(
         job_metadata=JobMetadata(
@@ -33,8 +34,8 @@ def _make_usage(
             unit_job_id=UnitJobId.LLM_GEN_TEXT,
             job_category=JobCategory.LLM_JOB,
         ),
-        inference_model_name="test-model",
-        inference_model_id="test-model-id",
+        inference_model_name=model_name,
+        inference_model_id=f"{model_name}-id",
         unit_costs=unit_costs,
         nb_tokens_by_category=nb_tokens_by_category or {TokenCategory.INPUT: 100, TokenCategory.OUTPUT: 50},
     )
@@ -221,3 +222,110 @@ class TestUsageAttribution:
         operator_spec = usage_specs["llm_a"]
         assert operator_spec.inference_calls == 1
         assert operator_spec.subtree_inference_calls == 1
+
+    def test_by_model_keeps_the_two_models_of_one_node_apart(self) -> None:
+        """A PipeLLM's text pass and object pass resolve separately — both must survive."""
+        accumulator = UsageAccumulator()
+        accumulator.fold(tokens_usage=_make_usage(unit_costs=_RATES, model_name="sonnet"))
+        accumulator.fold(tokens_usage=_make_usage(unit_costs=_RATES, model_name="sonnet"))
+        accumulator.fold(tokens_usage=_make_usage(unit_costs=_RATES, model_name="structurer"))
+
+        spec = accumulator.to_node_usage_spec(subtree=accumulator)
+
+        assert [entry.inference_model_name for entry in spec.by_model] == ["sonnet", "structurer"]
+        assert [entry.inference_calls for entry in spec.by_model] == [2, 1]
+        assert [entry.inference_model_id for entry in spec.by_model] == ["sonnet-id", "structurer-id"]
+        # The per-model calls account for every call the node made.
+        assert sum(entry.inference_calls for entry in spec.by_model) == spec.inference_calls
+
+    def test_by_model_is_ordered_by_calls_then_name(self) -> None:
+        """Most-used model first, so a consumer can take the first entry as dominant."""
+        accumulator = UsageAccumulator()
+        for model_name in ["alpha", "beta", "beta", "gamma", "gamma", "gamma"]:
+            accumulator.fold(tokens_usage=_make_usage(unit_costs=_RATES, model_name=model_name))
+
+        spec = accumulator.to_node_usage_spec(subtree=accumulator)
+
+        assert [entry.inference_model_name for entry in spec.by_model] == ["gamma", "beta", "alpha"]
+
+    def test_by_model_cost_is_none_for_an_unrated_model(self) -> None:
+        """Invariant 2 holds per model: a model with no rate table reports no price."""
+        accumulator = UsageAccumulator()
+        accumulator.fold(tokens_usage=_make_usage(unit_costs=_RATES, model_name="priced"))
+        accumulator.fold(tokens_usage=_make_usage(unit_costs=_UNRATED, model_name="own-gpu"))
+
+        spec = accumulator.to_node_usage_spec(subtree=accumulator)
+        by_name = {entry.inference_model_name: entry for entry in spec.by_model}
+
+        assert _is_close(by_name["priced"].cost, expected=_COST_OF_ONE_RATED_CALL)
+        assert by_name["priced"].rated_inference_calls == 1
+        assert by_name["own-gpu"].cost is None
+        assert by_name["own-gpu"].rated_inference_calls == 0
+        assert by_name["own-gpu"].inference_calls == 1
+
+    def test_subtree_by_model_merges_the_models_of_a_whole_branch(self) -> None:
+        """A controller reports every model its branch used, merged across children."""
+        left = UsageAccumulator()
+        left.fold(tokens_usage=_make_usage(unit_costs=_RATES, model_name="sonnet"))
+        right = UsageAccumulator()
+        right.fold(tokens_usage=_make_usage(unit_costs=_RATES, model_name="sonnet"))
+        right.fold(tokens_usage=_make_usage(unit_costs=_RATES, model_name="haiku"))
+        own_usage_by_node = {"ctrl": UsageAccumulator(), "left": left, "right": right}
+        parent_by_node: dict[str, str | None] = {"ctrl": None, "left": "ctrl", "right": "ctrl"}
+
+        usage_specs = attribute_usage(own_usage_by_node=own_usage_by_node, parent_by_node=parent_by_node)
+
+        controller_spec = usage_specs["ctrl"]
+        assert controller_spec.by_model == []
+        by_name = {entry.inference_model_name: entry for entry in controller_spec.subtree_by_model}
+        assert by_name["sonnet"].inference_calls == 2
+        assert by_name["haiku"].inference_calls == 1
+        assert _is_close(by_name["sonnet"].cost, expected=2 * _COST_OF_ONE_RATED_CALL)
+
+    def test_invariant_5_input_and_output_costs_split_the_total(self) -> None:
+        """cost_input + cost_output == cost: one number by direction, not extra charges."""
+        accumulator = _accumulator_with(unit_costs_per_call=[_RATES, _RATES])
+
+        assert accumulator.cost_input is not None
+        assert accumulator.cost_output is not None
+        assert _is_close(accumulator.cost_input, expected=2 * 100 * 3.0 / 1_000_000)
+        assert _is_close(accumulator.cost_output, expected=2 * 50 * 15.0 / 1_000_000)
+        assert _is_close(accumulator.cost_input + accumulator.cost_output, expected=accumulator.cost or 0.0)
+
+    def test_component_costs_are_none_on_exactly_the_same_condition_as_cost(self) -> None:
+        """Invariant 2 covers the components too — unrated has no input or output price."""
+        unrated = _accumulator_with(unit_costs_per_call=[_UNRATED])
+        ran_nothing = UsageAccumulator()
+
+        for accumulator in (unrated, ran_nothing):
+            assert accumulator.cost is None
+            assert accumulator.cost_input is None
+            assert accumulator.cost_output is None
+
+    def test_component_costs_roll_up_through_a_subtree(self) -> None:
+        """A controller's branch cost splits by direction the same way a leaf's does."""
+        own_usage_by_node = {
+            "ctrl": UsageAccumulator(),
+            "llm_a": _accumulator_with(unit_costs_per_call=[_RATES]),
+            "llm_b": _accumulator_with(unit_costs_per_call=[_RATES]),
+        }
+        parent_by_node: dict[str, str | None] = {"ctrl": None, "llm_a": "ctrl", "llm_b": "ctrl"}
+
+        controller_spec = attribute_usage(own_usage_by_node=own_usage_by_node, parent_by_node=parent_by_node)["ctrl"]
+
+        assert controller_spec.cost_input is None
+        assert controller_spec.subtree_cost_input is not None
+        assert controller_spec.subtree_cost_output is not None
+        assert _is_close(
+            controller_spec.subtree_cost_input + controller_spec.subtree_cost_output,
+            expected=controller_spec.subtree_cost or 0.0,
+        )
+
+    def test_by_model_carries_the_model_type_discriminator(self) -> None:
+        """model_type is what tells a consumer whether that model's tokens are real."""
+        accumulator = UsageAccumulator()
+        accumulator.fold(tokens_usage=_make_usage(unit_costs=_RATES))
+
+        spec = accumulator.to_node_usage_spec(subtree=accumulator)
+
+        assert spec.by_model[0].model_type == "llm"
