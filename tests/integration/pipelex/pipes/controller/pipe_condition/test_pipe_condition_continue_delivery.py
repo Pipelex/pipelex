@@ -11,7 +11,6 @@ from typing import Callable
 
 import pytest
 
-from pipelex.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
@@ -27,6 +26,7 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
+from tests.integration.pipelex.fixtures.pipe_job_helpers import make_mode_guarded_run_params
 
 
 def _make_continue_only_condition() -> PipeCondition:
@@ -55,9 +55,7 @@ def _make_input_text_stuff():
 
 
 def _make_run_params(run_mode: PipeRunMode) -> PipeRunParams:
-    # Constructed directly (not via the factory) so a keyless boot's forced-DRY coercion cannot
-    # silently swap which controller code path (live vs dry) the test exercises.
-    return PipeRunParams(run_mode=run_mode, pipe_stack_limit=get_config().pipelex.pipe_run_config.pipe_stack_limit)
+    return make_mode_guarded_run_params(pipe_run_mode=run_mode)
 
 
 @pytest.mark.asyncio(loop_scope="class")
