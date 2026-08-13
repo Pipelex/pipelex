@@ -4,7 +4,7 @@
 
 **Branch:** `fix/Time-native`, forked from `dev`. **Worktree:** `_time/` — treat it as the pipelex repo root; every path below is relative to it, not to this file's own directory (it was the root `TODOS.md` while the work was in flight).
 
-**Read first:** [`wip/native-concepts/time-native-open-questions.md`](../../../wip/native-concepts/time-native-open-questions.md) (in the workspace repo, not here) carries the decision and the design rationale — *why* each edit, and the three non-obvious points this plan only restates. If you are cold-starting, read its "Design of the accepted solution" section before touching code; it is the difference between making this change and making it correctly.
+**Read first:** `wip/native-concepts/time-native-open-questions.md` — in the workspace repo, not this one, so the path does not resolve from here. It carries the decision and the design rationale — *why* each edit, and the three non-obvious points this plan only restates. If you are cold-starting, read its "Design of the accepted solution" section before touching code; it is the difference between making this change and making it correctly.
 
 ## Standing constraints
 
@@ -97,7 +97,7 @@ Doc-only, and mandatory: `templates/skills/shared/mthds-reference.md.j2:357` nam
 - [ ] **4.2 — `make build`**, which regenerates all four targets. Verify the four generated `skills/shared/mthds-reference.md` copies moved.
 - [ ] **4.3 — check the neighbours before assuming one line is enough.** Phase 0 of the native-concepts plan found `Time` missing from *every* native enumeration in that repo, not the two files it expected. Grep the templates for the construct-conversion wording rather than trusting this list.
 - [ ] **4.4 — changelog** in `mthds-plugins`.
-- [ ] **4.5 — `internal-tools` integration suite.** Required by the workspace rule whenever `mthds-plugins/` is touched: `make build && make agent-test` in `internal-tools/`, Docker running. ⚠ Known trap recorded during Phase 0: these tests require the local `mthds-js` checkout to be at or ahead of the published npm `mthds` version, or `update-check` assertions fail for reasons unrelated to your change. Fast-forward `mthds-js` first if a `mthds` release has landed recently.
+- [ ] **4.5 — our internal integration suite** (not open core; its checkout lives in the workspace-level private notes). Required by the workspace rule whenever `mthds-plugins/` is touched: `make build && make agent-test` there, Docker running. ⚠ Known trap recorded during Phase 0: these tests require the local `mthds-js` checkout to be at or ahead of the published npm `mthds` version, or `update-check` assertions fail for reasons unrelated to your change. Fast-forward `mthds-js` first if a `mthds` release has landed recently.
 
 ## Deliberately not in scope
 
