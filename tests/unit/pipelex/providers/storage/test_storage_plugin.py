@@ -63,7 +63,7 @@ class TestStoragePlugin:
         assert plugin.targets_api == PLUGIN_API_VERSION
 
         registrar = PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(plugins=SimpleNamespace(disabled=[]))))
-        discovery = registrar.begin_plugin(name="storage", origin=PluginOrigin.BUILTIN, targets_api=PLUGIN_API_VERSION)
+        discovery = registrar.begin_plugin(name="storage", origin=PluginOrigin.BUILTIN, targets_api=PLUGIN_API_VERSION, group=None)
         plugin.register(registrar)
 
         # StrEnum keys compare equal to their plain-str form, so boot's plain-str config.method resolves them.

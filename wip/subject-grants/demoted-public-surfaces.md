@@ -1,11 +1,11 @@
 # Demoted public surfaces — release-wave cross-repo sweep handoff
 
-The subject-grant review demoted every positional first parameter that failed the grant rubric to keyword-only (see `docs/contribute/keyword-only-arguments.md`). No backward compatibility: any external consumer calling these surfaces positionally — or subclassing them with positional signatures — breaks when the release ships. This is the inventory for the release-gated cross-repo sweep; the consumers to check are `pipelex-api`, `pipelex-worker`, the private `pipelex-temporal` plugin, `pipelex-cookbook`, `cocode`, `pipelex-mistralai-workflows`, and any starter/template code.
+The subject-grant review demoted every positional first parameter that failed the grant rubric to keyword-only (see `docs/contribute/keyword-only-arguments.md`). No backward compatibility: any external consumer calling these surfaces positionally — or subclassing them with positional signatures — breaks when the release ships. This is the inventory for the release-gated cross-repo sweep; the consumers to check are `pipelex-api`, `pipelex-cookbook`, `cocode`, our orchestration plugins, our hosted services, and any starter/template code.
 
 ## Runtime / execution surfaces
 
 - `pipelex.core.pipes.pipe_abstract.PipeAbstract` run family (`run_pipe`, `live_run_pipe`, `dry_run_pipe`, `validate_before_run`, `validate_after_run`, `needed_inputs`) — `job_metadata` / `visited_pipes` now keyword-only; external code subclassing or invoking pipes positionally breaks.
-- `pipelex.runtime_bridge.bootstrap.ensure_pipelex_booted` (`config_overrides`) — runtime_bridge is consumed by pipelex-api / pipelex-worker; positional callers break.
+- `pipelex.runtime_bridge.bootstrap.ensure_pipelex_booted` (`config_overrides`) — runtime_bridge is consumed by `pipelex-api` and by our hosted services; positional callers break.
 - `pipelex.pipeline.pipeline_run_setup.pipeline_run_setup` (`execution_config`) and `pipelex.pipeline.pipeline_manager_abstract.add_new_pipeline` (`pipe_code`).
 - `pipelex.libraries.library_manager_abstract.LibraryManagerAbstract` load family (`load_libraries`, `load_from_blueprints`, `load_from_crate`, …) — `library_id` now keyword-only.
 - `pipelex.libraries.concept.concept_library_abstract.ConceptLibraryAbstract.is_compatible` / `ConceptLibrary.is_compatible` (`tested_concept`).

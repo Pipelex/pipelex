@@ -1,6 +1,6 @@
 """The two codegen axes (`kind` and `target`) and the emitted-file unit shared by every emitter.
 
-Codegen has exactly two explicit axes (see `docs/specs/pipelex-codegen.md` → "Two axes"): `kind` is
+Codegen has exactly two explicit axes (see the codegen spec → "Two axes"): `kind` is
 *what* to project (`types`, over the crate's concept set), `target` is *for whom* (a language / idiom
 flavor). An emitter returns one or more `EmittedFile`s — a filename relative to the output root plus
 its content — so a single projection can span more than one file (the ts-zod purity split: a pure
@@ -29,7 +29,7 @@ class CodegenKind(StrEnum):
 
 class CodegenTarget(StrEnum):
     """A codegen target flavor. All targets are Pipelex projections — the MTHDS standard specifies no
-    type projection (see `docs/specs/pipelex-codegen.md` → "Ownership"). They differ in audience:
+    type projection (see the codegen spec → "Ownership"). They differ in audience:
     `ts-zod` and `python-pydantic` emit idiom-neutral types any consumer can use; `python-structures`
     emits StructuredContent classes for a Pipelex runtime host.
     """

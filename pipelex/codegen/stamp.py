@@ -1,7 +1,7 @@
 """Stamp headers: every generated file self-describes so a lone file can testify about itself.
 
 A stamp is a small, machine-parseable comment block prepended to a generated file (see the Stamp
-header format in `docs/specs/pipelex-codegen.md`). It records the source crate fingerprint, the engine
+header format in the codegen spec). It records the source crate fingerprint, the engine
 version that produced the file, the projection (`kind` / `target`, plus `pipe_ref` for per-pipe
 artifacts), any output-affecting options, and a **content hash of the body below the stamp** — so a
 hand edit anywhere under the stamp is detectable without the engine, the network, or the lock.

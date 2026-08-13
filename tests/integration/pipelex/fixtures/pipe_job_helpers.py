@@ -10,12 +10,32 @@ from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
+from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata, SpecialPipelineId
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.telemetry.otel_constants import OTelConstants
 
 PIPE_JOB_HELPERS_PIPELINE_RUN_ID_PREFIX = "pipe_job_helpers_test"
+
+
+def make_mode_guarded_run_params(*, pipe_run_mode: PipeRunMode = PipeRunMode.LIVE) -> PipeRunParams:
+    """Run params built through the factory, with the requested run mode guarded.
+
+    A fixture builds through the factory rather than hand-building params because the factory is the
+    single writer of the three fields that carry a run-scoped invariant — `run_mode`,
+    `pipe_stack_limit` and `batch_max_concurrency`. What the factory adds in exchange is the
+    keyless-boot coercion: under `needs_inference=False` a requested LIVE comes back DRY. For a
+    fixture whose whole point is *which controller path* runs, that would swap the path under the
+    test while every assertion still passed, so assert the requested mode survived.
+    """
+    run_params = PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode)
+    match pipe_run_mode:
+        case PipeRunMode.LIVE:
+            assert run_params.run_mode.is_live, "This test must run the live path — the boot coerced the run mode to DRY"
+        case PipeRunMode.DRY:
+            assert run_params.run_mode.is_dry, "This test must run the dry path — the boot returned a run mode other than DRY"
+    return run_params
 
 
 def build_pipe_job(

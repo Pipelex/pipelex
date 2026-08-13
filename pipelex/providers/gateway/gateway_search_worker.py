@@ -27,7 +27,7 @@ from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
 class GatewaySearchWorker(SearchWorkerAbstract):
-    """Search worker that routes through Portkey to the pipelex-relay LinkUp endpoints."""
+    """Search worker that routes through Portkey to the relay's LinkUp endpoints."""
 
     def __init__(
         self,

@@ -1,4 +1,4 @@
-"""The runtime layer's composition root: stand up inference without the method interpreter.
+"""The kernel layer's composition root: stand up inference without the method interpreter.
 
 Pipelex has two layers and one hub each (``docs/contribute/hub-layering.md``). Every package in the
 tree is placed on one side of that line and pinned there, but the *composition root* was the one
@@ -7,7 +7,7 @@ sequence, so the only way into the process constructed an ``InterpreterHub``, a 
 ``PipelineManager``, a ``PipeRouter`` and a ``PipeRun`` whether the caller would ever load a method or
 not. The layering property was real for *importing* and vacuous for *booting*.
 
-This module is the runtime half. It stands up config, logging, secrets, telemetry, the class and func
+This module is the kernel half. It stands up config, logging, secrets, telemetry, the class and func
 registries, the template sets, the model deck, storage, the content generator, the inference manager,
 the reporting delegate and the observers — everything present at execution time whatever is loaded —
 and it loads **zero interpreter modules** doing it. ``pipelex.pipelex.Pipelex`` is the interpreter half:
@@ -15,7 +15,7 @@ it subclasses this class, imports it downward (which the interpreter layer may d
 method machinery.
 
 The split is the same move the built-in plugin manifests made, and it is what finally gives
-``RUNTIME_BUILTIN_PLUGINS`` a caller: a runtime-only boot discovers exactly that half, so the
+``KERNEL_BUILTIN_PLUGINS`` a caller: a kernel-only boot discovers exactly that half, so the
 ``direct`` orchestrator, the direct bundle validator and the built-in PipeFunc executor modes — all
 interpreter-contributed — are simply absent. Nothing here resolves out of those registries at boot;
 they are looked up at run time, by the interpreter.
@@ -23,13 +23,15 @@ they are looked up at run time, by the interpreter.
 **Every import in this module stays at module top level.** That is not incidental: a function-local
 import is precisely what hides a breach from the static guard and the import-closure test at the same
 time, so if one ever seems necessary here the placement is wrong and the type should move instead.
-The module is declared in the hub-layering guard's ``RUNTIME_LAYER_PACKAGES`` and listed in the
-closure test's ``RUNTIME_LAYER_ENTRY_POINTS``; a booted-runtime test pins the same property through
+The module is declared in the hub-layering guard's ``KERNEL_LAYER_PACKAGES`` and listed in the
+closure test's ``KERNEL_LAYER_ENTRY_POINTS``; a booted-kernel test pins the same property through
 ``make()`` rather than through an import.
 
-Three ``runtime_*`` names now live at the top of the package and they are different things:
-``runtime_hub`` is the runtime layer's service container, ``runtime_bridge`` is a transport, and
-``runtime_boot`` — this module — is the runtime layer's composition root.
+Three ``runtime_*`` names still live at the top of the package and they are different things:
+``runtime_hub`` is the kernel layer's service container, ``runtime_bridge`` is a transport, and
+``runtime_boot`` — this module — is the kernel layer's composition root. Two of the three are named
+after the layer under its former name; only ``runtime_bridge`` means "runtime" in the
+orchestration-venue sense and keeps the word for good.
 """
 
 import types
@@ -84,7 +86,7 @@ from pipelex.plugins.registrar import HubSlot, PluginRegistrar
 from pipelex.plugins.sdk_client_manager import SdkClientManager
 from pipelex.plugins.secrets_provider_registry import SecretsProviderRegistry
 from pipelex.plugins.storage_provider_registry import StorageProviderRegistry
-from pipelex.providers.builtins import RUNTIME_BUILTIN_PLUGINS, RUNTIME_CORE_UNCONDITIONAL_PLUGIN_NAMES
+from pipelex.providers.builtins import KERNEL_BUILTIN_PLUGINS, KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES, KERNEL_ENTRY_POINT_GROUPS
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.runtime_hub import RuntimeHub, set_runtime_hub
@@ -125,6 +127,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from pipelex.plugins.contract import PipelexPlugin
+    from pipelex.plugins.plugin_group import PluginGroup
     from pipelex.system.pipelex_service.remote_config import RemoteConfig
     from pipelex.system.pipelex_service.types import RemoteConfigSource
 
@@ -134,7 +137,7 @@ _HubSlotImplT = TypeVar("_HubSlotImplT")
 
 
 class RuntimeBoot(metaclass=MetaSingleton):
-    """Boot the runtime layer: inference, storage, models, telemetry — no method interpreter.
+    """Boot the kernel layer: inference, storage, models, telemetry — no method interpreter.
 
     Subclassed by ``pipelex.pipelex.Pipelex``, which appends the interpreter constructions. The
     singleton is therefore shared between the two: the class-level accessors below resolve **by
@@ -248,6 +251,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         needs_model_specs: bool | None = None,
         builtin_plugins: "Sequence[PipelexPlugin] | None" = None,
         core_unconditional_plugin_names: frozenset[str] | None = None,
+        entry_point_groups: "Sequence[PluginGroup] | None" = None,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
         storage_provider: StorageProviderAbstract | None = None,
@@ -260,15 +264,17 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         observers: dict[str, ObserverProtocol] | None = None,
         **kwargs: Any,
     ) -> None:
-        """Stand up the runtime layer.
+        """Stand up the kernel layer.
 
-        ``builtin_plugins`` defaults to ``RUNTIME_BUILTIN_PLUGINS`` — the runtime-layer half — so a bare
-        runtime boot never loads the interpreter-touching built-ins; the interpreter boot passes the
-        composed list instead. ``core_unconditional_plugin_names`` defaults to the runtime-layer half for
+        ``builtin_plugins`` defaults to ``KERNEL_BUILTIN_PLUGINS`` — the kernel-layer half — so a bare
+        kernel boot never loads the interpreter-touching built-ins; the interpreter boot passes the
+        composed list instead. ``core_unconditional_plugin_names`` defaults to the kernel-layer half for
         the same reason, and must describe the same set as ``builtin_plugins``: requiring a name that was
-        never discovered fails boot.
+        never discovered fails boot. ``entry_point_groups`` is the same story for *installed* plugins and
+        defaults to ``KERNEL_ENTRY_POINT_GROUPS``: a bare kernel boot never even queries the interpreter
+        group, so no interpreter-side plugin module is imported into the process.
 
-        Every other argument is the runtime subset of the same injections ``Pipelex.make`` documents.
+        Every other argument is the kernel subset of the same injections ``Pipelex.make`` documents.
         """
         if kwargs:
             msg = f"The base setup method does not support any additional arguments: {kwargs}"
@@ -360,10 +366,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # applied at their ordered apply-points in later phases.
         plugin_registrar = build_registrar(
             config=get_config(),
-            builtin_plugins=RUNTIME_BUILTIN_PLUGINS if builtin_plugins is None else builtin_plugins,
+            builtin_plugins=KERNEL_BUILTIN_PLUGINS if builtin_plugins is None else builtin_plugins,
             core_unconditional_plugin_names=(
-                RUNTIME_CORE_UNCONDITIONAL_PLUGIN_NAMES if core_unconditional_plugin_names is None else core_unconditional_plugin_names
+                KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES if core_unconditional_plugin_names is None else core_unconditional_plugin_names
             ),
+            entry_point_groups=KERNEL_ENTRY_POINT_GROUPS if entry_point_groups is None else entry_point_groups,
         )
         self._plugin_registrar = plugin_registrar
         # Reject an unknown boot orchestrator before falling through to the core defaults. The requested
@@ -373,18 +380,16 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # hub slots, so without this guard the run would silently execute in-process instead of under the
         # requested runtime. Checked here to fail fast, before the telemetry/model work.
         #
-        # On a runtime-only boot this rejects an orchestrator contributed by an interpreter-layer
-        # *built-in*, because ``builtin_plugins`` defaults to the runtime half and the name is therefore
-        # never registered. It does NOT reject an *external* entry-point plugin that is interpreter-side:
-        # ``build_registrar`` discovers external plugins unconditionally, so such a name satisfies this
-        # check, and a bare runtime boot would then apply the runtime slot claims while silently never
-        # applying the interpreter ones (``PIPE_ROUTER`` / ``PIPE_RUN`` / ``PIPE_FUNC_EXECUTOR``, all
-        # applied in ``Pipelex.setup``). Deliberately not guarded here, because every remedy needs a layer
-        # signal this layer does not have. Analysed in
-        # ``wip/boot-split/runtime-boot-external-interpreter-orchestrator.md``, which the first runtime-only
-        # caller (the Pipelex kernel's boot-contract test) has now settled: that caller names no
-        # ``boot_orchestrator``, so this gate is never reached and the hole is not on its path. Reassess
-        # when a runtime-only boot is offered to real callers — that is when naming one becomes reachable.
+        # On a kernel-only boot this rejects an interpreter-side orchestrator from either source, and for
+        # the same reason in both cases: the name was never registered, so it cannot satisfy the check.
+        # A built-in one is absent because ``builtin_plugins`` defaults to the kernel half; an *external*
+        # one is absent because ``entry_point_groups`` defaults to ``KERNEL_ENTRY_POINT_GROUPS``, so its
+        # group is never even queried. The result is a loud ``UnknownBootOrchestratorError`` rather than
+        # the half-application this comment used to defer — a boot that applied the kernel slot claims
+        # while silently never applying the interpreter ones (``PIPE_ROUTER`` / ``PIPE_RUN`` /
+        # ``PIPE_FUNC_EXECUTOR``, all applied in ``Pipelex.setup``). What closed it is the entry-point
+        # group split: the layer signal that remedy needed is now carried by the plugin's own
+        # declaration.
         requested_boot_orchestrator = get_config().plugins.boot_orchestrator
         if requested_boot_orchestrator is not None and requested_boot_orchestrator not in plugin_registrar.registered_plugin_names:
             raise UnknownBootOrchestratorError(requested=requested_boot_orchestrator)
@@ -462,8 +467,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             # properties, because pinning them requires the path overrides that exist on the *concrete*
             # ``ModelManager`` and not on ``ModelManagerAbstract`` — which is what this attribute is
             # typed as, and which is a public injection point. Widening that interface is a decision of
-            # its own, so the gap is documented rather than half-closed:
-            # ``wip/boot-split/config-dir-does-not-scope-inference-paths.md``. The docstrings say exactly
+            # its own, so the gap is documented rather than half-closed. The docstrings say exactly
             # this; do not read ``config_dir`` as "only this directory is read" for inference.
             self.models_manager.setup(
                 secrets_provider=secrets_provider,
@@ -510,7 +514,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # these at run time.
         #
         # The orchestrator and bundle-validator registries are interpreter-contributed and therefore
-        # empty on a runtime-only boot. That is fine and deliberate: nothing here resolves out of them,
+        # empty on a kernel-only boot. That is fine and deliberate: nothing here resolves out of them,
         # they are looked up at run time by the interpreter.
         self.runtime_hub.set_inference_backend_registry(InferenceBackendRegistry(plugin_registrar.inference_backends))
         self.runtime_hub.set_model_lister_registry(ModelListerRegistry(plugin_registrar.model_listers))
@@ -562,7 +566,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             self.class_registry.register_classes(TestRegistryModels.get_all_models())
 
         # --- Observers -------------------------------------------------------------------------
-        # Built from runtime-layer parts and held on the instance because the interpreter half's
+        # Built from kernel-layer parts and held on the instance because the interpreter half's
         # PipeRouter consumes it — one of the two seams that lets the interpreter constructions be a
         # tail rather than an interleaving.
 
@@ -660,8 +664,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         reporting buffer unflushed, the previous boot's ``func_registry`` entries carried forward.
         Everything that would instead **poison** the next boot moved into the ``finally``, so the two
         release paths guarantee the same set. Closing the dangling half means collapsing this path and
-        ``_release_after_failed_boot`` into one list —
-        ``wip/boot-split/failed-boot-does-not-release-every-resource.md``.
+        ``_release_after_failed_boot`` into one list.
         """
         try:
             if self.telemetry_manager:
@@ -682,7 +685,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         finally:
             # The runtime hub releases its process-global config. ``class_registry_scoping`` is reset here
             # too: the interpreter half installs the resolver at boot, so releasing it belongs to whichever
-            # teardown runs — and on a runtime-only boot nothing installed it, where the reset is a no-op.
+            # teardown runs — and on a kernel-only boot nothing installed it, where the reset is a no-op.
             self.runtime_hub.reset_config()
             class_registry_scoping.reset()
             # The same three ``_release_after_failed_boot`` releases, deliberately kept identical: these are
@@ -743,7 +746,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         ``setup()`` may not have assigned, which is the reason this path exists at all. Adding any of
         them here would widen a second hand-maintained copy of the teardown list that is bound to
         drift from the real one. Collapsing the two paths is the right fix and is a lifecycle decision of
-        its own — ``wip/boot-split/failed-boot-does-not-release-every-resource.md``.
+        its own.
 
         Without this, the next boot raises "LogConfig is already set" and serves a stale, half-populated
         class registry (the ``KajsonManager`` singleton ignores a fresh registry once created).
@@ -835,7 +838,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         config_dir: Path | None = None,
         config_overrides: dict[str, Any] | None = None,
     ) -> Self:
-        """Create and initialize a runtime-layer singleton: inference, storage, models, telemetry.
+        """Create and initialize a kernel-layer singleton: inference, storage, models, telemetry.
 
         Loads no method interpreter. Use ``pipelex.pipelex.Pipelex.make`` to boot the full stack.
         See that method for the shared arguments — including ``config_dir``, which scopes the *main

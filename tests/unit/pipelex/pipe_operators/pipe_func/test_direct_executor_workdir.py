@@ -64,7 +64,7 @@ class TestDirectExecutorWorkdir:
             pipe_code="missing_pipe",
             function_name="missing_func",
             job_metadata=JobMetadata(user_id="user", pipeline_run_id="run"),
-            pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10),
+            pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10, batch_max_concurrency=None),
         )
 
         with scoped_current_library(library_id=direct_pipe_func_executor._TRANSPORTED_LIBRARY_ID):  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
@@ -89,7 +89,7 @@ class TestDirectExecutorWorkdir:
             pipe_code="missing_pipe",
             function_name="missing_func",
             job_metadata=JobMetadata(user_id="user", pipeline_run_id="run"),
-            pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10),
+            pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10, batch_max_concurrency=None),
         )
 
         with scoped_current_library(library_id=direct_pipe_func_executor._TRANSPORTED_LIBRARY_ID):  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
@@ -141,7 +141,7 @@ class TestDirectExecutorWorkdir:
             pipe_code="greet_demo.greet",
             function_name="greet_it",
             job_metadata=JobMetadata(user_id="user", pipeline_run_id="run"),
-            pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10),
+            pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10, batch_max_concurrency=None),
         )
 
         with scoped_current_library(library_id=direct_pipe_func_executor._TRANSPORTED_LIBRARY_ID):  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]

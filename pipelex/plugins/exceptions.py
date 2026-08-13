@@ -174,6 +174,92 @@ class CoreUnconditionalPluginDisabledError(PluginError):
         super().__init__(message)
 
 
+class PluginLayerViolationError(PluginError):
+    """A kernel-group plugin registered an interpreter-layer capability.
+
+    The entry-point group a plugin publishes under declares its layer, and a kernel-only boot reads
+    the kernel group alone precisely so no interpreter-layer object is ever constructed there. A
+    plugin whose declaration and menu calls disagree would defeat that: installed as kernel, loaded
+    into a kernel-only process, it would hand back a ``Pipe``-aware object. Caught at register time,
+    before anything it contributed is wired.
+    """
+
+    def __init__(self, *, plugin_name: str, capability: str, declared_group: str, interpreter_group: str):
+        self.plugin_name = plugin_name
+        self.capability = capability
+        self.declared_group = declared_group
+        self.interpreter_group = interpreter_group
+        message = (
+            f"Plugin '{plugin_name}' is published under the entry-point group '{declared_group}' but registered "
+            f"an interpreter-layer capability ({capability}). Publish it under '{interpreter_group}' instead — a "
+            "kernel-group plugin may only contribute kernel-layer capabilities (inference backends, model listers, "
+            "storage and secrets providers, HTTP-error mappers, teardown callbacks, and the content_generator, "
+            "task_manager and isolated_execution_probe hub slots)."
+        )
+        super().__init__(message)
+
+
+class RetiredPluginEntryPointGroupError(PluginError):
+    """An installed plugin still advertises itself under the retired single entry-point group.
+
+    Nothing reads that group any more, so without this probe the plugin would simply never be
+    discovered: no orchestrator, no backend, no error — a process quietly running without the
+    capability it was installed for. Fail loud instead, naming the plugins and the group each
+    should move to.
+    """
+
+    # The message names the caller's own installed distributions and the exact fix; it is fully
+    # actionable, so keep it verbatim under STRICT disclosure.
+    _authors_caller_facing_message = True
+
+    def __init__(self, *, plugin_names: list[str], retired_group: str, groups: list[str]):
+        self.plugin_names = plugin_names
+        self.retired_group = retired_group
+        self.groups = groups
+        named = ", ".join(f"'{name}'" for name in sorted(plugin_names))
+        available = " or ".join(f"'{group}'" for group in groups)
+        message = (
+            f"Plugin(s) {named} advertise themselves under the retired entry-point group '{retired_group}', which is "
+            f"no longer read. Upgrade each to a release published under {available}, or uninstall it to recover "
+            "startup. If you author it: re-publish under the group matching its layer — a kernel-layer plugin "
+            "(inference backend, model lister, storage or secrets provider) goes in the kernel group; anything that "
+            "constructs a Pipe-aware object (orchestrator, bundle validator, PipeFunc executor) goes in the "
+            "interpreter group."
+        )
+        super().__init__(message)
+
+
+class PluginDeclaredInMultipleGroupsError(PluginError):
+    """One installed plugin advertises the same name under more than one entry-point group.
+
+    A boot that reads both groups then finds it twice, loads it twice and runs its ``register``
+    twice. Most menu methods collide on the second pass, but the resulting ``Duplicate*Error``
+    names the same plugin as both parties to the conflict — which reads as a bug in Pipelex rather
+    than as a misdeclared distribution. ``add_teardown`` does not collide at all: it appends, so the
+    callback lands twice and runs twice at shutdown with nothing raised. Neither symptom points at
+    the cause, hence this error.
+
+    The group is how a plugin declares its layer, so declaring two is not an over-declaration to be
+    tolerated — it is the declaration failing to say anything.
+    """
+
+    # The message names the caller's own installed distribution and the exact fix.
+    _authors_caller_facing_message = True
+
+    def __init__(self, *, plugin_name: str, groups: list[str]):
+        self.plugin_name = plugin_name
+        self.groups = groups
+        named = " and ".join(f"'{group}'" for group in sorted(groups))
+        message = (
+            f"Plugin '{plugin_name}' is published under {named}. The entry-point group is how a plugin declares "
+            "which layer it belongs to, so it must appear in exactly one: keep the kernel group if it only "
+            "contributes kernel-layer capabilities (inference backend, model lister, storage or secrets provider, "
+            "HTTP-error mapper), and the interpreter group if it constructs any Pipe-aware object (orchestrator, "
+            "bundle validator, PipeFunc executor). Remove the other declaration and reinstall."
+        )
+        super().__init__(message)
+
+
 class BrokenPluginError(PluginError):
     """A discovered plugin failed while loading or registering itself."""
 

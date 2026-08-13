@@ -5,7 +5,7 @@
 (this CLI, an SDK, a short CI script) implements it identically, and template improvements never redden
 a consumer's CI: regeneration is a dev action, the check is the CI action.
 
-The algorithm (see `docs/specs/pipelex-codegen.md` → "Offline check algorithm"):
+The algorithm (see the codegen spec → "Offline check algorithm"):
 
 1. For each artifact in the lock, locate the file and recompute its body content hash; a mismatch or a
    missing file is a drift.

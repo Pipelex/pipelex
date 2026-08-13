@@ -38,7 +38,7 @@ class TestStorageProviderRegistry:
     def test_registered_factory_is_retrievable_by_method(self) -> None:
         """A factory registered for a method is the exact callable the built registry returns for it."""
         registrar = _make_registrar()
-        registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
+        registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION, group=None)
         registrar.add_storage_provider(method="azure", factory=_fake_factory)
 
         registry = StorageProviderRegistry(registrar.storage_providers)
@@ -49,7 +49,7 @@ class TestStorageProviderRegistry:
     def test_contribution_recorded_on_the_active_plugin(self) -> None:
         """Registering a provider records a ``storage provider <method>`` contribution on the plugin's discovery."""
         registrar = _make_registrar()
-        discovery = registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
+        discovery = registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION, group=None)
 
         registrar.add_storage_provider(method="azure", factory=_fake_factory)
 
@@ -58,7 +58,7 @@ class TestStorageProviderRegistry:
     def test_get_required_miss_raises_listing_registered_methods(self) -> None:
         """A miss names the requested method and lists the registered ones (the boot-time actionable error)."""
         registrar = _make_registrar()
-        registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
+        registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION, group=None)
         registrar.add_storage_provider(method="local", factory=_fake_factory)
         registrar.add_storage_provider(method="s3", factory=_fake_factory)
         registry = StorageProviderRegistry(registrar.storage_providers)
@@ -84,9 +84,9 @@ class TestStorageProviderRegistry:
     def test_duplicate_method_fails_loud_naming_both_plugins(self) -> None:
         """Two plugins registering a provider for the same method is a fail-loud conflict naming both."""
         registrar = _make_registrar()
-        registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
+        registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION, group=None)
         registrar.add_storage_provider(method="azure", factory=_fake_factory)
-        registrar.begin_plugin(name="beta", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
+        registrar.begin_plugin(name="beta", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION, group=None)
 
         with pytest.raises(DuplicateStorageProviderError) as exc_info:
             registrar.add_storage_provider(method="azure", factory=_fake_factory)

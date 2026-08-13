@@ -1,7 +1,7 @@
 """Producing a run graph for a *bundle*, by dry-running it.
 
 Interpreter-layer counterpart of ``pipelex.graph.graph_rendering``: these helpers take a bundle path,
-load and dry-run the method to obtain a :class:`GraphSpec`, then hand it to the runtime-layer renderer.
+load and dry-run the method to obtain a :class:`GraphSpec`, then hand it to the kernel-layer renderer.
 The split is along "do I need a loaded method?", which is the hub layering boundary's own question —
 see ``docs/contribute/hub-layering.md``.
 """

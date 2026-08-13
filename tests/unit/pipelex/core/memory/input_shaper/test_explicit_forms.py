@@ -1,4 +1,5 @@
 import datetime
+from typing import Any
 
 import pytest
 
@@ -175,3 +176,44 @@ class TestInputShaperExplicitForms:
         pretty_print(stuff, title="collision rule")
         assert stuff.concept.concept_ref == "shaper_test.ShaperWeird"
         assert stuff.content == ShaperWeird(concept="x", content="y")
+
+    def test_envelope_empty_list_yields_empty_list_content(self) -> None:
+        """An envelope carrying an empty list builds an empty ListContent, like the bare `[]` does.
+
+        Regression: this raised "Cannot create Stuff from empty list in content". The bottom-up
+        factory infers a list's item type from its first item, and an empty list has none — but
+        with an envelope it never needed to infer, because the envelope NAMES the concept. The
+        result was that the two spellings of one input disagreed: a caller with no pictures could
+        send `[]` and run, or send `{"concept": ..., "content": []}` and fail.
+        """
+        input_specs = build_input_specs([("pics", "native.Image", True)])
+        provided: dict[str, Any] = {"concept": "native.Image", "content": []}
+
+        working_memory = InputShaper.shape({"pics": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+
+        stuff = working_memory.root["pics"]
+        pretty_print(stuff, title="envelope empty list")
+        assert stuff.concept.concept_ref == "native.Image"
+        assert stuff.content == ListContent(items=[])
+
+    def test_envelope_and_bare_empty_list_agree(self) -> None:
+        """The two spellings of "a plural input with nothing in it" must produce the same Stuff content."""
+        input_specs = build_input_specs([("pics", "native.Image", True)])
+
+        envelope: dict[str, Any] = {"concept": "native.Image", "content": []}
+        via_envelope = InputShaper.shape({"pics": envelope}, input_specs=input_specs, concept_provider=get_concept_library())
+        via_bare = InputShaper.shape({"pics": []}, input_specs=input_specs, concept_provider=get_concept_library())
+
+        assert via_envelope.root["pics"].content == via_bare.root["pics"].content
+        assert via_envelope.root["pics"].concept.concept_ref == via_bare.root["pics"].concept.concept_ref
+
+    def test_envelope_empty_list_under_structured_concept(self) -> None:
+        """Not just natives: a structured concept's empty list is equally representable."""
+        input_specs = build_input_specs([("questions", "shaper_test.Question", True)])
+        provided: dict[str, Any] = {"concept": "shaper_test.Question", "content": []}
+
+        working_memory = InputShaper.shape({"questions": provided}, input_specs=input_specs, concept_provider=get_concept_library())
+
+        stuff = working_memory.root["questions"]
+        assert stuff.concept.concept_ref == "shaper_test.Question"
+        assert stuff.content == ListContent(items=[])

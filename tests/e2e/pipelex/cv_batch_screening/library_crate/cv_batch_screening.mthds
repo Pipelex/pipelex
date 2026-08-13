@@ -1,5 +1,5 @@
 domain        = "cv_batch_screening"
-description   = "Analyzing CV and job offer compatibility — sourced from pipelex-demos example 21, used as a deeply-nested controller test (PipeSequence -> PipeSequence -> PipeBatch + PipeExtract + PipeLLM)."
+description   = "Analyzing CV and job offer compatibility — used as a deeply-nested controller test (PipeSequence -> PipeSequence -> PipeBatch + PipeExtract + PipeLLM)."
 system_prompt = "None"
 main_pipe     = "batch_analyze_cvs_for_job_offer"
 

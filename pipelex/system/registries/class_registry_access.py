@@ -7,7 +7,7 @@ plain top-level import instead of a lazy ``importlib`` shim.
 
 Exactly one module needs that today, and the constraint is a **static-analysis** cycle rather than a
 runtime one — measure before restating it. ``pipe_machinery.pipe_abstract`` decorates graph-registry
-entries with a concept's JSON Schema. It is *not* in ``runtime_hub``'s runtime import closure (a
+entries with a concept's JSON Schema. It is *not* in ``runtime_hub``'s kernel import closure (a
 clean-interpreter probe after ``import pipelex.runtime_hub`` shows it, ``pipe_run.pipe_job`` and
 ``plugins.orchestrator_registry`` all absent — those edges are ``TYPE_CHECKING``-only). But pyright's
 ``reportImportCycles`` counts ``TYPE_CHECKING`` edges, so importing **either** hub there is a hard
@@ -47,7 +47,7 @@ everywhere except inside this module's own import closure.
 
 Scoping: a run may pin a per-library ClassRegistry (a workflow's own registry) rather than the
 process-global Kajson one. Resolving *which* library is current is interpreter-layer knowledge, so
-the runtime layer holds only a slot — ``pipelex.interpreter_hub.set_interpreter_hub`` installs the real
+the kernel layer holds only a slot — ``pipelex.interpreter_hub.set_interpreter_hub`` installs the real
 resolver at boot. Unresolved, or with no library pinned, callers get the process-global registry.
 """
 

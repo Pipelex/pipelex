@@ -46,7 +46,7 @@ Operators perform concrete actions:
 - **PipeCompose** - Compose content from templates or construct structured objects
 - **PipeSearch** - Search the web for information
 
-What an operator *does* — model-deck resolution, prompt assembly, generation, memory write-back — lives one layer down in [`pipelex/kernel/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/kernel), as plain functions that take everything method-specific as an explicit argument and read only the runtime services a boot stands up, such as the model deck and the content generator. The operator classes above hold what is specific to being a step in a method: blueprint resolution, input validation, error context, and execution-graph tracing. The split exists so the same semantics can be called without a loaded method, and so there is one implementation rather than two that drift. See [The Pipelex Kernel](./pipelex-kernel.md) for the layering contract, what a programmatic caller imports, and how it boots.
+What an operator *does* — model-deck resolution, prompt assembly, generation, memory write-back — lives one layer down in [`pipelex/kernel/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/kernel), as plain functions that take everything method-specific as an explicit argument and read only the kernel-layer services a boot stands up, such as the model deck and the content generator. The operator classes above hold what is specific to being a step in a method: blueprint resolution, input validation, error context, and execution-graph tracing. The split exists so the same semantics can be called without a loaded method, and so there is one implementation rather than two that drift. See [The Pipelex Kernel](./pipelex-kernel.md) for the layering contract, what a programmatic caller imports, and how it boots.
 
 ### Core Domain
 
@@ -81,7 +81,7 @@ The COGT layer abstracts AI provider details from business logic:
 
 Two packages, one for the mechanism and one for the built-in adapters:
 
-- [`pipelex/plugins/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/plugins) — the plugin **mechanism**: the `PipelexPlugin` contract, the registrar every plugin registers into, and the capability registries. This is what an out-of-tree plugin imports, and what the `pipelex.plugins` entry point resolves against.
+- [`pipelex/plugins/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/plugins) — the plugin **mechanism**: the `PipelexPlugin` contract, the registrar every plugin registers into, and the capability registries. This is what an out-of-tree plugin imports, and what the `pipelex.plugins.kernel` / `pipelex.plugins.interpreter` entry points resolve against.
 - [`pipelex/providers/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/providers) — the built-in **provider adapters**, one directory per vendor, each handling that vendor's API specifics:
 
     - OpenAI
@@ -109,11 +109,11 @@ One rule governs them:
 !!! note "The one arrow"
     `interpreter_hub` imports `runtime_hub`. **`runtime_hub` never imports `interpreter_hub`.**
 
-The practical consequence is that the runtime layer cannot reach the interpreter layer. Importing the inference stack loads no `libraries`, `pipe_operators`, `pipe_controllers`, or `codegen` module at all — so anything that just wants a secret, the console, or the model deck (a health check, `pipelex --version`, a plugin's registration module) does not pay for the method interpreter, and a change to a pipe blueprint structurally cannot perturb the import graph of `cogt`.
+The practical consequence is that the kernel layer cannot reach the interpreter layer. Importing the inference stack loads no `libraries`, `pipe_operators`, `pipe_controllers`, or `codegen` module at all — so anything that just wants a secret, the console, or the model deck (a health check, `pipelex --version`, a plugin's registration module) does not pay for the method interpreter, and a change to a pipe blueprint structurally cannot perturb the import graph of `cogt`.
 
-That is not a convention held up by review: `make check-hub-layering` fails the build if a runtime-layer module imports — or merely names in a string — the interpreter hub, and an import-closure test pins the property itself in a subprocess.
+That is not a convention held up by review: `make check-hub-layering` fails the build if a kernel-layer module imports — or merely names in a string — the interpreter hub, and an import-closure test pins the property itself in a subprocess.
 
-`pipelex/core/` sits on both sides of the line, deliberately. Its data model — concepts, domains, stuffs, working memory, the input/output specs — belongs to the runtime layer: it describes what a method's values *are*, needs no loaded method, and takes the concept or pipe it needs as an injected argument. Everything in `core/` that names a **`Pipe`** belongs to the interpreter layer, because a pipe is the interpreter's own object.
+`pipelex/core/` sits on both sides of the line, deliberately. Its data model — concepts, domains, stuffs, working memory, the input/output specs — belongs to the kernel layer: it describes what a method's values *are*, needs no loaded method, and takes the concept or pipe it needs as an injected argument. Everything in `core/` that names a **`Pipe`** belongs to the interpreter layer, because a pipe is the interpreter's own object.
 
 Contributors: the full specification — what lives on each hub, how to place a new symbol, and how the boundary is enforced — is in [Hub Layering](../contribute/hub-layering.md).
 

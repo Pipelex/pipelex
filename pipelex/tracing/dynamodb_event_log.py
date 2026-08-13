@@ -7,7 +7,7 @@ Stores trace events in a DynamoDB table with the schema:
 
 Legacy emissions write writer_id="primary" so existing rows remain valid.
 
-Compatible with the pipelex-api-infra TraceEventDynamoDBAdapter schema.
+Compatible with the hosted trace-event DynamoDB adapter schema.
 Requires: pip install "pipelex[dynamodb]"
 """
 

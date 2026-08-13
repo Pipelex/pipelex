@@ -9,7 +9,6 @@ from typing import Callable
 
 import pytest
 
-from pipelex.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_pipe_library
@@ -24,12 +23,13 @@ from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlu
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
+from tests.integration.pipelex.fixtures.pipe_job_helpers import make_mode_guarded_run_params
 
 _DOMAIN_CODE = "test_optionals_gate"
 
 
 def _make_live_run_params() -> PipeRunParams:
-    return PipeRunParams(run_mode=PipeRunMode.LIVE, pipe_stack_limit=get_config().pipelex.pipe_run_config.pipe_stack_limit)
+    return make_mode_guarded_run_params(pipe_run_mode=PipeRunMode.LIVE)
 
 
 def _register_guarded_compose() -> None:

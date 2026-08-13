@@ -24,6 +24,8 @@ This is the ideal controller for processing collections of documents, images, or
 
 To restore unbounded fan-out (every branch started at once), set `max_concurrency = "unbounded"`.
 
+The setting is read **once, when the run's parameters are built**, and then frozen onto the run (`PipeRunParams.batch_max_concurrency`) — every `PipeBatch` in that run, at any depth, uses the value that was in effect when the run started. Editing the config while a run is in flight does not reshape it. This matters most on a durable-execution backend, where the bound is also the chunk size that decides where the backend's task boundaries fall between branch dispatches: a value re-read mid-run could make a replay group its dispatches differently from the recorded history.
+
 Results always preserve input order regardless of the concurrency bound. If a branch fails, the failure propagates and the first error by input index wins.
 
 For durable, rate-limited execution of very large batches, run the pipeline on the Temporal track.

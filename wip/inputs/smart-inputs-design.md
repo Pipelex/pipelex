@@ -150,7 +150,7 @@ When `YesNo` lands, the D5 matrix gains a row (YesNo-refining concept + JSON `tr
 
 ### D10 — Protocol widening (MTHDS-brand surface)
 
-`StuffContentOrData` / `PipelineInputs` live in `mthds/protocol/pipeline_inputs.py` — MTHDS-brand, spec territory. The type must widen to admit scalars, lists of dicts, and empty lists; honestly it converges toward "any JSON value | StuffContent forms". The interpretation semantics (this design's matrix) should be spec'd on the MTHDS side (docs/specs + the mthds repo), since signature-driven reading is a property of the protocol's inputs format, not a Pipelex quirk — no `pipelex_` naming anywhere wire-visible. Downstream mirrors (mthds-python, mthds-js `PipelineInputs` types, conformance rows, JSON schema if any) sweep after the pipelex release, same de-gate pattern as Optionals/TOML-inputs.
+`StuffContentOrData` / `PipelineInputs` live in `mthds/protocol/pipeline_inputs.py` — MTHDS-brand, spec territory. The type must widen to admit scalars, lists of dicts, and empty lists; honestly it converges toward "any JSON value | StuffContent forms". The interpretation semantics (this design's matrix) should be spec'd on the MTHDS side (the protocol spec + the mthds repo), since signature-driven reading is a property of the protocol's inputs format, not a Pipelex quirk — no `pipelex_` naming anywhere wire-visible. Downstream mirrors (mthds-python, mthds-js `PipelineInputs` types, cross-repo spec-suite rows, JSON schema if any) sweep after the pipelex release, same de-gate pattern as Optionals/TOML-inputs.
 
 ### D11 — Interactions with adjacent features
 

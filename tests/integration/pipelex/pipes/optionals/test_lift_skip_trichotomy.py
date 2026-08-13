@@ -10,7 +10,6 @@ from typing import Callable, cast
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
@@ -28,6 +27,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.func_registry import func_registry
+from tests.integration.pipelex.fixtures.pipe_job_helpers import make_mode_guarded_run_params
 from tests.unit.pipelex.graph.conftest import make_trace_context
 
 
@@ -83,9 +83,7 @@ def _make_seeded_absence() -> AbsenceRecord:
 
 
 def _make_live_run_params() -> PipeRunParams:
-    # Constructed directly (not via the factory) so a keyless boot's forced-DRY coercion cannot
-    # silently swap which code path (live vs dry) the test exercises.
-    return PipeRunParams(run_mode=PipeRunMode.LIVE, pipe_stack_limit=get_config().pipelex.pipe_run_config.pipe_stack_limit)
+    return make_mode_guarded_run_params(pipe_run_mode=PipeRunMode.LIVE)
 
 
 @pytest.mark.asyncio(loop_scope="class")

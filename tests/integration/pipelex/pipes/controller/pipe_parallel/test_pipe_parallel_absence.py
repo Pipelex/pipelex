@@ -16,7 +16,6 @@ from typing import Callable
 import pytest
 from pydantic import Field
 
-from pipelex.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -39,6 +38,7 @@ from pipelex.runtime_hub import get_class_registry
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.func_registry import func_registry
+from tests.integration.pipelex.fixtures.pipe_job_helpers import make_mode_guarded_run_params
 
 _DOMAIN_CODE = "test_optionals_par"
 
@@ -69,7 +69,7 @@ _TEST_FUNCS = [optionals_par_echo_source, optionals_par_echo_topic]
 
 
 def _make_live_run_params() -> PipeRunParams:
-    return PipeRunParams(run_mode=PipeRunMode.LIVE, pipe_stack_limit=get_config().pipelex.pipe_run_config.pipe_stack_limit)
+    return make_mode_guarded_run_params(pipe_run_mode=PipeRunMode.LIVE)
 
 
 def _build_parallel(*, output_ref: str, structure_class_names: list[str], add_each_output: bool = False) -> PipeParallel:

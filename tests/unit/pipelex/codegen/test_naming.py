@@ -26,7 +26,7 @@ def _resolved_concept(
 
 
 class TestNaming:
-    """Unit tests for the shared name-derivation rules (see docs/specs/pipelex-codegen.md)."""
+    """Unit tests for the shared name-derivation rules (see the codegen spec)."""
 
     def test_snake_to_pascal(self):
         assert snake_to_pascal("value") == "Value"

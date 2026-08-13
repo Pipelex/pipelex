@@ -617,8 +617,20 @@ class StuffFactory:
         if isinstance(content, list):
             list_content_2 = cast("list[Any]", content)
             if len(list_content_2) == 0:
-                msg = "Cannot create Stuff from empty list in content"
-                raise StuffFactoryError(msg)
+                # Case 2.7: the empty list is a VALUE, not a failure. Every arm below infers the
+                # item type from `first_item`, which an empty list has none of — but here it does
+                # not have to: the envelope NAMES the concept, so the items' type is already
+                # known. This is the same verdict the top-down shaper reaches for a bare `[]`
+                # under a plural slot (D2, "an empty list is legal and yields an empty
+                # ListContent"); refusing it here made the two spellings of one input disagree.
+                # Case 1.5 keeps raising, and must: with no concept key there is nothing to infer
+                # an empty list's type from.
+                return cls.make_stuff(
+                    concept=concept,
+                    content=ListContent[StuffContent](items=[]),
+                    name=name,
+                    code=code,
+                )
 
             first_item = list_content_2[0]
 

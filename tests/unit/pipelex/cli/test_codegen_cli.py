@@ -3,7 +3,7 @@
 Boot/teardown and the crate loader are mocked out so no real Pipelex is made; the emitter and the
 input renderer are stubbed so these tests pin the CLI wiring (targets, output paths, main_pipe
 defaulting, and the resolve-verdict exit codes), not the projection engines (covered by their own
-unit tests). End-to-end behavior against the binary is pinned by the conformance suite.
+unit tests). End-to-end behavior against the binary is pinned by our cross-repo spec suite.
 """
 
 from __future__ import annotations

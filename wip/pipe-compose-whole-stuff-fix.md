@@ -20,7 +20,7 @@
 
 A user designing a method with `/pipelex-design` used PipeCompose construct mode to copy whole native stuffs into native-typed fields of a structured output — `rejection_email = { from = "email" }` where `email` is a whole `Text` stuff, and `interview_questions = { from = "questions" }` where `questions` is a whole `Text[5]` stuff. Structural validation accepted it; the dry-run runnable gate rejected it because the composed field received the content wrapper object (`TextContent`, `ListContent[...]`) instead of the native value (`str`, `list[str]`). The user's usage was correct: the PipeCompose reference (`docs/building-methods/pipes/pipe-operators/PipeCompose.md`, "Copy value from input variable or nested field") and the composer's own design (`_resolve_from_var` docstring: "TextContent -> str: extract .text", "ListContent -> list[X]: extract items") both promise exactly this conversion. The implementation has gaps. **Verdict: fix pipelex, do not change the language or warn users off the pattern.**
 
-Full analysis with the user's original bundle and reasoning: `../mcp-demos/wip/pipe-compose-issue/README.md` (workspace sibling repo; + runnable repro under `repro/`). Note: that README's §5/§8 conclude "whole-stuff `from` hands over the wrapper **by design**" — that is a misdiagnosis of these bugs as a language rule; this plan is the correction.
+Full analysis with the user's original bundle and reasoning lives in an internal demos repo, alongside a runnable repro. Note: that write-up's §5/§8 conclude "whole-stuff `from` hands over the wrapper **by design**" — that is a misdiagnosis of these bugs as a language rule; this plan is the correction.
 
 ## Diagnosis — three gaps, all in `pipelex/pipe_operators/compose/structured_content_composer.py`
 
@@ -112,6 +112,6 @@ All changes in `pipelex/pipe_operators/compose/structured_content_composer.py` (
 
 - [x] `pipelex-plugins/skills/pipelex-design/references/writing-mthds.md` (source of truth; per-target copies under `pipelex-plugins/{pipelex,pipelex-vibe,pipelex-codex}/skills/...`): added a worked whole-stuff copy example (ScreeningReport, mirroring the PipeCompose.md docs example) to the PipeCompose construct section; `make build` propagated to all target copies; no warning added
 - [x] `mthds-plugins/templates/skills/shared/mthds-reference.md.j2` (the generated per-target copies come from this template): construct `from` row now reads "Reference a whole input or a nested field" + a note on the whole-native-stuff → native-field automatic conversion; `make build` propagated to all target copies
-- [x] `mcp-demos/wip/pipe-compose-issue/README.md`: annotated — update banner at top, correction blockquote in §5, update blockquote in §8 with the stale takeaways marked inline; root cause = implementation gaps fixed in pipelex v0.39.2, compose-based design recommended again
+- [x] The internal demos write-up: annotated — update banner at top, correction blockquote in §5, update blockquote in §8 with the stale takeaways marked inline; root cause = implementation gaps fixed in pipelex v0.39.2, compose-based design recommended again
 
-**Phase 4 executed 2026-07-18 — TRACK COMPLETE.** Committed per-repo: `pipelex-plugins` 2f97d2d, `mthds-plugins` 4e6288c, `mcp-demos` d422861.
+**Phase 4 executed 2026-07-18 — TRACK COMPLETE.** Committed per-repo: `pipelex-plugins` 2f97d2d, `mthds-plugins` 4e6288c, plus the internal demos repo.

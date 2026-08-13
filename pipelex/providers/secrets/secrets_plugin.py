@@ -13,7 +13,7 @@ class SecretsPlugin:
     """Always-on built-in provider of the ``env`` secrets backend (reads secrets from env vars).
 
     Core-unconditional: secrets is required infra, so this plugin cannot be disabled into a boot
-    with no secrets provider (see ``RUNTIME_CORE_UNCONDITIONAL_PLUGIN_NAMES``). It registers the one built-in
+    with no secrets provider (see ``KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES``). It registers the one built-in
     ``env`` method; ``secrets_config.method`` selects which factory boot invokes. Importing this module
     is import-light — no SDK loads at register (the env provider needs none, and an external
     ``pipelex-secrets-<backend>`` plugin defers its SDK import to its own factory).

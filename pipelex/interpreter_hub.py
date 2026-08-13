@@ -6,7 +6,7 @@ pipe router, the pipe runner, the pipeline manager, and the PipeFunc executor. T
 that reads the program and executes it — hence *interpreter*.
 
 **The one rule:** this module MAY import ``runtime_hub``; ``runtime_hub`` must never import this
-one. As it happens the arrow is currently unused — the only runtime-layer thing this module needs
+one. As it happens the arrow is currently unused — the only kernel-layer thing this module needs
 is the class-registry scoping slot, which lives below both hubs in
 ``system.registries.class_registry_access``. See ``docs/contribute/hub-layering.md``.
 """
@@ -201,7 +201,7 @@ def get_interpreter_hub() -> InterpreterHub:
 
 
 def set_interpreter_hub(interpreter_hub: InterpreterHub):
-    """Install ``interpreter_hub`` as the process singleton, and hand the runtime layer its scoping resolver.
+    """Install ``interpreter_hub`` as the process singleton, and hand the kernel layer its scoping resolver.
 
     Installing the resolver here rather than at an explicit boot step means library scoping is
     active exactly when an InterpreterHub exists — the invariant ``get_class_registry`` relies on, and

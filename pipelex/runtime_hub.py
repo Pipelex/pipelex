@@ -1,21 +1,21 @@
-"""The runtime layer's dependency hub: process-scoped infrastructure services.
+"""The kernel layer's dependency hub: process-scoped infrastructure services.
 
 ``RuntimeHub`` brokers everything that is configured once at boot and never varies per method:
 config, console, secrets, storage, telemetry, the model deck and inference workers, the content
 generator, the reporting delegate, and the plugin registries. That is the machinery present at
-execution time whatever is loaded — hence *runtime*, in the language-implementation sense.
+execution time whatever is loaded — the **kernel layer**, in the language-implementation sense.
 
 **The one rule:** ``interpreter_hub`` imports ``runtime_hub``; ``runtime_hub`` must never import
 ``interpreter_hub``. Nothing here may name ``libraries``, ``pipe_operators``, ``pipe_controllers``,
 ``codegen``, ``builder``, ``interpreter_plugins``, ``pipe_machinery``, ``pipe_signature``,
 ``mthds_parsing``, ``pipeline`` or ``pipe_run`` at module level. That list is the interpreter's
 top-level packages — all of them, with no qualification — so the property it buys is stated
-outright: **importing the Pipelex runtime loads zero interpreter modules.** It used to have to trail
+outright: **importing the Pipelex kernel layer loads zero interpreter modules.** It used to have to trail
 "…or the Pipe-touching modules of ``core.pipes``", because some of what it forbids lived under a
-runtime-named package, and it had to leave out ``pipeline`` and ``pipe_run``, because four leaf
+package declared kernel-layer, and it had to leave out ``pipeline`` and ``pipe_run``, because four leaf
 models of theirs landed in this module's closure. Both qualifications are gone the same way — the
 misfiled code moved. ``pipelex.core`` is *not* on the list at all: the whole package is declared
-runtime-layer, and this module's own closure runs straight through it. See
+kernel-layer, and this module's own closure runs straight through it. See
 ``docs/contribute/hub-layering.md``.
 """
 

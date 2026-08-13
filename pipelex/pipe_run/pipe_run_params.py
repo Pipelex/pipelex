@@ -148,6 +148,22 @@ class PipeRunParams(BaseModel):
     # frozen for the same reason as `run_mode`.
     is_mock_usage: bool = Field(default=False, frozen=True)
 
+    # Bounded fan-out for PipeBatch, resolved from `pipeline_execution_config.max_concurrency`
+    # once at construction (`PipeRunParamsFactory.make_run_params`). `None` means unbounded —
+    # `gather_bounded`'s own no-bound sentinel, so the field is passed straight through.
+    #
+    # REQUIRED (no default), for the same reason as `run_mode` above: `None` is *also* the
+    # resolved value of an authored `max_concurrency = "unbounded"`, so a default would make
+    # "never written" indistinguishable from "authored unbounded" — and would point the omission
+    # at the dangerous direction, launching every branch at once. An omission must fail loud.
+    #
+    # Frozen and payload-borne rather than read live at fan-out time: the bound is PipeBatch's
+    # chunk size, and chunk size determines where a distributed backend's task boundaries fall
+    # between branch dispatches. Read from live worker config, a redeploy that changed the
+    # setting mid-run would make a replay emit a different command grouping than the recorded
+    # history. Carried in the payload, the fan-out shape is a pure function of the run.
+    batch_max_concurrency: int | None = Field(frozen=True)
+
     final_stuff_code: str | None = None
     output_multiplicity: VariableMultiplicity | None = None
     dynamic_output_concept_ref: str | None = None

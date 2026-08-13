@@ -19,7 +19,7 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 class TestCogtRunParamsCarrier:
     def test_cogt_run_params_derives_from_run_mode_fields(self) -> None:
         """The carrier is minted from the stored fields — one copy of the facts."""
-        run_params = PipeRunParams(run_mode=PipeRunMode.DRY, is_mock_usage=True, pipe_stack_limit=20)
+        run_params = PipeRunParams(run_mode=PipeRunMode.DRY, is_mock_usage=True, pipe_stack_limit=20, batch_max_concurrency=None)
 
         cogt_run_params = run_params.cogt_run_params
         assert cogt_run_params.run_mode.is_dry
@@ -64,22 +64,23 @@ class TestCogtRunParamsCarrier:
     def test_stale_cogt_run_params_kwarg_fails_loudly(self) -> None:
         """cogt_run_params is a derived property, not a field: passing it as a kwarg must raise.
 
-        run_mode is supplied so the ONLY thing that can raise is the forbidden extra — without
-        it the test would pass on the missing-required-field error even if extra="forbid" were
-        dropped.
+        Every required field is supplied so the ONLY thing that can raise is the forbidden extra —
+        without them the test would pass on a missing-required-field error even if extra="forbid"
+        were dropped.
         """
         with pytest.raises(ValidationError, match="cogt_run_params"):
             PipeRunParams(
                 run_mode=PipeRunMode.DRY,
                 cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),  # type: ignore[call-arg] # pyright: ignore[reportCallIssue]
                 pipe_stack_limit=20,
+                batch_max_concurrency=None,
             )
 
     def test_run_mode_fields_are_frozen(self) -> None:
         """A post-construction DRY→LIVE flip (or mock-usage flip) must raise — it would bypass
         the construction validator and flow into real provider spend via the derived carrier.
         """
-        run_params = PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=20)
+        run_params = PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=20, batch_max_concurrency=None)
 
         with pytest.raises(ValidationError, match="frozen"):
             run_params.run_mode = PipeRunMode.LIVE  # type: ignore[misc]  # the static read-only error is the runtime contract under test
@@ -89,7 +90,7 @@ class TestCogtRunParamsCarrier:
     def test_mock_usage_requires_dry_on_pipe_run_params(self) -> None:
         """is_mock_usage is a sub-flag of DRY: setting it on a LIVE PipeRunParams is a contract violation."""
         with pytest.raises(ValidationError, match="is_mock_usage"):
-            PipeRunParams(run_mode=PipeRunMode.LIVE, is_mock_usage=True, pipe_stack_limit=20)
+            PipeRunParams(run_mode=PipeRunMode.LIVE, is_mock_usage=True, pipe_stack_limit=20, batch_max_concurrency=None)
 
     def test_mock_usage_requires_dry_on_carrier(self) -> None:
         """The wire carrier enforces the same rule at its own boundary (assignments cross the wire)."""

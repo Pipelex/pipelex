@@ -27,7 +27,8 @@ This is deliberately **not** a hub slot (those are orchestrator-coupled, claimed
 boot (Pipelex.setup)
   └─ build_registrar(config, builtin_plugins=BUILTIN_PLUGINS, …)   # pure, import-light
        ├─ for each built-in plugin                   (StoragePlugin is one)
-       └─ for each installed "pipelex.plugins" entry point
+       └─ for each installed entry point in the requested groups
+            #  "pipelex.plugins.kernel" alone on a kernel-only boot; both groups on a full one
             └─ plugin.register(registrar)            # side-effect-free
                  └─ registrar.add_storage_provider(method=…, factory=…)
   └─ StorageProviderRegistry(registrar.storage_providers)    # stored on the hub
@@ -79,7 +80,7 @@ The factory is a plain callable stored at registration and **invoked only at the
 
 ## The built-in `StoragePlugin`
 
-`pipelex/providers/storage/storage_plugin.py` is the reference storage plugin. It is **core-unconditional** — storage is required infra, so it joins the runtime layer's `RUNTIME_CORE_UNCONDITIONAL_PLUGIN_NAMES` — composed into `CORE_UNCONDITIONAL_PLUGIN_NAMES` at the boot entrypoint — and cannot be disabled into a boot with no storage:
+`pipelex/providers/storage/storage_plugin.py` is the reference storage plugin. It is **core-unconditional** — storage is required infra, so it joins the kernel layer's `KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES` — composed into `CORE_UNCONDITIONAL_PLUGIN_NAMES` at the boot entrypoint — and cannot be disabled into a boot with no storage:
 
 ```python
 class StoragePlugin:
@@ -132,6 +133,7 @@ Whether that token names an *installed* provider is validated at **registry look
 | Condition | Error |
 |-----------|-------|
 | `storage_config.method` names no registered provider | `UnknownStorageMethodError` (lists the registered methods) |
+| published under the retired `pipelex.plugins` group | `RetiredPluginEntryPointGroupError` (names the plugins and the group each should move to) |
 | two plugins register the same `method` | `DuplicateStorageProviderError` (names both plugins) |
 | `name` (`"storage"`) in `plugins.disabled` | `CoreUnconditionalPluginDisabledError` |
 | entry point raises while loading/registering | `BrokenPluginError` |
@@ -147,17 +149,17 @@ A third-party storage plugin is a distribution that:
 
 1. implements a `StorageProviderAbstract` subclass — the three hooks `_load_with_metadata`, `_store`, and `public_url` — deferring any SDK import into those methods (import-light);
 2. defines a plugin class (`name`, `targets_api`, `register`) whose `register` calls `add_storage_provider(method="<token>", factory=...)` — and nothing else;
-3. advertises itself under the `pipelex.plugins` entry-point group:
+3. advertises itself under the `pipelex.plugins.kernel` entry-point group — a storage provider is kernel-layer, and the group is how a plugin declares that (see [Inference Backend Plugins](inference-backend-plugins.md#shipping-it-as-an-out-of-tree-plugin) for what each group means and what happens if you pick the wrong one; the pre-split `pipelex.plugins` group is retired and now fails startup):
 
 ```toml
 # pyproject.toml of your plugin package
-[project.entry-points."pipelex.plugins"]
+[project.entry-points."pipelex.plugins.kernel"]
 azure_storage = "pipelex_storage_azure.plugin:AzureStoragePlugin"
 ```
 
 Installing the distribution makes the method selectable (`storage_config.method = "azure"`); uninstalling removes it. No core change, no central registration list — *presence* is the source of truth. A discovered plugin can be quarantined without uninstalling via the `plugins.disabled` denylist (matched against the entry-point name *before* load, so a broken install can still be disabled to recover startup — see [Inference Backend Plugins](inference-backend-plugins.md) for the shared discovery/denylist machinery).
 
-Use `pipelex plugins list` to see every discovered plugin, what each contributed, and its denylist state.
+Use `pipelex plugins list` to see every discovered plugin, the entry-point group it was found under, what each contributed, and its denylist state. The **Group** column is the first thing to read when a plugin is missing: a built-in shows `—`, and an external plugin that resolved to the wrong layer shows it there.
 
 ---
 

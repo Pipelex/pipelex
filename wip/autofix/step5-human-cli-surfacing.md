@@ -32,7 +32,7 @@ Two pieces, landed together for symmetry (per the master plan):
 - **`💡 Suggested fix:` line** — per fixable error in `pipelex validate`'s error rendering, showing `SuggestedFix.description` only (ops stay machine-facing), plus an actionable footer naming the `pipelex fix` command.
 - **`--diff` preview** (show, don't write) — listed in the design doc's wave-1 CLI surface and explicitly deferred from step 4 to here ("preview belongs to the human command"). Scoped as the last phase and **cuttable**: the step-5 exit criteria don't require it, so if it fights back it becomes a deferred item rather than blocking the step.
 
-**Out of scope:** the step-6 release train (user-facing docs page, conformance fixture regen, release cut); wave-2 surfaces (API `POST /fix`, MCP, editor); `--unsafe` (no UNSAFE rule exists in wave 1); richer still-invalid *markdown* for the agent command (only if Phase B's item renderer makes it free — see D5.5).
+**Out of scope:** the step-6 release train (user-facing docs page, cross-repo fixture regen, release cut); wave-2 surfaces (API `POST /fix`, MCP, editor); `--unsafe` (no UNSAFE rule exists in wave 1); richer still-invalid *markdown* for the agent command (only if Phase B's item renderer makes it free — see D5.5).
 
 ## What step 5 builds on (verified inventory)
 
@@ -164,7 +164,7 @@ Gates: `make agent-check` 0 errors; targeted CLI unit + integration suites and t
 Step 6 is the release train (see [master-plan.md](master-plan.md) step 6). Two things this step deliberately did **not** absorb — they belong to the release cut, not to step 5:
 
 - **The release CHANGELOG entry must name the additive `suggested_fix` wire field** now surfacing in `/validate` API payloads (deferred item 1c in the design doc). Step 5's `[Unreleased]` entries cover the human/agent CLI surfaces; the API wire-field mention is a release-train line.
-- **Regenerate the conformance fixture** that pins the `/validate` error body (deferred item 2, sibling `conformance/` repo), then bump the pipelex-api pin when the runner picks up the version.
+- **Regenerate the fixture in our cross-repo spec suite** that pins the `/validate` error body (deferred item 2), then bump the pipelex-api pin when the runner picks up the version.
 
 Carry-in from Checkpoint B (in [deferred-checkpoint-e-review-items.md](deferred-checkpoint-e-review-items.md)) — not release blockers, fold into wave 2 unless they surface sooner: the validate footer over-count (item A) and the `--diff` `-L` dedup (item B) are the two with user-visible edge cases; the cross-CLI resolver/filter duplications (items C, D) are the natural next shared-abstraction refactor.
 
