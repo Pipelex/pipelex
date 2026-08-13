@@ -17,17 +17,20 @@ from pipelex.graph.graphspec import (
     ErrorSpec,
     GraphSpec,
     GraphSpecMode,
+    GraphUsageSpec,
     IOSpec,
     NodeIOSpec,
     NodeKind,
     NodeSpec,
     NodeStatus,
+    NodeUsageSpec,
     PipelineRef,
     TimingSpec,
     make_graphspec_meta,
     output_digest_is_optional,
 )
 from pipelex.tracing.trace_events import (
+    UNATTRIBUTED_NODE_ID,
     BatchAggregateEvent,
     BatchItemEvent,
     ControllerOutputEvent,
@@ -41,6 +44,7 @@ from pipelex.tracing.trace_events import (
     TraceEvent,
     UsageReportEvent,
 )
+from pipelex.tracing.usage_attribution import UsageAccumulator, attribute_usage
 
 
 class _AssemblerNodeData:
@@ -73,6 +77,7 @@ class _AssemblerNodeData:
         self.status: NodeStatus = NodeStatus.RUNNING
         self.skip_reason: str | None = None
         self.metrics: dict[str, float] = {}
+        self.usage_spec: NodeUsageSpec | None = None
         self.error: ErrorSpec | None = None
         self.input_specs: list[IOSpec] = input_specs or []
         self.output_specs: list[IOSpec] = []
@@ -105,6 +110,7 @@ class _AssemblerNodeData:
             node_io=node_io,
             error=self.error,
             metrics=self.metrics,
+            usage=self.usage_spec,
             execution_data=self.execution_data,
         )
 
@@ -113,9 +119,17 @@ class GraphSpecAssembler:
     """Reconstructs a GraphSpec from trace events.
 
     Two-pass algorithm:
-    - Pass 1: Build nodes, producer map, and collect metadata from all events.
+    - Pass 1: Build nodes, producer map, per-node usage totals, and collect metadata
+      from all events.
     - Pass 2: Generate DATA, BATCH_ITEM, BATCH_AGGREGATE, PARALLEL_COMBINE edges
-      using the complete producer map.
+      using the complete producer map, then attribute usage — resolve each usage
+      total against the now-complete node set, roll subtrees up the parentage chain,
+      and compute the run total.
+
+    Usage attribution deliberately waits for pass 2: a ``UsageReportEvent`` can be read
+    before the ``PipeStartEvent`` of the node it names (they can come from different
+    workers, and the stream is ordered by (workflow_id, sequence)), so "is this node
+    real?" is only answerable once every event has been seen.
     """
 
     @staticmethod
@@ -169,6 +183,11 @@ class _AssemblerState:
         # Edges generated in Pass 2 (DATA, BATCH_ITEM, etc.)
         self._generated_edges: list[EdgeSpec] = []
 
+        # Usage accumulation, keyed by the node_id the event named — resolved against
+        # the real node set in pass 2 (see the class docstring).
+        self._usage_by_reported_node: dict[str, UsageAccumulator] = {}
+        self._graph_usage: GraphUsageSpec | None = None
+
     def pass_one(self, events: Sequence[TraceEvent]) -> None:
         """Pass 1: Build nodes, producer map, and collect metadata."""
         for event in events:
@@ -195,7 +214,7 @@ class _AssemblerState:
             elif isinstance(event, ExecutionDataEvent):
                 self._handle_execution_data(event)
             elif isinstance(event, UsageReportEvent):
-                pass  # Handled by UsageAggregator
+                self._handle_usage_report(event)
             else:
                 log.warning(f"Unknown event type: {type(event).__name__}")
 
@@ -203,11 +222,12 @@ class _AssemblerState:
         self._mark_canceled_nodes()
 
     def pass_two(self) -> None:
-        """Pass 2: Generate edges using the complete producer map."""
+        """Pass 2: Generate edges using the complete producer map, then attribute usage."""
         self._generate_data_edges()
         self._generate_batch_item_edges()
         self._generate_batch_aggregate_edges()
         self._generate_parallel_combine_edges()
+        self._attribute_usage()
 
     def build_graph_spec(self) -> GraphSpec:
         """Build the final GraphSpec from accumulated state."""
@@ -220,6 +240,7 @@ class _AssemblerState:
             pipeline_ref=self._pipeline_ref,
             nodes=nodes,
             edges=all_edges,
+            usage=self._graph_usage,
             meta=make_graphspec_meta(mode=self._mode),
             pipe_registry=dict(self._pipe_registry),
             concept_registry=dict(self._concept_registry),
@@ -346,6 +367,19 @@ class _AssemblerState:
         node_data.output_specs.append(event.output_spec)
         if event.output_spec.digest:
             self._stuff_producer_map[event.output_spec.digest] = event.node_id
+
+    def _handle_usage_report(self, event: UsageReportEvent) -> None:
+        """Fold one inference call into the total of the node it named.
+
+        No node lookup here on purpose — see the class docstring: the node may not have
+        started yet as far as this stream is concerned. Resolution happens in
+        ``_attribute_usage``.
+        """
+        accumulator = self._usage_by_reported_node.get(event.node_id)
+        if accumulator is None:
+            accumulator = UsageAccumulator()
+            self._usage_by_reported_node[event.node_id] = accumulator
+        accumulator.fold(tokens_usage=event.tokens_usage)
 
     def _handle_execution_data(self, event: ExecutionDataEvent) -> None:
         node_data = self._nodes.get(event.node_id)
@@ -522,3 +556,47 @@ class _AssemblerState:
                         source_stuff_digest=branch_stuff_code,
                         target_stuff_digest=combined_stuff_code,
                     )
+
+    # ------------------------------------------------------------------
+    # Pass 2 usage attribution
+    # ------------------------------------------------------------------
+
+    def _attribute_usage(self) -> None:
+        """Resolve the accumulated usage against the node set, roll it up, and total it.
+
+        Nothing is emitted at all when the stream reported no usage: every node keeps
+        ``usage=None`` and so does the graph (``NodeUsageSpec`` invariant 1, the
+        all-or-nothing half). As soon as one usage event was seen, EVERY node gets a
+        spec — zeroed for controllers, PipeFunc, skipped and lifted pipes, which run no
+        inference of their own and must not read as unmeasured.
+        """
+        if not self._usage_by_reported_node:
+            return
+
+        own_usage_by_node: dict[str, UsageAccumulator] = {node_id: UsageAccumulator() for node_id in self._nodes}
+        unattributed_usage = UsageAccumulator()
+        for reported_node_id, accumulator in self._usage_by_reported_node.items():
+            own_usage = own_usage_by_node.get(reported_node_id)
+            if own_usage is None:
+                if reported_node_id != UNATTRIBUTED_NODE_ID:
+                    log.warning(f"UsageReportEvent for unknown node: {reported_node_id}")
+                unattributed_usage.absorb(other=accumulator)
+                continue
+            own_usage.absorb(other=accumulator)
+
+        usage_specs = attribute_usage(
+            own_usage_by_node=own_usage_by_node,
+            parent_by_node={node_id: node_data.parent_node_id for node_id, node_data in self._nodes.items()},
+        )
+        for node_id, usage_spec in usage_specs.items():
+            self._nodes[node_id].usage_spec = usage_spec
+
+        # The run total counts every usage the stream reported, attributed or not — it is
+        # what the cost report's own total must agree with.
+        total_usage = UsageAccumulator()
+        for accumulator in self._usage_by_reported_node.values():
+            total_usage.absorb(other=accumulator)
+        self._graph_usage = GraphUsageSpec(
+            total=total_usage.to_self_contained_spec(),
+            unattributed=unattributed_usage.to_self_contained_spec(),
+        )

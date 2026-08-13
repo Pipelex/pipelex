@@ -179,6 +179,12 @@ class ExecutionDataEvent(TraceEvent):
     execution_data: dict[str, Any] = Field(default_factory=dict)
 
 
+# node_id stamped on a UsageReportEvent emitted outside any pipe context (no
+# parent_node_id on the trace context). The assembler routes it to
+# GraphUsageSpec.unattributed rather than dropping it.
+UNATTRIBUTED_NODE_ID = "unknown"
+
+
 class UsageReportEvent(TraceEvent):
     """Emitted when an inference job reports token usage."""
 

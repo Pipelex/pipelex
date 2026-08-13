@@ -257,6 +257,79 @@ class ErrorSpec(BaseModel):
         return _truncate_string(value, max_length=MAX_STACK_LENGTH)
 
 
+class NodeUsageSpec(BaseModel):
+    """Inference usage attributed to one graph node.
+
+    Field names mirror the already-shipped client-facing ``TokensUsageRecord``
+    (``reporting/usage_records.py``) so the graph does not introduce a fifth vocabulary
+    for numbers this codebase already names four ways (``TokenCategory``,
+    ``LLMTokenCostReportField``, ``GenAISpanAttr``, ``PostHogAttr``).
+
+    INVARIANTS — the UI and every other consumer branch on these, not on guesses about
+    why a number is missing:
+
+      1. ``NodeSpec.usage is None`` <=> no usage was reported anywhere in the run —
+         either usage collection was off, or the run made zero inference calls. As soon
+         as ONE usage event was seen, EVERY node carries a spec, zeroed where nothing
+         ran. A controller, a lifted pipe, and a PipeFunc all get ``inference_calls=0``,
+         never ``usage=None``. So the field is all-or-nothing across a graph: it never
+         distinguishes "this node was not measured" from "that node was".
+
+      2. ``cost is None`` <=> ``rated_inference_calls == 0``. Nothing else. "Made no
+         call" and "made only unrated calls" both land here and are told apart by
+         ``inference_calls``.
+
+      3. ``inference_calls > rated_inference_calls > 0`` => ``cost`` is a LOWER BOUND,
+         not a total: some of this node's calls carried no rate table. The UI must mark
+         it (a leading "≥").
+
+      4. ``total_tokens`` is input_joined + output — the same definition as
+         ``AggregatedCosts.total_nb_tokens``. It is NOT the sum of
+         ``nb_tokens_by_category``: ``input_cached`` is a SUBSET of ``input``, not
+         additive (see ``usage_records.py``), so summing double-counts. Never sum the
+         dict; read this field.
+
+    The same four invariants hold for the ``subtree_*`` half, which covers this node
+    plus every descendant (rolled up in the assembler, once, so no consumer re-derives
+    it and disagrees).
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    # This node's own inference.
+    inference_calls: int = 0
+    rated_inference_calls: int = 0
+    nb_tokens_by_category: dict[str, int] = Field(default_factory=dict)
+    total_tokens: int = 0
+    cost: float | None = None
+
+    # This node plus every descendant.
+    subtree_inference_calls: int = 0
+    subtree_rated_inference_calls: int = 0
+    subtree_nb_tokens_by_category: dict[str, int] = Field(default_factory=dict)
+    subtree_total_tokens: int = 0
+    subtree_cost: float | None = None
+
+
+class GraphUsageSpec(BaseModel):
+    """Run-level inference usage for a whole GraphSpec.
+
+    ``total`` covers every usage the run reported, attributed or not — it is the graph's
+    comparand for the cost report's own total. ``unattributed`` is the part that named no
+    live node (the ``UNATTRIBUTED_NODE_ID`` fallback, or a node that never emitted a
+    start event): surfaced as its own bucket rather than dropped, so the graph's total
+    can never silently disagree with the cost report's.
+
+    Both reuse ``NodeUsageSpec`` — one usage shape in the contract, not two. Neither has
+    a subtree distinct from itself, so their ``subtree_*`` fields repeat their own.
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    total: NodeUsageSpec
+    unattributed: NodeUsageSpec
+
+
 class NodeSpec(BaseModel):
     """Specification for a node in the execution graph.
 
@@ -283,6 +356,8 @@ class NodeSpec(BaseModel):
     error: ErrorSpec | None = None
     tags: dict[str, str] = Field(default_factory=dict)
     metrics: dict[str, float] = Field(default_factory=dict)
+    # Inference usage attributed to this node; None under NodeUsageSpec invariant 1.
+    usage: NodeUsageSpec | None = None
     execution_data: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -318,6 +393,8 @@ class GraphSpec(BaseModel):
     pipeline_ref: PipelineRef = Field(default_factory=PipelineRef)
     nodes: list[NodeSpec] = Field(default_factory=empty_list_factory_of(NodeSpec))
     edges: list[EdgeSpec] = Field(default_factory=empty_list_factory_of(EdgeSpec))
+    # Run-level usage rollup; None under NodeUsageSpec invariant 1, alongside every node's.
+    usage: GraphUsageSpec | None = None
     meta: dict[str, Any] = Field(default_factory=dict)
     pipe_registry: dict[str, dict[str, Any]] = Field(default_factory=dict)
     concept_registry: dict[str, dict[str, Any]] = Field(default_factory=dict)

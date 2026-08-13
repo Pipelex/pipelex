@@ -7036,6 +7036,10 @@ rationale = "Dispatch handler: handles the event; single operand."
 param = "event"
 rationale = "Dispatch handler: handles the event; single operand."
 
+["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_usage_report"]
+param = "event"
+rationale = "Dispatch handler: handles the event; single operand."
+
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState._track_earliest_timestamp"]
 param = "event"
 rationale = "Verb-object: reads the event to track its timestamp; single operand."
