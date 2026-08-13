@@ -97,6 +97,16 @@ class NativeScalarConversionTestData:
         "deadline": {"from": "deadline_date"},
     }
 
+    # Test case: TimeContent to time field
+    TIME_TO_TIME_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "start": {"from": "start_time"},
+    }
+
+    # Test case: ListContent[TimeContent] to list[time] field
+    TIME_LIST_TO_TIME_LIST_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "slots": {"from": "slot_times"},
+    }
+
 
 class ClassCompatibilityTestData:
     """Test data for class compatibility tests."""

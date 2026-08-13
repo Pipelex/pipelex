@@ -7,6 +7,8 @@ content wrappers into native-typed target fields:
 - NumberContent to float field
 - YesNoContent to bool field (including a falsy value)
 - DateContent to date field
+- TimeContent to time field (UTC offset preserved: the copy is lossless, unlike Date's)
+- ListContent[TimeContent] to list[time] field (item scalar extraction)
 """
 
 import datetime
@@ -24,6 +26,7 @@ from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.time_content import TimeContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.interpreter_hub import get_native_concept, get_pipe_router
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
@@ -39,6 +42,21 @@ from tests.integration.pipelex.pipes.operator.pipe_compose_structured.test_data 
 
 def _make_tag_texts() -> ListContent[TextContent]:
     return ListContent[TextContent](items=[TextContent(text="alpha"), TextContent(text="bravo"), TextContent(text="charlie")])
+
+
+# A UTC offset on the middle item: a Time carries its offset inside its own tzinfo, so the
+# list extraction must hand it over untouched, exactly like the singular case.
+_PARIS_OFFSET = datetime.timezone(datetime.timedelta(hours=2))
+
+
+def _make_slot_times() -> ListContent[TimeContent]:
+    return ListContent[TimeContent](
+        items=[
+            TimeContent(time=datetime.time(9, 0)),
+            TimeContent(time=datetime.time(13, 30, tzinfo=_PARIS_OFFSET)),
+            TimeContent(time=datetime.time(17, 15)),
+        ]
+    )
 
 
 @pytest.mark.dry_runnable
@@ -130,6 +148,28 @@ class TestPipeComposeNativeScalarConversions:
                 "deadline",
                 datetime.date(2026, 3, 14),
                 id="date_content_to_date_field",
+            ),
+            pytest.param(
+                "compose_time_to_time",
+                "start_time",
+                NativeConceptCode.TIME,
+                TimeContent(time=datetime.time(15, 40, tzinfo=_PARIS_OFFSET)),
+                NativeScalarConversionTestData.TIME_TO_TIME_CONSTRUCT,
+                "StartTimeHolder",
+                "start",
+                datetime.time(15, 40, tzinfo=_PARIS_OFFSET),
+                id="time_content_to_time_field",
+            ),
+            pytest.param(
+                "compose_time_list_to_time_list",
+                "slot_times",
+                NativeConceptCode.TIME,
+                _make_slot_times(),
+                NativeScalarConversionTestData.TIME_LIST_TO_TIME_LIST_CONSTRUCT,
+                "SlotTimesHolder",
+                "slots",
+                [datetime.time(9, 0), datetime.time(13, 30, tzinfo=_PARIS_OFFSET), datetime.time(17, 15)],
+                id="time_list_to_required_time_list_field",
             ),
         ],
     )
