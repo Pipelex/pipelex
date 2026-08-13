@@ -6,7 +6,7 @@ import json
 from typing import Any
 
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
-from pipelex.interpreter_hub import get_required_pipe
+from pipelex.interpreter_hub import get_required_entry_pipe
 from pipelex.pipe_machinery.rendering.output_renderer import render_output
 from pipelex.pipeline.validate_bundle import validate_bundle
 
@@ -35,7 +35,7 @@ async def build_output_for_pipe(
     # not a fully runnable pipeline — an in-progress bundle with PipeSignature placeholders is fine.
     await validate_bundle(mthds_contents=mthds_contents, allow_signatures=True)
 
-    the_pipe = get_required_pipe(pipe_code=pipe_code)
+    the_pipe = get_required_entry_pipe(pipe_code=pipe_code)
     output_str = render_output(the_pipe, output_format=output_format)
 
     match output_format:

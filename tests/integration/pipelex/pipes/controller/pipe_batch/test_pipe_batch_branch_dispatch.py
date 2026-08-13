@@ -79,7 +79,9 @@ def _build_batch() -> PipeBatch:
         pipe_code="branch_dispatch_batch",
         blueprint=PipeBatchBlueprint(
             description="Batch the shout over the items",
-            branch_pipe_code="branch_dispatch_shout",
+            # Domain-qualified: this blueprint is hand-built, so it never goes through the crate
+            # qualification pass, and `branch_pipe_code` is an in-body ref — the strict lookup.
+            branch_pipe_code=f"{_DOMAIN_CODE}.branch_dispatch_shout",
             output="Text",
             input_list_name="items",
             input_item_name="item",

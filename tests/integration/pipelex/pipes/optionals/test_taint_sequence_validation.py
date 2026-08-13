@@ -119,8 +119,8 @@ class TestSequenceTaintValidation:
             output_ref="Text",
             inputs={"source": "Text?"},
             steps=[
-                SubPipeBlueprint(pipe="taint_step_a", result="a_out"),
-                SubPipeBlueprint(pipe="taint_step_b", result="b_out"),
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_step_a", result="a_out"),
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_step_b", result="b_out"),
             ],
         )
 
@@ -142,8 +142,8 @@ class TestSequenceTaintValidation:
             output_ref="Text?",
             inputs={"source": "Text?"},
             steps=[
-                SubPipeBlueprint(pipe="taint_step_a", result="a_out"),
-                SubPipeBlueprint(pipe="taint_step_b", result="b_out"),
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_step_a", result="a_out"),
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_step_b", result="b_out"),
             ],
         )
         sequence.validate_with_libraries()
@@ -156,9 +156,9 @@ class TestSequenceTaintValidation:
             output_ref="Text",
             inputs={"source": "Text?"},
             steps=[
-                SubPipeBlueprint(pipe="taint_step_a", result="a_out"),
-                SubPipeBlueprint(pipe="taint_step_b", result="b_out"),
-                SubPipeBlueprint(pipe="taint_sink_c", result="final_report"),
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_step_a", result="a_out"),
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_step_b", result="b_out"),
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_sink_c", result="final_report"),
             ],
         )
         sequence.validate_with_libraries()
@@ -171,8 +171,8 @@ class TestSequenceTaintValidation:
             output_ref="Text",
             inputs={"source": "Text?"},
             steps=[
-                SubPipeBlueprint(pipe="taint_step_a", result="a_out"),
-                SubPipeBlueprint(pipe="taint_step_b", result="b_out"),
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_step_a", result="a_out"),
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_step_b", result="b_out"),
             ],
         )
         sequence.validate_with_libraries()
@@ -184,8 +184,8 @@ class TestSequenceTaintValidation:
             output_ref="Text",
             inputs={"source": "Text"},
             steps=[
-                SubPipeBlueprint(pipe="taint_step_a", result="a_out"),
-                SubPipeBlueprint(pipe="taint_step_b", result="b_out"),
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_step_a", result="a_out"),
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_step_b", result="b_out"),
             ],
         )
         sequence.validate_with_libraries()
@@ -213,8 +213,8 @@ class TestSequenceTaintValidation:
             output_ref="Text",
             inputs={"topic": "Text"},
             steps=[
-                SubPipeBlueprint(pipe="taint_gate", result="source"),
-                SubPipeBlueprint(pipe="taint_step_a", result="a_out"),
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_gate", result="source"),
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_step_a", result="a_out"),
             ],
         )
 
@@ -254,8 +254,8 @@ class TestSequenceTaintValidation:
             output_ref="Text",
             inputs={"items": "Text[]"},
             steps=[
-                SubPipeBlueprint(pipe="taint_item_finder", result="found_items", batch_over="items", batch_as="item"),
-                SubPipeBlueprint(pipe="taint_list_sink", result="summary"),
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_item_finder", result="found_items", batch_over="items", batch_as="item"),
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_list_sink", result="summary"),
             ],
         )
         sequence.validate_with_libraries()
@@ -285,8 +285,8 @@ class TestSequenceTaintValidation:
                 inputs={"source": "Text?", "topic": "Text"},
                 output="Composite",
                 branches=[
-                    SubPipeBlueprint(pipe="taint_step_a", result="a_out"),
-                    SubPipeBlueprint(pipe="taint_par_base", result="base_out"),
+                    SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_step_a", result="a_out"),
+                    SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_par_base", result="base_out"),
                 ],
                 add_each_output=True,
             ),
@@ -296,9 +296,9 @@ class TestSequenceTaintValidation:
             output_ref="Text",
             inputs={"source": "Text?", "topic": "Text"},
             steps=[
-                SubPipeBlueprint(pipe="taint_parallel", result="combined"),
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_parallel", result="combined"),
                 # Consumes the liftable branch's slot plain, and ends the sequence.
-                SubPipeBlueprint(pipe="taint_step_b", result="b_out"),
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_step_b", result="b_out"),
             ],
         )
 
@@ -317,10 +317,10 @@ class TestSequenceTaintValidation:
             inputs={"source": "Text?", "a_out": "Text"},
             steps=[
                 # Step A consumes the optional source and writes b_out (tainted)...
-                SubPipeBlueprint(pipe="taint_step_a", result="b_out"),
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_step_a", result="b_out"),
                 # ...then step B (consuming the guaranteed a_out) overwrites b_out with a
                 # guaranteed value, so the sequence output is guaranteed.
-                SubPipeBlueprint(pipe="taint_step_b", result="b_out"),
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_step_b", result="b_out"),
             ],
         )
         sequence.validate_with_libraries()

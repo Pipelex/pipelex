@@ -2420,9 +2420,9 @@ rationale = "Resolver getter: the native concept being fetched; single operand."
 param = "concept_ref"
 rationale = "Resolver getter keyed by the concept ref; single operand."
 
-["pipelex/core/concepts/concept_provider_abstract.py::ConceptProviderAbstract.get_required_concept_from_concept_ref_or_code"]
+["pipelex/core/concepts/concept_provider_abstract.py::ConceptProviderAbstract.get_required_entry_concept"]
 param = "concept_ref_or_code"
-rationale = "Resolver getter keyed by the ref-or-code; single operand."
+rationale = "Entry affordance keyed by the human-supplied concept string; single operand, the concept twin of get_required_entry_pipe."
 
 ["pipelex/core/concepts/concept_representation_generator.py::ConceptRepresentationGenerator._format_python_value"]
 param = "value"
@@ -3396,6 +3396,10 @@ rationale = "Hub getter: the native concept being fetched; single operand."
 param = "domain_code"
 rationale = "Hub getter keyed by the domain code; single operand."
 
+["pipelex/interpreter_hub.py::get_optional_entry_pipe"]
+param = "pipe_code"
+rationale = "Hub accessor keyed by the human-supplied pipe code; single operand, mirroring get_optional_pipe."
+
 ["pipelex/interpreter_hub.py::get_optional_pipe"]
 param = "pipe_code"
 rationale = "Hub getter keyed by the pipe code; single operand."
@@ -3415,6 +3419,10 @@ rationale = "Hub getter keyed by the concept ref; single operand."
 ["pipelex/interpreter_hub.py::get_required_domain"]
 param = "domain_code"
 rationale = "Hub getter keyed by the domain code; single operand."
+
+["pipelex/interpreter_hub.py::get_required_entry_pipe"]
+param = "pipe_code"
+rationale = "Hub accessor keyed by the human-supplied pipe code; single operand, mirroring get_required_pipe."
 
 ["pipelex/interpreter_hub.py::get_required_pipe"]
 param = "pipe_code"
@@ -3580,6 +3588,10 @@ rationale = "Verb-object: formats the text; formatting options stay keyword."
 param = "concept_ref"
 rationale = "Library getter keyed by the concept ref; single operand."
 
+["pipelex/libraries/concept/concept_library.py::ConceptLibrary.get_optional_entry_concept"]
+param = "concept_ref_or_code"
+rationale = "Entry affordance keyed by the human-supplied concept string; single operand, mirroring get_optional_entry_pipe."
+
 ["pipelex/libraries/concept/concept_library.py::ConceptLibrary.is_concept_exists"]
 param = "concept_ref"
 rationale = "Predicate on the concept named by the ref; single operand."
@@ -3616,10 +3628,6 @@ rationale = "Verb-object: validates refs within the blueprints; single operand."
 param = "spec"
 rationale = "Derivation: canonicalizes the spec; single operand."
 
-["pipelex/libraries/crate_normalization.py::_domain_of"]
-param = "qualified_ref"
-rationale = "Noun-named derivation: parses the domain out of the qualified ref."
-
 ["pipelex/libraries/crate_normalization.py::_flatten_refinement"]
 param = "concepts"
 rationale = "Verb-object: flattens the concepts mapping in place; single operand."
@@ -3636,30 +3644,6 @@ rationale = "Noun-named derivation: the effective structure for the native ref; 
 param = "value"
 rationale = "Single-operand normalization of the concept entry; the rest is context."
 
-["pipelex/libraries/crate_normalization.py::_normalize_pipe"]
-param = "blueprint"
-rationale = "Single-operand normalization of the pipe blueprint; owner_domain is context."
-
-["pipelex/libraries/crate_normalization.py::_qualify_concept_ref"]
-param = "concept_ref_or_code"
-rationale = "Single-operand transformation of the ref; domain is context."
-
-["pipelex/libraries/crate_normalization.py::_qualify_io_ref"]
-param = "io_ref"
-rationale = "Single-operand transformation of the ref; domain is context."
-
-["pipelex/libraries/crate_normalization.py::_qualify_pipe_ref"]
-param = "pipe_ref"
-rationale = "Single-operand transformation of the ref; domain is context."
-
-["pipelex/libraries/crate_normalization.py::_qualify_structure_field"]
-param = "field_blueprint"
-rationale = "Single-operand transformation of the field blueprint; domain is context."
-
-["pipelex/libraries/crate_normalization.py::_render_ref_with_markers"]
-param = "concept_ref"
-rationale = "Verb-object: renders the ref; parsed markers stay keyword."
-
 ["pipelex/libraries/crate_normalization.py::_resolve_refinement"]
 param = "concept_ref"
 rationale = "Verb-object: resolves the concept ref; concepts and cache are context."
@@ -3667,6 +3651,42 @@ rationale = "Verb-object: resolves the concept ref; concepts and cache are conte
 ["pipelex/libraries/crate_normalization.py::normalize_crate"]
 param = "crate"
 rationale = "Verb-object: normalizes the crate; mthds_version stays keyword."
+
+["pipelex/libraries/crate_qualification.py::_domain_of"]
+param = "qualified_ref"
+rationale = "Noun-named derivation: parses the domain out of the qualified ref."
+
+["pipelex/libraries/crate_qualification.py::_qualify_concept_entry"]
+param = "value"
+rationale = "Single-operand qualification of the concept entry; owner_domain is context."
+
+["pipelex/libraries/crate_qualification.py::_qualify_concept_ref"]
+param = "concept_ref_or_code"
+rationale = "Single-operand transformation of the ref; domain is context."
+
+["pipelex/libraries/crate_qualification.py::_qualify_io_ref"]
+param = "io_ref"
+rationale = "Single-operand transformation of the ref; domain is context."
+
+["pipelex/libraries/crate_qualification.py::_qualify_pipe_blueprint"]
+param = "blueprint"
+rationale = "Single-operand qualification of the pipe blueprint; owner_domain is context."
+
+["pipelex/libraries/crate_qualification.py::_qualify_pipe_ref"]
+param = "pipe_ref"
+rationale = "Single-operand transformation of the ref; domain is context."
+
+["pipelex/libraries/crate_qualification.py::_qualify_structure_field"]
+param = "field_blueprint"
+rationale = "Single-operand transformation of the field blueprint; domain is context."
+
+["pipelex/libraries/crate_qualification.py::_render_ref_with_markers"]
+param = "concept_ref"
+rationale = "Verb-object: renders the ref; parsed markers stay keyword."
+
+["pipelex/libraries/crate_qualification.py::qualify_crate"]
+param = "crate"
+rationale = "Verb-object: qualifies the crate's in-body refs; single operand."
 
 ["pipelex/libraries/domain/domain_library.py::DomainLibrary.add_domain"]
 param = "domain"
@@ -3840,9 +3860,17 @@ rationale = "Verb-object: adds the pipe; single operand."
 param = "pipes"
 rationale = "Verb-object: adds the pipes; single operand."
 
+["pipelex/libraries/pipe/pipe_library_abstract.py::PipeLibraryAbstract.get_optional_entry_pipe"]
+param = "pipe_code"
+rationale = "Entry-point getter keyed by the human-supplied pipe code; single operand."
+
 ["pipelex/libraries/pipe/pipe_library_abstract.py::PipeLibraryAbstract.get_optional_pipe"]
 param = "pipe_code"
 rationale = "Library getter keyed by the pipe code; single operand."
+
+["pipelex/libraries/pipe/pipe_library_abstract.py::PipeLibraryAbstract.get_required_entry_pipe"]
+param = "pipe_code"
+rationale = "Entry-point resolver keyed by the human-supplied pipe code; single operand."
 
 ["pipelex/libraries/pipe/pipe_library_abstract.py::PipeLibraryAbstract.get_required_pipe"]
 param = "pipe_code"

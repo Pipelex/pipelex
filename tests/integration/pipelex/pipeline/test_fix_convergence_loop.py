@@ -637,27 +637,22 @@ class TestFixConvergenceLoop:
         # The qualified step reference survives untouched (it resolves to the renamed bare pipe).
         assert pipes["run_seq"]["steps"][0]["pipe"] == "nsfix_loop.hello"
 
-    @pytest.mark.parametrize(
-        "sibling_mthds",
-        [_XFILE_SIBLING_SAME_DOMAIN_MTHDS, _XFILE_SIBLING_OTHER_DOMAIN_MTHDS],
-    )
-    async def test_strip_namespace_bails_on_cross_file_collision(
+    async def test_strip_namespace_bails_on_same_domain_cross_file_collision(
         self,
         tmp_path: Path,
         load_empty_library: Callable[[], str],
-        sibling_mthds: str,
     ) -> None:
-        """A rename whose bare code is declared by ANY sibling bundle is never applied.
+        """A rename whose bare code is declared by a SAME-DOMAIN sibling bundle is never applied.
 
         The raise-site collision gate only sees the target file, so the loop's cross-file guard
-        must drop the fix — same domain (duplicate declaration) and other domain (bare-code
-        ambiguity) alike. The loop bails loudly with the collision reason and the target file's
-        bytes are untouched — no unrepairable state is ever written.
+        must drop the fix: applying it would write a duplicate ``domain.code`` declaration the
+        loop can never repair. The loop bails loudly with the collision reason and the target
+        file's bytes are untouched — no unrepairable state is ever written.
         """
         load_empty_library()
         bundle_path = tmp_path / "target.mthds"
         bundle_path.write_text(_XFILE_TARGET_MTHDS, encoding="utf-8")
-        (tmp_path / "sibling.mthds").write_text(sibling_mthds, encoding="utf-8")
+        (tmp_path / "sibling.mthds").write_text(_XFILE_SIBLING_SAME_DOMAIN_MTHDS, encoding="utf-8")
 
         result = await fix_bundle_file(bundle_path, library_dirs=[tmp_path])
 
@@ -668,6 +663,32 @@ class TestFixConvergenceLoop:
         assert "'hola'" in result.bail_reason
         assert result.remaining_errors
         assert bundle_path.read_text(encoding="utf-8") == _XFILE_TARGET_MTHDS
+
+    async def test_strip_namespace_applies_despite_other_domain_sibling(
+        self,
+        tmp_path: Path,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A same-named pipe in ANOTHER domain is not a collision: the rename applies and converges.
+
+        The library keys pipes by ``domain.code`` and in-body refs never search across domains,
+        so ``nsfix_xfile.hola`` and ``nsfix_xfile_other.hola`` coexist. The old crate-wide
+        collision scope dropped this fix; the per-domain scope lets the bundle heal.
+        """
+        load_empty_library()
+        bundle_path = tmp_path / "target.mthds"
+        bundle_path.write_text(_XFILE_TARGET_MTHDS, encoding="utf-8")
+        (tmp_path / "sibling.mthds").write_text(_XFILE_SIBLING_OTHER_DOMAIN_MTHDS, encoding="utf-8")
+
+        result = await fix_bundle_file(bundle_path, library_dirs=[tmp_path])
+
+        assert result.is_valid is True
+        assert [fix.fix_code for fix in result.fixes_applied] == ["strip-namespace"]
+        assert result.bail_reason is None
+        parsed = tomlkit.loads(bundle_path.read_text(encoding="utf-8")).unwrap()
+        pipes = cast("dict[str, Any]", parsed["pipe"])
+        assert "hola" in pipes
+        assert "nsfix_xfile.hola" not in pipes
 
     async def test_typoed_main_pipe_tail_is_never_stripped(
         self,

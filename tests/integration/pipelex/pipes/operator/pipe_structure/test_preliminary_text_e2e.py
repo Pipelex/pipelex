@@ -10,7 +10,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.interpreter_hub import get_native_concept, get_pipe_router, get_required_pipe
+from pipelex.interpreter_hub import get_native_concept, get_pipe_router, get_required_entry_pipe
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_operators.structure.pipe_structure import PipeStructure
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
@@ -93,13 +93,13 @@ class TestPreliminaryTextE2E:
     ) -> None:
         load_test_library([Path("tests/integration/pipelex/pipes/operator/pipe_structure")])
 
-        user_facing_pipe = get_required_pipe(pipe_code=pipe_code)
+        user_facing_pipe = get_required_entry_pipe(pipe_code=pipe_code)
         assert isinstance(user_facing_pipe, PipeSequence)
         assert len(user_facing_pipe.sequential_sub_pipes) == 2
-        assert user_facing_pipe.sequential_sub_pipes[0].pipe_code == f"{pipe_code}__draft_text"
-        assert user_facing_pipe.sequential_sub_pipes[1].pipe_code == f"{pipe_code}__structure"
+        assert user_facing_pipe.sequential_sub_pipes[0].pipe_code == f"test_preliminary_text_e2e.{pipe_code}__draft_text"
+        assert user_facing_pipe.sequential_sub_pipes[1].pipe_code == f"test_preliminary_text_e2e.{pipe_code}__structure"
 
-        structure_step = get_required_pipe(pipe_code=f"{pipe_code}__structure")
+        structure_step = get_required_entry_pipe(pipe_code=f"{pipe_code}__structure")
         assert isinstance(structure_step, PipeStructure)
 
         working_memory = WorkingMemoryFactory.make_from_single_stuff(

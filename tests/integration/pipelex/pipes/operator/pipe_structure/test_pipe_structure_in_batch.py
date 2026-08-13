@@ -55,7 +55,7 @@ class TestPipeStructureInBatch:
 
         batch_blueprint = PipeBatchBlueprint(
             description="Run PipeStructure over a list of free-form review texts",
-            branch_pipe_code="structure_one_restaurant_review",
+            branch_pipe_code="test_pipe_structure_seq.structure_one_restaurant_review",
             inputs={"review_texts": NativeConceptCode.TEXT},
             output="RestaurantReview",
             input_list_name="review_texts",

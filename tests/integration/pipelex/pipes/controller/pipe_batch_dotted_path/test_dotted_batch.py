@@ -13,7 +13,7 @@ from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.interpreter_hub import get_required_pipe
+from pipelex.interpreter_hub import get_required_entry_pipe
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_run.pipe_run_params import BatchParams
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -60,9 +60,10 @@ class TestDottedBatchOver:
         )
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=search_result_stuff)
 
-        # Build SubPipe with dotted-path batch_params
+        # Build SubPipe with dotted-path batch_params. `pipe_code` on a SubPipe is an in-body ref, so
+        # it carries the domain — this is what the crate qualification pass produces for a built pipe.
         sub_pipe = SubPipe(
-            pipe_code="process_document",
+            pipe_code="dotted_batch_test.process_document",
             output_name="processed_docs",
             batch_params=BatchParams(
                 input_list_stuff_name="search_result.sources",
@@ -71,7 +72,7 @@ class TestDottedBatchOver:
         )
 
         # Get the branch pipe to verify it exists
-        branch_pipe = get_required_pipe(pipe_code="process_document")
+        branch_pipe = get_required_entry_pipe(pipe_code="process_document")
         log.info(f"Branch pipe: {branch_pipe.code}, inputs: {branch_pipe.inputs}")
 
         # Run SubPipe

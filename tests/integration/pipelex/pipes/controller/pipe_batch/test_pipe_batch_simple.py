@@ -50,7 +50,7 @@ class TestPipeBatchSimple:
 
         pipe_batch_blueprint = PipeBatchBlueprint(
             description="Simple batch processing test",
-            branch_pipe_code="uppercase_transformer",  # This exists in the MTHDS file
+            branch_pipe_code="test_integration1.uppercase_transformer",  # This exists in the MTHDS file
             inputs={
                 "text_list": concept_1.concept_ref,
             },
@@ -84,7 +84,7 @@ class TestPipeBatchSimple:
         assert pipe_batch is not None
         assert pipe_batch.domain_code == domain_code
         assert pipe_batch.code == "simple_batch"
-        assert pipe_batch.branch_pipe_code == "uppercase_transformer"
+        assert pipe_batch.branch_pipe_code == "test_integration1.uppercase_transformer"
         assert pipe_batch.batch_params is not None
         assert pipe_batch.batch_params.input_list_stuff_name == "text_list"
         assert pipe_batch.batch_params.input_item_stuff_name == "text_item"

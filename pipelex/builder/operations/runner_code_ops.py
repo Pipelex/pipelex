@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 from pipelex.builder.runner_code import generate_runner_code
-from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_pipe, set_current_library
+from pipelex.interpreter_hub import (
+    clear_current_library,
+    get_current_library_id_or_none,
+    get_library_manager,
+    get_required_entry_pipe,
+    set_current_library,
+)
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipeline.bundle_validator import BundleValidator
 
@@ -50,7 +56,7 @@ async def build_runner_code_for_pipe(
         await BundleValidator().validate_pipes(pipes=pipes, library_id=library_id)
 
         # Get the required pipe and generate runner code
-        pipe = get_required_pipe(pipe_code)
+        pipe = get_required_entry_pipe(pipe_code)
         runner_code = generate_runner_code(pipe=pipe)
         success = True
         return runner_code

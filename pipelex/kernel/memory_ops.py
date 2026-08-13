@@ -34,7 +34,7 @@ def shape_inputs(
     inputs: PipelineInputs,
     concept_provider: ConceptProviderAbstract,
     input_specs: InputStuffSpecs,
-    search_domain_codes: list[str] | None = None,
+    search_scope: str | None = None,
     inputs_base_dir: Path | None = None,
 ) -> WorkingMemory:
     """Interpret a caller's raw inputs against their declared specs and return the memory to run on.
@@ -60,7 +60,7 @@ def shape_inputs(
         inputs,
         concept_provider=concept_provider,
         input_specs=input_specs,
-        search_domain_codes=search_domain_codes,
+        search_scope=search_scope,
         inputs_base_dir=inputs_base_dir,
     )
 

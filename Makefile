@@ -1162,7 +1162,7 @@ up: generate-mthds-schema-quiet update-gateway-models-quiet up-kit-configs rules
 check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema check-keyword-only check-hub-layering drift-check format lint pyright mypy pylint
 	@echo "> done: check"
 
-agent-check: fix-unused-imports fix-keyword-only format lint pyright mypy check-keyword-only check-hub-layering
+agent-check: fix-unused-imports fix-keyword-only format lint pyright mypy check-keyword-only check-hub-layering drift-check
 	@echo "> done: agent-check"
 
 v: validate

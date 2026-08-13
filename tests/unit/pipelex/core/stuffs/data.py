@@ -660,14 +660,14 @@ TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | None, str, Stu
 
 
 # Test cases with search_domains - format: (test_name, stuff_content_or_data, stuff_name, stuff_code, search_domains, expected_stuff)
-SEARCH_DOMAIN_TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | None, str, list[str], Stuff]] = [
+SEARCH_DOMAIN_TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | None, str, str, Stuff]] = [
     # Case with search_domains: StuffContent object
     (
         "search-domain-stuff-content",
         AnotherConcept(name="test", value=42),
         "stuff_name",
         "stuff_code",
-        ["test_domain"],
+        "test_domain",
         Stuff(
             stuff_name="stuff_name",
             stuff_code="stuff_code",
@@ -689,7 +689,7 @@ SEARCH_DOMAIN_TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | 
         ],
         "stuff_name",
         "stuff_code",
-        ["test_domain"],
+        "test_domain",
         Stuff(
             stuff_name="stuff_name",
             stuff_code="stuff_code",
@@ -718,7 +718,7 @@ SEARCH_DOMAIN_TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | 
         ),
         "stuff_name",
         "stuff_code",
-        ["test_domain"],
+        "test_domain",
         Stuff(
             stuff_name="stuff_name",
             stuff_code="stuff_code",
@@ -745,7 +745,7 @@ SEARCH_DOMAIN_TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | 
         },
         "stuff_name",
         "stuff_code",
-        ["test_domain"],
+        "test_domain",
         Stuff(
             stuff_name="stuff_name",
             stuff_code="stuff_code",
@@ -762,7 +762,7 @@ SEARCH_DOMAIN_TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | 
 
 
 # Error test cases - these should raise exceptions
-ERROR_TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | None, str, list[str] | None, type[Exception], str]] = [
+ERROR_TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | None, str, str | None, type[Exception], str]] = [
     # Format: (test_name, stuff_content_or_data, stuff_name, stuff_code, search_domains, expected_exception, error_match)
     # Empty list - should fail
     (
@@ -860,7 +860,7 @@ ERROR_TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | None, st
         {"concept": "test_domain.MyConcept", "content": "plain text"},
         "stuff_name",
         "stuff_code",
-        ["test_domain"],
+        "test_domain",
         Exception,
         "not compatible",
     ),
@@ -870,7 +870,7 @@ ERROR_TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | None, st
         {"concept": "test_domain.MyConcept", "content": True},
         "stuff_name",
         "stuff_code",
-        ["test_domain"],
+        "test_domain",
         Exception,
         "native.YesNo",
     ),
@@ -890,7 +890,7 @@ ERROR_TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | None, st
         {"concept": "test_domain.MyConcept", "content": datetime.date(2026, 7, 7)},
         "stuff_name",
         "stuff_code",
-        ["test_domain"],
+        "test_domain",
         Exception,
         "native.Date",
     ),

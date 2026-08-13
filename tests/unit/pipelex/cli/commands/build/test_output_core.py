@@ -33,7 +33,7 @@ class TestGenerateOutputCore:
         validate_result = SimpleNamespace(blueprints=[SimpleNamespace(main_pipe="bundle_main")])
         return {
             "validate_bundle": mocker.patch(f"{MODULE}.validate_bundle", new=mocker.AsyncMock(return_value=validate_result)),
-            "get_required_pipe": mocker.patch(f"{MODULE}.get_required_pipe", return_value=SimpleNamespace(code="bundle_main")),
+            "get_required_entry_pipe": mocker.patch(f"{MODULE}.get_required_entry_pipe", return_value=SimpleNamespace(code="bundle_main")),
             "render_output": mocker.patch(f"{MODULE}.render_output", return_value='{"answer": 42}'),
         }
 
@@ -41,7 +41,7 @@ class TestGenerateOutputCore:
         """Without --pipe, the bundle's main_pipe is used and output.json lands next to the bundle."""
         asyncio.run(_generate_output_core(pipe_code=None, bundle_path=tmp_path / "demo.mthds"))
 
-        core_mocks["get_required_pipe"].assert_called_once_with(pipe_code="bundle_main")
+        core_mocks["get_required_entry_pipe"].assert_called_once_with(pipe_code="bundle_main")
         assert (tmp_path / "output.json").read_text(encoding="utf-8") == '{"answer": 42}'
 
     @pytest.mark.usefixtures("core_mocks")

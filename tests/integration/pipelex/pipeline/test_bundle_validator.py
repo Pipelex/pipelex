@@ -17,7 +17,7 @@ from pytest_mock import MockerFixture
 from typing_extensions import override
 
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.interpreter_hub import clear_current_library, get_interpreter_hub, get_library_manager, get_required_pipe
+from pipelex.interpreter_hub import clear_current_library, get_interpreter_hub, get_library_manager, get_required_entry_pipe
 from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_router import PipeRouter
@@ -144,7 +144,7 @@ class TestBundleValidatorIntegration:
         _, qualified_main_pipe = acquire_library(library_id=library_id, mthds_contents=[_BV_MTHDS])
         try:
             assert qualified_main_pipe is not None
-            pipe = get_required_pipe(pipe_code=qualified_main_pipe)
+            pipe = get_required_entry_pipe(pipe_code=qualified_main_pipe)
             results = await BundleValidator().validate_pipes([pipe], library_id=library_id)
             assert results[pipe.pipe_ref].status.is_success
             assert results[pipe.pipe_ref].pipe_ref == f"{_BV_DOMAIN}.echo_topic"
@@ -164,7 +164,7 @@ class TestBundleValidatorIntegration:
         _, qualified_main_pipe = acquire_library(library_id=library_id, mthds_contents=[_BV_MTHDS])
         try:
             assert qualified_main_pipe is not None
-            pipe = get_required_pipe(pipe_code=qualified_main_pipe)
+            pipe = get_required_entry_pipe(pipe_code=qualified_main_pipe)
             validator = BundleValidator()
             first = await validator.validate_pipes([pipe], library_id=library_id)
             second = await validator.validate_pipes([pipe], library_id=library_id)
@@ -217,7 +217,7 @@ class TestBundleValidatorIntegration:
         _, qualified_main_pipe = acquire_library(library_id=library_id, mthds_contents=[_BV_MTHDS])
         try:
             assert qualified_main_pipe is not None
-            pipe = get_required_pipe(pipe_code=qualified_main_pipe)
+            pipe = get_required_entry_pipe(pipe_code=qualified_main_pipe)
             first, second = await asyncio.gather(
                 BundleValidator().validate_pipes([pipe], library_id=library_id),
                 BundleValidator().validate_pipes([pipe], library_id=library_id),
@@ -240,8 +240,8 @@ class TestBundleValidatorIntegration:
         library_id = "bv_xpkg_skip_lib"
         acquire_library(library_id=library_id, mthds_contents=[_BV_XPKG_MTHDS])
         try:
-            leaf = get_required_pipe(pipe_code=f"{_BV_XPKG_DOMAIN}.implemented_leaf")
-            controller = get_required_pipe(pipe_code=f"{_BV_XPKG_DOMAIN}.cross_parallel")
+            leaf = get_required_entry_pipe(pipe_code=f"{_BV_XPKG_DOMAIN}.implemented_leaf")
+            controller = get_required_entry_pipe(pipe_code=f"{_BV_XPKG_DOMAIN}.cross_parallel")
             results = await BundleValidator().validate_pipes([controller, leaf], library_id=library_id)
             assert results[f"{_BV_XPKG_DOMAIN}.cross_parallel"].status == DryRunStatus.SKIPPED
             assert results[f"{_BV_XPKG_DOMAIN}.implemented_leaf"].status.is_success
@@ -264,8 +264,8 @@ class TestBundleValidatorIntegration:
         acquire_library(library_id=library_id, mthds_contents=[_BV_BATCH_MTHDS])
         hub.set_pipe_router(pipe_router=sentinel)
         try:
-            batch_pipe = get_required_pipe(pipe_code=f"{_BV_BATCH_DOMAIN}.summarize_items")
-            leaf_pipe = get_required_pipe(pipe_code=f"{_BV_BATCH_DOMAIN}.summarize_item")
+            batch_pipe = get_required_entry_pipe(pipe_code=f"{_BV_BATCH_DOMAIN}.summarize_items")
+            leaf_pipe = get_required_entry_pipe(pipe_code=f"{_BV_BATCH_DOMAIN}.summarize_item")
             results = await BundleValidator().validate_pipes([batch_pipe, leaf_pipe], library_id=library_id)
             assert results[f"{_BV_BATCH_DOMAIN}.summarize_items"].status.is_success
             assert results[f"{_BV_BATCH_DOMAIN}.summarize_item"].status.is_success
@@ -281,7 +281,7 @@ class TestBundleValidatorIntegration:
         _, qualified_main_pipe = acquire_library(library_id=library_id, mthds_contents=[_BV_MTHDS])
         try:
             assert qualified_main_pipe is not None
-            pipe = get_required_pipe(pipe_code=qualified_main_pipe)
+            pipe = get_required_entry_pipe(pipe_code=qualified_main_pipe)
             track_event_spy = mocker.spy(get_telemetry_manager(), "track_event")
             await BundleValidator().validate_pipes([pipe], library_id=library_id)
 

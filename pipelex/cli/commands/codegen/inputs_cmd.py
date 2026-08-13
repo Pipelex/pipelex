@@ -18,7 +18,7 @@ from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME, DEFAULT_INPUTS
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.crate_loading import load_normalized_crate_or_exit
 from pipelex.cli.error_handlers import ErrorContext
-from pipelex.interpreter_hub import get_required_pipe
+from pipelex.interpreter_hub import get_required_entry_pipe
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
@@ -76,9 +76,9 @@ def codegen_inputs_cmd(
 
             pipe_ref = pipe or _default_main_pipe_ref(crate=crate)
             try:
-                the_pipe = get_required_pipe(pipe_code=pipe_ref)
+                the_pipe = get_required_entry_pipe(pipe_code=pipe_ref)
             except PipeLibraryError as exc:
-                typer.secho(f"Cannot project inputs — pipe '{pipe_ref}' not found:\n{exc}", fg=typer.colors.RED, err=True)
+                typer.secho(f"Cannot project inputs for pipe '{pipe_ref}':\n{exc}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
 
             try:

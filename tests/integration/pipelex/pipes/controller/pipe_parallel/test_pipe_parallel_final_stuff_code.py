@@ -40,8 +40,8 @@ class TestPipeParallelFinalStuffCode:
             inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
             output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.COMPOSITE}",
             branches=[
-                SubPipeBlueprint(pipe="analyze_sentiment", result="sentiment_result"),
-                SubPipeBlueprint(pipe="count_words", result="word_count_result"),
+                SubPipeBlueprint(pipe="test_integration3.analyze_sentiment", result="sentiment_result"),
+                SubPipeBlueprint(pipe="test_integration3.count_words", result="word_count_result"),
             ],
             add_each_output=True,
         )
