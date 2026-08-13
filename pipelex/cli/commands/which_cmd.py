@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 from posthog import tag
+from rich.markup import escape
 
 from pipelex import log
 from pipelex.cli.cli_factory import make_pipelex_for_cli
@@ -28,8 +29,9 @@ def do_which_pipe(pipe_code: str, *, library_dirs: list[Path], source_label: str
     """Locate where a pipe is defined."""
     console = get_console()
 
-    # Show search path
-    console.print(f"\n[bold]Search path for '[cyan]{pipe_code}[/cyan]':[/bold]")
+    # Show search path. `pipe_code` is a raw CLI argument: escape it everywhere it meets markup,
+    # so a code containing brackets renders literally instead of raising a MarkupError.
+    console.print(f"\n[bold]Search path for '[cyan]{escape(pipe_code)}[/cyan]':[/bold]")
     if not library_dirs:
         console.print("  [dim](no directories configured)[/dim]")
     else:
@@ -45,13 +47,13 @@ def do_which_pipe(pipe_code: str, *, library_dirs: list[Path], source_label: str
     try:
         pipe = get_optional_entry_pipe(pipe_code=pipe_code)
     except PipeLibraryError as exc:
-        console.print(f"[red]Ambiguous:[/red] [bold]{pipe_code}[/bold]")
-        console.print(f"  {exc}")
+        console.print(f"[red]Ambiguous:[/red] [bold]{escape(pipe_code)}[/bold]")
+        console.print(f"  {escape(str(exc))}")
         console.print("")
         return False
 
     if pipe:
-        console.print(f"[green]Found:[/green] [bold]{pipe_code}[/bold]")
+        console.print(f"[green]Found:[/green] [bold]{escape(pipe_code)}[/bold]")
         console.print(f"  Type: [cyan]{pipe.pipe_type}[/cyan]")
         console.print(f"  Domain: [cyan]{pipe.domain_code}[/cyan]")
         source_path = get_pipe_source(pipe_code=pipe_code)
@@ -61,7 +63,7 @@ def do_which_pipe(pipe_code: str, *, library_dirs: list[Path], source_label: str
         console.print("")
         return True
     else:
-        console.print(f"[red]Not found:[/red] [bold]{pipe_code}[/bold]")
+        console.print(f"[red]Not found:[/red] [bold]{escape(pipe_code)}[/bold]")
         console.print("\n[dim]Tip: Check that the pipe code is correct and that the containing[/dim]")
         console.print("[dim]directory is in PIPELEXPATH or passed via --library-dir[/dim]")
         console.print("")

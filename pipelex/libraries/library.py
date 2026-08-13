@@ -66,15 +66,17 @@ def _describe_unresolved_pipe_dependency(
 
     referring_domain = QualifiedRef.parse(referring_pipe_ref).domain_path
     if parsed.domain_path is not None and parsed.domain_path == referring_domain:
-        bare_code = parsed.local_code
+        # After qualification a bare ref and an explicitly-written same-domain ref are
+        # indistinguishable, so the wording must not claim which one the author typed.
+        local_code = parsed.local_code
         lines.append(
-            f"A bare pipe reference resolves inside its own domain, so '{bare_code}' was read as '{missing_ref}'. "
+            f"A pipe reference resolves inside its own domain, so '{local_code}' is looked for in domain '{referring_domain}'. "
             "Referencing a pipe in another domain requires writing that domain out."
         )
-        elsewhere = sorted(ref for ref in candidates.get(bare_code, []) if ref != missing_ref)
+        elsewhere = sorted(ref for ref in candidates.get(local_code, []) if ref != missing_ref)
         if elsewhere:
             suggestion = "' or '".join(elsewhere)
-            lines.append(f"'{bare_code}' is declared elsewhere in this library — did you mean '{suggestion}'?")
+            lines.append(f"'{local_code}' is declared elsewhere in this library — did you mean '{suggestion}'?")
 
     return " ".join(lines)
 

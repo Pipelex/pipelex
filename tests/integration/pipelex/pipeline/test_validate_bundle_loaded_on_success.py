@@ -2,7 +2,7 @@
 
 The build/inputs/output CLIs and builder operations (``inputs_ops``, ``output_ops``,
 ``runner_code_ops``, ``validate_pipe_in_bundle``) call ``validate_bundle`` (or ``validate_pipes``
-directly) and then immediately ``get_required_pipe(...)`` against the library it left open. The
+directly) and then immediately ``get_required_entry_pipe(...)`` against the library it left open. The
 migration to ``BundleValidator.validate_pipes`` — the public inner sweep, which deliberately never
 tears the library down — must preserve this: a sweep that tore the library down on success would
 strand every one of those callers with ``No current library set`` / ``PipeNotFoundError``.
@@ -35,7 +35,7 @@ prompt = "Summarize $doc"
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestValidateBundleLoadedOnSuccess:
-    async def test_get_required_pipe_works_after_successful_validation(self) -> None:
+    async def test_entry_pipe_resolves_after_successful_validation(self) -> None:
         # The inner sweep never tears down on success: the library stays open + current, so a caller can
         # resolve the just-validated pipe without re-opening anything.
         result = await validate_bundle(mthds_contents=[_LOADED_MTHDS])

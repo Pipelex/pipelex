@@ -1055,11 +1055,12 @@ class LibraryManager(LibraryManagerAbstract):
 
         # Load exported pipes (reconciled by the crate) into child library, ensuring temp concepts
         # are always cleaned up even if an unexpected exception occurs
-        # Same qualification the main load path applies: a dependency package's own in-body refs are
-        # its own domain's, and its child library is keyed by qualified pipe_ref.
-        qualified_dep_pipes = qualify_crate(crate).pipes
-
         try:
+            # Same qualification the main load path applies: a dependency package's own in-body refs
+            # are its own domain's, and its child library is keyed by qualified pipe_ref. Inside the
+            # try: qualification can raise on malformed refs, and the temp concepts must still be
+            # removed from the main library.
+            qualified_dep_pipes = qualify_crate(crate).pipes
             for pipe_ref, pipe_blueprint in qualified_dep_pipes.items():
                 parsed_pipe = QualifiedRef.parse_pipe_ref(raw=pipe_ref)
                 if parsed_pipe.domain_path is None:

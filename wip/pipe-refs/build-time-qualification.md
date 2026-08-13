@@ -1,6 +1,6 @@
 # Decided design: in-body references qualify at build time
 
-**Status.** Decided 2026-08-11, not yet implemented. This settles the two questions [README.md](README.md) left open: the **direction** — tighten the runtime to the MTHDS standard's resolution rule — and the **mechanism** — qualify in-body references once, at library build time, rather than threading the caller's domain through the lookup API. The README carries the evidence for the direction (the export bypass, the corpus measurement, the concept-side defects); this document records the mechanism, why it won, and the implementation plan.
+**Status.** Decided 2026-08-11; Phases 1 and 2 have landed (outcomes recorded below), Phase 3 (the concept side) is open. This settles the two questions [README.md](README.md) left open: the **direction** — tighten the runtime to the MTHDS standard's resolution rule — and the **mechanism** — qualify in-body references once, at library build time, rather than threading the caller's domain through the lookup API. The README carries the evidence for the direction (the export bypass, the corpus measurement, the concept-side defects); this document records the mechanism, why it won, and the implementation plan.
 
 ## The decision in one paragraph
 

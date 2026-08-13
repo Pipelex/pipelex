@@ -119,13 +119,13 @@ Same three closures, same commands, on the fixed tree. Every prediction in this 
 Both failures take the same shape; the codes differ because the demos reference different pipes. `fallthrough`'s reads:
 
 ```
-Pipe 'alpha.run_flow' references 'alpha.present', which does not exist. A bare pipe reference
-resolves inside its own domain, so 'present' was read as 'alpha.present'. Referencing a pipe in
+Pipe 'alpha.run_flow' references 'alpha.present', which does not exist. A pipe reference
+resolves inside its own domain, so 'present' is looked for in domain 'alpha'. Referencing a pipe in
 another domain requires writing that domain out. 'present' is declared elsewhere in this library —
 did you mean 'beta.present'?
 ```
 
-`export-bypass` is the same sentence with its own codes — `'helper' was read as 'alpha.helper'`, suggesting `'beta.helper'` — because the message is pieced together from the specific ref that failed rather than being a fixed string.
+`export-bypass` is the same sentence with its own codes — `'helper'` looked for in `'alpha'`, suggesting `'beta.helper'` — because the message is pieced together from the specific ref that failed rather than being a fixed string. (The wording stays origin-neutral on purpose: after qualification, a bare `present` and an explicitly-written `alpha.present` are indistinguishable.)
 
 The suggestion comes from a crate-wide scan that runs **only** on the failure path. It suggests a spelling to a human; it never resolves a reference. Wiring it into a lookup would restore the bypass this section exists to document.
 
@@ -146,13 +146,13 @@ Three things fall out of that table, and the last two are defects nobody has fil
 
 1. **Rows 1–2 are the pipe divergence, verbatim, for concepts.** Fall-through where the standard errors; an ambiguity raise where the standard quietly succeeds. Meanwhile `_qualify_concept_ref` in the normalizer answers the *same authored text* the standard's way — confirm with `( cd "$DEMOS/concept-collision" && pipelex resolve . )`, which qualifies `alpha`'s bare `Note` to `alpha.Note` and `beta`'s to `beta.Note` and exits 0. Two readers, one fact, disagreeing — the exact defect class the parity track exists to remove, still open one file over from where it was closed for pipes.
 
-2. **Rows 4–5: a multi-domain search list cannot survive a domain that lacks the code.** The loop at `concept_library.py:212-216` calls `get_required_concept`, which *raises* (`concept_library.py:164-166`) rather than returning `None`, so the walrus `if found_concept := …` never sees a falsy value — the first miss escapes the method. Worse, it escapes as `ConceptLibraryError`, and `ConceptLibraryError` is **not** a subclass of the `ConceptLibraryConceptNotFoundError` that every caller in `pipelex/core/stuffs/stuff_factory.py` catches (`pipelex/libraries/concept/exceptions.py` extends `LibraryLoadingError`; `pipelex/core/concepts/exceptions.py:37` extends `PipelexError` — sibling branches). So the error bypasses the handler that exists to contextualize it.
+2. **Rows 4–5: a multi-domain search list cannot survive a domain that lacks the code.** The `search_domain_codes` loop in `ConceptLibrary.get_required_concept_from_concept_ref_or_code` calls `get_required_concept`, which *raises* rather than returning `None`, so the walrus `if found_concept := …` never sees a falsy value — the first miss escapes the method. Worse, it escapes as `ConceptLibraryError`, and `ConceptLibraryError` is **not** a subclass of the `ConceptLibraryConceptNotFoundError` that every caller in `pipelex/core/stuffs/stuff_factory.py` catches (`pipelex/libraries/concept/exceptions.py` extends `LibraryLoadingError`; `pipelex/core/concepts/exceptions.py` extends `PipelexError` — sibling branches). So the error bypasses the handler that exists to contextualize it.
 
-3. **Row 3 makes the deliberate ordering at `pipelex/pipeline/pipeline_run_setup.py:202-204` dead code.** That code inserts the running pipe's domain at position `0` so it wins; the loop then collects *all* matches and raises on `len > 1` before `found_concepts[0]` is ever returned. The own-domain preference it was written to express cannot fire.
+3. **Row 3 makes the deliberate ordering in `pipeline_run_setup` — the `search_domain_codes.insert(0, pipe.domain_code)` — dead code.** That insert puts the running pipe's domain at position `0` so it wins; the loop then collects *all* matches and raises on `len > 1` before `found_concepts[0]` is ever returned. The own-domain preference it was written to express cannot fire.
 
-**How live is (2) and (3)?** Latent, not live, today: `pipeline_run_setup.py:202-204` produces a single-element list, and no production call site passes a longer one (`grep -rn "search_domain_codes=\[" pipelex tests` finds only test call sites). That is worth stating plainly rather than dressing up — but it also means the multi-domain list is unusable the moment anyone reaches for it, and the standard's rule is exactly what makes the whole `search_domain_codes` parameter unnecessary.
+**How live is (2) and (3)?** Latent, not live, today: the `pipeline_run_setup` insert produces a single-element list, and no production call site passes a longer one (`grep -rn "search_domain_codes=\[" pipelex tests` finds only test call sites). That is worth stating plainly rather than dressing up — but it also means the multi-domain list is unusable the moment anyone reaches for it, and the standard's rule is exactly what makes the whole `search_domain_codes` parameter unnecessary.
 
-**One thing to confirm rather than assume:** `search_domain_codes` is fixed once from the *entry* pipe's domain and carried on the runner (`pipelex/pipeline/runner.py:115-126`, `:226`). Whether a sub-pipe in another domain can reach a concept-shaping path with the entry domain in hand — and therefore fail to resolve its own bare concept ref — was not established here. It is a good first question for whoever picks this up.
+**One thing to confirm rather than assume:** `search_domain_codes` is fixed once from the *entry* pipe's domain and carried on the runner (the `search_domain_codes` constructor field in `pipelex/pipeline/runner.py` and its pass-through into the pipe job). Whether a sub-pipe in another domain can reach a concept-shaping path with the entry domain in hand — and therefore fail to resolve its own bare concept ref — was not established here. It is a good first question for whoever picks this up.
 
 ## 5. The corpus — which direction is actually expensive
 
@@ -219,7 +219,7 @@ A proposal, not a decision. The deferred note's closing rule — *"Do not fix on
 - `PipeLibrary.get_optional_pipe` takes the caller's domain and stops at it: own bundle → own domain → not found. The permissive crate-wide search is arguably still right for *entry-point* lookups (a user typing `pipelex run my_pipe` with no domain in hand); if so, keep it there and make it an explicit, separately-named affordance rather than the resolution rule for in-body references. **Deciding that split is the first design question.**
 - `ConceptLibrary.get_required_concept_from_concept_ref_or_code` does the same, which also deletes the `search_domain_codes` machinery's reason to exist and takes the two defects in §4 with it.
 - `_qualify_pipe_ref` in `crate_normalization.py` reverts to owner-domain qualification — becoming the twin of `_qualify_concept_ref` sitting beside it — so the two readers agree by moving the one that is wrong about the standard, rather than the one that is right.
-- **The real work is the 63 call sites** (`grep -rn "get_optional_pipe\|get_required_pipe(" pipelex | grep -v "def get_"`), which today pass a bare code with no domain. Most are inside a `Pipe*` instance and so already hold `self.domain_code` (`pipelex/pipe_machinery/pipe_abstract.py:94`), but `pipelex/interpreter_hub.py:346-350` is the funnel and its signature has to change. Scope this before committing to the change.
+- **The real work is the call sites** (`grep -rn "get_optional_pipe\|get_required_pipe(" pipelex | grep -v "def get_"`), which today pass a bare code with no domain. Most are inside a `Pipe*` instance and so already hold `self.domain_code` (`PipeAbstract.domain_code`), but the `interpreter_hub` lookup accessors are the funnel and their signature has to change. Scope this before committing to the change.
 
 **Tests that pin today's behaviour and must flip** (they are correct tests of the current rule; they become tests of the new one):
 

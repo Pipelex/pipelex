@@ -24,7 +24,7 @@ helper, loads it through the real dependency loader, and asks both readers. It r
 It also asks the host for the ref the build-time qualification pass WOULD produce
 (`dep_domain.helper`), which is the OQ1 go/no-go question.
 
-    python wip/pipe-refs/probes/dep-subpipe-scope.py
+    .venv/bin/python wip/pipe-refs/probes/dep-subpipe-scope.py  # needs the venv: this probe imports pipelex
 
 No credentials and no inference backend are needed; nothing is executed, only resolved.
 """
@@ -130,8 +130,13 @@ def report(*, title: str, library: Library, library_id: str) -> None:
     else:
         print(f"   {'':<58} -> valid")
     print()
-    print(f"   VALIDATION reader — child library, bare {BARE_HELPER_CODE!r}")
-    ask(label="child.get_optional_pipe(bare)", library=child_library, pipe_code=BARE_HELPER_CODE)
+    print(f"   VALIDATION reader — child library ({BARE_HELPER_CODE!r}: authored spelling; qualified: what validation asks post-pass)")
+    ask(label="child.get_optional_pipe(bare)   [pre-qualification spelling]", library=child_library, pipe_code=BARE_HELPER_CODE)
+    ask(
+        label=f"child.get_optional_pipe('{DEP_DOMAIN}.{BARE_HELPER_CODE}')   [after the pass]",
+        library=child_library,
+        pipe_code=f"{DEP_DOMAIN}.{BARE_HELPER_CODE}",
+    )
     print()
     print("   EXECUTION reader — host library (what SubPipe.run_pipe asks)")
     ask(label=f"host.get_optional_pipe({BARE_HELPER_CODE!r})   [today]", library=library, pipe_code=BARE_HELPER_CODE)
@@ -162,10 +167,16 @@ def main() -> None:
         colliding_library_id, colliding_library = manager.open_library()
         with scoped_current_library(library_id=colliding_library_id):
             manager._load_single_dependency(library=colliding_library, resolved_dep=resolved_dep)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
-        manager.load_from_blueprints(
-            library_id=colliding_library_id,
-            blueprints=[MthdsParser.make_pipelex_bundle_blueprint(bundle_path=host_file)],
-        )
+        # load_from_blueprints validates the whole library, dependency entries included — since the
+        # strict lookup landed, that validation raises here. The host pipe is registered before the
+        # validation runs, so the shape-2 library is intact; catch and keep measuring.
+        try:
+            manager.load_from_blueprints(
+                library_id=colliding_library_id,
+                blueprints=[MthdsParser.make_pipelex_bundle_blueprint(bundle_path=host_file)],
+            )
+        except BaseException as exc:  # noqa: BLE001 - naming *which* error escapes IS the measurement here
+            print(f"\n   load_from_blueprints(host) -> {type(exc).__name__}: {exc}")
         report(title="host declares its OWN pipe under the same bare code", library=colliding_library, library_id=colliding_library_id)
 
         # The published shape: a manifest exporting only the entry pipe.

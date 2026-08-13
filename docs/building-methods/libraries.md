@@ -49,8 +49,8 @@ A bare reference never reaches another domain. This is what makes a domain a rea
 If a bare reference names nothing in its own domain, validation says so, names the reference it actually tried, and points at the domain that does declare that code:
 
 ```
-Pipe 'marketing.run_campaign' references 'marketing.render_html', which does not exist. A bare pipe
-reference resolves inside its own domain, so 'render_html' was read as 'marketing.render_html'.
+Pipe 'marketing.run_campaign' references 'marketing.render_html', which does not exist. A pipe
+reference resolves inside its own domain, so 'render_html' is looked for in domain 'marketing'.
 Referencing a pipe in another domain requires writing that domain out. 'render_html' is declared
 elsewhere in this library — did you mean 'presentation.render_html'?
 ```

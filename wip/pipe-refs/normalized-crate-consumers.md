@@ -4,7 +4,7 @@
 
 ## The headline: nothing writes a normalized crate back to `.mthds`
 
-This was the plan's stated worry — "if formatting persists a qualified ref into a user's source file, the flip rewrites their code, not just its in-memory form". It does not happen. No code path encodes a crate into `.mthds` and writes it over a source file. The crate encoder is used for stdout and for the codegen projections only.
+This was the plan's stated worry — "if formatting persists a qualified ref into a user's source file, the flip rewrites their code, not just its in-memory form". It does not happen. No code path encodes a crate into `.mthds` and writes it over a source file. The crate encoder is used for stdout only (`pipelex resolve`); the codegen projections consume a normalized crate but encode a **lock**, not a crate.
 
 The one command that *does* rewrite user `.mthds` files is `pipelex fix`, and it does not go through a crate at all: `fix_loop` edits a tomlkit DOM of the user's own file, applying ops planned from validation-error data. Two properties keep it clear of this change:
 

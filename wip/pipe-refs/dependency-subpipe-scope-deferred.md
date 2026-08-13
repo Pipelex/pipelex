@@ -1,8 +1,8 @@
 # Deferred: a dependency pipe's own sub-pipe refs resolve against the HOST library
 
-**Status.** Measured 2026-08-11 while answering OQ1 of [build-time-qualification.md](build-time-qualification.md). Pre-existing, independent of the pipe-refs change, and deliberately **not** fixed on the `fix/Pipe-refs` branch — the fix needs package scope threaded through the lookup, which is the packaging project's design work. Reproduce with [`probes/dep-subpipe-scope.py`](probes/dep-subpipe-scope.py).
+**Status.** Measured 2026-08-11 while answering OQ1 of [build-time-qualification.md](build-time-qualification.md). Pre-existing, independent of the pipe-refs change, and deliberately **not** fixed on this branch — the fix needs package scope threaded through the lookup, which is the packaging project's design work. Reproduce with [`probes/dep-subpipe-scope.py`](probes/dep-subpipe-scope.py).
 
-Code is cited by symbol, not by line: this note is written to outlive the branch, and `fix/Pipe-refs` itself edits several of these regions.
+Code is cited by symbol, not by line: this note is written to outlive the branch, which itself edits several of these regions.
 
 ## What is broken
 
@@ -22,6 +22,8 @@ The child library is built from the crate under an export filter (`if has_export
 
 ## Measured behaviour
 
+The table below is the **pre-Phase-2 baseline** — measured before the qualification pass landed on the dependency load path. Re-running the probe on this tree shows the post-change verdicts the next section describes: shapes 1 and 3 still fail, and row 2's silent capture is now a deterministic load failure.
+
 A dependency whose exported entry is a `PipeSequence` calling a bare same-domain helper, under three shapes:
 
 | Shape | Load verdict | What the execution reader resolves the helper to |
@@ -36,7 +38,7 @@ So today a dependency package that uses a controller internally either does not 
 
 Owner-domain qualification rewrites the authored bare `helper` to `dep_domain.helper`. Measured against the same host library, that ref also resolves to `None` — the host holds it as `alias->dep_domain.helper`. So:
 
-- **not a regression, but only because the two edits co-land.** Reader row 1 *is* served by the bare fall-through today: the child library's keys are `dep_domain.helper`, and the first loop looks up a **bare** code against it, which only succeeds via that fall-through. Deleting the fall-through alone would break row 1. The plan puts the qualification pass on the dependency load path and the fall-through deletion in the same phase, so the first loop's lookup is qualified by the time the fall-through is gone. That co-landing is load-bearing, not incidental — it is also what makes "`library` validation needs no edit" true.
+- **not a regression, but only because the two edits co-landed.** Reader row 1 *was* served by the bare fall-through: the child library's keys are `dep_domain.helper`, and the first loop looked up a **bare** code against it, which only succeeded via that fall-through. Deleting the fall-through alone would have broken row 1. Both edits landed in the same phase — the qualification pass on the dependency load path (`LibraryManager._load_single_dependency`) and the strict lookup — so the first loop's lookup is qualified now that the fall-through is gone. That co-landing was load-bearing, not incidental — it is also what makes "`library` validation needs no edit" true.
 - **strictly better on the capture.** The silent host-capture in row 2 becomes a deterministic not-found. A bundle that loads today and runs the wrong pipe will stop loading — loudly, naming `dep_domain.helper`, which points at the scope that should have been searched.
 - **it moves the eventual fix closer.** The child library's own keys are exactly `dep_domain.helper`. Once the lookup is package-scoped, a qualified ref is a direct key hit in the child library; a bare one would still need a search.
 

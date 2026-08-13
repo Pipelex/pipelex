@@ -54,6 +54,8 @@ NATIVE_CONCEPT_CODES = frozenset(
 
 # pipelex/pipe_controllers/condition/special_outcome.py
 SPECIAL_OUTCOMES = frozenset({"fail", "continue"})
+# The only fields where `fail`/`continue` are special outcomes rather than pipe refs.
+OUTCOME_FIELDS = frozenset({"outcome", "default_outcome"})
 
 MANIFEST_NAME = "METHODS.toml"
 SKIPPED_DIR_NAMES = frozenset({".git", ".venv", "node_modules", "__pycache__", "dist", "build"})
@@ -117,7 +119,9 @@ def bare_pipe_references(pipe_body: dict[str, Any]) -> list[Reference]:
         field_value = pipe_body.get(field_name)
         if isinstance(field_value, str):
             found.append(Reference(code=field_value, where=field_name))
-    return [ref for ref in found if ref.code not in SPECIAL_OUTCOMES]
+    # The fail/continue exemption belongs to outcome fields only (see crate_qualification.qualify_outcome):
+    # a step, branch or batch target may genuinely name a pipe called `continue`.
+    return [ref for ref in found if not (ref.where in OUTCOME_FIELDS and ref.code in SPECIAL_OUTCOMES)]
 
 
 def _structure_field_references(field_value: Any, *, where: str) -> list[Reference]:

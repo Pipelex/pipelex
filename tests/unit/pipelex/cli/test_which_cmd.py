@@ -9,6 +9,7 @@ import pytest
 from rich.console import Console
 
 from pipelex.cli.commands.which_cmd import do_which_pipe
+from pipelex.libraries.pipe.exceptions import PipeLibraryError
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -63,6 +64,32 @@ class TestWhichCmd:
         output = console.export_text()
         assert "Not found: ghost_pipe" in output
         assert "PIPELEXPATH or passed via --library-dir" in output
+
+    def test_ambiguous_bare_code_reports_candidates(self, mocker: MockerFixture, console: Console, tmp_path: Path) -> None:
+        """An ambiguous bare code names the candidate domains and returns False instead of escaping as a traceback."""
+        mocker.patch(
+            "pipelex.cli.commands.which_cmd.get_optional_entry_pipe",
+            side_effect=PipeLibraryError("Pipe code 'compute_score' is ambiguous: declared by ['analytics.compute_score', 'scoring.compute_score']"),
+        )
+
+        found = do_which_pipe(pipe_code="compute_score", library_dirs=[tmp_path], source_label="PIPELEXPATH")
+
+        assert found is False
+        output = console.export_text()
+        assert "Ambiguous: compute_score" in output
+        assert "analytics.compute_score" in output
+        assert "scoring.compute_score" in output
+
+    def test_bracketed_pipe_code_renders_literally(self, mocker: MockerFixture, console: Console, tmp_path: Path) -> None:
+        """A pipe code containing Rich markup characters is printed literally, not parsed as markup."""
+        mocker.patch("pipelex.cli.commands.which_cmd.get_optional_entry_pipe", return_value=None)
+
+        found = do_which_pipe(pipe_code="[/foo]", library_dirs=[tmp_path], source_label="PIPELEXPATH")
+
+        assert found is False
+        output = console.export_text()
+        assert "Search path for '[/foo]':" in output
+        assert "Not found: [/foo]" in output
 
     def test_empty_library_dirs(self, mocker: MockerFixture, console: Console) -> None:
         """An empty search path is reported explicitly."""

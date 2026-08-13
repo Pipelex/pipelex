@@ -24,6 +24,7 @@ from pipelex.cli.agent_cli.commands.validate.bundle_cmd import validate_bundle_c
 from pipelex.cli.agent_cli.commands.validate.pipe_cmd import validate_pipe_cmd as agent_validate_pipe_cmd
 from pipelex.cli.commands.validate.bundle_cmd import validate_bundle_cmd as bare_validate_bundle_cmd
 from pipelex.cli.commands.validate.pipe_cmd import validate_pipe_cmd as bare_validate_pipe_cmd
+from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipeline.exceptions import ValidateBundleError
 
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
 
 AGENT_BUNDLE_MODULE = "pipelex.cli.agent_cli.commands.validate.bundle_cmd"
 AGENT_PIPE_MODULE = "pipelex.cli.agent_cli.commands.validate.pipe_cmd"
+BARE_VALIDATE_CORE = "pipelex.cli.commands.validate._validate_core"
 
 
 def _make_dir(tmp_path: Path, name: str, mthds_files: list[str]) -> Path:
@@ -85,6 +87,24 @@ class TestValidateExitCodes:
     def test_bare_pipe_code_that_looks_like_a_path_exits_2(self) -> None:
         with pytest.raises(typer.Exit) as exc_info:
             bare_validate_pipe_cmd(pipe_code="my_bundle.mthds")
+        assert exc_info.value.exit_code == 2
+
+    def test_bare_pipe_ambiguous_code_is_no_verdict_exit_2(self, mocker: MockerFixture) -> None:
+        """A bare code declared by several domains is an unresolvable target: clean exit 2, not a traceback."""
+        mocker.patch("pipelex.cli.commands.validate.pipe_cmd.resolve_pipe_from_exports", return_value=[])
+        mocker.patch(f"{BARE_VALIDATE_CORE}.make_pipelex_for_cli")
+        mocker.patch(f"{BARE_VALIDATE_CORE}.Pipelex.teardown_if_needed")
+        library_manager = mocker.Mock()
+        library_manager.open_library.return_value = ("lib-id", mocker.Mock())
+        mocker.patch(f"{BARE_VALIDATE_CORE}.get_library_manager", return_value=library_manager)
+        mocker.patch(f"{BARE_VALIDATE_CORE}.set_current_library")
+        mocker.patch(f"{BARE_VALIDATE_CORE}.resolve_library_dirs", return_value=([], "defaults"))
+        mocker.patch(
+            f"{BARE_VALIDATE_CORE}.get_required_entry_pipe",
+            side_effect=PipeLibraryError("Pipe code 'my_pipe' is ambiguous: declared by ['a.my_pipe', 'b.my_pipe']"),
+        )
+        with pytest.raises(typer.Exit) as exc_info:
+            bare_validate_pipe_cmd(pipe_code="my_pipe")
         assert exc_info.value.exit_code == 2
 
     # --- agent CLI: bad args / unresolvable targets exit 2 (no verdict), pre-boot ---

@@ -23,7 +23,7 @@ from pipelex.interpreter_hub import (
     resolve_library_dirs,
     set_current_library,
 )
-from pipelex.libraries.pipe.exceptions import PipeNotFoundError
+from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_signature.signature_walk import collect_signature_refs
 from pipelex.pipelex import Pipelex
@@ -239,6 +239,15 @@ def execute_validate(
             error_message += "\nDid you mean 'pipelex validate --all'?"
         typer.secho(
             f"Failed to validate: {error_message}",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(2) from exc
+    except PipeLibraryError as exc:
+        # After the PipeNotFoundError arm (subclass ordering): reached by e.g. an ambiguous bare
+        # code declared in several domains. An unresolvable target is a no-verdict exit 2.
+        typer.secho(
+            f"Failed to validate: {exc}",
             fg=typer.colors.RED,
             err=True,
         )

@@ -5,7 +5,7 @@ Builds a two-domain library in memory and asks for a bare concept code under eac
 `search_domain_codes`. No bundle files, no runtime boot — the library object is enough, because the
 lookup is pure.
 
-    python wip/pipe-refs/probes/concept-lookup-matrix.py
+    .venv/bin/python wip/pipe-refs/probes/concept-lookup-matrix.py  # needs the venv: this probe imports pipelex
 
 Read the output against `mthds/docs/spec/namespace-resolution.md`
 § "Resolution Order for Bare Concept References": current bundle, then same domain in other

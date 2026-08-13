@@ -636,7 +636,7 @@
     "tests/integration/pipelex/pipeline/test_validate_bundle_library_lifecycle.py::TestValidateBundleLibraryLifecycle::test_validate_bundles_from_directory_tears_down_library_on_translated_error": 0.4914957089931704,
     "tests/integration/pipelex/pipeline/test_validate_bundle_library_lifecycle.py::TestValidateBundleRestoresOuterLibraryOnFailure::test_validate_bundle_restores_previous_current_library": 0.29557849999400787,
     "tests/integration/pipelex/pipeline/test_validate_bundle_library_lifecycle.py::TestValidateBundleRestoresOuterLibraryOnFailure::test_validate_bundles_from_directory_restores_previous_current_library": 0.7135502500022994,
-    "tests/integration/pipelex/pipeline/test_validate_bundle_loaded_on_success.py::TestValidateBundleLoadedOnSuccess::test_get_required_pipe_works_after_successful_validation": 1.734181040985277,
+    "tests/integration/pipelex/pipeline/test_validate_bundle_loaded_on_success.py::TestValidateBundleLoadedOnSuccess::test_entry_pipe_resolves_after_successful_validation": 1.734181040985277,
     "tests/integration/pipelex/pipeline/test_validate_bundle_loaded_on_success.py::TestValidateBundleLoadedOnSuccess::test_runner_code_ops_resolves_pipe_after_inner_sweep": 0.9875382080062991,
     "tests/integration/pipelex/pipeline/test_validate_bundle_return_placement.py::TestValidateBundleResultConstructionErrorTranslation::test_validate_bundle_translates_result_construction_error": 1.4922394989989698,
     "tests/integration/pipelex/pipeline/test_validate_bundle_return_placement.py::TestValidateBundleResultConstructionErrorTranslation::test_validate_bundles_from_directory_translates_result_construction_error": 0.7523452490131604,
