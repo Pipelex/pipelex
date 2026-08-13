@@ -10,6 +10,10 @@
 - **`make agent-check` now runs the drift-contracts gate**: An open code↔docs review obligation fails the agent quality gate locally instead of surfacing only in `make check` or CI. The digest reads the git index, so stage changes for the gate to see them; resolve open contracts with the documented drift workflow.
 - **`missing_pipe_code` on an unresolved-dependency validation item is now the qualified ref (Breaking)**: The structured error field carries the reference that was actually tried (`marketing.render_html`), not the bare spelling the author wrote. Machine consumers branching on this field see a domain-qualified value where they previously saw a bare code.
 
+### Fixed
+
+- **Pipe-lookup CLI failures no longer claim "not found" for every failure**: `pipelex codegen inputs` and the `build runner`/`build inputs`/`build output` commands printed a "not found"/"Could not find" prefix on any lookup failure, including an ambiguous bare code — contradicting the ambiguity message printed underneath. The prefix is now verdict-neutral and the underlying error states whether the code was missing or ambiguous.
+
 ## [v0.43.1] - 2026-08-12
 
 ### Changed

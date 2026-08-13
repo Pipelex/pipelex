@@ -8,8 +8,10 @@ authored bare sub-pipe ref, and the question this probe answers is whether they 
 - **validation** (`Library.validate_pipe_library_with_libraries`) special-cases a dependency pipe:
   for an aliased key, a bare sub-pipe code is looked up in the CHILD library;
 - **execution** (`SubPipe.run_pipe` -> `interpreter_hub.get_required_pipe`) has no such
-  special-case: it asks the ambient current library — the HOST — and the host's bare-code
-  fall-through explicitly SKIPS `alias->` entries.
+  special-case: it asks the ambient current library — the HOST — with a strict key lookup and no
+  fallback, so a bare code matches nothing there. (When this probe was first run, the host lookup
+  instead ended in a crate-wide bare-code fall-through that explicitly SKIPPED `alias->` entries —
+  same outcome for a dependency's bare ref, different mechanism.)
 
 The probe builds a dependency whose exported entry is a `PipeSequence` calling a bare same-domain
 helper, loads it through the real dependency loader, and asks both readers. It runs three shapes:
@@ -139,7 +141,7 @@ def report(*, title: str, library: Library, library_id: str) -> None:
     )
     print()
     print("   EXECUTION reader — host library (what SubPipe.run_pipe asks)")
-    ask(label=f"host.get_optional_pipe({BARE_HELPER_CODE!r})   [today]", library=library, pipe_code=BARE_HELPER_CODE)
+    ask(label=f"host.get_optional_pipe({BARE_HELPER_CODE!r})   [pre-qualification spelling]", library=library, pipe_code=BARE_HELPER_CODE)
     ask(
         label=f"host.get_optional_pipe('{DEP_DOMAIN}.{BARE_HELPER_CODE}')   [after the pass]",
         library=library,

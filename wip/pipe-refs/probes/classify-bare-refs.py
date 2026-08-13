@@ -166,7 +166,9 @@ def read_bundles(root: pathlib.Path) -> dict[pathlib.Path, list[Bundle]]:
     """Group every readable `.mthds` bundle under `root` by the merge unit it belongs to."""
     by_unit: dict[pathlib.Path, list[Bundle]] = defaultdict(list)
     for path in sorted(root.rglob("*.mthds")):
-        if any(part in SKIPPED_DIR_NAMES for part in path.parts):
+        # Root-relative parts only: a root that itself sits under a dir named `build`/`dist`/…
+        # must not silently skip every bundle.
+        if any(part in SKIPPED_DIR_NAMES for part in path.relative_to(root).parts):
             continue
         try:
             document = tomllib.loads(path.read_text(encoding="utf-8"))

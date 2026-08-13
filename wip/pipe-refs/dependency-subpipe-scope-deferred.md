@@ -14,7 +14,7 @@ A dependency package is loaded into an isolated *child* `Library` and its pipes 
 | per-pipe validation | same method's second loop → `PipeAbstract.generic_validate_inputs_with_library` → `PipeSequence.needed_inputs` | the **host** library, via `interpreter_hub.get_required_pipe` — no special case |
 | execution | `SubPipe.run_pipe` | the **host** library, via the same hub accessor — no special case |
 
-The child-library special case is neutralized by the second loop in the very same method. And the host's bare-code fall-through (the last branch of `PipeLibrary.get_optional_pipe`) explicitly **skips** `alias->` entries, so it can never reach the dependency's own pipe.
+The child-library special case is neutralized by the second loop in the very same method. And the host lookup cannot reach the dependency's own pipe either: `PipeLibrary.get_optional_pipe` is a strict key lookup, so a bare code matches nothing there. (Before this branch it instead ended in a crate-wide bare-code fall-through that explicitly **skipped** `alias->` entries — same outcome, different mechanism; that fall-through is what row 2 of the baseline table below measured.)
 
 ## A second defect, in the shape a real package ships
 

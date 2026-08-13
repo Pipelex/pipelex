@@ -44,7 +44,7 @@ Read the columns as scopes, not as a total: the whole workspace is **630 bundles
 The caveats in README §5 ("What this measurement does not cover") all still apply — in particular, a directory is not always a merge unit, so `both` is an upper bound and **`sibling-only` is the robust column**. Two more apply to this wider scan specifically, both inflating the denominator:
 
 - **Duplicates.** The enumerated roots hold 510 `.mthds` files with only 360 distinct contents: 256 files sit in one of 106 byte-identical groups, spread across roots (starters, demos and fixtures copy bundles wholesale). The scan counts files, not distinct bundles.
-- **Scratch trees.** Enumeration reaches material README §5 deliberately fenced off — `hidden/`, `wip/`, `playroom/`, `test-bed/`, `mcp-demos/`, `pipelex-demos/`, and the `internal-tools/wip/carol-sessions/*` container homes — 67 files in all. §5 called the demo bundles pathological and kept them out; enumerating by definition cannot.
+- **Scratch trees.** Enumeration reaches material README §5 deliberately fenced off — the workspace's internal scratch, demo, and container-session trees (none of them open core; the list lives in the workspace-level private notes) — 67 files in all. §5 called the demo bundles pathological and kept them out; enumerating by definition cannot.
 
 So the denominator is an upper bound and the breakage *ratio* is a floor. That does not touch the finding: the two breaking references are named files in neither category, and no scratch tree or duplicate contributed one.
 

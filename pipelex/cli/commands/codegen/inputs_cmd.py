@@ -78,7 +78,7 @@ def codegen_inputs_cmd(
             try:
                 the_pipe = get_required_entry_pipe(pipe_code=pipe_ref)
             except PipeLibraryError as exc:
-                typer.secho(f"Cannot project inputs — pipe '{pipe_ref}' not found:\n{exc}", fg=typer.colors.RED, err=True)
+                typer.secho(f"Cannot project inputs for pipe '{pipe_ref}':\n{exc}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
 
             try:

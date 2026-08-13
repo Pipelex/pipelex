@@ -85,7 +85,7 @@ async def _generate_inputs_core(
         the_pipe = get_required_entry_pipe(pipe_code=pipe_code)
     except Exception as exc:
         # CLI command boundary: any failure resolving the pipe is reported to the user and exits via typer.Exit.
-        typer.secho(f"Error: Could not find pipe '{pipe_code}': {exc}", fg=typer.colors.RED)
+        typer.secho(f"Error: Failed to resolve pipe '{pipe_code}': {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
     inputs_template_str: str

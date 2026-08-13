@@ -146,7 +146,7 @@ The normalizer and the live library must never disagree in a committed state, so
 - [x] Flip the normalizer test that pins the old rule: `tests/unit/pipelex/libraries/test_crate_normalization.py::test_bare_cross_domain_pipe_refs_resolve_to_the_declaring_domain` becomes a test of owner-domain qualification.
 - [x] Flip the lookup tests that pin the old rule: `tests/unit/pipelex/libraries/test_pipe_library_lookup.py::test_bare_code_ambiguous_raises` and `::test_bare_code_unambiguous` become tests of the strict lookup + entry affordance split.
 - [x] Qualify the refs in tests that construct pipes directly with bare sub-refs (bypassing the crate pass) — they hit the strict lookup now. Find them by running the suite, not by grepping alone.
-- [x] Conformance-shaped unit coverage for the resolution rows on the two-domain fixture: own-only resolves; sibling-only errors; both-declare resolves to own; nowhere errors. ⚠ **The export-bypass closure case is NOT covered by a test here** — only by re-running the demo probe by hand (recorded in README §3). Its *behaviour* is covered: a bare in-body ref cannot reach **any** sibling domain, exported or not, which is pinned at library level by `test_unresolved_pipe_ref_message.py::test_names_the_qualified_ref_and_explains_the_rule`, and export-bypass is a strict subcase of that. What has no test is the `[exports]`/`METHODS.toml` machinery *interacting* with the new rule, which needs a package fixture and is conformance-shaped — it is already scheduled in Phase 4b's `conformance/` line item. Do not tick that 4b item without it.
+- [x] Conformance-shaped unit coverage for the resolution rows on the two-domain fixture: own-only resolves; sibling-only errors; both-declare resolves to own; nowhere errors. ⚠ **The export-bypass closure case is NOT covered by a test here** — only by re-running the demo probe by hand (recorded in README §3). Its *behaviour* is covered: a bare in-body ref cannot reach **any** sibling domain, exported or not, which is pinned at library level by `test_unresolved_pipe_ref_message.py::test_names_the_qualified_ref_and_explains_the_rule`, and export-bypass is a strict subcase of that. What has no test is the `[exports]`/`METHODS.toml` machinery *interacting* with the new rule, which needs a package fixture and is conformance-shaped — it is already scheduled in Phase 4b's spec-suite line item. Do not tick that 4b item without it.
 - [x] **Mutation-check the rows.** Done for sibling-only (restoring the crate-wide search reddens the two rule tests and both message tests) and per-controller-kind for the closure walk. **Not done for export-bypass**, because there is no export-bypass test to mutate — see the item above.
 - [x] Coverage for the entry affordance semantics: exact hit, crate-wide unique bare match, ambiguity error message, and no-match.
 - [x] Pin the stated invariants that currently have no test: `alias->` refs pass through the pass untouched; all four ref kinds are covered (steps, branches, outcomes, batch refs — branches and batch refs are the ones a hand-written pass forgets); the pass is idempotent (`d.c` must not become `d.d.c`, and it now runs in two places); the pass runs on **all three** load paths (a miss on the secondary or dependency path is invisible for any single-domain library); the OQ3 ruling; and that the affordance reaches a **non-exported** pipe (the twin of the export-bypass closure — the docstring claim needs enforcement).
@@ -210,18 +210,19 @@ The runtime is fully spec-compliant and self-consistent; only cross-repo work re
 These need no published `pipelex`. They can land as soon as Phase 3 is committed.
 
 - [ ] `mthds/` — additive clarification at § *Resolution Order for Bare Pipe References*: no-fall-through is what makes `[exports]` enforceable, so the next reader does not mistake the rule for a lookup convenience. No normative change.
-- [ ] Add the new hub accessor to `docs/specs/pipelex-transport-boundary.md` (workspace root). The prose spec is a doc edit; its verifying test lands in 4b, and the two must land together per the spec/conformance sync rule — so hold this until 4b is ready to go with it.
+- [ ] Add the new hub accessor to the transport boundary spec (workspace-level; exact path in the workspace private notes). The prose spec is a doc edit; its verifying test lands in 4b, and the two must land together per the spec/conformance sync rule — so hold this until 4b is ready to go with it.
 
 ## Phase 4b — cross-repo, gated on a published `pipelex`
 
 **Gate:** every item below needs a `pipelex` release carrying the new `interpreter_hub` accessor, installable by the sibling repo. Cut that release first. Opening these PRs beforehand produces red CI for a reason unrelated to the change.
 
-- [ ] `conformance/` — executable conformance cases for the resolution rows (own-only, sibling-only, both-declare, nowhere) and the export-bypass closure, on a two-domain fixture. Reuse the fixture built in Phase 2.
-- [ ] `conformance/` — add the new hub accessor to `tests/pipelex_transport/test_data.py` (`ALLOWED_SURFACE`), landing together with the spec doc edit from 4a.
-- [ ] Run `make check-spec-links` in `conformance/` — must pass.
-- [ ] `pipelex-transport/` — migrate `bridge.py`'s payload-supplied lookup to the new accessor (its code is entry-shaped; `get_required_pipe`'s pinned signature is untouched).
-- [ ] `pipelex-cookbook/` — qualify the one reference that leans on fall-through: `presentation.present_as_markdown` in `examples/wip/advisory_board/bundle.mthds`. Verify the example still validates and runs against the updated runtime.
-- [ ] **Error-surface sweep.** Run `make generate-error-identity` and `make generate-error-pages`, review the identity diff, and grep the TypeScript consumers for any changed or newly-introduced `error_type` literal — `mthds-starter-js/src/lib/errors.ts`, `pipelex-starter-js/src/lib/errors.ts`, `vscode-pipelex`'s `cliValidationBackend.test.ts`, and `playroom/src/app/api/graph/route.ts`. The class name is a wire string; those repos switch on the literal and fall through to a generic branch without failing to compile. No Python tool will point at this.
+- [ ] our cross-repo spec suite — executable conformance cases for the resolution rows (own-only, sibling-only, both-declare, nowhere) and the export-bypass closure, on a two-domain fixture. Reuse the fixture built in Phase 2.
+- [ ] our cross-repo spec suite — add the new hub accessor to the transport allowed-surface test, landing together with the spec doc edit from 4a (exact paths and the current state of that test in the workspace private notes).
+- [ ] Run the spec suite's spec-link checker — must pass.
+- [ ] the transport layer that is not open core — migrate its host-side bridge's payload-supplied lookup to the new accessor (that code is entry-shaped; `get_required_pipe`'s pinned signature is untouched).
+- [ ] `pipelex-cookbook/` — qualify the first reference that leans on fall-through: `presentation.present_as_markdown` in `examples/wip/advisory_board/bundle.mthds`. Verify the example still validates and runs against the updated runtime.
+- [ ] `cocode/` — qualify the second: `changelog.format_changelog_as_markdown` in `cocode/pipelines/swe_diff/changelog_enhanced.mthds` (a shipped CLI — see `wip/pipe-refs/corpus-measurement.md`). Verify the pipeline still validates against the updated runtime.
+- [ ] **Error-surface sweep.** Run `make generate-error-identity` and `make generate-error-pages`, review the identity diff, and grep the TypeScript consumers for any changed or newly-introduced `error_type` literal — `mthds-starter-js/src/lib/errors.ts`, `pipelex-starter-js/src/lib/errors.ts`, `vscode-pipelex`'s `cliValidationBackend.test.ts`, and the internal playground app's graph route. The class name is a wire string; those repos switch on the literal and fall through to a generic branch without failing to compile. No Python tool will point at this.
 - [ ] Changelog entries in each touched repo noting the breaking language-behavior change, per each repo's convention (skip `wip/` docs in changelogs).
 
 ### ⛔ CHECKPOINT C4 — MANDATORY STOP (final)
@@ -255,10 +256,10 @@ Phase 3  (concept side,     Phase 4a  (mthds/ clarification —
    +----------------------------+
                 |
                 v   requires a published pipelex carrying the accessor
-          Phase 4b  (conformance + transport + cookbook + error sweep)
+          Phase 4b  (spec suite + transport + cookbook/cocode + error sweep)
 ```
 
-Lane A: Phase 0 → 1 → 2 → 3 (sequential — all touch `pipelex/libraries/`). Lane B: Phase 4a (independent once Phase 2 lands; touches `mthds/` and workspace-root `docs/specs/`). Lanes A and B share no module directory. Phase 4b joins both and is gated on a release, so it cannot run in parallel with anything.
+Lane A: Phase 0 → 1 → 2 → 3 (sequential — all touch `pipelex/libraries/`). Lane B: Phase 4a (independent once Phase 2 lands; touches `mthds/` and the workspace-level boundary spec). Lanes A and B share no module directory. Phase 4b joins both and is gated on a release, so it cannot run in parallel with anything.
 
 ## GSTACK REVIEW REPORT
 

@@ -28,7 +28,7 @@ Two other sections of that same page **depend** on this rule. They are quoted in
 
 ## 2. What this repository does today
 
-> **HISTORICAL as of the pipe-side fix.** The table below records the state that motivated this work, and it is kept as written rather than rewritten — the argument only makes sense against the disagreement it describes. What changed: the pipe readers now qualify a bare in-body ref to its **owner domain** and the live `PipeLibrary` lookup no longer searches across domains, so the two pipe rows agree with each other *and* with the standard. Bare codes a human types at an entry point keep working through a separate, explicitly-named affordance (`get_optional_entry_pipe`), which searches crate-wide and refuses ambiguity. **The concept rows are still accurate** — the concept-side work is not done. Re-measured outcomes are in §3.
+> **HISTORICAL as of the pipe-side fix.** The table below records the state that motivated this work, and it is kept as written rather than rewritten — the argument only makes sense against the disagreement it describes. What changed: the pipe readers now qualify a bare in-body ref to its **owner domain** and the live `PipeLibrary` lookup no longer searches across domains for a bare in-body ref, so the two pipe rows agree with each other *and* with the standard. One search survives on purpose: a cross-package `alias->bare_code` ref is still matched across the aliased dependency's domains — alias-scoped, so it can never reach a host pipe; OQ3 in [build-time-qualification.md](build-time-qualification.md) records why. Bare codes a human types at an entry point keep working through a separate, explicitly-named affordance (`get_optional_entry_pipe`), which searches crate-wide and refuses ambiguity. **The concept rows are still accurate** — the concept-side work is not done. Re-measured outcomes are in §3.
 
 Four readers of one authored fact. They do not agree, and only one of them agrees with the standard.
 
@@ -165,8 +165,10 @@ The deferred note's decisive reason was migration cost: *"Every `.mthds` in the 
 ```sh
 python wip/pipe-refs/probes/classify-bare-refs.py .
 python wip/pipe-refs/probes/classify-bare-refs.py \
-    ../pipelex-cookbook ../pipelex-starter-python ../hub ../mthds ../pipelex-app \
-    ../pipelex-api ../mthds-js ../pipelex-transport ../conformance ../pipelex-platform
+    ../pipelex-cookbook ../pipelex-starter-python ../mthds ../pipelex-api ../mthds-js
+# …plus the rest of the workspace's .mthds trees as extra roots (the probe takes roots
+# as argv). Several of those repos are not open core, so the full root list lives in the
+# workspace-level private notes.
 ```
 
 | | this repo | every other `.mthds` tree in the workspace |
@@ -184,7 +186,7 @@ python wip/pipe-refs/probes/classify-bare-refs.py \
 | `both` | 27 | 22 |
 | `nowhere` | 1 | 4 |
 
-**One bare pipe reference out of 300 leans on cross-domain resolution**, and it is `pipelex-cookbook/examples/wip/advisory_board/bundle.mthds` — `advisory_orchestrator.master_advisory_orchestrator` naming a bare `present_as_markdown` that only the `presentation` domain declares. It is fixed by writing `presentation.present_as_markdown`. **Zero** bare *concept* references lean on it, anywhere.
+**One bare pipe reference out of 300 leans on cross-domain resolution**, and it is `pipelex-cookbook/examples/wip/advisory_board/bundle.mthds` — `advisory_orchestrator.master_advisory_orchestrator` naming a bare `present_as_markdown` that only the `presentation` domain declares. It is fixed by writing `presentation.present_as_markdown`. **Zero** bare *concept* references lean on it, anywhere. Widening the scan to every `.mthds` tree in the workspace finds a second breaking pipe reference, in `cocode` — a shipped CLI; see [corpus-measurement.md](corpus-measurement.md).
 
 That is the entire migration cost of tightening, across every `.mthds` either repo can see. The cost argument that carried the deferral does not survive contact with the corpus.
 
@@ -200,7 +202,7 @@ That is the entire migration cost of tightening, across every `.mthds` either re
 
 > **1. It is a behavior change to the language, not to a reader.**
 
-True, and the measurement is what sizes it: one reference, in an examples directory. Worth adding that the *current* state is also a behaviour change to the language — an undeclared one, made by a resolver rather than by a spec edit, which took away two guarantees (§3) the standard still advertises.
+True, and the measurement is what sizes it: two references across every `.mthds` tree in the workspace — one in a cookbook `examples/wip/` bundle, one in `cocode`, a shipped CLI ([corpus-measurement.md](corpus-measurement.md)). Worth adding that the *current* state is also a behaviour change to the language — an undeclared one, made by a resolver rather than by a spec edit, which took away two guarantees (§3) the standard still advertises.
 
 > **2. It is cross-repo.**
 
@@ -208,7 +210,7 @@ True, and it stays cross-repo whichever way it settles. That is an argument abou
 
 > **3. The direction of the fix is genuinely open […] cross-domain bare resolution inside a single crate is convenient and has evidently been relied on.**
 
-"Evidently been relied on" is the assumption the numbers contradict: one reference, in `examples/wip/`. And loosening the standard is not a one-line edit either — it means deleting the bare-reference exemption from § *Visibility Rules*, rewriting the § *Conflict Rules* row for different domains in one package, and answering what `[exports]` is for once bare refs route around it (§3). Of the three positions in play — the standard, this runtime's pipe readers, this runtime's concept readers — the standard is the only one that is internally consistent today.
+"Evidently been relied on" is the assumption the numbers contradict: two references in the entire workspace, each fixed by one qualified spelling. And loosening the standard is not a one-line edit either — it means deleting the bare-reference exemption from § *Visibility Rules*, rewriting the § *Conflict Rules* row for different domains in one package, and answering what `[exports]` is for once bare refs route around it (§3). Of the three positions in play — the standard, this runtime's pipe readers, this runtime's concept readers — the standard is the only one that is internally consistent today.
 
 ## 7. Proposed shape of the fix
 
@@ -230,8 +232,9 @@ A proposal, not a decision. The deferred note's closing rule — *"Do not fix on
 **Outside this repository** (each is somebody else's merge, so land them in a coordinated set):
 
 - `mthds/` — **no normative change**. One additive clarification is worth making, because this round is evidence it is needed: say at § *Resolution Order for Bare Pipe References* that no-fall-through is what makes `[exports]` enforceable, so the next reader does not take it for a lookup convenience.
-- `conformance/` — the four rows of §5's table as executable cases (own-only resolves; sibling-only errors; both resolves to the referring domain's own; nowhere errors), plus the export-bypass case from §3, which is the one nobody would think to write without the visibility argument.
+- our cross-repo spec suite — the four rows of §5's table as executable cases (own-only resolves; sibling-only errors; both resolves to the referring domain's own; nowhere errors), plus the export-bypass case from §3, which is the one nobody would think to write without the visibility argument.
 - `pipelex-cookbook` — qualify one reference in `examples/wip/advisory_board/bundle.mthds`.
+- `cocode` — qualify one reference in `cocode/pipelines/swe_diff/changelog_enhanced.mthds`: write `changelog.format_changelog_as_markdown`.
 
 ## 8. What to verify before building
 
@@ -250,9 +253,9 @@ The claims above are measured, but a plan should not rest on someone else's meas
 ```sh
 # corpus classification (§5)
 python wip/pipe-refs/probes/classify-bare-refs.py .
-python wip/pipe-refs/probes/classify-bare-refs.py ../pipelex-cookbook ../pipelex-starter-python \
-    ../hub ../mthds ../pipelex-app ../pipelex-api ../mthds-js ../pipelex-transport \
-    ../conformance ../pipelex-platform
+python wip/pipe-refs/probes/classify-bare-refs.py \
+    ../pipelex-cookbook ../pipelex-starter-python ../mthds ../pipelex-api ../mthds-js
+# …plus the rest of the workspace's .mthds trees as extra roots — see the note in §5.
 
 # concept lookup matrix (§4)
 .venv/bin/python wip/pipe-refs/probes/concept-lookup-matrix.py   # needs the venv: this probe imports pipelex

@@ -55,6 +55,18 @@ output = "Text"
 steps = [{ pipe = "nowhere_to_be_found", result = "presented" }]
 """
 
+_MALFORMED_REF_MTHDS = """
+domain = "orchestrator"
+description = "Calls a pipe through a ref that does not even parse."
+
+[pipe.run_all]
+type = "PipeSequence"
+description = "Runs a step whose ref is malformed."
+inputs = { data = "Text" }
+output = "Text"
+steps = [{ pipe = "a..b", result = "presented" }]
+"""
+
 
 class TestUnresolvedPipeRefMessage:
     def _load_and_capture(self, *, sources: dict[str, str], load_test_library: Callable[[list[Path]], None]) -> str:
@@ -99,6 +111,22 @@ class TestUnresolvedPipeRefMessage:
             load_test_library=load_test_library,
         )
         assert "orchestrator.nowhere_to_be_found" in message
+        assert "did you mean" not in message.lower()
+
+    def test_malformed_ref_stays_a_categorized_error(self, load_test_library: Callable[[list[Path]], None]):
+        """A ref that does not parse must surface as the categorized load error, never a crash.
+
+        The message builder parses the missing ref to explain the qualification rule; on a
+        malformed ref that parse would replace the categorized error with a raw QualifiedRefError
+        on the way to reporting bad user input. The guard falls back to the short message instead —
+        `_load_and_capture`'s `pytest.raises(LibraryLoadingError)` is what pins the exception class.
+        """
+        message = self._load_and_capture(
+            sources={"orchestrator.mthds": _MALFORMED_REF_MTHDS},
+            load_test_library=load_test_library,
+        )
+        assert "a..b" in message
+        assert "does not exist" in message
         assert "did you mean" not in message.lower()
 
     def test_two_domains_declaring_the_same_code_each_bind_their_own(self, load_test_library: Callable[[list[Path]], None]):
