@@ -72,7 +72,7 @@ class TestInputShaperExplicitForms:
         provided = ShaperInvoice(invoice_number="INV-002", amount=99.0)
 
         working_memory = InputShaper.shape(
-            {"invoice": provided}, input_specs=input_specs, search_domain_codes=["shaper_test"], concept_provider=get_concept_library()
+            {"invoice": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library()
         )
 
         stuff = working_memory.root["invoice"]
@@ -90,7 +90,7 @@ class TestInputShaperExplicitForms:
         provided = [Question(text="a"), Question(text="b")]
 
         working_memory = InputShaper.shape(
-            {"questions": provided}, input_specs=input_specs, search_domain_codes=["shaper_test"], concept_provider=get_concept_library()
+            {"questions": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library()
         )
 
         stuff = working_memory.root["questions"]
@@ -104,9 +104,7 @@ class TestInputShaperExplicitForms:
         provided = [Question(text="a")]
 
         with pytest.raises(ExplicitConceptIncompatibleError, match="not compatible"):
-            InputShaper.shape(
-                {"priorities": provided}, input_specs=input_specs, search_domain_codes=["shaper_test"], concept_provider=get_concept_library()
-            )
+            InputShaper.shape({"priorities": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library())
 
     def test_explicit_list_into_singular_raises(self) -> None:
         """D2: an explicit ListContent (or envelope-with-list) must not fill a singular-declared slot.
@@ -118,9 +116,7 @@ class TestInputShaperExplicitForms:
         provided: ListContent[Question] = ListContent(items=[Question(text="a"), Question(text="b")])
 
         with pytest.raises(ListWhereSingularError, match="declares a single"):
-            InputShaper.shape(
-                {"question": provided}, input_specs=input_specs, search_domain_codes=["shaper_test"], concept_provider=get_concept_library()
-            )
+            InputShaper.shape({"question": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library())
 
     def test_explicit_list_wrong_fixed_count_raises(self) -> None:
         """D2: an explicit ListContent whose length differs from a declared [N] count is a D4 error."""
@@ -128,9 +124,7 @@ class TestInputShaperExplicitForms:
         provided: ListContent[Question] = ListContent(items=[Question(text="only-one")])
 
         with pytest.raises(MultiplicityCountMismatchError, match="exactly 2 items"):
-            InputShaper.shape(
-                {"questions": provided}, input_specs=input_specs, search_domain_codes=["shaper_test"], concept_provider=get_concept_library()
-            )
+            InputShaper.shape({"questions": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library())
 
     def test_explicit_list_into_list_slot_ok(self) -> None:
         """D2/D6: an explicit ListContent whose length matches a declared list slot shapes cleanly."""
@@ -138,7 +132,7 @@ class TestInputShaperExplicitForms:
         provided: ListContent[Question] = ListContent(items=[Question(text="a"), Question(text="b")])
 
         working_memory = InputShaper.shape(
-            {"questions": provided}, input_specs=input_specs, search_domain_codes=["shaper_test"], concept_provider=get_concept_library()
+            {"questions": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library()
         )
 
         stuff = working_memory.root["questions"]
@@ -152,7 +146,7 @@ class TestInputShaperExplicitForms:
         provided: ListContent[Question] = ListContent(items=[Question(text="a"), Question(text="b")])
 
         working_memory = InputShaper.shape(
-            {"payload": provided}, input_specs=input_specs, search_domain_codes=["shaper_test"], concept_provider=get_concept_library()
+            {"payload": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library()
         )
 
         stuff = working_memory.root["payload"]

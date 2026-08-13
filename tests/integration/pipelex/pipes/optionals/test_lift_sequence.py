@@ -103,9 +103,9 @@ def _build_lift_sequence() -> PipeSequence:
             inputs={"source": "Text?", "topic": "Text"},
             output="Text",
             steps=[
-                SubPipeBlueprint(pipe="opt_seq_step_a", result="a_out"),
-                SubPipeBlueprint(pipe="opt_seq_step_b", result="b_out"),
-                SubPipeBlueprint(pipe="opt_seq_sink_c", result="final_report"),
+                SubPipeBlueprint(pipe="test_optionals_seq.opt_seq_step_a", result="a_out"),
+                SubPipeBlueprint(pipe="test_optionals_seq.opt_seq_step_b", result="b_out"),
+                SubPipeBlueprint(pipe="test_optionals_seq.opt_seq_sink_c", result="final_report"),
             ],
         ),
     )

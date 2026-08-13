@@ -99,7 +99,7 @@ class InputShaper:
         *,
         concept_provider: ConceptProviderAbstract,
         input_specs: InputStuffSpecs,
-        search_domain_codes: list[str] | None = None,
+        search_scope: str | None = None,
         inputs_base_dir: Path | None = None,
     ) -> WorkingMemory:
         """Shape every provided input against its declared ``StuffSpec`` and return a WorkingMemory.
@@ -110,7 +110,8 @@ class InputShaper:
                 than looked up so this module stays out of the method interpreter's import closure
                 (see hub-layering); the caller holds the loaded method's library.
             input_specs: The entry pipe's declared inputs (name -> StuffSpec).
-            search_domain_codes: Domain codes used to resolve envelope/object concepts.
+            search_scope: The entry pipe's own scope (its domain, `alias->domain` for a dependency
+                entry pipe), preferred when resolving a bare envelope/object concept code.
             inputs_base_dir: Directory that bare *relative local* file paths resolve against (D3) —
                 the inputs file's parent when the inputs were loaded from a file (threaded from the
                 CLI). ``None`` (in-process / inline-JSON callers) leaves relative paths untouched
@@ -130,7 +131,7 @@ class InputShaper:
                 concept_provider=concept_provider,
                 stuff_spec=stuff_spec,
                 variable_name=variable_name,
-                search_domain_codes=search_domain_codes,
+                search_scope=search_scope,
                 inputs_base_dir=inputs_base_dir,
             )
             working_memory.add_new_stuff(name=variable_name, stuff=stuff)
@@ -153,7 +154,7 @@ class InputShaper:
         concept_provider: ConceptProviderAbstract,
         stuff_spec: StuffSpec,
         variable_name: str,
-        search_domain_codes: list[str] | None,
+        search_scope: str | None,
         inputs_base_dir: Path | None,
     ) -> Stuff:
         declared_concept = stuff_spec.concept
@@ -167,7 +168,7 @@ class InputShaper:
                 declared_concept=declared_concept,
                 stuff_spec=stuff_spec,
                 variable_name=variable_name,
-                search_domain_codes=search_domain_codes,
+                search_scope=search_scope,
             )
 
         # (D9) A top-level null is never a value — absence is expressed by omitting the key.
@@ -188,7 +189,7 @@ class InputShaper:
                     stuff_content_or_data=value,
                     concept_provider=concept_provider,
                     name=variable_name,
-                    search_domain_codes=search_domain_codes,
+                    search_scope=search_scope,
                 )
             case (
                 InputKind.TEXT
@@ -206,7 +207,7 @@ class InputShaper:
                     stuff_spec=stuff_spec,
                     input_kind=input_kind,
                     variable_name=variable_name,
-                    search_domain_codes=search_domain_codes,
+                    search_scope=search_scope,
                     inputs_base_dir=inputs_base_dir,
                 )
                 return StuffFactory.make_stuff(concept=declared_concept, content=content, name=variable_name)
@@ -265,7 +266,7 @@ class InputShaper:
         stuff_spec: StuffSpec,
         input_kind: InputKind,
         variable_name: str,
-        search_domain_codes: list[str] | None,
+        search_scope: str | None,
         inputs_base_dir: Path | None,
     ) -> StuffContent:
         """Peel the declared multiplicity (D2), then build the item content(s)."""
@@ -297,7 +298,7 @@ class InputShaper:
                 input_kind=input_kind,
                 variable_name=variable_name,
                 fixed_count=fixed_count,
-                search_domain_codes=search_domain_codes,
+                search_scope=search_scope,
                 inputs_base_dir=inputs_base_dir,
             )
 
@@ -315,7 +316,7 @@ class InputShaper:
             input_kind=input_kind,
             stuff_spec=stuff_spec,
             variable_name=variable_name,
-            search_domain_codes=search_domain_codes,
+            search_scope=search_scope,
             inputs_base_dir=inputs_base_dir,
         )
 
@@ -371,7 +372,7 @@ class InputShaper:
         input_kind: InputKind,
         variable_name: str,
         fixed_count: int | None,
-        search_domain_codes: list[str] | None,
+        search_scope: str | None,
         inputs_base_dir: Path | None,
     ) -> ListContent[StuffContent]:
         """Shape a declared-multiple input element-wise into a ListContent (D2)."""
@@ -392,7 +393,7 @@ class InputShaper:
                 input_kind=input_kind,
                 stuff_spec=stuff_spec,
                 variable_name=variable_name,
-                search_domain_codes=search_domain_codes,
+                search_scope=search_scope,
                 inputs_base_dir=inputs_base_dir,
             )
             for item_value in item_values
@@ -408,7 +409,7 @@ class InputShaper:
         input_kind: InputKind,
         stuff_spec: StuffSpec,
         variable_name: str,
-        search_domain_codes: list[str] | None,
+        search_scope: str | None,
         inputs_base_dir: Path | None,
     ) -> StuffContent:
         """Build one item's ``StuffContent`` from a value, dispatched on the declared kind (D5).
@@ -423,7 +424,7 @@ class InputShaper:
         concept = stuff_spec.concept
         if isinstance(value, StuffContent):
             built = StuffFactory.make_stuff_from_stuff_content_or_data(
-                stuff_content_or_data=value, concept_provider=concept_provider, name=variable_name, search_domain_codes=search_domain_codes
+                stuff_content_or_data=value, concept_provider=concept_provider, name=variable_name, search_scope=search_scope
             )
             if not concept_provider.is_compatible(tested_concept=built.concept, wanted_concept=concept):
                 raise ExplicitConceptIncompatibleError.make(
@@ -577,7 +578,7 @@ class InputShaper:
         declared_concept: Concept,
         stuff_spec: StuffSpec,
         variable_name: str,
-        search_domain_codes: list[str] | None,
+        search_scope: str | None,
     ) -> Stuff:
         """Build an explicit form bottom-up, then compat-check the built concept against declared (D6).
 
@@ -590,7 +591,7 @@ class InputShaper:
             stuff_content_or_data=cast("StuffContentOrData", value),
             concept_provider=concept_provider,
             name=variable_name,
-            search_domain_codes=search_domain_codes,
+            search_scope=search_scope,
         )
         if not concept_provider.is_compatible(tested_concept=stuff.concept, wanted_concept=declared_concept):
             raise ExplicitConceptIncompatibleError.make(

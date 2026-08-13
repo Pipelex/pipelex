@@ -57,7 +57,10 @@ async def best_effort_graph_spec(*, pipe_ref: str | None, library_id: str | None
     if not pipe_ref or not library_id:
         return None
     try:
-        pipe = get_library_manager().get_library(library_id=library_id).pipe_library.get_required_pipe(pipe_code=pipe_ref)
+        # Entry-shaped: `pipe_ref` is either a caller-supplied graph target (a protocol request
+        # field) or a bundle's already-qualified main_pipe_ref. Both are pipes someone pointed at,
+        # not in-body references, so a bare code must still resolve.
+        pipe = get_library_manager().get_library(library_id=library_id).pipe_library.get_required_entry_pipe(pipe_code=pipe_ref)
         return await dry_run_pipe_in_process(pipe=pipe, library_id=library_id)
     except (PipelexError, FactoryException, ValueError) as graph_error:
         log.warning(

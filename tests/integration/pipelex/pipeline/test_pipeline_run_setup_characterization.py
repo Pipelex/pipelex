@@ -13,10 +13,10 @@ What is pinned here:
   does *not* tear down on success — the caller, ``execute``, owns
   teardown); exactly one ``PIPELINE_EXECUTE`` telemetry event is emitted; and the
   pipeline is registered in the pipeline manager.
-- **``search_domain_codes`` in-place mutation (trap at the domain-insert block):**
-  a non-empty caller list is mutated in place — the pipe's domain is inserted at
-  the front. Pinned so the extraction preserves it consciously (a "pure" builder
-  would be tempted to copy the list, which would be a behavior change).
+- **``search_scope`` derivation:** the concept-shaping scope handed to
+  ``prepare_pipe_job`` is derived from the resolved entry pipe (its domain), not
+  supplied by the caller — the old caller-supplied ``search_domain_codes`` list
+  is gone.
 - **Empty inputs behave like no inputs:** an empty ``PipelineInputs`` with
   ``mock_inputs=False`` yields an empty working memory, identical to
   ``inputs=None``. This characterizes the end-to-end behavior but does *not*
@@ -60,6 +60,7 @@ from pipelex.interpreter_hub import (
     set_current_library,
 )
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
+from pipelex.pipeline import pipeline_run_setup as pipeline_run_setup_module
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.reporting.reporting_manager import ReportingManager
@@ -141,18 +142,23 @@ class TestPipelineRunSetupCharacterization:
             library_manager.teardown(library_id=library_id)
             clear_current_library()
 
-    async def test_search_domain_codes_list_is_mutated_in_place(self) -> None:
-        caller_domains = ["zzz_other_domain"]
+    async def test_search_scope_is_derived_from_the_entry_pipe(self, mocker: MockerFixture) -> None:
+        # The concept-shaping scope is the resolved entry pipe's own domain — computed here, not
+        # caller-supplied (the old search_domain_codes list parameter is gone).
+        seam_spy = mocker.patch.object(
+            pipeline_run_setup_module,
+            "prepare_pipe_job",
+            wraps=pipeline_run_setup_module.prepare_pipe_job,
+        )
         _, _, library_id = await pipeline_run_setup(
             execution_config=_dry_mock_config(),
             mthds_contents=[_CHAR_MTHDS],
             pipe_code="echo_topic",
             pipe_run_mode=PipeRunMode.DRY,
-            search_domain_codes=caller_domains,
         )
         try:
-            # The pipe's domain is inserted at the front of the caller's (non-empty) list, in place.
-            assert caller_domains == [_CHAR_DOMAIN, "zzz_other_domain"]
+            assert seam_spy.call_count == 1
+            assert seam_spy.call_args.kwargs["search_scope"] == _CHAR_DOMAIN
         finally:
             get_library_manager().teardown(library_id=library_id)
             clear_current_library()

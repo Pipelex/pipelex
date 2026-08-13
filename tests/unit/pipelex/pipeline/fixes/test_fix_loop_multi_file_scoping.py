@@ -78,6 +78,35 @@ output = "Text"
 prompt = "Write about $topic"
 """
 
+_DOTTED_SAME_DOMAIN_A_MTHDS = """domain = "rebuild_same"
+
+[pipe."rebuild_same.shared"]
+type = "PipeLLM"
+description = "A dotted declaration that strips to a bare shared code."
+inputs = { topic = "Text" }
+output = "Text"
+prompt = "Write about $topic"
+"""
+
+_DOTTED_SAME_DOMAIN_B_MTHDS = """domain = "rebuild_same"
+
+[pipe."rebuild_same.shared"]
+type = "PipeLLM"
+description = "The same dotted declaration in a second file of the SAME domain."
+inputs = { topic = "Text" }
+output = "Text"
+prompt = "Write about $topic"
+"""
+
+_DOMAINLESS_SHARED_MTHDS = """
+[pipe.shared]
+type = "PipeLLM"
+description = "Declares the colliding code in a file whose domain cannot be read."
+inputs = { topic = "Text" }
+output = "Text"
+prompt = "Write about $topic"
+"""
+
 
 def _seq_output_error_data(*, pipe_code: str, source: str | None) -> PipesAndConceptValidationErrorData:
     """One enriched output-mismatch error datum — plans a ``match-sequence-output`` fix."""
@@ -414,24 +443,26 @@ class TestFixLoopMultiFileScoping:
         tmp_path: Path,
         mocker: MockerFixture,
     ) -> None:
-        """A rename from round one blocks a sibling rename proposed in round two.
+        """A rename from round one blocks a same-domain sibling rename proposed in round two.
 
         If the cross-file map were cached before the loop, the second ``strip-namespace`` fix
-        would not see that round one already created ``[pipe.shared]`` in a sibling bundle.
+        would not see that round one already created ``[pipe.shared]`` in a same-domain sibling
+        bundle. Both files declare the SAME domain — since the collision scope became
+        per-domain, only a same-domain sibling can collide at all.
         """
         bundle_path = tmp_path / "entry.mthds"
         bundle_path.write_text(_MINIMAL_MTHDS, encoding="utf-8")
         libs_dir = tmp_path / "libs"
         libs_dir.mkdir()
         first_path = libs_dir / "a_first.mthds"
-        first_path.write_text(_DOTTED_SHARED_A_MTHDS, encoding="utf-8")
+        first_path.write_text(_DOTTED_SAME_DOMAIN_A_MTHDS, encoding="utf-8")
         second_path = libs_dir / "b_second.mthds"
-        second_path.write_text(_DOTTED_SHARED_B_MTHDS, encoding="utf-8")
+        second_path.write_text(_DOTTED_SAME_DOMAIN_B_MTHDS, encoding="utf-8")
         validate_mock = mocker.patch(
             "pipelex.pipeline.fixes.fix_loop.validate_bundle",
             side_effect=[
-                _strip_namespace_error(pipe_code="rebuild_a.shared", stripped_pipe_code="shared", source=str(first_path)),
-                _strip_namespace_error(pipe_code="rebuild_b.shared", stripped_pipe_code="shared", source=str(second_path)),
+                _strip_namespace_error(pipe_code="rebuild_same.shared", stripped_pipe_code="shared", source=str(first_path)),
+                _strip_namespace_error(pipe_code="rebuild_same.shared", stripped_pipe_code="shared", source=str(second_path)),
             ],
         )
 
@@ -448,8 +479,84 @@ class TestFixLoopMultiFileScoping:
         fixed_first = tomlkit.loads(first_path.read_text(encoding="utf-8")).unwrap()
         unchanged_second = tomlkit.loads(second_path.read_text(encoding="utf-8")).unwrap()
         assert "shared" in fixed_first["pipe"]
-        assert "rebuild_a.shared" not in fixed_first["pipe"]
-        assert "rebuild_b.shared" in unchanged_second["pipe"]
+        assert "rebuild_same.shared" not in fixed_first["pipe"]
+        assert "rebuild_same.shared" in unchanged_second["pipe"]
+
+    async def test_same_named_renames_in_different_domains_both_apply(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+    ) -> None:
+        """Two files in DIFFERENT domains renaming to the same bare code do not collide.
+
+        The library keys pipes by ``domain.code`` and in-body refs never search across domains,
+        so ``rebuild_a.shared`` and ``rebuild_b.shared`` coexist. Under the old crate-wide
+        collision scope the second rename was dropped and the loop bailed; per-domain scope lets
+        both land.
+        """
+        bundle_path = tmp_path / "entry.mthds"
+        bundle_path.write_text(_MINIMAL_MTHDS, encoding="utf-8")
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+        first_path = libs_dir / "a_first.mthds"
+        first_path.write_text(_DOTTED_SHARED_A_MTHDS, encoding="utf-8")
+        second_path = libs_dir / "b_second.mthds"
+        second_path.write_text(_DOTTED_SHARED_B_MTHDS, encoding="utf-8")
+        validate_mock = mocker.patch(
+            "pipelex.pipeline.fixes.fix_loop.validate_bundle",
+            side_effect=[
+                _strip_namespace_error(pipe_code="rebuild_a.shared", stripped_pipe_code="shared", source=str(first_path)),
+                _strip_namespace_error(pipe_code="rebuild_b.shared", stripped_pipe_code="shared", source=str(second_path)),
+                None,
+            ],
+        )
+
+        result = await fix_bundle_file(bundle_path, library_dirs=[libs_dir], max_iterations=3)
+
+        assert result.is_valid is True
+        assert result.iterations == 2
+        assert validate_mock.await_count == 3
+        assert [fix.fix_code for fix in result.fixes_applied] == ["strip-namespace", "strip-namespace"]
+        assert [Path(written) for written in result.files_written] == [first_path.resolve(), second_path.resolve()]
+        fixed_first = tomlkit.loads(first_path.read_text(encoding="utf-8")).unwrap()
+        fixed_second = tomlkit.loads(second_path.read_text(encoding="utf-8")).unwrap()
+        assert "shared" in fixed_first["pipe"]
+        assert "shared" in fixed_second["pipe"]
+
+    async def test_sibling_without_a_readable_domain_still_collides(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+    ) -> None:
+        """A sibling whose ``domain`` cannot be read keeps the conservative cross-domain behavior.
+
+        Per-domain collision scope only relaxes when BOTH files' domains are known: a domainless
+        sibling declaring the rename target must still drop the fix (``None`` collides with
+        everything). This reddens if the ``domain_unknown`` arm in
+        ``_split_cross_file_collisions`` regresses to never-collide.
+        """
+        bundle_path = tmp_path / "entry.mthds"
+        bundle_path.write_text(_MINIMAL_MTHDS, encoding="utf-8")
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+        rename_target_path = libs_dir / "a_rename.mthds"
+        rename_target_path.write_text(_DOTTED_SHARED_A_MTHDS, encoding="utf-8")
+        domainless_path = libs_dir / "b_domainless.mthds"
+        domainless_path.write_text(_DOMAINLESS_SHARED_MTHDS, encoding="utf-8")
+        mocker.patch(
+            "pipelex.pipeline.fixes.fix_loop.validate_bundle",
+            side_effect=[
+                _strip_namespace_error(pipe_code="rebuild_a.shared", stripped_pipe_code="shared", source=str(rename_target_path)),
+            ],
+        )
+
+        result = await fix_bundle_file(bundle_path, library_dirs=[libs_dir], max_iterations=3)
+
+        assert result.is_valid is False
+        assert result.fixes_applied == []
+        assert result.bail_reason is not None
+        assert "cross-file collision" in result.bail_reason
+        assert "'shared'" in result.bail_reason
 
     async def test_max_iterations_none_reads_the_config_default(
         self,

@@ -158,7 +158,7 @@ The referenced value must be a list, and every item must carry the key attribute
 
 ### Copying Whole Inputs Into Native Fields
 
-The `from` reference is not limited to dotted paths like `"customer.name"` — it can name a whole input variable. When the referenced input is a native stuff (`Text`, `Number`, `YesNo`, `Date`, or a list of them) and the target field is native-typed, the composer automatically converts the content wrapper into the field's native value. This works for required and optional fields alike.
+The `from` reference is not limited to dotted paths like `"customer.name"` — it can name a whole input variable. When the referenced input is a native stuff (`Text`, `Number`, `YesNo`, `Date`, `Time`, or a list of them) and the target field is native-typed, the composer automatically converts the content wrapper into the field's native value. This works for required and optional fields alike.
 
 Conversion matrix:
 
@@ -168,14 +168,18 @@ Conversion matrix:
 | `Number` | `type = "number"` | the number |
 | `YesNo` | `type = "boolean"` | the boolean |
 | `Date` | `type = "date"` | the date |
+| `Time` | `type = "time"` | the time of day |
 | `Text[]` | `type = "list"`, `item_type = "text"` | the list of strings |
 | `Number[]` | `type = "list"`, `item_type = "number"` | the list of numbers |
 | `YesNo[]` | `type = "list"`, `item_type = "boolean"` | the list of booleans |
 | `Date[]` | `type = "list"`, `item_type = "date"` | the list of dates |
+| `Time[]` | `type = "list"`, `item_type = "time"` | the list of times of day |
 
 When the target field expects a content object rather than a native value (e.g. a field typed with a concept), the object is kept as-is — the conversion only fires when the field expects the native type.
 
 One fidelity guard: a `Date` stuff that carries a time of day cannot be copied into a bare `date` field — that would silently drop the time and its UTC offset, so the composer raises an error instead. Target a `Date`-typed field to keep the full timestamp. The same guard applies per item when copying a `Date[]` into a list of `date` items.
+
+`Time` needs no such guard, and the asymmetry is deliberate: a `Time` is a single value that carries its UTC offset inside the time itself, so copying it into a `time` field is lossless and nothing can be dropped. In the other direction, a whole `Date` does not convert into a `time` field at all — that would drop the date. Use a dotted path instead, `{ from = "deadline.time" }`, to take the time of day out of a `Date`.
 
 Worked example — assembling a report from whole stuffs produced by earlier steps:
 

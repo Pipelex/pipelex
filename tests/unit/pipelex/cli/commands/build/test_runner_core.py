@@ -38,7 +38,7 @@ class TestPrepareRunnerCore:
         return {
             "library_manager": library_manager,
             "validate_bundle": mocker.patch(f"{MODULE}.validate_bundle", new=mocker.AsyncMock(return_value=validate_result)),
-            "get_required_pipe": mocker.patch(f"{MODULE}.get_required_pipe", return_value=SimpleNamespace(code="bundle_main")),
+            "get_required_entry_pipe": mocker.patch(f"{MODULE}.get_required_entry_pipe", return_value=SimpleNamespace(code="bundle_main")),
             "normalize_crate": mocker.patch(f"{MODULE}.normalize_crate"),
             "emit_types": mocker.patch(f"{MODULE}.emit_types", return_value=[]),
             "write_stamped_projection": mocker.patch(
@@ -54,7 +54,7 @@ class TestPrepareRunnerCore:
         """Without --pipe, the bundle's main_pipe names the default run_<pipe>.py file."""
         asyncio.run(_prepare_runner_core(pipe_code=None, bundle_path=tmp_path / "demo.mthds"))
 
-        core_mocks["get_required_pipe"].assert_called_once_with(pipe_code="bundle_main")
+        core_mocks["get_required_entry_pipe"].assert_called_once_with(pipe_code="bundle_main")
         runner_file = tmp_path / "run_bundle_main.py"
         assert runner_file.read_text(encoding="utf-8") == "# runner code\n"
         codegen_kwargs = core_mocks["generate_runner_code"].call_args.kwargs

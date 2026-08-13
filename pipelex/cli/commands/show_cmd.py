@@ -19,7 +19,8 @@ from pipelex.cli.error_handlers import ErrorContext
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_lists import ModelLister
-from pipelex.interpreter_hub import get_library_manager, get_pipe_library, get_required_pipe, resolve_library_dirs, set_current_library
+from pipelex.interpreter_hub import get_library_manager, get_pipe_library, get_required_entry_pipe, resolve_library_dirs, set_current_library
+from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.pipelex import Pipelex
 from pipelex.runtime_hub import get_console, get_models_manager, get_secrets_provider, get_telemetry_manager
 from pipelex.system.configuration.config_loader import config_manager
@@ -55,7 +56,7 @@ def do_list_pipes() -> None:
 
 def do_show_pipe(pipe_code: str) -> None:
     """Show a single pipe definition from the library."""
-    pipe = get_required_pipe(pipe_code=pipe_code)
+    pipe = get_required_entry_pipe(pipe_code=pipe_code)
     get_telemetry_manager().track_event(EventName.PIPE_SHOW, properties={EventProperty.PIPE_TYPE: pipe.type})
     pretty_print(pipe, title=f"Pipe '{pipe_code}'")
 
@@ -248,6 +249,15 @@ def show_pipe_cmd(
             else:
                 assert pipe_code is not None
                 do_show_pipe(pipe_code=pipe_code)
+    except PipeLibraryError as exc:
+        # Entry-lookup failure on a user-supplied code (unknown, or a bare code declared in
+        # several domains): report cleanly instead of letting the traceback escape.
+        typer.secho(
+            f"Failed to show pipe: {exc}",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(1) from exc
     finally:
         Pipelex.teardown_if_needed()
 

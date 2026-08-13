@@ -7,7 +7,7 @@ from pipelex import pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.interpreter_hub import get_pipe_router, get_required_pipe
+from pipelex.interpreter_hub import get_pipe_router, get_required_entry_pipe
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
@@ -52,7 +52,7 @@ class TestPipeConditionExpression:
         # Run the pipe
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
-                pipe=get_required_pipe(pipe_code="basic_condition_by_category"),
+                pipe=get_required_entry_pipe(pipe_code="basic_condition_by_category"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
                 job_metadata=job_metadata,

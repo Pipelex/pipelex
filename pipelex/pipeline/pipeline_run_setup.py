@@ -6,12 +6,14 @@ from mthds.protocol.pipeline_inputs import PipelineInputs
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import (
     clear_current_library,
     get_current_library_id_or_none,
     get_library_manager,
     get_pipeline_manager,
+    get_required_entry_pipe,
     get_required_pipe,
     set_current_library,
 )
@@ -52,7 +54,6 @@ async def pipeline_run_setup(
     dynamic_output_concept_ref: str | None = None,
     pipe_run_mode: PipeRunMode | None = None,
     is_mock_usage: bool = False,
-    search_domain_codes: list[str] | None = None,
     user_id: str | None = None,
     pipeline_run_id: str | None = None,
     request_id: str | None = None,
@@ -113,9 +114,6 @@ async def pipeline_run_setup(
         the cheap, deterministic cross-worker cost-report validation affordance. Threaded onto
         :attr:`CogtRunParams.is_mock_usage`, which rides every assignment to the leaf in both
         direct and Temporal modes. Requires a DRY run; setting it on a LIVE run fails validation.
-    search_domain_codes:
-        List of domain codes to search for pipes. The executed pipe's domain is automatically
-        added if not already present.
     user_id:
         Unique identifier for the user (optional).
     pipeline_run_id:
@@ -179,11 +177,17 @@ async def pipeline_run_setup(
         )
         library_acquired = True
 
-        # Resolve the pipe to execute against the now-open library.
+        # Resolve the pipe to execute against the now-open library. A caller-supplied `pipe_code` is
+        # entry-shaped — it comes from a CLI argument or an API request field, not from inside a
+        # method — so a bare code still resolves across domains. `qualified_main_pipe` is already
+        # domain-qualified and goes through the strict lookup.
+        # Captured now because `pipe_code` is rebound to the resolved pipe's own code below, and
+        # only the raw form carries a dependency alias prefix (`alias->…`).
+        raw_entry_ref: str | None = pipe_code
         pipe: PipeAbstract
         if mthds_contents:
             if pipe_code:
-                pipe = get_required_pipe(pipe_code=pipe_code)
+                pipe = get_required_entry_pipe(pipe_code=pipe_code)
             elif qualified_main_pipe:
                 # main_pipe is validated as snake_case (no dots), so acquire_library returns it already
                 # domain-qualified. See PipelexBundleBlueprint.validate_main_pipe_syntax.
@@ -192,16 +196,20 @@ async def pipeline_run_setup(
                 msg = "No pipe_code provided and no main_pipe found in any of the MTHDS contents."
                 raise PipeExecutionError(message=msg)
         elif pipe_code:
-            pipe = get_required_pipe(pipe_code=pipe_code)
+            pipe = get_required_entry_pipe(pipe_code=pipe_code)
         else:
             msg = "Either provide pipe_code or mthds_contents to the pipeline API."
             raise PipeExecutionError(message=msg)
 
-        pipe_code = pipe.code
+        # The entry pipe's own scope, preferred when input shaping resolves a bare concept code.
+        # When the caller invoked a dependency pipe (`alias->…`), the scope carries the package
+        # alias too, so the dependency's own concepts — keyed under the alias — stay reachable.
+        search_scope: str = pipe.domain_code
+        if raw_entry_ref and QualifiedRef.has_cross_package_prefix(raw_entry_ref):
+            entry_alias, _ = QualifiedRef.split_cross_package_ref(raw_entry_ref)
+            search_scope = f"{entry_alias}->{pipe.domain_code}"
 
-        search_domain_codes = search_domain_codes or []
-        if pipe.domain_code not in search_domain_codes:
-            search_domain_codes.insert(0, pipe.domain_code)
+        pipe_code = pipe.code
 
         # Initialize the tracing context if graph OR cost reporting is requested (after pipe is loaded so we
         # have domain info). The two concerns share one event-log transport and one in-memory tracer; the
@@ -276,7 +284,7 @@ async def pipeline_run_setup(
             pipeline_run_id=pipeline_run_id,
             user_id=user_id,
             inputs=inputs,
-            search_domain_codes=search_domain_codes,
+            search_scope=search_scope,
             trace_context=trace_context,
             otel_context=otel_context,
             output_name=output_name,

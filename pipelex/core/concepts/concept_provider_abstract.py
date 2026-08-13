@@ -30,8 +30,16 @@ class ConceptProviderAbstract(ABC):
         """Resolve one of the native concepts."""
 
     @abstractmethod
-    def get_required_concept_from_concept_ref_or_code(self, concept_ref_or_code: str, *, search_domain_codes: list[str] | None = None) -> Concept:
-        """Resolve a ref *or* a bare code, optionally restricting the domains searched for a bare code."""
+    def get_required_entry_concept(self, concept_ref_or_code: str, *, search_scope: str | None = None) -> Concept:
+        """Resolve a concept string a *human* supplied — an input payload's `concept` field, a CLI argument.
+
+        Entry-shaped lookup, not in-body reference resolution: natives resolve first, a
+        fully-specified ref is a direct hit, and a bare code prefers `search_scope` (the entry
+        pipe's own domain, `alias->domain` when the entry pipe came from a dependency package —
+        in which case the rest of that package is searched next) before falling back to a
+        crate-wide unique match. Every refusal — invalid string, no match, ambiguous bare code —
+        raises the same exception class, so entry boundaries catch one thing.
+        """
 
     @abstractmethod
     def is_compatible(self, *, tested_concept: Concept, wanted_concept: Concept, strict: bool = False) -> bool:

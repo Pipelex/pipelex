@@ -10,7 +10,7 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.inputs.input_stuff_specs import TypedNamedStuffSpec
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.interpreter_hub import get_required_pipe
+from pipelex.interpreter_hub import get_required_entry_pipe
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.job_metadata import JobMetadata
@@ -42,7 +42,7 @@ async def test_review_analysis_sequence_with_batching(
                 ),
             ],
         )
-        pipe = get_required_pipe(pipe_code="analyze_reviews_sequence")
+        pipe = get_required_entry_pipe(pipe_code="analyze_reviews_sequence")
         pipe_output = await pipe.run_pipe(
             job_metadata=job_metadata,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),

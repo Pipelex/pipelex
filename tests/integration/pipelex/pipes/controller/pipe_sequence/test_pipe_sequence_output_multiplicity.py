@@ -53,7 +53,7 @@ class TestPipeSequenceOutputMultiplicity:
             inputs={"input_text": "Text"},
             output="Text",  # Single output - MISMATCH!
             steps=[
-                SubPipeBlueprint(pipe="llm_multiple_output", result="result"),
+                SubPipeBlueprint(pipe=f"{domain_code}.llm_multiple_output", result="result"),
             ],
         )
         sequence_pipe = PipeFactory[PipeSequence].make_from_blueprint(
@@ -113,7 +113,7 @@ class TestPipeSequenceOutputMultiplicity:
             inputs={"input_text": "Text"},
             output="Text",  # Single output - MATCHES!
             steps=[
-                SubPipeBlueprint(pipe="llm_single_output", result="result"),
+                SubPipeBlueprint(pipe=f"{domain_code}.llm_single_output", result="result"),
             ],
         )
         sequence_pipe = PipeFactory[PipeSequence].make_from_blueprint(
@@ -162,7 +162,7 @@ class TestPipeSequenceOutputMultiplicity:
             inputs={"input_text": "Text"},
             output="Text[]",  # Variable multiplicity - MATCHES!
             steps=[
-                SubPipeBlueprint(pipe="llm_variable_output", result="result"),
+                SubPipeBlueprint(pipe=f"{domain_code}.llm_variable_output", result="result"),
             ],
         )
         sequence_pipe = PipeFactory[PipeSequence].make_from_blueprint(
@@ -211,7 +211,7 @@ class TestPipeSequenceOutputMultiplicity:
             inputs={"input_text": "Text"},
             output="Text",  # No multiplicity - MISMATCH!
             steps=[
-                SubPipeBlueprint(pipe="llm_variable", result="result"),
+                SubPipeBlueprint(pipe=f"{domain_code}.llm_variable", result="result"),
             ],
         )
         sequence_pipe = PipeFactory[PipeSequence].make_from_blueprint(
@@ -267,7 +267,7 @@ class TestPipeSequenceOutputMultiplicity:
             inputs={"input_text": "Text"},
             output="Text[]",  # Variable multiplicity - compatible with fixed
             steps=[
-                SubPipeBlueprint(pipe="llm_fixed_3", result="result"),
+                SubPipeBlueprint(pipe=f"{domain_code}.llm_fixed_3", result="result"),
             ],
         )
         sequence_pipe = PipeFactory[PipeSequence].make_from_blueprint(
@@ -318,7 +318,7 @@ class TestPipeSequenceOutputMultiplicity:
             inputs={"input_text": "Text"},
             output="Text[3]",  # Fixed multiplicity - cannot be fulfilled by variable
             steps=[
-                SubPipeBlueprint(pipe="llm_variable", result="result"),
+                SubPipeBlueprint(pipe=f"{domain}.llm_variable", result="result"),
             ],
         )
         sequence_pipe = PipeFactory[PipeSequence].make_from_blueprint(
@@ -375,7 +375,7 @@ class TestPipeSequenceOutputMultiplicity:
             output="Text[]",  # Variable multiplicity output - should match batch_over effect
             steps=[
                 SubPipeBlueprint(
-                    pipe="process_cv",
+                    pipe=f"{domain}.process_cv",
                     result="match_analyses",
                     batch_over="cvs",
                     batch_as="cv_pdf",
@@ -432,7 +432,7 @@ class TestPipeSequenceOutputMultiplicity:
             output="Text",  # No multiplicity - MISMATCH with batch effect!
             steps=[
                 SubPipeBlueprint(
-                    pipe="process_cv_single",
+                    pipe=f"{domain}.process_cv_single",
                     result="match_analyses",
                     batch_over="cvs",
                     batch_as="cv_pdf",
@@ -493,7 +493,7 @@ class TestPipeSequenceOutputMultiplicity:
             output="Text[6]",  # Fixed multiplicity - should match nb_output
             steps=[
                 SubPipeBlueprint(
-                    pipe="process_cv_fixed",
+                    pipe=f"{domain}.process_cv_fixed",
                     result="match_analyses",
                     batch_over="cvs",
                     batch_as="cv_pdf",
@@ -548,7 +548,7 @@ class TestPipeSequenceOutputMultiplicity:
             output="Text[5]",  # Fixed multiplicity - should match nb_output
             steps=[
                 SubPipeBlueprint(
-                    pipe="single_output_llm",
+                    pipe=f"{domain}.single_output_llm",
                     result="results",
                     nb_output=5,  # Fixed output count, no batch_over/batch_as
                 ),
@@ -601,7 +601,7 @@ class TestPipeSequenceOutputMultiplicity:
             output="Text[]",  # Variable multiplicity - should match multiple_output=True
             steps=[
                 SubPipeBlueprint(
-                    pipe="single_output_llm_mult",
+                    pipe=f"{domain}.single_output_llm_mult",
                     result="results",
                     multiple_output=True,  # Variable output, no nb_output, no batch_over/batch_as
                 ),

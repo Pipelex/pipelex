@@ -88,7 +88,7 @@ def validate_concept_references_in_blueprints(
             # `native.Text` only) — not a bare local-code match — so a same-domain ref that merely
             # *shares* a native local code (e.g. `mydomain.Text`) is NOT mistaken for native and still
             # gets the membership check. This matches how the concept actually resolves
-            # (ConceptLibrary.get_required_concept_from_concept_ref_or_code) and contract_match.
+            # (ConceptLibrary.get_optional_entry_concept) and contract_match.
             if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code):
                 continue
             concept_ref = ConceptFactory.make_concept_ref_with_domain(domain_code=domain_code, concept_code=ref.local_code)

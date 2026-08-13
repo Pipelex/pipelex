@@ -72,7 +72,7 @@ class TestCollectSignatureRefs:
             description="Sequence containing a signature step.",
             inputs={"doc": "SigTestDoc"},
             output="SigTestSummary",
-            steps=[SubPipeBlueprint(pipe="seq_sig_step", result="summary")],
+            steps=[SubPipeBlueprint(pipe=f"{SIGNATURES_DOMAIN_CODE}.seq_sig_step", result="summary")],
         )
         seq_pipe = PipeFactory[PipeSequence].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
@@ -103,7 +103,7 @@ class TestCollectSignatureRefs:
             description="Parallel with a signature branch.",
             inputs={"doc": "SigTestDoc"},
             output="SigTestSummary",
-            branches=[SubPipeBlueprint(pipe="par_sig_branch", result="summary")],
+            branches=[SubPipeBlueprint(pipe=f"{SIGNATURES_DOMAIN_CODE}.par_sig_branch", result="summary")],
             add_each_output=True,
         )
         par_pipe = PipeFactory[PipeParallel].make_from_blueprint(
@@ -143,8 +143,8 @@ class TestCollectSignatureRefs:
             inputs={"doc": "SigTestDoc"},
             output="SigTestSummary",
             expression="doc",
-            outcomes={"A": "cond_sig_a"},
-            default_outcome="cond_sig_b",
+            outcomes={"A": f"{SIGNATURES_DOMAIN_CODE}.cond_sig_a"},
+            default_outcome=f"{SIGNATURES_DOMAIN_CODE}.cond_sig_b",
         )
         cond_pipe = PipeFactory[PipeCondition].make_from_blueprint(
             domain_code=SIGNATURES_DOMAIN_CODE,
@@ -175,7 +175,7 @@ class TestCollectSignatureRefs:
             description="Batch over a signature branch.",
             inputs={"docs": "SigTestDoc[]"},
             output="SigTestSummary[]",
-            branch_pipe_code="batch_sig_branch",
+            branch_pipe_code=f"{SIGNATURES_DOMAIN_CODE}.batch_sig_branch",
             input_list_name="docs",
             input_item_name="doc",
         )
@@ -210,7 +210,7 @@ class TestCollectSignatureRefs:
                 description="Inner sequence calling signature.",
                 inputs={"doc": "SigTestDoc"},
                 output="SigTestSummary",
-                steps=[SubPipeBlueprint(pipe="nested_sig", result="summary")],
+                steps=[SubPipeBlueprint(pipe=f"{SIGNATURES_DOMAIN_CODE}.nested_sig", result="summary")],
             ),
             concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
         )
@@ -223,7 +223,7 @@ class TestCollectSignatureRefs:
                 description="Outer sequence calling inner sequence.",
                 inputs={"doc": "SigTestDoc"},
                 output="SigTestSummary",
-                steps=[SubPipeBlueprint(pipe="inner_seq", result="summary")],
+                steps=[SubPipeBlueprint(pipe=f"{SIGNATURES_DOMAIN_CODE}.inner_seq", result="summary")],
             ),
             concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
         )
@@ -254,8 +254,8 @@ class TestCollectSignatureRefs:
                 inputs={"doc": "SigTestDoc"},
                 output="SigTestSummary",
                 steps=[
-                    SubPipeBlueprint(pipe="cycle_sig", result="summary_via_sig"),
-                    SubPipeBlueprint(pipe="seq_cycle_a", result="summary_recurse"),
+                    SubPipeBlueprint(pipe=f"{SIGNATURES_DOMAIN_CODE}.cycle_sig", result="summary_via_sig"),
+                    SubPipeBlueprint(pipe=f"{SIGNATURES_DOMAIN_CODE}.seq_cycle_a", result="summary_recurse"),
                 ],
             ),
             concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
@@ -288,7 +288,7 @@ class TestCollectSignatureRefs:
                 inputs={"doc": "SigTestDoc"},
                 output="SigTestSummary",
                 steps=[
-                    SubPipeBlueprint(pipe="reachable_sig", result="summary"),
+                    SubPipeBlueprint(pipe=f"{SIGNATURES_DOMAIN_CODE}.reachable_sig", result="summary"),
                     SubPipeBlueprint(pipe="missing_pkg->some.unknown_pipe", result="ignored"),
                 ],
             ),
@@ -323,7 +323,7 @@ class TestCollectSignatureRefs:
                 description="Short branch straight to the signature.",
                 inputs={"doc": "SigTestDoc"},
                 output="SigTestSummary",
-                steps=[SubPipeBlueprint(pipe="diamond_sig", result="summary")],
+                steps=[SubPipeBlueprint(pipe=f"{SIGNATURES_DOMAIN_CODE}.diamond_sig", result="summary")],
             ),
             concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
         )
@@ -334,7 +334,7 @@ class TestCollectSignatureRefs:
                 description="Last hop of the long branch before the signature.",
                 inputs={"doc": "SigTestDoc"},
                 output="SigTestSummary",
-                steps=[SubPipeBlueprint(pipe="diamond_sig", result="summary")],
+                steps=[SubPipeBlueprint(pipe=f"{SIGNATURES_DOMAIN_CODE}.diamond_sig", result="summary")],
             ),
             concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
         )
@@ -347,7 +347,7 @@ class TestCollectSignatureRefs:
                 description="First hop of the long branch.",
                 inputs={"doc": "SigTestDoc"},
                 output="SigTestSummary",
-                steps=[SubPipeBlueprint(pipe="d_seq", result="summary")],
+                steps=[SubPipeBlueprint(pipe=f"{SIGNATURES_DOMAIN_CODE}.d_seq", result="summary")],
             ),
             concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
         )
@@ -361,8 +361,8 @@ class TestCollectSignatureRefs:
                 inputs={"doc": "SigTestDoc"},
                 output="SigTestSummary",
                 steps=[
-                    SubPipeBlueprint(pipe="b_seq", result="via_short"),
-                    SubPipeBlueprint(pipe="c_seq", result="via_long"),
+                    SubPipeBlueprint(pipe=f"{SIGNATURES_DOMAIN_CODE}.b_seq", result="via_short"),
+                    SubPipeBlueprint(pipe=f"{SIGNATURES_DOMAIN_CODE}.c_seq", result="via_long"),
                 ],
             ),
             concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],
@@ -396,8 +396,8 @@ class TestCollectSignatureRefs:
                 inputs={"doc": "SigTestDoc"},
                 output="SigTestSummary",
                 steps=[
-                    SubPipeBlueprint(pipe="paths_cycle_sig", result="summary_via_sig"),
-                    SubPipeBlueprint(pipe="paths_seq_cycle", result="summary_recurse"),
+                    SubPipeBlueprint(pipe=f"{SIGNATURES_DOMAIN_CODE}.paths_cycle_sig", result="summary_via_sig"),
+                    SubPipeBlueprint(pipe=f"{SIGNATURES_DOMAIN_CODE}.paths_seq_cycle", result="summary_recurse"),
                 ],
             ),
             concept_codes_from_the_same_domain=["SigTestDoc", "SigTestSummary"],

@@ -155,6 +155,46 @@ def _cross_domain_crate() -> LibraryCrate:
     )
 
 
+def _closed_all_kinds_crate() -> LibraryCrate:
+    """Every controller kind calling a pipe in its OWN domain, so the crate is closed.
+
+    `_cross_domain_crate` used to carry the closure test's coverage of parallel / condition / batch,
+    but it stopped being closed the moment bare refs started qualifying to their own domain — that is
+    the whole point of it. Dropping it from the parametrize would have quietly narrowed the closure
+    walk to sequences, so this fixture takes over: same four kinds, all resolvable in-domain.
+    """
+    return LibraryCrate(
+        pipes={
+            "solo.leaf": PipeLLMBlueprint(description="The callee", inputs={"data": "Text"}, output="Text", prompt="Handle $data"),
+            "solo.other_leaf": PipeLLMBlueprint(description="A second callee", inputs={"data": "Text"}, output="Text", prompt="Handle $data"),
+            "solo.run_all": PipeSequenceBlueprint(description="seq", output="Text", steps=[SubPipeBlueprint(pipe="leaf")]),
+            "solo.fan_out": PipeParallelBlueprint(
+                description="par",
+                inputs={"data": "Text"},
+                output="Composite",
+                branches=[SubPipeBlueprint(pipe="leaf", result="one"), SubPipeBlueprint(pipe="other_leaf", result="two")],
+            ),
+            "solo.route": PipeConditionBlueprint(
+                description="cond",
+                inputs={"data": "Text"},
+                output="Text",
+                expression="format",
+                outcomes={"a": "leaf"},
+                default_outcome="other_leaf",
+            ),
+            "solo.batch_all": PipeBatchBlueprint(
+                description="batch",
+                inputs={"docs": "Text[]"},
+                output="Text[]",
+                branch_pipe_code="leaf",
+                input_list_name="docs",
+                input_item_name="doc",
+            ),
+        },
+        domains={"solo": DomainBlueprint(code="solo", description="Solo domain")},
+    )
+
+
 def _reverse_refinement_chain_crate(size: int) -> LibraryCrate:
     concepts: dict[str, ConceptBlueprint | str] = {
         f"scale.Node{index:04d}": ConceptBlueprint(description=f"Node {index}", refines=f"Node{index + 1:04d}") for index in range(size - 1)
@@ -203,14 +243,15 @@ class TestCrateNormalization:
         assert isinstance(pipeline, PipeSequenceBlueprint)
         assert pipeline.steps[0].pipe == "scoring.compute_score"
 
-    @pytest.mark.parametrize("crate_factory", [_authored_crate, _cross_domain_crate])
+    @pytest.mark.parametrize("crate_factory", [_authored_crate, _closed_all_kinds_crate])
     def test_normalized_crate_is_closed_over_its_pipe_refs(self, crate_factory: Callable[[], LibraryCrate]):
         """Every in-body pipe ref of a normalized crate names a pipe the crate actually holds.
 
         Driven off `pipe_dependencies` rather than a hand-walk of the controller kinds, so a new kind —
-        or a new `_qualify_pipe_ref` call site on an existing one — is covered the day it lands. An open
-        ref is silent: the crate hashes content nobody can resolve, and a round-trip through
-        `load_from_crate` dies with `PipeNotFoundError` at run time instead of at normalization.
+        or a new `crate_qualification._qualify_pipe_ref` call site on an existing one — is covered the
+        day it lands. An open ref is silent: the crate hashes content nobody can resolve, and a
+        round-trip through `load_from_crate` dies with `PipeNotFoundError` at run time instead of at
+        normalization.
         """
         result = normalize_crate(crate_factory(), mthds_version=MTHDS_TEST_VERSION)
         dangling = {
@@ -221,29 +262,47 @@ class TestCrateNormalization:
         }
         assert not dangling
 
-    def test_bare_cross_domain_pipe_refs_resolve_to_the_declaring_domain(self):
-        """A bare ref to a sibling domain's pipe is the shape the live `PipeLibrary` resolves.
+    def test_bare_pipe_refs_qualify_to_their_own_domain_not_a_siblings(self):
+        """Resolution row `sibling-only`: the ref qualifies to its OWN domain even when only a sibling
+        declares the code — every controller kind, since branches and batch refs are the ones a
+        hand-written pass forgets.
 
-        `get_optional_pipe` falls back to a search across every domain, so this bundle runs. Prefixing
-        the owner domain would name `orchestrator.present_as_markdown`, which does not exist.
+        This crate is the authored shape that used to work by falling through to another domain. It
+        now produces refs naming pipes that do not exist, and that is the intended answer: the ref was
+        never resolvable under the rule, and dependency validation is where the user is told so. The
+        fixture needs two domains to say anything at all — in a single-domain crate, owner-domain
+        qualification and the deleted crate-wide search agree on every input.
         """
         result = normalize_crate(_cross_domain_crate(), mthds_version=MTHDS_TEST_VERSION)
         sequence = result.pipes["orchestrator.run_all"]
         assert isinstance(sequence, PipeSequenceBlueprint)
-        assert sequence.steps[0].pipe == "presentation.present_as_markdown"
+        assert sequence.steps[0].pipe == "orchestrator.present_as_markdown"
 
         parallel = result.pipes["orchestrator.fan_out"]
         assert isinstance(parallel, PipeParallelBlueprint)
-        assert [branch.pipe for branch in parallel.branches] == ["presentation.present_as_markdown", "presentation.render_html"]
+        assert [branch.pipe for branch in parallel.branches] == ["orchestrator.present_as_markdown", "orchestrator.render_html"]
 
         condition = result.pipes["orchestrator.route"]
         assert isinstance(condition, PipeConditionBlueprint)
-        assert condition.outcomes == {"markdown": "presentation.present_as_markdown"}
-        assert condition.default_outcome == "presentation.render_html"
+        assert condition.outcomes == {"markdown": "orchestrator.present_as_markdown"}
+        assert condition.default_outcome == "orchestrator.render_html"
 
         batch = result.pipes["orchestrator.batch_all"]
         assert isinstance(batch, PipeBatchBlueprint)
-        assert batch.branch_pipe_code == "presentation.present_as_markdown"
+        assert batch.branch_pipe_code == "orchestrator.present_as_markdown"
+
+        # The sibling's own pipes are untouched: qualification is per declaring pipe, not global.
+        assert "presentation.present_as_markdown" in result.pipes
+
+    def test_own_domain_ref_resolves(self):
+        """Resolution row `own-only`: a bare ref to a pipe the owner domain declares still resolves,
+        and the resulting crate is closed over it.
+        """
+        result = normalize_crate(_authored_crate(), mthds_version=MTHDS_TEST_VERSION)
+        pipeline = result.pipes["scoring.pipeline"]
+        assert isinstance(pipeline, PipeSequenceBlueprint)
+        assert pipeline.steps[0].pipe == "scoring.compute_score"
+        assert "scoring.compute_score" in result.pipes
 
     def test_special_outcomes_are_left_alone(self):
         """`fail` / `continue` are outcomes, not pipe refs — they must survive un-qualified."""
@@ -253,26 +312,59 @@ class TestCrateNormalization:
         assert condition.outcomes == {"stop": SpecialOutcome.FAIL}
         assert condition.default_outcome == SpecialOutcome.CONTINUE
 
-    def test_ambiguous_bare_pipe_ref_raises(self):
-        """Two domains declaring the same code: the live library raises, so normalization raises too.
+    def test_own_domain_wins_when_two_domains_declare_the_code(self):
+        """Resolution row `both-declare`: the owner's own pipe, with no ambiguity error.
 
-        Silently preferring the owner domain would produce a crate that resolves while an interpreted
-        run of the same library dies on the ambiguity — a new disagreement, not a fix.
+        Ambiguity was a *consequence* of searching. Nothing is searched for now, so a second domain
+        declaring the same code is simply irrelevant to how the first domain's refs resolve — which is
+        the contextual stability this rule buys: installing or writing an unrelated `present_as_markdown`
+        elsewhere cannot change what an existing pipe means.
         """
         crate = _cross_domain_crate()
-        crate.pipes["duplicates.present_as_markdown"] = PipeLLMBlueprint(
-            description="A second pipe sharing the callee's code",
+        crate.pipes["orchestrator.present_as_markdown"] = PipeLLMBlueprint(
+            description="The orchestrator's own presenter",
             inputs={"data": "Text"},
             output="Text",
             prompt="Present $data",
         )
-        crate.domains["duplicates"] = DomainBlueprint(code="duplicates", description="Duplicates domain")
+        crate.pipes["orchestrator.render_html"] = PipeLLMBlueprint(
+            description="The orchestrator's own renderer",
+            inputs={"data": "Text"},
+            output="Text",
+            prompt="Render $data",
+        )
+        result = normalize_crate(crate, mthds_version=MTHDS_TEST_VERSION)
 
-        with pytest.raises(CrateNormalizationError, match="Ambiguous pipe ref 'present_as_markdown'"):
-            normalize_crate(crate, mthds_version=MTHDS_TEST_VERSION)
+        # All four kinds, matching the sibling-only row: a cross-domain fall-through would hide in a
+        # branch, an outcome or a batch ref just as readily as in a step, so a row that checks only
+        # steps is a row that only half-holds.
+        sequence = result.pipes["orchestrator.run_all"]
+        assert isinstance(sequence, PipeSequenceBlueprint)
+        assert sequence.steps[0].pipe == "orchestrator.present_as_markdown"
 
-    def test_unresolvable_bare_pipe_ref_raises(self):
-        """A bare ref matching no pipe in the crate is surfaced, not silently qualified into a dangling ref."""
+        parallel = result.pipes["orchestrator.fan_out"]
+        assert isinstance(parallel, PipeParallelBlueprint)
+        assert [branch.pipe for branch in parallel.branches] == ["orchestrator.present_as_markdown", "orchestrator.render_html"]
+
+        condition = result.pipes["orchestrator.route"]
+        assert isinstance(condition, PipeConditionBlueprint)
+        assert condition.outcomes == {"markdown": "orchestrator.present_as_markdown"}
+        assert condition.default_outcome == "orchestrator.render_html"
+
+        batch = result.pipes["orchestrator.batch_all"]
+        assert isinstance(batch, PipeBatchBlueprint)
+        assert batch.branch_pipe_code == "orchestrator.present_as_markdown"
+
+        # And the sibling's own pipes are untouched — qualification is per declaring pipe.
+        assert "presentation.present_as_markdown" in result.pipes
+
+    def test_bare_pipe_ref_matching_nothing_is_qualified_not_raised(self):
+        """Resolution row `nowhere`: the pass qualifies and moves on; it does not check existence.
+
+        It cannot: it sees one load batch, and a batch may legitimately reference a pipe a prior batch
+        put in the same domain (a `-L` directory, a secondary load). Only dependency validation, which
+        sees the whole live library, can tell a forward reference from a typo.
+        """
         crate = LibraryCrate(
             pipes={
                 "orchestrator.run_all": PipeSequenceBlueprint(
@@ -283,8 +375,10 @@ class TestCrateNormalization:
             },
             domains={"orchestrator": DomainBlueprint(code="orchestrator", description="Orchestrator domain")},
         )
-        with pytest.raises(CrateNormalizationError, match="resolves to no pipe in the crate"):
-            normalize_crate(crate, mthds_version=MTHDS_TEST_VERSION)
+        result = normalize_crate(crate, mthds_version=MTHDS_TEST_VERSION)
+        sequence = result.pipes["orchestrator.run_all"]
+        assert isinstance(sequence, PipeSequenceBlueprint)
+        assert sequence.steps[0].pipe == "orchestrator.nowhere_to_be_found"
 
     def test_refinement_with_structured_base_is_flattened(self):
         """Refining a concept with a structure adopts that (qualified) structure and drops `refines`."""

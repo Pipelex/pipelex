@@ -15,8 +15,15 @@ from pipelex.cli.error_handlers import (
     handle_validate_bundle_error,
 )
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
-from pipelex.interpreter_hub import get_library_manager, get_pipe_library, get_pipes, get_required_pipe, resolve_library_dirs, set_current_library
-from pipelex.libraries.pipe.exceptions import PipeNotFoundError
+from pipelex.interpreter_hub import (
+    get_library_manager,
+    get_pipe_library,
+    get_pipes,
+    get_required_entry_pipe,
+    resolve_library_dirs,
+    set_current_library,
+)
+from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_signature.signature_walk import collect_signature_refs
 from pipelex.pipelex import Pipelex
@@ -167,7 +174,7 @@ async def _validate_pipe_or_bundle(
         if effective_dirs:
             library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
 
-        pipe = get_required_pipe(pipe_code=pipe_code)
+        pipe = get_required_entry_pipe(pipe_code=pipe_code)
         typer.echo(f"Validating pipe '{pipe_code}'...")
         # Signatures are never an error (D-B): a single-pipe validation reaching a PipeSignature
         # dry-runs trivially (the placeholder mints a mock). validate pipe makes no library-wide
@@ -232,6 +239,15 @@ def execute_validate(
             error_message += "\nDid you mean 'pipelex validate --all'?"
         typer.secho(
             f"Failed to validate: {error_message}",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(2) from exc
+    except PipeLibraryError as exc:
+        # After the PipeNotFoundError arm (subclass ordering): reached by e.g. an ambiguous bare
+        # code declared in several domains. An unresolvable target is a no-verdict exit 2.
+        typer.secho(
+            f"Failed to validate: {exc}",
             fg=typer.colors.RED,
             err=True,
         )
