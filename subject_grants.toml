@@ -3460,6 +3460,10 @@ rationale = "Plugin entrypoint: registers into the registrar; single self-labell
 param = "config"
 rationale = "PipeFuncExecutorFactoryFn implementation: the registry invokes factories positionally via the Callable type."
 
+["pipelex/kernel/llm_ops.py::concrete_llm_model_handle"]
+param = "model"
+rationale = "Verb-object: resolve one model reference to a concrete handle; the single obvious operand is the model."
+
 ["pipelex/kit/cursor_rules.py::_is_pipelex_managed"]
 param = "mdc_path"
 rationale = "Predicate on the .mdc file path; single operand."

@@ -21,6 +21,7 @@ from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.interpreter_hub import get_concept_library, get_native_concept, get_required_concept
 from pipelex.kernel.llm_ops import (
+    concrete_llm_model_handle,
     derive_templating_style,
     resolve_llm_setting_for_object,
     resolve_llm_setting_for_text,
@@ -308,8 +309,12 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
         # Capture execution data for the graph tracer
         execution_data_dict: dict[str, Any] = {
-            "resolved_model": llm_setting_main.model,
-            "resolved_model_for_object": llm_setting_for_object.model,
+            # Fully resolved, not `llm_setting_*.model`: the deck advances one hop, so a
+            # preset lands on another alias and a DRY run could only ever report a
+            # half-resolved handle. Resolving here makes the reported model identical
+            # whether or not the pipe ran.
+            "resolved_model": concrete_llm_model_handle(llm_setting_main.model),
+            "resolved_model_for_object": concrete_llm_model_handle(llm_setting_for_object.model),
             "is_multiple_output": is_multiple_output,
             "rendered_system_prompt": rendered_llm_prompt.system_text,
             "rendered_user_prompt": rendered_llm_prompt.user_text,
