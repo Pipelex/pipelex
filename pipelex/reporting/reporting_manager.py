@@ -18,7 +18,7 @@ from pipelex.system.exceptions import MissingDependencyError
 from pipelex.system.trace_context import TraceContext
 from pipelex.tracing.activity_event_log import ActivityEventLogCache
 from pipelex.tracing.event_log_protocol import EventLogProtocol
-from pipelex.tracing.trace_events import UsageReportEvent
+from pipelex.tracing.trace_events import UNATTRIBUTED_NODE_ID, UsageReportEvent
 
 # DynamoDB PutItem failures come in two sibling botocore base classes (neither subclasses the other):
 # ClientError (service-side throttle / auth) and BotoCoreError (transport / credential / timeout, e.g.
@@ -216,7 +216,7 @@ class ReportingManager(ReportingProtocol):
         tokens_usage: AnyTokensUsage,
     ) -> None:
         """Fast-path emit through a context registered via set_event_log."""
-        node_id = trace_context.parent_node_id or "unknown"
+        node_id = trace_context.parent_node_id or UNATTRIBUTED_NODE_ID
         seq = context.event_log.next_sequence()
 
         event = UsageReportEvent(
@@ -290,7 +290,7 @@ class ReportingManager(ReportingProtocol):
             return
 
         workflow_id = trace_context.tracer_key or trace_context.graph_id
-        node_id = trace_context.parent_node_id or "unknown"
+        node_id = trace_context.parent_node_id or UNATTRIBUTED_NODE_ID
 
         ActivityEventLogCache.log_once_runner_fallback_engaged(workflow_id=workflow_id, writer_id=process_event_log.writer_id)
 

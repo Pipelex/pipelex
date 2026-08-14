@@ -3456,6 +3456,10 @@ rationale = "Plugin entrypoint: registers into the registrar; single self-labell
 param = "config"
 rationale = "PipeFuncExecutorFactoryFn implementation: the registry invokes factories positionally via the Callable type."
 
+["pipelex/kernel/llm_ops.py::concrete_llm_model_handle"]
+param = "model"
+rationale = "Verb-object: resolve one model reference to a concrete handle; the single obvious operand is the model."
+
 ["pipelex/kit/cursor_rules.py::_is_pipelex_managed"]
 param = "mdc_path"
 rationale = "Predicate on the .mdc file path; single operand."
@@ -7048,6 +7052,10 @@ rationale = "Dispatch handler: handles the event; single operand."
 param = "event"
 rationale = "Dispatch handler: handles the event; single operand."
 
+["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_usage_report"]
+param = "event"
+rationale = "Dispatch handler: handles the event; single operand."
+
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState._track_earliest_timestamp"]
 param = "event"
 rationale = "Verb-object: reads the event to track its timestamp; single operand."
@@ -7063,3 +7071,15 @@ rationale = "Derivation: encodes the workflow id into a file name; writer_id sta
 ["pipelex/tracing/usage_aggregator.py::UsageAggregator.aggregate"]
 param = "events"
 rationale = "Verb-object: aggregates the events; single operand."
+
+["pipelex/tracing/usage_attribution.py::_merge_token_categories"]
+param = "usages"
+rationale = "Verb-object: operates on one list of usage records; the single obvious operand is the usages."
+
+["pipelex/tracing/usage_attribution.py::_rated_count"]
+param = "usages"
+rationale = "Verb-object: operates on one list of usage records; the single obvious operand is the usages."
+
+["pipelex/tracing/usage_attribution.py::make_self_contained_spec"]
+param = "usages"
+rationale = "Verb-object: operates on one list of usage records; the single obvious operand is the usages."

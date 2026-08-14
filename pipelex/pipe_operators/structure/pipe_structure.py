@@ -18,7 +18,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.interpreter_hub import get_concept_library, get_native_concept
-from pipelex.kernel.llm_ops import derive_structure_prompt, generate_object_content, resolve_llm_setting_for_object
+from pipelex.kernel.llm_ops import concrete_llm_model_handle, derive_structure_prompt, generate_object_content, resolve_llm_setting_for_object
 from pipelex.kernel.memory_ops import store_result
 from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_operators.pipe_operator import PipeOperator
@@ -172,7 +172,7 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
         )
 
         execution_data_dict: dict[str, Any] = {
-            "resolved_model": llm_setting_for_object.model,
+            "resolved_model": concrete_llm_model_handle(llm_setting_for_object.model),
             "is_multiple_output": is_multiple_output,
             "rendered_user_prompt": rendered_user_prompt,
             "structuring_path": "structure",

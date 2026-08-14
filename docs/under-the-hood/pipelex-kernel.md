@@ -52,7 +52,7 @@ Four gates hold this, and each covers something the others miss — see [Hub Lay
 | `pipelex-dev check-hub-layering` | No kernel *module* imports the interpreter hub |
 | `tests/unit/pipelex/test_kernel_layer_import_closure.py` | A kernel entry point *imports* clean |
 | `tests/unit/pipelex/test_kernel_layer_exceptions_aggregate_gate.py` | No kernel module reaches the exceptions aggregate — imports and bare strings alike |
-| `tests/unit/pipelex/kernel/test_kernel_boot_contract.py` | Every kernel entry point **runs** on a keyless boot, swept afterwards — except the three `resolve_*_setting` helpers, which read the model deck (a separate question from this one) |
+| `tests/unit/pipelex/kernel/test_kernel_boot_contract.py` | Every kernel entry point **runs** on a keyless boot, swept afterwards — except the deck-reading helpers (`resolve_*_setting`, `concrete_llm_model_handle`), which read the model deck (a separate question from this one) |
 
 Only the last one can see a function-local interpreter import, and it is **per-function**: it catches one inside `run_search` only by calling `run_search`. Every new kernel entry point owes it an arm.
 
@@ -67,7 +67,7 @@ Both façade calls take the concept and the output class the caller wants, defau
 | Module | Entry points |
 |---|---|
 | `pipelex.kernel.pipelex_kernel` | `PipelexKernel.make`, `.llm_text`, `.llm_object`, `.make_step_metadata` |
-| `pipelex.kernel.llm_ops` | `resolve_llm_setting_for_text` / `_for_object`, `derive_structure_prompt`, `generate_object_content`, `run_llm_text`, `run_llm_object` |
+| `pipelex.kernel.llm_ops` | `resolve_llm_setting_for_text` / `_for_object`, `concrete_llm_model_handle`, `derive_structure_prompt`, `generate_object_content`, `run_llm_text`, `run_llm_object` |
 | `pipelex.kernel.templating_style_ops` | `resolve_templating_style` |
 | `pipelex.kernel.extract_ops` | `resolve_extract_setting`, `build_extract_job_params`, `run_extract` |
 | `pipelex.kernel.img_gen_ops` | `resolve_img_gen_setting`, `resolve_default_size`, `build_img_gen_job_params`, `run_img_gen` |

@@ -317,6 +317,7 @@ plugins:
         - under-the-hood/dry-run-mock-generation.md: "Dry Run Mock Generation"
         - under-the-hood/execution-graph-tracing.md: "Execution Graph Tracing"
         - under-the-hood/tokens-usage-wire-records.md: "TokensUsage Wire Records"
+        - under-the-hood/per-node-usage-attribution.md: "Per-node Usage Attribution"
         - under-the-hood/image-handling-in-llm-prompts.md: "Image Handling in LLM Prompts"
         - under-the-hood/reasoning-controls.md: "Reasoning Controls"
         - under-the-hood/stuffartefact-and-image-rendering.md: "StuffArtefact & Image Rendering"
@@ -558,6 +559,7 @@ nav:
       - Dry Run Mock Generation: under-the-hood/dry-run-mock-generation.md
       - Execution Graph Tracing: under-the-hood/execution-graph-tracing.md
       - TokensUsage Wire Records: under-the-hood/tokens-usage-wire-records.md
+      - Per-node Usage Attribution: under-the-hood/per-node-usage-attribution.md
       - Image Handling in LLM Prompts: under-the-hood/image-handling-in-llm-prompts.md
       - Reasoning Controls: under-the-hood/reasoning-controls.md
       - StuffArtefact & Image Rendering: under-the-hood/stuffartefact-and-image-rendering.md

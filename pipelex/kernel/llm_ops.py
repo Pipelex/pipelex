@@ -20,8 +20,10 @@ from typing import Any
 
 from pipelex import log
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
+from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
+from pipelex.cogt.models.model_reference import ModelReferenceKind, ensure_model_reference
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.config import get_config
 from pipelex.core.concepts.concept import Concept
@@ -56,6 +58,53 @@ def resolve_llm_setting_for_object(*, llm_choice: LLMModelChoice | None = None, 
     model_deck = get_model_deck()
     resolved_choice = llm_choice or llm_choice_for_text or model_deck.llm_choice_overrides.for_object or model_deck.llm_choice_defaults.for_object
     return model_deck.get_llm_setting(llm_choice=resolved_choice)
+
+
+# A resolution chain is at most a handful of hops (preset -> alias -> handle); this only
+# has to stop a malformed deck that points an alias back at itself.
+_MAX_MODEL_RESOLUTION_HOPS = 8
+
+
+def concrete_llm_model_handle(model: str) -> str:
+    """Resolve an LLM model reference down to a concrete handle, for display.
+
+    ``ModelDeck.get_llm_setting`` advances exactly ONE hop, and a preset's own model
+    field is frequently another alias — `$writing-factual` yields `@default-premium`,
+    not `claude-4.7-opus`. That is invisible during a real run, where the remaining hops
+    happen inside the call, but it means a DRY run can only ever report a half-resolved
+    handle. Following the chain here makes the answer to "which model does this pipe
+    use" identical whether or not the pipe ran.
+
+    A WATERFALL is returned as-is and deliberately so: which of its models serves a call
+    depends on availability at that moment, so there is no answer to give in advance —
+    and inventing one would be worse than naming the waterfall.
+
+    Never raises: an unknown reference is returned unchanged. This feeds an
+    observability field, and a graph must not fail to assemble because a deck entry is
+    missing.
+    """
+    model_deck = get_model_deck()
+    seen: set[str] = set()
+    current = model
+    for _hop in range(_MAX_MODEL_RESOLUTION_HOPS):
+        reference = ensure_model_reference(current)
+        match reference.kind:
+            case ModelReferenceKind.PRESET | ModelReferenceKind.ALIAS:
+                if current in seen:
+                    log.warning(f"Cycle resolving model reference '{model}' at '{current}'; reporting it unresolved")
+                    return current
+                seen.add(current)
+                try:
+                    setting = model_deck.get_llm_setting(llm_choice=current)
+                except ModelChoiceNotFoundError:
+                    return current
+                if setting.model == current:
+                    return current
+                current = setting.model
+            case ModelReferenceKind.WATERFALL | ModelReferenceKind.HANDLE:
+                return current
+    log.warning(f"Model reference '{model}' did not resolve within {_MAX_MODEL_RESOLUTION_HOPS} hops")
+    return current
 
 
 async def derive_structure_prompt(*, output_class: type[StuffContent], templating_style: TemplatingStyle) -> str | None:

@@ -66,3 +66,4 @@ For this reason the trim must never be implemented as a `field_serializer`/`mode
 
 - [Cost Tracking & Reporting](../features/cost-tracking.md) — the in-process cost table and CSV export (full internal records, unaffected by this wire contract).
 - [Execution Graph Tracing](execution-graph-tracing.md) — the sibling `graph_spec` artifact and the trace event streams.
+- [Per-node Usage Attribution](per-node-usage-attribution.md) — the *other* projection of the same usage events, which keeps `node_id` and folds calls per graph node.

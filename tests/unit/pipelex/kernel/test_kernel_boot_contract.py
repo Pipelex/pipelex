@@ -15,9 +15,10 @@ interpreter through a function-local import, which is invisible to the static gr
 import-closure test *at once*. The sweep below therefore runs **after** the kernel call, which is
 what makes this test strictly stronger than the import-time one it complements.
 
-**Every kernel entry point is called, not a representative one** — the seven operator arms and the
-memory-boundary ops (`shape_inputs` and the four extraction helpers), with the three
-`resolve_*_setting` helpers the sole exception, for the deck reason given below. The blind spot this test
+**Every kernel entry point is called, not a representative one** — the operator arms and the
+memory-boundary ops (`shape_inputs` and the extraction helpers), with the deck-reading helpers
+(`resolve_*_setting`, `concrete_llm_model_handle`) the sole exception, for the deck reason given
+below. The blind spot this test
 exists for is per-function, so covering one op says nothing about the next: a function-local import
 inside `run_search` is caught only by calling `run_search`. That also makes this the only gate the
 ops modules other than `llm_ops` have — `PipelexKernel` is an LLM-era façade that does not import
