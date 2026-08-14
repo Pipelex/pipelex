@@ -2,11 +2,17 @@
 
 **Written 2026-08-14 on `fix/Keyless-dry-run`, against tip `84b1f682c` (v0.44.0).** Brief: [`keyless-boot-changes-dry-prompts.md`](keyless-boot-changes-dry-prompts.md). Everything in §0 was measured on this branch today, not carried over from the 2026-08-08 measurement.
 
-> ⏸ **On hold, and the headline symptom is likely to be dissolved rather than fixed.** Louis has decided prompt dialect should become a method-authoring decision instead of per-model infra config — see [`../prompting-style/prompt-style-as-an-authoring-decision.md`](../prompting-style/prompt-style-as-an-authoring-decision.md). Once prompt style depends on nothing but authored declarations and config, a keyless boot and a keyed boot agree by construction, and symptom 1 below (plus Part 1 and most of Part 3) stops existing. **Re-read this plan only after that design is settled**, and re-scope it to what actually survives: symptoms 3, 4, 5 and 7 in §2, which depend on the deck for reasons that have nothing to do with prompting.
+> ✅ **Re-scoped 2026-08-14 — the hold is lifted and the headline symptom is gone, dissolved rather than fixed.** The templating-style change shipped on this same branch ([design](../prompting-style/prompt-style-as-an-authoring-decision.md), [build](../prompting-style/templating-style-implementation-plan.md)): prompt shape is now declared on the pipe and defaulted from config, and **no code path consults the deck, a model spec, or a credential to decide it.** A keyless boot and a keyed boot therefore render byte-identical prompts by construction. **Symptoms 1 and 2 no longer exist, and neither do the fields they were about** — `prompting_target` and `derive_templating_style` are deleted. Part 1 (§3.2) is dissolved entirely; Part 3 (§3.4) loses its warning site.
+>
+> **What survives is a real bug and still worth fixing**, but it is a different bug than the one this plan was written for. A keyless boot still drops every backend, so the deck is still empty — and the deck still governs things that have nothing to do with prompting: symptoms 3, 4, 5 and 7 in §2. **Part 2 (§3.3) remains the core and is unchanged**; Part 4 (§3.5) remains the user-visible half. Sections below are annotated in place: struck premises are kept as the record of what was measured, not as instructions.
+>
+> ⚠️ **Re-judging the surviving residue is its own task.** With the headline symptom gone the cost/benefit has changed — the remaining symptoms are narrower and none of them silently rewrites output. Whether Part 2's `BackendLoadMode` surgery is still worth its blast radius is an open question for Louis, not a conclusion this plan should be read as having reached.
 
 ## 0. Re-verification, and one correction to the brief
 
-### 0.1 The divergence reproduces
+### 0.1 The divergence reproduces ~~(dissolved — historical record)~~
+
+> **Dissolved.** `derive_templating_style` is deleted; the style no longer comes from the deck at all, so the last column of this table has no meaning against current code. Kept because the *first three* columns still reproduce exactly as measured — a keyless boot still yields a 0-model deck — and that is the mechanism symptoms 3/4/5 ride on.
 
 Booting `Pipelex.make(...)` three ways and asking for the deck-resolved default text setting's style:
 
@@ -19,6 +25,8 @@ Booting `Pipelex.make(...)` three ways and asking for the deck-resolved default 
 | `needs_inference=False, needs_model_specs=True` | **no credentials at all** | **0** | `claude-4.6-sonnet` | **`None`** |
 
 `None` is not inert. `apply_tag_style` (`pipelex/tools/jinja2/jinja2_filters.py:120-122`) reads `TAG_STYLE` off the Jinja2 context and, when the key was never set, falls back to `TagStyle.TICKS` — so the step-2 prompt says ``result: ``` `` where a keyed run says `<result>`. The brief's reproduction table is accurate.
+
+> **Both halves of that sentence are now false, deliberately.** There is no deck-derived style to be `None`, and `apply_tag_style` no longer has a `TICKS` fallback — a context with no tag style raises `Jinja2ContextError` rather than silently choosing a shape. The silent-rewrite failure mode this plan was named for cannot recur: the only two outcomes left are the authored style and a loud error.
 
 ### 0.2 The correction: `needs_model_specs=True` is **not** the faithful seam
 
@@ -41,7 +49,9 @@ That reframes the fix: this is not "flip the existing seam on", it is "build the
 
 ### 0.3 The metadata is already credential-free on disk
 
-The reason the faithful option is cheap: `prompting_target` — and `max_prompt_images`, `rules`, costs — live in the per-backend spec TOMLs (`pipelex/kit/configs/inference/backends/openai.toml:26`), which need no credential to read. Only the *backend entry's* `${VAR}` substitution fails. The load conflates two unrelated things — "can I call this provider" and "do I know what its models are like" — and drops the second because the first failed.
+The reason the faithful option is cheap: `max_prompt_images`, `rules`, `inputs`/`outputs` and costs live in the per-backend spec TOMLs, which need no credential to read. Only the *backend entry's* `${VAR}` substitution fails. The load conflates two unrelated things — "can I call this provider" and "do I know what its models are like" — and drops the second because the first failed.
+
+> *(`prompting_target` was the fourth item on that list and the one the plan leaned on hardest; it no longer exists. The argument is unaffected — the remaining fields are just as credential-free, and `max_prompt_images` is what symptom 3 needs.)*
 
 The gateway is the one genuine exception: its specs come from a remote fetch (`RemoteConfigFetcher.fetch_remote_config`, a public URL, no key needed for the fetch itself), so an offline keyless boot cannot know them. That residual is what §3.4 makes audible instead of silent.
 
@@ -49,12 +59,11 @@ The gateway is the one genuine exception: its specs come from a remote fetch (`R
 
 The brief asks the fix to choose between **faithful** and **cheap-but-honest**. Recommendation: **faithful**, because the metadata is free (§0.3) and because "same program, mocked leaves" is what a dry run is *for* — a rehearsal that quietly rewrites the script is worth less than no rehearsal. Concretely the invariant to establish:
 
-> **Credentials gate inference. They do not gate knowledge of models.** A boot without credentials resolves the same models, the same prompting styles and the same model constraints as a boot with them; what it cannot do is call a provider.
+> **Credentials gate inference. They do not gate knowledge of models.** A boot without credentials resolves the same models and the same model constraints as a boot with them; what it cannot do is call a provider.
 
-Two things the invariant deliberately does not promise, both handled in §3.4:
+*(The invariant originally said "the same prompting styles" too. That clause is now true unconditionally and for a different reason — prompt shape never consults the deck — so it is dropped rather than claimed as a benefit of this fix.)*
 
-- Gateway-hosted models on an **offline** keyless boot: unknowable, so warned.
-- A model served by an **external LLM plugin**: genuinely absent from the deck, `None` stays correct — and after the fix `None` on a keyless boot is distinguishable from `None` on a keyed one, which is exactly what the brief says the caller cannot do today.
+One thing the invariant deliberately does not promise, handled in §3.4: gateway-hosted models on an **offline** keyless boot are unknowable, so warned. *(The second exception — an external-LLM-plugin model, absent from the deck, where a `None` style stayed correct — is gone with the style derivation.)*
 
 ## 2. Blast radius, enumerated
 
@@ -62,15 +71,17 @@ The brief asks for this enumeration as part of the fix. Everything a keyless boo
 
 | # | Symptom | Mechanism | Site | Status |
 | --- | --- | --- | --- | --- |
-| 1 | Step-2 prompts tag step-1 output with ``` ``` ``` instead of `<…>` | style `None` → Jinja2 `TAG_STYLE` unset → `TICKS` | `kernel/llm_ops.py:71-75`, `tools/jinja2/jinja2_filters.py:120` | **measured** |
-| 2 | An **explicitly set** `llm_setting.prompting_target` is ignored | deck lookup short-circuits to `None` before the explicit target is read | `kernel/llm_ops.py:71-74` | **measured** (independent bug, keyed boots too) |
+| ~~1~~ | ~~Step-2 prompts tag step-1 output with ``` ``` ``` instead of `<…>`~~ | ~~style `None` → Jinja2 `TAG_STYLE` unset → `TICKS`~~ | — | **✅ dissolved** — no deck-derived style, and no `TICKS` fallback to land in |
+| ~~2~~ | ~~An **explicitly set** `llm_setting.prompting_target` is ignored~~ | ~~deck lookup short-circuits to `None`~~ | — | **✅ dissolved** — the field is deleted; the authored `templating_style` on the pipe is the only declaration and it is always honoured |
 | 3 | `PipeImgGen`'s `max_prompt_images` limit is not enforced | `model_spec` `None` → limit `None` → check skipped | `pipe_operators/img_gen/pipe_img_gen.py:172-173`, `img_gen_prompt_blueprint.py:81` | code-read, test in §3.1 |
 | 4 | `PipeImgGen` param-support validation is skipped | `spec is None` → early return | `pipe_operators/img_gen/pipe_img_gen.py:100-104` | code-read |
 | 5 | A bundle pinning a **bare model handle** is *rejected* on a keyless machine | `is_model_handle_defined` false against an empty deck | `cogt/models/model_deck_check.py:91-101` | **measured** (`ModelChoiceNotFoundError`) |
 | 6 | Deck preset validation degrades to log-only noise | every handle missing → `missing_presets_reaction = "log"` | `cogt/models/model_deck.py:612-630`, `pipelex.toml:140` | code-read |
 | 7 | The two CLIs disagree with each other on a keyless machine | `pipelex run --dry-run` boots **keyed** (so it fails outright without keys); `pipelex-agent run --dry` boots keyless (so it degrades silently) | `cli/commands/run/_run_core.py:419` vs `cli/agent_cli/commands/run/*_cmd.py` | code-read |
 
-Item 5 is the loud converse of item 1 and belongs in the same fix: today a keyless process silently rewrites prompts for preset-pinned methods *and* hard-rejects handle-pinned ones. Both stop once the deck is populated.
+~~Item 5 is the loud converse of item 1 and belongs in the same fix: today a keyless process silently rewrites prompts for preset-pinned methods *and* hard-rejects handle-pinned ones. Both stop once the deck is populated.~~
+
+**Item 5 now stands alone, and that changes its character.** With item 1 dissolved there is no longer a silent-rewrite half to pair it with: what remains is a keyless process *loudly rejecting* handle-pinned bundles. A loud wrong answer is a much weaker motivation for the Part 2 surgery than a silent one was — it is visible, diagnosable, and arguably even defensible ("this machine cannot resolve that handle"). This is the single biggest input into the re-judging flagged in the banner.
 
 **Verified non-effects** (so the fix does not chase them): dry-run mock usage records are model-independent — `dry_mock.py:152-165` uses fixed `DRY_RUN_INFERENCE_MODEL_*` constants — and mock text length comes from `dry_run_config`, not from any spec. The brief's "both report the same usage records" holds.
 
@@ -90,14 +101,21 @@ New module `tests/integration/pipelex/system/test_keyless_boot_model_metadata.py
 Both via `Pipelex.make(secrets_provider=…, needs_inference=False)`. Assertions, all failing today:
 
 1. `len(deck.inference_models)` is equal on both sides (today: 0 vs 75).
-2. `derive_templating_style(llm_setting=resolve_llm_setting_for_text())` is equal and non-`None` on both sides (today: `None` vs `xml/plain`).
+2. ~~`derive_templating_style(...)` is equal and non-`None` on both sides~~ — **dropped, the function is deleted.**
 3. A bundle pinning a bare handle passes `check_llm_choice_with_deck` on both sides (today: `ModelChoiceNotFoundError` on the empty side — item 5).
 
 Then the end-to-end assertion the brief actually asks for, `tests/integration/pipelex/pipes/test_dry_prompt_parity_keyless.py`: a two-step method whose second `PipeLLM` embeds the first's output, dry-run under both providers, asserting the two `LlmTextResult.rendered_prompt` values are **identical** — not merely both non-empty. (`tests/unit/pipelex/pipe_operators/pipe_llm/test_prompt_rendering_purity.py` is the precedent for reaching the rendered prompt.)
 
+> **This one is now green before any production edit, and is worth writing anyway — as a guard, not as a receipt.** Prompt rendering no longer reads the deck, so the parity it asserts holds by construction. That makes it exactly the kind of test the sequencing step 5 warns about (*"a parity test that passes against the old code is testing nothing"*) — it must be understood as a regression guard against re-coupling prompt shape to infrastructure, and it should be labelled as such in its docstring so a future reader does not mistake it for evidence that Part 2 works.
+
 And one for item 3: a `PipeImgGen` given more input images than the model's `max_prompt_images`, dry-run keyless with `EmptySecretsProvider`, must raise — today it passes.
 
-### 3.2 Part 1 — style derivation precedence (small, independent, ships alone)
+### 3.2 ~~Part 1 — style derivation precedence~~ ✅ DISSOLVED — do not build
+
+> **Nothing in this section is buildable or wanted.** `derive_templating_style` and `llm_setting.prompting_target` are both deleted; the four-case precedence table below describes a resolution that no longer has any inputs. The concern it encoded — *an explicitly authored declaration must beat an inferred one* — is satisfied structurally: `resolve_templating_style(authored=…)` returns the authored style when there is one and the config default otherwise, with nothing in between to override it. Kept only so a reader of the original plan can see why this part vanished.
+
+<details>
+<summary>Original Part 1 (obsolete)</summary>
 
 Unit module `tests/unit/pipelex/kernel/test_derive_templating_style.py`, stubbing the deck on the hub (`tests/unit/pipelex/cli/test_agent_models_cmd.py:86` shows the fake-deck pattern):
 
@@ -109,6 +127,8 @@ Unit module `tests/unit/pipelex/kernel/test_derive_templating_style.py`, stubbin
 | setting has no target, deck has no model | `None` (external-plugin case) | same — green, pin it |
 
 Implementation in `pipelex/kernel/llm_ops.py:62-75`: read `llm_setting.prompting_target` first and only consult the deck when it is unset. Keeps the documented `None` path intact and makes an explicitly-pinned target authoritative — which it always should have been.
+
+</details>
 
 ### 3.3 Part 2 — credential-free model metadata (the core)
 
@@ -134,10 +154,12 @@ Green after this: every assertion in §3.1 except any gateway-only model on an o
 
 ### 3.4 Part 3 — the residual, made audible
 
-Once Part 2 lands, a `None` style on a keyless boot means something specific and narrow: *this model's metadata is genuinely unknowable here* (gateway model, no network, dummy specs) — not "we forgot to load anything". Warn exactly there, and only there:
+Once Part 2 lands, a missing model spec on a keyless boot means something specific and narrow: *this model's metadata is genuinely unknowable here* (gateway model, no network, dummy specs) — not "we forgot to load anything". Warn exactly there, and only there.
 
-- In `derive_templating_style`, when the deck has no model **and** `is_dry_run_forced()` (`runtime_hub.py:526`) is set, emit a `log.warning` naming the handle and the fallback tag style the prompt will actually use. On a keyed boot the same `None` stays silent — that is the external-plugin case, where `None` is correct and expected. This is the discriminator the brief says the caller lacks today.
-- Dedupe per boot, not per run: keep the already-warned handles on the `ModelDeck` instance, which is rebuilt at each boot. **Not** a ContextVar and not module-global state (`payload-first, no ContextVars`; a process-global set leaks across runs in a server).
+> **The warning site named below is deleted; the need is smaller but not zero.** `derive_templating_style` was where this plan proposed to warn, because a silently-wrong prompt shape was the damage being detected. That damage is gone. What is left worth warning about is narrower: a model whose spec is unknowable still silently skips the `max_prompt_images` check (symptom 3) and the param-support validation (symptom 4). If Part 2 is built, warn at *those* two sites — where a constraint is being skipped rather than enforced — and drop the notion of a style-derivation warning entirely.
+
+- ~~In `derive_templating_style`, when the deck has no model **and** `is_dry_run_forced()` is set, emit a `log.warning` naming the handle and the fallback tag style.~~ **Obsolete.** Replace with: at the `max_prompt_images` and param-support checks, when the spec is absent under a forced-dry boot, log that the constraint was not enforced and why.
+- Dedupe per boot, not per run: keep the already-warned handles on the `ModelDeck` instance, which is rebuilt at each boot. **Not** a ContextVar and not module-global state (`payload-first, no ContextVars`; a process-global set leaks across runs in a server). *(Unchanged — this part of the design survives whichever site does the warning.)*
 
 ### 3.5 Part 4 — entry-point audit
 
@@ -147,16 +169,17 @@ Once Part 2 lands, a `None` style on a keyless boot means something specific and
 
 ## 4. Sequencing
 
-1. **Part 0 tests** — commit red (or `xfail` with a reason naming this doc, flipped in step 4). They are the receipt that the bug existed.
-2. **Part 1** — self-contained; can merge on its own if Part 2 stalls.
+1. **Part 0 tests** — commit red (or `xfail` with a reason naming this doc, flipped in step 4). They are the receipt that the bug existed. *(Assertion 2 is dropped and the prompt-parity test is green from the start — see §3.1.)*
+2. ~~**Part 1** — self-contained; can merge on its own if Part 2 stalls.~~ **Dissolved; Part 2 no longer has a cheap independent sibling to ship ahead of it.**
 3. **Part 2** — the core. ⛳ *Checkpoint*: at this point re-run the §3.1 gate and record actual numbers in this doc before touching the CLI surface; Part 2 is where a hidden `all_enabled_backends()` consumer would show up.
 4. **Parts 3 + 4**, then flip the xfails.
-5. **Mutation-check the gate**: revert Part 2 locally and confirm the parity test goes red. A parity test that passes against the old code is testing nothing.
+5. **Mutation-check the gate**: revert Part 2 locally and confirm the *deck-count and handle-resolution* assertions go red. ⚠️ **Do not mutation-check against the prompt-parity test** — it passes with or without Part 2 now, by construction; using it as the mutation target would produce a false green on the whole gate.
 6. `make agent-check` && `make agent-test`.
 
 ## 5. Decisions for Louis
 
-- **Faithful over cheap** (§1) — confirm. The alternative is a log line and a documented divergence, which is honest but leaves dry-run-as-validation validating a prompt that will not be sent.
+- **⚠️ First, the prior question: is any of this still worth building?** The symptom that justified "faithful over cheap" — a dry run silently validating a prompt that will not be sent — is gone. Every survivor is either loud (5) or a skipped constraint check (3, 4) or a CLI inconsistency (7). Part 4 is cheap and clearly right on its own; Part 2 is the expensive one and now has to earn its keep against a weaker case. Recommend deciding Part 2 and Part 4 **separately** rather than as one plan.
+- **Faithful over cheap** (§1) — confirm, *if Part 2 proceeds at all*. The alternative is a log line and a documented divergence, which is honest but leaves dry-run-as-validation skipping constraint checks it claims to run.
 - **`pipelex run --dry-run` stops requiring credentials** (§3.5). Behaviour change, arguably breaking for anyone relying on it as a credential check. It is the right default, but say so in the changelog.
 - **Handle-pinned bundles start validating keylessly** (item 5). A bundle that today fails `pipelex-agent validate` on a keyless machine will pass. That is a fix, but it changes CI outcomes for keyless runners.
 - **Does `needs_model_specs` survive?** After Part 2 it means only "fetch the gateway's remote specs rather than dummy them" — i.e. a *network* flag, not a metadata flag. Either rename it (`needs_gateway_specs`) or document the narrowed meaning. Renaming touches every CLI command listed in §2 item 7; recommend renaming, since the current name is precisely what made the brief's closing sentence wrong.
@@ -166,7 +189,7 @@ Once Part 2 lands, a `None` style on a keyless boot means something specific and
 - `docs/features/validation-dry-run.md` — state the guarantee and its two exceptions (§1).
 - `docs/under-the-hood/dry-run-mock-generation.md` — the credentials-vs-metadata split, and what the new warning means.
 - Backend config docs — `missing_credential_vars` / uncredentialed-but-enabled as a visible state.
-- `CHANGELOG.md` under `## [Unreleased]`: the dry-run parity fix, the explicit-`prompting_target` fix, and the `pipelex run --dry-run` credential change.
+- `CHANGELOG.md` under `## [Unreleased]`: ~~the dry-run parity fix, the explicit-`prompting_target` fix,~~ and the `pipelex run --dry-run` credential change. *(The first two are dissolved and are already covered by the templating-style entry that shipped on this branch — do not double-report them.)*
 - `make drift-plan` after staging — Part 2 touches config-model and CLI trigger files; ack with an honest rationale.
 
 ## 7. Out of scope

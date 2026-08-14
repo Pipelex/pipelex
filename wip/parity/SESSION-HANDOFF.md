@@ -73,7 +73,7 @@ Gates all run and green at `d9efffbfb`:
 | Gap | Outcome | Commit (by subject — the stack is rebased, so hashes die) |
 | --- | --- | --- |
 | 2.1 `llm_text` narrowness | fixed | *make llm_text as wide as the op beneath it* — `refactor/Kernel` (#1081) |
-| 2.2 `llm_object` prompting style | **withdrawn** — not a live defect | silenced by the KF-16 numbering commit on #1081, which added the `llm_object` docstring recording why its single `model` is correct (its subject line is truncated in git — *"…to keep the stack's"* — so match on `KF-16`); deferred as KF-16 |
+| 2.2 `llm_object` templating style | **withdrawn** — not a live defect; deferred as KF-16, now **closed** | silenced by the KF-16 numbering commit on #1081, which added the `llm_object` docstring recording why its single `model` is correct (its subject line is truncated in git — *"…to keep the stack's"* — so match on `KF-16`). **KF-16 closed 2026-08-14 by dissolution** on `fix/Keyless-dry-run` (*Phase 1 — templating style becomes an authoring decision on the LLM path*): the derivation is deleted, the style is authored on the pipe, and that docstring goes with it |
 | 2.3 kernel cannot build an `ImgGenPrompt` | fixed | *let a runtime-only caller build the image prompt it has to pass in* — `refactor/Kernel-phase2` (#1082) |
 | — its boot-contract arm | added | *give the image prompt assembler the boot-contract arm the rule owes it* — `refactor/Kernel-phase2` (#1082), same PR as the entry point |
 | — the kernel doc's drift review | recorded | *record the image prompt assembler on the page that specifies the kernel* — `refactor/Kernel-phase3` (#1083), where the doc and its contract live |

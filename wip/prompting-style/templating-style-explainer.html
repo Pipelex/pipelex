@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Retiring prompting_target</title>
+<style>
+:root {
+  --ground:      #F2F5F5;
+  --surface:     #FFFFFF;
+  --surface-2:   #E9EFEF;
+  --ink:         #101619;
+  --ink-soft:    #56656A;
+  --ink-faint:   #7E8D91;
+  --accent:      #0C6E6E;
+  --accent-soft: #D6EAE8;
+  --old:         #9C5638;
+  --old-soft:    #F3E1D8;
+  --line:        #D6DFDF;
+  --line-strong: #B9C6C6;
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --measure: 68ch;
+  --pad: clamp(1.1rem, 4vw, 2.5rem);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #0D1214;
+    --surface:     #151D1F;
+    --surface-2:   #1D2729;
+    --ink:         #E4EBEB;
+    --ink-soft:    #94A4A6;
+    --ink-faint:   #728284;
+    --accent:      #4FC3BE;
+    --accent-soft: #12312F;
+    --old:         #D3906F;
+    --old-soft:    #33211A;
+    --line:        #253032;
+    --line-strong: #37484A;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #0D1214;
+  --surface:     #151D1F;
+  --surface-2:   #1D2729;
+  --ink:         #E4EBEB;
+  --ink-soft:    #94A4A6;
+  --ink-faint:   #728284;
+  --accent:      #4FC3BE;
+  --accent-soft: #12312F;
+  --old:         #D3906F;
+  --old-soft:    #33211A;
+  --line:        #253032;
+  --line-strong: #37484A;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: var(--pad);
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+}
+
+/* ---------- masthead ---------- */
+
+header.masthead {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  padding-top: 1.5rem;
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0;
+}
+
+h1 {
+  font-family: var(--mono);
+  font-size: clamp(2rem, 6vw, 3.1rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+  margin: 0;
+  text-wrap: balance;
+}
+
+h1 .brk { color: var(--line-strong); font-weight: 400; }
+
+.standfirst {
+  font-size: clamp(1.05rem, 2.4vw, 1.24rem);
+  line-height: 1.55;
+  color: var(--ink-soft);
+  margin: 0;
+  max-width: var(--measure);
+  text-wrap: pretty;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.4rem;
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  color: var(--ink-faint);
+  border-top: 1px solid var(--line);
+  padding-top: 0.9rem;
+  margin-top: 0.3rem;
+}
+.meta b { color: var(--ink-soft); font-weight: 500; }
+
+/* ---------- tldr ---------- */
+
+.tldr {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  padding: clamp(1.2rem, 3vw, 1.9rem);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tldr h2 {
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0;
+  font-weight: 600;
+}
+
+.tldr ul { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 0.6rem; }
+.tldr li { max-width: var(--measure); }
+
+/* ---------- sections ---------- */
+
+section { display: flex; flex-direction: column; gap: 1.1rem; }
+
+h2.sec {
+  font-family: var(--mono);
+  font-size: clamp(1.15rem, 3vw, 1.5rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+}
+
+h2.sec .num {
+  font-size: 0.75rem;
+  color: var(--accent);
+  letter-spacing: 0.1em;
+  flex: none;
+}
+
+h3 {
+  font-family: var(--mono);
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0.7rem 0 0;
+  color: var(--ink);
+}
+
+p { margin: 0; max-width: var(--measure); text-wrap: pretty; }
+
+section > ul { margin: 0; padding-left: 1.2rem; max-width: var(--measure); display: flex; flex-direction: column; gap: 0.55rem; }
+
+a { color: var(--accent); text-underline-offset: 2px; text-decoration-thickness: 1px; }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+code {
+  font-family: var(--mono);
+  font-size: 0.875em;
+  background: var(--surface-2);
+  padding: 0.1em 0.34em;
+  border-radius: 3px;
+  word-break: break-word;
+}
+
+strong { font-weight: 650; }
+
+/* ---------- figure ---------- */
+
+figure {
+  margin: 0.6rem 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: clamp(0.9rem, 2.5vw, 1.5rem);
+  overflow-x: auto;
+}
+figure svg { display: block; min-width: 640px; width: 100%; height: auto; }
+figcaption {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  color: var(--ink-faint);
+  margin-top: 1rem;
+  line-height: 1.5;
+  max-width: 78ch;
+}
+
+.s-box   { fill: var(--surface-2); stroke: var(--line-strong); stroke-width: 1; }
+.s-box-a { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.2; }
+.s-box-o { fill: var(--old-soft); stroke: var(--old); stroke-width: 1.2; }
+.s-t     { font-family: var(--mono); font-size: 12px; fill: var(--ink); }
+.s-t-s   { font-family: var(--mono); font-size: 11px; fill: var(--ink-soft); }
+.s-lbl   { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; }
+.s-lbl-a { fill: var(--accent); }
+.s-lbl-o { fill: var(--old); }
+.s-ln-o  { stroke: var(--old); stroke-width: 1.4; fill: none; }
+.s-ln-a  { stroke: var(--accent); stroke-width: 1.4; fill: none; }
+.s-head-o  { fill: var(--old); }
+.s-head-a  { fill: var(--accent); }
+.s-dash  { stroke-dasharray: 4 3; }
+.s-rule  { stroke: var(--line); stroke-width: 1; }
+
+/* ---------- code ---------- */
+
+pre {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 1.62;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1rem 1.1rem;
+  overflow-x: auto;
+  margin: 0;
+  tab-size: 2;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+
+.diff .add { color: var(--accent); display: block; }
+.diff .del { color: var(--old); display: block; }
+
+.filelabel {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+  margin-bottom: 0.35rem;
+  display: block;
+}
+
+.codeblock { display: flex; flex-direction: column; margin: 0.4rem 0; }
+
+/* ---------- two-up ---------- */
+
+.twoup {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  margin: 0.4rem 0;
+}
+.pane {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.pane.old { border-top: 2px solid var(--old); }
+.pane.new { border-top: 2px solid var(--accent); }
+.pane h4 {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin: 0;
+  font-weight: 600;
+}
+.pane.old h4 { color: var(--old); }
+.pane.new h4 { color: var(--accent); }
+.pane pre { border: none; background: var(--surface-2); padding: 0.75rem 0.85rem; }
+.pane p { font-size: 0.92rem; color: var(--ink-soft); }
+
+/* ---------- table ---------- */
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.87rem; min-width: 520px; }
+th, td { text-align: left; padding: 0.62rem 0.9rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 600;
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: none; }
+td code { font-size: 0.82em; white-space: pre-line; display: inline-block; line-height: 1.5; }
+
+/* ---------- callout ---------- */
+
+.callout {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--old);
+  background: var(--surface);
+  border-radius: 4px;
+  padding: 1rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.callout.good { border-left-color: var(--accent); }
+.callout .tag {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--old);
+  font-weight: 600;
+}
+.callout.good .tag { color: var(--accent); }
+.callout p { max-width: 74ch; }
+
+/* ---------- details ---------- */
+
+details {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  padding: 0.5rem 1.1rem;
+}
+details[open] { padding-bottom: 1.1rem; }
+summary {
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.55rem 0;
+  color: var(--ink);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+summary::-webkit-details-marker { display: none; }
+summary::before {
+  content: "+";
+  color: var(--accent);
+  font-weight: 600;
+  flex: none;
+  width: 1ch;
+}
+details[open] summary::before { content: "\2013"; }
+details > *:not(summary) { margin-top: 0.7rem; }
+details p, details ul { max-width: 74ch; }
+details ul { padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.5rem; }
+
+footer {
+  border-top: 1px solid var(--line);
+  padding: 1.4rem 0 3rem;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  color: var(--ink-faint);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Engineering note &middot; branch fix/Keyless-dry-run</p>
+  <h1><span class="brk">&lt;</span>Retiring prompting_target<span class="brk">&gt;</span></h1>
+  <p class="standfirst">How a method&rsquo;s inputs get tagged into a prompt is now something the <em>author</em> declares, not something the runtime infers from whichever provider happens to serve the model. The per-provider dialect map is deleted. Every OpenAI-family prompt changes shape from back-tick fences to XML tags.</p>
+  <div class="meta">
+    <span><b>Status</b> all phases built &amp; green; final two staged, uncommitted</span>
+    <span><b>Repo</b> Pipelex/pipelex</span>
+    <span><b>Date</b> 2026-08-14</span>
+    <span><b>Breaking</b> yes</span>
+  </div>
+</header>
+
+<div class="tldr">
+  <h2>TL;DR</h2>
+  <ul>
+    <li><strong>What.</strong> A <code>PipeLLM</code> can declare <code>templating_style</code> &mdash; a bare tag-style string (<code>"xml"</code>, <code>"ticks"</code>, <code>"square_brackets"</code>, <code>"no_tag"</code>) or a full <code>{ tag_style, text_format }</code> table. Anything that declares nothing takes <strong>one</strong> runtime default, shipped as <code>xml</code>. <code>prompting_target</code>, the per-target style map and <code>derive_templating_style</code> are gone; nothing consults a model, a deck or a credential to decide prompt shape.</li>
+    <li><strong>Why.</strong> Sending back-ticks to OpenAI and XML to Anthropic maintained a distinction current frontier models no longer make &mdash; and the data was infra-shaped, declared once per backend rather than per model. The direction was ruled on <strong>2026-08-03</strong> and deferred as <strong>KF-16</strong>.</li>
+    <li><strong>Why now.</strong> A keyless boot was silently rendering <em>different prompts</em> in dry runs. We started to fix that, realised the fix was to delete the mechanism we had already agreed was obsolete, and did that instead. The bug is dissolved, not repaired.</li>
+    <li><strong>What breaks for you.</strong> Prompt text changes for every OpenAI-family model, and for any template using <code>| tag</code> on any model. <strong>Any repo shipping its own <code>.pipelex/inference/backends/*.toml</code> fails to boot</strong> until every <code>prompting_target</code> line is deleted &mdash; and <code>portkey.toml</code> carries it per-model as well as in <code>[defaults]</code>.</li>
+  </ul>
+</div>
+
+<section>
+  <h2 class="sec"><span class="num">01</span> The mechanism we deleted</h2>
+  <p>Prompt shape used to be the tail end of a six-link inference chain: the pipe resolved an LLM setting, the setting named a model handle, the handle was looked up in the deck, the deck returned an <code>InferenceModelSpec</code>, the spec carried a <code>prompting_target</code> string, and that string indexed a map in <code>pipelex.toml</code> which finally produced a <code>TemplatingStyle</code>. Six links, each of which had to succeed, to answer a question the method author could simply have been asked.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 470" role="img" aria-label="Diagram comparing the old six-step model-derived resolution chain against the new two-step authored resolution.">
+      <defs>
+        <marker id="ah-o" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,1 L7,4 L0,7 z" class="s-head-o"></path>
+        </marker>
+        <marker id="ah-a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,1 L7,4 L0,7 z" class="s-head-a"></path>
+        </marker>
+      </defs>
+
+      <text x="20" y="22" class="s-lbl s-lbl-o">BEFORE &mdash; DERIVED FROM INFRASTRUCTURE</text>
+      <text x="480" y="22" class="s-lbl s-lbl-a">AFTER &mdash; DECLARED BY THE AUTHOR</text>
+      <line x1="450" y1="10" x2="450" y2="460" class="s-rule"></line>
+
+      <rect x="20" y="42" width="330" height="38" rx="5" class="s-box"></rect>
+      <text x="36" y="66" class="s-t">PipeLLM runs</text>
+
+      <path d="M60,80 L60,102" class="s-ln-o" marker-end="url(#ah-o)"></path>
+      <rect x="20" y="104" width="330" height="38" rx="5" class="s-box"></rect>
+      <text x="36" y="128" class="s-t">resolve LLMSetting &rarr; model handle</text>
+
+      <path d="M60,142 L60,164" class="s-ln-o" marker-end="url(#ah-o)"></path>
+      <rect x="20" y="166" width="330" height="38" rx="5" class="s-box"></rect>
+      <text x="36" y="190" class="s-t">ModelDeck lookup &rarr; InferenceModelSpec</text>
+
+      <path d="M60,204 L60,226" class="s-ln-o" marker-end="url(#ah-o)"></path>
+      <rect x="20" y="228" width="330" height="38" rx="5" class="s-box-o"></rect>
+      <text x="36" y="252" class="s-t">spec.prompting_target = "openai"</text>
+
+      <path d="M60,266 L60,288" class="s-ln-o" marker-end="url(#ah-o)"></path>
+      <rect x="20" y="290" width="330" height="38" rx="5" class="s-box-o"></rect>
+      <text x="36" y="314" class="s-t">prompting_styles["openai"]</text>
+
+      <path d="M60,328 L60,350" class="s-ln-o" marker-end="url(#ah-o)"></path>
+      <rect x="20" y="352" width="330" height="38" rx="5" class="s-box"></rect>
+      <text x="36" y="376" class="s-t">TagStyle.TICKS</text>
+
+      <path d="M185,390 L185,412" class="s-ln-o" marker-end="url(#ah-o)"></path>
+      <text x="20" y="432" class="s-t-s">deck miss at any link &rarr; style is None</text>
+      <text x="20" y="450" class="s-t-s">&rarr; filter falls back to TICKS, silently</text>
+
+      <rect x="480" y="42" width="330" height="38" rx="5" class="s-box"></rect>
+      <text x="496" y="66" class="s-t">PipeLLM runs</text>
+
+      <path d="M520,80 L520,164" class="s-ln-a" marker-end="url(#ah-a)"></path>
+      <rect x="480" y="166" width="330" height="38" rx="5" class="s-box-a"></rect>
+      <text x="496" y="190" class="s-t">resolve_templating_style(authored=&hellip;)</text>
+
+      <path d="M520,204 L520,288" class="s-ln-a" marker-end="url(#ah-a)"></path>
+      <text x="536" y="240" class="s-t-s">pipe declared one? use it.</text>
+      <text x="536" y="258" class="s-t-s">else: the config default.</text>
+
+      <rect x="480" y="290" width="330" height="38" rx="5" class="s-box"></rect>
+      <text x="496" y="314" class="s-t">TagStyle.XML</text>
+
+      <path d="M645,328 L645,350" class="s-ln-a s-dash" marker-end="url(#ah-a)"></path>
+      <text x="480" y="370" class="s-t-s">no deck, no model spec, no credential</text>
+      <text x="480" y="388" class="s-t-s">is read anywhere on this path</text>
+
+      <text x="480" y="432" class="s-t-s">a style-less render is now a loud</text>
+      <text x="480" y="450" class="s-t-s">Jinja2ContextError &mdash; never a fallback</text>
+    </svg>
+    <figcaption>The old chain had two failure modes and no way to tell them apart: &ldquo;this model is served by an external plugin, so we legitimately know nothing about it&rdquo; and &ldquo;we loaded no models at all.&rdquo; Both produced <code>None</code>, and <code>None</code> was silently absorbed by a triple-backtick fallback in the Jinja2 filter.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2 class="sec"><span class="num">02</span> Why now: the dry-run divergence</h2>
+  <p>The branch is called <code>fix/Keyless-dry-run</code> because it was cut to fix a different bug. A dry run exists to rehearse a real run without spending money, which is why it is documented as needing no API keys &mdash; naturally read as <em>same program, mocked leaves</em>. It was not true: <strong>a dry run booted without credentials rendered different prompts from one booted with them, and nothing in either run said so.</strong></p>
+
+  <div class="twoup">
+    <div class="pane new">
+      <h4>Boot A &mdash; with credentials</h4>
+<pre><code>deck: every model loaded
+style &rarr; xml/plain
+
+&lt;result&gt;
+&hellip;
+&lt;/result&gt;</code></pre>
+    </div>
+    <div class="pane old">
+      <h4>Boot B &mdash; keyless</h4>
+<pre><code>deck: zero models
+style &rarr; None
+
+result: ```
+&hellip;
+```</code></pre>
+    </div>
+  </div>
+  <p>Same method, same inputs. Every backend declares its key as a <code>${VAR}</code>, so on a keyless machine the lenient load skipped every backend and the deck came out empty &mdash; and the style derivation took its documented <code>None</code> path, written for a case (a model served by an external plugin) that a keyless boot satisfies for <em>every</em> model at once. Both runs complete, both report identical usage records, neither logs the difference.</p>
+  <p><strong>Why it stayed invisible:</strong> any gate whose two sides boot the same way cannot see this variable at all &mdash; and reads as evidence that it does not matter. Two keyless sides agree perfectly. The divergence only surfaces against a side that <em>cannot</em> boot keyless.</p>
+
+  <div class="callout good">
+    <span class="tag">The turn &mdash; and the relationship, stated precisely</span>
+    <p>A four-part fix plan was written: build a seam letting a credential-free process load model <em>metadata</em> without model <em>credentials</em>. Then the obvious thing landed &mdash; <strong>the headline symptom only exists because prompt shape is derived from infrastructure at all.</strong> Delete the derivation, and keyless and keyed boots render byte-identical prompts <em>by construction</em>.</p>
+    <p>The bug <strong>surfaced and scheduled</strong> this work; it did not motivate it. Every argument for the change holds with no bug in the picture. Had we fixed the bug as planned, we would have built a metadata seam whose main beneficiary was a derivation we were about to delete.</p>
+  </div>
+
+  <p>The <em>diagnosis</em> in that bug report is untouched &mdash; a keyless boot still yields an empty deck &mdash; but the two silent symptoms (back-tick step-2 prompts, an ignored <code>llm_setting.prompting_target</code>) are dissolved rather than fixed. What survives is loud or minor: <code>max_prompt_images</code> and image param-support checks need a populated deck; handle-pinned bundles are <em>rejected</em> keylessly; the two CLIs disagree on whether <code>--dry-run</code> needs credentials. Whether the expensive half of that plan still earns its blast radius is now an open question rather than a settled one.</p>
+</section>
+
+<section>
+  <h2 class="sec"><span class="num">03</span> What it looks like now</h2>
+
+  <div class="twoup">
+    <div class="pane old">
+      <h4>Before &mdash; infra decided</h4>
+      <span class="filelabel">pipelex/pipelex.toml</span>
+<pre><code>[pipelex.prompting_config]
+default_prompting_style = { tag_style = "xml" }
+
+[pipelex.prompting_config.prompting_styles]
+openai    = { tag_style = "ticks" }
+anthropic = { tag_style = "xml" }
+mistral   = { tag_style = "square_brackets" }
+gemini    = { tag_style = "xml" }</code></pre>
+      <p>Plus a <code>prompting_target</code> line in every backend TOML, and per-model overrides in <code>portkey.toml</code>.</p>
+    </div>
+    <div class="pane new">
+      <h4>After &mdash; the author decides</h4>
+      <span class="filelabel">pipelex/pipelex.toml</span>
+<pre><code>[pipelex.templating_config]
+default_templating_style = { tag_style = "xml" }</code></pre>
+      <p>One default for anything that declares nothing. No per-model, per-backend or per-preset override exists &mdash; deliberately.</p>
+    </div>
+  </div>
+
+<div class="codeblock">
+<span class="filelabel">any .mthds file &mdash; bare string is the tag_style shorthand, inline table is the full struct</span>
+<pre><code>[pipe.summarize_article]
+type             = "PipeLLM"
+inputs           = { article = "Text" }
+output           = "Text"
+templating_style = "square_brackets"
+
+[pipe.render_note]
+type             = "PipeLLM"
+templating_style = { tag_style = "xml", text_format = "markdown" }</code></pre>
+</div>
+
+  <p>Each style below shows what <code>@article</code> produces for an input named <code>article</code>. The tag name comes from the variable; a value with no name of its own falls back to <code>data</code>. The two sigils are governed by different halves of the style: <code>@variable</code> on its own line wraps the whole input per <code>tag_style</code>; inline <code>$variable</code> inserts it formatted per <code>text_format</code>, unwrapped.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>tag_style</th><th>Renders as</th></tr></thead>
+      <tbody>
+        <tr><td><code>xml</code> <em>(default)</em></td><td><code>&lt;article&gt;&#10;&hellip;&#10;&lt;/article&gt;</code></td></tr>
+        <tr><td><code>ticks</code></td><td><code>article: ```&#10;&hellip;&#10;```</code></td></tr>
+        <tr><td><code>square_brackets</code></td><td><code>[article]&#10;&hellip;&#10;[/article]</code></td></tr>
+        <tr><td><code>no_tag</code></td><td>the value, bare</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>The two edits that carry the change</h3>
+<div class="codeblock">
+<span class="filelabel">pipelex/kernel/templating_style_ops.py &mdash; new, and this is the whole thing</span>
+<pre class="diff"><code><span class="add">+def resolve_templating_style(*, authored: TemplatingStyle | None) -> TemplatingStyle:</span>
+<span class="add">+    """The style a prompt renders under: the authored one, else the configured default."""</span>
+<span class="add">+    return authored or get_config().pipelex.templating_config.default_templating_style</span></code></pre>
+</div>
+  <p>Total, deck-free, credential-free. Its totality is the point &mdash; because it can never return <code>None</code>, nothing downstream has to carry an optional style and invent a fallback for it.</p>
+
+<div class="codeblock">
+<span class="filelabel">pipelex/tools/jinja2/jinja2_filters.py &mdash; the fallbacks die</span>
+<pre class="diff"><code><span class="del">-    tag_style_str = context.get(Jinja2ContextKey.TAG_STYLE)</span>
+<span class="del">-    tag_style = TagStyle(tag_style_str) if tag_style_str else TagStyle.TICKS</span>
+<span class="add">+    tag_style = TagStyle(require_templating_style_value(</span>
+<span class="add">+        context=context, jinja2_context_key=Jinja2ContextKey.TAG_STYLE))</span></code></pre>
+</div>
+  <p>This is what makes the class of bug unreachable rather than merely fixed. A missing key now raises <code>Jinja2ContextError</code>, with no default, deliberately: every prompt-rendering entry point resolves a style before rendering, so a missing one means the render was set up wrong. The old <code>TICKS</code> default is exactly how a triple-backtick style used to reach prompts nobody had chosen it for.</p>
+</section>
+
+<section>
+  <h2 class="sec"><span class="num">04</span> Three traps worth knowing about</h2>
+
+  <div class="callout">
+    <span class="tag">Trap 1 &mdash; an unknown key becomes an HTTP header</span>
+    <p><code>backend_library.py</code> reclassifies any per-model TOML key that is not in <code>InferenceModelSpecBlueprint.model_fields</code> as an <strong>outbound HTTP header</strong>. Deleting the model field while a per-model <code>prompting_target = "gemini"</code> line survived would have shipped that line to the provider as a header, silently. The field deletion and the TOML deletions had to land in one commit, verified by grep across the source tree and the synced kit copies.</p>
+    <p><strong>This is the trap in the downstream sweep too</strong>, and it is why deleting only the <code>[defaults]</code> line is worse than doing nothing: the boot starts working again while the per-model occurrences quietly become headers.</p>
+    <p><strong>Now scheduled to be closed &mdash; <code>wip/rogue-extra-headers-guard-plan.md</code>, gated on this branch merging.</strong> The bag stays open (the gateway genuinely needs to be served new <code>x-portkey-*</code> headers without a client release) but gets a <em>shape</em> rule: an unknown key is accepted as a header only if it is header-shaped, i.e. contains a hyphen. Blueprint field names never do, so every removed field and every snake_case typo &mdash; <code>max_tokns</code> &mdash; becomes a loud error from a local TOML and a silent prune from the served payload, instead of a string posted to the provider. <code>endpoint_path</code>, which is routing metadata rather than a header and only escapes the wire by luck today, is promoted to a real field.</p>
+  </div>
+
+  <div class="callout">
+    <span class="tag">Trap 2 &mdash; the remote config outlives the field, and the skew is routine</span>
+    <p>Deleting <code>prompting_target</code> from the blueprint made the entire test suite fail at boot, one cause. The Pipelex Gateway does not read its model specs from this repo: they are fetched from the API and cached, and that served config still declared the key. The blueprint is <code>extra="forbid"</code>, so a config written by a different release than the client reading it stopped the boot dead. Fixed with a general tolerance rather than a shim for one field &mdash; <code>drop_unknown_gateway_defaults</code> prunes unknown keys from the <em>remote</em> config&rsquo;s <code>defaults</code>. Local files stay strict.</p>
+    <p><strong>That tolerance is load-bearing every day, not just on deploy days.</strong> The cache is <em>one file per machine</em>, <code>~/.pipelex/cache/remote_config.json</code>, shared by every worktree &mdash; and it records <code>schema_version</code>, <code>cached_at</code> and the body, but <strong>no source URL</strong>. So a checkout pinning <code>_12</code> cannot tell it is reading an <code>_11</code> body. On this machine on 2026-08-14 it was doing exactly that: the cache held <code>_11</code> byte-for-byte, because the other seven checkouts all pin <code>_11</code> and one had booted more recently. Make remote unknowns fatal and that ordinary local condition turns the suite red.</p>
+  </div>
+
+  <div class="callout">
+    <span class="tag">Trap 3 &mdash; deleting the key from the served config is a live change</span>
+    <p>The served gateway config is owned by <code>pipelex-back-office</code>. Removing the key there would have flipped every gateway prompt <strong>already deployed in the field</strong> from XML to back-tick fences &mdash; because an older client never reaches its configured default (<code>get_prompting_style(None)</code> returns <code>None</code>, not the default), so no style reaches the filter and the old <code>TICKS</code> fallback applies.</p>
+    <p>That never happened because the config is <strong>versioned in its URL</strong> and this branch bumps it: <code>pipelex_remote_config_12.json</code>, was <code>_11</code>. <code>_11</code> is frozen and still carries the key, so every earlier release keeps rendering XML. <strong>The URL bump is the compatibility boundary for any breaking change to that config</strong> &mdash; worth knowing before the next one.</p>
+  </div>
+</section>
+
+<section>
+  <h2 class="sec"><span class="num">05</span> What you need to do</h2>
+
+  <h3>If you author .mthds methods</h3>
+  <p>Nothing, unless you want the control. Prompts for OpenAI-family models change shape from back-tick fences to XML tags &mdash; that <em>is</em> the change. If a specific pipe wants a different shape, declare <code>templating_style</code> on it; if your whole project wants a different house style, set <code>default_templating_style</code> in your <code>.pipelex/pipelex.toml</code>.</p>
+
+  <h3>If your repo ships its own backend TOMLs &mdash; not optional</h3>
+  <p>Local backend files are read strictly. On the version bump, every repo shipping <code>.pipelex/inference/backends/*.toml</code> <strong>dies at boot</strong> with <code>Extra forbidden fields: 'prompting_target'</code> &mdash; confirmed in <code>pipelex-server/worker/</code>, <code>pipelex-api/</code>, <code>cocode/</code>, <code>pipelex-cookbook/</code>, <code>pipelex-demos/</code>, <code>mthds-ui/</code>, plus <code>pipelex-js/</code> fixtures. Delete <strong>every</strong> occurrence, <code>[defaults]</code> and per-model alike, and grep to prove it. Re-read trap 1 first: a partial fix is worse than none.</p>
+
+  <h3>If you use a template with <code>| tag</code> or <code>| format</code></h3>
+  <p>Those filters no longer have a default of their own. Through any normal prompt path you are fine &mdash; a style is always resolved for you. Drive the kernel API directly and omit the style, and you now get a loud <code>Jinja2ContextError</code> instead of a silently-chosen shape.</p>
+
+  <details>
+    <summary>Other things this change also does, that you might not expect</summary>
+    <ul>
+      <li><strong>Compose, image-gen, search and structuring prompts all changed too.</strong> They previously rendered style-less, which the filters silently absorbed as back-ticks and plain text. If your <code>PipeCompose</code> template or a construct-mode template field uses <code>| tag</code>, its output changes shape &mdash; on any model family, not just OpenAI&rsquo;s.</li>
+      <li><strong><code>PipeImgGen</code> and <code>PipeSearch</code> have no authored knob</strong> (deliberately, for now). They inherit the config default.</li>
+      <li><strong>Lenient loading got narrower.</strong> <code>InferenceBackendLibrary.load(lenient=...)</code> exists so a keyless boot can skip backends with missing credentials &mdash; but it caught the error <em>base</em> classes, so a malformed local TOML was skipped just as quietly. Now only <code>InferenceBackendCredentialsError</code> is tolerated; malformed configuration is fatal in both modes.</li>
+      <li><strong>The <code>format</code> filter had a latent bug, fixed in passing:</strong> its argument was annotated <code>TextFormat | None</code>, but Jinja2 hands a template-supplied <code>{{ x | format("markdown") }}</code> over as a raw <code>str</code>.</li>
+      <li><strong>A dead module went with it:</strong> <code>llm_prompt_template.py</code>, <code>llm_prompt_factory_abstract.py</code>, <code>llm_prompt_template_inputs.py</code> and <code>LLMPromptTemplateInputsError</code> &mdash; a hardcoded XML+Markdown style that predated the configurable one and had no production consumer.</li>
+    </ul>
+  </details>
+</section>
+
+<footer>
+  <span>Written for co-developers, 2026-08-14. Companion to the design note, the implementation plan and the rogue-headers guard plan in this repo&rsquo;s <code>wip/</code>.</span>
+  <span>Gates at time of writing: make agent-check green &middot; full make agent-test green &middot; mkdocs build --strict green.</span>
+</footer>
+
+</div>
+</body>
+</html>

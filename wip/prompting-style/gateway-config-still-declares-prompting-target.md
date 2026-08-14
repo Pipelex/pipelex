@@ -40,4 +40,6 @@ The prune is pure and silent by design. It first logged the dropped keys, which 
    The URL bump is the compatibility boundary for *any* breaking change to this config, which is worth knowing before the next one — it is the reason the deletion did not need to wait for a deployed floor.
 2. **Decide whether the per-model unknown-key → HTTP-header rule should survive for the gateway backend.** Deliberately untouched here. A removed field that had lived per-model rather than in `defaults` would have been sent to the provider as a header instead of raising — a worse outcome than the one that was actually hit, and one no test would catch.
 
+   **Decided, and planned: [`../rogue-extra-headers-guard-plan.md`](../rogue-extra-headers-guard-plan.md).** The rule survives, but only for header-shaped keys; anything else is fatal from a local file and pruned from the served payload. To be executed after the templating-style branch merges.
+
 Neither is in scope for the templating-style change. Item 1 is a `pipelex-server` deliverable; item 2 is a design question about the backend loader that deserves its own look.

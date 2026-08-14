@@ -87,7 +87,7 @@ These three are written against the open kernel-extraction PRs and share a theme
 | Gap | Outcome | Where |
 |---|---|---|
 | 2.1 `llm_text` narrower than its op | Fixed | *make llm_text as wide as the op beneath it*, on `refactor/Kernel` (#1081) |
-| 2.2 `llm_object` prompting style | **Not a live defect** — claim overstated; the surviving question is deferred | *number the prompting-style follow-up KF-16 to keep the stack's*, on `refactor/Kernel` (#1081); KF-16 → `wip/prompting-style/prompt-style-as-an-authoring-decision.md` |
+| 2.2 `llm_object` templating style | **Not a live defect** — claim overstated; deferred as KF-16, now **closed by dissolution** | *number the prompting-style follow-up KF-16 to keep the stack's*, on `refactor/Kernel` (#1081); closed on `fix/Keyless-dry-run` by *Phase 1 — templating style becomes an authoring decision on the LLM path* |
 | 2.3 kernel cannot build an `ImgGenPrompt` | Fixed | *let a runtime-only caller build the image prompt it has to pass in* + arm *give the image prompt assembler the boot-contract arm the rule owes it*, on `refactor/Kernel-phase2` (#1082); doc review *record the image prompt assembler on the page that specifies the kernel* (#1083) |
 
 **Commits are named by subject, not by SHA, and deliberately.** These fixes live on a three-deep stacked series that is rebased whenever a parent moves, which rewrites every hash on it. An earlier revision of this table named SHAs; the rebase that folded in the review round orphaned three of them, so they resolved from no branch at all. A subject survives the rewrite — `git log --grep` finds it.
@@ -119,6 +119,10 @@ The re-verification the plan asked for happened against each PR's own branch rat
 *The mechanism is obsolete.* Model-derived prompting style dates from when models were genuinely sensitive to prompt markup. Louis' ruling: rather than widen the derivation, the style becomes an explicit user choice defaulting to XML, and the derivation goes away. Building `model_for_object` here would mean constructing the two-setting derivation that refactor deletes.
 
 Deferred as **KF-16** in the kernel track's deferred-follow-ups doc (now tracked at workspace level), with the design in [`../prompting-style/prompt-style-as-an-authoring-decision.md`](../prompting-style/prompt-style-as-an-authoring-decision.md) — superseding the deferred note that landed with [PR #1081](https://github.com/Pipelex/pipelex/pull/1081). Silenced in #1081 by *number the prompting-style follow-up KF-16 to keep the stack's* — a docstring on `llm_object` recording why its single `model` is correct, carrying the trap explicitly: *do not "fix" this by deriving the style from an object-only resolution, which would introduce the divergence rather than close it.*
+
+**✅ KF-16 closed 2026-08-14, by dissolution — on `fix/Keyless-dry-run`, commit *Phase 1 — templating style becomes an authoring decision on the LLM path*.** The second reason above is what happened: the derivation is deleted, not widened. A `PipeLLM` declares `templating_style` (bare tag-style string or full `{ tag_style, text_format }` table); everything that declares nothing resolves one runtime default; no code path consults a model, a deck, or a credential to decide prompt shape. `llm_text` and `llm_object` both take the style as an optional argument resolved through the same total resolver, so the two-choice case that motivated this gap can no longer diverge — there is nothing left to derive from either setting.
+
+**The trap recorded in the #1081 docstring is now moot, and the docstring carrying it is deleted.** "Do not fix this by deriving the style from an object-only resolution" was a warning about a mechanism that no longer exists; there is no object-only resolution to derive a style from, and no derivation site to put one in. It is preserved here as history only — do not reintroduce it as guidance.
 
 ### 2.3 Nothing in the kernel can build an `ImgGenPrompt`
 

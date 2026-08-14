@@ -2,6 +2,16 @@
 
 **Filed 2026-08-14 as the brief for this fix branch (`fix/Keyless-dry-run`).** Measured 2026-08-08 against the then-current tip; re-verify on this branch before building the fix — the boot and deck code has moved since (v0.43.x, v0.44.0).
 
+> ## ✅ CLOSED 2026-08-14 — dissolved, not fixed
+>
+> **This bug no longer exists, and the mechanism it describes has been deleted.** Prompt shape is now an authoring decision: a pipe declares `templating_style`, anything that declares nothing takes one runtime default from config, and **no code path consults the deck, a model spec, or a credential to decide how a prompt is tagged**. A keyless boot and a keyed boot therefore render byte-identical prompts by construction — there is no longer a derivation that could disagree with itself.
+>
+> The two load-bearing facts in "Why it happens" are both gone: `derive_templating_style` is deleted, and the `TagStyle.TICKS` fallback that made a `None` style silently *render* rather than *fail* is deleted too. Where a style is genuinely absent, the Jinja2 filters now raise `Jinja2ContextError` instead of quietly picking a shape — so the specific failure mode named in this report's title, *silently*, is unreachable even in principle.
+>
+> Shipped on this same branch: design in [`../prompting-style/prompt-style-as-an-authoring-decision.md`](../prompting-style/prompt-style-as-an-authoring-decision.md), build in [`../prompting-style/templating-style-implementation-plan.md`](../prompting-style/templating-style-implementation-plan.md). Note the change was **not** undertaken to fix this bug — it was a separate design ruling that happened to dissolve it, which is why the fix plan's core survives while its headline does not.
+>
+> **What did not get fixed.** The underlying boot behaviour this report *diagnosed* is untouched: a keyless boot still drops every backend and still yields an empty deck. That still has consequences — a skipped `max_prompt_images` check, skipped image-param validation, handle-pinned bundles rejected, and the two CLIs disagreeing about whether `--dry-run` needs credentials. Those survive in the re-scoped [`keyless-dry-prompts-fix-plan.md`](keyless-dry-prompts-fix-plan.md) and are pending their own re-judging. **"Why it stayed invisible" below is still worth reading** — the two-sided-gate blindness it describes is a general lesson about measurement, not a fact about prompting.
+
 ## The claim it undermines
 
 A DRY run's whole purpose is to rehearse the real run without spending money — which is why it is documented as needing no keys. That promise is naturally read as "same program, mocked leaves". It currently is not: **a dry run booted keyless renders different prompts from a dry run booted with credentials, and nothing in either run says so.**

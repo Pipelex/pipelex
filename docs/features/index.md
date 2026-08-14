@@ -45,7 +45,7 @@ This section covers all Pipelex capabilities, organized by area.
 
 -   **[LLM Integration](llm-integration.md)**
 
-    Text generation, structured outputs, vision language models, prompting styles, system prompt inheritance, and model presets.
+    Text generation, structured outputs, vision language models, templating styles, system prompt inheritance, and model presets.
 
 -   **[Document Extraction](document-extraction.md)**
 
