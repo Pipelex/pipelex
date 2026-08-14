@@ -47,8 +47,8 @@ class TestPipeSequenceSimple:
             inputs={"input_text": concept_1.concept_ref},
             output=concept_2.concept_ref,
             steps=[
-                SubPipeBlueprint(pipe="capitalize_text", result="capitalized_text"),
-                SubPipeBlueprint(pipe="add_prefix", result="final_text"),
+                SubPipeBlueprint(pipe="test_integration4.capitalize_text", result="capitalized_text"),
+                SubPipeBlueprint(pipe="test_integration4.add_prefix", result="final_text"),
             ],
         )
 
@@ -72,9 +72,9 @@ class TestPipeSequenceSimple:
         assert pipe_sequence.domain_code == "test_integration"
         assert pipe_sequence.code == "simple_sequence"
         assert len(pipe_sequence.sequential_sub_pipes) == 2
-        assert pipe_sequence.sequential_sub_pipes[0].pipe_code == "capitalize_text"
+        assert pipe_sequence.sequential_sub_pipes[0].pipe_code == "test_integration4.capitalize_text"
         assert pipe_sequence.sequential_sub_pipes[0].output_name == "capitalized_text"
-        assert pipe_sequence.sequential_sub_pipes[1].pipe_code == "add_prefix"
+        assert pipe_sequence.sequential_sub_pipes[1].pipe_code == "test_integration4.add_prefix"
         assert pipe_sequence.sequential_sub_pipes[1].output_name == "final_text"
 
         # Verify the working memory has the correct structure

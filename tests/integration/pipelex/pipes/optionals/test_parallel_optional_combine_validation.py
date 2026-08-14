@@ -96,8 +96,8 @@ def _build_parallel(*, output_ref: str, structure_class_names: list[str], inputs
             inputs=inputs,
             output=output_ref,
             branches=[
-                SubPipeBlueprint(pipe="par_static_find", result="found_result"),
-                SubPipeBlueprint(pipe="par_static_base", result="base_result"),
+                SubPipeBlueprint(pipe="test_optionals_par_static.par_static_find", result="found_result"),
+                SubPipeBlueprint(pipe="test_optionals_par_static.par_static_base", result="base_result"),
             ],
             add_each_output=False,
         ),

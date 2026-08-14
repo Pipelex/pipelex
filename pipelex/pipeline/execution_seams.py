@@ -163,7 +163,7 @@ async def prepare_pipe_job(
     pipeline_run_id: str,
     user_id: str,
     inputs: PipelineInputs | WorkingMemory | None = None,
-    search_domain_codes: list[str] | None = None,
+    search_scope: str | None = None,
     trace_context: "TraceContext | None" = None,
     otel_context: OtelContext | None = None,
     output_name: str | None = None,
@@ -206,7 +206,7 @@ async def prepare_pipe_job(
                 inputs=inputs,
                 concept_provider=get_concept_library(),
                 input_specs=pipe.inputs,
-                search_domain_codes=search_domain_codes,
+                search_scope=search_scope,
                 inputs_base_dir=inputs_base_dir,
             )
 

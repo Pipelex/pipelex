@@ -100,8 +100,8 @@ def _backfill_pipe_error_source(pipe_error: PipeValidationError) -> None:
     runs. Intercepting once at this catch boundary covers every raise site, present and future.
 
     Lookup is by the full ``domain.pipe_code`` ref only — never the bare-code suffix fallback
-    (bare codes are ambiguous across domains, exactly what the fix loop's cross-file guard
-    defends against). A miss leaves ``file_path`` as ``None``: the fix stays source-less and
+    (under the strict own-domain resolution rule, a bare-code suffix match would guess a file
+    where the qualified ref did not resolve). A miss leaves ``file_path`` as ``None``: the fix stays source-less and
     falls under the conservative single-file rule, which is the safe direction.
     """
     if pipe_error.file_path is not None:
@@ -322,9 +322,11 @@ async def validate_bundle(
                     # File not yet loaded - load it from the blueprint
                     loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
                 else:
-                    # File already loaded - get existing pipes from library by their codes
+                    # File already loaded - get existing pipes from library by their refs. A bundle's
+                    # `[pipe.<code>]` keys are bare and belong to the bundle's own domain, so they are
+                    # qualified here rather than searched for: the library is keyed by qualified ref.
                     pipe_codes = list(blueprint.pipe.keys()) if blueprint.pipe else []
-                    loaded_pipes = [library.pipe_library.get_required_pipe(pipe_code=code) for code in pipe_codes]
+                    loaded_pipes = [library.pipe_library.get_required_pipe(pipe_code=f"{blueprint.domain}.{code}") for code in pipe_codes]
 
                 dry_run_results = await BundleValidator().validate_pipes(
                     pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes=dry_run_pipe_codes),

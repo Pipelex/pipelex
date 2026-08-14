@@ -13,6 +13,34 @@
 - **A dry run of a `PipeCondition` is now reproducible.** `pipe_dependencies()` returns a `set[str]`, and the dry-run arm walks **every** branch into the same working memory under the same `output_name` — so the branch iterated last is the one whose stuff the enclosing pipe reports as the condition's output. Iterating the raw set made "last" a function of string-hash order, which varies per process, so the same bundle dry-run twice produced two different graphs: in a sequence routing to two branches that each name their own tail result, the sequence's output name flipped between them run to run. Nothing about a dry run should depend on `PYTHONHASHSEED`, and anything diffing graph specs across runs — a fixture corpus, a static-vs-dry parity check — saw phantom changes. The loop sorts now, which is what the two other order-sensitive readers of this set (`signature_walk`, the `output_option_N` renderer) already did. Live runs were never affected: they take exactly one branch.
 
 - **A `{concept, content}` envelope carrying an empty list is now a value, not an error**: a plural slot is never _absent_ — when nothing is found it is the empty list — and the top-down shaper has always honoured that for a bare `[]` (D2). The bottom-up factory did not: it infers a list's item type from the first item, so an empty list raised _"Cannot create Stuff from empty list in content"_. The two spellings of one input therefore disagreed — a caller with no pictures could send `[]` and run, or send `{"concept": "native.Image", "content": []}` and fail — which made a plural input with nothing in it unrunnable for every caller that wraps its inputs. The envelope names the concept, so there was never anything to infer; it now builds an empty `ListContent`. Case 1.5 (a bare empty `ListContent`, no concept anywhere) still raises, and must: nothing there says what the items would have been.
+- **Kernel step identity**: `PipelexKernel.make_step_metadata` now accepts `pipe_code` to name the pipe a step is running, mirroring what the interpreter stamps on its live and dry paths — so log correlation, usage accounting, and per-step labelling see a named step for kernel-driven runs. The key is omitted from the metadata update when not supplied, so a run-level `pipe_code` is never silently erased; the direct-call façade (`llm_text`/`llm_object`) stays deliberately anonymous. `PipelexKernel.make` also accepts an injectable `step_id_source` for per-step ids, defaulting to `uuid4`, so a kernel hosted inside a replay-based executor can supply a replay-safe source.
+
+## [v0.44.0] - 2026-08-13
+
+### Added
+
+- **Entry-point resolution affordances**: Added `get_required_entry_pipe`, `get_optional_entry_pipe`, `get_required_entry_concept` and `get_optional_entry_concept` to the `interpreter_hub` and library APIs. These are designed for human-supplied codes (CLI arguments, API payloads) and safely search across domains, unlike strict in-body references. Installed dependency packages are excluded from that search, so adding a dependency cannot make one of your own codes ambiguous.
+- **Build-time crate qualification**: Introduced a standalone `crate_qualification` pass that fully qualifies in-body references to their owner domain at library build time, ensuring the normalizer and the live library strictly agree on reference resolution. This supersedes v0.43.0's _Cross-domain pipe refs in normalized crates_: the two readers still agree, but on owner-domain qualification rather than on a crate-wide search.
+
+### Changed
+
+- **Strict in-body pipe reference resolution (Breaking)**: Bare in-body pipe references (sequence steps, parallel branches, condition outcomes, `batch_over` targets) now resolve _only_ within their own domain. To reference a pipe in another domain, use the fully qualified form (e.g. `sales.generate_tagline`). This enforces `[exports]` visibility rules that were previously bypassable, and lets multiple domains safely reuse the same pipe code without library load failures.
+- **Automatic search scope for concepts (Breaking)**: Replaced the `search_domain_codes` list parameter across the public API (`PipelexMTHDSProtocol`, `pipeline_run_setup`, `prepare_pipe_job`, `InputShaper`, `WorkingMemoryFactory`, etc.) with a single `search_scope` string derived automatically from the entry pipe. Every entry-lookup refusal — invalid string, miss, ambiguity — is now raised as `ConceptLibraryConceptNotFoundError`, a class the input-shaping handlers catch.
+- **Fully qualified validation error payloads (Breaking)**: The `missing_pipe_code` field on unresolved-dependency validation items now returns the fully qualified reference the compiler attempted to resolve (e.g. `marketing.render_html`) rather than the bare spelling the author wrote.
+- **Ambiguity handling for bare code lookups**: Bare pipe codes typed by users (via `pipelex run`, `show`, `which`, or API requests) still search across all domains, but when two domains declare the same code the system now raises a clean ambiguity error listing the candidates instead of failing with a traceback.
+- **Per-domain scoping in `pipelex fix`**: Rename collisions in the fix loop are now scoped per-domain rather than crate-wide, so two same-named pipes in different domains rename independently without bailing.
+- **`PipeFunc` transports qualified references**: `PipeFunc` now transports the fully qualified `pipe_ref` to the executor instead of the bare code, preventing resolution failures in strict remote environments.
+- **Expanded agent quality gate**: `make agent-check` now includes `drift-check` and `check-hub-layering`, so open code↔docs drift contracts fail the local quality gate before reaching CI. The digest reads the git index, so stage changes for the gate to see them.
+
+### Fixed
+
+- **Verdict-neutral CLI lookup errors**: The `build` and `codegen` CLI commands no longer prepend a misleading "not found" verdict to stderr when a bare code is ambiguous; the prefix is now verdict-neutral.
+- **`Time` native conversion in `PipeCompose`**: `Time` and `Time[]` native concepts are now correctly converted to `datetime.time` and `list[datetime.time]` when copied into native-typed fields via `PipeCompose`.
+- **Batch sub-pipe code derivation**: Fixed `batch_over` synthesized pipes deriving their code from the qualified reference rather than the local code, which caused false-positive "namespace prefix" warnings on every batched run.
+
+### Removed
+
+- **`ConceptProviderAbstract.get_required_concept_from_concept_ref_or_code`**: Removed in favor of the new `get_required_entry_concept` method to standardize entry-point concept resolution.
 
 ## [v0.43.1] - 2026-08-12
 

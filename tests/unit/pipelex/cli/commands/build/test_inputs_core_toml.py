@@ -33,7 +33,7 @@ class TestGenerateInputsCoreToml:
         validate_result = SimpleNamespace(blueprints=[SimpleNamespace(main_pipe="bundle_main")])
         return {
             "validate_bundle": mocker.patch(f"{MODULE}.validate_bundle", new=mocker.AsyncMock(return_value=validate_result)),
-            "get_required_pipe": mocker.patch(f"{MODULE}.get_required_pipe", return_value=SimpleNamespace(code="bundle_main")),
+            "get_required_entry_pipe": mocker.patch(f"{MODULE}.get_required_entry_pipe", return_value=SimpleNamespace(code="bundle_main")),
             "render_inputs": mocker.patch(f"{MODULE}.render_inputs", return_value='{\n  "topic": "your topic"\n}'),
             "render_inputs_toml": mocker.patch(f"{MODULE}.render_inputs_toml", return_value=TOML_TEMPLATE),
         }

@@ -37,31 +37,91 @@ class TestPipeLibraryLookup:
         result = library.get_optional_pipe("wrong_domain.compute_score")
         assert result is None
 
-    # ── Bare code fallback ──────────────────────────────────────────
+    # ── In-body resolution is strict: no bare-code search ────────────
 
-    def test_bare_code_unambiguous(self, mocker: MockerFixture):
-        """Bare code lookup works when only one pipe has that code."""
+    def test_bare_code_does_not_resolve_in_body(self, mocker: MockerFixture):
+        """A bare code is not an in-body reference the library will chase across domains.
+
+        In-body refs arrive qualified, so a bare one reaching here is not a lookup to be helped along.
+        Searching for it is what let a pipe reach a pipe no `[exports]` rule had released.
+        """
         library = PipeLibrary.make_empty()
         mock_pipe = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
         library.root["scoring.compute_score"] = mock_pipe
-        result = library.get_optional_pipe("compute_score")
-        assert result is mock_pipe
-
-    def test_bare_code_ambiguous_raises(self, mocker: MockerFixture):
-        """Bare code lookup raises PipeLibraryError when multiple domains have the same code."""
-        library = PipeLibrary.make_empty()
-        pipe_scoring = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
-        pipe_analytics = _make_stub_pipe(mocker, code="compute_score", domain_code="analytics")
-        library.root["scoring.compute_score"] = pipe_scoring
-        library.root["analytics.compute_score"] = pipe_analytics
-        with pytest.raises(PipeLibraryError, match="Ambiguous pipe code"):
-            library.get_optional_pipe("compute_score")
+        assert library.get_optional_pipe("compute_score") is None
 
     def test_bare_code_no_match_returns_none(self):
         """Bare code lookup returns None when no pipe has that code."""
         library = PipeLibrary.make_empty()
         result = library.get_optional_pipe("nonexistent")
         assert result is None
+
+    # ── The entry affordance: a code a human typed ───────────────────
+
+    def test_entry_pipe_exact_ref_hits_directly(self, mocker: MockerFixture):
+        """A fully-qualified code goes straight through, no search."""
+        library = PipeLibrary.make_empty()
+        mock_pipe = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
+        library.root["scoring.compute_score"] = mock_pipe
+        assert library.get_optional_entry_pipe("scoring.compute_score") is mock_pipe
+
+    def test_entry_pipe_bare_code_matches_across_domains(self, mocker: MockerFixture):
+        """`pipelex run compute_score` keeps working: the user is pointing at a pipe, not writing a ref.
+
+        The library holds a second domain with a different code, so the search genuinely has to look
+        past a non-match in another domain rather than find the only pipe there is.
+        """
+        library = PipeLibrary.make_empty()
+        mock_pipe = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
+        library.root["scoring.compute_score"] = mock_pipe
+        library.root["analytics.summarize"] = _make_stub_pipe(mocker, code="summarize", domain_code="analytics")
+        assert library.get_optional_entry_pipe("compute_score") is mock_pipe
+
+    def test_entry_pipe_ambiguous_bare_code_raises(self, mocker: MockerFixture):
+        """Two domains declaring the code: refuse to guess, and name both so the user can pick."""
+        library = PipeLibrary.make_empty()
+        library.root["scoring.compute_score"] = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
+        library.root["analytics.compute_score"] = _make_stub_pipe(mocker, code="compute_score", domain_code="analytics")
+        with pytest.raises(PipeLibraryError, match="is ambiguous") as exc_info:
+            library.get_optional_entry_pipe("compute_score")
+        assert "analytics.compute_score" in str(exc_info.value)
+        assert "scoring.compute_score" in str(exc_info.value)
+
+    def test_entry_pipe_no_match_returns_none(self):
+        library = PipeLibrary.make_empty()
+        assert library.get_optional_entry_pipe("nonexistent") is None
+
+    def test_entry_pipe_required_raises_not_found(self):
+        library = PipeLibrary.make_empty()
+        with pytest.raises(PipeNotFoundError):
+            library.get_required_entry_pipe("nonexistent")
+
+    def test_entry_pipe_ignores_aliased_dependency_entries(self, mocker: MockerFixture):
+        """An installed package must not make a host pipe's bare code ambiguous.
+
+        Otherwise the entry affordance reintroduces, through its own door, exactly the contextual
+        instability the strict in-body rule removes: `pipelex run compute_score` would start failing
+        because someone added an unrelated dependency that happens to ship the same code.
+        """
+        library = PipeLibrary.make_empty()
+        host_pipe = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
+        library.root["scoring.compute_score"] = host_pipe
+        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="vendor"))
+
+        assert library.get_optional_entry_pipe("compute_score") is host_pipe
+
+    def test_entry_pipe_reaches_a_pipe_no_export_released(self, mocker: MockerFixture):
+        """The affordance deliberately does not consult `[exports]`.
+
+        Package visibility governs what one method may reference from inside another. A pipe someone
+        names by hand at an entry point is not an in-body reference, so the rule does not apply — and
+        the docstring says so, which is worth more with a test under it.
+        """
+        library = PipeLibrary.make_empty()
+        unexported = _make_stub_pipe(mocker, code="internal_helper", domain_code="scoring")
+        library.root["scoring.internal_helper"] = unexported
+
+        assert library.get_optional_entry_pipe("internal_helper") is unexported
 
     # ── Multi-domain coexistence ────────────────────────────────────
 

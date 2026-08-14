@@ -10,7 +10,7 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.interpreter_hub import get_required_pipe
+from pipelex.interpreter_hub import get_required_entry_pipe
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -38,7 +38,7 @@ class TestPipeSequenceSimple:
         # Create working memory with the required input for dry run
         working_memory = WorkingMemoryFactory.make_from_multiple_stuffs([raw_text_stuff])
 
-        pipe = get_required_pipe(pipe_code="simple_text_sequence")
+        pipe = get_required_entry_pipe(pipe_code="simple_text_sequence")
         pipe_output = await pipe.run_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,

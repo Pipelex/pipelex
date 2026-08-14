@@ -161,7 +161,10 @@ class SubPipe(BaseModel):
             pipe_batch_blueprint = PipeBatchBlueprint(
                 description=f"Batch processing for {self.pipe_code}",
                 branch_pipe_code=self.pipe_code,
-                output=sub_pipe.output.concept.code,
+                # The full concept_ref, not the bare code: the factory resolves a bare code in
+                # `domain_code` below (the sub-pipe's own domain), so a sub-pipe whose output concept
+                # lives in another domain would resolve to the wrong concept — or to nothing.
+                output=sub_pipe.output.concept.concept_ref,
                 input_list_name=batch_params.input_list_stuff_name,
                 input_item_name=batch_params.input_item_stuff_name,
                 inputs={
@@ -169,7 +172,10 @@ class SubPipe(BaseModel):
                 },
             )
 
-            pipe_batch_adhoc_pipe_code = f"{self.pipe_code}_batch"
+            # Derived from the resolved pipe's LOCAL code, not from `self.pipe_code` — that is a
+            # qualified ref (`domain.foo`), and suffixing it would name `domain.foo_batch` while
+            # `domain_code` below adds the domain a second time.
+            pipe_batch_adhoc_pipe_code = f"{sub_pipe.code}_batch"
             pipe_batch = PipeFactory[PipeBatch].make_from_blueprint(
                 domain_code=sub_pipe.domain_code,
                 pipe_code=pipe_batch_adhoc_pipe_code,

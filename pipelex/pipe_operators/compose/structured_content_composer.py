@@ -12,6 +12,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.time_content import TimeContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.kernel.compose_ops import build_compose_context
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint, ConstructFieldBlueprint, ConstructFieldMethod
@@ -25,12 +26,12 @@ from pipelex.tools.typing.annotation_utils import unwrap_optional
 from pipelex.tools.typing.class_utils import are_classes_equivalent
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
-NativeScalarValue: TypeAlias = str | float | int | bool | datetime.date
+NativeScalarValue: TypeAlias = str | float | int | bool | datetime.date | datetime.time
 """The native Python scalar types a content wrapper can be unwrapped into."""
 
 # The exact native scalar target types (no subclass matching: datetime is a date subclass
 # and bool is an int subclass, and neither cross-kind conversion is wanted).
-NATIVE_SCALAR_TARGET_TYPES: tuple[type[Any], ...] = (str, float, int, bool, datetime.date)
+NATIVE_SCALAR_TARGET_TYPES: tuple[type[Any], ...] = (str, float, int, bool, datetime.date, datetime.time)
 
 
 class NativeScalarExtraction(NamedTuple):
@@ -170,6 +171,7 @@ class StructuredContentComposer:
         - NumberContent -> float/int: extract .number
         - YesNoContent -> bool: extract .yes_no
         - DateContent -> date: extract .date
+        - TimeContent -> time: extract .time
         - any wrapper -> its own wrapper class/subclass: keep object
         - ListContent -> list[native scalar]: extract the scalar from each item
         - ListContent -> list[X]: extract items as dicts
@@ -327,8 +329,8 @@ class StructuredContentComposer:
 
         Central dispatcher for type-aware conversion. Native scalar wrappers are unwrapped
         first (TextContent -> str, NumberContent -> float/int, YesNoContent -> bool,
-        DateContent -> date) when the target expects the native type; otherwise routes to
-        specific conversion methods based on content type.
+        DateContent -> date, TimeContent -> time) when the target expects the native type;
+        otherwise routes to specific conversion methods based on content type.
 
         Args:
             stuff_content: The content to convert
@@ -388,6 +390,12 @@ class StructuredContentComposer:
         - DateContent -> date (exactly, never datetime, a date subclass): extract .date,
           but only when the Date carries no time of day — truncating a timestamped Date
           to a bare date would silently drop the time and its UTC offset, so it raises
+        - TimeContent -> time (exactly): extract .time, with no fidelity guard — unlike the
+          Date bullet above, the copy is lossless: a TimeContent holds exactly one field and
+          its UTC offset rides inside the time's own tzinfo, so there is nothing to drop
+
+        A whole Date deliberately does not convert into a bare `time` field: that would drop
+        the date. The authored route to that value is the dotted path, e.g. `from = "deadline.time"`.
 
         A wrapper-typed target (e.g. a NumberContent field) deliberately does not match here:
         it is handled by the generic StuffContent conversion path so the object is kept.
@@ -423,6 +431,9 @@ class StructuredContentComposer:
                     )
                     raise StructuredContentComposerTypeError(msg)
                 return NativeScalarExtraction(matched=True, value=stuff_content.date)
+        elif isinstance(stuff_content, TimeContent):
+            if expected_type is datetime.time:
+                return NativeScalarExtraction(matched=True, value=stuff_content.time)
         return NativeScalarExtraction(matched=False, value=None)
 
     def _convert_list_content(
@@ -619,7 +630,7 @@ class StructuredContentComposer:
     def _convert_list_items_as_scalars(self, *, items: list[StuffContent], expected_item_type: type[Any]) -> list[NativeScalarValue]:
         """Extract native scalar values from list item wrappers.
 
-        Used when target is list[X] with X a native scalar type (str/float/int/bool/date):
+        Used when target is list[X] with X a native scalar type (str/float/int/bool/date/time):
         each item wrapper is unwrapped to its scalar value (e.g. TextContent -> str).
 
         Args:

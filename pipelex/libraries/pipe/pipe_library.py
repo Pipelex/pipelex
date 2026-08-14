@@ -54,12 +54,27 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
 
     @override
     def get_optional_pipe(self, pipe_code: str) -> PipeAbstract | None:
+        """Resolve an **in-body** pipe reference: a ref names its own domain, or it names nothing.
+
+        In-body refs arrive here already qualified — `crate_qualification.qualify_crate` runs on
+        every crate-to-pipes path before pipes are built — so this is a key lookup. There is
+        deliberately no bare-code search across domains: a reference that can find a pipe in a
+        domain its author never named is a reference `[exports]` cannot constrain, and a visibility
+        rule the resolver reaches around is not a visibility rule.
+
+        A code a *human* typed is a different question and gets a different answer — see
+        `get_optional_entry_pipe`.
+        """
         # 1. Direct lookup — handles pipe_ref keys (domain.code) and cross-package keys (alias->domain.code)
         pipe = self.root.get(pipe_code)
         if pipe is not None:
             return pipe
 
-        # 2. Cross-package refs
+        # 2. Cross-package refs. The bare-remainder search below survives the strictness change on
+        # purpose (OQ3): the qualification pass leaves `alias->…` refs alone — it cannot know the
+        # dependency's domain layout — so removing it would break every `alias->bare_code` ref with
+        # no canonical spelling to migrate to. It is alias-scoped, so it cannot reach a host pipe;
+        # revisit when the packaging design rules on cross-package reference forms.
         if QualifiedRef.has_cross_package_prefix(pipe_code):
             alias, remainder = QualifiedRef.split_cross_package_ref(pipe_code)
             # Try domain-qualified remainder as direct key
@@ -78,21 +93,53 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
                     raise PipeLibraryError(msg)
             return None
 
-        # 3. Bare code fallback — search across domains (excluding cross-package entries)
-        # TODO: add domain_hint parameter so controllers can prefer their own domain when bare code is ambiguous.
-        # Currently, controllers resolve sub-pipes by bare code; if two domains share a pipe code the lookup
-        # raises PipeLibraryError instead of preferring the caller's domain. See PR #779 review.
-        if "." not in pipe_code:
-            matches = [val for key, val in self.root.items() if not QualifiedRef.has_cross_package_prefix(key) and val.code == pipe_code]
-            if len(matches) == 1:
-                return matches[0]
-            if len(matches) > 1:
-                domains = [match.domain_code for match in matches]
-                msg = f"Ambiguous pipe code '{pipe_code}' found in domains: {domains}. Use domain-qualified ref."
-                raise PipeLibraryError(msg)
+        return None
+
+    @override
+    def get_optional_entry_pipe(self, pipe_code: str) -> PipeAbstract | None:
+        """Resolve a pipe code a **human** supplied — a CLI argument, an API request field.
+
+        This is an entry-shaped lookup, not in-body reference resolution, and the two differ on
+        purpose. `pipelex run summarize` should keep working without making the user recite a domain
+        they can see in their own file, so a bare code here is matched across every domain the
+        library holds. An ambiguous bare code raises rather than picking a winner.
+
+        It deliberately does **not** consult `[exports]`. Package visibility governs what one method
+        may reference from inside another; a pipe someone names by hand at an entry point is not an
+        in-body reference, so the rule does not apply to it.
+
+        Aliased dependency entries are excluded from the search. Without that, installing an
+        unrelated package could make a host pipe's bare code ambiguous — reintroducing, through this
+        door, exactly the contextual instability the strict in-body rule exists to remove.
+        """
+        pipe = self.get_optional_pipe(pipe_code=pipe_code)
+        if pipe is not None:
+            return pipe
+
+        # Anything dotted or aliased was fully specified and simply did not resolve; only a bare code
+        # is a request to search.
+        if "." in pipe_code or QualifiedRef.has_cross_package_prefix(pipe_code):
             return None
 
+        matches = [val for key, val in self.root.items() if not QualifiedRef.has_cross_package_prefix(key) and val.code == pipe_code]
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            candidates = sorted(match.pipe_ref for match in matches)
+            msg = f"Pipe code '{pipe_code}' is ambiguous — it is declared by {candidates}. Name one of them explicitly."
+            raise PipeLibraryError(msg)
         return None
+
+    @override
+    def get_required_entry_pipe(self, pipe_code: str) -> PipeAbstract:
+        the_pipe = self.get_optional_entry_pipe(pipe_code=pipe_code)
+        if not the_pipe:
+            msg = (
+                f"Pipe '{pipe_code}' could not be resolved. Check for typos and make sure its bundle is loaded. "
+                "A bare code only matches this library's own domains — a pipe from a dependency package must be named 'alias->pipe_code'."
+            )
+            raise PipeNotFoundError(msg)
+        return the_pipe
 
     def add_dependency_pipe(self, *, alias: str, pipe: PipeAbstract) -> None:
         """Add a pipe from a dependency package with an aliased key.

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.interpreter_hub import clear_current_library, get_library_manager, get_required_pipe, set_current_library
+from pipelex.interpreter_hub import clear_current_library, get_library_manager, get_required_entry_pipe, set_current_library
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
@@ -100,7 +100,7 @@ def pipe_job_from_library(
     try:
         load_fn(library_id)
 
-        pipe = get_required_pipe(pipe_code=pipe_code)
+        pipe = get_required_entry_pipe(pipe_code=pipe_code)
         library_crate = library_manager.get_crate(library_id=library_id)
         pipe_job = build_pipe_job(pipe=pipe, library_crate=library_crate, pipe_run_mode=pipe_run_mode, pipeline_run_id=pipeline_run_id)
         if working_memory_builder is not None:

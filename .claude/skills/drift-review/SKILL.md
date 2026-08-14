@@ -2,8 +2,9 @@
 name: drift-review
 description: >
   Resolve open drift contracts — the review obligations between code and docs
-  declared in drift.toml. Use whenever `make drift-check` (or the `make check`
-  aggregate, or the CI lint-drift job) fails with open contracts, when the user
+  declared in drift.toml. Use whenever `make drift-check` (or the `make
+  agent-check` / `make check` aggregates, or the CI lint-drift job) fails with
+  open contracts, when the user
   says "drift check failed", "resolve the drift contract", "ack the drift",
   "run drift plan", or after any change that touches drift trigger files (the
   config model / pipelex.toml, CLI code, the keyword-only guard). Also use when

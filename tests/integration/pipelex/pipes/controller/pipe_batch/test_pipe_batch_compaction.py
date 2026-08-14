@@ -70,7 +70,7 @@ def _build_compacting_batch() -> PipeBatch:
             inputs={"item": "Text"},
             output="Text?",
             expression_template="{% if item.text.startswith('good') %}keep{% else %}reject{% endif %}",
-            outcomes={"keep": "opt_batch_shout"},
+            outcomes={"keep": "test_optionals_batch.opt_batch_shout"},
             default_outcome=SpecialOutcome.CONTINUE,
         ),
     )
@@ -83,7 +83,7 @@ def _build_compacting_batch() -> PipeBatch:
         pipe_code="opt_batch_compact",
         blueprint=PipeBatchBlueprint(
             description="Batch the gate over the items",
-            branch_pipe_code="opt_batch_gate",
+            branch_pipe_code="test_optionals_batch.opt_batch_gate",
             output="Text",
             input_list_name="items",
             input_item_name="item",

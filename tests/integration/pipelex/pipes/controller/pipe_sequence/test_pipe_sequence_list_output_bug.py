@@ -13,7 +13,7 @@ from typing import ClassVar
 
 import pytest
 
-from pipelex.interpreter_hub import get_current_library, get_required_pipe
+from pipelex.interpreter_hub import get_current_library, get_required_entry_pipe
 from pipelex.pipeline.bundle_validator import BundleValidator
 from pipelex.pipeline.validate_bundle import validate_bundle
 
@@ -99,7 +99,7 @@ class TestPipeSequenceListOutputBug:
             assert len(result.pipes) > 0
 
             # Get the main sequence pipe (without domain prefix since it's loaded into the library)
-            main_sequence = get_required_pipe("main_sequence")
+            main_sequence = get_required_entry_pipe("main_sequence")
 
             # Run dry run - this should NOT fail
             # BUG: Currently fails with "Content of 'items' is of type 'Item', it should be 'ListContent'"
@@ -128,7 +128,7 @@ class TestPipeSequenceListOutputBug:
             )
 
             # Get the generate_items pipe (without domain prefix since it's loaded into the library)
-            generate_items_pipe = get_required_pipe("generate_items")
+            generate_items_pipe = get_required_entry_pipe("generate_items")
 
             # Verify the pipe has the correct output multiplicity
             assert generate_items_pipe.output.multiplicity is True, (
@@ -267,7 +267,7 @@ class TestNestedPipeSequenceListOutputBug:
             assert len(result.pipes) > 0
 
             # Get the main sequence pipe
-            main_sequence = get_required_pipe("generate_expense_dataset")
+            main_sequence = get_required_entry_pipe("generate_expense_dataset")
 
             # Run dry run - this should NOT fail
             # BUG: Currently may fail with "Content of 'expenses' is of type 'Expense', it should be 'ListContent'"
@@ -292,7 +292,7 @@ class TestNestedPipeSequenceListOutputBug:
             )
 
             # Get the inner sequence pipe
-            inner_sequence = get_required_pipe("generate_employee_report")
+            inner_sequence = get_required_entry_pipe("generate_employee_report")
 
             # Run dry run on the inner sequence
             dry_run_results = await BundleValidator().validate_pipes([inner_sequence], library_id=get_current_library())

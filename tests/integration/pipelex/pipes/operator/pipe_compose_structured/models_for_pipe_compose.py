@@ -1,6 +1,6 @@
 """Test StructuredContent models for PipeCompose construct testing."""
 
-from datetime import date
+from datetime import date, time
 
 from pydantic import Field
 
@@ -337,7 +337,8 @@ class DocumentBundle(StructuredContent):
 # Models for native scalar conversion testing
 # These test whole-stuff copies into native-typed fields: the content wrapper
 # must be unwrapped to the native value (TextContent -> str, NumberContent -> float,
-# YesNoContent -> bool, DateContent -> date), including into Optional fields.
+# YesNoContent -> bool, DateContent -> date, TimeContent -> time), including into
+# Optional fields.
 # ============================================================================
 
 
@@ -381,3 +382,15 @@ class DeadlineHolder(StructuredContent):
     """Holder with a date field - should receive DateContent.date extracted."""
 
     deadline: date = Field(description="The deadline date")
+
+
+class StartTimeHolder(StructuredContent):
+    """Holder with a time field - should receive TimeContent.time extracted, UTC offset included."""
+
+    start: time = Field(description="The start time of day")
+
+
+class SlotTimesHolder(StructuredContent):
+    """Holder with a required list[time] field - should receive item times extracted."""
+
+    slots: list[time] = Field(description="The slot times")

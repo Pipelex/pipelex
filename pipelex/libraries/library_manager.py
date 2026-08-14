@@ -28,6 +28,7 @@ from pipelex.interpreter_hub import get_current_library, get_current_library_id_
 from pipelex.libraries.collision_messages import duplicate_ref_msg
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.concept_reference_validation import validate_concept_references_in_blueprints
+from pipelex.libraries.crate_qualification import qualify_crate
 from pipelex.libraries.exceptions import (
     LibraryError,
     LibraryLoadingError,
@@ -446,13 +447,11 @@ class LibraryManager(LibraryManagerAbstract):
             # Detect cycles in concept references (A -> B -> A is forbidden)
             self._detect_concept_cycles(all_concepts)
 
-            # Precompute domain -> concept local codes mapping (avoids O(N*M) re-parsing per pipe).
-            # Sourced from the LIVE library (native concepts + concepts from prior load batches + this
-            # batch's concepts, already added above), not just this crate — so a pipe can reference, by
-            # bare code, a same-domain concept that a prior batch (e.g. a -L library directory) loaded.
-            # This is the pipe-factory counterpart to the loader's cross-batch concept-reference check:
-            # without it, that check would pass a bare cross-batch ref only for the factory to reject
-            # it. Cross-package aliased entries ('alias->...') are skipped — they resolve through the
+            # Precompute domain -> concept local codes mapping. VESTIGIAL on this path — see the note
+            # on the qualification pass below: every io ref reaching PipeFactory is dotted, and the
+            # factory only consults this parameter for dot-free refs. Kept until the PipeFactory
+            # signature change that removes it (deferred with the concept-side work).
+            # Cross-package aliased entries ('alias->...') are skipped — they resolve through the
             # dependency resolver, not by bare code, and would not parse as a concept ref.
             domain_concept_codes: dict[str, list[str]] = {}
             for concept_ref in library.concept_library.root:
@@ -462,9 +461,21 @@ class LibraryManager(LibraryManagerAbstract):
                 if parsed_concept.domain_path is not None:
                     domain_concept_codes.setdefault(parsed_concept.domain_path, []).append(parsed_concept.local_code)
 
+            # Qualify in-body refs before constructing pipes, so a built pipe's sub-pipe refs are the
+            # same qualified refs the normalizer would produce — one rule, stated once, read by both.
+            #
+            # Note what this does to `concept_codes_from_the_same_domain` below: the pass also rewrites
+            # each pipe's inputs/output into `domain.Code` form, and PipeFactory only runs its
+            # declared-in-this-domain check for refs with NO dot — so on this path that parameter is
+            # now never consulted. Nothing is lost: an undeclared same-domain concept is still caught,
+            # earlier, by `validate_concept_references_in_blueprints`, which runs on the blueprints
+            # before this. The parameter is vestigial here rather than load-bearing; removing it is a
+            # signature change across PipeFactory and belongs with the concept-side work.
+            qualified_pipes = qualify_crate(crate).pipes
+
             # Load pipes with domain-filtered concept codes
             all_pipes: list[PipeAbstract] = []
-            for pipe_ref, pipe_blueprint in crate.pipes.items():
+            for pipe_ref, pipe_blueprint in qualified_pipes.items():
                 parsed = QualifiedRef.parse_pipe_ref(raw=pipe_ref)
                 if parsed.domain_path is None:
                     msg = f"Crate pipe_ref '{pipe_ref}' must be domain-qualified"
@@ -1032,8 +1043,10 @@ class LibraryManager(LibraryManagerAbstract):
                 library.concept_library.add_new_concept(concept=concept)
                 temp_concept_refs.append(concept.concept_ref)
 
-        # Per-domain concept codes let a pipe resolve a same-domain concept by bare code, mirroring
-        # load_from_crate. A multi-file dependency may span several domains.
+        # Per-domain concept codes, mirroring load_from_crate — and VESTIGIAL for the same reason:
+        # the qualification pass below rewrites every io ref to dotted form, and PipeFactory only
+        # consults this parameter for dot-free refs. Kept until the deferred PipeFactory signature
+        # change removes it on both paths together.
         domain_concept_codes: dict[str, list[str]] = {}
         for concept in dep_concepts:
             parsed_concept = QualifiedRef.parse_concept_ref(raw=concept.concept_ref)
@@ -1043,7 +1056,12 @@ class LibraryManager(LibraryManagerAbstract):
         # Load exported pipes (reconciled by the crate) into child library, ensuring temp concepts
         # are always cleaned up even if an unexpected exception occurs
         try:
-            for pipe_ref, pipe_blueprint in crate.pipes.items():
+            # Same qualification the main load path applies: a dependency package's own in-body refs
+            # are its own domain's, and its child library is keyed by qualified pipe_ref. Inside the
+            # try: qualification can raise on malformed refs, and the temp concepts must still be
+            # removed from the main library.
+            qualified_dep_pipes = qualify_crate(crate).pipes
+            for pipe_ref, pipe_blueprint in qualified_dep_pipes.items():
                 parsed_pipe = QualifiedRef.parse_pipe_ref(raw=pipe_ref)
                 if parsed_pipe.domain_path is None:
                     msg = f"Crate pipe_ref '{pipe_ref}' must be domain-qualified"
