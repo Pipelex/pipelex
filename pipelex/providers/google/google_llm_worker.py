@@ -1,5 +1,5 @@
 import asyncio
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, ClassVar, cast
 
 import httpx
 from google.genai import errors as genai_errors
@@ -36,6 +36,9 @@ if TYPE_CHECKING:
 
 
 class GoogleLLMWorker(LLMWorkerAbstract):
+    # Key into cogt.llm_config.effort_to_budget_maps for manual-thinking budget resolution
+    reasoning_budget_family: ClassVar[str] = "gemini"
+
     def __init__(
         self,
         sdk_instance: GoogleGenAiClient,
@@ -146,12 +149,8 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 if google_level is None:
                     log.verbose("Google manual thinking disabled (effort mapped to disabled)")
                     return genai_types.ThinkingConfig(thinking_budget=0)
-                prompting_target = self.inference_model.prompting_target
-                if prompting_target is None:
-                    msg = f"Model '{self.inference_model.desc}' has no prompting_target configured, cannot resolve reasoning budget"
-                    raise LLMCapabilityError(msg)
                 budget = get_config().cogt.llm_config.get_reasoning_budget(
-                    prompting_target=prompting_target,
+                    family=self.reasoning_budget_family,
                     effort=effort,
                 )
                 if max_tokens is not None:

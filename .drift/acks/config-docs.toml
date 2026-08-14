@@ -1,11 +1,11 @@
 contract = "config-docs"
-digest = "sha256:6559e8b12f68cc9b7edbb82cfcb78191add1fa8a555e58552a731d40da7ce4a1"
+digest = "sha256:36a93110fbe851cf69dfff621b8692306d6ec837d5b328b38b2aa8db9539e031"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-07-30T06:58:11Z"
-rationale = "Trigger is a docstring-only correction in config_loader.load_config: the config_dir Args entry still said 'project/global layering is bypassed and only this directory is read', which contradicts the same docstring's own summary six lines above and the body at line 313, where list_of_configs is seeded unconditionally with the package pipelex.toml. It is the exact wording this branch already corrected one file over in RuntimeHub.setup_config, and the sibling was missed. No config field, default, validator, TOML key, section name or loading behaviour changed — only prose. Reviewed docs/configuration/ against it: grepped every page for config_dir, 'only this directory', layering and --global. config_dir is not a user-facing concept and appears nowhere; the one layering hit (config-practical/telemetry-config.md:39) is about global-vs-project TOML precedence and is unaffected and correct. configuration/index.md:64-71 documents the default loading sequence and its step 1 ('Base configuration from the installed Pipelex package') is precisely the package-defaults-always-apply fact the corrected docstring now states, so the page already agreed with the truth the docstring was contradicting. Nothing to update."
+reviewed_at = "2026-08-14T09:01:59Z"
+rationale = "Trigger is Phase 0 of the templating-style plan: LLMConfig.get_reasoning_budget lost its positional prompting_target subject and is now keyed by a keyword-only reasoning family that each worker owns as a class attribute; two error strings reworded accordingly. Reviewed docs/configuration/: no page mentions get_reasoning_budget or effort_to_budget_maps; the single prompting_target hit (inference-backend-config.md default_prompting_target example) belongs to the untouched style path, slated for deletion in Phase 3/4 of the same plan. The budget-map documentation lives in docs/under-the-hood/reasoning-controls.md and was updated in this same change. No configuration doc change needed."
 
 [trigger_files]
-"pipelex/cogt/config_cogt.py" = "blob:3c10f6a2b809e38b9a1112ce24ffb8ea4c32b04b"
+"pipelex/cogt/config_cogt.py" = "blob:ee1ee2d0c1474dcef5e07690268de37ae3ff0987"
 "pipelex/cogt/img_gen/img_gen_job_components.py" = "blob:084985080413fd8d6c3b1b9b0747020cb0161858"
 "pipelex/pipelex.toml" = "blob:e646e431b5db2e467bc962b738be7bc9f3b3ffb8"
 "pipelex/system/configuration/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"

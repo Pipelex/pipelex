@@ -19,7 +19,7 @@ These follow from "one name everywhere" but were not explicitly ruled; they are 
 
 The worktree carries doc-migration changes from the design session: `pipelex/kernel/pipelex_kernel.py` (docstring pointer re-aimed at the new design-doc filename), the `wip/prompting-style/` README deletion + design doc, the `wip/keyless/` brief and plan, and `wip/parity/` updates. Plus this plan and the design doc's §7 ruling record.
 
-- [ ] Commit the standing wip/doc baseline as its own commit before Phase 0 code begins, so each phase's diff is reviewable on its own. (Needs Louis' go — commits happen at checkpoints or on request.)
+- [x] Commit the standing wip/doc baseline as its own commit before Phase 0 code begins, so each phase's diff is reviewable on its own. — Already done before this session: the branch-tip commit "plans" carries exactly that baseline (kernel docstring pointer, wip/prompting-style, wip/keyless, wip/parity).
 
 ## Phase map
 
@@ -45,13 +45,13 @@ The worktree carries doc-migration changes from the design session: `pipelex/ker
 
 Goal: no code reads `inference_model.prompting_target` for thinking budgets; each worker supplies its own family key. Pure re-homing — the style path is untouched, `prompting_target` still exists everywhere else. Independently shippable.
 
-- [ ] **Tests first (red):** in `tests/unit/pipelex/providers/google/test_google_reasoning.py`, rewrite `_make_worker` so the mock model spec has **no** `prompting_target` and the budget tests still pass once the worker owns its key; add the missing twin coverage for the Anthropic worker's manual-thinking budget resolution (today its budget branch has no test at all).
-- [ ] Give each worker its own key: a `ClassVar` on the worker class — `"anthropic"` on `AnthropicLLMWorker`, `"gemini"` on `GoogleLLMWorker` — read where `providers/anthropic/anthropic_llm_worker.py:180-188` and `providers/google/google_llm_worker.py:149-158` currently read `self.inference_model.prompting_target`.
-- [ ] Delete both `prompting_target is None → LLMCapabilityError` raise sites (the "has no prompting_target configured" branches) — unreachable once the key is worker-owned. The `LLMCapabilityError` class survives (other users).
-- [ ] Rename the concept in `pipelex/cogt/config_cogt.py`: `get_reasoning_budget(self, prompting_target, *, effort)` becomes fully keyword-only `get_reasoning_budget(*, family: str, effort: ReasoningEffort)`; update the two error message strings; delete the now-dead subject grant for it in `subject_grants.toml` (preserving sort order). `effort_to_budget_maps` keeps its name and its TOML keys (`anthropic`, `gemini`) — only the lookup parameter stops borrowing the word "prompting".
-- [ ] Update `tests/unit/pipelex/cogt/llm/test_llm_config_reasoning.py` for the new signature.
-- [ ] Docs in the same change: `docs/under-the-hood/reasoning-controls.md` — both "keyed by `prompting_target`" passages now describe the worker-owned key.
-- [ ] Gates: targeted pytest for the touched tests, then stage everything and `make agent-check` (the `config-docs` drift contract fires → review `docs/configuration/**` for real, then `make drift-ack CONTRACT=config-docs RATIONALE="…"`), then full `make agent-test`.
+- [x] **Tests first (red):** in `tests/unit/pipelex/providers/google/test_google_reasoning.py`, rewrite `_make_worker` so the mock model spec has **no** `prompting_target` and the budget tests still pass once the worker owns its key; add the missing twin coverage for the Anthropic worker's manual-thinking budget resolution (today its budget branch has no test at all). — Done: `del mock_model.prompting_target` proves the spec is never read; new `tests/unit/pipelex/providers/anthropic/test_anthropic_reasoning.py` covers the manual budget branch, NONE gating, cap, explicit passthrough, and thinking_mode=none raise; both budget tests assert the lookup is keyed `family="anthropic"`/`"gemini"`. Confirmed red before implementation (14 failed), green after.
+- [x] Give each worker its own key: a `ClassVar` on the worker class — `reasoning_budget_family = "anthropic"` on `AnthropicLLMWorker`, `"gemini"` on `GoogleLLMWorker` — read where the workers previously read `self.inference_model.prompting_target`.
+- [x] Delete both `prompting_target is None → LLMCapabilityError` raise sites (the "has no prompting_target configured" branches) — unreachable once the key is worker-owned. The `LLMCapabilityError` class survives (other users).
+- [x] Rename the concept in `pipelex/cogt/config_cogt.py`: `get_reasoning_budget(self, prompting_target, *, effort)` becomes fully keyword-only `get_reasoning_budget(*, family: str, effort: ReasoningEffort)`; update the two error message strings; delete the now-dead subject grant for it in `subject_grants.toml` (preserving sort order). `effort_to_budget_maps` keeps its name and its TOML keys (`anthropic`, `gemini`) — only the lookup parameter stops borrowing the word "prompting".
+- [x] Update `tests/unit/pipelex/cogt/llm/test_llm_config_reasoning.py` for the new signature.
+- [x] Docs in the same change: `docs/under-the-hood/reasoning-controls.md` — both "keyed by `prompting_target`" passages now describe the worker-owned key.
+- [x] Gates: targeted pytest green (64 passed), `make agent-check` green after honest acks of `config-docs` (no configuration page mentions the budget lookup; the one `prompting_target` hit is the style path, Phase 3/4 scope) and `pipelex-kernel-docs` (trigger was the baseline commit's docstring pointer re-aim; kernel page references no wip paths and still describes today's code). Full `make agent-test` green — see Checkpoint 1 log.
 
 ### ✋ CHECKPOINT 1 — HARD STOP
 
@@ -178,6 +178,6 @@ Everything is green and documented; nothing is committed beyond what earlier che
 
 *(Filled in as checkpoints are reached: status of completed phases, decisions taken, open questions, state of the code.)*
 
-- **Checkpoint 1:** —
+- **Checkpoint 1:** *(2026-08-14)* Phase 0 complete. Reasoning-budget resolution is re-homed off `prompting_target`: each worker owns a `reasoning_budget_family` ClassVar (`"anthropic"` on the Anthropic worker, `"gemini"` on the Google worker) and `LLMConfig.get_reasoning_budget` is fully keyword-only with a `family` parameter (its subject grant removed from `subject_grants.toml`). TDD red→green: new twin Anthropic reasoning test module + updated Google/config tests landed red first, went green with the implementation; the tests `del mock_model.prompting_target` so any spec read would raise — this stays valid after Phase 3 deletes the field. `effort_to_budget_maps` TOML keys unchanged. Docs updated (`docs/under-the-hood/reasoning-controls.md`). Gates: `make agent-check` green (two drift contracts honestly reviewed and acked: config-docs, pipelex-kernel-docs); full `make agent-test` green. Verified exit criterion: `prompting_target`'s only remaining consumers are the style path (configs.py `get_prompting_style`, llm_setting.py, model_spec + factory, kernel/llm_ops.py derive path) — Phases 1–3 scope. State: committed standalone on `fix/Keyless-dry-run` (commit "Phase 0 — re-home reasoning budgets off prompting_target"). Open questions: none. Louis' go received 2026-08-14 → Phase 1 underway.
 - **Checkpoint 2:** —
 - **Checkpoint 3:** —

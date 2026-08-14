@@ -228,7 +228,7 @@ Both modes first check `anthropic_config.effort_to_level_map` to gate reasoning.
 
 **ADAPTIVE mode** uses `{"type": "adaptive"}` with an `OutputConfigParam(effort=...)` where the effort value comes from the level map.
 
-**MANUAL mode** resolves effort to a token budget via the `effort_to_budget_maps` config (keyed by `prompting_target`), then sends `{"type": "enabled", "budget_tokens": N}`. The budget is capped to `min(budget, max_tokens - 1)` to satisfy Anthropic's API constraint.
+**MANUAL mode** resolves effort to a token budget via the `effort_to_budget_maps` config (keyed by the worker-owned reasoning family — `"anthropic"` for the Anthropic worker), then sends `{"type": "enabled", "budget_tokens": N}`. The budget is capped to `min(budget, max_tokens - 1)` to satisfy Anthropic's API constraint.
 
 **`reasoning_budget`** (explicit) always uses `{"type": "enabled", "budget_tokens": N}` regardless of thinking mode. The same `min(budget, max_tokens - 1)` cap is applied.
 
@@ -360,7 +360,7 @@ xhigh = 32768
 max = 65536
 ```
 
-The map is keyed by `prompting_target` (from the model spec). A validated mapping must contain entries for all `ReasoningEffort` values (including `none`, even though it is unreachable at runtime — the level map gates `NONE` as disabled before the budget lookup).
+The map is keyed by the reasoning family each worker owns (`reasoning_budget_family`, a class attribute: `"anthropic"` on the Anthropic worker, `"gemini"` on the Google worker) — the model spec plays no part in the lookup. A validated mapping must contain entries for all `ReasoningEffort` values (including `none`, even though it is unreachable at runtime — the level map gates `NONE` as disabled before the budget lookup).
 
 The budget is resolved at runtime via `LLMConfig.get_reasoning_budget()` (`pipelex/cogt/config_cogt.py`).
 

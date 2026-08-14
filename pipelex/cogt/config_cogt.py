@@ -93,14 +93,14 @@ class LLMConfig(ConfigModel):
             raise LLMConfigError(msg)
         return template
 
-    def get_reasoning_budget(self, prompting_target: str, *, effort: ReasoningEffort) -> int:
-        effort_to_budget_map = self.effort_to_budget_maps.get(prompting_target)
+    def get_reasoning_budget(self, *, family: str, effort: ReasoningEffort) -> int:
+        effort_to_budget_map = self.effort_to_budget_maps.get(family)
         if not effort_to_budget_map:
-            msg = f"No effort-to-budget map found for prompting target '{prompting_target}'"
+            msg = f"No effort-to-budget map found for reasoning family '{family}'"
             raise ConfigValidationError(msg)
         budget = effort_to_budget_map.get(effort)
         if budget is None:
-            msg = f"No budget found for reasoning effort '{effort}' and prompting target '{prompting_target}'"
+            msg = f"No budget found for reasoning effort '{effort}' and reasoning family '{family}'"
             raise ConfigValidationError(msg)
         return budget
 

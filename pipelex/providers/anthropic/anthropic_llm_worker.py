@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from anthropic import (
     APIConnectionError,
@@ -58,6 +58,9 @@ class _ThinkingParams:
 
 
 class AnthropicLLMWorker(LLMWorkerAbstract):
+    # Key into cogt.llm_config.effort_to_budget_maps for manual-thinking budget resolution
+    reasoning_budget_family: ClassVar[str] = "anthropic"
+
     def __init__(
         self,
         sdk_instance: Any,
@@ -177,12 +180,8 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                         output_config=None,
                         suppress_temperature=False,
                     )
-                prompting_target = self.inference_model.prompting_target
-                if prompting_target is None:
-                    msg = f"Model '{self.inference_model.desc}' has no prompting_target configured, cannot resolve reasoning budget"
-                    raise LLMCapabilityError(msg)
                 budget = get_config().cogt.llm_config.get_reasoning_budget(
-                    prompting_target=prompting_target,
+                    family=self.reasoning_budget_family,
                     effort=effort,
                 )
                 safe_budget = min(budget, max_tokens - 1)

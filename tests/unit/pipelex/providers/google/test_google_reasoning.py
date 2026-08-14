@@ -19,13 +19,13 @@ _GOOGLE_LEVEL_MAP: dict[str, str] = {
 }
 
 
-def _make_worker(mocker: MockerFixture, thinking_mode: ThinkingMode, prompting_target: str = "gemini") -> GoogleLLMWorker:
+def _make_worker(mocker: MockerFixture, thinking_mode: ThinkingMode) -> GoogleLLMWorker:
     """Create a minimal GoogleLLMWorker with a mocked inference_model."""
     worker = object.__new__(GoogleLLMWorker)
     mock_model = mocker.MagicMock()
     mock_model.thinking_mode = thinking_mode
-    mock_model.prompting_target = prompting_target
     mock_model.desc = "test-model"
+    del mock_model.prompting_target  # budget resolution is worker-owned; reading the model spec for it would raise
     worker.inference_model = mock_model
     return worker
 
@@ -65,15 +65,16 @@ class TestGoogleReasoning:
         effort: ReasoningEffort,
         expected_budget: int,
     ):
-        """MANUAL mode maps each non-NONE ReasoningEffort to the correct thinking_budget."""
+        """MANUAL mode maps each non-NONE ReasoningEffort to the correct thinking_budget, keyed by the worker-owned family."""
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
         google_config = GoogleConfig(effort_to_level_map=_GOOGLE_LEVEL_MAP)
+        budget_mock = mocker.MagicMock(return_value=expected_budget)
         mocker.patch(
             "pipelex.providers.google.google_llm_worker.get_config",
             return_value=mocker.MagicMock(
                 cogt=mocker.MagicMock(
                     llm_config=mocker.MagicMock(
-                        get_reasoning_budget=mocker.MagicMock(return_value=expected_budget),
+                        get_reasoning_budget=budget_mock,
                         google_config=google_config,
                     ),
                 ),
@@ -83,6 +84,7 @@ class TestGoogleReasoning:
         result = worker._build_thinking_config(job_params=job_params, max_tokens=100000)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
         assert result is not None
         assert result.thinking_budget == expected_budget
+        budget_mock.assert_called_once_with(family="gemini", effort=effort)
 
     @pytest.mark.parametrize(
         ("effort", "expected_level"),

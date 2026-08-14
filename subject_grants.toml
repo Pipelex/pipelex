@@ -1244,10 +1244,6 @@ rationale = "Parser: the text is the operand; comment_prefix is context."
 param = "model_name"
 rationale = "Keyed accessor by the model_name; single operand."
 
-["pipelex/cogt/config_cogt.py::LLMConfig.get_reasoning_budget"]
-param = "prompting_target"
-rationale = "Keyed accessor by the prompting_target; single operand."
-
 ["pipelex/cogt/config_cogt.py::LLMConfig.get_template"]
 param = "template_name"
 rationale = "Keyed accessor by the template_name; single operand."
