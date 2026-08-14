@@ -20,7 +20,12 @@ from pipelex.interpreter_hub import get_native_concept
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
 from pipelex.pipe_operators.compose.exceptions import StructuredContentComposerValidationError, StructuredContentComposerValueError
 from pipelex.pipe_operators.compose.structured_content_composer import StructuredContentComposer
+from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
+
+# Explicit rather than resolved: these are unit tests over the assembly itself, so the style they
+# render under is stated here instead of read out of config.
+_TEMPLATING_STYLE = TemplatingStyle(tag_style=TagStyle.XML)
 
 
 # Test StructuredContent classes for testing
@@ -112,6 +117,7 @@ class TestStructuredContentComposerFixedValues:
         working_memory = WorkingMemory()
 
         composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory,
             output_class=SimpleReport,
@@ -147,6 +153,7 @@ class TestStructuredContentComposerVariableRefs:
         blueprint = ConstructBlueprint.make_from_raw(ComposerTestData.VAR_REF_CONSTRUCT)
 
         composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory_with_deal,
             output_class=SalesSummary,
@@ -180,6 +187,7 @@ class TestStructuredContentComposerTemplates:
         blueprint = ConstructBlueprint.make_from_raw(ComposerTestData.MIXED_CONSTRUCT)
 
         composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory_with_deal,
             output_class=SalesSummary,
@@ -225,6 +233,7 @@ class TestStructuredContentComposerNested:
         blueprint = ConstructBlueprint.make_from_raw(ComposerTestData.NESTED_CONSTRUCT)
 
         composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory_with_address,
             output_class=Company,
@@ -301,6 +310,7 @@ class TestStructuredContentComposerNestedOptional:
         blueprint = ConstructBlueprint.make_from_raw(nested_construct)
 
         composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory_with_address,
             output_class=CompanyWithOptionalAddress,
@@ -332,6 +342,7 @@ class TestStructuredContentComposerErrors:
         working_memory = WorkingMemory()
 
         composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory,
             output_class=SimpleReport,
@@ -366,6 +377,7 @@ class TestStructuredContentComposerErrors:
         )
 
         composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory,
             output_class=SalesSummary,
@@ -388,6 +400,7 @@ class TestStructuredContentComposerErrors:
         working_memory = WorkingMemory()
 
         composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory,
             output_class=SimpleReport,
@@ -419,6 +432,7 @@ class TestStructuredContentComposerWithTemplates:
         blueprint = ConstructBlueprint.make_from_raw(ComposerTestData.MIXED_CONSTRUCT)
 
         composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory_with_deal,
             output_class=SalesSummary,
@@ -487,6 +501,7 @@ class TestStructuredContentComposerDottedPathTypeConversion:
         )
 
         composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory_with_container,
             output_class=OutputWithStringField,
@@ -512,6 +527,7 @@ class TestStructuredContentComposerDottedPathTypeConversion:
         )
 
         composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory_with_container,
             output_class=OutputWithTextContentField,
@@ -561,6 +577,7 @@ class TestGetNestedFieldClassOptionalSyntaxes:
         working_memory = WorkingMemory()
 
         composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory,
             output_class=CompanyWithTypingOptionalAddress,
@@ -590,6 +607,7 @@ class TestGetNestedFieldClassOptionalSyntaxes:
         working_memory = WorkingMemory()
 
         composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory,
             output_class=CompanyWithOptionalAddress,
@@ -615,12 +633,14 @@ class TestGetNestedFieldClassOptionalSyntaxes:
         working_memory = WorkingMemory()
 
         composer_typing_optional = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory,
             output_class=CompanyWithTypingOptionalAddress,
         )
 
         composer_union_syntax = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory,
             output_class=CompanyWithOptionalAddress,
@@ -679,6 +699,7 @@ class TestGetNestedFieldClassGenericTypes:
         working_memory = WorkingMemory()
 
         composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory,
             output_class=CompanyWithAddressList,
@@ -707,6 +728,7 @@ class TestGetNestedFieldClassGenericTypes:
         working_memory = WorkingMemory()
 
         composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory,
             output_class=CompanyWithAddressDict,
@@ -778,6 +800,7 @@ class TestStructuredContentComposerRuntimeParams:
         )
 
         composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory_with_deal,
             output_class=ReportWithRuntimeParams,
@@ -807,6 +830,7 @@ class TestStructuredContentComposerRuntimeParams:
         )
 
         composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory_with_deal,
             output_class=ReportWithRuntimeParams,
@@ -837,6 +861,7 @@ class TestStructuredContentComposerRuntimeParams:
         )
 
         composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory_with_deal,
             output_class=ReportWithRuntimeParams,
@@ -868,6 +893,7 @@ class TestStructuredContentComposerRuntimeParams:
         blueprint = ConstructBlueprint.make_from_raw(nested_construct)
 
         composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory_with_deal,
             output_class=NestedReportWithRuntimeParams,

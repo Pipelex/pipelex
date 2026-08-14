@@ -3,7 +3,7 @@
 `PipeLibrary.get_required_pipe` hands out the stored pipe instance — nothing copies it — so
 any write-back performed while rendering a prompt pollutes shared, long-lived state. Two
 sites used to do exactly that: `PipeLLM._live_run_operator_pipe` cached the config-derived
-prompting style onto `self.llm_prompt_spec`, and `LLMPromptBlueprint._unravel_text` wrote
+templating style onto `self.llm_prompt_spec`, and `LLMPromptBlueprint._unravel_text` wrote
 the spec-level style into the caller's `TemplateBlueprint`.
 
 Pinned behaviors:
@@ -92,7 +92,7 @@ class TestPromptRenderingPurity:
         load_empty_library: Callable[[], str],
         topic: str,
         blueprint_style: TemplatingStyle | None,
-        passed_style: TemplatingStyle | None,
+        passed_style: TemplatingStyle,
         expects_xml_tag: bool,
     ):
         """A template-declared style takes precedence over the resolved one.
@@ -124,7 +124,7 @@ class TestPromptRenderingPurity:
         self,
         load_empty_library: Callable[[], str],
     ):
-        """Regression: the operator used to cache the config-derived prompting style onto
+        """Regression: the operator used to cache the config-derived templating style onto
         `self.llm_prompt_spec`, so a pipe's `model_dump()` — which feeds the graph registry and
         the crate payload sent to a Temporal worker — differed before and after its first run.
         """

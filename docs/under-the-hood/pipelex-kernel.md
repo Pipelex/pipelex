@@ -82,6 +82,8 @@ Both façade calls take the concept and the output class the caller wants, defau
 
 The two `assemble_*` functions are there because `run_llm_text` and `run_img_gen` both take a *ready* prompt. A caller that could not build one would be holding an operator it cannot reach, which is what image generation was until `assemble_img_gen_prompt` existed: its only builder was an interpreter-layer blueprint. What they own is the part a caller must not re-derive — resolving `ImageReference` and `DocumentReference` out of working memory, and, on the image side, keeping the `[Image N]` tokens numbered from the same registry that orders `input_images`, since a mismatch mislabels which image the prompt is describing and nothing downstream can detect it.
 
+**Every entry point that renders a template takes a required `templating_style`** — `run_llm_text`, `run_llm_object`, `derive_structure_prompt`, `assemble_llm_prompt`, `assemble_img_gen_prompt`, `run_search`, `run_compose_template`. It is not nullable, and that is the contract: the Jinja2 filters that tag and format a value have no default of their own, so a call that omitted the style would render a prompt in a shape nobody chose. `resolve_templating_style(authored=...)` is what produces one — pass what the caller authored, or `None` to take the runtime default.
+
 There are **no re-exports**: `pipelex/kernel/__init__.py` holds doctrine and nothing else, and every symbol is imported from the module that defines it. For this package that is a layering property rather than a style one — a module that re-exports across layers is a layer boundary with the sign filed off.
 
 Every kernel function is **fully keyword-only**, with zero entries in `subject_grants.toml`. Call sites name every argument.

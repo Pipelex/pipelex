@@ -32,3 +32,13 @@ prompt = """
 Here is the topic:
 @topic
 """
+
+[pipe.default_style_picture]
+type = "PipeImgGen"
+description = "An image prompt has no authored style, so it renders under the config default"
+inputs = { topic = "Text" }
+output = "Image"
+prompt = """
+Draw the topic:
+@topic
+"""

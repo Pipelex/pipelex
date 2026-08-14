@@ -58,12 +58,16 @@ def resolve_llm_setting_for_object(*, llm_choice: LLMModelChoice | None = None, 
     return model_deck.get_llm_setting(llm_choice=resolved_choice)
 
 
-async def derive_structure_prompt(*, output_class: type[StuffContent]) -> str | None:
+async def derive_structure_prompt(*, output_class: type[StuffContent], templating_style: TemplatingStyle) -> str | None:
     """Render the structure-description prompt for an output class.
 
     Derived from the class in hand — no concept-to-class registry hop, because the caller already
     holds the class. Returns `None` when structure prompts are disabled in config, or when the class
     has no printable structure (a bare text content has none).
+
+    It renders under a style like every other prompt fragment: the shipped template uses no tagging
+    filter, but the template is config-editable, and one that reached this render style-less could
+    not use one at all.
     """
     llm_config = get_config().cogt.llm_config
     if not llm_config.is_structure_prompt_enabled:
@@ -75,6 +79,7 @@ async def derive_structure_prompt(*, output_class: type[StuffContent]) -> str | 
         template=llm_config.get_template(template_name="output_structure_prompt"),
         category=TemplateCategory.LLM_PROMPT,
         context={"class_structure_str": "\n".join(class_structure)},
+        templating_style=templating_style,
     )
 
 
@@ -127,7 +132,7 @@ async def run_llm_text(
     output_class: type[StuffContent],
     job_metadata: JobMetadata,
     cogt_run_params: CogtRunParams,
-    templating_style: TemplatingStyle | None = None,
+    templating_style: TemplatingStyle,
     extra_params: dict[str, Any] | None = None,
     result_name: str | None = None,
     result_code: str | None = None,
@@ -176,7 +181,7 @@ async def run_llm_object(
     structure_prompt: str | None = None,
     is_multiple_output: bool = False,
     fixed_nb_output: int | None = None,
-    templating_style: TemplatingStyle | None = None,
+    templating_style: TemplatingStyle,
     extra_params: dict[str, Any] | None = None,
     result_name: str | None = None,
     result_code: str | None = None,
@@ -188,7 +193,11 @@ async def run_llm_object(
     same prompt by default — a prompt supplied only from outside would have left the derivation at
     each caller and let the two defaults fork.
     """
-    output_structure_prompt = structure_prompt if structure_prompt is not None else await derive_structure_prompt(output_class=output_class)
+    output_structure_prompt = (
+        structure_prompt
+        if structure_prompt is not None
+        else await derive_structure_prompt(output_class=output_class, templating_style=templating_style)
+    )
     llm_prompt = await assemble_llm_prompt(
         prompt_content=prompt_content,
         context_provider=memory,

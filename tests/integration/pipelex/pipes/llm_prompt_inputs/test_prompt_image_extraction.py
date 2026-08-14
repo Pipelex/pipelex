@@ -55,6 +55,7 @@ class TestPromptImageExtraction:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -95,6 +96,7 @@ class TestPromptImageExtraction:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -139,6 +141,7 @@ class TestPromptImageExtraction:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -197,6 +200,7 @@ class TestPromptImageExtraction:
         # Should raise error because tag converts to string before with_images
         with pytest.raises(Jinja2TemplateRenderError, match="does not implement the ImageRenderable protocol"):
             await pipe_llm.llm_prompt_spec.make_llm_prompt(
+                templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
                 output_concept_ref="Text",
                 context_provider=working_memory,
             )
@@ -244,9 +248,9 @@ class TestPromptImageExtraction:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
-            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
         )
 
         # Tag filter produces formatted text output but NO image tokens or extraction
@@ -301,9 +305,9 @@ class TestPromptImageExtraction:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
-            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
         )
 
         # with_images | tag: images ARE extracted AND content is wrapped in tags
@@ -359,6 +363,7 @@ class TestPromptImageExtraction:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -408,6 +413,7 @@ class TestPromptImageExtraction:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -456,6 +462,7 @@ class TestPromptImageExtraction:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -512,10 +519,12 @@ class TestPromptImageExtraction:
         )
 
         prompt_at = await pipe_at.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_at.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
         prompt_dollar = await pipe_dollar.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_dollar.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -584,10 +593,12 @@ class TestPromptImageExtraction:
         )
 
         prompt_at = await pipe_at.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_at.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
         prompt_dollar = await pipe_dollar.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_dollar.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -673,6 +684,7 @@ class TestPromptImageExtraction:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -725,6 +737,7 @@ class TestPromptImageExtraction:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )

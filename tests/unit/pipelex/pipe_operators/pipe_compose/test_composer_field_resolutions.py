@@ -18,6 +18,11 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_native_concept
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint, ConstructFieldMethod
 from pipelex.pipe_operators.compose.structured_content_composer import StructuredContentComposer
+from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
+
+# Explicit rather than resolved: these are unit tests over the assembly itself, so the style they
+# render under is stated here instead of read out of config.
+_TEMPLATING_STYLE = TemplatingStyle(tag_style=TagStyle.XML)
 
 
 class HeadquartersForResolutions(StructuredContent):
@@ -79,6 +84,7 @@ class TestComposerFieldResolutions:
         )
 
         composer = StructuredContentComposer(
+            templating_style=_TEMPLATING_STYLE,
             construct_blueprint=blueprint,
             working_memory=working_memory_with_inputs,
             output_class=ReportForResolutions,

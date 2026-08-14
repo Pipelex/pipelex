@@ -8,6 +8,7 @@ from jinja2.runtime import Context, Undefined
 from pipelex.tools.jinja2.exceptions import Jinja2ContextError
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.image_renderable import ImageRenderable
+from pipelex.tools.jinja2.jinja2_filters import require_templating_style_value
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
 from pipelex.tools.templating.text_format import TextFormat
 
@@ -53,9 +54,8 @@ def with_images(context: Context, value: Any, _: Any = None) -> str:
         msg = f"Expected ImageRegistry in context, got {type(registry).__name__}"
         raise Jinja2ContextError(msg)
 
-    # Get text format from context
-    text_format_str = context.get(Jinja2ContextKey.TEXT_FORMAT, default=TextFormat.PLAIN)
-    text_format = TextFormat(text_format_str)
+    # Get text format from context — no fallback, same as the tag and format filters
+    text_format = TextFormat(require_templating_style_value(context=context, jinja2_context_key=Jinja2ContextKey.TEXT_FORMAT))
 
     # Protocol-based rendering
     if isinstance(value, ImageRenderable):

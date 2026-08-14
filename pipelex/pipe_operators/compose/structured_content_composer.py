@@ -22,6 +22,7 @@ from pipelex.pipe_operators.compose.exceptions import (
     StructuredContentComposerValueError,
 )
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.typing.annotation_utils import unwrap_optional
 from pipelex.tools.typing.class_utils import are_classes_equivalent
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
@@ -67,12 +68,14 @@ class StructuredContentComposer:
         construct_blueprint: ConstructBlueprint,
         working_memory: WorkingMemory,
         output_class: type[StuffContent],
+        templating_style: TemplatingStyle,
         runtime_params: dict[str, Any] | None = None,
         extra_context: dict[str, Any] | None = None,
     ):
         self.construct_blueprint = construct_blueprint
         self.working_memory = working_memory
         self.output_class = output_class
+        self.templating_style = templating_style
         self.runtime_params = runtime_params or {}
         self.extra_context = extra_context or {}
         # Per-field record of how each field was built. Populated as fields resolve.
@@ -790,6 +793,7 @@ class StructuredContentComposer:
         return await render_template(
             template=field_blueprint.template,
             category=TemplateCategory.BASIC,
+            templating_style=self.templating_style,
             context=build_compose_context(
                 memory=self.working_memory,
                 runtime_params=self.runtime_params,
@@ -819,6 +823,7 @@ class StructuredContentComposer:
             construct_blueprint=field_blueprint.nested,
             working_memory=self.working_memory,
             output_class=nested_class,
+            templating_style=self.templating_style,
             runtime_params=self.runtime_params,
             extra_context=self.extra_context,
         )

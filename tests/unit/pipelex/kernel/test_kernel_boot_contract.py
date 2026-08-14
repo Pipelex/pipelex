@@ -110,6 +110,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     from pipelex.kernel.pipelex_kernel import PipelexKernel
     from pipelex.kernel.prompt_references import ImageReference, ImageReferenceKind
     from pipelex.kernel.search_ops import run_search
+    from pipelex.kernel.templating_style_ops import resolve_templating_style
     from pipelex.runtime_boot import RuntimeBoot
     from pipelex.system.pipe_run_mode import PipeRunMode
     from pipelex.system.registries.class_registry_access import get_class_registry
@@ -278,6 +279,10 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     # exactly the way the kernel surface was. Assembly is also the half that reaches into memory to
     # resolve references, which is where a function-local interpreter import would hide, and this
     # subprocess is the only gate that can see one.
+    # Resolved here rather than hand-built: the resolver reads config, so passing it through every
+    # prompt-rendering call below is also what proves it works on a boot with no library.
+    templating_style = resolve_templating_style(authored=None)
+
     img_gen_memory = WorkingMemoryFactory.make_from_single_stuff(
         StuffFactory.make_stuff(
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),
@@ -288,6 +293,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
     img_gen_prompt = asyncio.run(
         assemble_img_gen_prompt(
             context_provider=img_gen_memory,
+            templating_style=templating_style,
             prompt_blueprint=TemplateBlueprint(
                 template="Draw something like {{ reference }}.",
                 category=TemplateCategory.IMG_GEN_PROMPT,
@@ -329,6 +335,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
             template=search_query,
             category=TemplateCategory.LLM_PROMPT,
             search_setting=SearchSetting(model="kernel-boot-contract-search-model"),
+            templating_style=templating_style,
             concept=text_concept,
             job_metadata=kernel.make_step_metadata(),
             cogt_run_params=kernel.cogt_run_params,
@@ -350,6 +357,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
             category=TemplateCategory.LLM_PROMPT,
             concept=text_concept,
             output_class=TextContent,
+            templating_style=templating_style,
             result_name="composed",
         )
     )

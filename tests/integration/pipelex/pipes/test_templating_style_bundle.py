@@ -1,8 +1,12 @@
-"""End-to-end: a bundle authoring `templating_style` parses, loads, and renders under that style."""
+"""End-to-end: a bundle authoring `templating_style` parses, loads, and renders under that style.
+
+Also covers the operators that have no authored style of their own: they inherit the same runtime
+default rather than falling into a filter-level one, which is the whole point of resolving centrally.
+"""
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -16,6 +20,9 @@ from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
 from pipelex.tools.templating.text_format import TextFormat
+
+if TYPE_CHECKING:
+    from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 
 _PIPELINES_DIR = Path("tests/integration/pipelex/pipes/pipelines")
 
@@ -67,3 +74,17 @@ class TestTemplatingStyleBundle:
         assert "<topic>" in user_text
         assert "</topic>" in user_text
         assert "```" not in user_text
+
+    async def test_img_gen_prompt_renders_under_config_default(self, load_test_library: Callable[[list[Path]], None]):
+        """An image prompt has no authored style, and used to render under the filters' triple-backtick
+        fallback. It now inherits the same default an LLM pipe that declares nothing gets.
+        """
+        load_test_library([_PIPELINES_DIR])
+        pipe = cast("PipeImgGen", get_required_pipe("test_templating_style.default_style_picture"))
+        img_gen_prompt = await pipe.img_gen_prompt_blueprint.make_img_gen_prompt(
+            context_provider=_make_memory(),
+            templating_style=resolve_templating_style(authored=None),
+        )
+        assert "<topic>" in img_gen_prompt.positive_text
+        assert "</topic>" in img_gen_prompt.positive_text
+        assert "```" not in img_gen_prompt.positive_text

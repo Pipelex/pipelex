@@ -23,6 +23,7 @@ from pipelex.kernel.search_results import SearchResult
 from pipelex.runtime_hub import get_content_generator, get_model_deck
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.templating.templating_style import TemplatingStyle
 
 
 def resolve_search_setting(
@@ -61,6 +62,7 @@ async def run_search(
     concept: Concept,
     job_metadata: JobMetadata,
     cogt_run_params: CogtRunParams,
+    templating_style: TemplatingStyle,
     output_structure_class: type[StuffContent] | None = None,
     include_domains: list[str] | None = None,
     exclude_domains: list[str] | None = None,
@@ -72,8 +74,10 @@ async def run_search(
     """A whole search step: render the query, search, store, report.
 
     The query template arrives as source plus category rather than as a `TemplateBlueprint`, the way
-    `run_compose_template` takes it: a search renders against memory alone, with no style and no extra
-    context, so a blueprint would hand over two fields this function has nothing to do with.
+    `run_compose_template` takes it: a search renders against memory alone, with no extra context, so
+    a blueprint would hand over a field this function has nothing to do with. The style is not that
+    field — it is passed explicitly, because a query template can tag its inputs like any other and
+    the filters that do it have no default of their own.
 
     The search itself goes through the same content-generation seam as the LLM, image-generation and
     extract leaves — direct inline, an activity when in-workflow, or a dry mock — which is what makes
@@ -84,6 +88,7 @@ async def run_search(
         template=template,
         category=category,
         context=memory.generate_context(),
+        templating_style=templating_style,
     )
     search_assignment = SearchAssignment(
         job_metadata=job_metadata,
