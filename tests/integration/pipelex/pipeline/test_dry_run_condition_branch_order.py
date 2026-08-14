@@ -12,7 +12,6 @@ dependency set to iterate in either order must produce the same graph.
 """
 
 from collections.abc import Iterator
-from typing import Any
 
 import pytest
 from pytest_mock import MockerFixture
@@ -106,9 +105,29 @@ class _OrderedDependencySet(set[str]):
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestDryRunConditionBranchOrder:
-    async def _graph_output_names(self, *, mocker: MockerFixture, order: list[str]) -> dict[str, list[str]]:
-        def ordered_dependencies(condition: Any) -> set[str]:  # noqa: ARG001 — bound as a method, so it takes self
-            return _OrderedDependencySet(values=order)
+    async def _graph_output_names(self, *, mocker: MockerFixture, reverse: bool) -> dict[str, list[str]]:
+        """Dry-run the bundle with the condition's dependency set iterating in a pinned order.
+
+        Two things this must NOT do, both learned the hard way:
+
+        - Do not replace the method unconditionally. Patching a CLASS attribute reaches
+          every ``PipeCondition`` alive in the process, and ``pipe_dependencies()`` is not
+          read only by the dry-run loop — library loading calls it to validate that each
+          outcome names a real pipe. An unconditional replacement tells every condition in
+          every bundle this worker loaded that it depends on this test's branches.
+        - Do not hard-code the dependency names. They come back domain-qualified
+          (``<domain>.alpha_branch``), and a bare code fails that same validation lookup.
+
+        So: delegate to the real implementation for every other pipe, and derive the order
+        from what it actually returns rather than restating it.
+        """
+        original = PipeCondition.pipe_dependencies
+
+        def ordered_dependencies(condition: PipeCondition) -> set[str]:
+            real = original(condition)
+            if condition.code != "route":
+                return real
+            return _OrderedDependencySet(values=sorted(real, reverse=reverse))
 
         mocker.patch.object(PipeCondition, "pipe_dependencies", ordered_dependencies)
         graph_spec, _ = await dry_run_pipeline(mthds_contents=[_CONDITION_MTHDS])
@@ -116,8 +135,8 @@ class TestDryRunConditionBranchOrder:
 
     async def test_branch_iteration_order_does_not_change_the_graph(self, mocker: MockerFixture) -> None:
         """Both iteration orders must yield the same graph — that is what sorting buys."""
-        forward = await self._graph_output_names(mocker=mocker, order=["alpha_branch", "beta_branch"])
-        reverse = await self._graph_output_names(mocker=mocker, order=["beta_branch", "alpha_branch"])
+        forward = await self._graph_output_names(mocker=mocker, reverse=False)
+        reverse = await self._graph_output_names(mocker=mocker, reverse=True)
 
         assert forward == reverse
         # Pin the value too, not just the agreement: the sorted loop ends on the branch whose
