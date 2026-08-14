@@ -16,25 +16,35 @@ Every inference call emits a `UsageReportEvent` carrying `node_id` (from `trace_
 
 The two projections are deliberately separate — `tokens_usages` is a shipped, `extra="forbid"` client contract, and a graph is not the place to re-litigate its record shape. What they are *not* allowed to do is disagree on arithmetic, so both compute every dollar through the same `compute_tokens_usage_cost` (`pipelex/cogt/usage/cost_registry.py`) and define a token total the same way `AggregatedCosts.total_nb_tokens` does.
 
-```text
-  inference call completes
-          │
-          ▼
-  UsageReportEvent{ node_id, tokens_usage }        ← the link exists here
-          │
-          ▼
-  ┌──────────── event log — one stream ────────────┐
-  │  PipeStart   PipeEndSuccess   Edge   UsageReport │
-  └──────────────────────┬─────────────────────────┘
-              ┌──────────┴──────────┐
-              ▼                     ▼
-      GraphSpecAssembler       UsageAggregator
-      (node_id kept,           (node_id dropped,
-       calls folded)            one record per call)
-              │                     │
-              ▼                     ▼
-   NodeSpec.usage /            PipeOutput.tokens_usages
-   GraphSpec.usage             → cost table, CSV, API wire
+```mermaid
+flowchart TB
+    CALL["inference call completes"]
+    EVENT["UsageReportEvent<br/>{ node_id, tokens_usage }"]
+
+    subgraph LOG["event log — one stream, ordered by (workflow_id, sequence)"]
+        STREAM["PipeStart · PipeEndSuccess · Edge · UsageReport"]
+    end
+
+    subgraph ATTRIBUTED["attributed projection"]
+        direction TB
+        ASSEMBLER["GraphSpecAssembler<br/>node_id kept, calls folded"]
+        GRAPH["NodeSpec.usage<br/>GraphSpec.usage"]
+    end
+
+    subgraph FLATTENED["flat projection"]
+        direction TB
+        AGGREGATOR["UsageAggregator<br/>node_id dropped, one record per call"]
+        FLAT["PipeOutput.tokens_usages"]
+        SINKS["cost table · CSV · API wire"]
+    end
+
+    CALL --> EVENT
+    EVENT -- "the link exists here" --> STREAM
+    STREAM --> ASSEMBLER
+    STREAM --> AGGREGATOR
+    ASSEMBLER --> GRAPH
+    AGGREGATOR --> FLAT
+    FLAT --> SINKS
 ```
 
 ## When attribution happens, and why it waits
