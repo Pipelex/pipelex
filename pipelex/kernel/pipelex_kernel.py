@@ -3,13 +3,16 @@
 The semantics live in the module-level ops functions beside this one; the interpreter's operator
 classes call those directly, because they already hold everything the façade would supply. This
 class exists for the *other* caller — the programmatic one, embedding the kernel — and it holds
-exactly two things, both of them run-scoped identity:
+only run-scoped identity plus the one seam that identity needs:
 
 - ``job_metadata`` — the **run-level** metadata. It is not what a step runs under: each call mints
   a per-step copy via :meth:`make_step_metadata`, mirroring the interpreter's pass-down-a-modified-copy
   pattern, so trace and usage attribution stay per-step.
 - ``cogt_run_params`` — the execution-mode contract (``run_mode``, ``is_mock_usage``) every cogt
   leaf reads off the assignment it is handed.
+- ``step_id_source`` — where a step's ``pipe_run_id`` comes from, defaulting to ``uuid4``. A caller
+  hosting the kernel inside a replay-based executor injects a replay-safe source; see
+  :meth:`make`. It is a seam, not state — the kernel never inspects what it returns.
 
 What it deliberately does **not** hold is anything derived from config or the model deck — resolved
 LLM settings, prompting style. Those are computed per call and never cached here, exactly as
@@ -29,7 +32,8 @@ both halves a caller needs (``make_event_log``, ``UsageAggregator``) and is kern
 this costs the boot contract. See ``docs/under-the-hood/pipelex-kernel.md``.
 """
 
-from typing import Self
+from collections.abc import Callable
+from typing import Any, Self
 from uuid import uuid4
 
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams, check_mock_usage_requires_dry
@@ -56,12 +60,24 @@ from pipelex.system.trace_context import TraceContext
 from pipelex.tools.templating.templating_style import TemplatingStyle
 
 
+def _mint_step_id() -> str:
+    """The default per-step id source: a fresh uuid4, which is what every in-process run wants."""
+    return str(uuid4())
+
+
 class PipelexKernel:
     """Façade over the module-level kernel ops; holds per-run state."""
 
-    def __init__(self, *, job_metadata: JobMetadata, cogt_run_params: CogtRunParams) -> None:
+    def __init__(
+        self,
+        *,
+        job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
+        step_id_source: Callable[[], str] | None = None,
+    ) -> None:
         self.job_metadata = job_metadata
         self.cogt_run_params = cogt_run_params
+        self.step_id_source = step_id_source or _mint_step_id
 
     @classmethod
     def make(
@@ -71,6 +87,7 @@ class PipelexKernel:
         user_id: str,
         is_mock_usage: bool = False,
         trace_context: TraceContext | None = None,
+        step_id_source: Callable[[], str] | None = None,
     ) -> Self:
         """Mint a kernel for one run: a run id, the execution-mode contract, and optional tracing.
 
@@ -89,6 +106,13 @@ class PipelexKernel:
         the two are one identity, and letting them diverge would scatter a single run's usage events
         across two ids (the registered-context emit path stamps the event log's id, the runner
         fallback stamps the metadata's), so the read-back would silently miss half of them.
+
+        ``step_id_source`` overrides where each step's ``pipe_run_id`` comes from; it defaults to a
+        fresh ``uuid4``, which is what every in-process run wants. It exists for a kernel hosted
+        inside a **replay-based** executor, where identifiers minted from a non-replay-safe source
+        take different values each time the host re-executes the code. Such a host injects its own
+        replay-safe source here; the kernel stays ignorant of it, which is the point of this tier —
+        nothing about a durable backend reaches the runtime or the code it runs.
         """
         check_mock_usage_requires_dry(run_mode=run_mode, is_mock_usage=is_mock_usage)
         return cls(
@@ -98,9 +122,10 @@ class PipelexKernel:
                 trace_context=trace_context,
             ),
             cogt_run_params=CogtRunParams(run_mode=resolve_run_mode_for_boot(requested=run_mode), is_mock_usage=is_mock_usage),
+            step_id_source=step_id_source,
         )
 
-    def make_step_metadata(self) -> JobMetadata:
+    def make_step_metadata(self, *, pipe_code: str | None = None) -> JobMetadata:
         """A per-step copy of the run-level metadata, carrying its own ``pipe_run_id``.
 
         ``otel_context`` is passed explicitly as ``None`` rather than left to inherit, which is the
@@ -108,8 +133,25 @@ class PipelexKernel:
         the span, and a kernel call opens none. ``trace_context`` is left to inherit, which is the
         same method's other contract and the reason usage events from every step of a kernel run
         attribute to the one context the caller supplied.
+
+        ``pipe_code`` names the pipe this step is running, mirroring what the interpreter stamps in
+        ``pipe_abstract``'s run paths. Anything that attributes work by it — log correlation, usage
+        accounting, the per-step labelling a distributed backend derives from the metadata — sees an
+        anonymous step without it.
+
+        ⚠ It is **omitted from the update rather than passed as ``None``** when the caller supplies
+        none. ``copy_with_update`` applies whatever it is handed, so an unconditional pass would
+        overwrite a run-level ``pipe_code`` with ``None`` — turning an optional enrichment into a
+        silent erasure for every caller that never asked for it.
+
+        **The façade's own callers below stay anonymous, and that is the honest answer rather than
+        an oversight**: ``llm_text`` and ``llm_object`` are the direct-call form, where there is no
+        pipe because the caller did not run one. Do not "finish the job" by inventing a name there.
         """
-        return self.job_metadata.copy_with_update(otel_context=None, pipe_run_id=str(uuid4()))
+        updates: dict[str, Any] = {"pipe_run_id": self.step_id_source()}
+        if pipe_code is not None:
+            updates["pipe_code"] = pipe_code
+        return self.job_metadata.copy_with_update(otel_context=None, **updates)
 
     async def llm_text(
         self,

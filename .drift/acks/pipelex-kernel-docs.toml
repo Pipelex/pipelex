@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:48847e93fbdd6d3dd7016d484ce169c4907acc53786c581b039fef276eda03bd"
+digest = "sha256:df1e4a302a2c231fa0de3a791f75af6fe8851aaed31582d0766772e17d9b865d"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-14T09:52:31Z"
-rationale = "Phase 2 of the templating-style plan changed a kernel contract, so the page needed a real addition rather than a wording fix: every prompt-rendering entry point (run_llm_text, run_llm_object, derive_structure_prompt, assemble_llm_prompt, assemble_img_gen_prompt, run_search, run_compose_template) now takes a required templating_style instead of a nullable one, because the Jinja2 tag and format filters lost their silent fallbacks. Added a paragraph in the programmatic-caller section stating that contract and pointing at resolve_templating_style. The rest of the page was reviewed and is still accurate: the entry-point table is unchanged in names, the assemble-star paragraph and the no-caching note both still hold."
+reviewed_at = "2026-08-14T12:02:23Z"
+rationale = "Merge of dev into fix/Keyless-dry-run: the only trigger change is the step-identity commit (make_step_metadata gains pipe_code, PipelexKernel.make gains an injectable step_id_source), and that same commit brought its own doc paragraphs in with it. Reviewed the merged page against the merged kernel and both halves hold: the run-scoped-state section now documents job_metadata with the omit-not-None pipe_code contract plus the step_id_source seam, and the facade's deliberate anonymity is verified in code, where llm_text and llm_object both call make_step_metadata with no pipe_code. This branch's own templating-style paragraph is untouched by the merge and still matches the signatures, which take an optional authored style resolved through resolve_templating_style. No doc change needed beyond what the merge already carried."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -20,7 +20,7 @@ rationale = "Phase 2 of the templating-style plan changed a kernel contract, so 
 "pipelex/kernel/llm_prompt_content.py" = "blob:82c34283dacd2bfd9a2c263915e744736d399875"
 "pipelex/kernel/llm_results.py" = "blob:6e3b8a2878b5bb284ece5fac10262fb59ac2029d"
 "pipelex/kernel/memory_ops.py" = "blob:f6a5745e804ac08f19c70f1beb1f78baf50d51cd"
-"pipelex/kernel/pipelex_kernel.py" = "blob:142031ab742eb606e241814f657e798abd531717"
+"pipelex/kernel/pipelex_kernel.py" = "blob:3264150e92940c97346f1fb5dd9313eff8825d50"
 "pipelex/kernel/prompt_references.py" = "blob:03ec9ef67ae84f141d072ca2d2c3ef888549ccc0"
 "pipelex/kernel/search_ops.py" = "blob:ed0a8c7953aca1e38de852d0ddef11731b819539"
 "pipelex/kernel/search_results.py" = "blob:101b70dc96cc5ee1721c9f6b1cb725a5ca78ff70"

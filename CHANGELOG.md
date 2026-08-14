@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Kernel step identity**: `PipelexKernel.make_step_metadata` now accepts `pipe_code` to name the pipe a step is running, mirroring what the interpreter stamps on its live and dry paths — so log correlation, usage accounting, and per-step labelling see a named step for kernel-driven runs. The key is omitted from the metadata update when not supplied, so a run-level `pipe_code` is never silently erased; the direct-call façade (`llm_text`/`llm_object`) stays deliberately anonymous. `PipelexKernel.make` also accepts an injectable `step_id_source` for per-step ids, defaulting to `uuid4`, so a kernel hosted inside a replay-based executor can supply a replay-safe source.
+
 ### Changed
 
 - **Templating style is now an authoring decision (Breaking)**: How a pipe's inputs are tagged into a prompt is declared on the pipe — `templating_style` on `PipeLLM`, either a bare tag-style string (`"xml"`, `"ticks"`, `"square_brackets"`, `"no_tag"`) or a full `{ tag_style, text_format }` table — with a single runtime default for everything that declares nothing (`[pipelex.templating_config].default_templating_style`, shipped as `xml`). It is no longer derived from model metadata, so the same method renders the same prompt shape on every model. **Every prompt rendered for an OpenAI-family model changes shape, from back-tick fences to XML tags.** `PipelexKernel.llm_text` and `llm_object` take the same optional argument.

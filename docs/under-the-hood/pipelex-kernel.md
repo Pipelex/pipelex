@@ -121,10 +121,11 @@ summaries = extract_main_content_as_list(memory=result.memory, item_type=Summary
 
 ## Run-scoped state, and who owns the usage lifecycle
 
-`PipelexKernel` holds exactly two things, both run-scoped identity:
+`PipelexKernel` holds run-scoped identity, plus the one seam that identity needs:
 
-- **`job_metadata`** — the run-level metadata. It is not what a step runs under: every call mints a per-step copy through `make_step_metadata()`, carrying a fresh `pipe_run_id` and inheriting the trace context, so trace and usage attribution stay per-step. This mirrors the interpreter's pass-down-a-modified-copy pattern.
+- **`job_metadata`** — the run-level metadata. It is not what a step runs under: every call mints a per-step copy through `make_step_metadata()`, carrying a fresh `pipe_run_id` and inheriting the trace context, so trace and usage attribution stay per-step. This mirrors the interpreter's pass-down-a-modified-copy pattern. `make_step_metadata(pipe_code=…)` names the pipe the step is running — mirroring what the interpreter stamps on its live and dry paths — so log correlation, usage accounting, and the per-step labelling a distributed backend derives see a named step. When no `pipe_code` is supplied the key is omitted from the update rather than passed as `None`, so a run-level `pipe_code` is never silently erased; the direct-call façade (`llm_text`/`llm_object`) stays deliberately anonymous, because the caller ran no pipe.
 - **`cogt_run_params`** — the execution-mode contract (`run_mode`, and the DRY-only `is_mock_usage` sub-flag) that every cogt leaf reads off the assignment it is handed.
+- **`step_id_source`** — where each step's `pipe_run_id` comes from, defaulting to a fresh `uuid4`, which is what every in-process run wants. It exists for a kernel hosted inside a replay-based executor, where ids minted from a non-replay-safe source take different values each re-execution; such a host injects its own replay-safe source via `PipelexKernel.make(step_id_source=…)`. It is a seam, not state — the kernel never inspects what it returns.
 
 Nothing derived from config or the model deck is cached on the instance — resolved settings and templating styles are computed per call, because cached derived state would shadow a later config or deck change and break per-call variation.
 
