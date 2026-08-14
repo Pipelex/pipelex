@@ -12,7 +12,7 @@ Extra forbidden fields: 'prompting_target'
 
 The Pipelex Gateway backend does not read its model specs from a file in this repo. They are fetched from the Pipelex API and cached at `~/.pipelex/cache/remote_config.json`, and that config's `backend_model_specs.defaults` block carries `prompting_target = "anthropic"`. `InferenceModelSpecBlueprint` is `extra="forbid"`, so once the field was deleted here, a config that still declares it stopped validating.
 
-Note the asymmetry inside `backend_library._load_backend`: the loop that reclassifies unknown keys as outbound HTTP headers iterates the **per-model** dict only. So an unknown key per-model is silently turned into a header (the hazard the implementation plan already flags), while an unknown key in `defaults` is fatal. Same input, two opposite failure modes, neither of them "ignore it".
+Note the asymmetry inside `InferenceBackendLibrary.load`: the loop that reclassifies unknown keys as outbound HTTP headers iterates the **per-model** dict only. So an unknown key per-model is silently turned into a header (the hazard the implementation plan already flags), while an unknown key in `defaults` is fatal. Same input, two opposite failure modes, neither of them "ignore it".
 
 ## What was done here
 
@@ -24,7 +24,7 @@ The prune is pure and silent by design. It first logged the dropped keys, which 
 
 ## What still needs doing, elsewhere
 
-1. **Drop `prompting_target` from the gateway config served by the Pipelex API.** It is dead data as of this change: nothing in `pipelex` reads it any more. The source is **`pipelex-back-office`**, not `pipelex-server`: `pipelex_back_office/remote_config/gateway_models.toml` declares it in `[defaults]`, and `build_service.py` publishes that block as the remote config's `backend_model_specs`.
+1. **Drop `prompting_target` from the gateway config served by the Pipelex API.** It is dead data as of this change: nothing in `pipelex` reads it any more. The source is **our back-office repo** (private), not the hosted server: its gateway-models TOML declares it in `[defaults]`, and its build service publishes that block as the remote config's `backend_model_specs`.
 
    **Done — and the mechanism that made it safe is the versioned config URL, not timing.** Deleting the key would have been a live prompt change for every deployed client, in the one direction we do not want:
 
@@ -42,4 +42,4 @@ The prune is pure and silent by design. It first logged the dropped keys, which 
 
    **Decided, and planned: [`../rogue-extra-headers-guard-plan.md`](../rogue-extra-headers-guard-plan.md).** The rule survives, but only for header-shaped keys; anything else is fatal from a local file and pruned from the served payload. To be executed after the templating-style branch merges.
 
-Neither is in scope for the templating-style change. Item 1 is a `pipelex-server` deliverable; item 2 is a design question about the backend loader that deserves its own look.
+Neither is in scope for the templating-style change. Item 1 is a back-office deliverable (private repo); item 2 is a design question about the backend loader that deserves its own look.

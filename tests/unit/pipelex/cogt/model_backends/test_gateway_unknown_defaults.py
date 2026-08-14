@@ -59,9 +59,12 @@ class TestGatewayUnknownDefaults:
 
     def test_per_model_unknown_keys_are_untouched(self) -> None:
         """A per-model unknown key means something already — it becomes an outbound HTTP header."""
-        specs = self._specs(defaults={"max_tokens": 4096})
+        # The unknown key in `defaults` is what forces the deep-copy prune to run at all: without it
+        # the function early-returns and this test proves nothing.
+        specs = self._specs(defaults={"max_tokens": 4096, "a_field_we_removed": "anthropic"})
         cast("dict[str, Any]", specs["gpt-4o-mini"])["x-some-header"] = "value"
 
         pruned = drop_unknown_gateway_defaults(gateway_model_specs=specs)
 
+        assert pruned is not specs
         assert cast("dict[str, Any]", pruned["gpt-4o-mini"])["x-some-header"] == "value"

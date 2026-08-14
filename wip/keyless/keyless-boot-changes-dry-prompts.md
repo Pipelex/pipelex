@@ -46,12 +46,14 @@ Is a keyless dry run meant to be **faithful** (then the deck's prompting metadat
 
 ---
 
-## Re-verified 2026-08-14 on this branch (tip `84b1f682c`, v0.44.0) — and one premise above is wrong
+## Re-verified 2026-08-14 at this branch's base (tip `84b1f682c`, v0.44.0 — before the templating-style change) — and one premise above is wrong
 
 The divergence reproduces exactly as described: a keyless boot derives `None`, a keyed boot derives `xml/plain`, and `None` renders as `TICKS` because `apply_tag_style` defaults to it when `TAG_STYLE` was never put on the Jinja2 context.
 
+> **The TICKS half is now false, deliberately** — see the CLOSED box above. `apply_tag_style` has no fallback any more: a render context with no tag style raises `Jinja2ContextError` rather than quietly choosing a shape, and there is no deck-derived style left to be `None`. Kept as the record of what reproduced at that tip.
+
 **But the last paragraph's parenthesis is false.** `needs_model_specs=True` is *not* the faithful seam. Measured on a machine with no credentials at all, it changes nothing — the deck is empty in both modes. `needs_model_specs` only governs whether the *gateway's* remote specs are fetched or dummied; what empties the deck is `lenient=not needs_inference`, which makes the backend loader **skip every backend whose `${…_API_KEY}` cannot substitute** — and every shipped backend, gateway included, declares its key that way. There is currently no flag combination that gives a credential-free process a populated deck. The seam has to be built, not switched on.
 
-Two things also worth carrying forward: the prompting metadata itself is credential-free on-disk data (`prompting_target` lives in the per-backend spec TOMLs), which is what makes "faithful" cheap; and the blast radius includes a *loud* converse — on a keyless machine a bundle pinning a bare model handle is **rejected** by validation, while preset-pinned methods silently get rewritten prompts.
+Two things also worth carrying forward: the prompting metadata itself was credential-free on-disk data (~~`prompting_target` lives in the per-backend spec TOMLs~~ — that field is deleted too), which is what made "faithful" cheap; and the blast radius includes a *loud* converse — on a keyless machine a bundle pinning a bare model handle is **rejected** by validation, while preset-pinned methods silently get rewritten prompts.
 
 Full measurements, the enumerated blast radius, and the TDD fix plan: [`keyless-dry-prompts-fix-plan.md`](keyless-dry-prompts-fix-plan.md).

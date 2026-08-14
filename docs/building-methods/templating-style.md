@@ -117,7 +117,7 @@ Bees pollinate a third of the food we eat.
 ```
 
 !!! note "Tag names come from the variable"
-    `@article` tags with `article`. A value with no name of its own — anything piped through `with_images`, for instance — falls back to `data`.
+    `@article` tags with `article`. A value with no name of its own — anything piped through `with_images`, for instance — falls back to `data` under `xml` and `square_brackets`. Under `ticks` it renders as a bare fence with no prefix, and `no_tag` adds nothing either way.
 
 ## What the two sigils do
 

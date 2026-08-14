@@ -131,7 +131,7 @@ This is a prerequisite, not a follow-up. Sequence it first so that removing `pro
 - **Schema propagation.** `PipeLLMBlueprint` gaining a field changes the MTHDS JSON Schema: regenerate with `pipelex-dev generate-mthds-schema`, then propagate to the downstream committed copies via the `mthds-schema-sync` skill, gated on a released `pipelex` version.
 - **Config shape.** `prompting_config` loses `prompting_styles` and renames its default — the config model and every `pipelex.toml` must move together or boot fails; `make tb` is the quick check.
 - **Docs.** Prompt style becomes an authoring topic (a page under method authoring) rather than an inference-config topic; the backend-config docs lose a field. One whole published page is premised on the old mechanism — `docs/building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md` ("adapt prompting styles for OpenAI, Anthropic, Mistral…"), linked from `docs/features/llm-integration.md` — replace it with the authoring page rather than patching it; even its URL states the dead premise.
-- **MTHDS spec.** A pipe-level `prompt_style` is a language-surface change, which the `mthds/` spec repo owns — the JSON-Schema regen and downstream sync above are only the mechanical half; the spec prose is a deliverable of its own.
+- **MTHDS spec.** A pipe-level `templating_style` is a language-surface change, which the `mthds/` spec repo owns — the JSON-Schema regen and downstream sync above are only the mechanical half; the spec prose is a deliverable of its own.
 - **No backward compatibility**, per repo policy: no deprecation window, just the changelog entry.
 
 ## 9. Relationship to the keyless dry-run bug

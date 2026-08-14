@@ -6,7 +6,7 @@ Progress is tracked with the checkboxes below. **The checkpoint marked ✋ is a 
 
 ## The behaviour today
 
-`InferenceBackendLibrary._load_backend` (`pipelex/cogt/model_backends/backend_library.py:195-199`) loops over each per-model TOML table and moves every key that is not a field of `InferenceModelSpecBlueprint` into `extra_headers`:
+`InferenceBackendLibrary.load` (`pipelex/cogt/model_backends/backend_library.py:195-199`) loops over each per-model TOML table and moves every key that is not a field of `InferenceModelSpecBlueprint` into `extra_headers`:
 
 ```python
 extra_headers: dict[str, str] = {}
@@ -54,7 +54,7 @@ Two things follow. First, the mechanism is load-bearing and cannot simply be clo
 ## Why this is worth fixing
 
 - **A deleted or renamed blueprint field becomes a header.** This is the hazard the templating-style plan flagged and then dodged by luck: `prompting_target` happened to live in `[defaults]`, so its removal was fatal and loud. Had it lived per-model — and in `portkey.toml` it *does* also live per-model — the same removal would have started sending `prompting_target: gemini` to the provider. No test in the suite would have gone red.
-- **A typo becomes a header.** `max_tokns = 4096` on a model posts a junk header *and* silently leaves the real cap unset. That is exactly the class of silent misconfiguration `_load_backend`'s own docstring says it refuses to tolerate ("a config typo must never silently delete a backend, because the commands that boot leniently would then report the far more confusing 'model not found'").
+- **A typo becomes a header.** `max_tokns = 4096` on a model posts a junk header *and* silently leaves the real cap unset. That is exactly the class of silent misconfiguration `InferenceBackendLibrary.load`'s own docstring says it refuses to tolerate ("a config typo must never silently delete a backend, because the commands that boot leniently would then report the far more confusing 'model not found'").
 - **We send unreviewed strings to third parties.** Whatever is in a model table goes out over the network to the provider. That deserves a deliberate opt-in, not a default.
 - **The rule is undocumented.** `grep -rn "header" docs/` returns nothing about it. Nobody outside this file knows it exists, which means nobody outside this file can use it on purpose either.
 
@@ -62,19 +62,19 @@ Two things follow. First, the mechanism is load-bearing and cannot simply be clo
 
 **An unknown per-model key is accepted as a header only if it is shaped like a header name.** Concretely: it contains a hyphen. HTTP header names conventionally do (`x-portkey-config`, `anthropic-beta`, `api-version`); blueprint field names never do, because they are Python identifiers. Every real key in the table above passes except `endpoint_path`, which is not a header and is promoted to a declared field in Phase 1.
 
-A shape rule, not an allowlist of names: the whole point of the open bag is that pipelex-back-office can start serving a new `x-portkey-*` header without waiting for a client release, and a name allowlist would take that away.
+A shape rule, not an allowlist of names: the whole point of the open bag is that the back office can start serving a new `x-portkey-*` header without waiting for a client release, and a name allowlist would take that away.
 
 Everything unknown that is *not* header-shaped is then handled by source:
 
 - **From a local backend TOML — fatal.** There, an unknown snake_case key really is the author's typo, and local files are already strict about `[defaults]`.
 - **From the served gateway payload — pruned, silently.** There, it is version skew: a client legitimately reads a config written by a different release. This is the identical judgement `drop_unknown_gateway_defaults` already makes for the `defaults` block, for the identical reason, and the silence is required for the identical reason too — the prune runs before `runtime_hub.set_config()` on some boot paths, so a `log` call turns a data transform into a boot-order dependency (`test_pruning_does_not_need_the_log_hub` pins this).
 
-**That skew tolerance is not theoretical, and the executing agent should verify it still holds before assuming otherwise.** On 2026-08-14 this machine's `~/.pipelex/cache/remote_config.json` held the `_11` payload byte-for-byte while this branch pinned `_12` — because the cache path is shared across every checkout, seven of the eight on this machine pinned `_11`, and the cache records `schema_version` / `cached_at` / `raw_config` but **no source URL**, so a `_12` client cannot tell it is reading an `_11` body. Making remote unknowns fatal would have turned that ordinary local condition into a red suite.
+**That skew tolerance is not theoretical, and the executing agent should verify it still holds before assuming otherwise.** Observed on 2026-08-14: a local `~/.pipelex/cache/remote_config.json` held the `_11` payload byte-for-byte while this branch pinned `_12`. The cache path is shared across every checkout on a machine, and the cache records `schema_version` / `cached_at` / `raw_config` but **no source URL** — so a `_12` client cannot tell it is reading an `_11` body, and whichever version most checkouts pin is the one that populates it. Making remote unknowns fatal would have turned that ordinary local condition into a red suite.
 
 ## Decisions (veto here, cheaply)
 
-- **D1 — the classifier is pure, the policy lives at the call site.** A new `pipelex/cogt/model_backends/model_spec_keys.py` splits a raw model table into (blueprint fields, headers, rejected). It does not decide what "rejected" means. `_load_backend` decides, because only it knows the source. Functions are fully keyword-only so no subject grant is needed.
-- **D2 — the source is an enum, not a bool.** `ModelSpecSource.LOCAL_FILE | REMOTE_GATEWAY`, matched with `match`/`case` per the repo's enum convention. `_load_backend` already distinguishes the two branches (`PipelexBackend.is_gateway_backend`), so this threads one value, not new logic.
+- **D1 — the classifier is pure, the policy lives at the call site.** A new `pipelex/cogt/model_backends/model_spec_keys.py` splits a raw model table into (blueprint fields, headers, rejected). It does not decide what "rejected" means. `InferenceBackendLibrary.load` decides, because only it knows the source. Functions are fully keyword-only so no subject grant is needed.
+- **D2 — the source is an enum, not a bool.** `ModelSpecSource.LOCAL_FILE | REMOTE_GATEWAY`, matched with `match`/`case` per the repo's enum convention. `InferenceBackendLibrary.load` already distinguishes the two branches (`PipelexBackend.is_gateway_backend`), so this threads one value, not new logic.
 - **D3 — near-miss protection.** A key whose hyphens-to-underscores form matches a known blueprint field (`max-tokens`, `model-id`, `thinking-mode`) is rejected despite being header-shaped. Three lines, and it closes the one hole the shape rule leaves. **Separable — drop this if you think it is a solution in search of a problem.**
 - **D4 — `endpoint_path` becomes a real field**, not a permanent exception to the rule. It is our own data, read by our own worker; it has no business in a bag named for headers.
 - **D5 — no change to the backend-level twin** (`backend_library.py:154-156`, unknown backend keys → `extra_config`) in this change. Same silent-reclassification shape, but that dict never reaches a provider, so the blast radius is a local misconfiguration rather than an outbound one. See "Considered and deferred".
@@ -115,10 +115,10 @@ Goal: an unknown per-model key is either a plausible header or a loud error, and
 
 - [ ] **Tests first (red):** new `tests/unit/pipelex/cogt/model_backends/test_model_spec_key_policy.py` — header-shaped key accepted; snake_case unknown rejected; D3 near-miss (`max-tokens`) rejected; known blueprint field never diverted.
 - [ ] New `pipelex/cogt/model_backends/model_spec_keys.py` (D1): the pure classifier plus `ModelSpecSource` (D2).
-- [ ] Wire it into `_load_backend` (`backend_library.py:195-199`), replacing the unconditional loop. Local source raises `InferenceBackendLibraryError` with D6's message; gateway source prunes.
+- [ ] Wire it into `InferenceBackendLibrary.load` (`backend_library.py:195-199`), replacing the unconditional loop. Local source raises `InferenceBackendLibraryError` with D6's message; gateway source prunes.
 - [ ] **Tests (red first):** a local backend TOML carrying a synthetic unknown snake_case key fails the load with a message naming the key, the model and the file; the same key in a remote payload is pruned and the boot survives. Extend `test_gateway_unknown_defaults.py` rather than starting a parallel module — it already owns the remote-tolerance story, including the no-log-hub constraint.
 - [ ] **Regression, and the point of the whole change:** `x-portkey-provider` from local `portkey.toml` and `x-portkey-config` from the remote payload still reach `extra_headers` and still reach the wire.
-- [ ] **Leniency interaction:** confirm what a rejected key does under `lenient=True`. A typo must not silently delete a backend — that is the existing ruling in `_load_backend`'s docstring, and this new raise sits inside the same `try`. Decide deliberately and record the answer here; if it needs to escape the lenient skip, say why in a comment at the raise site.
+- [ ] **Leniency interaction:** confirm what a rejected key does under `lenient=True`. A typo must not silently delete a backend — that is the existing ruling in `InferenceBackendLibrary.load`'s docstring, and this new raise sits inside the same `try`. Decide deliberately and record the answer here; if it needs to escape the lenient skip, say why in a comment at the raise site.
 - [ ] **Mutation-check the new tests:** revert the guard, confirm the new tests go red, restore. A guard whose tests pass without it is not a guard.
 - [ ] Gates: `make tb`, targeted tests, stage + `make agent-check`, **full `make agent-test`**.
 
@@ -137,9 +137,9 @@ Do not start Phase 3 without Louis' explicit go. This is where a config that boo
 
 ## Cross-repo / release-gated follow-ups
 
-- **The downstream backend-TOML sweep gets louder, and that is the good news.** The templating-style plan already lists this as its one non-optional follow-up: every repo shipping `.pipelex/inference/backends/*.toml` still declares `prompting_target`, and `portkey.toml` carries it **per-model as well as in `[defaults]`**, so a fix that deletes only the `[defaults]` line unblocks the boot while quietly turning the per-model ones into outbound headers. With this guard in place that residue becomes a boot error naming the key instead. Confirmed tracked-file hits at the time of writing: `pipelex-server/worker/`, `pipelex-api/`, `cocode/`, `pipelex-cookbook/`, `pipelex-demos/`, `mthds-ui/`, plus `pipelex-js/` fixtures. **Ship this guard in or after the release that deletes `prompting_target`, never before** — before, it would reject the key while the field still exists.
-- **`pipelex-back-office`** owns the served gateway config (`pipelex_back_office/remote_config/gateway_models.toml`). Nothing to change now: `endpoint_path` becomes a declared field on the client side and `x-portkey-config` is header-shaped. Worth telling whoever maintains it that a *new* non-header per-model key would from now on be pruned by new clients rather than forwarded as a header.
-- **`pipelex-js`** is a second consumer of the same wire contract and models these specs its own way (`packages/runtime/src/worker/catalogue.ts`). Whether it wants a parallel rule is its own call, not this plan's.
+- **The downstream backend-TOML sweep gets louder, and that is the good news.** The templating-style plan already lists this as its one non-optional follow-up: every repo shipping `.pipelex/inference/backends/*.toml` still declares `prompting_target`, and `portkey.toml` carries it **per-model as well as in `[defaults]`**, so a fix that deletes only the `[defaults]` line unblocks the boot while quietly turning the per-model ones into outbound headers. With this guard in place that residue becomes a boot error naming the key instead. Confirmed tracked-file hits at the time of writing: `pipelex-api/`, `cocode/`, `pipelex-cookbook/`, `mthds-ui/`, plus our hosted worker, our demo repos, and fixtures in our JS runtime (all private). **Ship this guard in or after the release that deletes `prompting_target`, never before** — before, it would reject the key while the field still exists.
+- **Our back-office repo** (private) owns the served gateway config, in its gateway-models TOML. Nothing to change now: `endpoint_path` becomes a declared field on the client side and `x-portkey-config` is header-shaped. Worth telling whoever maintains it that a *new* non-header per-model key would from now on be pruned by new clients rather than forwarded as a header.
+- **Our JS runtime** (private repo) is a second consumer of the same wire contract and models these specs its own way, in its worker catalogue. Whether it wants a parallel rule is its own call, not this plan's.
 
 ## Considered and deferred
 

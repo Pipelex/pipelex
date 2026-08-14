@@ -22,7 +22,7 @@ def drop_unknown_gateway_defaults(*, gateway_model_specs: BackendModelSpecs) -> 
     stays strict, because there an unknown key really is the author's typo.
 
     Scoped to `defaults` on purpose. A per-model key the blueprint does not know is already meaningful
-    — `_load_backend` reclassifies it as an outbound HTTP header — and that behaviour is not this
+    — `InferenceBackendLibrary.load` reclassifies it as an outbound HTTP header — and that behaviour is not this
     function's to reinterpret.
 
     Deliberately pure, and deliberately silent: it runs on the success path of every gateway-backend

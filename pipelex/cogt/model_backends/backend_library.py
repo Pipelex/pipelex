@@ -330,6 +330,15 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         """
         try:
             return apply_to_strings_recursive(model_specs_dict, transform_func=substitute_vars_with_provider)
+        except VarFallbackPatternError as var_fallback_pattern_exc:
+            msg = f"Variable substitution failed in {source}: {var_fallback_pattern_exc}"
+            raise InferenceBackendCredentialsError(
+                credentials_error_type=InferenceBackendCredentialsErrorType.VAR_FALLBACK_PATTERN,
+                backend_name=backend_name,
+                # The pattern names several candidates, so no single one of them is the missing key.
+                key_name="unknown",
+                message=msg,
+            ) from var_fallback_pattern_exc
         except VarNotFoundError as var_not_found_exc:
             msg = f"Variable substitution failed in {source}: {var_not_found_exc}"
             raise InferenceBackendCredentialsError(

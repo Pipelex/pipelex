@@ -7,6 +7,8 @@ from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequen
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
 from pipelex.pipe_operators.structure.pipe_structure_blueprint import PipeStructureBlueprint
+from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
+from pipelex.tools.templating.text_format import TextFormat
 
 
 class TestBundleElaborator:
@@ -248,6 +250,42 @@ class TestBundleElaborator:
         assert structure.model is not None  # parsed to ModelReference
         assert draft.model is not None
         assert draft.model_to_structure is None
+
+    def test_templating_style_propagates_to_step_1(self):
+        """Step 1 renders the author's own prompt, so it must inherit the author's declared style."""
+        bundle = PipelexBundleBlueprint(
+            domain="my_domain",
+            description="Templating style propagation",
+            concept={"Foo": "A foo"},
+            pipe={
+                "make_foo": PipeLLMBlueprint(
+                    type="PipeLLM",
+                    description="Make a Foo",
+                    output="Foo",
+                    prompt="hello",
+                    templating_style=TagStyle.SQUARE_BRACKETS,
+                    structuring_method=StructuringMethod.PRELIMINARY_TEXT,
+                ),
+                "make_bar": PipeLLMBlueprint(
+                    type="PipeLLM",
+                    description="Make a Bar",
+                    output="Foo",
+                    prompt="hello",
+                    templating_style=TemplatingStyle(tag_style=TagStyle.XML, text_format=TextFormat.MARKDOWN),
+                    structuring_method=StructuringMethod.PRELIMINARY_TEXT,
+                ),
+            },
+        )
+        elaborated = BundleElaborator.elaborate(bundle=bundle)
+        assert elaborated.pipe is not None
+
+        shorthand_draft = elaborated.pipe["make_foo__draft_text"]
+        assert isinstance(shorthand_draft, PipeLLMBlueprint)
+        assert shorthand_draft.templating_style is TagStyle.SQUARE_BRACKETS
+
+        full_table_draft = elaborated.pipe["make_bar__draft_text"]
+        assert isinstance(full_table_draft, PipeLLMBlueprint)
+        assert full_table_draft.templating_style == TemplatingStyle(tag_style=TagStyle.XML, text_format=TextFormat.MARKDOWN)
 
     def test_model_to_structure_none_yields_step_2_default(self):
         bundle = PipelexBundleBlueprint(

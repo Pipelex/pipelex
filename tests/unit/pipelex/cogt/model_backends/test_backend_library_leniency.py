@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.cogt.exceptions import InferenceBackendCredentialsError, InferenceBackendLibraryError
+from pipelex.cogt.exceptions import InferenceBackendCredentialsError, InferenceBackendCredentialsErrorType, InferenceBackendLibraryError
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
@@ -53,6 +53,15 @@ sdk = "openai_responses"
 
 ["acme-one"]
 model_id = "${{{ABSENT_VAR}}}"
+"""
+
+MODEL_SPECS_TOML_WITH_MISSING_FALLBACK_PATTERN = f"""
+[defaults]
+model_type = "llm"
+sdk = "openai_responses"
+
+["acme-one"]
+model_id = "${{env:{ABSENT_VAR}_A|env:{ABSENT_VAR}_B}}"
 """
 
 
@@ -123,6 +132,30 @@ class TestBackendLibraryLeniency:
         )
 
         assert library.root == {}
+
+    def test_an_unresolvable_model_spec_fallback_pattern_is_skipped_leniently(self, tmp_path: Path) -> None:
+        """A fallback pattern whose every candidate is absent is still just a missing credential."""
+        library = self._load(
+            tmp_path,
+            backends_toml=BACKENDS_TOML,
+            model_specs_toml=MODEL_SPECS_TOML_WITH_MISSING_FALLBACK_PATTERN,
+            lenient=True,
+        )
+
+        assert library.root == {}
+
+    def test_an_unresolvable_model_spec_fallback_pattern_raises_a_credentials_error_when_strict(self, tmp_path: Path) -> None:
+        """No single variable name is right when several were tried, but the error still names the backend."""
+        with pytest.raises(InferenceBackendCredentialsError) as exc_info:
+            self._load(
+                tmp_path,
+                backends_toml=BACKENDS_TOML,
+                model_specs_toml=MODEL_SPECS_TOML_WITH_MISSING_FALLBACK_PATTERN,
+                lenient=False,
+            )
+
+        assert exc_info.value.credentials_error_type is InferenceBackendCredentialsErrorType.VAR_FALLBACK_PATTERN
+        assert exc_info.value.backend_name == "acme"
 
     @pytest.mark.parametrize(
         ("backends_toml", "model_specs_toml"),
