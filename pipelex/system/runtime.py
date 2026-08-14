@@ -82,8 +82,6 @@ class ProblemReaction(StrEnum):
 
 
 class ProblemReactions(BaseModel):
-    template_inputs: ProblemReaction
-    prompt_templates: ProblemReaction
     job: ProblemReaction
 
 
@@ -93,8 +91,6 @@ class RuntimeManager(BaseModel):
     _worker_mode: WorkerMode | None = None
 
     problem_reactions: ProblemReactions = ProblemReactions(
-        template_inputs=ProblemReaction.LOG,
-        prompt_templates=ProblemReaction.LOG,
         job=ProblemReaction.LOG,
     )
 

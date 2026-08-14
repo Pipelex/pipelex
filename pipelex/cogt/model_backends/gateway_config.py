@@ -3,7 +3,6 @@ from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex import log
 from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs, InferenceModelSpecBlueprint
 
 
@@ -25,6 +24,11 @@ def drop_unknown_gateway_defaults(*, gateway_model_specs: BackendModelSpecs) -> 
     Scoped to `defaults` on purpose. A per-model key the blueprint does not know is already meaningful
     — `_load_backend` reclassifies it as an outbound HTTP header — and that behaviour is not this
     function's to reinterpret.
+
+    Deliberately pure, and deliberately silent: it runs on the success path of every gateway-backend
+    load, including loads that happen before `runtime_hub.set_config()` has configured the log
+    dispatch. A `log` call here would turn a plain data transform into a boot-order dependency and
+    crash the caller with `LogConfig is not set`.
     """
     known_fields = InferenceModelSpecBlueprint.model_fields.keys()
     defaults = gateway_model_specs.get("defaults")
@@ -35,7 +39,6 @@ def drop_unknown_gateway_defaults(*, gateway_model_specs: BackendModelSpecs) -> 
     if not unknown_keys:
         return gateway_model_specs
 
-    log.verbose(f"Ignoring unknown key(s) in the remote gateway config defaults: {', '.join(sorted(unknown_keys))}")
     pruned: BackendModelSpecs = copy.deepcopy(gateway_model_specs)
     pruned_defaults = cast("dict[str, Any]", pruned["defaults"])
     for unknown_key in unknown_keys:

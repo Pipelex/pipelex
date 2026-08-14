@@ -8,6 +8,9 @@ what happened the day `prompting_target` was removed while the served config sti
 
 from typing import Any, cast
 
+from pytest_mock import MockerFixture
+
+from pipelex import log
 from pipelex.cogt.model_backends.gateway_config import drop_unknown_gateway_defaults
 from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs, InferenceModelSpecBlueprint
 
@@ -42,6 +45,17 @@ class TestGatewayUnknownDefaults:
         specs = self._specs(defaults={"max_tokens": 4096})
 
         assert drop_unknown_gateway_defaults(gateway_model_specs=specs) is specs
+
+    def test_pruning_does_not_need_the_log_hub(self, mocker: MockerFixture) -> None:
+        """It runs on the success path of every gateway load, including ones that precede runtime_hub.set_config().
+
+        The served config really does carry an unknown key today, so this is the ordinary path, not a corner.
+        """
+        mocker.patch.object(log.log_dispatch, "_log_config_instance", None)
+
+        pruned = drop_unknown_gateway_defaults(gateway_model_specs=self._specs(defaults={"max_tokens": 4096, "a_field_we_removed": "anthropic"}))
+
+        assert pruned["defaults"] == {"max_tokens": 4096}
 
     def test_per_model_unknown_keys_are_untouched(self) -> None:
         """A per-model unknown key means something already — it becomes an outbound HTTP header."""

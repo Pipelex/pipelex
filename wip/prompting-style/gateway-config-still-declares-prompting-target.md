@@ -20,9 +20,11 @@ Note the asymmetry inside `backend_library._load_backend`: the loop that reclass
 
 This is not a shim for `prompting_target` specifically; it is the tolerance a remote config needs in general, and it would have prevented this failure for any removed field. Tested in `tests/unit/pipelex/cogt/model_backends/test_gateway_unknown_defaults.py`.
 
+The prune is pure and silent by design. It first logged the dropped keys, which crashed any caller that loads backends before `runtime_hub.set_config()` has configured the log dispatch (`RuntimeError: LogConfig is not set`) — and since the served config really does declare an unknown key, that fired on the ordinary success path, not a corner. Pinned by `test_pruning_does_not_need_the_log_hub`.
+
 ## What still needs doing, elsewhere
 
-1. **Drop `prompting_target` from the gateway config served by the Pipelex API** (`pipelex-server`). It is dead data as of this change: nothing in `pipelex` reads it any more. Until then, every client logs a verbose line about ignoring it.
+1. **Drop `prompting_target` from the gateway config served by the Pipelex API.** It is dead data as of this change: nothing in `pipelex` reads it any more. The source is **`pipelex-back-office`**, not `pipelex-server`: `pipelex_back_office/remote_config/gateway_models.toml` declares it in `[defaults]`, and `build_service.py` publishes that block as the remote config's `backend_model_specs`.
 2. **Decide whether the per-model unknown-key → HTTP-header rule should survive for the gateway backend.** Deliberately untouched here. A removed field that had lived per-model rather than in `defaults` would have been sent to the provider as a header instead of raising — a worse outcome than the one that was actually hit, and one no test would catch.
 
 Neither is in scope for the templating-style change. Item 1 is a `pipelex-server` deliverable; item 2 is a design question about the backend loader that deserves its own look.

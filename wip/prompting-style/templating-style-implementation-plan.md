@@ -155,7 +155,7 @@ Docs (the design's §8 — replace, don't patch, the dead-premise page):
 - [ ] `docs/under-the-hood/pipelex-kernel.md` — the flow prose ("derive a prompting style"), the kernel-surface table row, the per-call note; whatever Phase 1 already touched, finish here.
 - [ ] `docs/building-methods/pipes/pipe-operators/PipeLLM.md` — new `templating_style` parameter row; inline model-table field list checked (it never documented `prompting_target`, so no deletion there).
 - [ ] `docs/building-methods/pipes/pipe-operators/PipeCompose.md` — align wording with the one-name vocabulary; cross-link the new page.
-- [ ] `.claude/skills/add-model/SKILL.md` — remove the `prompting_target` authoring step.
+- [x] `.claude/skills/add-model/SKILL.md` — remove the `prompting_target` authoring step. **Pulled forward out of Phase 4 and done**, because it is an agent-executable instruction living in the repo: between Phase 3 and Phase 4 it told an author to write a key that now hard-fails the boot. Replaced with a line saying a model spec never declares prompt formatting, and that an unknown key becomes an outbound header.
 - [ ] Verify `docs/CLAUDE.md`'s language-surface note still reads true now that PipeLLM carries the field too.
 - [ ] Sweep for stragglers: `grep -ri "prompting" docs/` and judge each survivor.
 
@@ -187,6 +187,8 @@ Everything is green and documented; nothing is committed beyond what earlier che
 - **MTHDS spec prose** — a pipe-level `templating_style` is a language-surface change owned by the `mthds/` repo; the schema regen is only the mechanical half. A deliverable of its own after release.
 - **`pipelex-api` CI** — its openapi check runs only under its own `make check` and has been bitten by pipelex bumps before; verify on the release bump whether the schema change surfaces there.
 - **Cookbook / starter sweeps** — no shipped `.mthds` uses any styling surface today, so no migration is expected; a post-release sanity pass confirms.
+- **Downstream backend-TOML sweep — a boot-breaker, and the one item on this list that is not optional.** Every repo that ships its own `.pipelex/inference/backends/*.toml` still declares `prompting_target`, and local backend files are read strictly: on the `pipelex` version bump each one dies at boot with `Extra forbidden fields: 'prompting_target'`. Tracked-file hits confirmed in `pipelex-server/worker/`, `pipelex-api/`, `cocode/`, `pipelex-cookbook/`, `pipelex-demos/`, `mthds-ui/`, plus two `pipelex-js/` fixtures. **`portkey.toml` is the trap in every one of them**: the key appears once in `[defaults]` *and* again on several per-model entries, so a "fix" that deletes only the `[defaults]` line unblocks the boot while leaving the per-model ones — which the loader reclassifies as **outbound HTTP headers** sent to Portkey. Delete every occurrence, `[defaults]` and per-model alike, and grep to prove it.
+- **The served gateway config is owned by `pipelex-back-office`, not `pipelex-server`.** `pipelex_back_office/remote_config/gateway_models.toml` declares `prompting_target = "anthropic"` in its `[defaults]`, and `build_service.py` publishes that block as the remote config's `backend_model_specs` — that file is the reason `drop_unknown_gateway_defaults` exists. Removing it there is what retires the tolerance's occasion (not the tolerance itself, which is general). See [`gateway-config-still-declares-prompting-target.md`](gateway-config-still-declares-prompting-target.md).
 - **PipeImgGen/PipeSearch authored styling** (D6) — only if a real need appears.
 
 ## Checkpoint log
