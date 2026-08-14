@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:6a613fed0ff7873b3e1e61fe9aee1d7b8c033bc2f6f7c886273a66294a0aa944"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-12T12:00:30Z"
-rationale = "Trigger is a comment-only pointer removal in compose_ops.py, func_ops.py and test_kernel_boot_contract.py: all three ended a paragraph with a see-also tail naming a wip/ doc that has since moved out of this repo, so the tails were dangling. Each comment already stated its own conclusion, so only the tail was dropped - the compose/func placement rationale and the distributed-orchestrator paragraph read exactly as before. No kernel entry point, signature or behavior changed. Reviewed docs/under-the-hood/pipelex-kernel.md: it cites neither moved doc, carries no private-repo reference, and its module table, completeness claim and Enforcement-table citation of test_kernel_boot_contract.py all still hold (that citation describes the test coverage, which this edit did not touch). Reviewed, no doc change needed. (Re-recorded 2026-08-12: the original rationale was written with backticked paths, which the shell command-substituted away.)"
+digest = "sha256:deb51b17a46b4de6eb46b3f25b62af49b51957601e6363b20deb4077a15b3e16"
+reviewed_by = "thomashebrard"
+reviewed_at = "2026-08-14T10:55:55Z"
+rationale = "HEAD (2407a682a) added a new public kernel function, concrete_llm_model_handle, to llm_ops.py without listing it in the doc module table, which enumerates that module's entry points and claims completeness. Added it there. Reviewed the rest of docs/under-the-hood/pipelex-kernel.md against the change: the function is a pure display-side resolver over the deck, adds no state to the kernel facade and changes no existing entry point signature or behavior, so the facade section, the per-run state discussion and the Enforcement table all still hold as written."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -16,7 +16,7 @@ rationale = "Trigger is a comment-only pointer removal in compose_ops.py, func_o
 "pipelex/kernel/img_gen_ops.py" = "blob:b22869bee7dfbb624e3c406a0631969fc8695b7c"
 "pipelex/kernel/img_gen_prompt.py" = "blob:90c33eae95298aa76d036f256ffc7d6523249166"
 "pipelex/kernel/img_gen_results.py" = "blob:46b4ca11c70d906ae6d58ce66461f9b3414f1bfa"
-"pipelex/kernel/llm_ops.py" = "blob:36a2e2f3a002e0c50ef4f645937b66573e46aa51"
+"pipelex/kernel/llm_ops.py" = "blob:02bec74888ae6a586ceabaf313277706ba2a2036"
 "pipelex/kernel/llm_prompt_content.py" = "blob:26dfce734de582320c0ea7b9a09b01f2d1ca8627"
 "pipelex/kernel/llm_results.py" = "blob:6e3b8a2878b5bb284ece5fac10262fb59ac2029d"
 "pipelex/kernel/memory_ops.py" = "blob:c4d7fee0a5ac2c1292ad39d2c188b2a02b47d15b"

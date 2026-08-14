@@ -67,7 +67,7 @@ Both façade calls take the concept and the output class the caller wants, defau
 | Module | Entry points |
 |---|---|
 | `pipelex.kernel.pipelex_kernel` | `PipelexKernel.make`, `.llm_text`, `.llm_object`, `.make_step_metadata` |
-| `pipelex.kernel.llm_ops` | `resolve_llm_setting_for_text` / `_for_object`, `derive_templating_style`, `derive_structure_prompt`, `generate_object_content`, `run_llm_text`, `run_llm_object` |
+| `pipelex.kernel.llm_ops` | `resolve_llm_setting_for_text` / `_for_object`, `concrete_llm_model_handle`, `derive_templating_style`, `derive_structure_prompt`, `generate_object_content`, `run_llm_text`, `run_llm_object` |
 | `pipelex.kernel.extract_ops` | `resolve_extract_setting`, `build_extract_job_params`, `run_extract` |
 | `pipelex.kernel.img_gen_ops` | `resolve_img_gen_setting`, `resolve_default_size`, `build_img_gen_job_params`, `run_img_gen` |
 | `pipelex.kernel.search_ops` | `resolve_search_setting`, `run_search` |
