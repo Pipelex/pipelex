@@ -3,17 +3,22 @@
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
+from pydantic import ValidationError
+
 from pipelex.graph.graphspec import (
     EdgeKind,
     EdgeSpec,
     ErrorSpec,
     GraphSpec,
     GraphSpecMode,
+    GraphUsageSpec,
     IOSpec,
     NodeIOSpec,
     NodeKind,
     NodeSpec,
     NodeStatus,
+    NodeUsageSpec,
     PipelineRef,
     TimingSpec,
 )
@@ -286,6 +291,107 @@ class TestGraphSpecRoundtrip:
         assert len(error_spec.stack or "") <= PreviewTruncationData.MAX_STACK_LENGTH
         if error_spec.stack and len(long_stack) > PreviewTruncationData.MAX_STACK_LENGTH:
             assert error_spec.stack.endswith("...")
+
+    def test_roundtrip_with_usage_preserves_none_cost(self) -> None:
+        """An unrated node round-trips as unrated — never as $0.00 (NodeUsageSpec invariant 2)."""
+        node = NodeSpec(
+            node_id="node_unrated",
+            kind=NodeKind.OPERATOR,
+            pipe_code="generate_text",
+            pipe_type="PipeLLM",
+            status=NodeStatus.SUCCEEDED,
+            usage=NodeUsageSpec(
+                inference_calls=2,
+                rated_inference_calls=0,
+                nb_tokens_by_category={"input": 100, "input_cached": 40, "output": 50},
+                total_tokens=150,
+                cost=None,
+                subtree_inference_calls=2,
+                subtree_rated_inference_calls=0,
+                subtree_nb_tokens_by_category={"input": 100, "input_cached": 40, "output": 50},
+                subtree_total_tokens=150,
+                subtree_cost=None,
+            ),
+        )
+        graph = GraphSpec(
+            graph_id="usage_roundtrip",
+            created_at=ValidGraphData.CREATED_AT,
+            pipeline_ref=PipelineRef(),
+            nodes=[node],
+            edges=[],
+            usage=GraphUsageSpec(
+                total=NodeUsageSpec(inference_calls=2, total_tokens=150),
+                unattributed=NodeUsageSpec(),
+            ),
+        )
+
+        restored = GraphSpec.model_validate_json(graph.to_json())
+
+        restored_usage = restored.nodes[0].usage
+        assert restored_usage is not None
+        assert restored_usage.cost is None
+        assert restored_usage.subtree_cost is None
+        assert restored_usage.inference_calls == 2
+        assert restored_usage.rated_inference_calls == 0
+        assert restored_usage.total_tokens == 150
+        assert restored_usage.nb_tokens_by_category == {"input": 100, "input_cached": 40, "output": 50}
+        assert restored.usage is not None
+        assert restored.usage.total.total_tokens == 150
+        assert restored.usage.unattributed.inference_calls == 0
+
+    def test_roundtrip_with_rated_usage(self) -> None:
+        """A rated node keeps its dollar figure and its rated-call count through the wire."""
+        node = NodeSpec(
+            node_id="node_rated",
+            kind=NodeKind.OPERATOR,
+            pipe_code="generate_text",
+            pipe_type="PipeLLM",
+            status=NodeStatus.SUCCEEDED,
+            usage=NodeUsageSpec(inference_calls=1, rated_inference_calls=1, total_tokens=150, cost=0.0043),
+        )
+        graph = GraphSpec(
+            graph_id="usage_rated",
+            created_at=ValidGraphData.CREATED_AT,
+            pipeline_ref=PipelineRef(),
+            nodes=[node],
+            edges=[],
+        )
+
+        restored = GraphSpec.model_validate_json(graph.to_json())
+
+        restored_usage = restored.nodes[0].usage
+        assert restored_usage is not None
+        assert restored_usage.cost == 0.0043
+        assert restored_usage.rated_inference_calls == 1
+        assert restored.usage is None
+
+    def test_usage_forbids_unknown_fields(self) -> None:
+        """extra="forbid" on NodeUsageSpec: a stale or invented field fails loudly."""
+        with pytest.raises(ValidationError):
+            NodeUsageSpec.model_validate({"inference_calls": 1, "cost_usd": 0.01})
+
+    def test_roundtrip_without_usage_stays_none(self) -> None:
+        """A graph assembled with usage collection off keeps None everywhere (invariant 1)."""
+        graph = GraphSpec(
+            graph_id="no_usage",
+            created_at=ValidGraphData.CREATED_AT,
+            pipeline_ref=PipelineRef(),
+            nodes=[
+                NodeSpec(
+                    node_id="node_001",
+                    kind=NodeKind.OPERATOR,
+                    pipe_code="test_pipe",
+                    pipe_type="PipeLLM",
+                    status=NodeStatus.SUCCEEDED,
+                )
+            ],
+            edges=[],
+        )
+
+        restored = GraphSpec.model_validate_json(graph.to_json())
+
+        assert restored.usage is None
+        assert restored.nodes[0].usage is None
 
     def test_roundtrip_with_all_node_kinds(self) -> None:
         """Test round-trip preserves all NodeKind enum values."""
