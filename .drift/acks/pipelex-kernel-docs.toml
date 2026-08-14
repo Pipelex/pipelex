@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:5ec1035b41c34141c61a699d4310d73f2999c3d8cd6c4cc6d95fc930ab2101d9"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-14T06:58:58Z"
-rationale = "Cherry-pick of the step-identity change: make_step_metadata gains pipe_code and PipelexKernel.make gains an injectable step_id_source. Updated the doc's run-scoped-state section: the façade now holds identity plus the step_id_source seam, the job_metadata bullet documents pipe_code naming with its omit-not-None contract and the façade's deliberate anonymity."
+digest = "sha256:b3bee1e27d8ffdbf02ce9a7323c43cce190e1a68368fd56833201eabc48edfae"
+reviewed_by = "Claude (Opus 5, 1M context)"
+reviewed_at = "2026-08-14T12:33:25Z"
+rationale = "Reopened with ZERO trigger-file changes: every blob in pipelex/kernel and test_kernel_boot_contract.py is byte-identical to the previous ack, so no kernel surface moved since Louis reviewed it; the contract definition digest is what shifted, across the dev merge. Reviewed docs/under-the-hood/pipelex-kernel.md anyway, both halves the contract names. Module table: diffed it against every public function AST-parsed out of pipelex/kernel/*.py and it is complete, concrete_llm_model_handle included; kernel.exceptions is absent from the table correctly, since it defines error classes and no entry point. Gates table: its claim that the boot-contract test covers every entry point except the three resolve_*_setting helpers, which read the deck, still matches that test's own stated exception. Nothing stale, no doc change needed."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
