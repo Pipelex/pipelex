@@ -393,8 +393,14 @@ class PipeCondition(PipeController):
             )
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
-        # Here, it should launch the dry run of all the pipes in the outcomes map
-        for pipe_code in self.pipe_dependencies():
+        # Here, it should launch the dry run of all the pipes in the outcomes map.
+        # pipe_dependencies() is a set, and every branch dry-runs into the SAME
+        # working memory under the SAME output_name — so the branch iterated last
+        # is the one whose stuff the caller sees as this condition's output. Left
+        # unsorted, that is string-hash order, which varies per process: the same
+        # bundle dry-run twice yields two different graphs. Sort so the last writer
+        # is a property of the method, not of PYTHONHASHSEED.
+        for pipe_code in sorted(self.pipe_dependencies()):
             pipe = get_required_pipe(pipe_code=pipe_code)
             await pipe.run_pipe(
                 job_metadata=job_metadata,

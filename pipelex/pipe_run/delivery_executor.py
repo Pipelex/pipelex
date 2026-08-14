@@ -152,6 +152,18 @@ class DeliveryExecutor:
         client wire shape (``TokensUsageRecord``) — the same shape the ``/execute``
         response carries on ``pipe_output.tokens_usages`` — never the internal
         full-fidelity usage models.
+
+        TODO: the envelope carries no RUN TOTAL, so every consumer that wants "what did
+        this run cost" sums the list itself. The number already exists as
+        ``GraphSpec.usage.total`` — but only on the graph, an optional and often large
+        RENDERING artifact, which is the wrong contract to read a price from (turn off
+        ``is_generate_graph`` and the total disappears while this file is still written).
+        Store it here instead, from the same ``compute_tokens_usage_cost`` engine the
+        graph rollup and the cost report both go through, so two artifacts of one run can
+        never quote different prices. Keep the three-valued semantics rather than
+        flattening them: ``None`` means unrated and must never render as zero, and a
+        partially rated run's total is a lower bound. Tracked as T-5 in
+        ``pipelex-server/TODOS.md``.
         """
         usage_doc: dict[str, Any] = {
             "tokens_usages": dump_tokens_usage_records(pipe_output.tokens_usages),

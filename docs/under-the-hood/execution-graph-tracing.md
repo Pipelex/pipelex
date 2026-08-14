@@ -167,11 +167,14 @@ class GraphSpec(BaseModel):
     pipeline_ref: PipelineRef
     nodes: list[NodeSpec]
     edges: list[EdgeSpec]
+    usage: GraphUsageSpec | None
     meta: dict[str, Any]
 
     def to_json(self) -> str:
         return self.model_dump_json(by_alias=True, indent=2)
 ```
+
+`usage` (and its per-node counterpart `NodeSpec.usage`) carries the run's inference usage attributed to graph position — see [Per-node Usage Attribution](per-node-usage-attribution.md) for the three usage states and the invariants a consumer must branch on.
 
 `meta.format` is always `"mthds"` on newly emitted Pipelex graphs. `meta.mode` records provenance for renderers and shared tooling: Pipelex execution graphs emit `"dry"` for dry-run/mock execution and `"live"` for real execution. The shared renderer also accepts `"static"` for graphs produced by a static MTHDS graph builder.
 
@@ -517,6 +520,7 @@ validate_graphspec(graph_spec)
 | File | Purpose |
 |------|---------|
 | `pipelex/graph/graphspec.py` | Canonical GraphSpec model |
+| `pipelex/tracing/usage_attribution.py` | Per-node usage accumulation and subtree rollup |
 | `pipelex/graph/graph_tracer.py` | GraphTracer implementation |
 | `pipelex/graph/graph_tracer_manager.py` | Singleton manager for tracers |
 | `pipelex/graph/graph_tracer_protocol.py` | Protocol + NoOp implementation |

@@ -14,11 +14,16 @@ from typing import Any, Callable
 
 import pytest
 
+from pipelex.cogt.llm.llm_report import LLMTokensUsage
+from pipelex.cogt.usage.cost_category import CostCategory
+from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import EdgeKind, EdgeSpec, GraphSpec, IOSpec, NodeKind, NodeSpec
+from pipelex.system.job_metadata import JobCategory, JobMetadata, UnitJobId
 from pipelex.system.trace_context import TraceContext
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
+from pipelex.tracing.trace_events import PipeStartEvent, UsageReportEvent
 from tests.unit.pipelex.graph.conftest import make_defaulted_data_inclusion_config
 
 # ---------------------------------------------------------------------------
@@ -422,6 +427,67 @@ def _scenario_pass_through(tracer: GraphTracer, context: TraceContext) -> None:
     )
 
 
+def _scenario_with_usage(tracer: GraphTracer, context: TraceContext) -> None:
+    """A sequence whose child reports inference usage through the event log.
+
+    Feeds ``test_usage_is_the_one_intentional_divergence``: the assembler folds the
+    usage event, the in-process tracer has no channel to receive it at all.
+    """
+    started_at = _T0
+
+    parent_id, child_ctx = tracer.on_pipe_start(
+        trace_context=context,
+        pipe_code="sequence",
+        pipe_type="PipeSequence",
+        node_kind=NodeKind.CONTROLLER,
+        started_at=started_at,
+    )
+
+    child_id, _ = tracer.on_pipe_start(
+        trace_context=child_ctx,
+        pipe_code="gen_text",
+        pipe_type="PipeLLM",
+        node_kind=NodeKind.OPERATOR,
+        started_at=started_at + timedelta(seconds=1),
+    )
+    tracer.on_pipe_end_success(
+        node_id=child_id,
+        ended_at=started_at + timedelta(seconds=2),
+        output_spec=IOSpec(name="output_text", digest="digest_a"),
+    )
+    tracer.on_pipe_end_success(
+        node_id=parent_id,
+        ended_at=started_at + timedelta(seconds=3),
+    )
+
+
+def _usage_events_for(*, assembled_child_node_id: str, event_log: InMemoryEventLog) -> list[UsageReportEvent]:
+    """One rated LLM call attributed to ``assembled_child_node_id``."""
+    return [
+        UsageReportEvent(
+            pipeline_run_id=_PIPELINE_RUN_ID,
+            workflow_id=_WORKFLOW_ID,
+            writer_id=event_log.writer_id,
+            timestamp=_T0 + timedelta(seconds=2),
+            sequence=event_log.next_sequence(),
+            node_id=assembled_child_node_id,
+            tokens_usage=LLMTokensUsage(
+                job_metadata=JobMetadata(
+                    user_id="user_test",
+                    pipeline_run_id=_PIPELINE_RUN_ID,
+                    pipe_code="gen_text",
+                    unit_job_id=UnitJobId.LLM_GEN_TEXT,
+                    job_category=JobCategory.LLM_JOB,
+                ),
+                inference_model_name="test-model",
+                inference_model_id="test-model-id",
+                unit_costs={CostCategory.INPUT: 3.0, CostCategory.OUTPUT: 15.0},
+                nb_tokens_by_category={TokenCategory.INPUT: 100, TokenCategory.OUTPUT: 50},
+            ),
+        )
+    ]
+
+
 def _scenario_condition_selected_outcome(tracer: GraphTracer, context: TraceContext) -> None:
     """Condition pipe with SELECTED_OUTCOME edge."""
     started_at = _T0
@@ -482,3 +548,54 @@ class TestAssemblerEquivalence:
         """GraphTracer teardown and GraphSpecAssembler produce structurally identical GraphSpecs."""
         direct_spec, assembled_spec = _run_both_paths(scenario_fn)
         _assert_graphs_equivalent(direct_spec, assembled_spec)
+
+    def test_usage_is_the_one_intentional_divergence(self) -> None:
+        """The two builders stay structurally equivalent, and diverge on `usage` on purpose.
+
+        The in-process GraphTracer has no channel to receive a UsageReportEvent —
+        ``GraphTracerProtocol`` has no method for it — and its GraphSpec is discarded at
+        every call site anyway (runner.py, pipe_run.py, dry_run_in_process.py all read
+        ``pipe_output.graph_spec``, i.e. the assembler's). So usage is deliberately
+        assembler-only. That gap is asserted here rather than normalized away: if someone
+        later plumbs usage into the tracer, this test fails and tells them to delete the
+        divergence assertion instead of leaving a silently rotting comparison.
+        """
+        data_inclusion = make_defaulted_data_inclusion_config()
+
+        tracer_direct = GraphTracer()
+        ctx_direct = tracer_direct.setup(graph_id=_GRAPH_ID, data_inclusion=data_inclusion)
+        _scenario_with_usage(tracer_direct, ctx_direct)
+        direct_spec = tracer_direct.teardown()
+        assert direct_spec is not None
+
+        event_log = InMemoryEventLog()
+        tracer_event = GraphTracer()
+        ctx_event = tracer_event.setup(
+            graph_id=_GRAPH_ID,
+            data_inclusion=data_inclusion,
+            event_log=event_log,
+            workflow_id=_WORKFLOW_ID,
+            pipeline_run_id=_PIPELINE_RUN_ID,
+        )
+        _scenario_with_usage(tracer_event, ctx_event)
+        tracer_event.teardown()
+
+        # The reporting manager emits usage against the node the inference ran under;
+        # replicate that here against the operator node the scenario produced.
+        operator_node_id = next(
+            event.node_id for event in event_log.read_events(_PIPELINE_RUN_ID) if isinstance(event, PipeStartEvent) and event.pipe_code == "gen_text"
+        )
+        for usage_event in _usage_events_for(assembled_child_node_id=operator_node_id, event_log=event_log):
+            event_log.emit(usage_event)
+
+        assembled_spec = GraphSpecAssembler.assemble(events=event_log.read_events(_PIPELINE_RUN_ID), graph_id=_GRAPH_ID)
+
+        # Everything the two builders both model still matches.
+        _assert_graphs_equivalent(direct_spec, assembled_spec)
+
+        # The intentional divergence.
+        assert direct_spec.usage is None
+        assert all(node.usage is None for node in direct_spec.nodes)
+        assert assembled_spec.usage is not None
+        assert assembled_spec.usage.total.inference_calls == 1
+        assert all(node.usage is not None for node in assembled_spec.nodes)
