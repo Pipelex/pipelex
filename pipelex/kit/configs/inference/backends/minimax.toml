@@ -23,7 +23,6 @@
 [defaults]
 model_type = "llm"
 sdk = "anthropic"
-prompting_target = "anthropic"
 structure_method = "instructor/anthropic_tools"
 thinking_mode = "manual"
 max_tokens = 16384

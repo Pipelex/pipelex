@@ -316,10 +316,6 @@ class LLMPromptSpecError(CogtError):
     error_category = InferenceErrorCategory.CONTENT
 
 
-class LLMPromptTemplateInputsError(CogtError):
-    error_category = InferenceErrorCategory.CONTENT
-
-
 class LLMPromptParameterError(CogtError):
     error_category = InferenceErrorCategory.CONTENT
 

@@ -10,7 +10,6 @@ from pipelex.cogt.exceptions import (
     InferenceErrorCategory,
     LLMPromptParameterError,
     LLMPromptSpecError,
-    LLMPromptTemplateInputsError,
     PromptDocumentFactoryError,
     PromptImageFactoryError,
     PromptImageFormatError,
@@ -80,7 +79,6 @@ class TestClassLevelMetadata:
         ("_topic", "exc", "expected_category"),
         [
             ("prompt_spec", LLMPromptSpecError("x"), InferenceErrorCategory.CONTENT),
-            ("prompt_template", LLMPromptTemplateInputsError("x"), InferenceErrorCategory.CONTENT),
             ("prompt_parameter", LLMPromptParameterError("x"), InferenceErrorCategory.CONTENT),
             ("prompt_image_factory", PromptImageFactoryError("x"), InferenceErrorCategory.CONTENT),
             ("prompt_image_format", PromptImageFormatError("x"), InferenceErrorCategory.CONTENT),

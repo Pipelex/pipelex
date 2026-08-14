@@ -25,7 +25,6 @@ def _make_worker(mocker: MockerFixture, thinking_mode: ThinkingMode) -> GoogleLL
     mock_model = mocker.MagicMock()
     mock_model.thinking_mode = thinking_mode
     mock_model.desc = "test-model"
-    del mock_model.prompting_target  # budget resolution is worker-owned; reading the model spec for it would raise
     worker.inference_model = mock_model
     return worker
 

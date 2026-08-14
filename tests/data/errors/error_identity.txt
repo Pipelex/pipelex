@@ -145,7 +145,6 @@ LLMHandleNotFoundError | LLM handle not found | https://docs.pipelex.com/latest/
 LLMModelNotFoundError | LLM model not found | https://docs.pipelex.com/latest/errors/llm-model-not-found-error/
 LLMPromptParameterError | LLM prompt parameter | https://docs.pipelex.com/latest/errors/llm-prompt-parameter-error/
 LLMPromptSpecError | LLM prompt spec | https://docs.pipelex.com/latest/errors/llm-prompt-spec-error/
-LLMPromptTemplateInputsError | LLM prompt template inputs | https://docs.pipelex.com/latest/errors/llm-prompt-template-inputs-error/
 LLMSettingsValidationError | LLM settings validation | https://docs.pipelex.com/latest/errors/llm-settings-validation-error/
 LangfuseCredentialsError | Langfuse credentials | https://docs.pipelex.com/latest/errors/langfuse-credentials-error/
 LibraryError | Library error | https://docs.pipelex.com/latest/errors/library-error/

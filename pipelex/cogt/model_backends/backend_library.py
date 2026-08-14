@@ -18,7 +18,7 @@ from pipelex.cogt.model_backends.backend_factory import (
     InferenceBackendBlueprint,
     InferenceBackendFactory,
 )
-from pipelex.cogt.model_backends.gateway_config import GatewayConfig
+from pipelex.cogt.model_backends.gateway_config import GatewayConfig, drop_unknown_gateway_defaults
 from pipelex.cogt.model_backends.model_spec_factory import (
     BackendModelSpecs,
     InferenceModelSpecBlueprint,
@@ -250,7 +250,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
 
         # Merge remote config with local overrides
         model_specs_dict = GatewayConfigMerger.merge(
-            gateway_model_specs=gateway_config.model_specs,
+            gateway_model_specs=drop_unknown_gateway_defaults(gateway_model_specs=gateway_config.model_specs),
             local_overrides=local_overrides,
         )
 

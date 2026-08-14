@@ -1920,14 +1920,6 @@ rationale = "Prepares the job against the inference_model; single operand."
 param = "llm_prompt"
 rationale = "Factory from source: builds the result from the llm_prompt; single operand."
 
-["pipelex/cogt/llm/llm_prompt_template_inputs.py::LLMPromptTemplateInputs.complemented_by"]
-param = "additional_template_inputs"
-rationale = "Operates on the additional_template_inputs; single operand (qualifiers keyword-only)."
-
-["pipelex/cogt/llm/llm_prompt_template_inputs.py::LLMPromptTemplateInputs.complemented_by_dict"]
-param = "additional_inputs_dict"
-rationale = "Operates on the additional_inputs_dict; single operand (qualifiers keyword-only)."
-
 ["pipelex/cogt/llm/llm_report.py::LLMTokenCostReportField.report_field_for_cost_by_category"]
 param = "token_category"
 rationale = "Derives the report field for the token category; single operand."

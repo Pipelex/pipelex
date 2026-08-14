@@ -23,7 +23,6 @@
 [defaults]
 model_type = "llm"
 sdk = "bedrock_aioboto3"
-prompting_target = "anthropic"
 thinking_mode = "none"
 
 ################################################################################

@@ -46,7 +46,6 @@ own page. Classes are grouped by subsystem.
 - [`LLMModelNotFoundError`](llm-model-not-found-error.md) — LLM model not found
 - [`LLMPromptParameterError`](llm-prompt-parameter-error.md) — LLM prompt parameter
 - [`LLMPromptSpecError`](llm-prompt-spec-error.md) — LLM prompt spec
-- [`LLMPromptTemplateInputsError`](llm-prompt-template-inputs-error.md) — LLM prompt template inputs
 - [`LLMSettingsValidationError`](llm-settings-validation-error.md) — LLM settings validation
 - [`ModelChoiceNotFoundError`](model-choice-not-found-error.md) — Model choice not found
 - [`ModelDeckNotFoundError`](model-deck-not-found-error.md) — Model deck not found
