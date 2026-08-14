@@ -180,7 +180,7 @@ class PipelexKernel:
         that is deliberate. Do not "fix" this by deriving the style from an object-only resolution:
         that would introduce the divergence rather than close it. The whole model-derived-style
         mechanism is slated for replacement by an explicit caller-chosen style — see
-        `wip/prompting-style/README.md`.
+        `wip/prompting-style/prompt-style-as-an-authoring-decision.md`.
         """
         llm_setting = resolve_llm_setting_for_object(llm_choice=model)
         return await run_llm_object(

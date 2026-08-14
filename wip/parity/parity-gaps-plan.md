@@ -87,7 +87,7 @@ These three are written against the open kernel-extraction PRs and share a theme
 | Gap | Outcome | Where |
 |---|---|---|
 | 2.1 `llm_text` narrower than its op | Fixed | *make llm_text as wide as the op beneath it*, on `refactor/Kernel` (#1081) |
-| 2.2 `llm_object` prompting style | **Not a live defect** — claim overstated; the surviving question is deferred | *number the prompting-style follow-up KF-16 to keep the stack's*, on `refactor/Kernel` (#1081); KF-16 → `wip/prompting-style/README.md` |
+| 2.2 `llm_object` prompting style | **Not a live defect** — claim overstated; the surviving question is deferred | *number the prompting-style follow-up KF-16 to keep the stack's*, on `refactor/Kernel` (#1081); KF-16 → `wip/prompting-style/prompt-style-as-an-authoring-decision.md` |
 | 2.3 kernel cannot build an `ImgGenPrompt` | Fixed | *let a runtime-only caller build the image prompt it has to pass in* + arm *give the image prompt assembler the boot-contract arm the rule owes it*, on `refactor/Kernel-phase2` (#1082); doc review *record the image prompt assembler on the page that specifies the kernel* (#1083) |
 
 **Commits are named by subject, not by SHA, and deliberately.** These fixes live on a three-deep stacked series that is rebased whenever a parent moves, which rewrites every hash on it. An earlier revision of this table named SHAs; the rebase that folded in the review round orphaned three of them, so they resolved from no branch at all. A subject survives the rewrite — `git log --grep` finds it.
@@ -118,7 +118,7 @@ The re-verification the plan asked for happened against each PR's own branch rat
 
 *The mechanism is obsolete.* Model-derived prompting style dates from when models were genuinely sensitive to prompt markup. Louis' ruling: rather than widen the derivation, the style becomes an explicit user choice defaulting to XML, and the derivation goes away. Building `model_for_object` here would mean constructing the two-setting derivation that refactor deletes.
 
-Deferred as **KF-16** in the kernel track's deferred-follow-ups doc (now tracked at workspace level), with the design in [`../prompting-style/README.md`](../prompting-style/README.md) — that design landed with [PR #1081](https://github.com/Pipelex/pipelex/pull/1081) and is present on this branch. Silenced in #1081 by *number the prompting-style follow-up KF-16 to keep the stack's* — a docstring on `llm_object` recording why its single `model` is correct, carrying the trap explicitly: *do not "fix" this by deriving the style from an object-only resolution, which would introduce the divergence rather than close it.*
+Deferred as **KF-16** in the kernel track's deferred-follow-ups doc (now tracked at workspace level), with the design in [`../prompting-style/prompt-style-as-an-authoring-decision.md`](../prompting-style/prompt-style-as-an-authoring-decision.md) — superseding the deferred note that landed with [PR #1081](https://github.com/Pipelex/pipelex/pull/1081). Silenced in #1081 by *number the prompting-style follow-up KF-16 to keep the stack's* — a docstring on `llm_object` recording why its single `model` is correct, carrying the trap explicitly: *do not "fix" this by deriving the style from an object-only resolution, which would introduce the divergence rather than close it.*
 
 ### 2.3 Nothing in the kernel can build an `ImgGenPrompt`
 
@@ -136,7 +136,7 @@ Deferred as **KF-16** in the kernel track's deferred-follow-ups doc (now tracked
 
 **🔶 CHECKPOINT B — plan complete.** Record: merged-code re-verification results for 2.1–2.3 (what moved, what held), each fix's commit and gates, D-3's scoping outcome (which helpers moved to which layer), and changelog entries. Run the full gate set. Update the README status block and close the track, or spin out whatever the re-verification surfaced.
 
-**Checkpoint B record.** Re-verification: 2.1 held as written in all three of its arms, `model` included; 2.2 did **not** hold and was withdrawn (above); 2.3 held, and its predicted layering cost did not materialise. Commits and gates are recorded per-gap above. D-3 settled on (a) with no helper moving layers. Changelog: one entry extended (`LLMPromptBlueprintValueError` → *and `ImgGenPromptBlueprintValueError`*) plus one new entry for `assemble_img_gen_prompt`, both on #1082; 2.1 needed none. Gate set green on both branches — `make agent-check`, `make drift-check`, and a full `make agent-test`. Spun out: KF-16 / `wip/prompting-style/README.md`.
+**Checkpoint B record.** Re-verification: 2.1 held as written in all three of its arms, `model` included; 2.2 did **not** hold and was withdrawn (above); 2.3 held, and its predicted layering cost did not materialise. Commits and gates are recorded per-gap above. D-3 settled on (a) with no helper moving layers. Changelog: one entry extended (`LLMPromptBlueprintValueError` → *and `ImgGenPromptBlueprintValueError`*) plus one new entry for `assemble_img_gen_prompt`, both on #1082; 2.1 needed none. Gate set green on both branches — `make agent-check`, `make drift-check`, and a full `make agent-test`. Spun out: KF-16 / `wip/prompting-style/` (design now at `prompt-style-as-an-authoring-decision.md`).
 
 ## Decisions
 
