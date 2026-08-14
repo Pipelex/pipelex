@@ -65,34 +65,45 @@ Goal: a `PipeLLM` step can declare `templating_style`; when it says nothing, the
 
 Config (D1):
 
-- [ ] `pipelex/system/configuration/configs.py`: `PromptingConfig` → `TemplatingConfig` with the single field `default_templating_style: TemplatingStyle`; delete `prompting_styles` and `get_prompting_style` (and its subject grant, keeping `subject_grants.toml` sorted); remount as `templating_config`.
-- [ ] `pipelex/pipelex.toml`: replace the `[pipelex.prompting_config]` block (and its `prompting_styles` sub-table) with `[pipelex.templating_config]` / `default_templating_style = { tag_style = "xml" }`. Neither `.pipelex/pipelex.toml` nor the kit `pipelex.toml` carries the section — no other TOML moves. `make tb` proves the lockstep.
+- [x] `pipelex/system/configuration/configs.py`: `PromptingConfig` → `TemplatingConfig` with the single field `default_templating_style: TemplatingStyle`; delete `prompting_styles` and `get_prompting_style` (and its subject grant, keeping `subject_grants.toml` sorted); remount as `templating_config`.
+- [x] `pipelex/pipelex.toml`: replace the `[pipelex.prompting_config]` block (and its `prompting_styles` sub-table) with `[pipelex.templating_config]` / `default_templating_style = { tag_style = "xml" }`. Neither `.pipelex/pipelex.toml` nor the kit `pipelex.toml` carries the section — no other TOML moves. `make tb` proves the lockstep.
 
 Resolver (D2):
 
-- [ ] New `pipelex/kernel/templating_style_ops.py` with `resolve_templating_style(*, authored: TemplatingStyle | None) -> TemplatingStyle` — total, deck-free, credential-free.
-- [ ] Unit tests: totality (returns config default on `None`), authored-wins precedence, and the invariant that it never returns `None`.
+- [x] New `pipelex/kernel/templating_style_ops.py` with `resolve_templating_style(*, authored: TemplatingStyle | None) -> TemplatingStyle` — total, deck-free, credential-free.
+- [x] Unit tests: totality (returns config default on `None`), authored-wins precedence, and the invariant that it never returns `None`. — `tests/unit/pipelex/kernel/test_templating_style_ops.py`, which also pins the shipped house default (xml + plain).
 
 Authored surface (D3):
 
-- [ ] `PipeLLMBlueprint.templating_style: TagStyle | TemplatingStyle | None = None` (`pipe_llm_blueprint.py`).
-- [ ] `PipeLLMSpec.templating_style` — same union, passed through in `to_blueprint()` (`builder/pipe/pipe_llm_spec.py`), per the spec-vs-blueprint layering.
-- [ ] `PipeLLMFactory.make` widens `TagStyle` → `TemplatingStyle(tag_style=...)`; `PipeLLM` gains `templating_style: TemplatingStyle | None = None` (`pipe_llm_factory.py`, `pipe_llm.py`).
-- [ ] Parsing tests: bare string (`templating_style = "no_tag"`), inline table (`{ tag_style = "xml", text_format = "markdown" }`), absent → `None` at blueprint level.
-- [ ] An e2e/integration bundle exercising the authored field (a small `.mthds` under the existing test-package layout) — today zero `.mthds` files in the repo touch styling, so this is the first.
+- [x] `PipeLLMBlueprint.templating_style: TagStyle | TemplatingStyle | None = None` (`pipe_llm_blueprint.py`).
+- [x] `PipeLLMSpec.templating_style` — same union, passed through in `to_blueprint()` (`builder/pipe/pipe_llm_spec.py`), per the spec-vs-blueprint layering.
+- [x] `PipeLLMFactory.make` widens `TagStyle` → `TemplatingStyle(tag_style=...)`; `PipeLLM` gains `templating_style: TemplatingStyle | None = None` (`pipe_llm_factory.py`, `pipe_llm.py`).
+- [x] Parsing tests: bare string (`templating_style = "no_tag"`), inline table (`{ tag_style = "xml", text_format = "markdown" }`), absent → `None` at blueprint level. — `tests/unit/pipelex/pipe_operators/pipe_llm/test_pipe_llm_templating_style.py`, covering both parsing shapes, the spec passthrough, and all three factory-widening outcomes.
+- [x] An e2e/integration bundle exercising the authored field — `tests/integration/pipelex/pipes/pipelines/templating_style.mthds` + `test_templating_style_bundle.py`: all three arms parse, load, and actually govern the rendered text. (a small `.mthds` under the existing test-package layout) — today zero `.mthds` files in the repo touch styling, so this is the first.
 
 Wiring:
 
-- [ ] `pipe_llm.py` — replace `templating_style = derive_templating_style(llm_setting=llm_setting_main)` with `resolve_templating_style(authored=self.templating_style)`; drop the "both paths render under the text setting's style" comment (there is no derived style to agree about any more — both arms simply pass the pipe's resolved style).
-- [ ] `pipelex_kernel.py` — `llm_text` / `llm_object` gain `templating_style: TemplatingStyle | None = None`, resolved through the resolver (D4); **delete the `llm_object` docstring paragraph** recording the parity-gap 2.2 adjudication ("One `model`, and it carries…") — the question it adjudicates dissolves.
-- [ ] Update `tests/unit/pipelex/pipe_operators/pipe_llm/test_prompt_rendering_purity.py`: the "blueprint style wins over the **run-derived** one" parametrization becomes authored-vs-config-default; the purity assertion itself (blueprint not mutated) survives as-is.
-- [ ] Flip the two default-shape assertions in `tests/integration/pipelex/pipes/llm_prompt_inputs/test_prompt_image_extraction.py` (`assert "```" in llm_prompt.user_text` → XML shape) and fix its docstring prose.
-- [ ] MTHDS schema test `tests/unit/pipelex/language/test_mthds_schema.py`: assert `PipeLLMBlueprint` now carries `templating_style` (optional — the minimal-table cases stay valid).
-- [ ] Gates: `make tb`, targeted tests, stage + `make agent-check` (both drift contracts fire — review `docs/configuration/**` and `docs/under-the-hood/pipelex-kernel.md`; the kernel page's surface table still names `derive_templating_style`, which is *correct to leave red until Phase 4* — if the ack would be dishonest, defer the ack to Phase 4 and run gates knowing drift is the one expected red, or update the one table row now and ack honestly. Prefer the latter: keep gates green.)
+- [x] `pipe_llm.py` — replace `templating_style = derive_templating_style(llm_setting=llm_setting_main)` with `resolve_templating_style(authored=self.templating_style)`; drop the "both paths render under the text setting's style" comment (there is no derived style to agree about any more — both arms simply pass the pipe's resolved style).
+- [x] `pipelex_kernel.py` — `llm_text` / `llm_object` gain `templating_style: TemplatingStyle | None = None`, resolved through the resolver (D4); **delete the `llm_object` docstring paragraph** recording the parity-gap 2.2 adjudication ("One `model`, and it carries…") — the question it adjudicates dissolves.
+- [x] Update `tests/unit/pipelex/pipe_operators/pipe_llm/test_prompt_rendering_purity.py`: the "blueprint style wins over the **run-derived** one" parametrization becomes authored-vs-config-default; the purity assertion itself (blueprint not mutated) survives as-is.
+- [x] Flip the two default-shape assertions in `tests/integration/pipelex/pipes/llm_prompt_inputs/test_prompt_image_extraction.py` (`assert "```" in llm_prompt.user_text` → XML shape) and fix its docstring prose.
+- [x] MTHDS schema test `tests/unit/pipelex/language/test_mthds_schema.py`: assert `PipeLLMBlueprint` now carries `templating_style` (optional — the minimal-table cases stay valid).
+- [x] Gates: `make tb`, targeted tests, stage + `make agent-check` (both drift contracts fire — review `docs/configuration/**` and `docs/under-the-hood/pipelex-kernel.md`; the kernel page's surface table still names `derive_templating_style`, which is *correct to leave red until Phase 4* — if the ack would be dishonest, defer the ack to Phase 4 and run gates knowing drift is the one expected red, or update the one table row now and ack honestly. Prefer the latter: keep gates green.)
 
-Note: `derive_templating_style`, `LLMSetting.prompting_target` and friends are now **uncalled but still present** — deletion is batched in Phase 3 so this phase stays reviewable as "add + rewire".
+Note: `LLMSetting.prompting_target` and friends are now **uncalled but still present** — deletion is batched in Phase 3 so this phase stays reviewable as "add + rewire".
+
+**Deviation taken in Phase 1:** `derive_templating_style` could *not* wait for Phase 3. Its only data source was `PromptingConfig.get_prompting_style`, which D1 deletes here, so leaving it in place would have left the tree not type-checking. It was deleted in this phase together with the config it read; everything else in the Phase 3 deletion batch is untouched.
 
 ## Phase 2 — One resolver, every prompt; tighten optionality; strict filters
+
+> **Session paused here (2026-08-14), nothing of Phase 2 started.** Phases 0 and 1 are committed and green. The survey done just before the pause, so the next session need not redo it — every remaining `templating_style` site outside the LLM entry path:
+>
+> - `kernel/img_gen_prompt.py` — `assemble_img_gen_prompt` and `_render_text` take no style at all today; `_render_text` passes `template_blueprint.templating_style` (always `None` on this path) straight to `render_template`, which is exactly the silent-`TICKS` route.
+> - `kernel/compose_ops.py:72` — `run_compose_template` has `templating_style: TemplatingStyle | None = None`; `pipe_compose.py:206` passes `self.templating_style` (the existing authored compose surface) and its `desc()` at line 61 still says "prompting style".
+> - `kernel/llm_prompt_content.py` — `assemble_llm_prompt` (line 75) and `_unravel_text` (line 383) both default to `None`; line 387 holds the per-template merge `jinja2_blueprint.templating_style or templating_style` that stays but becomes total.
+> - `pipe_operators/llm/llm_prompt_blueprint.py:70` — `make_llm_prompt` likewise optional.
+> - `kernel/llm_ops.py` — `run_llm_text` / `run_llm_object` still `TemplatingStyle | None = None`.
+> - The fallbacks to delete (D5): `apply_tag_style`'s `tag_style = TagStyle(...) if tag_style_str else TagStyle.TICKS` at `jinja2_filters.py:122`, the `format` filter's `TextFormat.PLAIN` default at line 43, the `with_images` twin, and the zero-caller `TemplatingStyle.make_default_prompting_style`.
 
 Goal: img-gen, search and compose prompts stop falling into the silent `TICKS` fallback and inherit the same config default; `TemplatingStyle` stops being optional along the prompt-rendering path (§4.3); the fallbacks die.
 
@@ -179,5 +190,15 @@ Everything is green and documented; nothing is committed beyond what earlier che
 *(Filled in as checkpoints are reached: status of completed phases, decisions taken, open questions, state of the code.)*
 
 - **Checkpoint 1:** *(2026-08-14)* Phase 0 complete. Reasoning-budget resolution is re-homed off `prompting_target`: each worker owns a `reasoning_budget_family` ClassVar (`"anthropic"` on the Anthropic worker, `"gemini"` on the Google worker) and `LLMConfig.get_reasoning_budget` is fully keyword-only with a `family` parameter (its subject grant removed from `subject_grants.toml`). TDD red→green: new twin Anthropic reasoning test module + updated Google/config tests landed red first, went green with the implementation; the tests `del mock_model.prompting_target` so any spec read would raise — this stays valid after Phase 3 deletes the field. `effort_to_budget_maps` TOML keys unchanged. Docs updated (`docs/under-the-hood/reasoning-controls.md`). Gates: `make agent-check` green (two drift contracts honestly reviewed and acked: config-docs, pipelex-kernel-docs); full `make agent-test` green. Verified exit criterion: `prompting_target`'s only remaining consumers are the style path (configs.py `get_prompting_style`, llm_setting.py, model_spec + factory, kernel/llm_ops.py derive path) — Phases 1–3 scope. State: committed standalone on `fix/Keyless-dry-run` (commit "Phase 0 — re-home reasoning budgets off prompting_target"). Open questions: none. Louis' go received 2026-08-14 → Phase 1 underway.
-- **Checkpoint 2:** —
+- **Checkpoint 2:** — *(not reached; Phase 2 not started. Session paused after Phase 1 — see the pause note under Phase 2 for the survey already done.)*
+
+  **Phase 1 landed (2026-08-14), committed, all gates green.** What it built: `TemplatingConfig` (single field `default_templating_style`, mounted `pipelex.templating_config`; `prompting_styles` and `get_prompting_style` deleted along with the latter's subject grant), the total resolver `pipelex/kernel/templating_style_ops.py`, the authored `templating_style` union on `PipeLLMBlueprint` / `PipeLLMSpec` / `PipeLLM` with the factory widening the bare-`TagStyle` arm, and both `PipelexKernel` façade calls taking the same optional argument (D4 — the `llm_object` parity-gap docstring paragraph is deleted, the question it adjudicated having dissolved). **The behaviour flip is live:** every OpenAI-family prompt now renders XML instead of back-ticks, because nothing derives a style from model metadata any more.
+
+  One deviation from the plan, recorded under Phase 1: `derive_templating_style` was deleted here rather than in Phase 3, because D1 deletes the config map that was its only data source — leaving it would not type-check. The rest of the Phase 3 deletion batch is untouched.
+
+  Tests added: `test_templating_style_ops.py` (totality, house default, authored-wins), `test_pipe_llm_templating_style.py` (both parsing shapes, spec passthrough, all three factory outcomes), and the `templating_style.mthds` bundle + `test_templating_style_bundle.py` proving the authored field survives parse→load→render. `test_prompt_image_extraction.py`'s two default-shape assertions now supply the resolved style and assert XML; note the `with_images | tag` case asserts `<data>`, not `<pages>` — after `with_images` the value is a plain string with no name of its own.
+
+  Docs touched in-phase (to keep the drift acks honest): `docs/under-the-hood/pipelex-kernel.md` — entry-point table lists `templating_style_ops` and drops `derive_templating_style`, and the flow prose plus the per-call-derivation note use the templating vocabulary. Both `config-docs` and `pipelex-kernel-docs` were reviewed and acked.
+
+  Known and deliberate: the Claude Code `check-mthds` hook rejects `templating_style` in a `.mthds` file because it validates against the plugin's bundled schema, which is stale. `make plxt-lint` regenerates `derived/mthds_schema.json` first and passes. The downstream schema sync is already listed as a release-gated follow-up.
 - **Checkpoint 3:** —

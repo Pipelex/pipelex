@@ -41,7 +41,6 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.kernel.llm_ops import (
-    derive_templating_style,
     resolve_llm_setting_for_object,
     resolve_llm_setting_for_text,
     run_llm_object,
@@ -49,10 +48,12 @@ from pipelex.kernel.llm_ops import (
 )
 from pipelex.kernel.llm_prompt_content import LlmPromptContent
 from pipelex.kernel.llm_results import LlmObjectResult, LlmTextResult
+from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.runtime_hub import resolve_run_mode_for_boot
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
+from pipelex.tools.templating.templating_style import TemplatingStyle
 
 
 class PipelexKernel:
@@ -119,6 +120,7 @@ class PipelexKernel:
         system: str | None = None,
         concept: Concept | None = None,
         output_class: type[StuffContent] | None = None,
+        templating_style: TemplatingStyle | None = None,
         result: str,
     ) -> LlmTextResult:
         """The semantics of an LLM step with a Text output.
@@ -136,6 +138,9 @@ class PipelexKernel:
         step and anything reading the result back raises `StuffContentTypeError`. Omitting `model`
         is the ordinary authored case, not an edge one — it defers to the deck exactly as a `$preset`
         does. `llm_object` below has taken all three from the start; this is the same convenience.
+
+        `templating_style` is the same authoring decision a `PipeLLM` declares; omitting it takes the
+        runtime default, exactly as an authored pipe that declares nothing does.
         """
         llm_setting = resolve_llm_setting_for_text(llm_choice=model)
         return await run_llm_text(
@@ -146,7 +151,7 @@ class PipelexKernel:
             output_class=output_class or TextContent,
             job_metadata=self.make_step_metadata(),
             cogt_run_params=self.cogt_run_params,
-            templating_style=derive_templating_style(llm_setting=llm_setting),
+            templating_style=resolve_templating_style(authored=templating_style),
             result_name=result,
         )
 
@@ -160,6 +165,7 @@ class PipelexKernel:
         user: str,
         system: str | None = None,
         structure_prompt: str | None = None,
+        templating_style: TemplatingStyle | None = None,
         result: str,
         is_multiple_output: bool = False,
         fixed_nb_output: int | None = None,
@@ -171,16 +177,8 @@ class PipelexKernel:
         from `output_class` by default; pass `structure_prompt` to override it. As with `llm_text`,
         prompts carrying image or document references go through `run_llm_object` directly.
 
-        **One `model`, and it carries the interpreter's *text*-choice semantics for templating.** A
-        `PipeLLM` can name two models (`model` → for_text, `model_to_structure` → for_object) and
-        derives the prompting style from the text one. Here the single explicit choice wins
-        `resolve_llm_setting_for_object`'s first rung, so the style comes from that same setting —
-        which is what an interpreted run derives for a pipe naming only a text model. The two agree
-        for every call this form can express; a pipe naming *both* is what it cannot express, and
-        that is deliberate. Do not "fix" this by deriving the style from an object-only resolution:
-        that would introduce the divergence rather than close it. The whole model-derived-style
-        mechanism is slated for replacement by an explicit caller-chosen style — see
-        `wip/prompting-style/prompt-style-as-an-authoring-decision.md`.
+        `templating_style` is the same authoring decision a `PipeLLM` declares; omitting it takes the
+        runtime default, exactly as an authored pipe that declares nothing does.
         """
         llm_setting = resolve_llm_setting_for_object(llm_choice=model)
         return await run_llm_object(
@@ -194,6 +192,6 @@ class PipelexKernel:
             structure_prompt=structure_prompt,
             is_multiple_output=is_multiple_output,
             fixed_nb_output=fixed_nb_output,
-            templating_style=derive_templating_style(llm_setting=llm_setting),
+            templating_style=resolve_templating_style(authored=templating_style),
             result_name=result,
         )

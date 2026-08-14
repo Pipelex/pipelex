@@ -16,7 +16,7 @@ class TagStyle(StrEnum):
 
 class TemplatingStyle(BaseModel):
     tag_style: TagStyle = Field(strict=False)
-    text_format: TextFormat = Field(TextFormat.PLAIN, strict=False)
+    text_format: TextFormat = Field(default=TextFormat.PLAIN, strict=False)
 
     @override
     def __str__(self):

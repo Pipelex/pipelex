@@ -21,12 +21,12 @@ from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.interpreter_hub import get_concept_library, get_native_concept, get_required_concept
 from pipelex.kernel.llm_ops import (
-    derive_templating_style,
     resolve_llm_setting_for_object,
     resolve_llm_setting_for_text,
     run_llm_object,
     run_llm_text,
 )
+from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
 from pipelex.pipe_machinery.validation import is_input_used_by_variables, is_variable_satisfied_by_inputs
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
@@ -38,6 +38,7 @@ from pipelex.pipe_run.pipe_run_params import (
 from pipelex.runtime_hub import get_class_registry
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_param_key import PipeRunParamKey
+from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 if TYPE_CHECKING:
@@ -54,6 +55,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     llm_prompt_spec: LLMPromptBlueprint
     llm_choices: LLMSettingChoices | None = None
     output_multiplicity: VariableMultiplicity | None = None
+    templating_style: TemplatingStyle | None = None
 
     @override
     def validate_inputs_static(self):
@@ -209,18 +211,16 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             llm_for_text_choice = self.llm_choices.for_text
             llm_for_object_choice = self.llm_choices.for_object
 
-        # The deck chain and the style derivation are kernel semantics; the settings are derived per
-        # run into locals and never cached onto `self`, because the pipe instance is the one the
-        # library holds and hands out — a write-back would make its serialized form depend on run
-        # order and shadow any later config/deck change with the first run's value.
+        # The deck chain is kernel semantics; the settings are derived per run into locals and never
+        # cached onto `self`, because the pipe instance is the one the library holds and hands out —
+        # a write-back would make its serialized form depend on run order and shadow any later
+        # config/deck change with the first run's value.
         llm_setting_main: LLMSetting = resolve_llm_setting_for_text(llm_choice=llm_for_text_choice)
         llm_setting_for_object: LLMSetting = resolve_llm_setting_for_object(
             llm_choice=llm_for_object_choice,
             llm_choice_for_text=llm_for_text_choice,
         )
-        # Both paths render under the *text* setting's style: it is the pipe's main model, and the
-        # object path differs only in how the answer comes back, not in how the prompt is written.
-        templating_style = derive_templating_style(llm_setting=llm_setting_main)
+        templating_style = resolve_templating_style(authored=self.templating_style)
 
         llm_prompt_run_params = PipeRunParams.copy_by_injecting_multiplicity(
             pipe_run_params=pipe_run_params,

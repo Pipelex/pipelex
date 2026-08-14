@@ -16,6 +16,7 @@ from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
+from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
 
 
 class StructuringMethod(StrEnum):
@@ -42,6 +43,10 @@ class PipeLLMBlueprint(PipeBlueprint):
     prompt: str | None = None
 
     structuring_method: StructuringMethod | None = None
+
+    # A bare string is the `tag_style` shorthand; an inline table is the full struct. The factory
+    # widens the string arm, so the union never travels past parsing.
+    templating_style: TagStyle | TemplatingStyle | None = None
 
     @model_validator(mode="after")
     def validate_preliminary_text_output(self) -> Self:

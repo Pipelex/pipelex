@@ -266,17 +266,11 @@ default_page_views_dpi = 72
 # in order to test new model integrations or debug issues with the Gateway
 
 ####################################################################################################
-# Prompting config
+# Templating config
 ####################################################################################################
 
-[pipelex.prompting_config]
-default_prompting_style = { tag_style = "xml" }
-
-[pipelex.prompting_config.prompting_styles]
-openai = { tag_style = "ticks" }
-anthropic = { tag_style = "xml" }
-mistral = { tag_style = "square_brackets" }
-gemini = { tag_style = "xml" }
+[pipelex.templating_config]
+default_templating_style = { tag_style = "xml" }
 
 ####################################################################################################
 # Pipe run config

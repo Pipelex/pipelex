@@ -5464,10 +5464,6 @@ rationale = "Predicate on the text; single operand."
 param = "text"
 rationale = "Predicate on the text; single operand."
 
-["pipelex/system/configuration/configs.py::PromptingConfig.get_prompting_style"]
-param = "prompting_target"
-rationale = "Config getter keyed by the prompting target; single operand."
-
 ["pipelex/system/environment.py::all_env_vars_are_set"]
 param = "keys"
 rationale = "Predicate on the given env-var keys; single operand."

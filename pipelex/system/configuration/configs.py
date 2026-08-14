@@ -6,7 +6,6 @@ from pydantic import Field, field_validator, model_validator
 
 from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cogt.config_cogt import Cogt
-from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.graph.graph_config import GraphConfig
 from pipelex.language.mthds_config import MthdsConfig
 from pipelex.system.configuration.config_model import ConfigModel
@@ -77,14 +76,8 @@ class DryRunConfig(ConfigModel):
         return value
 
 
-class PromptingConfig(ConfigModel):
-    default_prompting_style: TemplatingStyle
-    prompting_styles: dict[str, TemplatingStyle]
-
-    def get_prompting_style(self, prompting_target: PromptingTarget | None = None) -> TemplatingStyle | None:
-        if prompting_target:
-            return self.prompting_styles.get(prompting_target, self.default_prompting_style)
-        return None
+class TemplatingConfig(ConfigModel):
+    default_templating_style: TemplatingStyle
 
 
 class ReportingConfig(ConfigModel):
@@ -204,7 +197,7 @@ class Pipelex(ConfigModel):
     log_config: LogConfig
     aws_config: AwsConfig
 
-    prompting_config: PromptingConfig
+    templating_config: TemplatingConfig
     mthds_config: MthdsConfig
 
     dry_run_config: DryRunConfig

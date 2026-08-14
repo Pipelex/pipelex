@@ -7,7 +7,7 @@ description: "Operator semantics as importable functions — what pipelex/kernel
 
 This page is for contributors working on Pipelex internals, and for anyone embedding the kernel directly rather than running `.mthds` methods. For how the operator classes above it fit into the whole, see [Architecture Overview](./architecture-overview.md).
 
-What a `PipeLLM` step actually *does* — resolve a model off the deck, derive a prompting style, assemble the prompt, generate, write the result into memory — used to be reachable only through a fully booted interpreter with a method loaded. [`pipelex/kernel/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/kernel) holds that semantics as plain functions, so it has **one implementation with two kinds of caller**:
+What a `PipeLLM` step actually *does* — resolve a model off the deck, resolve the templating style, assemble the prompt, generate, write the result into memory — used to be reachable only through a fully booted interpreter with a method loaded. [`pipelex/kernel/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/kernel) holds that semantics as plain functions, so it has **one implementation with two kinds of caller**:
 
 - the interpreter's operator classes (`PipeLLM`, `PipeExtract`, `PipeImgGen`, `PipeSearch`, `PipeCompose`, `PipeFunc`), which resolve blueprints, validate inputs, wrap errors and trace, then call the kernel;
 - any **programmatic caller** embedding the kernel, which calls the same functions on a process with zero `.mthds` loaded.
@@ -67,7 +67,8 @@ Both façade calls take the concept and the output class the caller wants, defau
 | Module | Entry points |
 |---|---|
 | `pipelex.kernel.pipelex_kernel` | `PipelexKernel.make`, `.llm_text`, `.llm_object`, `.make_step_metadata` |
-| `pipelex.kernel.llm_ops` | `resolve_llm_setting_for_text` / `_for_object`, `derive_templating_style`, `derive_structure_prompt`, `generate_object_content`, `run_llm_text`, `run_llm_object` |
+| `pipelex.kernel.llm_ops` | `resolve_llm_setting_for_text` / `_for_object`, `derive_structure_prompt`, `generate_object_content`, `run_llm_text`, `run_llm_object` |
+| `pipelex.kernel.templating_style_ops` | `resolve_templating_style` |
 | `pipelex.kernel.extract_ops` | `resolve_extract_setting`, `build_extract_job_params`, `run_extract` |
 | `pipelex.kernel.img_gen_ops` | `resolve_img_gen_setting`, `resolve_default_size`, `build_img_gen_job_params`, `run_img_gen` |
 | `pipelex.kernel.search_ops` | `resolve_search_setting`, `run_search` |
@@ -123,7 +124,7 @@ summaries = extract_main_content_as_list(memory=result.memory, item_type=Summary
 - **`job_metadata`** — the run-level metadata. It is not what a step runs under: every call mints a per-step copy through `make_step_metadata()`, carrying a fresh `pipe_run_id` and inheriting the trace context, so trace and usage attribution stay per-step. This mirrors the interpreter's pass-down-a-modified-copy pattern.
 - **`cogt_run_params`** — the execution-mode contract (`run_mode`, and the DRY-only `is_mock_usage` sub-flag) that every cogt leaf reads off the assignment it is handed.
 
-Nothing derived from config or the model deck is cached on the instance — resolved settings and prompting styles are computed per call, because cached derived state would shadow a later config or deck change and break per-call variation.
+Nothing derived from config or the model deck is cached on the instance — resolved settings and templating styles are computed per call, because cached derived state would shadow a later config or deck change and break per-call variation.
 
 **Cost and usage reporting is the caller's lifecycle, not the kernel's.** The interpreter's run machinery opens a graph tracer, builds an event log, registers it on the report delegate and closes all three in a `finally`, because it has a run boundary to hang that on. A kernel call has no such boundary — it is one step, and a caller may make one or a thousand. So the kernel takes a `TraceContext` and does exactly one thing with it: stamp it onto every step's `JobMetadata`, which is what the cogt leaf reads to decide whether to emit a usage event.
 

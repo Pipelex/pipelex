@@ -1,4 +1,4 @@
-"""LLM operator semantics: deck resolution, style derivation, generation, memory write-back.
+"""LLM operator semantics: deck resolution, generation, memory write-back.
 
 These are the functions the interpreter's `PipeLLM` and `PipeStructure` call, and the ones a
 programmatic caller invokes on a `RuntimeBoot`-only process. They read the runtime hub for the
@@ -22,7 +22,6 @@ from pipelex import log
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
-from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.config import get_config
 from pipelex.core.concepts.concept import Concept
@@ -57,22 +56,6 @@ def resolve_llm_setting_for_object(*, llm_choice: LLMModelChoice | None = None, 
     model_deck = get_model_deck()
     resolved_choice = llm_choice or llm_choice_for_text or model_deck.llm_choice_overrides.for_object or model_deck.llm_choice_defaults.for_object
     return model_deck.get_llm_setting(llm_choice=resolved_choice)
-
-
-def derive_templating_style(*, llm_setting: LLMSetting) -> TemplatingStyle | None:
-    """The configured prompting style for a resolved setting, via its prompting target.
-
-    Derived per call and never cached: the deck and the config can both change under a live process,
-    and a cached style would shadow that with whatever the first call saw.
-
-    Returns `None` when the deck has no inference model for the handle, which is what an external
-    LLM plugin looks like from here — the model is real, it is just not in the deck.
-    """
-    inference_model = get_model_deck().get_optional_inference_model(model_handle=llm_setting.model, model_type=ModelType.LLM)
-    if inference_model is None:
-        return None
-    prompting_target = llm_setting.prompting_target or inference_model.prompting_target
-    return get_config().pipelex.prompting_config.get_prompting_style(prompting_target=prompting_target)
 
 
 async def derive_structure_prompt(*, output_class: type[StuffContent]) -> str | None:
@@ -151,9 +134,8 @@ async def run_llm_text(
 ) -> LlmTextResult:
     """A whole LLM step with a text output: assemble, generate, store, report.
 
-    `templating_style` is an argument rather than derived here because a caller may hold more than
-    one resolved setting for a step and has to say which one governs rendering — `PipeLLM` derives
-    it from its text setting even on its object path.
+    `templating_style` is an argument because the style is an authoring decision the caller holds —
+    what the step declared, resolved against the runtime default — not something derivable here.
     """
     llm_prompt = await assemble_llm_prompt(
         prompt_content=prompt_content,

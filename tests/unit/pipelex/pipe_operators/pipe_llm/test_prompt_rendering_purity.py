@@ -10,8 +10,8 @@ Pinned behaviors:
 
 - rendering a prompt leaves the `TemplateBlueprint` untouched (the run-scoped style is
   passed as a parameter, never stored)
-- a blueprint-declared `templating_style` wins over the run-derived one; without one, the
-  run-derived style governs
+- a template-declared `templating_style` wins over the resolved one; without one, the
+  resolved style governs
 - a dry run of a `PipeLLM` leaves `pipe.model_dump()` byte-identical, so the serialized form
   that feeds the graph registry and the Temporal crate payload does not depend on run order
 """
@@ -60,7 +60,7 @@ class TestPromptRenderingPurity:
         self,
         load_empty_library: Callable[[], str],
     ):
-        """Regression: `_unravel_text` used to write the run-derived style into the caller's
+        """Regression: `_unravel_text` used to write the run-scoped style into the caller's
         `TemplateBlueprint`, which on a library-held pipe is shared long-lived state.
         """
         load_empty_library()
@@ -82,9 +82,9 @@ class TestPromptRenderingPurity:
     @pytest.mark.parametrize(
         ("topic", "blueprint_style", "passed_style", "expects_xml_tag"),
         [
-            ("blueprint style wins over the run-derived one", _XML_STYLE, _NO_TAG_STYLE, True),
-            ("run-derived style governs when the blueprint declares none", None, _XML_STYLE, True),
-            ("run-derived style is really applied, not merely tolerated", None, _NO_TAG_STYLE, False),
+            ("template style wins over the resolved one", _XML_STYLE, _NO_TAG_STYLE, True),
+            ("resolved style governs when the template declares none", None, _XML_STYLE, True),
+            ("resolved style is really applied, not merely tolerated", None, _NO_TAG_STYLE, False),
         ],
     )
     async def test_effective_style_precedence(
@@ -95,7 +95,7 @@ class TestPromptRenderingPurity:
         passed_style: TemplatingStyle | None,
         expects_xml_tag: bool,
     ):
-        """A blueprint-declared style takes precedence over the run-derived one.
+        """A template-declared style takes precedence over the resolved one.
 
         The XML tag style wraps an `@variable` in `<name>...</name>`; NO_TAG inlines it bare,
         so the rendered text tells us which style actually governed.
