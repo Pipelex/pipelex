@@ -25,6 +25,19 @@ The prune is pure and silent by design. It first logged the dropped keys, which 
 ## What still needs doing, elsewhere
 
 1. **Drop `prompting_target` from the gateway config served by the Pipelex API.** It is dead data as of this change: nothing in `pipelex` reads it any more. The source is **`pipelex-back-office`**, not `pipelex-server`: `pipelex_back_office/remote_config/gateway_models.toml` declares it in `[defaults]`, and `build_service.py` publishes that block as the remote config's `backend_model_specs`.
+
+   **Done — and the mechanism that made it safe is the versioned config URL, not timing.** Deleting the key would have been a live prompt change for every deployed client, in the one direction we do not want:
+
+   | Client | Config declares the key | Config drops it |
+   |---|---|---|
+   | With the prune (this branch) | pruned → `xml` (the new resolved default) | `xml` |
+   | Earlier release | `anthropic` → `xml` | **`None` → the filter's own `TICKS` fallback** |
+
+   An older client never reaches its configured `default_prompting_style`: `PromptingConfig.get_prompting_style(None)` returns `None` rather than the default, so no style reaches `apply_tag_style`, which applies its own `TagStyle.TICKS` (`tools/jinja2/jinja2_filters.py`). Every gateway prompt in the field would have moved from XML tags to backtick fences, silently.
+
+   That never happens because the served config is **versioned in its URL**, and this branch bumps it: `pipelex_details.py` now points at `pipelex_remote_config_12.json` (was `_11`). The edited `gateway_models.toml` was published as `_12`; `_11` is frozen and still carries `prompting_target = "anthropic"`, so every earlier release keeps rendering XML. Verified live against both URLs: `_12` `defaults` = `{model_type, sdk, structure_method}`, `_11` = the same plus `prompting_target`, 73 model entries either side.
+
+   The URL bump is the compatibility boundary for *any* breaking change to this config, which is worth knowing before the next one — it is the reason the deletion did not need to wait for a deployed floor.
 2. **Decide whether the per-model unknown-key → HTTP-header rule should survive for the gateway backend.** Deliberately untouched here. A removed field that had lived per-model rather than in `defaults` would have been sent to the provider as a header instead of raising — a worse outcome than the one that was actually hit, and one no test would catch.
 
 Neither is in scope for the templating-style change. Item 1 is a `pipelex-server` deliverable; item 2 is a design question about the backend loader that deserves its own look.

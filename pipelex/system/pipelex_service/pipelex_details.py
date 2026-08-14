@@ -2,7 +2,7 @@ import os
 
 from pipelex.tools.misc.hash_utils import hash_sha256
 
-_DEFAULT_REMOTE_CONFIG_URL = "https://pipelex-config.s3.eu-west-3.amazonaws.com/pipelex_remote_config_11.json"
+_DEFAULT_REMOTE_CONFIG_URL = "https://pipelex-config.s3.eu-west-3.amazonaws.com/pipelex_remote_config_12.json"
 REMOTE_CONFIG_URL_ENV_VAR = "PIPELEX_REMOTE_CONFIG_URL"
 
 
