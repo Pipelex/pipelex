@@ -162,8 +162,8 @@ class DeliveryExecutor:
         graph rollup and the cost report both go through, so two artifacts of one run can
         never quote different prices. Keep the three-valued semantics rather than
         flattening them: ``None`` means unrated and must never render as zero, and a
-        partially rated run's total is a lower bound. See
-        ``wip/run-total-cost-in-usage-artifact.md``.
+        partially rated run's total is a lower bound. Tracked as T-5 in
+        ``pipelex-server/TODOS.md``.
         """
         usage_doc: dict[str, Any] = {
             "tokens_usages": dump_tokens_usage_records(pipe_output.tokens_usages),
