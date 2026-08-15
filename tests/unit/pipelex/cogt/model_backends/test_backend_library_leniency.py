@@ -46,6 +46,36 @@ a_field_we_removed = "openai"
 model_id = "acme-one"
 """
 
+MODEL_SPECS_TOML_WITH_UNKNOWN_PER_MODEL_KEY = """
+[defaults]
+model_type = "llm"
+sdk = "openai_responses"
+
+["acme-one"]
+model_id = "acme-one"
+max_tokns = 4096
+"""
+
+MODEL_SPECS_TOML_WITH_NEAR_MISS_PER_MODEL_KEY = """
+[defaults]
+model_type = "llm"
+sdk = "openai_responses"
+
+["acme-one"]
+model_id = "acme-one"
+max-tokens = 4096
+"""
+
+MODEL_SPECS_TOML_WITH_HEADER_KEY = """
+[defaults]
+model_type = "llm"
+sdk = "openai_responses"
+
+["acme-one"]
+model_id = "acme-one"
+x-portkey-provider = "@openai"
+"""
+
 MODEL_SPECS_TOML_WITH_MISSING_CREDENTIAL = f"""
 [defaults]
 model_type = "llm"
@@ -106,6 +136,44 @@ class TestBackendLibraryLeniency:
                 model_specs_toml=MODEL_SPECS_TOML_WITH_UNKNOWN_DEFAULT,
                 lenient=lenient,
             )
+
+    @pytest.mark.parametrize("lenient", [True, False])
+    def test_an_unknown_per_model_key_in_a_local_backend_is_fatal_in_both_modes(self, tmp_path: Path, lenient: bool) -> None:
+        """A per-model typo used to be sent to the provider as a request header, silently, while the
+        real setting stayed unset. It is now a boot error that names the key, the model and the file.
+        """
+        with pytest.raises(InferenceBackendLibraryError) as exc_info:
+            self._load(
+                tmp_path,
+                backends_toml=BACKENDS_TOML,
+                model_specs_toml=MODEL_SPECS_TOML_WITH_UNKNOWN_PER_MODEL_KEY,
+                lenient=lenient,
+            )
+
+        message = str(exc_info.value)
+        assert "'max_tokns'" in message
+        assert "'acme-one'" in message
+        assert "acme.toml" in message
+        assert "hyphen" in message
+
+    def test_a_hyphenated_spelling_of_a_known_field_is_fatal_and_names_the_field(self, tmp_path: Path) -> None:
+        with pytest.raises(InferenceBackendLibraryError, match=r"'max-tokens'.*'max_tokens'"):
+            self._load(
+                tmp_path,
+                backends_toml=BACKENDS_TOML,
+                model_specs_toml=MODEL_SPECS_TOML_WITH_NEAR_MISS_PER_MODEL_KEY,
+                lenient=False,
+            )
+
+    def test_a_header_shaped_per_model_key_still_becomes_a_request_header(self, tmp_path: Path) -> None:
+        """The regression that matters: `x-portkey-provider` in the local portkey.toml keeps working."""
+        library = self._load(tmp_path, backends_toml=BACKENDS_TOML, model_specs_toml=MODEL_SPECS_TOML_WITH_HEADER_KEY, lenient=False)
+
+        backend = library.get_inference_backend(backend_name="acme")
+        assert backend is not None
+        model_spec = backend.model_specs["acme-one"]
+        assert model_spec.extra_headers == {"x-portkey-provider": "@openai"}
+        assert model_spec.model_id == "acme-one"
 
     @pytest.mark.parametrize("lenient", [True, False])
     def test_a_missing_per_backend_toml_is_fatal_in_both_modes(self, tmp_path: Path, lenient: bool) -> None:
