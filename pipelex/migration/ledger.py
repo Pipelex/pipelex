@@ -108,6 +108,17 @@ class MigrationEntry(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def check_pre_history_declares_what_it_removed(self) -> Self:
+        if self.pre_history and not self.declared_removed_paths:
+            msg = (
+                f"entry '{self.id}': a pre-history entry declares the paths it removes — the flag exempts the entry from "
+                f"being accounted against a fingerprint diff, and the declaration is what replaces that diff, so an entry "
+                f"carrying the flag and declaring nothing is exempt from every accounting there is"
+            )
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
     def check_an_op_free_entry_is_unsafe(self) -> Self:
         if not self.ops and self.safety is MigrationSafety.SAFE:
             msg = f"entry '{self.id}': an entry with no operations cannot be 'safe' — there is nothing for the applier to do"

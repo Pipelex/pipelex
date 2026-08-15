@@ -141,6 +141,27 @@ new_key    = "{new_key}"
 """
 
 
+def _pre_history_entry() -> str:
+    """An entry about `legacy_mode`, a key no fingerprint in this chain has ever recorded."""
+    return f"""
+[[migration]]
+id                     = "{SURFACE_ID}@2"
+to_schema_version      = 2
+introduced_in          = "0.46.0"
+breaking               = true
+safety                 = "safe"
+title                  = "Drop a key that predates the chain"
+description            = "It was gone before anything was snapshotted."
+pre_history            = true
+declared_removed_paths = ["legacy_mode"]
+
+[[migration.ops]]
+kind       = "delete_key"
+table_path = []
+key        = "legacy_mode"
+"""
+
+
 class TestTheSteadyState:
     def test_a_surface_whose_golden_matches_its_models_passes(self, tmp_path: Path) -> None:
         """The overwhelmingly common state: nothing changed, so nothing is owed."""
@@ -209,6 +230,31 @@ class TestTheHeadLink:
         issues = check_surface(surface=_surface(config_model=_SchemaTwoRenamed), migration_dir=tmp_path)
         assert _kinds(issues) == [CoverageIssueKind.GOLDEN_MISSING]
         assert "schema version 1" in issues[0].message
+
+
+class TestThePreHistoryClaim:
+    def test_a_pre_history_entry_over_an_unmoved_pair_is_green(self, tmp_path: Path) -> None:
+        """The whole point of the flag: the change it describes happened before any of this was snapshotted."""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=_pre_history_entry())
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=2)
+        assert check_surface(surface=_surface(config_model=_SchemaOne), migration_dir=tmp_path) == []
+
+    def test_a_pre_history_entry_hiding_a_real_removal_is_refused(self, tmp_path: Path) -> None:
+        """The flag exempts an entry from accounting, so a change with an observable diff must not carry it."""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=_pre_history_entry())
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoRemoved, schema_version=2)
+        issues = check_surface(surface=_surface(config_model=_SchemaTwoRemoved), migration_dir=tmp_path)
+        assert CoverageIssueKind.PRE_HISTORY_HAS_A_DIFF in _kinds(issues)
+        assert "label" in "".join(issue.message for issue in issues)
+
+    def test_a_pre_history_entry_beside_an_addition_stays_green(self, tmp_path: Path) -> None:
+        """Additions are absorbed by the defaults layer, so they are nobody's accounting — the flag's included."""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=_pre_history_entry())
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOneWithBothNames, schema_version=2)
+        assert check_surface(surface=_surface(config_model=_SchemaOneWithBothNames), migration_dir=tmp_path) == []
 
 
 class TestEntryAccounting:

@@ -62,6 +62,7 @@ class CoverageIssueKind(StrEnum):
     OVER_DELETION = "over_deletion"
     ENUM_MEMBER_NOT_REMAPPED = "enum_member_not_remapped"
     REQUIRED_PATH_WITHOUT_DEFAULT = "required_path_without_default"
+    PRE_HISTORY_HAS_A_DIFF = "pre_history_has_a_diff"
 
 
 class CoverageIssue(BaseModel):
@@ -124,12 +125,7 @@ def diff_fingerprints(*, before: SurfaceFingerprint, after: SurfaceFingerprint) 
 def check_entry_accounting(*, surface_id: str, entry: MigrationEntry, before: SurfaceFingerprint, after: SurfaceFingerprint) -> list[CoverageIssue]:
     """Verify that one entry says exactly what the fingerprint diff shows happened."""
     if entry.pre_history:
-        # A removal that predates the first fingerprint has no observed diff to be accounted
-        # against — that is what the flag means. Such an entry declares its own removed paths and
-        # ships a hand-authored `before` document, and is verified against those by `check-ledger`
-        # rather than here. Checking it against a fingerprint pair it never described would
-        # produce a failure naming the wrong defect.
-        return []
+        return _check_the_pre_history_claim(surface_id=surface_id, entry=entry, before=before, after=after)
 
     issues: list[CoverageIssue] = []
     walk = walk_entry(entry=entry, before=before)
@@ -174,6 +170,46 @@ def check_entry_accounting(*, surface_id: str, entry: MigrationEntry, before: Su
 
     issues.extend(_check_enum_accounting(surface_id=surface_id, entry=entry, before=before, after=after, walk=walk))
     return issues
+
+
+def _check_the_pre_history_claim(
+    *,
+    surface_id: str,
+    entry: MigrationEntry,
+    before: SurfaceFingerprint,
+    after: SurfaceFingerprint,
+) -> list[CoverageIssue]:
+    """A pre-history entry claims its change is invisible here, and that claim is checkable.
+
+    The flag says the change predates the first fingerprint, so there is no diff to account the
+    entry against — which is precisely why the accounting above cannot run and precisely why the
+    flag must not be taken on trust. What replaces the accounting is the claim itself: **the
+    fingerprint pair must show no removal at all.** A removal between these two snapshots is a
+    change that *does* have an observed diff, and the flag would be exempting it from the only
+    gate that would have demanded an operation for it.
+
+    Additions are not the flag's business, here as everywhere: the defaults layer absorbs them.
+
+    What the declaration itself says, and whether the operations stay inside it, is `check-ledger`'s
+    to verify against the checked-in chain and the entry's hand-authored `before` document — no
+    live model is needed for either, and this gate exists to look at live models.
+    """
+    diff = diff_fingerprints(before=before, after=after)
+    if not diff.has_removals:
+        return []
+    removed = diff.removed_paths + [f"{path}: {members}" for path, members in diff.removed_enum_members.items()]
+    return [
+        CoverageIssue(
+            surface_id=surface_id,
+            kind=CoverageIssueKind.PRE_HISTORY_HAS_A_DIFF,
+            message=(
+                f"entry '{entry.id}' is marked pre_history, but schema version {after.schema_version} no longer has {removed} "
+                f"relative to version {before.schema_version} — that change is observable here, so the flag would exempt it "
+                f"from the accounting it needs. Drop the flag and account for each removed path with an operation; the flag is "
+                f"for material that predates the first fingerprint, which by definition no snapshot shows going away"
+            ),
+        )
+    ]
 
 
 def _check_enum_accounting(

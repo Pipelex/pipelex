@@ -175,6 +175,19 @@ new_key    = "title"
 """
 
 
+_DELETE_LEGACY_MODE = """
+[[migration.ops]]
+kind       = "delete_key"
+table_path = []
+key        = "legacy_mode"
+"""
+
+
+def _pre_history_entry(*, ops: str, declared: str = 'declared_removed_paths = ["legacy_mode"]') -> str:
+    """An entry for material that predates the chain: no fingerprint records `legacy_mode` at all."""
+    return _entry(ops=f"{declared}\n{ops}", pre_history="pre_history = true")
+
+
 def _kinds(issues: list[LedgerIssue]) -> list[LedgerIssueKind]:
     return [issue.kind for issue in issues]
 
@@ -376,21 +389,42 @@ new_key    = "level"
         assert _kinds(issues) == [LedgerIssueKind.CONVERGENCE_BROKEN]
         assert "kit template" in issues[0].message
 
-    def test_a_pre_history_entry_is_refused_until_the_check_that_verifies_one_exists(self, tmp_path: Path) -> None:
-        """The flag exempts an entry from coverage, so nothing may wave it through here as well."""
-        ops = """
-declared_removed_paths = ["label"]
+    def test_a_pre_history_entry_addressing_only_what_it_declares_is_green(self, tmp_path: Path) -> None:
+        """The shape the flag is for: material that predates the chain, so no fingerprint shows it going away."""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=_pre_history_entry(ops=_DELETE_LEGACY_MODE))
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=2)
+        assert check_ledger(surface=_surface(config_model=_SchemaOne), migration_dir=tmp_path) == []
 
+    def test_a_pre_history_entry_declaring_a_path_the_chain_records_is_refused(self, tmp_path: Path) -> None:
+        """Otherwise the flag is a way to opt out of accounting for a change that has a diff."""
+        _write_ledger(
+            migration_dir=tmp_path,
+            current_schema_version=2,
+            entries=_pre_history_entry(ops=_DELETE_LEGACY_MODE, declared='declared_removed_paths = ["legacy_mode", "label"]'),
+        )
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=2)
+        issues = check_ledger(surface=_surface(config_model=_SchemaOne), migration_dir=tmp_path)
+        assert _kinds(issues) == [LedgerIssueKind.PRE_HISTORY_PATH_IS_RECORDED]
+        assert "'label'" in issues[0].message
+
+    def test_a_pre_history_operation_outside_the_declaration_is_refused(self, tmp_path: Path) -> None:
+        """The declaration is the entry's only record of what it may address, so it bounds the operations too."""
+        ops = (
+            _DELETE_LEGACY_MODE
+            + """
 [[migration.ops]]
 kind       = "delete_key"
 table_path = []
 key        = "label"
 """
-        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=_entry(ops=ops, pre_history="pre_history = true"))
+        )
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=_pre_history_entry(ops=ops))
         _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
-        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoLabelGone, schema_version=2)
-        issues = check_ledger(surface=_surface(config_model=_SchemaTwoLabelGone), migration_dir=tmp_path)
-        assert LedgerIssueKind.PRE_HISTORY_UNVERIFIED in _kinds(issues)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=2)
+        issues = check_ledger(surface=_surface(config_model=_SchemaOne), migration_dir=tmp_path)
+        assert LedgerIssueKind.OP_ACTS_ON_LIVE_MATERIAL in _kinds(issues)
 
     @pytest.mark.parametrize(
         ("current_schema_version", "entries"),

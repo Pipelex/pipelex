@@ -7,7 +7,7 @@ would go red on an ordinary configuration edit with "regenerate the golden" as i
 fail-regenerate-fail cycle that keeps the coverage gate out of the loop agents run constantly.
 Here, every failure is a statement about files the author wrote, and every remedy is to fix one.
 
-Four questions, each with its own failure kind:
+Five questions, each with its own failure kind:
 
 - **Op legality.** An operation's source must be material some schema version *removed*. One
   addressing a live path would fire on a perfectly valid current file, and replay neutrality —
@@ -17,6 +17,10 @@ Four questions, each with its own failure kind:
   at an open node, nowhere else.
 - **Remap legality.** A `safe` remap must be provably unable to fire on a current-valid file:
   its target enumerated at the new schema, and every old spelling now outside the member set.
+- **Pre-history declarations.** An entry claiming its change predates the first fingerprint must
+  declare material no fingerprint records, and may address nothing outside that declaration —
+  otherwise the flag, which exempts an entry from being accounted against a diff, would be a way
+  to opt out of accounting for a change that has one.
 - **Convergence.** Replaying the whole ledger over each reference document must apply nothing
   and return the very bytes it was given.
 
@@ -37,7 +41,7 @@ from pipelex.migration.goldens import read_fingerprint_golden
 from pipelex.migration.ledger import INITIAL_SCHEMA_VERSION, MigrationEntry, MigrationLedger, MigrationSafety, load_ledger
 from pipelex.migration.reserved import ReservedRegistry, derive_reserved_registry
 from pipelex.migration.surfaces import Surface, SurfaceRegistry
-from pipelex.migration.walk import EntryWalk, WalkedOp, walk_entry
+from pipelex.migration.walk import EntryWalk, WalkedOp, op_source_path, walk_entry
 from pipelex.suggested_fix import WILDCARD_SEGMENT, MigrationOp, RemapValueOp
 
 
@@ -51,7 +55,7 @@ class LedgerIssueKind(StrEnum):
     ILLEGAL_REMAP = "illegal_remap"
     RESERVED_PATH_REUSED = "reserved_path_reused"
     RESERVED_VALUE_REUSED = "reserved_value_reused"
-    PRE_HISTORY_UNVERIFIED = "pre_history_unverified"
+    PRE_HISTORY_PATH_IS_RECORDED = "pre_history_path_is_recorded"
     CONVERGENCE_BROKEN = "convergence_broken"
 
 
@@ -137,14 +141,14 @@ def _check_entries(
 ) -> list[LedgerIssue]:
     issues: list[LedgerIssue] = []
     for entry in ledger.migration:
-        if entry.pre_history:
-            issues.append(_pre_history_is_not_verified_yet(surface_id=surface_id, entry=entry))
-            continue
         before = chain.get(entry.to_schema_version - 1)
         after = chain.get(entry.to_schema_version)
         if before is None or after is None:
             # The chain check above already named the missing link and its remedy. Checking the
             # entry against a shape nobody snapshotted would blame the entry for that gap.
+            continue
+        if entry.pre_history:
+            issues.extend(_check_pre_history_entry(surface_id=surface_id, entry=entry, chain=chain, before=before, after=after, reserved=reserved))
             continue
         walk = walk_entry(entry=entry, before=before)
         issues.extend(_check_op_legality(surface_id=surface_id, entry=entry, before=before, walk=walk, reserved=reserved))
@@ -152,26 +156,126 @@ def _check_entries(
     return issues
 
 
-def _pre_history_is_not_verified_yet(*, surface_id: str, entry: MigrationEntry) -> LedgerIssue:
-    """A pre-history entry is refused until the check that verifies one exists.
+def _check_pre_history_entry(
+    *,
+    surface_id: str,
+    entry: MigrationEntry,
+    chain: dict[int, SurfaceFingerprint],
+    before: SurfaceFingerprint,
+    after: SurfaceFingerprint,
+    reserved: ReservedRegistry,
+) -> list[LedgerIssue]:
+    """What a pre-history entry is verified against, since no fingerprint pair describes it.
 
-    The flag exempts an entry from the coverage gate, on the grounds that no fingerprint pair
-    describes a change that predates the first fingerprint. The contract's answer is that this
-    check verifies such an entry against its own `declared_removed_paths` and a hand-authored
-    `before` document instead — and that verification does not exist yet. Until it does, the flag
-    would be precisely the escape hatch the contract says must not exist, so an entry carrying it
-    is refused rather than waved through by two gates in a row.
+    The flag says the change predates the first fingerprint, so the entry's own declaration stands
+    in for the diff and the checks are stated over that declaration instead:
+
+    - **Every declared path really is invisible to the chain.** A path some fingerprint records is
+      material a snapshot describes, so the change that removed it has an ordinary diff and must be
+      accounted against it. Were the declaration allowed to name a recorded path, the flag would be
+      a way to opt out of accounting entirely — the escape hatch this contract refuses.
+    - **Every operation acts on declared material.** The ordinary rule is that a source must be a
+      path some version removed, read from the reserved registry; for a pre-history source the
+      registry is fed by the declaration, so the same rule holds and the same failure is reported.
+      Without it the entry could reach for a live path, and replay neutrality would be false.
+
+    Remap legality is unchanged and is checked against the literal path: a `remap_value` retires a
+    *spelling*, so its path survives into the new schema, and none of this entry's renames can have
+    moved it — they act on material no fingerprint records.
+
+    The walk is not run at all. It replays an entry over the previous fingerprint's path set, and a
+    pre-history entry addresses paths that set never had, so every operation would be reported dead.
     """
-    return LedgerIssue(
-        surface_id=surface_id,
-        kind=LedgerIssueKind.PRE_HISTORY_UNVERIFIED,
-        message=(
-            f"entry '{entry.id}' is marked pre_history, which exempts it from the coverage gate — and the check that verifies "
-            f"such an entry against its declared_removed_paths and its hand-authored `before` document is not built yet. "
-            f"A pre-history entry no gate verifies is the escape hatch the contract refuses, so it cannot be merged until "
-            f"that verification lands with it"
-        ),
-    )
+    issues = _check_declared_paths_are_invisible_to_the_chain(surface_id=surface_id, entry=entry, chain=chain)
+    for op in entry.ops:
+        issues.extend(_check_open_node_addressing(surface_id=surface_id, entry=entry, op=op, origin_path=op_source_path(op=op), before=before))
+        issues.extend(_check_pre_history_source_is_declared_material(surface_id=surface_id, entry=entry, op=op, reserved=reserved))
+    if entry.safety is MigrationSafety.SAFE:
+        for op in entry.ops:
+            if isinstance(op, RemapValueOp):
+                issues.extend(
+                    _check_one_remap(
+                        surface_id=surface_id,
+                        entry=entry,
+                        after=after,
+                        final_path=op_source_path(op=op),
+                        old_values=sorted(op.mapping),
+                        new_values=sorted(set(op.mapping.values())),
+                    )
+                )
+    return issues
+
+
+def _check_declared_paths_are_invisible_to_the_chain(
+    *,
+    surface_id: str,
+    entry: MigrationEntry,
+    chain: dict[int, SurfaceFingerprint],
+) -> list[LedgerIssue]:
+    """No declared path may appear in a fingerprint at or below the entry's own version.
+
+    A later version bringing one back is a different failure with a different remedy, and the
+    reserved-path check reports it in those terms.
+    """
+    issues: list[LedgerIssue] = []
+    for path in entry.declared_removed_paths:
+        recorded_at = sorted(version for version, fingerprint in chain.items() if version <= entry.to_schema_version and path in fingerprint.paths)
+        if recorded_at:
+            issues.append(
+                LedgerIssue(
+                    surface_id=surface_id,
+                    kind=LedgerIssueKind.PRE_HISTORY_PATH_IS_RECORDED,
+                    message=(
+                        f"entry '{entry.id}' declares '{path}' as removed before the first fingerprint, but schema "
+                        f"{'versions' if len(recorded_at) > 1 else 'version'} {', '.join(str(version) for version in recorded_at)} "
+                        f"records it. A pre-history declaration stands in for a diff nobody can observe, so material a snapshot "
+                        f"does describe has to be accounted against that snapshot like any other change"
+                    ),
+                )
+            )
+    return issues
+
+
+def _check_pre_history_source_is_declared_material(
+    *,
+    surface_id: str,
+    entry: MigrationEntry,
+    op: MigrationOp,
+    reserved: ReservedRegistry,
+) -> list[LedgerIssue]:
+    """A pre-history operation's source must be declared material, or lie beneath some.
+
+    Beneath, because a declaration names the shape that retired and an operation may address one
+    key inside it — declaring the parent is the honest record of what went away, and enumerating
+    every leaf under it would add nothing a reader could act on.
+    """
+    if isinstance(op, RemapValueOp):
+        return []
+    source = op_source_path(op=op)
+    removed_at = _reserved_at_or_above(reserved=reserved, path=source)
+    if removed_at is not None and removed_at <= entry.to_schema_version:
+        return []
+    return [
+        LedgerIssue(
+            surface_id=surface_id,
+            kind=LedgerIssueKind.OP_ACTS_ON_LIVE_MATERIAL,
+            message=(
+                f"entry '{entry.id}': {op.kind} acts on '{source}', which no schema version up to {entry.to_schema_version} "
+                f"removes and this entry does not declare either — a pre-history entry's declaration is the only record of "
+                f"what it may address, so an operation outside it would fire on material nothing retired"
+            ),
+        )
+    ]
+
+
+def _reserved_at_or_above(*, reserved: ReservedRegistry, path: str) -> int | None:
+    """The version that retired this path, or the nearest ancestor of it that a version retired."""
+    segments = path.split(PATH_SEPARATOR)
+    for depth in range(len(segments), 0, -1):
+        removed_at = reserved.reserved_at(path=PATH_SEPARATOR.join(segments[:depth]))
+        if removed_at is not None:
+            return removed_at
+    return None
 
 
 def _check_op_legality(
@@ -185,7 +289,7 @@ def _check_op_legality(
     """What an operation may address: removed material, and never a user's own key."""
     issues: list[LedgerIssue] = []
     for walked, op in zip(walk.walked_ops, entry.ops, strict=True):
-        issues.extend(_check_open_node_addressing(surface_id=surface_id, entry=entry, op=op, walked=walked, before=before))
+        issues.extend(_check_open_node_addressing(surface_id=surface_id, entry=entry, op=op, origin_path=walked.origin_path, before=before))
         issues.extend(_check_source_is_removed_material(surface_id=surface_id, entry=entry, op=op, walked=walked, reserved=reserved))
     return issues
 
@@ -230,14 +334,17 @@ def _check_open_node_addressing(
     surface_id: str,
     entry: MigrationEntry,
     op: MigrationOp,
-    walked: WalkedOp,
+    origin_path: str,
     before: SurfaceFingerprint,
 ) -> list[LedgerIssue]:
     """`*` exactly at an open node, and never a concrete key beneath one.
 
     The check runs on the source traced back to the previous fingerprint's spelling, so that an
     operation acting inside a table an earlier operation in the same entry renamed is judged
-    against the node it really addresses.
+    against the node it really addresses. A pre-history source has no such spelling to trace back
+    to and is judged as written, which is the right answer for both halves: no fingerprint records
+    the node, so nothing can confirm that a `*` stands at an open one, and nothing claims the keys
+    beneath it are the user's either.
 
     Sources only, as the contract states them. A *destination* landing in user key space needs no
     rule of its own: a concrete key beneath an open node is never a path of any fingerprint, so
@@ -245,7 +352,7 @@ def _check_open_node_addressing(
     have — the same defect, named where the author is already looking.
     """
     issues: list[LedgerIssue] = []
-    segments = walked.origin_path.split(PATH_SEPARATOR)
+    segments = origin_path.split(PATH_SEPARATOR)
     for index, segment in enumerate(segments):
         parent_path = PATH_SEPARATOR.join(segments[:index])
         parent_record = before.paths.get(parent_path) if index else None
@@ -257,7 +364,7 @@ def _check_open_node_addressing(
                     surface_id=surface_id,
                     kind=LedgerIssueKind.WILDCARD_NOT_AT_OPEN_NODE,
                     message=(
-                        f"entry '{entry.id}': {op.kind} addresses '{walked.origin_path}', but {parent_label} is not an open "
+                        f"entry '{entry.id}': {op.kind} addresses '{origin_path}', but {parent_label} is not an open "
                         f"mapping at schema version {before.schema_version} — '{WILDCARD_SEGMENT}' stands for every key of an "
                         f"open node and means nothing anywhere else"
                     ),
@@ -269,7 +376,7 @@ def _check_open_node_addressing(
                     surface_id=surface_id,
                     kind=LedgerIssueKind.CONCRETE_KEY_UNDER_OPEN_NODE,
                     message=(
-                        f"entry '{entry.id}': {op.kind} addresses '{walked.origin_path}', but the keys under '{parent_path}' are "
+                        f"entry '{entry.id}': {op.kind} addresses '{origin_path}', but the keys under '{parent_path}' are "
                         f"the user's and unbounded, so no schema change can remove one — address every entry with "
                         f"'{WILDCARD_SEGMENT}' instead of naming '{segment}'"
                     ),
@@ -298,48 +405,79 @@ def _check_remap_legality(
     issues: list[LedgerIssue] = []
     for remap in walk.remaps:
         final_path = walk.state.final_path_of_origin(origin=remap.origin_path)
-        record = after.paths.get(final_path) if final_path is not None else None
-        if record is None:
-            # The path the remap targets does not survive into the new schema; the coverage gate's
-            # unaccounted-path or over-deletion check says so in terms the author can act on.
+        if final_path is None:
             continue
-        member_set = set(record.enum_members or [])
-        if not member_set:
-            issues.append(
-                LedgerIssue(
-                    surface_id=surface_id,
-                    kind=LedgerIssueKind.ILLEGAL_REMAP,
-                    message=(
-                        f"entry '{entry.id}': remap_value on '{final_path}' is 'safe', but that path is not enumerated at "
-                        f"schema version {after.schema_version} — staleness cannot be proven from the schema, so the entry must be unsafe"
-                    ),
-                )
+        issues.extend(
+            _check_one_remap(
+                surface_id=surface_id,
+                entry=entry,
+                after=after,
+                final_path=final_path,
+                old_values=remap.old_values,
+                new_values=remap.new_values,
             )
-            continue
-        still_legal = sorted(set(remap.old_values) & member_set)
-        if still_legal:
-            issues.append(
-                LedgerIssue(
-                    surface_id=surface_id,
-                    kind=LedgerIssueKind.ILLEGAL_REMAP,
-                    message=(
-                        f"entry '{entry.id}': remap_value on '{final_path}' is 'safe', but {still_legal} are still legal values at "
-                        f"schema version {after.schema_version} — a user who chose one deliberately would have it rewritten"
-                    ),
-                )
+        )
+    return issues
+
+
+def _check_one_remap(
+    *,
+    surface_id: str,
+    entry: MigrationEntry,
+    after: SurfaceFingerprint,
+    final_path: str,
+    old_values: list[str],
+    new_values: list[str],
+) -> list[LedgerIssue]:
+    """The rule itself, over one remap whose destination path is already resolved.
+
+    Resolved differently by each caller and for the same reason: an ordinary entry's remap may sit
+    on a path that entry renamed, so the walk says where it ended up, while a pre-history entry's
+    renames act on material no fingerprint records and therefore cannot have moved it.
+    """
+    record = after.paths.get(final_path)
+    if record is None:
+        # The path the remap targets does not survive into the new schema; the coverage gate's
+        # unaccounted-path or over-deletion check says so in terms the author can act on.
+        return []
+    member_set = set(record.enum_members or [])
+    if not member_set:
+        return [
+            LedgerIssue(
+                surface_id=surface_id,
+                kind=LedgerIssueKind.ILLEGAL_REMAP,
+                message=(
+                    f"entry '{entry.id}': remap_value on '{final_path}' is 'safe', but that path is not enumerated at "
+                    f"schema version {after.schema_version} — staleness cannot be proven from the schema, so the entry must be unsafe"
+                ),
             )
-        unknown_new = sorted(set(remap.new_values) - member_set)
-        if unknown_new:
-            issues.append(
-                LedgerIssue(
-                    surface_id=surface_id,
-                    kind=LedgerIssueKind.ILLEGAL_REMAP,
-                    message=(
-                        f"entry '{entry.id}': remap_value on '{final_path}' rewrites values to {unknown_new}, which schema version "
-                        f"{after.schema_version} does not accept — every migrated file would be rejected, with the tool reporting success"
-                    ),
-                )
+        ]
+
+    issues: list[LedgerIssue] = []
+    still_legal = sorted(set(old_values) & member_set)
+    if still_legal:
+        issues.append(
+            LedgerIssue(
+                surface_id=surface_id,
+                kind=LedgerIssueKind.ILLEGAL_REMAP,
+                message=(
+                    f"entry '{entry.id}': remap_value on '{final_path}' is 'safe', but {still_legal} are still legal values at "
+                    f"schema version {after.schema_version} — a user who chose one deliberately would have it rewritten"
+                ),
             )
+        )
+    unknown_new = sorted(set(new_values) - member_set)
+    if unknown_new:
+        issues.append(
+            LedgerIssue(
+                surface_id=surface_id,
+                kind=LedgerIssueKind.ILLEGAL_REMAP,
+                message=(
+                    f"entry '{entry.id}': remap_value on '{final_path}' rewrites values to {unknown_new}, which schema version "
+                    f"{after.schema_version} does not accept — every migrated file would be rejected, with the tool reporting success"
+                ),
+            )
+        )
     return issues
 
 

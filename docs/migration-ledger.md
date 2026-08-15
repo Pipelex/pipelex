@@ -4,7 +4,7 @@ Pipelex configuration files live on users' machines and in users' repositories, 
 
 This page is the contract: what a ledger may contain, what the engine may do with it, and what is guaranteed to a user whose files are migrated. It is normative. Everything asserted here has, or will have, a test behind it, and where a rule exists to prevent a specific failure the failure is named — a rule whose reason is forgotten is a rule that gets relaxed.
 
-> **Status.** This specification was written before its implementation, deliberately: the guarantees below are what the engine is built against. The data format, the operation vocabulary and the checks land first; `pipelex migrate` and boot tolerance land last. Of the checks, the coverage gate (`make check-migration-schemas`), its regenerator (`make up-migration-schemas`), the ledger check (`make check-ledger`), the transform-golden verifier inside the coverage gate and the neutrality property suite all exist today — though over a surface whose ledger is still empty the property necessarily exercises its sampler and not the theorem; the verification of a pre-history entry does not exist, and **an entry carrying `pre_history = true` is refused by `make check-ledger` until its verification lands** — the flag exempts an entry from the coverage gate, and an entry no gate verifies is exactly the escape hatch this contract refuses. Until the commands exist, this page is built but kept out of the documentation navigation.
+> **Status.** This specification was written before its implementation, deliberately: the guarantees below are what the engine is built against. The data format, the operation vocabulary and the checks land first; `pipelex migrate` and boot tolerance land last. Every check described here exists today: the coverage gate (`make check-migration-schemas`), its regenerator (`make up-migration-schemas`), the ledger check (`make check-ledger`), the transform-golden verifier inside the coverage gate, the neutrality property suite, and the verification of a [pre-history entry](#pre-history-entries). The ledgers themselves are nearly empty — `telemetry-config` carries the one entry the package ships, and the other two surfaces sit at schema version 1 — so over those two the neutrality property still exercises its sampler rather than the theorem. Until the commands exist, this page is built but kept out of the documentation navigation.
 
 ## What migrates, and what does not
 
@@ -163,7 +163,17 @@ The rules that govern the file:
 
 A removal that predates the first fingerprint has no observed diff and no snapshot to compare against. Such an entry may carry `pre_history = true`, in which case it **declares its own removed paths** — the reserved-path registry records them from the declaration rather than from a fingerprint diff — and ships a hand-authored `before` document so the transform check has a pair to verify. Convergence and neutrality then verify it exactly like any other entry.
 
-This exception is bounded to entries carrying the flag, and exists for the changes that shipped before the ledger did. It is not a way to avoid a fingerprint diff for a change that has one.
+This exception is bounded to entries carrying the flag, and exists for the changes that shipped before the ledger did. It is not a way to avoid a fingerprint diff for a change that has one — and because that is the whole risk of the flag, it is what the four rules below check rather than trust. A pre-history entry buys an exemption from one accounting and pays for it with another.
+
+> **The declaration is not optional.** An entry carrying the flag and declaring nothing is refused when the ledger is parsed: the declaration is what stands in for the diff, so without one the flag exempts the entry from every accounting there is.
+
+> **No declared path may appear in a fingerprint at or below the entry's own version.** A path some snapshot records is material whose removal *is* observable, so it is accounted against that snapshot like any other change. (A *later* version bringing a declared path back is a different failure with a different remedy, and [the reserved-path rule](#reserved-paths-and-names) reports it in those terms.)
+
+> **The fingerprint pair the entry sits between must show no removal at all.** Stated from the other side by the coverage gate, which is the gate the flag exempts: if something did go away between those two snapshots, the entry is not pre-history and the flag would be exempting a real removal from the operation it needs.
+
+> **Every operation's source must be declared material, or lie beneath some.** The ordinary op-legality rule reads the reserved-path registry, which a pre-history entry feeds by declaration; the effect is the same rule and the same refusal. Beneath, because a declaration names the shape that retired and an operation may address one key inside it.
+
+The `before` document lives beside the golden chain as `before@N.toml`, and it is the one file there that is neither snapshotted nor regenerated — a regenerated one would describe today's models, which is exactly what it is not about. Write it as a faithful representative of the old shape, carrying every path the entry's operations address, so that the transform check exercises each of them rather than taking them on the entry's word. The link then runs from that document instead of from `defaults@N-1`, and nothing else about the check changes: the same three claims verify it.
 
 ## The operation vocabulary
 
@@ -312,7 +322,7 @@ Freezing the head instead would rot. An additive change is absorbed by the defau
 
 The check then applies entry N to `defaults@N−1` and asserts three things about what comes out, pairwise over the complete-defaults family:
 
-> **Every path the migration creates, `defaults@N` has**; **every path `defaults@N−1` and `defaults@N` share survives the migration**; and **the last link's migrated document is accepted by the current model**, read the way a user's file is read — beneath the current defaults layer, not alone.
+> **Every path the migration creates, schema version N has** — in `defaults@N` or in `fingerprint@N`; **every path `defaults@N−1` and `defaults@N` share survives the migration**; and **the last link's migrated document is accepted by the current model**, read the way a user's file is read — beneath the current defaults layer, not alone.
 
 Each claim is one-directional on purpose, and together they are red on wrong destinations, wrong remap targets, wrong order and over-deletion. The first catches a destination that is misspelled or lands where the new shape carries nothing, which is the defect the whole check exists for: coverage accounts for the removed path and convergence skips the absent source, so without this the typo migrates every user file to a key `extra="forbid"` rejects, with the tool reporting success. The second catches an entry that dropped a parent table where it meant to drop one child. The third catches what moves no path at all — a value the schema does not accept, or a key it does not know.
 
@@ -322,9 +332,11 @@ The comparator is **not byte-exact, not a subset test, and not an equality**. By
 
 > **What the comparator is not: `paths(defaults@N) − added_at_N`.** A raw fingerprint difference counts a rename's *destination* as an addition, so subtracting it would demand the destination be absent from the expected shape — exactly where a correct rename puts it. This is the same defect the [symbolic end-state walk](#sequential-path-state) met and answered with containment, and the answer here is the same one expressed over documents. Subtraction would also be blind by construction to everything a fingerprint cannot see: a model added to a packaged deck lives beneath an open node, where the fingerprint records a value schema and never a key, so that addition would be asserted rather than tolerated and the check would go red on ordinary content.
 
+> **What the first claim reads: `defaults@N` *or* `fingerprint@N`, never the document alone.** An optional key whose default is `None` has no value in any reference document — TOML has no null, and the synthesized document drops the key — while being a perfectly ordinary destination for a migration to move a user's value onto. Against the document alone, the check would refuse the destination the schema most obviously has. A misspelled destination is in neither the document nor the fingerprint, so nothing the claim was protecting is given up, and the fingerprint is checked-in data like everything else the check reads.
+
 > **What the comparator does not assert: value equality against `defaults@N`.** A default flipped in the same commit as a rename makes such a check red with no remedy available to anyone — the older link is frozen, the head link tracks, and a migrated file legitimately carries the user's old value where the new reference document carries the new default. What that assertion was for, *the operations produce values the new schema accepts*, is checked where it can be checked soundly: by the last link's validation above, and by [the remap legality rule](#replay-neutrality), which refuses a remap whose target spelling the new schema does not accept.
 
-Two kinds of entry have no link to check. An **unsafe** entry is reported and never applied, so no document ever makes that transition mechanically, and the vocabulary explicitly grants such an entry the right to be incomplete — an entry with no operations at all is legal precisely when it is unsafe. A **pre-history** entry has no snapshot on the far side of it, which is what the flag means; it is verified against its hand-authored `before` document instead, and until that verification exists `check-ledger` refuses it outright.
+One kind of entry has no link to check: an **unsafe** entry is reported and never applied, so no document ever makes that transition mechanically, and the vocabulary explicitly grants such an entry the right to be incomplete — an entry with no operations at all is legal precisely when it is unsafe. A **pre-history** entry does have a link, and this is where it is verified: it has no snapshot on the far side of it, which is what the flag means, so the link starts from its hand-authored [`before@N.toml`](#pre-history-entries) and answers the same three claims. An entry marked pre-history with no such document is refused by name.
 
 The sparse kit template is **not** in the chain: starter-template edits between bumps would go red under equality, and it exercises no operation the complete document does not. It remains a convergence and neutrality witness.
 
@@ -355,9 +367,10 @@ pipelex/migration/ledgers/<surface-id>.toml            the ledgers
 pipelex/migration/goldens/<surface-id>/
     fingerprint@N.json                                 the fingerprint at schema version N
     defaults@N.toml                                    the complete reference document at schema version N
+    before@N.toml                                      a pre-history entry's hand-authored starting document
 ```
 
-Two files per version and nothing else. The fingerprint the coverage check diffs against is the chain's head link, `fingerprint@<current>`, rather than a separate always-current copy — one file with one writer cannot disagree with itself. The reserved-path registry is [derived from the chain](#reserved-paths-and-names), and the sparse kit template is read live rather than snapshotted.
+Two files per version, and a third only where a [pre-history entry](#pre-history-entries) needs one. The fingerprint the coverage check diffs against is the chain's head link, `fingerprint@<current>`, rather than a separate always-current copy — one file with one writer cannot disagree with itself. The reserved-path registry is [derived from the chain](#reserved-paths-and-names), and the sparse kit template is read live rather than snapshotted.
 
 ## What the engine reports
 

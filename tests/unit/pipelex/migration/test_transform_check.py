@@ -17,7 +17,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex.migration.goldens import write_defaults_golden
+from pipelex.migration.fingerprint import compute_fingerprint
+from pipelex.migration.goldens import pre_history_document_path, write_defaults_golden, write_fingerprint_golden
 from pipelex.migration.ledger import ledgers_dir
 from pipelex.migration.surfaces import DefaultsLayerKind, Surface
 from pipelex.migration.transform_check import TransformIssue, TransformIssueKind, check_transform_chain
@@ -45,6 +46,14 @@ class _RenamedWithMotto(BaseModel):
 
     title: str = "hello"
     motto: str = "onwards"
+
+
+class _WithOptional(BaseModel):
+    """Schema 2 with an optional destination: legal path, no value any TOML document can carry."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    nickname: str | None = None
 
 
 class _DeckEntry(BaseModel):
@@ -152,7 +161,80 @@ def _messages(issues: list[TransformIssue]) -> str:
     return " ".join(issue.message for issue in issues)
 
 
+def _pre_history_entry(*, ops: str) -> str:
+    return f"""
+[[migration]]
+id                     = "{SURFACE_ID}@2"
+to_schema_version      = 2
+introduced_in          = "0.46.0"
+breaking               = true
+safety                 = "safe"
+title                  = "Carry a shape that predates the chain"
+description            = "There was no snapshot on the far side of this one."
+pre_history            = true
+declared_removed_paths = ["legacy_label"]
+{ops}
+"""
+
+
+def _pre_history_document(*, migration_dir: Path, document: str) -> None:
+    path = pre_history_document_path(migration_dir=migration_dir, surface_id=SURFACE_ID, schema_version=2)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(document, encoding="utf-8")
+
+
+def _fingerprint(*, migration_dir: Path, config_model: type[BaseModel], schema_version: int) -> None:
+    write_fingerprint_golden(
+        migration_dir=migration_dir,
+        fingerprint=compute_fingerprint(
+            surface_id=SURFACE_ID,
+            schema_version=schema_version,
+            config_model=config_model,
+            defaults_document=_surface(config_model=config_model).read_defaults_document(),
+        ),
+    )
+
+
+class TestThePreHistoryLink:
+    def test_a_pre_history_entry_is_verified_against_its_hand_authored_document(self, tmp_path: Path) -> None:
+        """The exception's whole shape: a different starting document, then the same three claims."""
+        _write_ledger(migration_dir=tmp_path, entries=_pre_history_entry(ops=_rename(key="legacy_label", new_key="title")))
+        _pre_history_document(migration_dir=tmp_path, document='legacy_label = "hello"\n')
+        _defaults(migration_dir=tmp_path, schema_version=2, document='title = "hello"\n')
+        assert check_transform_chain(surface=_surface(config_model=_Renamed), migration_dir=tmp_path) == []
+
+    def test_a_pre_history_entry_with_no_document_to_start_from_is_refused(self, tmp_path: Path) -> None:
+        """Nothing else verifies it, so an absent document is the escape hatch reopening."""
+        _write_ledger(migration_dir=tmp_path, entries=_pre_history_entry(ops=_rename(key="legacy_label", new_key="title")))
+        _defaults(migration_dir=tmp_path, schema_version=2, document='title = "hello"\n')
+        issues = check_transform_chain(surface=_surface(config_model=_Renamed), migration_dir=tmp_path)
+        assert _kinds(issues) == [TransformIssueKind.PRE_HISTORY_DOCUMENT_MISSING]
+        assert "before@2.toml" in _messages(issues)
+
+    def test_a_misspelled_destination_is_caught_on_the_pre_history_link_too(self, tmp_path: Path) -> None:
+        """The exception changes where the link starts, and nothing about what it proves."""
+        _write_ledger(migration_dir=tmp_path, entries=_pre_history_entry(ops=_rename(key="legacy_label", new_key="titel")))
+        _pre_history_document(migration_dir=tmp_path, document='legacy_label = "hello"\n')
+        _defaults(migration_dir=tmp_path, schema_version=2, document='title = "hello"\n')
+        issues = check_transform_chain(surface=_surface(config_model=_Renamed), migration_dir=tmp_path)
+        assert TransformIssueKind.DESTINATION_NOT_IN_NEW_SHAPE in _kinds(issues)
+        assert "titel" in _messages(issues)
+
+
 class TestTheTransformGoldens:
+    def test_a_destination_the_fingerprint_records_but_the_document_cannot_carry_is_tolerated(self, tmp_path: Path) -> None:
+        """An optional key defaulting to `None` is a legal path with no value in any document.
+
+        TOML has no null, so the reference document simply lacks it — and a migration moving a
+        user's value onto it creates a path that document does not have. Checking the document
+        alone would refuse the one destination the schema most obviously has.
+        """
+        _write_ledger(migration_dir=tmp_path, entries=_entry(ops=_rename(key="label", new_key="nickname")))
+        _defaults(migration_dir=tmp_path, schema_version=1, document='label = "hello"\n')
+        _defaults(migration_dir=tmp_path, schema_version=2, document="")
+        _fingerprint(migration_dir=tmp_path, config_model=_WithOptional, schema_version=2)
+        assert check_transform_chain(surface=_surface(config_model=_WithOptional), migration_dir=tmp_path) == []
+
     def test_a_surface_that_has_never_changed_shape_has_no_link_to_check(self, tmp_path: Path) -> None:
         """The overwhelmingly common state, and the one all three surfaces are in today."""
         _write_ledger(migration_dir=tmp_path, entries="", current_schema_version=1)

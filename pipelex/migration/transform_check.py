@@ -12,11 +12,15 @@ Three claims per link, and every one of them is one-directional on purpose — a
 demands the two documents agree outright goes red on any honest bump, where the same commit adds
 keys, edits comments and flips unrelated defaults:
 
-- **Every path the migration creates, the new reference document has.** This is the wrong
-  destination, the misordered rename and the operation that lands in a table the new shape does
-  not carry. A created path whose *container* is gone from the new document is exempt: when a whole
-  entry of an open mapping was dropped from the reference document between versions, nothing can
-  be said about what an operation did inside it.
+- **Every path the migration creates, the new shape has** — its reference document or its
+  fingerprint. This is the wrong destination, the misordered rename and the operation that lands in
+  a table the new shape does not carry. The fingerprint is consulted alongside the document because
+  a document cannot express every legal path: an optional key whose default is `None` is absent
+  from the reference document, TOML having no null, while being a perfectly ordinary destination —
+  and a misspelled destination is in neither, so nothing is weakened. A created path whose
+  *container* is gone from the new document is exempt too: when a whole entry of an open mapping
+  was dropped from the reference document between versions, nothing can be said about what an
+  operation did inside it.
 - **Every path the two reference documents share survives the migration.** This is over-deletion —
   an entry that dropped a parent table where it meant to drop one child. A path the new shape no
   longer has is not this check's business: the schema removed it, and coverage is what demands the
@@ -25,7 +29,13 @@ keys, edits comments and flips unrelated defaults:
   file is actually read: beneath the current defaults layer. This is where a wrong value lands —
   a remap rewriting to a spelling the schema rejects, a destination the model does not know.
 
-Two departures from the contract's first wording, both recorded in `docs/migration-ledger.md`:
+This is also where a **pre-history** entry is verified, and it is verified by exactly these three
+claims: an entry whose change predates the first fingerprint has no `defaults@N-1` to start from,
+so it ships a hand-authored `before@N.toml` saying what the old shape was, and the link runs from
+there. Nothing else about the check changes — which is the point of that exception's shape. What
+the entry may declare and address is `check-ledger`'s half.
+
+Three departures from the contract's first wording, all recorded in `docs/migration-ledger.md`:
 
 **`paths(defaults@N)` minus `added_at_N` is not the comparator.** A raw fingerprint difference counts a
 rename's *destination* as an addition, so subtracting it would demand the destination be absent
@@ -44,6 +54,13 @@ value where the new reference document carries the new default. What the contrac
 soundly: by the last link's validation here, and by `check-ledger`'s remap legality, which refuses
 a remap whose target spelling the new schema does not accept.
 
+**A created path is checked against `defaults@N` *or* `fingerprint@N`, not against the document
+alone.** An optional key whose default is `None` has no value in any reference document — TOML has
+no null and the synthesized document drops it — so a migration that moves a user's value onto such
+a key creates a path the document legitimately lacks. Checking the document alone would refuse the
+one destination the schema most obviously has. The fingerprint is checked-in data like everything
+else here, so consulting it costs the check nothing it was protecting.
+
 See `docs/migration-ledger.md` → "Transform goldens".
 """
 
@@ -55,8 +72,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from pipelex.migration.documents import document_paths
 from pipelex.migration.engine import apply_ops_over_text
-from pipelex.migration.fingerprint import PATH_SEPARATOR
-from pipelex.migration.goldens import defaults_golden_path
+from pipelex.migration.fingerprint import PATH_SEPARATOR, SurfaceFingerprint
+from pipelex.migration.goldens import defaults_golden_path, pre_history_document_path, read_fingerprint_golden
 from pipelex.migration.ledger import MigrationEntry, MigrationLedger, MigrationSafety, load_ledger
 from pipelex.migration.surfaces import Surface, SurfaceRegistry
 from pipelex.system.configuration.config_surface import strip_reserved_meta
@@ -68,6 +85,7 @@ class TransformIssueKind(StrEnum):
     """Why a link of the transform chain failed. Distinct kinds so a red gate says what broke."""
 
     DEFAULTS_GOLDEN_MISSING = "defaults_golden_missing"
+    PRE_HISTORY_DOCUMENT_MISSING = "pre_history_document_missing"
     TRANSFORM_CONFLICTED = "transform_conflicted"
     DESTINATION_NOT_IN_NEW_SHAPE = "destination_not_in_new_shape"
     SURVIVING_PATH_REMOVED = "surviving_path_removed"
@@ -108,11 +126,6 @@ def check_transform_chain(*, surface: Surface, migration_dir: Path) -> list[Tran
 
 
 def _check_link(*, surface: Surface, ledger: MigrationLedger, entry: MigrationEntry, migration_dir: Path) -> list[TransformIssue]:
-    if entry.pre_history:
-        # A pre-history entry's `before` document is hand-authored rather than snapshotted — there
-        # was no fingerprint yet — so it has no link of this chain to be verified against. It is
-        # refused outright by `check-ledger` until the check that reads that document exists.
-        return []
     if entry.safety is MigrationSafety.UNSAFE:
         # An unsafe entry is reported and never applied, so no document ever makes this transition
         # mechanically. Demanding that its operations reach the new shape would demand a
@@ -122,9 +135,9 @@ def _check_link(*, surface: Surface, ledger: MigrationLedger, entry: MigrationEn
 
     version = entry.to_schema_version
     is_head = version == ledger.surface.current_schema_version
-    before_text = _read_defaults_golden(migration_dir=migration_dir, surface_id=surface.surface_id, schema_version=version - 1)
+    before_text = _read_document_the_entry_migrates_from(surface=surface, entry=entry, migration_dir=migration_dir)
     if before_text is None:
-        return [_defaults_golden_missing(surface=surface, entry=entry, migration_dir=migration_dir, schema_version=version - 1)]
+        return [_starting_document_missing(surface=surface, entry=entry, migration_dir=migration_dir)]
     after_text = _read_defaults_golden(migration_dir=migration_dir, surface_id=surface.surface_id, schema_version=version)
     if after_text is None:
         # The head link has no snapshot until `update-migration-schemas` runs, and the coverage
@@ -141,26 +154,42 @@ def _check_link(*, surface: Surface, ledger: MigrationLedger, entry: MigrationEn
                 surface=surface,
                 kind=TransformIssueKind.TRANSFORM_CONFLICTED,
                 message=(
-                    f"entry '{entry.id}': {len(application.conflicts)} of its operations conflict when applied to the reference "
-                    f"document of schema version {version - 1} — {details}. A document at the version the entry migrates *from* "
+                    f"entry '{entry.id}': {len(application.conflicts)} of its operations conflict when applied to "
+                    f"{_starting_document_label(entry=entry)} — {details}. A document at the version the entry migrates *from* "
                     f"is the one document it must be able to migrate, so a conflict here is a conflict on every file in the field"
                 ),
             )
         ]
 
-    issues = _check_paths(surface=surface, entry=entry, before_text=before_text, after_text=after_text, migrated_text=application.text)
+    issues = _check_paths(
+        surface=surface,
+        entry=entry,
+        before_text=before_text,
+        after_text=after_text,
+        migrated_text=application.text,
+        after_fingerprint=read_fingerprint_golden(migration_dir=migration_dir, surface_id=surface.surface_id, schema_version=version),
+    )
     if is_head:
         issues.extend(_check_the_migrated_document_is_accepted(surface=surface, entry=entry, after_text=after_text, migrated_text=application.text))
     return issues
 
 
-def _check_paths(*, surface: Surface, entry: MigrationEntry, before_text: str, after_text: str, migrated_text: str) -> list[TransformIssue]:
+def _check_paths(
+    *,
+    surface: Surface,
+    entry: MigrationEntry,
+    before_text: str,
+    after_text: str,
+    migrated_text: str,
+    after_fingerprint: SurfaceFingerprint | None,
+) -> list[TransformIssue]:
     version = entry.to_schema_version
     before_paths = _paths_of(text=before_text)
     after_paths = _paths_of(text=after_text)
     migrated_paths = _paths_of(text=migrated_text)
+    recorded_paths = after_fingerprint.path_names() if after_fingerprint is not None else set[str]()
 
-    created = migrated_paths - before_paths
+    created = migrated_paths - before_paths - recorded_paths
     unexpected = {path for path in created - after_paths if _ancestors_are_in(path=path, paths=after_paths)}
     removed = (before_paths & after_paths) - migrated_paths
 
@@ -169,10 +198,10 @@ def _check_paths(*, surface: Surface, entry: MigrationEntry, before_text: str, a
             surface=surface,
             kind=TransformIssueKind.DESTINATION_NOT_IN_NEW_SHAPE,
             message=(
-                f"entry '{entry.id}': migrating the reference document of schema version {version - 1} produces '{path}', which "
-                f"schema version {version}'s reference document does not have — a destination is misspelled, or lands where the "
-                f"new shape carries nothing. Every file this entry migrates would end up holding that key, with the tool "
-                f"reporting success"
+                f"entry '{entry.id}': migrating {_starting_document_label(entry=entry)} produces '{path}', which schema version "
+                f"{version} has nowhere — neither its reference document nor its fingerprint carries that path, so a destination "
+                f"is misspelled or lands where the new shape holds nothing. Every file this entry migrates would end up holding "
+                f"that key, with the tool reporting success"
             ),
         )
         for path in _shallowest(paths=unexpected)
@@ -182,9 +211,9 @@ def _check_paths(*, surface: Surface, entry: MigrationEntry, before_text: str, a
             surface=surface,
             kind=TransformIssueKind.SURVIVING_PATH_REMOVED,
             message=(
-                f"entry '{entry.id}': '{path}' is in the reference documents of schema versions {version - 1} and {version} alike, "
-                f"but migrating the first one removes it — an operation targets a parent where it meant to target one child, or "
-                f"renames away material the new shape still has"
+                f"entry '{entry.id}': '{path}' is in {_starting_document_label(entry=entry)} and in the reference document of "
+                f"schema version {version} alike, but migrating the first one removes it — an operation targets a parent where it "
+                f"meant to target one child, or renames away material the new shape still has"
             ),
         )
         for path in _shallowest(paths=removed)
@@ -227,6 +256,46 @@ def _check_the_migrated_document_is_accepted(*, surface: Surface, entry: Migrati
 def _read_defaults_golden(*, migration_dir: Path, surface_id: str, schema_version: int) -> str | None:
     path = defaults_golden_path(migration_dir=migration_dir, surface_id=surface_id, schema_version=schema_version)
     return path.read_text(encoding="utf-8") if path.exists() else None
+
+
+def _read_document_the_entry_migrates_from(*, surface: Surface, entry: MigrationEntry, migration_dir: Path) -> str | None:
+    """The document this link starts from: the previous snapshot, or a hand-authored one.
+
+    A pre-history entry has no previous snapshot by definition — the change predates the first
+    fingerprint — so its author writes the old shape down as `before@N.toml` and the link is
+    verified from there. Everything after that point is identical for both kinds of entry, which is
+    the whole reason the exception is worth having: the three claims below are what actually
+    verifies a pre-history entry, and they are the same three claims every other entry answers.
+    """
+    if entry.pre_history:
+        path = _pre_history_document_path(surface=surface, entry=entry, migration_dir=migration_dir)
+        return path.read_text(encoding="utf-8") if path.exists() else None
+    return _read_defaults_golden(migration_dir=migration_dir, surface_id=surface.surface_id, schema_version=entry.to_schema_version - 1)
+
+
+def _pre_history_document_path(*, surface: Surface, entry: MigrationEntry, migration_dir: Path) -> Path:
+    return pre_history_document_path(migration_dir=migration_dir, surface_id=surface.surface_id, schema_version=entry.to_schema_version)
+
+
+def _starting_document_label(*, entry: MigrationEntry) -> str:
+    if entry.pre_history:
+        return f"its hand-authored pre-history document (before@{entry.to_schema_version}.toml)"
+    return f"the reference document of schema version {entry.to_schema_version - 1}"
+
+
+def _starting_document_missing(*, surface: Surface, entry: MigrationEntry, migration_dir: Path) -> TransformIssue:
+    if not entry.pre_history:
+        return _defaults_golden_missing(surface=surface, entry=entry, migration_dir=migration_dir, schema_version=entry.to_schema_version - 1)
+    path = _pre_history_document_path(surface=surface, entry=entry, migration_dir=migration_dir)
+    return _issue(
+        surface=surface,
+        kind=TransformIssueKind.PRE_HISTORY_DOCUMENT_MISSING,
+        message=(
+            f"entry '{entry.id}' is marked pre_history and there is no {path.name} beside the golden chain. A pre-history entry "
+            f"is exempt from being accounted against a fingerprint diff precisely because none describes it, and this document "
+            f"is what it is verified against instead — write the old shape it migrates from, by hand, at {path}"
+        ),
+    )
 
 
 def _paths_of(*, text: str) -> set[str]:

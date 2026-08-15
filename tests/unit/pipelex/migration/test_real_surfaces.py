@@ -60,11 +60,11 @@ class TestTheCheckedInGoldens:
         assert ledger_issues == [], "\n".join(f"{issue.surface_id}: {issue.message}" for issue in ledger_issues)
 
     def test_the_real_transform_chains_hold(self) -> None:
-        """Every entry, applied to the frozen document of the version before it, lands on the next one.
+        """Every entry, applied to the document of the version before it, lands on the next one.
 
-        Vacuous while all three surfaces sit at schema version 1 with no entries — there is no link
-        to walk — and that is worth asserting anyway: the first real entry is the reshape, and this
-        is the assertion that will meet it.
+        No longer vacuous: `telemetry-config@2` is a pre-history entry, so this walks its
+        hand-authored `before@2.toml` through its operations and holds the result against today's
+        shape and today's model.
         """
         transform_issues = check_transforms(registry=build_config_surface_registry(), migration_dir=packaged_migration_dir())
         assert transform_issues == [], "\n".join(f"{issue.surface_id}: {issue.message}" for issue in transform_issues)
