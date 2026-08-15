@@ -19,8 +19,10 @@ TOML to patch) and against ops targeting a different file than the one being pat
 op is reported, never raised.
 """
 
+import copy
+from collections.abc import Sequence
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
 import tomlkit
 from pipelex_tools import format_mthds
@@ -30,7 +32,18 @@ from tomlkit.container import Container, OutOfOrderTableProxy
 from tomlkit.items import AbstractTable, Item
 
 from pipelex.base_exceptions import PipelexUnexpectedError
-from pipelex.suggested_fix import FixOp, FixOpKind, TomlValue
+from pipelex.suggested_fix import (
+    WILDCARD_SEGMENT,
+    DeleteKeyOp,
+    DeleteTableOp,
+    EnsureTableOp,
+    FixOp,
+    MoveKeyOp,
+    RemapValueOp,
+    RenameTableKeyOp,
+    SetKeyOp,
+    TomlValue,
+)
 
 if TYPE_CHECKING:
     # ``Diagnostic`` is a type-only TypedDict from the stub — declared in ``__all__`` but not a
@@ -39,17 +52,25 @@ if TYPE_CHECKING:
 
 
 class FixOpOutcome(StrEnum):
-    """What happened to one op during application."""
+    """What happened to one op during application.
+
+    ``SKIPPED`` is benign and, under a migration's always-replay, overwhelmingly the common
+    case: the target is gone or the change is already there. ``CONFLICT`` is not benign and
+    must never travel inside ``SKIPPED`` — it means the change cannot be made without choosing
+    on the user's behalf, typically because they hand-fixed part of the file themselves.
+    Consumers classify on this enum and never by parsing ``detail``, which is presentation.
+    """
 
     APPLIED = "applied"
     SKIPPED = "skipped"
+    CONFLICT = "conflict"
 
     @property
     def did_apply(self) -> bool:
         match self:
             case FixOpOutcome.APPLIED:
                 return True
-            case FixOpOutcome.SKIPPED:
+            case FixOpOutcome.SKIPPED | FixOpOutcome.CONFLICT:
                 return False
 
 
@@ -173,7 +194,7 @@ def _render_syntax_diagnostic(diagnostic: "Diagnostic") -> str:
     return f"{diagnostic['message']} (line {diagnostic_range['start_line']}:{diagnostic_range['start_col']})"
 
 
-def apply_fix_ops(*, toml_doc: TOMLDocument, ops: list[FixOp]) -> list[FixOpApplication]:
+def apply_fix_ops(*, toml_doc: TOMLDocument, ops: Sequence[FixOp]) -> list[FixOpApplication]:
     """Apply each op to the DOM in place, returning one application report per op, in order.
 
     Idempotent: re-applying an already-applied op sets the same value / finds the key
@@ -185,69 +206,225 @@ def apply_fix_ops(*, toml_doc: TOMLDocument, ops: list[FixOp]) -> list[FixOpAppl
     return applications
 
 
+class _OpResult(NamedTuple):
+    """One op's effect at one concrete table path, before wildcard expansions are folded."""
+
+    outcome: FixOpOutcome
+    detail: str | None = None
+
+
+def _expand_table_paths(*, toml_doc: TOMLDocument, table_path: list[str]) -> list[list[str]]:
+    """Resolve ``table_path`` into the concrete paths it addresses in this document.
+
+    A path with no wildcard is itself, always — expansion never filters, so a path pointing at
+    a table the document does not have still reaches its handler and is reported as a guarded
+    skip there, exactly as before wildcards existed.
+
+    A ``*`` segment expands over the table-valued keys present at that node, which is what
+    "every entry of this open mapping" means for a file: the keys belong to the user, so the
+    document is the only thing that can enumerate them. A wildcard over a node that is absent,
+    or that holds no table-valued key, expands to nothing.
+    """
+    if WILDCARD_SEGMENT not in table_path:
+        return [table_path]
+    expanded_paths: list[list[str]] = [[]]
+    for segment in table_path:
+        if segment != WILDCARD_SEGMENT:
+            expanded_paths = [[*path, segment] for path in expanded_paths]
+            continue
+        next_paths: list[list[str]] = []
+        for path in expanded_paths:
+            node = _resolve_table(toml_doc=toml_doc, table_path=path)
+            if node is None:
+                continue
+            next_paths.extend([*path, key] for key, value in node.items() if isinstance(value, dict))
+        expanded_paths = next_paths
+    return expanded_paths
+
+
 def _apply_one_op(*, toml_doc: TOMLDocument, fix_op: FixOp) -> FixOpApplication:
-    table_path_str = ".".join(fix_op.table_path)
-    match fix_op.kind:
-        case FixOpKind.SET_KEY:
-            if fix_op.key is None or fix_op.value is None:
-                msg = f"set_key op on '{table_path_str}' requires both key and value — planner bug"
-                raise PipelexUnexpectedError(msg)
-            target_table = _resolve_table(toml_doc=toml_doc, table_path=fix_op.table_path)
+    """Apply one op at every concrete path it addresses, folded into a single report.
+
+    An op is one step, and a conflicting step writes nothing — including a wildcard op whose
+    conflict sits in the *last* matched entry. Every handler decides its own conflict before it
+    writes, so a single path is atomic by construction; across several paths the op is first
+    rehearsed on a copy of the document, and touches the real one only once no match conflicts.
+    """
+    concrete_paths = _expand_table_paths(toml_doc=toml_doc, table_path=fix_op.table_path)
+    if not concrete_paths:
+        detail = f"no table matches '{'.'.join(fix_op.table_path)}' in document"
+        return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=detail)
+    if len(concrete_paths) == 1:
+        result = _apply_at_table_path(toml_doc=toml_doc, fix_op=fix_op, table_path=concrete_paths[0])
+        return FixOpApplication(op=fix_op, outcome=result.outcome, detail=result.detail)
+    rehearsal = copy.deepcopy(toml_doc)
+    rehearsed = [_apply_at_table_path(toml_doc=rehearsal, fix_op=fix_op, table_path=path) for path in concrete_paths]
+    if any(result.outcome is FixOpOutcome.CONFLICT for result in rehearsed):
+        return _fold_wildcard_results(fix_op=fix_op, results=rehearsed)
+    results = [_apply_at_table_path(toml_doc=toml_doc, fix_op=fix_op, table_path=path) for path in concrete_paths]
+    return _fold_wildcard_results(fix_op=fix_op, results=results)
+
+
+def _fold_wildcard_results(*, fix_op: FixOp, results: list[_OpResult]) -> FixOpApplication:
+    """Reduce one wildcard op's per-entry results to the single report the caller sees.
+
+    A conflict anywhere wins, because a conflict is the one outcome a caller must act on and
+    burying it under a sibling entry's success would hide exactly what the outcome exists to
+    surface. Otherwise any application makes the op applied, and only an op that did nothing
+    anywhere is skipped.
+    """
+    conflicts = [result for result in results if result.outcome is FixOpOutcome.CONFLICT]
+    if conflicts:
+        return FixOpApplication(
+            op=fix_op,
+            outcome=FixOpOutcome.CONFLICT,
+            detail=f"{len(conflicts)} of {len(results)} matched tables conflict — first: {conflicts[0].detail}",
+        )
+    applied_count = sum(1 for result in results if result.outcome.did_apply)
+    if applied_count:
+        return FixOpApplication(
+            op=fix_op,
+            outcome=FixOpOutcome.APPLIED,
+            detail=f"applied in {applied_count} of {len(results)} matched tables",
+        )
+    return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"nothing to do in any of {len(results)} matched tables")
+
+
+def _apply_at_table_path(*, toml_doc: TOMLDocument, fix_op: FixOp, table_path: list[str]) -> _OpResult:
+    """Dispatch one op to its handler, at one already-expanded concrete table path.
+
+    Matching on the op **type** rather than on its ``kind`` is what removes the shape checks
+    this function used to open with: each variant of the union declares exactly the fields its
+    handler reads, so "a set_key without a value" is a pydantic error at construction and can no
+    longer reach the applier as a runtime "planner bug" raise.
+    """
+    table_path_str = ".".join(table_path)
+    match fix_op:
+        case SetKeyOp():
+            target_table = _resolve_table(toml_doc=toml_doc, table_path=table_path)
             if target_table is None:
-                return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"table '{table_path_str}' not found in document")
+                return _OpResult(FixOpOutcome.SKIPPED, f"table '{table_path_str}' not found in document")
             target_table[fix_op.key] = _as_tomlkit_value(fix_op.value)
-            return FixOpApplication(op=fix_op, outcome=FixOpOutcome.APPLIED)
-        case FixOpKind.ENSURE_TABLE:
-            if not fix_op.table_path:
-                msg = "ensure_table op requires a non-empty table_path — planner bug"
-                raise PipelexUnexpectedError(msg)
-            existing_table = _resolve_table(toml_doc=toml_doc, table_path=fix_op.table_path)
+            return _OpResult(FixOpOutcome.APPLIED)
+        case EnsureTableOp():
+            existing_table = _resolve_table(toml_doc=toml_doc, table_path=table_path)
             if existing_table is not None:
-                return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"table '{table_path_str}' already exists")
-            parent_table = _resolve_table(toml_doc=toml_doc, table_path=fix_op.table_path[:-1])
-            table_key = fix_op.table_path[-1]
-            if parent_table is None or table_key in parent_table:
-                return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"parent of table '{table_path_str}' not found")
+                return _OpResult(FixOpOutcome.SKIPPED, f"table '{table_path_str}' already exists")
+            parent_table = _resolve_table(toml_doc=toml_doc, table_path=table_path[:-1])
+            if parent_table is None:
+                return _OpResult(FixOpOutcome.SKIPPED, f"parent of table '{table_path_str}' not found")
+            table_key = table_path[-1]
+            if table_key in parent_table:
+                # The key is there but is not a table — the check above would have resolved it.
+                # Creating the table would destroy whatever the user put there, so this is a
+                # choice on their behalf, not an absence: a conflict, and not the "parent not
+                # found" this branch used to report.
+                return _OpResult(FixOpOutcome.CONFLICT, f"'{table_key}' is already present in '{'.'.join(table_path[:-1])}' and is not a table")
             parent_table[table_key] = tomlkit.inline_table()
-            return FixOpApplication(op=fix_op, outcome=FixOpOutcome.APPLIED)
-        case FixOpKind.DELETE_KEY:
-            if fix_op.key is None:
-                msg = f"delete_key op on '{table_path_str}' requires a key — planner bug"
-                raise PipelexUnexpectedError(msg)
-            target_table = _resolve_table(toml_doc=toml_doc, table_path=fix_op.table_path)
+            return _OpResult(FixOpOutcome.APPLIED)
+        case DeleteKeyOp():
+            target_table = _resolve_table(toml_doc=toml_doc, table_path=table_path)
             if target_table is None:
-                return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"table '{table_path_str}' not found in document")
+                return _OpResult(FixOpOutcome.SKIPPED, f"table '{table_path_str}' not found in document")
             if fix_op.key not in target_table:
-                return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"key '{fix_op.key}' not found in table '{table_path_str}'")
+                return _OpResult(FixOpOutcome.SKIPPED, f"key '{fix_op.key}' not found in table '{table_path_str}'")
             del target_table[fix_op.key]
-            return FixOpApplication(op=fix_op, outcome=FixOpOutcome.APPLIED)
-        case FixOpKind.DELETE_TABLE:
-            if not fix_op.table_path:
-                msg = "delete_table op requires a non-empty table_path — planner bug"
-                raise PipelexUnexpectedError(msg)
-            parent_table = _resolve_table(toml_doc=toml_doc, table_path=fix_op.table_path[:-1])
-            table_key = fix_op.table_path[-1]
+            return _OpResult(FixOpOutcome.APPLIED)
+        case DeleteTableOp():
+            parent_table = _resolve_table(toml_doc=toml_doc, table_path=table_path[:-1])
+            table_key = table_path[-1]
             # The final segment must itself be a table — a scalar there is a drifted target
             # (same guarded-skip contract _resolve_table enforces for every other segment).
             if parent_table is None or not isinstance(parent_table.get(table_key), dict):
-                return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"table '{table_path_str}' not found in document")
+                return _OpResult(FixOpOutcome.SKIPPED, f"table '{table_path_str}' not found in document")
             del parent_table[table_key]
-            return FixOpApplication(op=fix_op, outcome=FixOpOutcome.APPLIED)
-        case FixOpKind.RENAME_TABLE_KEY:
-            if fix_op.key is None or fix_op.new_key is None:
-                msg = f"rename_table_key op on '{table_path_str}' requires both key and new_key — planner bug"
-                raise PipelexUnexpectedError(msg)
-            parent_table = _resolve_table(toml_doc=toml_doc, table_path=fix_op.table_path)
+            return _OpResult(FixOpOutcome.APPLIED)
+        case RenameTableKeyOp():
+            parent_table = _resolve_table(toml_doc=toml_doc, table_path=table_path)
             if parent_table is None or fix_op.key not in parent_table:
-                return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"key '{fix_op.key}' not found in table '{table_path_str}'")
+                return _OpResult(FixOpOutcome.SKIPPED, f"key '{fix_op.key}' not found in table '{table_path_str}'")
             if fix_op.new_key in parent_table:
                 # Collision: the bare name is already taken by a separate declaration — renaming
-                # would clobber it. The raise-site guard suppresses this case, but the applier
-                # stays defensive (a stale fix from a prior loop iteration could reach here).
-                return FixOpApplication(
-                    op=fix_op,
-                    outcome=FixOpOutcome.SKIPPED,
-                    detail=f"cannot rename to '{fix_op.new_key}': already present in table '{table_path_str}'",
-                )
+                # would clobber it. The raise-site guard suppresses this case for `.mthds` fixes,
+                # but the applier stays defensive (a stale fix from a prior loop iteration, or a
+                # user who hand-fixed half of a migration, could reach here).
+                return _OpResult(FixOpOutcome.CONFLICT, f"cannot rename to '{fix_op.new_key}': already present in table '{table_path_str}'")
             _rename_key_in_place(parent_table=parent_table, key=fix_op.key, new_key=fix_op.new_key)
-            return FixOpApplication(op=fix_op, outcome=FixOpOutcome.APPLIED)
+            return _OpResult(FixOpOutcome.APPLIED)
+        case MoveKeyOp():
+            return _apply_move_key(toml_doc=toml_doc, fix_op=fix_op, table_path=table_path)
+        case RemapValueOp():
+            target_table = _resolve_table(toml_doc=toml_doc, table_path=table_path)
+            if target_table is None or fix_op.key not in target_table:
+                return _OpResult(FixOpOutcome.SKIPPED, f"key '{fix_op.key}' not found in table '{table_path_str}'")
+            current_value = target_table[fix_op.key]
+            if not isinstance(current_value, str):
+                return _OpResult(FixOpOutcome.SKIPPED, f"value of '{table_path_str}.{fix_op.key}' is not a string")
+            new_value = fix_op.mapping.get(str(current_value))
+            if new_value is None:
+                # The current value is deliberately not named: a report must never echo a value
+                # read from a user's file (docs/migration-ledger.md, "What the engine reports").
+                return _OpResult(FixOpOutcome.SKIPPED, f"value of '{table_path_str}.{fix_op.key}' is not in this operation's mapping")
+            target_table[fix_op.key] = new_value
+            return _OpResult(FixOpOutcome.APPLIED)
+
+
+def _apply_move_key(*, toml_doc: TOMLDocument, fix_op: MoveKeyOp, table_path: list[str]) -> _OpResult:
+    """Relocate one key, creating whatever destination parents are missing.
+
+    Order matters and is the whole reason this is not inline: everything that can refuse the
+    move is decided **before** anything is written, so a conflicting move leaves the document
+    byte-identical rather than seeded with the empty parent tables it was about to fill.
+    """
+    table_path_str = ".".join(table_path)
+    destination_path_str = ".".join(fix_op.new_table_path)
+    source_table = _resolve_table(toml_doc=toml_doc, table_path=table_path)
+    if source_table is None or fix_op.key not in source_table:
+        return _OpResult(FixOpOutcome.SKIPPED, f"key '{fix_op.key}' not found in table '{table_path_str}'")
+
+    blocking_segment = _first_non_table_segment(toml_doc=toml_doc, table_path=fix_op.new_table_path)
+    if blocking_segment is not None:
+        return _OpResult(
+            FixOpOutcome.CONFLICT, f"destination '{destination_path_str}' is blocked: '{blocking_segment}' is present and is not a table"
+        )
+    existing_destination = _resolve_table(toml_doc=toml_doc, table_path=fix_op.new_table_path)
+    if existing_destination is not None and fix_op.new_key in existing_destination:
+        return _OpResult(FixOpOutcome.CONFLICT, f"cannot move to '{destination_path_str}.{fix_op.new_key}': already present")
+
+    moved_value = cast("Item", source_table[fix_op.key])
+    del source_table[fix_op.key]
+    destination_table = _create_block_table_path(toml_doc=toml_doc, table_path=fix_op.new_table_path)
+    destination_table[fix_op.new_key] = moved_value
+    return _OpResult(FixOpOutcome.APPLIED)
+
+
+def _first_non_table_segment(*, toml_doc: TOMLDocument, table_path: list[str]) -> str | None:
+    """The first segment of ``table_path`` that exists and is not a table, if there is one.
+
+    One walk answers the whole question because absence is terminal: once a segment is missing,
+    every deeper segment is missing too and the rest of the path is free to be created.
+    """
+    node = cast("dict[str, Any]", toml_doc)
+    for segment in table_path:
+        candidate = node.get(segment)
+        if candidate is None:
+            return None
+        if not isinstance(candidate, dict):
+            return segment
+        node = cast("dict[str, Any]", candidate)
+    return None
+
+
+def _create_block_table_path(*, toml_doc: TOMLDocument, table_path: list[str]) -> dict[str, Any]:
+    """Walk ``table_path``, creating missing segments as block tables, and return the leaf node.
+
+    Block tables rather than inline ones, because this creates a *section* of a configuration
+    file — a destination that will hold moved keys and be read by a human. Callers must have
+    ruled out a non-table segment first; this function would silently overwrite one.
+    """
+    node = cast("dict[str, Any]", toml_doc)
+    for segment in table_path:
+        if not isinstance(node.get(segment), dict):
+            node[segment] = tomlkit.table()
+        node = cast("dict[str, Any]", node[segment])
+    return node

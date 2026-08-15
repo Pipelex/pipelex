@@ -13,7 +13,10 @@ import pytest
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.pipeline.fixes.planner import plan_fix_for_pipe_validation_error
-from pipelex.suggested_fix import FixOpKind, FixSafety
+from pipelex.suggested_fix import DeleteKeyOp, EnsureTableOp, FixSafety, SetKeyOp
+
+# The inputs table of the pipe every input-drift case below is built around.
+_INPUTS_TABLE_PATH = ["pipe", "make_summary", "inputs"]
 
 
 def _error_data(
@@ -62,12 +65,7 @@ class TestFixPlanner:
         assert fix.fix_code == "match-sequence-output"
         assert fix.safety == FixSafety.SAFE
         assert fix.source == "main.mthds"
-        assert len(fix.ops) == 1
-        the_op = fix.ops[0]
-        assert the_op.kind == FixOpKind.SET_KEY
-        assert the_op.table_path == ["pipe", "list_ideas"]
-        assert the_op.key == "output"
-        assert the_op.value == "Idea[]"
+        assert fix.ops == [SetKeyOp(table_path=["pipe", "list_ideas"], key="output", value="Idea[]")]
 
     def test_multiplicity_mismatch_yields_fix_with_expected_ref_value(self) -> None:
         """An enriched INADEQUATE_OUTPUT_MULTIPLICITY yields the same fix, carrying the expected ref."""
@@ -76,7 +74,7 @@ class TestFixPlanner:
         )
         assert fix is not None
         assert fix.fix_code == "match-sequence-output"
-        assert fix.ops[0].value == "Idea[3]"
+        assert fix.ops == [SetKeyOp(table_path=["pipe", "list_ideas"], key="output", value="Idea[3]")]
 
     def test_missing_expected_ref_yields_none(self) -> None:
         """No enriched expected ref (PipeParallel / PipeCondition / operator raise sites) → no fix."""
@@ -120,12 +118,7 @@ class TestFixPlanner:
         assert fix.fix_code == "sync-controller-inputs"
         assert fix.safety == FixSafety.SAFE
         assert fix.source == "main.mthds"
-        assert len(fix.ops) == 1
-        the_op = fix.ops[0]
-        assert the_op.kind == FixOpKind.SET_KEY
-        assert the_op.table_path == ["pipe", "make_summary", "inputs"]
-        assert the_op.key == "text"
-        assert the_op.value == "Text"
+        assert fix.ops == [SetKeyOp(table_path=_INPUTS_TABLE_PATH, key="text", value="Text")]
 
     def test_input_drift_diff_adds_updates_and_deletes(self) -> None:
         """The fix is a diff: set_key for added/changed variables, delete_key for extraneous ones."""
@@ -136,13 +129,11 @@ class TestFixPlanner:
             )
         )
         assert fix is not None
-        op_shapes = [(op.kind, op.key, op.value) for op in fix.ops]
-        assert op_shapes == [
-            (FixOpKind.SET_KEY, "text", "Text"),
-            (FixOpKind.SET_KEY, "doc", "Doc"),
-            (FixOpKind.DELETE_KEY, "note", None),
+        assert fix.ops == [
+            SetKeyOp(table_path=_INPUTS_TABLE_PATH, key="text", value="Text"),
+            SetKeyOp(table_path=_INPUTS_TABLE_PATH, key="doc", value="Doc"),
+            DeleteKeyOp(table_path=_INPUTS_TABLE_PATH, key="note"),
         ]
-        assert all(op.table_path == ["pipe", "make_summary", "inputs"] for op in fix.ops)
         for var_name in ("text", "doc", "note"):
             assert var_name in fix.description
 
@@ -156,7 +147,7 @@ class TestFixPlanner:
             )
         )
         assert fix is not None
-        assert [(op.kind, op.key) for op in fix.ops] == [(FixOpKind.SET_KEY, "note")]
+        assert fix.ops == [SetKeyOp(table_path=_INPUTS_TABLE_PATH, key="note", value="Text")]
 
     def test_no_declared_inputs_ensures_table_then_sets_each_key(self) -> None:
         """The same ops create a missing table or preserve an explicitly empty block table."""
@@ -167,12 +158,11 @@ class TestFixPlanner:
             )
         )
         assert fix is not None
-        assert [(op.kind, op.key, op.value) for op in fix.ops] == [
-            (FixOpKind.ENSURE_TABLE, None, None),
-            (FixOpKind.SET_KEY, "text", "Text"),
-            (FixOpKind.SET_KEY, "doc", "Doc?"),
+        assert fix.ops == [
+            EnsureTableOp(table_path=_INPUTS_TABLE_PATH),
+            SetKeyOp(table_path=_INPUTS_TABLE_PATH, key="text", value="Text"),
+            SetKeyOp(table_path=_INPUTS_TABLE_PATH, key="doc", value="Doc?"),
         ]
-        assert all(op.table_path == ["pipe", "make_summary", "inputs"] for op in fix.ops)
 
     def test_equal_mappings_yield_none(self) -> None:
         """An empty diff (renderings already agree) must not produce a no-op fix."""

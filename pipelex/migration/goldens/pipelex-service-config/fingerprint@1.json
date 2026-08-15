@@ -1,0 +1,28 @@
+{
+  "surface_id": "pipelex-service-config",
+  "schema_version": 1,
+  "paths": {
+    "agreement": {
+      "value_type": "table",
+      "required": false,
+      "open_node": false
+    },
+    "agreement.terms_accepted": {
+      "value_type": "bool",
+      "required": false,
+      "default": false,
+      "open_node": false
+    },
+    "onboarding": {
+      "value_type": "table",
+      "required": false,
+      "open_node": false
+    },
+    "onboarding.inference_setup_completed": {
+      "value_type": "bool",
+      "required": false,
+      "default": false,
+      "open_node": false
+    }
+  }
+}

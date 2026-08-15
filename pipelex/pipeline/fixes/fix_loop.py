@@ -43,7 +43,7 @@ from pipelex.pipeline.fixes.applicability import is_safe_fix_for_load_scope, is_
 from pipelex.pipeline.fixes.applier import apply_fix_ops, serialize_and_format
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validation_errors import build_validation_error_items
-from pipelex.suggested_fix import FixOp, FixOpKind, SuggestedFix
+from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, EnsureTableOp, FixOp, MoveKeyOp, RemapValueOp, RenameTableKeyOp, SetKeyOp, SuggestedFix
 from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
@@ -245,12 +245,14 @@ class FixBundleResult(BaseModel):
 
 
 def _fix_fingerprint(fix: SuggestedFix) -> str:
-    """Stable identity of a fix attempt: fix_code + source + each op's (kind, path, key, value, new_key).
+    """Stable identity of a fix attempt: ``fix_code`` + ``source`` + every op serialized whole.
 
-    ``new_key`` participates so two ``rename_table_key`` ops that differ only in their target name
-    are distinct fingerprints (they would otherwise collide and trip the no-progress bail).
+    Serializing each op rather than listing chosen fields means every field of every variant
+    participates by construction — two ``rename_table_key`` ops differing only in their target
+    name stay distinct fingerprints (they would otherwise collide and trip the no-progress
+    bail), and a new op kind cannot silently collapse two different fixes into one identity.
     """
-    op_parts = [f"{op.kind}:{'.'.join(op.table_path)}:{op.key}:{op.value!r}:{op.new_key}" for op in fix.ops]
+    op_parts = [op.model_dump_json() for op in fix.ops]
     return f"{fix.fix_code}|{fix.source}|{'|'.join(op_parts)}"
 
 
@@ -459,12 +461,12 @@ def _colliding_op_name(
       value, the ``main_pipe`` remains bundle-local and safe despite same-named sibling pipes.
       The categorizer cannot see cross-file state, so this suppression lives here.
     """
-    match fix_op.kind:
-        case FixOpKind.RENAME_TABLE_KEY:
-            if fix_op.table_path == ["pipe"] and fix_op.new_key is not None and fix_op.new_key in other_file_pipe_codes:
+    match fix_op:
+        case RenameTableKeyOp():
+            if fix_op.table_path == ["pipe"] and fix_op.new_key in other_file_pipe_codes:
                 return fix_op.new_key
             return None
-        case FixOpKind.SET_KEY:
+        case SetKeyOp():
             if (
                 not fix_op.table_path
                 and fix_op.key == _MAIN_PIPE_KEY
@@ -474,7 +476,7 @@ def _colliding_op_name(
             ):
                 return fix_op.value
             return None
-        case FixOpKind.ENSURE_TABLE | FixOpKind.DELETE_KEY | FixOpKind.DELETE_TABLE:
+        case EnsureTableOp() | DeleteKeyOp() | DeleteTableOp() | MoveKeyOp() | RemapValueOp():
             return None
 
 

@@ -1,0 +1,11 @@
+# The migration ledger for the telemetry configuration.
+#
+# See docs/migration-ledger.md for the contract this file obeys.
+
+[surface]
+id = "telemetry-config"
+title = "Telemetry destinations and capture settings"
+base_file = "telemetry.toml"
+tier_glob = "telemetry_*.toml"
+current_schema_version = 1
+min_supported_schema_version = 0

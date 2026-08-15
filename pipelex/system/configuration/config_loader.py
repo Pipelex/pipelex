@@ -4,6 +4,7 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
+from pipelex.system.configuration.config_surface import strip_reserved_meta
 from pipelex.system.runtime import runtime_manager
 from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_utils import load_toml_from_path_and_merge_with_overrides
@@ -338,6 +339,7 @@ class ConfigLoader:
             list_of_configs.append(Path.cwd() / "tests" / f"pipelex_{runtime_manager.run_mode}.toml")
 
         merged = load_toml_from_path_and_merge_with_overrides(paths=list_of_configs)
+        strip_reserved_meta(config_dict=merged)
         if extra_overrides:
             deep_update(merged, updates=extra_overrides)
         return merged

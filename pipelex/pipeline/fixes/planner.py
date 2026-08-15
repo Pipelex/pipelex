@@ -6,7 +6,7 @@ of the validation report — CLI, API, MCP — sees fixes with zero extra plumbi
 """
 
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
-from pipelex.suggested_fix import FixOp, FixOpKind, FixSafety, SuggestedFix
+from pipelex.suggested_fix import DeleteKeyOp, EnsureTableOp, FixOp, FixSafety, RenameTableKeyOp, SetKeyOp, SuggestedFix
 
 MATCH_SEQUENCE_OUTPUT_FIX_CODE = "match-sequence-output"
 SYNC_CONTROLLER_INPUTS_FIX_CODE = "sync-controller-inputs"
@@ -52,8 +52,7 @@ def _plan_match_sequence_output(error_data: PipesAndConceptValidationErrorData) 
         safety=FixSafety.SAFE,
         source=error_data.source,
         ops=[
-            FixOp(
-                kind=FixOpKind.SET_KEY,
+            SetKeyOp(
                 table_path=["pipe", error_data.pipe_code],
                 key="output",
                 value=error_data.expected_output_ref,
@@ -79,10 +78,9 @@ def _plan_sync_controller_inputs(error_data: PipesAndConceptValidationErrorData)
             return None
         variables = ", ".join(f"'{var_name}'" for var_name in error_data.expected_inputs)
         inputs_table_path = ["pipe", error_data.pipe_code, "inputs"]
-        create_ops = [FixOp(kind=FixOpKind.ENSURE_TABLE, table_path=inputs_table_path)]
+        create_ops: list[FixOp] = [EnsureTableOp(table_path=inputs_table_path)]
         create_ops.extend(
-            FixOp(kind=FixOpKind.SET_KEY, table_path=inputs_table_path, key=var_name, value=expected_ref)
-            for var_name, expected_ref in error_data.expected_inputs.items()
+            SetKeyOp(table_path=inputs_table_path, key=var_name, value=expected_ref) for var_name, expected_ref in error_data.expected_inputs.items()
         )
         return SuggestedFix(
             fix_code=SYNC_CONTROLLER_INPUTS_FIX_CODE,
@@ -102,11 +100,11 @@ def _plan_sync_controller_inputs(error_data: PipesAndConceptValidationErrorData)
         if declared_ref == expected_ref:
             continue
         (added if declared_ref is None else updated).append(var_name)
-        ops.append(FixOp(kind=FixOpKind.SET_KEY, table_path=inputs_table_path, key=var_name, value=expected_ref))
+        ops.append(SetKeyOp(table_path=inputs_table_path, key=var_name, value=expected_ref))
     for var_name in error_data.declared_inputs:
         if var_name not in error_data.expected_inputs:
             removed.append(var_name)
-            ops.append(FixOp(kind=FixOpKind.DELETE_KEY, table_path=inputs_table_path, key=var_name))
+            ops.append(DeleteKeyOp(table_path=inputs_table_path, key=var_name))
     if not ops:
         # The renderings already agree (e.g. two concepts that render to the same relative ref):
         # an empty diff would be a no-op fix the loop applies forever — suppress instead.
@@ -158,8 +156,7 @@ def _plan_strip_native_concept_redecl(error_data: PipelexBundleBlueprintValidati
         safety=FixSafety.SAFE,
         source=error_data.source,
         ops=[
-            FixOp(
-                kind=FixOpKind.DELETE_KEY,
+            DeleteKeyOp(
                 table_path=["concept"],
                 key=error_data.concept_code,
             ),
@@ -187,8 +184,7 @@ def _plan_strip_namespace(error_data: PipelexBundleBlueprintValidationErrorData)
             safety=FixSafety.SAFE,
             source=error_data.source,
             ops=[
-                FixOp(
-                    kind=FixOpKind.RENAME_TABLE_KEY,
+                RenameTableKeyOp(
                     table_path=["pipe"],
                     key=error_data.pipe_code,
                     new_key=error_data.stripped_pipe_code,
@@ -201,8 +197,7 @@ def _plan_strip_namespace(error_data: PipelexBundleBlueprintValidationErrorData)
         safety=FixSafety.SAFE,
         source=error_data.source,
         ops=[
-            FixOp(
-                kind=FixOpKind.SET_KEY,
+            SetKeyOp(
                 table_path=[],
                 key="main_pipe",
                 value=error_data.stripped_pipe_code,

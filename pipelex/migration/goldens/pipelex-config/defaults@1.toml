@@ -1,0 +1,452 @@
+
+
+[pipelex]
+
+[pipelex.storage_config]
+is_fetch_remote_content_enabled = true
+is_upload_local_content_enabled = true
+method = "local"                       # local, in_memory, s3, gcp
+
+[pipelex.storage_config.local]
+uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
+local_storage_path = ".pipelex/storage"
+
+[pipelex.storage_config.in_memory]
+uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
+
+[pipelex.storage_config.s3]
+uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
+bucket_name = ""
+region = ""
+signed_urls_lifespan_seconds = 3600
+
+[pipelex.storage_config.gcp]
+uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
+bucket_name = ""
+project_id = ""
+signed_urls_lifespan_seconds = 3600
+
+[pipelex.secrets_config]
+method = "env" # env (built-in); an external plugin may add e.g. vault
+
+[pipelex.observer_config]
+observer_dir = "results/observer"
+
+[pipelex.scan_config]
+excluded_dirs = [
+  ".venv",
+  "venv",
+  "env",
+  ".env",
+  "virtualenv",
+  ".virtualenv",
+  ".git",
+  "__pycache__",
+  ".pytest_cache",
+  ".mypy_cache",
+  ".ruff_cache",
+  "node_modules",
+  "results",
+]
+
+[pipelex.builder_config]
+fix_loop_max_attempts = 10
+default_output_dir = "."
+default_bundle_file_name = "bundle"
+default_directory_base_name = "pipeline"
+
+[pipelex.reporting_config]
+is_log_costs_to_console = true
+is_generate_cost_report_file_enabled = false
+cost_report_dir_path = "reports"
+cost_report_base_name = "cost_report"
+cost_report_extension = "csv"
+cost_report_unit_scale = 1.0
+
+####################################################################################################
+# Log config
+####################################################################################################
+
+[pipelex.log_config]
+default_log_level = "INFO"
+# console_log_target controls the RichHandler used by the logging system (log.debug/info/...).
+# Logs are diagnostics → stderr.
+console_log_target = "stderr"
+# console_print_target controls the Console returned by get_console(), used for banners,
+# deck notices, and the main `pipelex` CLI's data tables (`show backends`, `show models`,
+# `which`, `doctor`). Tables are data the user pipes to a file → stdout.
+# Note: the agent CLI (`pipelex-agent`) emits its actual JSON/markdown results via bare
+# builtin `print(...)` to sys.stdout, bypassing Rich entirely — so this knob does NOT
+# affect the agent CLI data channel. The agent CLI factory additionally forces both
+# targets to stderr internally to keep its stdout strictly reserved for the success
+# envelope (see `_AGENT_CLI_STDERR_CONSOLE_OVERRIDES` in `agent_cli_factory.py`).
+console_print_target = "stdout"
+is_console_logging_enabled = true
+
+json_logs_indent = 4
+presentation_line_width = 120
+silenced_problem_ids = ["azure_openai_no_stream_options"]
+caller_info_template = "file_line"
+is_caller_info_enabled = false
+
+log_mode = "rich"
+
+poor_loggers = []
+generic_poor_logger = "#poor-log"
+
+[pipelex.log_config.package_log_levels]
+# for logger names, the dots "." have been replaced by "-" to avoid toml parsing issues
+# TODO: use quotes to re-enable names with dots
+anthropic = "INFO"
+asyncio = "INFO"
+botocore = "INFO"
+botocore-credentials = "WARNING"
+google = "INFO"
+httpx = "WARNING"
+httpcore = "INFO"
+openai = "INFO"
+instructor = "INFO"
+urllib3-connectionpool = "INFO"
+urllib3-util-retry = "INFO"
+
+pipelex = "INFO"
+
+
+[pipelex.log_config.rich_log_config]
+is_show_time = false
+is_show_level = true
+is_link_path_enabled = true
+is_markup_enabled = true
+highlighter_name = "json"
+is_rich_tracebacks = true
+is_tracebacks_word_wrap = true
+is_tracebacks_show_locals = false
+tracebacks_suppress = []
+keywords_to_hilight = []
+
+[pipelex.aws_config]
+api_key_method = "env"
+bedrock_access_variant = "aws_access"
+
+####################################################################################################
+# Cogt inference config
+####################################################################################################
+
+[cogt]
+transport_max_retries = 2
+
+[cogt.model_deck_config]
+is_model_fallback_enabled = true
+missing_presets_reaction = "log"
+
+[cogt.llm_config]
+default_max_images = 100
+is_structure_prompt_enabled = true
+is_dump_text_prompts_enabled = false
+is_dump_response_text_enabled = false
+schema_reask_max_attempts = 3
+
+[cogt.llm_config.instructor_config]
+is_dump_kwargs_enabled = false
+is_dump_response_enabled = false
+is_dump_error_enabled = false
+
+[cogt.llm_config.openai_config.effort_to_level_map]
+none = "none"
+minimal = "minimal"
+low = "low"
+medium = "medium"
+high = "high"
+xhigh = "xhigh"
+max = "xhigh"
+
+[cogt.llm_config.anthropic_config]
+structured_output_timeout_seconds = 1200
+
+[cogt.llm_config.anthropic_config.effort_to_level_map]
+none = "disabled"
+minimal = "low"
+low = "low"
+medium = "medium"
+high = "high"
+xhigh = "xhigh"
+max = "max"
+
+[cogt.llm_config.google_config.effort_to_level_map]
+none = "disabled"
+minimal = "minimal"
+low = "low"
+medium = "medium"
+high = "high"
+xhigh = "high"
+max = "high"
+
+[cogt.llm_config.mistral_config.effort_to_level_map]
+none = "disabled"
+minimal = "reasoning"
+low = "reasoning"
+medium = "reasoning"
+high = "reasoning"
+xhigh = "reasoning"
+max = "reasoning"
+
+[cogt.llm_config.effort_to_budget_maps.anthropic]
+none = 0      # Required by validator; unreachable at runtime (level map gates NONE as disabled before budget lookup)
+minimal = 512
+low = 1024
+medium = 5000
+high = 16384
+xhigh = 32768
+max = 65536
+
+[cogt.llm_config.effort_to_budget_maps.gemini]
+none = 0      # Required by validator; unreachable at runtime (level map gates NONE as disabled before budget lookup)
+minimal = 512
+low = 1024
+medium = 5000
+high = 16384
+xhigh = 32768
+max = 65536
+
+[cogt.llm_config.generic_templates]
+output_structure_prompt = """
+
+
+---
+The instance we want to generate will be for the following class:
+{{ class_structure_str }}
+
+DO NOT create information.
+If some information is not present for an attribute, output the default value or None according to the attribute definition.
+"""
+
+structuring_prompt = """
+Read the following text carefully and produce the requested structured output from it.
+
+---
+{{ text }}
+"""
+
+####################################################################################################
+# Image generation config
+####################################################################################################
+
+[cogt.img_gen_config.img_gen_job_config]
+is_sync_mode = false
+
+[cogt.img_gen_config.img_gen_param_defaults]
+nb_steps = 28           # 28 is a good default for Flux, possible values are [1,2,4,8] for SDXL Lightning
+quality = "low"
+aspect_ratio = "square" # "square", "landscape_4_3", "landscape_3_2", "landscape_16_9", "landscape_21_9", "landscape_4_1", "landscape_8_1", "portrait_3_4", "portrait_2_3", "portrait_9_16", "portrait_9_21", "portrait_1_4", "portrait_1_8"
+guidance_scale = 2.5
+background = "auto"
+is_moderated = true
+safety_tolerance = 5
+is_raw = false
+seed = "auto"
+
+[cogt.img_gen_config.quality_to_steps_maps]
+flux = { "low" = 14, "medium" = 28, "high" = 56 }
+sdxl_lightning = { "low" = 2, "medium" = 4, "high" = 8 }
+qwen_image = { "low" = 10, "medium" = 20, "high" = 28 }
+
+####################################################################################################
+# Extract config
+####################################################################################################
+
+[cogt.extract_config]
+default_page_views_dpi = 72
+
+####################################################################################################
+# Gateway test config
+####################################################################################################
+
+[cogt.gateway_test_config.config_id_substitutions]
+# this is an empty dict, it's only used by Pipelex staff to override the ¨Pipelex Gateway¨ config
+# in order to test new model integrations or debug issues with the Gateway
+
+####################################################################################################
+# Templating config
+####################################################################################################
+
+[pipelex.templating_config]
+default_templating_style = { tag_style = "xml" }
+
+####################################################################################################
+# Pipe run config
+####################################################################################################
+
+[pipelex.pipe_run_config]
+pipe_stack_limit = 20
+
+####################################################################################################
+# PipeFunc config
+####################################################################################################
+
+[pipelex.pipe_func_config]
+# PipeFunc execution mode, selected from the PipeFuncExecutorRegistry the plugins populate. "direct"
+# (core) imports and runs customer functions in this process; "daytona" (our Daytona sandbox plugin)
+# runs them in a remote box. Any non-"direct" mode carries customer PipeFunc code as source text and
+# executes it only inside an isolated sandbox, never imported here.
+execution_mode = "direct"
+
+####################################################################################################
+# Pipeline execution config
+####################################################################################################
+
+[pipelex.pipeline_execution_config]
+is_normalize_data_urls_to_storage = true
+is_mock_inputs = false
+is_generate_graph = true
+is_generate_usage = true
+
+# Bounded fan-out concurrency for PipeBatch: at most this many branches run at once.
+# A modest default keeps a large workload (one pipe over many items) from overwhelming
+# asyncio, memory, and provider rate limits. Set to "unbounded" to disable the bound.
+max_concurrency = 8
+
+[pipelex.pipeline_execution_config.graph_config]
+
+[pipelex.pipeline_execution_config.graph_config.data_inclusion]
+stuff_json_content = true
+stuff_text_content = true
+stuff_html_content = true
+error_stack_traces = true
+pipe_and_concept_registry = true
+
+[pipelex.pipeline_execution_config.graph_config.graphs_inclusion]
+graphspec_json = true
+mermaidflow_mmd = true
+mermaidflow_html = true
+reactflow_html = true
+
+[pipelex.pipeline_execution_config.graph_config.mermaid_config]
+direction = "left_to_right"
+is_include_data_edges = true
+is_include_contains_edges = false
+is_include_selected_outcome_edges = true
+is_show_stuff_codes = false
+
+[pipelex.pipeline_execution_config.graph_config.mermaid_config.style]
+theme = "dark"
+
+[pipelex.pipeline_execution_config.graph_config.reactflow_config]
+is_use_cdn = true
+layout_direction = "left_to_right"
+nodesep = 50
+ranksep = 30
+edge_type = "bezier"
+initial_zoom = 1.0
+pan_to_top = true
+default_title = "Pipelex Graph"
+# Forwarded to mthds-ui as `showControllers`: when true, controller pipes (PipeSequence,
+# PipeParallel, PipeCondition, PipeBatch) render as grouping containers around their children;
+# when false, they collapse out of the graph and edges connect stuff nodes directly.
+show_batch_controller = true
+
+[pipelex.pipeline_execution_config.graph_config.reactflow_config.style]
+theme = "dark"
+palette = "dracula"
+
+####################################################################################################
+# Tracing config (event log for distributed tracing across workers)
+####################################################################################################
+
+[pipelex.tracing_config]
+is_enabled = true
+backend = "ndjson"
+
+[pipelex.tracing_config.ndjson]
+traces_dir = ".pipelex/traces"
+
+[pipelex.tracing_config.dynamodb]
+table_name = ""
+region = ""
+
+####################################################################################################
+# Dry run config
+####################################################################################################
+
+[pipelex.dry_run_config]
+text_gen_truncate_length = 256
+nb_list_items = 3
+nb_extract_pages = 4
+allowed_to_fail_pipes = [
+  "failing_pipelines.infinite_loop_1", # Loop but only for testing purposes — matched on the namespaced pipe_ref
+]
+image_urls = [
+  "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg",
+  "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_2.png",
+]
+
+####################################################################################################
+# MTHDS config
+####################################################################################################
+
+[pipelex.mthds_config.inline_tables]
+spaces_inside_curly_braces = true
+
+[pipelex.mthds_config.strings]
+prefer_literal = false
+force_multiline = false
+length_limit_to_multiline = 100
+ensure_trailing_newline = true
+ensure_leading_blank_line = true
+
+[pipelex.mthds_config.concepts]
+structure_field_ordering = [
+  "type",
+  "concept_ref",
+  "item_type",
+  "item_concept_ref",
+  "description",
+  "choices",
+  "required",
+]
+
+[pipelex.mthds_config.pipes]
+field_ordering = ["type", "description", "inputs", "output"]
+
+####################################################################################################
+# Migration config
+####################################################################################################
+
+[migration.migration_maps.config]
+definition = "description"
+ocr_config = "extract_config"
+ocr = "extract"
+img_gen = "model"
+llm_handle = "model"
+llm = "model"
+llm_to_structure = "model_to_structure"
+task_queue = "default_task_queue"
+
+[migration.migration_maps.mthds]
+img_gen = "model"
+ocr = "model"
+llm_handle = "model"
+llm = "model"
+llm_to_structure = "model_to_structure"
+llm_skill = "llm_talent"
+img_gen_skill = "img_gen_talent"
+extract_skill = "extract_talent"
+parallels = "branches"
+
+
+####################################################################################################
+# Kit Config
+####################################################################################################
+
+[pipelex.kit_config]
+# Agent rule files to install (used by `pipelex-dev kit rules`)
+# Each entry is one of: "cursor", "agents", "claude"
+# - "cursor" installs .cursor/rules/*.mdc files (cannot be combined with others)
+# - "agents" / "claude" install AGENTS.md / CLAUDE.md respectively — both can be listed together
+preferred_agent_targets = ["claude", "agents"]
+
+[migration.migration_maps.telemetry]
+
+[plugins]
+# Names of discovered plugins to skip at startup (a denylist). Discovery is the
+# source of truth for which plugins are present; this only turns one off.
+disabled = []

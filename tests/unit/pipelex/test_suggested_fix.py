@@ -9,7 +9,7 @@ what it was before the field existed.
 import json
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
-from pipelex.suggested_fix import FixOp, FixOpKind, FixSafety, SuggestedFix
+from pipelex.suggested_fix import FixOpKind, FixSafety, SetKeyOp, SuggestedFix
 
 
 def _sample_fix() -> SuggestedFix:
@@ -19,8 +19,7 @@ def _sample_fix() -> SuggestedFix:
         safety=FixSafety.SAFE,
         source="main.mthds",
         ops=[
-            FixOp(
-                kind=FixOpKind.SET_KEY,
+            SetKeyOp(
                 table_path=["pipe", "list_ideas"],
                 key="output",
                 value="Idea[]",
@@ -72,7 +71,12 @@ class TestSuggestedFixModels:
             sort_keys=True,
         )
 
-    def test_unset_op_fields_drop_from_wire(self) -> None:
-        """A set_key op's unused fields (new_key) drop out of the exclude_none projection."""
-        dumped = _sample_fix().model_dump(mode="json", exclude_none=True)
-        assert "new_key" not in dumped["ops"][0]
+    def test_op_wire_shape_is_exactly_its_variant_fields(self) -> None:
+        """An op carries its own fields and no others — no ``exclude_none`` projection needed.
+
+        Under the flat model this needed ``exclude_none=True`` to keep a ``set_key``'s unused
+        ``new_key`` off the wire. The union removes the question: ``SetKeyOp`` has no such field,
+        so the plain dump is already the minimal shape.
+        """
+        dumped = _sample_fix().model_dump(mode="json")
+        assert set(dumped["ops"][0]) == {"kind", "table_path", "key", "value"}
