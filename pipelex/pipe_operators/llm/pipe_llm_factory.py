@@ -18,6 +18,7 @@ from pipelex.pipe_operators.llm.template_document_analyzer import TemplateDocume
 from pipelex.pipe_operators.shared.template_image_analyzer import TemplateImageAnalyzer
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
 
 
 class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
@@ -138,6 +139,17 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             multiple_items=output_parse_result.multiplicity if isinstance(output_parse_result.multiplicity, bool) else None,
         )
 
+        # The authored union narrows here: a bare tag style widens into a full style, so the runtime
+        # pipe holds one shape and nothing downstream re-interprets the shorthand.
+        templating_style: TemplatingStyle | None
+        match blueprint.templating_style:
+            case None:
+                templating_style = None
+            case TagStyle():
+                templating_style = TemplatingStyle(tag_style=blueprint.templating_style)
+            case TemplatingStyle():
+                templating_style = blueprint.templating_style
+
         return PipeLLM(
             domain_code=domain_code,
             code=pipe_code,
@@ -147,4 +159,5 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             llm_prompt_spec=llm_prompt_spec,
             llm_choices=llm_choices,
             output_multiplicity=output_multiplicity,
+            templating_style=templating_style,
         )

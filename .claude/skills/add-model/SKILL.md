@@ -86,12 +86,17 @@ When adding a model to multiple backends, be aware of these differences:
   `gpt-5.4-2026-03-01`). SDK is `azure_openai_responses`. Inputs typically use
   `images` but not `pdf`. Image gen models use `azure_rest_img_gen` SDK and need
   a `.rules` sub-table.
-- **Anthropic direct**: SDK is `anthropic`. Uses `prompting_target = "anthropic"`,
+- **Anthropic direct**: SDK is `anthropic`. Uses
   `structure_method = "instructor/anthropic_tools"`. Often has `max_tokens` and
   `max_prompt_images`.
-- **Bedrock**: SDK is `bedrock_converse`. Has its own `prompting_target`.
-- **Google direct**: SDK is `google`. Uses `prompting_target = "gemini"`,
+- **Bedrock**: SDK is `bedrock_converse`.
+- **Google direct**: SDK is `google`. Uses
   `structure_method = "instructor/genai_tools"`.
+
+A model spec never declares how its prompts are formatted: templating style is an
+authoring decision on the pipe (`templating_style` on `PipeLLM`) with a single
+runtime default. Any key you write that the model-spec blueprint does not know is
+sent to the provider as an outbound HTTP header — so do not invent fields.
 
 Each backend TOML has a `[defaults]` section — the model entry only needs to
 specify fields that differ from those defaults. Read the defaults before writing

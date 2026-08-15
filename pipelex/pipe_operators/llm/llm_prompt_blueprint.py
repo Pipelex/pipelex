@@ -67,7 +67,7 @@ class LLMPromptBlueprint(BaseModel):
         context_provider: ContextProviderAbstract,
         output_structure_prompt: str | None = None,
         extra_params: dict[str, Any] | None = None,
-        templating_style: TemplatingStyle | None = None,
+        templating_style: TemplatingStyle,
     ) -> LLMPrompt:
         llm_prompt = await assemble_llm_prompt(
             prompt_content=self.to_prompt_content(),

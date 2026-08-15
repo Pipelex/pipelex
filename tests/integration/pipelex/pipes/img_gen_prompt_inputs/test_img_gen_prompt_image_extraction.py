@@ -14,6 +14,7 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
@@ -65,6 +66,7 @@ class TestImgGenPromptImageExtraction:
         )
 
         img_gen_prompt = await pipe.img_gen_prompt_blueprint.make_img_gen_prompt(
+            templating_style=resolve_templating_style(authored=None),
             context_provider=working_memory,
         )
 
@@ -120,6 +122,7 @@ class TestImgGenPromptImageExtraction:
         )
 
         img_gen_prompt = await pipe.img_gen_prompt_blueprint.make_img_gen_prompt(
+            templating_style=resolve_templating_style(authored=None),
             context_provider=working_memory,
         )
 
@@ -174,6 +177,7 @@ class TestImgGenPromptImageExtraction:
         )
 
         img_gen_prompt = await pipe.img_gen_prompt_blueprint.make_img_gen_prompt(
+            templating_style=resolve_templating_style(authored=None),
             context_provider=working_memory,
         )
 

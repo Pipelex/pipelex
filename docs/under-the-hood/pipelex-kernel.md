@@ -7,7 +7,7 @@ description: "Operator semantics as importable functions — what pipelex/kernel
 
 This page is for contributors working on Pipelex internals, and for anyone embedding the kernel directly rather than running `.mthds` methods. For how the operator classes above it fit into the whole, see [Architecture Overview](./architecture-overview.md).
 
-What a `PipeLLM` step actually *does* — resolve a model off the deck, derive a prompting style, assemble the prompt, generate, write the result into memory — used to be reachable only through a fully booted interpreter with a method loaded. [`pipelex/kernel/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/kernel) holds that semantics as plain functions, so it has **one implementation with two kinds of caller**:
+What a `PipeLLM` step actually *does* — resolve a model off the deck, resolve the templating style, assemble the prompt, generate, write the result into memory — used to be reachable only through a fully booted interpreter with a method loaded. [`pipelex/kernel/`](https://github.com/Pipelex/pipelex/tree/main/pipelex/kernel) holds that semantics as plain functions, so it has **one implementation with two kinds of caller**:
 
 - the interpreter's operator classes (`PipeLLM`, `PipeExtract`, `PipeImgGen`, `PipeSearch`, `PipeCompose`, `PipeFunc`), which resolve blueprints, validate inputs, wrap errors and trace, then call the kernel;
 - any **programmatic caller** embedding the kernel, which calls the same functions on a process with zero `.mthds` loaded.
@@ -52,7 +52,7 @@ Four gates hold this, and each covers something the others miss — see [Hub Lay
 | `pipelex-dev check-hub-layering` | No kernel *module* imports the interpreter hub |
 | `tests/unit/pipelex/test_kernel_layer_import_closure.py` | A kernel entry point *imports* clean |
 | `tests/unit/pipelex/test_kernel_layer_exceptions_aggregate_gate.py` | No kernel module reaches the exceptions aggregate — imports and bare strings alike |
-| `tests/unit/pipelex/kernel/test_kernel_boot_contract.py` | Every kernel entry point **runs** on a keyless boot, swept afterwards — except the three `resolve_*_setting` helpers, which read the model deck (a separate question from this one) |
+| `tests/unit/pipelex/kernel/test_kernel_boot_contract.py` | Every kernel entry point **runs** on a keyless boot, swept afterwards — except the deck-reading helpers (`resolve_*_setting`, `concrete_llm_model_handle`), which read the model deck (a separate question from this one) |
 
 Only the last one can see a function-local interpreter import, and it is **per-function**: it catches one inside `run_search` only by calling `run_search`. Every new kernel entry point owes it an arm.
 
@@ -67,7 +67,8 @@ Both façade calls take the concept and the output class the caller wants, defau
 | Module | Entry points |
 |---|---|
 | `pipelex.kernel.pipelex_kernel` | `PipelexKernel.make`, `.llm_text`, `.llm_object`, `.make_step_metadata` |
-| `pipelex.kernel.llm_ops` | `resolve_llm_setting_for_text` / `_for_object`, `concrete_llm_model_handle`, `derive_templating_style`, `derive_structure_prompt`, `generate_object_content`, `run_llm_text`, `run_llm_object` |
+| `pipelex.kernel.llm_ops` | `resolve_llm_setting_for_text` / `_for_object`, `concrete_llm_model_handle`, `derive_structure_prompt`, `generate_object_content`, `run_llm_text`, `run_llm_object` |
+| `pipelex.kernel.templating_style_ops` | `resolve_templating_style` |
 | `pipelex.kernel.extract_ops` | `resolve_extract_setting`, `build_extract_job_params`, `run_extract` |
 | `pipelex.kernel.img_gen_ops` | `resolve_img_gen_setting`, `resolve_default_size`, `build_img_gen_job_params`, `run_img_gen` |
 | `pipelex.kernel.search_ops` | `resolve_search_setting`, `run_search` |
@@ -80,6 +81,8 @@ Both façade calls take the concept and the output class the caller wants, defau
 | `pipelex.kernel.*_results` | The typed result envelopes |
 
 The two `assemble_*` functions are there because `run_llm_text` and `run_img_gen` both take a *ready* prompt. A caller that could not build one would be holding an operator it cannot reach, which is what image generation was until `assemble_img_gen_prompt` existed: its only builder was an interpreter-layer blueprint. What they own is the part a caller must not re-derive — resolving `ImageReference` and `DocumentReference` out of working memory, and, on the image side, keeping the `[Image N]` tokens numbered from the same registry that orders `input_images`, since a mismatch mislabels which image the prompt is describing and nothing downstream can detect it.
+
+**Every entry point that renders a template takes a required `templating_style`** — `run_llm_text`, `run_llm_object`, `derive_structure_prompt`, `assemble_llm_prompt`, `assemble_img_gen_prompt`, `run_search`, `run_compose_template`. It is not nullable, and that is the contract: the Jinja2 filters that tag and format a value have no default of their own, so a call that omitted the style would render a prompt in a shape nobody chose. `resolve_templating_style(authored=...)` is what produces one — pass what the caller authored, or `None` to take the runtime default.
 
 There are **no re-exports**: `pipelex/kernel/__init__.py` holds doctrine and nothing else, and every symbol is imported from the module that defines it. For this package that is a layering property rather than a style one — a module that re-exports across layers is a layer boundary with the sign filed off.
 
@@ -124,7 +127,7 @@ summaries = extract_main_content_as_list(memory=result.memory, item_type=Summary
 - **`cogt_run_params`** — the execution-mode contract (`run_mode`, and the DRY-only `is_mock_usage` sub-flag) that every cogt leaf reads off the assignment it is handed.
 - **`step_id_source`** — where each step's `pipe_run_id` comes from, defaulting to a fresh `uuid4`, which is what every in-process run wants. It exists for a kernel hosted inside a replay-based executor, where ids minted from a non-replay-safe source take different values each re-execution; such a host injects its own replay-safe source via `PipelexKernel.make(step_id_source=…)`. It is a seam, not state — the kernel never inspects what it returns.
 
-Nothing derived from config or the model deck is cached on the instance — resolved settings and prompting styles are computed per call, because cached derived state would shadow a later config or deck change and break per-call variation.
+Nothing derived from config or the model deck is cached on the instance — resolved settings and templating styles are computed per call, because cached derived state would shadow a later config or deck change and break per-call variation.
 
 **Cost and usage reporting is the caller's lifecycle, not the kernel's.** The interpreter's run machinery opens a graph tracer, builds an event log, registers it on the report delegate and closes all three in a `finally`, because it has a run boundary to hang that on. A kernel call has no such boundary — it is one step, and a caller may make one or a thousand. So the kernel takes a `TraceContext` and does exactly one thing with it: stamp it onto every step's `JobMetadata`, which is what the cogt leaf reads to decide whether to emit a usage event.
 

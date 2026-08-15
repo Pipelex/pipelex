@@ -20,8 +20,8 @@ from pipelex.tools.templating.templating_style import TagStyle
 class TestTagFilterValidation:
     """Tests for tag filter error handling and edge cases."""
 
-    def _make_context(self, mocker: MockerFixture, tag_style: TagStyle = TagStyle.TICKS) -> Any:
-        """Create a mock Jinja2 context."""
+    def _make_context(self, mocker: MockerFixture, *, tag_style: TagStyle) -> Any:
+        """Create a mock Jinja2 context. The style is explicit: no filter supplies one any more."""
         context_dict: dict[str, Any] = {
             Jinja2ContextKey.TAG_STYLE: tag_style,
         }
@@ -37,30 +37,30 @@ class TestTagFilterValidation:
 
     async def test_tag_raises_on_undefined(self, mocker: MockerFixture) -> None:
         """Test tag raises error for undefined value."""
-        context = self._make_context(mocker)
+        context = self._make_context(mocker, tag_style=TagStyle.TICKS)
 
         with pytest.raises(Jinja2ContextError, match="undefined"):
             await tag(context, value=Undefined())
 
     async def test_tag_raises_on_undefined_with_tag_name(self, mocker: MockerFixture) -> None:
         """Test tag raises error for undefined value with tag name in message."""
-        context = self._make_context(mocker)
+        context = self._make_context(mocker, tag_style=TagStyle.TICKS)
 
         with pytest.raises(Jinja2ContextError, match="tag_name 'my_tag'"):
             await tag(context, value=Undefined(), tag_name="my_tag")
 
     async def test_tag_with_string_converts_to_string(self, mocker: MockerFixture) -> None:
         """Test tag filter converts plain string input."""
-        context = self._make_context(mocker)
+        context = self._make_context(mocker, tag_style=TagStyle.TICKS)
 
         result = await tag(context, value="hello world")
 
         assert "hello world" in result
-        assert "```" in result  # Default style is TICKS
+        assert "```" in result
 
     async def test_tag_with_number_converts_to_string(self, mocker: MockerFixture) -> None:
         """Test tag filter converts number input to string."""
-        context = self._make_context(mocker)
+        context = self._make_context(mocker, tag_style=TagStyle.TICKS)
 
         result = await tag(context, value=42)
 
@@ -78,7 +78,7 @@ class TestTagFilterValidation:
 
     async def test_tag_with_tag_renderable(self, mocker: MockerFixture) -> None:
         """Test tag filter uses TagRenderable protocol."""
-        context = self._make_context(mocker)
+        context = self._make_context(mocker, tag_style=TagStyle.TICKS)
 
         # Create a mock TagRenderable with async method
         mock_renderable = mocker.MagicMock(spec=TagRenderable)
@@ -108,7 +108,7 @@ class TestTagFilterValidation:
 class TestApplyTagStyle:
     """Tests for apply_tag_style helper function."""
 
-    def _make_context(self, mocker: MockerFixture, tag_style: TagStyle) -> Any:
+    def _make_context(self, mocker: MockerFixture, *, tag_style: TagStyle) -> Any:
         """Create a mock Jinja2 context with specific tag style."""
         context_dict: dict[str, Any] = {
             Jinja2ContextKey.TAG_STYLE: tag_style,
@@ -121,7 +121,7 @@ class TestApplyTagStyle:
 
     def test_no_tag_style_returns_value_unchanged(self, mocker: MockerFixture) -> None:
         """Test NO_TAG style returns value unchanged."""
-        context = self._make_context(mocker, TagStyle.NO_TAG)
+        context = self._make_context(mocker, tag_style=TagStyle.NO_TAG)
 
         result = apply_tag_style(context=context, value="hello", tag_name="my_tag")
 
@@ -129,7 +129,7 @@ class TestApplyTagStyle:
 
     def test_ticks_style_without_tag_name(self, mocker: MockerFixture) -> None:
         """Test TICKS style without tag name."""
-        context = self._make_context(mocker, TagStyle.TICKS)
+        context = self._make_context(mocker, tag_style=TagStyle.TICKS)
 
         result = apply_tag_style(context=context, value="content", tag_name=None)
 
@@ -137,7 +137,7 @@ class TestApplyTagStyle:
 
     def test_ticks_style_with_tag_name(self, mocker: MockerFixture) -> None:
         """Test TICKS style with tag name."""
-        context = self._make_context(mocker, TagStyle.TICKS)
+        context = self._make_context(mocker, tag_style=TagStyle.TICKS)
 
         result = apply_tag_style(context=context, value="content", tag_name="my_tag")
 
@@ -145,7 +145,7 @@ class TestApplyTagStyle:
 
     def test_xml_style_without_tag_name_uses_default(self, mocker: MockerFixture) -> None:
         """Test XML style uses 'data' as default tag name."""
-        context = self._make_context(mocker, TagStyle.XML)
+        context = self._make_context(mocker, tag_style=TagStyle.XML)
 
         result = apply_tag_style(context=context, value="content", tag_name=None)
 
@@ -153,7 +153,7 @@ class TestApplyTagStyle:
 
     def test_xml_style_with_tag_name(self, mocker: MockerFixture) -> None:
         """Test XML style with tag name."""
-        context = self._make_context(mocker, TagStyle.XML)
+        context = self._make_context(mocker, tag_style=TagStyle.XML)
 
         result = apply_tag_style(context=context, value="content", tag_name="my_tag")
 
@@ -161,7 +161,7 @@ class TestApplyTagStyle:
 
     def test_square_brackets_style_without_tag_name_uses_default(self, mocker: MockerFixture) -> None:
         """Test SQUARE_BRACKETS style uses 'data' as default tag name."""
-        context = self._make_context(mocker, TagStyle.SQUARE_BRACKETS)
+        context = self._make_context(mocker, tag_style=TagStyle.SQUARE_BRACKETS)
 
         result = apply_tag_style(context=context, value="content", tag_name=None)
 
@@ -169,19 +169,22 @@ class TestApplyTagStyle:
 
     def test_square_brackets_style_with_tag_name(self, mocker: MockerFixture) -> None:
         """Test SQUARE_BRACKETS style with tag name."""
-        context = self._make_context(mocker, TagStyle.SQUARE_BRACKETS)
+        context = self._make_context(mocker, tag_style=TagStyle.SQUARE_BRACKETS)
 
         result = apply_tag_style(context=context, value="content", tag_name="my_tag")
 
         assert result == "[my_tag]\ncontent\n[/my_tag]"
 
-    def test_default_style_is_ticks_when_not_set(self, mocker: MockerFixture) -> None:
-        """Test default tag style is TICKS when not set in context."""
+    def test_missing_tag_style_raises(self, mocker: MockerFixture) -> None:
+        """A style-less render context is an error, not a silent triple-backtick default.
+
+        Every prompt-rendering entry point resolves a templating style, so a missing TAG_STYLE means
+        the render was set up without one — which used to reshape the prompt quietly.
+        """
         context_dict: dict[str, Any] = {}  # No TAG_STYLE set
 
         context = mocker.MagicMock(spec=Context)
         context.get = lambda key, default=None: context_dict.get(key, default)  # pyright: ignore[reportUnknownLambdaType, reportUnknownArgumentType]
 
-        result = apply_tag_style(context=context, value="content", tag_name=None)
-
-        assert "```" in result  # TICKS is default
+        with pytest.raises(Jinja2ContextError, match="No templating style in the render context"):
+            apply_tag_style(context=context, value="content", tag_name=None)

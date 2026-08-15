@@ -18,6 +18,7 @@ from pipelex.kernel.prompt_references import ImageReference
 from pipelex.pipe_operators.img_gen.exceptions import PipeImgGenFactoryError
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
+from pipelex.tools.templating.templating_style import TemplatingStyle
 
 
 class ImgGenPromptBlueprint(BaseModel):
@@ -59,6 +60,7 @@ class ImgGenPromptBlueprint(BaseModel):
         self,
         *,
         context_provider: ContextProviderAbstract,
+        templating_style: TemplatingStyle,
         extra_params: dict[str, Any] | None = None,
         max_prompt_images: int | None = None,
     ) -> ImgGenPrompt:
@@ -69,6 +71,7 @@ class ImgGenPromptBlueprint(BaseModel):
         """
         img_gen_prompt = await assemble_img_gen_prompt(
             context_provider=context_provider,
+            templating_style=templating_style,
             prompt_blueprint=self.prompt_blueprint,
             negative_prompt_blueprint=self.negative_prompt_blueprint,
             image_references=self.image_references,

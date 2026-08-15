@@ -20,9 +20,28 @@ from pipelex.tools.templating.text_format import TextFormat
 ALLOWED_FILTERS = ["tag", "format", "default", "escape_script_tag", "with_images"]
 
 
+def require_templating_style_value(*, context: Context, jinja2_context_key: Jinja2ContextKey) -> str:
+    """Read a templating-style key out of the render context, or fail loudly.
+
+    Deliberately without a fallback: every prompt-rendering entry point resolves a templating style
+    before rendering, so a missing key means the render was set up without one. A default here would
+    silently change the shape of a prompt — which is exactly how a triple-backtick style used to
+    reach prompts nobody had chosen it for.
+    """
+    value = context.get(jinja2_context_key)
+    if value is None:
+        msg = (
+            f"No templating style in the render context: '{jinja2_context_key}' is missing. "
+            "The tag, format and with_images filters have no default to fall back on — the caller "
+            "must resolve a templating style and pass it to the render call."
+        )
+        raise Jinja2ContextError(msg)
+    return str(value)
+
+
 # Filter to format some Stuff or any object with the appropriate text formatting methods
 @pass_context
-async def text_format(context: Context, value: Any, text_format: TextFormat | None = None) -> Any:
+async def text_format(context: Context, value: Any, text_format: TextFormat | str | None = None) -> Any:
     # Check if this is a registered image - use placeholder instead of rendering as text
     # This handles $page.page_view syntax where the format filter would otherwise call rendered_plain() → URL
     registry = context.get(Jinja2ContextKey.IMAGE_REGISTRY)
@@ -31,16 +50,18 @@ async def text_format(context: Context, value: Any, text_format: TextFormat | No
         if placeholder is not None:
             return placeholder
 
+    applied_text_format: TextFormat
     if text_format:
-        if isinstance(text_format, str):  # pyright: ignore[reportUnnecessaryIsInstance]
+        # A template can name its own format — `{{ x | format("markdown") }}` — and Jinja2 hands the
+        # argument over as a raw string, so both that and a `TextFormat` member normalise here. An
+        # unknown name is a template error, reported as one rather than as a bare `ValueError`.
+        try:
             applied_text_format = TextFormat(text_format)
-        elif isinstance(text_format, TextFormat):  # pyright: ignore[reportUnnecessaryIsInstance]
-            applied_text_format = text_format
-        else:
+        except ValueError as exc:
             msg = f"Invalid text format: '{text_format}'"
-            raise Jinja2ContextError(msg)
+            raise Jinja2ContextError(msg) from exc
     else:
-        applied_text_format = TextFormat(context.get(Jinja2ContextKey.TEXT_FORMAT, default=TextFormat.PLAIN))
+        applied_text_format = TextFormat(require_templating_style_value(context=context, jinja2_context_key=Jinja2ContextKey.TEXT_FORMAT))
 
     # Protocol-based rendering
     if isinstance(value, TextFormatRenderable):
@@ -118,8 +139,7 @@ def apply_tag_style(*, context: Context, value: str, tag_name: str | None = None
     Returns:
         Content wrapped in tags according to the style.
     """
-    tag_style_str = context.get(Jinja2ContextKey.TAG_STYLE)
-    tag_style = TagStyle(tag_style_str) if tag_style_str else TagStyle.TICKS
+    tag_style = TagStyle(require_templating_style_value(context=context, jinja2_context_key=Jinja2ContextKey.TAG_STYLE))
 
     match tag_style:
         case TagStyle.NO_TAG:

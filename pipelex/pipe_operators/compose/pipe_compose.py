@@ -17,6 +17,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_concept_library, get_native_concept
 from pipelex.kernel.compose_ops import run_compose_template
+from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
 from pipelex.pipe_operators.compose.exceptions import PipeComposeError, StructuredContentComposerValueError
@@ -58,7 +59,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         if self.is_construct_mode:
             return f"PipeCompose in construct mode for StructuredContent output of type '{self.output.concept.structure_class_name}'"
         else:
-            return f"PipeCompose in template mode with Jinja2 template, prompting style {self.templating_style}, category {self.category}"
+            return f"PipeCompose in template mode with Jinja2 template, templating style {self.templating_style}, category {self.category}"
 
     @override
     def required_variables(self) -> set[str]:
@@ -203,7 +204,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             category=self.category,
             concept=self.output.concept,
             output_class=structure_class,
-            templating_style=self.templating_style,
+            templating_style=resolve_templating_style(authored=self.templating_style),
             runtime_params=pipe_run_params.params,
             extra_context=self.extra_context,
             result_name=output_name,
@@ -247,6 +248,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             construct_blueprint=self.construct_blueprint,
             working_memory=working_memory,
             output_class=output_class,
+            templating_style=resolve_templating_style(authored=self.templating_style),
             runtime_params=pipe_run_params.params if pipe_run_params else None,
             extra_context=self.extra_context,
         )

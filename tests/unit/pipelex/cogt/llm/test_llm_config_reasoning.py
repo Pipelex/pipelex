@@ -89,20 +89,20 @@ class TestLLMConfigReasoning:
 
     def test_get_reasoning_budget_valid(self):
         config = _make_llm_config()
-        assert config.get_reasoning_budget("anthropic", effort=ReasoningEffort.HIGH) == 16384
+        assert config.get_reasoning_budget(family="anthropic", effort=ReasoningEffort.HIGH) == 16384
 
     def test_get_reasoning_budget_none_effort(self):
         config = _make_llm_config()
-        assert config.get_reasoning_budget("gemini", effort=ReasoningEffort.NONE) == 0
+        assert config.get_reasoning_budget(family="gemini", effort=ReasoningEffort.NONE) == 0
 
     def test_get_reasoning_budget_max_effort(self):
         config = _make_llm_config()
-        assert config.get_reasoning_budget("anthropic", effort=ReasoningEffort.MAX) == 65536
+        assert config.get_reasoning_budget(family="anthropic", effort=ReasoningEffort.MAX) == 65536
 
-    def test_get_reasoning_budget_unknown_target_raises(self):
+    def test_get_reasoning_budget_unknown_family_raises(self):
         config = _make_llm_config()
         with pytest.raises(ConfigValidationError, match="No effort-to-budget map found"):
-            config.get_reasoning_budget("unknown_target", effort=ReasoningEffort.HIGH)
+            config.get_reasoning_budget(family="unknown_family", effort=ReasoningEffort.HIGH)
 
     def test_validator_missing_effort_level_raises(self):
         incomplete_maps = {
@@ -152,7 +152,7 @@ class TestLLMConfigReasoning:
     )
     def test_all_effort_levels_retrievable(self, effort: ReasoningEffort):
         config = _make_llm_config()
-        budget = config.get_reasoning_budget("anthropic", effort=effort)
+        budget = config.get_reasoning_budget(family="anthropic", effort=effort)
         assert isinstance(budget, int)
         assert budget >= 0
 

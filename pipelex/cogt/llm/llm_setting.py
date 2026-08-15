@@ -4,7 +4,6 @@ from pydantic import BeforeValidator, Field, WithJsonSchema, field_validator, mo
 
 from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
-from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.models.model_reference import ModelReference, parse_model_reference
 from pipelex.system.configuration.config_model import ConfigModel
 
@@ -21,7 +20,6 @@ class LLMSetting(ConfigModel):
         WithJsonSchema({"anyOf": [{"type": "integer"}, {"enum": ["auto"]}, {"type": "null"}], "default": None}),
     ] = None
     image_detail: PromptImageDetail | None = Field(default=None, strict=False)
-    prompting_target: PromptingTarget | None = Field(default=None, strict=False)
     reasoning_effort: ReasoningEffort | None = Field(default=None, strict=False)
     reasoning_budget: int | None = Field(default=None, gt=0)
     description: str | None = None
@@ -59,7 +57,6 @@ class LLMSetting(ConfigModel):
             f"LLMSetting(llm_handle={self.model}",
             f"temperature={self.temperature}",
             f"max_tokens={self.max_tokens}",
-            f"prompting_target={self.prompting_target}",
         ]
         if self.reasoning_effort is not None:
             parts.append(f"reasoning_effort={self.reasoning_effort}")

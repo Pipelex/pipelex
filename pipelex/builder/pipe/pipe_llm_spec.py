@@ -11,6 +11,7 @@ from typing_extensions import override
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
 from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
 
 
 class PipeLLMSpec(PipeSpec):
@@ -63,6 +64,16 @@ Example: `Only analyze the colors from $image_1 and the shapes from $image_2.
 • If we are generating a structured concept, DO NOT detail the structure in the prompt: we will add the schema later.
 So, don't have to write a bullet-list of all the attributes definitions yourself.
 """,
+    )
+
+    templating_style: TagStyle | TemplatingStyle | None = Field(
+        default=None,
+        description=(
+            "How this pipe's inputs are tagged into the prompt. A bare string names the tag style "
+            "('xml', 'ticks', 'square_brackets', 'no_tag'); an inline table sets both tag style and "
+            'text format, e.g. { tag_style = "xml", text_format = "markdown" }. Omit to use the '
+            "runtime default."
+        ),
     )
 
     @field_validator("model", mode="before")
@@ -124,4 +135,5 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
             prompt=self.prompt,
             model=self.model,
             structuring_method=self.structuring_method,
+            templating_style=self.templating_style,
         )

@@ -296,7 +296,6 @@ Each backend has its own model specification file in `.pipelex/inference/backend
 ```toml
 # openai.toml
 default_sdk = "openai"
-default_prompting_target = "openai"
 
 [gpt-4o-mini]
 model_id = "gpt-4o-mini"

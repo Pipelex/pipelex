@@ -12,6 +12,7 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.interpreter_hub import get_concept_library
 from pipelex.kernel.search_ops import resolve_search_setting, run_search
+from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -114,6 +115,9 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
             concept=self.output.concept,
             job_metadata=job_metadata,
             cogt_run_params=pipe_run_params.cogt_run_params,
+            # No authored style on this operator: a query template takes the runtime default, the
+            # same one an LLM pipe that declares nothing gets.
+            templating_style=resolve_templating_style(authored=None),
             output_structure_class=output_structure_class,
             include_domains=self.include_domains,
             exclude_domains=self.exclude_domains,

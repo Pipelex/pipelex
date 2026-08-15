@@ -1,6 +1,6 @@
 ---
 title: "LLM Integration"
-description: "Pipelex LLM integration: text generation, structured outputs, vision models, prompting styles, and system prompt inheritance. Write once, run on any supported model."
+description: "Pipelex LLM integration: text generation, structured outputs, vision models, templating styles, and system prompt inheritance. Write once, run on any supported model."
 ---
 
 # LLM Integration
@@ -24,11 +24,11 @@ See [`PipeStructure`](../building-methods/pipes/pipe-operators/PipeStructure.md)
 
 Include images and PDFs directly in LLM prompts using `@variable` syntax. Support for single documents, multiple documents, and mixed content (text + images + PDFs). The runtime automatically handles document rendering and provider-specific vision API formats.
 
-## Prompting Styles
+## Templating Style
 
-Adapt prompts for different LLM families (OpenAI, Anthropic, Mistral) to get the best results from each provider. Pipelex applies provider-specific formatting, system prompt handling, and structured output instructions automatically.
+Choose how a pipe's inputs are tagged into its prompt — XML tags, back-tick fences, square brackets, or no tag at all. It is declared on the pipe (`templating_style`), with one runtime default for everything that declares nothing, so the same method renders the same prompt shape on every model.
 
-See [LLM Prompting Style](../building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md).
+See [Templating Style](../building-methods/templating-style.md).
 
 ## System Prompt Inheritance
 

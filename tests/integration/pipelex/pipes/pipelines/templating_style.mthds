@@ -1,0 +1,44 @@
+domain      = "test_templating_style"
+description = "Test library for authored templating styles"
+
+[pipe.square_brackets_note]
+type = "PipeLLM"
+description = "Render a note under an authored bare-string templating style"
+inputs = { topic = "Text" }
+output = "Text"
+templating_style = "square_brackets"
+prompt = """
+Here is the topic:
+@topic
+"""
+
+[pipe.full_struct_note]
+type = "PipeLLM"
+description = "Render a note under an authored full-struct templating style"
+inputs = { topic = "Text" }
+output = "Text"
+templating_style = { tag_style = "xml", text_format = "markdown" }
+prompt = """
+Here is the topic:
+@topic
+"""
+
+[pipe.default_style_note]
+type = "PipeLLM"
+description = "Render a note under the config-default templating style"
+inputs = { topic = "Text" }
+output = "Text"
+prompt = """
+Here is the topic:
+@topic
+"""
+
+[pipe.default_style_picture]
+type = "PipeImgGen"
+description = "An image prompt has no authored style, so it renders under the config default"
+inputs = { topic = "Text" }
+output = "Image"
+prompt = """
+Draw the topic:
+@topic
+"""

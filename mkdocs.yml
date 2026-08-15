@@ -118,7 +118,8 @@ plugins:
         'setup/index.md': 'get-started/build-with-claude-code.md'
         'setup/project-organization.md': 'get-started/build-with-claude-code.md'
         'setup/configure-ai-providers.md': 'get-started/configure-ai-providers.md'
-        'home/6-build-reliable-ai-workflows/adapt-to-llm-prompting-style-openai-anthropic-mistral.md': 'building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md'
+        'home/6-build-reliable-ai-workflows/adapt-to-llm-prompting-style-openai-anthropic-mistral.md': 'building-methods/templating-style.md'
+        'building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md': 'building-methods/templating-style.md'
         'home/6-build-reliable-ai-workflows/concepts/define_your_concepts.md': 'building-methods/concepts/define_your_concepts.md'
         'home/6-build-reliable-ai-workflows/concepts/inline-structures.md': 'building-methods/concepts/inline-structures.md'
         'home/6-build-reliable-ai-workflows/concepts/native-concepts.md': 'building-methods/concepts/native-concepts.md'
@@ -268,7 +269,7 @@ plugins:
         - building-methods/pipes/pipe-controllers/PipeCondition.md: "PipeCondition"
         - building-methods/pipes/signature-pipes.md: "Signature Pipes"
         - building-methods/configure-ai-llm-to-optimize-methods.md: "Optimize Cost & Quality"
-        - building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md: "LLM Prompting Style"
+        - building-methods/templating-style.md: "Templating Style"
         Reference:
         - tools/cli/index.md: "CLI Reference Overview"
         - tools/cli/init.md: "CLI Init"
@@ -489,7 +490,7 @@ nav:
           - PipeCondition: building-methods/pipes/pipe-controllers/PipeCondition.md
         - Signature Pipes: building-methods/pipes/signature-pipes.md
       - Optimize Cost & Quality: building-methods/configure-ai-llm-to-optimize-methods.md
-      - LLM Prompting Style: building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
+      - Templating Style: building-methods/templating-style.md
     - Retries & Resilience:
       - Overview: reliability/retries-and-resilience.md
       - Automatic Retries: reliability/automatic-retries.md

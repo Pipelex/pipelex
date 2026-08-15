@@ -23,7 +23,6 @@
 [defaults]
 model_type = "llm"
 sdk = "google"
-prompting_target = "gemini"
 structure_method = "instructor/genai_tools"
 thinking_mode = "manual"
 

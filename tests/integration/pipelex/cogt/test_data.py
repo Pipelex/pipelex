@@ -5,8 +5,6 @@ from pydantic import BaseModel, Field, field_validator
 
 from pipelex.cogt.image.prompt_image import PromptImageUri
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
-from pipelex.cogt.llm.llm_prompt_template_inputs import LLMPromptTemplateInputs
 from tests.cases import ImageTestCases
 from tests.cases.documents import DocumentTestCases
 from tests.integration.pipelex.test_data import PipeTestCases
@@ -178,39 +176,29 @@ How tall do you think he was when he was 12? and at 15?
 
 
 class SerDeTestLLMCases:
-    """Constants and example objects used for SerDe unit tests."""
+    """Constants and example objects used for SerDe unit tests.
+
+    The subject is `LLMPrompt`, which really does cross a process boundary — the interpreter hands one
+    to a worker, and a distributed run serializes it onto the wire. Its `user_images` list is the part
+    that matters: the items are `PromptImage` subclasses, so a round-trip that lost the subclass would
+    hand the model a prompt with no image and nothing downstream would notice.
+    """
 
     # Base building blocks -------------------------------------------------
-    PROTO_PROMPT: ClassVar[LLMPrompt] = LLMPrompt(
-        user_text="Some user text in the template",
+    PLAIN_PROMPT: ClassVar[LLMPrompt] = LLMPrompt(
+        user_text="Some user text in the prompt",
     )
 
-    BASE_TEMPLATE_INPUTS_1: ClassVar[LLMPromptTemplateInputs] = LLMPromptTemplateInputs(
-        root={"foo": "bar"},
-    )
-    MY_PROMPT_TEMPLATE_MODEL_1: ClassVar[LLMPromptTemplate] = LLMPromptTemplate(
-        proto_prompt=PROTO_PROMPT,
-        base_template_inputs=BASE_TEMPLATE_INPUTS_1,
-    )
-
-    BASE_TEMPLATE_INPUTS_2: ClassVar[LLMPromptTemplateInputs] = LLMPromptTemplateInputs(
-        root={},
-    )
-    MY_PROMPT_TEMPLATE_MODEL_2: ClassVar[LLMPromptTemplate] = LLMPromptTemplate(
-        proto_prompt=PROTO_PROMPT,
-        base_template_inputs=BASE_TEMPLATE_INPUTS_2,
+    PROMPT_WITH_SYSTEM_TEXT: ClassVar[LLMPrompt] = LLMPrompt(
+        system_text="Some system text",
+        user_text="Some user text in the prompt",
     )
 
     # Dictionary representation example ------------------------------------
     DICT_1: ClassVar[dict[str, Any]] = {
-        "proto_prompt": LLMPrompt(
-            system_text=None,
-            user_text="Some user text in the template",
-            user_images=[],
-        ),
-        "base_template_inputs": LLMPromptTemplateInputs(root={}),
-        "source_system_template_name": None,
-        "source_user_template_name": "markdown_reordering_vision_claude3_5_sonnet",
+        "system_text": None,
+        "user_text": "Some user text in the prompt",
+        "user_images": [],
     }
 
     # Prompt containing an image URI --------------------------------------
@@ -224,8 +212,8 @@ class SerDeTestLLMCases:
 
     # Group constants for parametrization ----------------------------------
     PYDANTIC_EXAMPLES: ClassVar[list[BaseModel]] = [
-        MY_PROMPT_TEMPLATE_MODEL_1,
-        MY_PROMPT_TEMPLATE_MODEL_2,
+        PLAIN_PROMPT,
+        PROMPT_WITH_SYSTEM_TEXT,
     ]
     PYDANTIC_EXAMPLES_USING_SUBCLASS: ClassVar[list[BaseModel]] = [
         PROMPT_WITH_IMAGE_URI,

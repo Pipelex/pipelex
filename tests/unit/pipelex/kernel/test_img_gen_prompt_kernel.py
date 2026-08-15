@@ -28,6 +28,11 @@ from pipelex.kernel.img_gen_prompt import assemble_img_gen_prompt
 from pipelex.kernel.prompt_references import ImageReference, ImageReferenceKind
 from pipelex.pipe_operators.img_gen.img_gen_prompt_blueprint import ImgGenPromptBlueprint
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
+
+# Explicit rather than resolved: these are unit tests over the assembly itself, so the style they
+# render under is stated here instead of read out of config.
+_TEMPLATING_STYLE = TemplatingStyle(tag_style=TagStyle.XML)
 
 IMAGE_URL_1 = "https://example.com/first.png"
 IMAGE_URL_2 = "https://example.com/second.png"
@@ -58,6 +63,7 @@ class TestImgGenPromptKernel:
     @pytest.mark.asyncio(loop_scope="class")
     async def test_tokens_are_numbered_from_the_registry_that_orders_input_images(self) -> None:
         prompt = await assemble_img_gen_prompt(
+            templating_style=_TEMPLATING_STYLE,
             context_provider=_memory_with_images(),
             prompt_blueprint=_prompt_template(),
             image_references=_image_references(),
@@ -79,6 +85,7 @@ class TestImgGenPromptKernel:
     async def test_the_kernel_and_the_blueprint_build_the_same_prompt(self) -> None:
         """Both readers, same answer — the property the blueprint's delegation has to preserve."""
         from_kernel = await assemble_img_gen_prompt(
+            templating_style=_TEMPLATING_STYLE,
             context_provider=_memory_with_images(),
             prompt_blueprint=_prompt_template(),
             image_references=_image_references(),
@@ -86,7 +93,7 @@ class TestImgGenPromptKernel:
         from_blueprint = await ImgGenPromptBlueprint(
             prompt_blueprint=_prompt_template(),
             image_references=_image_references(),
-        ).make_img_gen_prompt(context_provider=_memory_with_images())
+        ).make_img_gen_prompt(context_provider=_memory_with_images(), templating_style=_TEMPLATING_STYLE)
 
         assert from_kernel == from_blueprint
 
@@ -95,6 +102,7 @@ class TestImgGenPromptKernel:
         """The error moved into the kernel with the code that raises it, so it is the kernel's."""
         with pytest.raises(PromptContentError):
             await assemble_img_gen_prompt(
+                templating_style=_TEMPLATING_STYLE,
                 context_provider=_memory_with_images(),
                 prompt_blueprint=TemplateBlueprint(template="Draw {{ nobody }}.", category=TemplateCategory.IMG_GEN_PROMPT),
                 image_references=[ImageReference(variable_path="nobody", kind=ImageReferenceKind.DIRECT)],

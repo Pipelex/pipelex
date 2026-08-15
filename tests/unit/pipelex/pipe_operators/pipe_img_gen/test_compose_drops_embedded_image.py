@@ -31,6 +31,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_native_concept, get_pipe_router
+from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose, PipeComposeOutput
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
@@ -100,7 +101,9 @@ async def _compose_then_build_img_gen_prompt(job_metadata: JobMetadata) -> tuple
             prompt="$gen_prompt",
         ),
     )
-    img_gen_prompt = await pipe_img_gen.img_gen_prompt_blueprint.make_img_gen_prompt(context_provider=working_memory)
+    img_gen_prompt = await pipe_img_gen.img_gen_prompt_blueprint.make_img_gen_prompt(
+        context_provider=working_memory, templating_style=resolve_templating_style(authored=None)
+    )
     return composed_prompt_text, img_gen_prompt
 
 

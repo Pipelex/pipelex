@@ -18,7 +18,7 @@ from pipelex.cogt.model_backends.backend_factory import (
     InferenceBackendBlueprint,
     InferenceBackendFactory,
 )
-from pipelex.cogt.model_backends.gateway_config import GatewayConfig
+from pipelex.cogt.model_backends.gateway_config import GatewayConfig, drop_unknown_gateway_defaults
 from pipelex.cogt.model_backends.model_spec_factory import (
     BackendModelSpecs,
     InferenceModelSpecBlueprint,
@@ -74,7 +74,12 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             backends_dir_path: Path to directory containing per-backend TOML files.
             include_disabled: Whether to include disabled backends.
             gateway_config: Gateway configuration for Pipelex Gateway backend.
-            lenient: When True, skip backends with credential errors instead of raising.
+            lenient: When True, skip a backend whose *credentials* cannot be resolved instead of
+                raising — that is the whole of the tolerance. A malformed configuration (an unknown
+                or invalid key, a model spec that is not a table, a missing per-backend TOML) stays
+                fatal in both modes: a config typo must never silently delete a backend, because the
+                commands that boot leniently (validate, show, dry runs) would then report the far
+                more confusing "model not found" for every handle that backend served.
         """
         try:
             backends_dict = load_toml_from_path(path=backends_library_path)
@@ -163,6 +168,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     extra_config["aws_region"] = gateway_config.aws_region
                     model_specs_dict, backend_config_source = self._load_gateway_model_specs(
                         gateway_config=gateway_config,
+                        backend_name=backend_name,
                         backends_dir_path=backends_dir_path,
                         substitute_vars_with_provider=substitute_vars_with_provider,
                     )
@@ -218,9 +224,9 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     model_specs=backend_model_specs,
                 )
                 self.root[backend_name] = backend
-            except (InferenceBackendLibraryError, InferenceModelSpecError) as exc:
+            except InferenceBackendCredentialsError as credentials_exc:
                 if lenient:
-                    log.verbose(f"Skipping backend '{backend_name}': {exc}")
+                    log.verbose(f"Skipping backend '{backend_name}': {credentials_exc}")
                     continue
                 raise
 
@@ -228,6 +234,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         self,
         gateway_config: GatewayConfig,
         *,
+        backend_name: str,
         backends_dir_path: str,
         substitute_vars_with_provider: Any,
     ) -> tuple[BackendModelSpecs, str]:
@@ -235,6 +242,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
 
         Args:
             gateway_config: Gateway configuration for Pipelex Gateway backend.
+            backend_name: Name the backend library gives this gateway backend.
             backends_dir_path: Path to directory containing local override file.
             substitute_vars_with_provider: Function to substitute variables.
 
@@ -242,7 +250,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             Model specs dictionary merged from remote and local overrides.
 
         Raises:
-            InferenceModelSpecError: If variable substitution fails.
+            InferenceBackendCredentialsError: If variable substitution fails.
         """
         # Load local overrides if they exist
         path_to_local_overrides = f"{backends_dir_path}/{PipelexBackend.GATEWAY}.toml"
@@ -250,18 +258,20 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
 
         # Merge remote config with local overrides
         model_specs_dict = GatewayConfigMerger.merge(
-            gateway_model_specs=gateway_config.model_specs,
+            gateway_model_specs=drop_unknown_gateway_defaults(gateway_model_specs=gateway_config.model_specs),
             local_overrides=local_overrides,
         )
 
+        backend_config_source = f"remote config with local overrides from '{path_to_local_overrides}'"
         # Apply variable substitution (in case remote config has any variables)
-        try:
-            model_specs_dict = apply_to_strings_recursive(model_specs_dict, transform_func=substitute_vars_with_provider)
-        except (VarNotFoundError, UnknownVarPrefixError) as exc:
-            msg = f"Variable substitution failed in remote gateway config: {exc}"
-            raise InferenceModelSpecError(msg) from exc
+        model_specs_dict = self._substitute_model_spec_vars(
+            model_specs_dict=model_specs_dict,
+            backend_name=backend_name,
+            source=backend_config_source,
+            substitute_vars_with_provider=substitute_vars_with_provider,
+        )
 
-        return model_specs_dict, f"remote config with local overrides from '{path_to_local_overrides}'"
+        return model_specs_dict, backend_config_source
 
     def _load_local_model_specs(
         self,
@@ -281,20 +291,70 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             Model specs dictionary from local TOML.
 
         Raises:
-            InferenceBackendLibraryError: If loading fails.
+            InferenceBackendLibraryError: If the file is missing.
+            InferenceBackendCredentialsError: If variable substitution fails.
         """
         path_to_model_specs_toml = f"{backends_dir_path}/{backend_name}.toml"
         try:
             model_specs_dict_raw = load_toml_from_path(path=path_to_model_specs_toml)
-            try:
-                model_specs_dict = apply_to_strings_recursive(model_specs_dict_raw, transform_func=substitute_vars_with_provider)
-            except (VarNotFoundError, UnknownVarPrefixError) as exc:
-                msg = f"Variable substitution failed in file '{path_to_model_specs_toml}': {exc}"
-                raise InferenceModelSpecError(msg) from exc
-        except (FileNotFoundError, InferenceModelSpecError) as exc:
-            msg = f"Failed to load inference model specs from file '{path_to_model_specs_toml}': {exc}"
-            raise InferenceBackendLibraryError(msg) from exc
-        return model_specs_dict, f"file '{path_to_model_specs_toml}'"
+        except FileNotFoundError as file_not_found_exc:
+            msg = f"Failed to load inference model specs from file '{path_to_model_specs_toml}': {file_not_found_exc}"
+            raise InferenceBackendLibraryError(msg) from file_not_found_exc
+
+        backend_config_source = f"file '{path_to_model_specs_toml}'"
+        model_specs_dict = self._substitute_model_spec_vars(
+            model_specs_dict=model_specs_dict_raw,
+            backend_name=backend_name,
+            source=backend_config_source,
+            substitute_vars_with_provider=substitute_vars_with_provider,
+        )
+        return model_specs_dict, backend_config_source
+
+    @classmethod
+    def _substitute_model_spec_vars(
+        cls,
+        *,
+        model_specs_dict: BackendModelSpecs,
+        backend_name: str,
+        source: str,
+        substitute_vars_with_provider: Any,
+    ) -> BackendModelSpecs:
+        """Resolve variable placeholders in model specs, as a *credentials* failure when one cannot be.
+
+        The error class carries the leniency decision: `load(lenient=True)` skips a backend whose
+        credentials are missing, and nothing else. Raising anything broader here would put a
+        malformed-config failure on the same silent path.
+
+        Raises:
+            InferenceBackendCredentialsError: If a variable cannot be resolved.
+        """
+        try:
+            return apply_to_strings_recursive(model_specs_dict, transform_func=substitute_vars_with_provider)
+        except VarFallbackPatternError as var_fallback_pattern_exc:
+            msg = f"Variable substitution failed in {source}: {var_fallback_pattern_exc}"
+            raise InferenceBackendCredentialsError(
+                credentials_error_type=InferenceBackendCredentialsErrorType.VAR_FALLBACK_PATTERN,
+                backend_name=backend_name,
+                # The pattern names several candidates, so no single one of them is the missing key.
+                key_name="unknown",
+                message=msg,
+            ) from var_fallback_pattern_exc
+        except VarNotFoundError as var_not_found_exc:
+            msg = f"Variable substitution failed in {source}: {var_not_found_exc}"
+            raise InferenceBackendCredentialsError(
+                credentials_error_type=InferenceBackendCredentialsErrorType.VAR_NOT_FOUND,
+                backend_name=backend_name,
+                message=msg,
+                key_name=var_not_found_exc.var_name,
+            ) from var_not_found_exc
+        except UnknownVarPrefixError as unknown_var_prefix_exc:
+            msg = f"Variable substitution failed in {source}: {unknown_var_prefix_exc}"
+            raise InferenceBackendCredentialsError(
+                credentials_error_type=InferenceBackendCredentialsErrorType.UNKNOWN_VAR_PREFIX,
+                backend_name=backend_name,
+                message=msg,
+                key_name=unknown_var_prefix_exc.var_name,
+            ) from unknown_var_prefix_exc
 
     def check_backend_credentials(self, path: str, *, include_disabled: bool = False) -> CredentialsValidationReport:
         """Check if required environment variables are set for enabled backends.

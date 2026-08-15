@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Templating style is now an authoring decision (Breaking)**: How a pipe's inputs are tagged into a prompt is declared on the pipe — `templating_style` on `PipeLLM`, either a bare tag-style string (`"xml"`, `"ticks"`, `"square_brackets"`, `"no_tag"`) or a full `{ tag_style, text_format }` table — with a single runtime default for everything that declares nothing (`[pipelex.templating_config].default_templating_style`, shipped as `xml`). It is no longer derived from model metadata, so the same method renders the same prompt shape on every model. **Every prompt rendered for an OpenAI-family model changes shape, from back-tick fences to XML tags.** `PipelexKernel.llm_text` and `llm_object` take the same optional argument.
+- **Compose, image-generation, search and structuring prompts follow the same default (Breaking)**: These paths previously rendered style-less, which the Jinja2 filters silently absorbed as triple-backticks and plain text. They now resolve the same runtime default as the LLM path. Any template of yours that uses `| tag` — including `PipeCompose` templates and construct-mode template fields — changes shape accordingly, whichever model family you run on.
+- **Templating filters are strict**: The `tag`, `format` and `with_images` Jinja2 filters no longer fall back to a built-in style when the rendering context carries none; a missing tag style or text format raises `Jinja2ContextError`. Every prompt-rendering entry point now supplies a resolved style, so a missing one is a bug rather than a shape nobody chose. An explicit filter argument (`| format("markdown")`) is unaffected, and an unknown format name is now reported as a template error instead of a bare `ValueError`.
+- **Reasoning budgets are worker-owned**: The thinking-budget lookup is keyed by a family constant on the worker class rather than read from the model spec's `prompting_target`. Behavior is unchanged; the budget maps keep their `anthropic` and `gemini` keys.
+- **Remote inference config bumped to `pipelex_remote_config_12.json`**: The Pipelex Gateway model specs are fetched from a new versioned URL whose `defaults` no longer declare the removed field. Earlier releases stay pinned to `_11`, which is frozen. Unknown keys in the *remote* config's `defaults` are now pruned rather than rejected, so a gateway config written by a different release than the client reading it is version skew to tolerate; local backend files stay strict.
+
+### Removed
+
+- **`prompting_target` (Breaking)**: Gone from `LLMSetting`, `InferenceModelSpec`, `InferenceModelSpecBlueprint` and every backend TOML, along with the `PromptingTarget` enum and the per-target style map (`[pipelex.prompting_config]` and its `prompting_styles` sub-table, replaced by `[pipelex.templating_config]`). **Migration:** delete every `prompting_target` line from your own `.pipelex/inference/backends/*.toml` — backend files are read strictly, so a surviving one fails the boot. Check `portkey.toml` in particular: the key appears in `[defaults]` *and* on individual model entries, and an unknown per-model key is sent to the provider as an HTTP header rather than rejected.
+- **`LLMPromptTemplate` and friends**: Removed the unused prompt-template module along with `LLMPromptFactoryAbstract`, `LLMPromptTemplateInputs` and `LLMPromptTemplateInputsError`. Their hardcoded XML+Markdown style predated the configurable one and had no production consumer.
+
 ## [v0.45.0] - 2026-08-14
 
 ### Added
