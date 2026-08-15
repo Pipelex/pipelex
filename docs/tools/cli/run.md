@@ -37,7 +37,7 @@ Runs a pipe by code from your project's pipe library.
 - `--no-pretty-print` - Skip pretty printing the main output
 - `--graph` / `--no-graph` - Enable/disable execution graph visualization
 - `--graph-full-data` / `--graph-no-data` - Include full data in the graph visualization
-- `--dry-run` - Dry-run the pipeline without calling AI providers
+- `--dry-run` - Dry-run the pipeline without calling AI providers; no inference credentials are needed
 - `--mock-inputs` - Use mock inputs for the pipeline (requires `--dry-run`)
 - `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
 
@@ -59,7 +59,7 @@ pipelex run pipe my_pipe --no-save-main-stuff --no-pretty-print
 # Write a flat list output to CSV (literal path, not under --output-dir)
 pipelex run pipe summarize_people --inputs people.json --save-csv summaries.csv
 
-# Dry-run (no AI calls)
+# Dry-run (no AI calls, no credentials needed)
 pipelex run pipe my_pipe --dry-run
 
 # Run with custom library directories
@@ -90,7 +90,7 @@ Runs a pipeline from a bundle file (`.mthds`) or a pipeline directory. When a di
 - `--no-pretty-print` - Skip pretty printing the main output
 - `--graph` / `--no-graph` - Enable/disable execution graph visualization
 - `--graph-full-data` / `--graph-no-data` - Include full data in the graph visualization
-- `--dry-run` - Dry-run the pipeline without calling AI providers
+- `--dry-run` - Dry-run the pipeline without calling AI providers; no inference credentials are needed
 - `--mock-inputs` - Use mock inputs for the pipeline (requires `--dry-run`)
 - `--library-dir`, `-L` - Directory to search for additional pipe definitions. Can be specified multiple times.
 
@@ -137,7 +137,7 @@ Runs a pipeline from an installed method package.
 - `--no-pretty-print` - Skip pretty printing the main output
 - `--graph` / `--no-graph` - Enable/disable execution graph visualization
 - `--graph-full-data` / `--graph-no-data` - Include full data in the graph visualization
-- `--dry-run` - Dry-run the pipeline without calling AI providers
+- `--dry-run` - Dry-run the pipeline without calling AI providers; no inference credentials are needed
 - `--mock-inputs` - Use mock inputs for the pipeline (requires `--dry-run`)
 - `--library-dir`, `-L` - Directory to search for additional pipe definitions. Can be specified multiple times.
 

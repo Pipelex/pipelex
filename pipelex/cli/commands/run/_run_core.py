@@ -416,7 +416,16 @@ def execute_run(
 
     Shared between the ``method`` and ``pipe`` subcommands.
     """
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN, library_dirs=library_dir, boot_orchestrator=orchestrator)
+    # A dry run makes no inference call, so it must not demand credentials: boot keyless (every run
+    # is then forced to DRY) but with real model specs, so model handles resolve as on a live run.
+    # This is the same boot `pipelex-agent run --dry-run` uses, so the two CLIs agree on a keyless machine.
+    make_pipelex_for_cli(
+        context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN,
+        library_dirs=library_dir,
+        needs_inference=not dry_run,
+        boot_orchestrator=orchestrator,
+        needs_model_specs=True,
+    )
 
     try:
         with get_telemetry_manager().telemetry_context():
