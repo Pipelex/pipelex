@@ -103,24 +103,24 @@ Everything unknown that is *not* header-shaped is then handled by source:
 
 Goal: the one non-header key in the bag stops pretending to be a header. No behaviour change, no served-config change, no config URL bump — the served TOML is untouched, the new client merely classifies the key differently, and older clients keep reading it out of `extra_headers` exactly as before.
 
-- [ ] `InferenceModelSpecBlueprint.endpoint_path: str | None = None` (`model_spec_factory.py`) and the matching field on `InferenceModelSpec` (`model_spec.py`), with the factory passthrough.
-- [ ] `gateway_img_gen_worker.py:86` reads `self.inference_model.endpoint_path` instead of digging in `extra_headers`. Its existing "does not have an endpoint_path configured" error stays — it is the right error, it just now guards a real field.
-- [ ] Update the image-worker tests that stub the bag: `test_gateway_img_gen_worker_semantic.py`, `test_gateway_img_gen_worker_malformed_body.py`, `test_gateway_img_gen_worker_edit_routing.py`, `test_gateway_quota_detection.py`. Each sets `mock_model.extra_headers = {"endpoint_path": …}`; they should set the field and leave the bag to the headers that belong in it.
-- [ ] Verify against the live payload that the key still parses into the field and that `x-portkey-config` still lands in `extra_headers` — a real boot, not only mocks.
-- [ ] Gates: targeted tests, `make tb`, stage + `make agent-check`.
+- [x] `InferenceModelSpecBlueprint.endpoint_path: str | None = None` (`model_spec_factory.py`) and the matching field on `InferenceModelSpec` (`model_spec.py`), with the factory passthrough.
+- [x] `gateway_img_gen_worker.py:86` reads `self.inference_model.endpoint_path` instead of digging in `extra_headers`. Its existing "does not have an endpoint_path configured" error stays — it is the right error, it just now guards a real field.
+- [x] Update the image-worker tests that stub the bag: `test_gateway_img_gen_worker_semantic.py`, `test_gateway_img_gen_worker_malformed_body.py`, `test_gateway_img_gen_worker_edit_routing.py`, `test_gateway_quota_detection.py`. Each sets `mock_model.extra_headers = {"endpoint_path": …}`; they should set the field and leave the bag to the headers that belong in it.
+- [x] Verify against the live payload that the key still parses into the field and that `x-portkey-config` still lands in `extra_headers` — a real boot, not only mocks.
+- [x] Gates: targeted tests, `make tb`, stage + `make agent-check`.
 
 ## Phase 2 — the shape guard
 
 Goal: an unknown per-model key is either a plausible header or a loud error, and never a silent outbound string. TDD throughout — each box's test lands red first.
 
-- [ ] **Tests first (red):** new `tests/unit/pipelex/cogt/model_backends/test_model_spec_key_policy.py` — header-shaped key accepted; snake_case unknown rejected; D3 near-miss (`max-tokens`) rejected; known blueprint field never diverted.
-- [ ] New `pipelex/cogt/model_backends/model_spec_keys.py` (D1): the pure classifier plus `ModelSpecSource` (D2).
-- [ ] Wire it into `InferenceBackendLibrary.load` (`backend_library.py:195-199`), replacing the unconditional loop. Local source raises `InferenceBackendLibraryError` with D6's message; gateway source prunes.
-- [ ] **Tests (red first):** a local backend TOML carrying a synthetic unknown snake_case key fails the load with a message naming the key, the model and the file; the same key in a remote payload is pruned and the boot survives. Extend `test_gateway_unknown_defaults.py` rather than starting a parallel module — it already owns the remote-tolerance story, including the no-log-hub constraint.
-- [ ] **Regression, and the point of the whole change:** `x-portkey-provider` from local `portkey.toml` and `x-portkey-config` from the remote payload still reach `extra_headers` and still reach the wire.
-- [ ] **Leniency interaction:** confirm what a rejected key does under `lenient=True`. A typo must not silently delete a backend — that is the existing ruling in `InferenceBackendLibrary.load`'s docstring, and this new raise sits inside the same `try`. Decide deliberately and record the answer here; if it needs to escape the lenient skip, say why in a comment at the raise site.
-- [ ] **Mutation-check the new tests:** revert the guard, confirm the new tests go red, restore. A guard whose tests pass without it is not a guard.
-- [ ] Gates: `make tb`, targeted tests, stage + `make agent-check`, **full `make agent-test`**.
+- [x] **Tests first (red):** new `tests/unit/pipelex/cogt/model_backends/test_model_spec_key_policy.py` — header-shaped key accepted; snake_case unknown rejected; D3 near-miss (`max-tokens`) rejected; known blueprint field never diverted.
+- [x] New `pipelex/cogt/model_backends/model_spec_keys.py` (D1): the pure classifier plus `ModelSpecSource` (D2).
+- [x] Wire it into `InferenceBackendLibrary.load` (`backend_library.py:195-199`), replacing the unconditional loop. Local source raises `InferenceBackendLibraryError` with D6's message; gateway source prunes.
+- [x] **Tests (red first):** a local backend TOML carrying a synthetic unknown snake_case key fails the load with a message naming the key, the model and the file; the same key in a remote payload is pruned and the boot survives. Extend `test_gateway_unknown_defaults.py` rather than starting a parallel module — it already owns the remote-tolerance story, including the no-log-hub constraint.
+- [x] **Regression, and the point of the whole change:** `x-portkey-provider` from local `portkey.toml` and `x-portkey-config` from the remote payload still reach `extra_headers` and still reach the wire.
+- [x] **Leniency interaction:** confirm what a rejected key does under `lenient=True`. A typo must not silently delete a backend — that is the existing ruling in `InferenceBackendLibrary.load`'s docstring, and this new raise sits inside the same `try`. Decide deliberately and record the answer here; if it needs to escape the lenient skip, say why in a comment at the raise site.
+- [x] **Mutation-check the new tests:** revert the guard, confirm the new tests go red, restore. A guard whose tests pass without it is not a guard.
+- [x] Gates: `make tb`, targeted tests, stage + `make agent-check`, **full `make agent-test`**.
 
 ### ✋ CHECKPOINT — HARD STOP
 
@@ -149,4 +149,36 @@ Do not start Phase 3 without Louis' explicit go. This is where a config that boo
 
 ## Checkpoint log
 
-*(Filled in as the checkpoint is reached: status, decisions taken, open questions, state of the code.)*
+### 2026-08-15 — Phase 1 and Phase 2 done, stopped at the ✋ checkpoint
+
+**Branch and PR shape.** `feat/rogue-extra-headers-guard`, stacked on `fix/keyless-followups` (PR #1106), which is itself stacked on `fix/Keyless-dry-run` (PR #1104). Two commits, one per phase, so Phase 1 could ship alone if ever needed: "endpoint_path is a declared model-spec field, not an extra header" and "Unknown per-model backend keys are headers only if header-shaped". Opened as a draft PR because Phase 3 (docs, changelog, dogfood log) is not started.
+
+**Re-measurement (2026-08-15).** Identical to the 2026-08-14 table: local `portkey.toml` carries `x-portkey-provider` per model and nothing else; the served `_12` payload carries `x-portkey-config` on every LLM model and `endpoint_path` on the four image models; the served `[defaults]` block is clean. The local `~/.pipelex/cache/remote_config.json` (`schema_version` / `cached_at` / `raw_config`, no source URL) was refreshed this morning, so this session did not reproduce the `_11`-body-under-a-`_12`-pin condition — but nothing in the change depends on it, and the remote path prunes rather than raises precisely so that condition stays harmless.
+
+**What was built.**
+
+- Phase 1: `endpoint_path: str | None = None` on `InferenceModelSpecBlueprint` and `InferenceModelSpec`, factory passthrough, `gateway_img_gen_worker.py` reads the field. The four image-worker tests set the field and leave `extra_headers` to headers. Verified with a real `Pipelex.make(needs_inference=False, needs_model_specs=True)` boot against the live payload: `gpt-image-1.endpoint_path` is the Azure route, `gpt-image-1.extra_headers == {'x-portkey-config': …}`, `gpt-4o-mini.endpoint_path is None`, and the local portkey model still carries `{'x-portkey-provider': '@openai'}`.
+- Phase 2: `pipelex/cogt/model_backends/model_spec_keys.py` — `ModelSpecSource` (D2), `split_model_spec_keys` returning a `ModelSpecKeySplit(fields, headers, rejected)` NamedTuple, `RejectedModelSpecKey(key, near_miss_of)`, `describe_rejected_keys` for the wording. Fully keyword-only, no subject grant. `InferenceBackendLibrary.load` threads the source (`REMOTE_GATEWAY` on the `is_gateway_backend` branch, `LOCAL_FILE` otherwise) and does a `match`/`case`: local raises `InferenceBackendLibraryError`, remote prunes with no log call. `drop_unknown_gateway_defaults`'s docstring updated to point at the new per-model rule.
+- Tests: `test_model_spec_key_policy.py` (classifier), three new cases in `test_backend_library_leniency.py` (unknown per-model key fatal in both modes naming key/model/file; near-miss fatal naming the field; `x-portkey-provider` still becomes a header), and a new `TestGatewayUnknownPerModelKeys` class in `test_gateway_unknown_defaults.py` (header kept, non-header pruned and boot survives, `endpoint_path` lands in the field, header reaches `GatewayFactory.make_extras`, prune needs no log hub).
+
+**Gates.** `make tb`, `make agent-check` (staged), and the full `make agent-test` are all green. Mutation check done: with the guard replaced by the old "everything unknown is a header" behaviour, exactly the four guard tests go red; restored, all green.
+
+**Answer to the leniency question.** A rejected key from a local file is fatal in *both* modes. No new mechanism was needed: the raise is an `InferenceBackendLibraryError` inside the same `try` as before, and the lenient `except` only catches `InferenceBackendCredentialsError`, so it lets this through — exactly the docstring's ruling ("a config typo must never silently delete a backend"). A comment at the raise site says so, and `test_an_unknown_per_model_key_in_a_local_backend_is_fatal_in_both_modes` is parametrized over `lenient`.
+
+**Worked example of the error, as a user sees it** (a local `openai.toml` with `max_tokns = 4096` on `gpt-4o`):
+
+> Unknown key on model 'gpt-4o' for backend 'openai' from file '.pipelex/inference/backends/openai.toml': 'max_tokns' is not a known model-spec field, and not header-shaped. A per-model key that is not a model-spec field is sent to the provider as a request header and must contain a hyphen (e.g. 'x-portkey-provider'): fix the typo, or name the key like a header if that is what it is meant to be.
+
+The near-miss variant (`max-tokens = 4096`):
+
+> Unknown key on model 'gpt-4o' for backend 'openai' from file '.pipelex/inference/backends/openai.toml': 'max-tokens' looks like the model-spec field 'max_tokens' spelled with hyphens — use 'max_tokens'. A per-model key that is not a model-spec field is sent to the provider as a request header and must contain a hyphen (e.g. 'x-portkey-provider'): fix the typo, or name the key like a header if that is what it is meant to be.
+
+Several rejected keys on one model are listed in one message ("Unknown keys on model …: 'prompting_target' is …; 'max_tokns' is …"), with the rule stated once at the end.
+
+**Awaiting Louis' rulings.**
+
+- D3 (near-miss): built as planned; separable — dropping it removes `near_miss_of`, the second `describe` branch, and one test each in the classifier and leniency modules.
+- Leniency: fatal in both modes, as above. Confirm.
+- Commit/PR shape: two commits on one draft PR stacked on #1106. Confirm, or ask for a squash / a separate Phase 1 PR.
+
+**Not done, deliberately (Phase 3):** the docs page (`docs/configuration/config-technical/inference-backend-config.md`), the changelog entry, and the dogfood-log entry. Note for Phase 3: the current `## [Unreleased]` changelog already says, in the `prompting_target` removal entry, that "an unknown per-model key is sent to the provider as an HTTP header rather than rejected" — that sentence must be rewritten when this lands, since it is no longer true.
