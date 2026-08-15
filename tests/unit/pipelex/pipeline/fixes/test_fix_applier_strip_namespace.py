@@ -139,11 +139,16 @@ class TestFixApplierStripNamespace:
         assert [application.outcome for application in second] == [FixOpOutcome.SKIPPED, FixOpOutcome.APPLIED]
         assert serialize_and_format(toml_doc) == once
 
-    def test_rename_skips_on_collision(self) -> None:
-        """Renaming to a key already declared separately is skipped, not applied (no clobber)."""
+    def test_rename_conflicts_on_collision(self) -> None:
+        """Renaming onto a key already declared separately is a CONFLICT, and clobbers nothing.
+
+        It was reported as a plain SKIPPED, which is the outcome for "nothing to do" — so a
+        caller had no way to tell a benign no-op from a change it could not make on the user's
+        behalf without parsing the detail string.
+        """
         toml_doc = tomlkit.loads(_COLLISION_MTHDS)
         applications = apply_fix_ops(toml_doc=toml_doc, ops=[_rename_op(key="coll.hello", new_key="hello")])
-        assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED]
+        assert [application.outcome for application in applications] == [FixOpOutcome.CONFLICT]
         dumped = _dumps(toml_doc)
         # Both declarations survive untouched — nothing was clobbered.
         assert '[pipe."coll.hello"]' in dumped
@@ -168,12 +173,12 @@ class TestFixApplierStripNamespace:
         # The whole document still formats cleanly (no malformed TOML out of the proxy rename).
         assert "[pipe.hello]" in serialize_and_format(toml_doc)
 
-    def test_rename_skips_on_collision_across_interleaved_sections(self) -> None:
-        """A collision with a bare key living in a *different* ``[pipe.*]`` section is still a skip."""
+    def test_rename_conflicts_on_collision_across_interleaved_sections(self) -> None:
+        """A collision with a bare key living in a *different* ``[pipe.*]`` section conflicts too."""
         interleaved_collision = _INTERLEAVED_MTHDS.replace("[pipe.other]", "[pipe.hello]")
         toml_doc = tomlkit.loads(interleaved_collision)
         applications = apply_fix_ops(toml_doc=toml_doc, ops=[_rename_op(key="inter.hello", new_key="hello")])
-        assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED]
+        assert [application.outcome for application in applications] == [FixOpOutcome.CONFLICT]
         dumped = _dumps(toml_doc)
         assert '[pipe."inter.hello"]' in dumped
 

@@ -233,10 +233,16 @@ class TestFixApplierConfigSurfaceShapes:
         assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED]
         assert _dumps(replayed_doc) == once
 
-    def test_ensure_table_still_emits_an_inline_table(self) -> None:
-        """``ensure_table`` creates ``key = {}``, not a block table — the known bug Phase 1 fixes.
+    def test_ensure_table_emits_an_inline_table(self) -> None:
+        """``ensure_table`` creates ``key = {}``, an inline table, and that is deliberate.
 
-        Pinned so the fix is a visible, deliberate change to this expectation rather than a silent one.
+        The migration plan carried this down as a bug to fix — "the wrong shape for a config
+        section" — but ``ensure_table`` is not a migration op and never touches a config
+        section. Its one producer is the ``sync-controller-inputs`` fix, where the inline form
+        is the dominant `.mthds` authoring form and keeps the mapping attached to its pipe; a
+        block table would detach it into a ``[pipe.x.inputs]`` section after the pipe's body.
+        The block-table shape landed in ``move_key``, which is where a migration actually needs
+        to create a destination section.
         """
         toml_doc = _parse(_PACKAGED_DEFAULTS)
         applications = apply_fix_ops(toml_doc=toml_doc, ops=[EnsureTableOp(table_path=["pipelex", "freshly_ensured"])])

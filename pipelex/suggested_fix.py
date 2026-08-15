@@ -19,13 +19,20 @@ creating an import cycle. Naming is brand-neutral: fixes are a language-level co
 from enum import StrEnum
 from typing import Annotated, Literal, TypeAlias, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # A TOML-representable value for a set_key op: a scalar (output refs, input refs), or a flat
 # scalar mapping for fixes that create a whole table at once (written as an inline table —
 # e.g. a missing `inputs` mapping). Deeper nesting would come with rules that need it.
 TomlScalar: TypeAlias = str | int | float | bool
 TomlValue: TypeAlias = TomlScalar | dict[str, TomlScalar]
+
+# The wildcard path segment. It stands for "every entry of the open mapping at this node" — a
+# field typed as a mapping from arbitrary user-chosen keys to a value schema, where the keys
+# belong to the user and the value schema belongs to us. The applier expands it over the keys
+# the document actually holds; deciding whether a given node really is open is the migration
+# gate's job, since only the fingerprint knows.
+WILDCARD_SEGMENT = "*"
 
 
 class FixOpKind(StrEnum):
@@ -36,6 +43,8 @@ class FixOpKind(StrEnum):
     DELETE_KEY = "delete_key"
     DELETE_TABLE = "delete_table"
     RENAME_TABLE_KEY = "rename_table_key"
+    MOVE_KEY = "move_key"
+    REMAP_VALUE = "remap_value"
 
     @property
     def is_structural(self) -> bool:
@@ -49,7 +58,7 @@ class FixOpKind(StrEnum):
         match self:
             case FixOpKind.SET_KEY | FixOpKind.ENSURE_TABLE:
                 return False
-            case FixOpKind.DELETE_KEY | FixOpKind.DELETE_TABLE | FixOpKind.RENAME_TABLE_KEY:
+            case FixOpKind.DELETE_KEY | FixOpKind.DELETE_TABLE | FixOpKind.RENAME_TABLE_KEY | FixOpKind.MOVE_KEY | FixOpKind.REMAP_VALUE:
                 return True
 
 
@@ -127,10 +136,51 @@ class RenameTableKeyOp(FixOpBase):
     new_key: str
 
 
+class MoveKeyOp(FixOpBase):
+    """Relocate ``key`` from the addressed table into ``new_table_path``, under ``new_key``.
+
+    The moved key may be table-valued, in which case the whole subtree travels. Destination
+    parents that do not exist are created, as block tables, as part of the operation. Position
+    is preserved within a parent and never across parents — see ``docs/migration-ledger.md``
+    for the placement rule and for what happens to a moved table's introducing comment.
+    """
+
+    kind: Literal[FixOpKind.MOVE_KEY] = FixOpKind.MOVE_KEY
+    key: str
+    new_table_path: list[str]
+    new_key: str
+
+    @field_validator("new_table_path")
+    @classmethod
+    def refuse_wildcard_destination(cls, new_table_path: list[str]) -> list[str]:
+        """A destination cannot be a wildcard: there would be no rule for which entry receives it.
+
+        A wildcard *source* is unambiguous — it means "each of these" — but "move each entry's
+        key into *some* entry" names no target. Should a real need for a mirrored source and
+        destination appear, it wants an explicit correspondence rule, not this silence.
+        """
+        if WILDCARD_SEGMENT in new_table_path:
+            msg = f"a move_key destination may not contain the wildcard segment '{WILDCARD_SEGMENT}'"
+            raise ValueError(msg)
+        return new_table_path
+
+
+class RemapValueOp(FixOpBase):
+    """Rewrite ``key``'s value through ``mapping``, doing nothing when it is not a mapped value.
+
+    Only string values are remapped: the operation exists for renamed enumerated values, whose
+    TOML representation is always a string.
+    """
+
+    kind: Literal[FixOpKind.REMAP_VALUE] = FixOpKind.REMAP_VALUE
+    key: str
+    mapping: dict[str, str] = Field(min_length=1)
+
+
 # Every kind, for the `.mthds` fix path: a planner derives ops from one typed error about one
 # key, so materializing ops are correct there.
 FixOp: TypeAlias = Annotated[
-    Union[SetKeyOp, EnsureTableOp, DeleteKeyOp, DeleteTableOp, RenameTableKeyOp],
+    Union[SetKeyOp, EnsureTableOp, DeleteKeyOp, DeleteTableOp, RenameTableKeyOp, MoveKeyOp, RemapValueOp],
     Field(discriminator="kind"),
 ]
 
@@ -138,7 +188,7 @@ FixOp: TypeAlias = Annotated[
 # over every file on every run. Validating a ledger against this alias is what turns "a ledger
 # must not materialize" from a review rule into a parse error.
 MigrationOp: TypeAlias = Annotated[
-    Union[DeleteKeyOp, DeleteTableOp, RenameTableKeyOp],
+    Union[DeleteKeyOp, DeleteTableOp, RenameTableKeyOp, MoveKeyOp, RemapValueOp],
     Field(discriminator="kind"),
 ]
 

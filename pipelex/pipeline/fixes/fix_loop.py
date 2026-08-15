@@ -43,7 +43,7 @@ from pipelex.pipeline.fixes.applicability import is_safe_fix_for_load_scope, is_
 from pipelex.pipeline.fixes.applier import apply_fix_ops, serialize_and_format
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validation_errors import build_validation_error_items
-from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, EnsureTableOp, FixOp, RenameTableKeyOp, SetKeyOp, SuggestedFix
+from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, EnsureTableOp, FixOp, MoveKeyOp, RemapValueOp, RenameTableKeyOp, SetKeyOp, SuggestedFix
 from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
@@ -476,7 +476,7 @@ def _colliding_op_name(
             ):
                 return fix_op.value
             return None
-        case EnsureTableOp() | DeleteKeyOp() | DeleteTableOp():
+        case EnsureTableOp() | DeleteKeyOp() | DeleteTableOp() | MoveKeyOp() | RemapValueOp():
             return None
 
 

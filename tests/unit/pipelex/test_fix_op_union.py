@@ -18,6 +18,8 @@ from pipelex.suggested_fix import (
     FixOp,
     FixOpKind,
     MigrationOp,
+    MoveKeyOp,
+    RemapValueOp,
     RenameTableKeyOp,
     SetKeyOp,
 )
@@ -44,6 +46,8 @@ class TestFixOpUnion:
             ({"kind": "delete_key", "table_path": ["concept"], "key": "Text"}, DeleteKeyOp),
             ({"kind": "delete_table", "table_path": ["legacy"]}, DeleteTableOp),
             ({"kind": "rename_table_key", "table_path": [], "key": "old", "new_key": "new"}, RenameTableKeyOp),
+            ({"kind": "move_key", "table_path": ["a"], "key": "k", "new_table_path": ["b"], "new_key": "k"}, MoveKeyOp),
+            ({"kind": "remap_value", "table_path": ["a"], "key": "k", "mapping": {"old": "new"}}, RemapValueOp),
         ],
     )
     def test_kind_string_selects_the_variant(self, payload: dict[str, object], expected_type: type[BaseModel]) -> None:
@@ -100,7 +104,29 @@ class TestFixOpUnion:
             FixOpKind.DELETE_KEY: {"kind": "delete_key", "table_path": ["s"], "key": "k"},
             FixOpKind.DELETE_TABLE: {"kind": "delete_table", "table_path": ["s"]},
             FixOpKind.RENAME_TABLE_KEY: {"kind": "rename_table_key", "table_path": ["s"], "key": "k", "new_key": "n"},
+            FixOpKind.MOVE_KEY: {"kind": "move_key", "table_path": ["s"], "key": "k", "new_table_path": ["t"], "new_key": "k"},
+            FixOpKind.REMAP_VALUE: {"kind": "remap_value", "table_path": ["s"], "key": "k", "mapping": {"old": "new"}},
         }
         assert set(payloads) == structural_kinds
         for payload in payloads.values():
             assert _MigrationOpHolder.model_validate({"op": payload}).op.kind.is_structural
+
+    def test_a_wildcard_destination_is_refused(self) -> None:
+        """A wildcard source means "each of these"; a wildcard destination names no target at all."""
+        with pytest.raises(ValidationError):
+            _FixOpHolder.model_validate(
+                {"op": {"kind": "move_key", "table_path": ["deck", "*"], "key": "k", "new_table_path": ["deck", "*"], "new_key": "k"}}
+            )
+
+    def test_a_wildcard_source_is_accepted(self) -> None:
+        """The source side is the whole point of the segment, and stays legal."""
+        op = _FixOpHolder.model_validate(
+            {"op": {"kind": "move_key", "table_path": ["deck", "*"], "key": "k", "new_table_path": ["storage"], "new_key": "k"}}
+        ).op
+        assert isinstance(op, MoveKeyOp)
+        assert op.table_path == ["deck", "*"]
+
+    def test_a_remap_needs_a_non_empty_mapping(self) -> None:
+        """An empty mapping is an operation that can never do anything — an authoring mistake."""
+        with pytest.raises(ValidationError):
+            _FixOpHolder.model_validate({"op": {"kind": "remap_value", "table_path": ["a"], "key": "k", "mapping": {}}})
