@@ -1,6 +1,6 @@
 """Contract-conformance tests for plugin discovery: protocol satisfaction, fail-loud
 conflict/version policy, the side-effect-free (idempotent) register invariant, and the
-plugins.disabled denylist.
+runtime.plugins.disabled denylist.
 """
 
 from __future__ import annotations
@@ -210,7 +210,7 @@ class TestPluginDiscovery:
         assert "bad_ep" in str(exc_info.value)
 
     def test_disabled_broken_external_entry_point_is_skipped_before_load(self, mocker: MockerFixture) -> None:
-        """A broken external entry point listed in plugins.disabled is skipped by its entry-point name
+        """A broken external entry point listed in runtime.plugins.disabled is skipped by its entry-point name
         *before* load(), so the denylist can recover from a bad installed plugin instead of raising BrokenPluginError.
         """
 
