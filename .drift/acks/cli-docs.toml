@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:91b2f3b364728697c389ea2e1b2bf030a20e841e9d9c7bd176fc16b2faf7f3ee"
+digest = "sha256:922bd9bc5dd5f6ef955ffee4b5843331613c69a8849a730b9f13a4f69f1177e3"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-15T07:04:47Z"
-rationale = "pipelex run --dry-run now boots keyless (needs_inference=not dry_run, needs_model_specs=True), matching pipelex-agent run --dry-run. Reviewed docs/tools/cli/run.md and noted on each --dry-run flag row that no inference credentials are needed; agent-CLI CLAUDE.md already describes the keyless dry-run boot and is unaffected by this bare-CLI change."
+reviewed_at = "2026-08-15T08:29:38Z"
+rationale = "Comment-only change in _run_core.py: reworded the dry-run boot comment so it no longer promises model-handle resolution on a keyless machine (needs_model_specs only keeps real gateway specs; lenient load still skips keyless backends). Reviewed docs/tools/cli/run.md and the agent-CLI CLAUDE.md: neither makes that promise, so no doc change needed."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -109,7 +109,7 @@ rationale = "pipelex run --dry-run now boots keyless (needs_inference=not dry_ru
 "pipelex/cli/commands/run/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/run/_inputs_file_loader.py" = "blob:dde781f846968b667a0acfb4b3e3cea01cef7049"
 "pipelex/cli/commands/run/_inputs_path_resolver.py" = "blob:c8ec89d98718e18af7aaaded44c9f545be60adab"
-"pipelex/cli/commands/run/_run_core.py" = "blob:c2fe39ee9a1c26656847094240d673f3fad6ebd9"
+"pipelex/cli/commands/run/_run_core.py" = "blob:bde638fe3075dd9d8ebe6e306f427583904717ec"
 "pipelex/cli/commands/run/app.py" = "blob:a7090b0ff6bf2f1d47827fa27d2a138096a2e148"
 "pipelex/cli/commands/run/bundle_cmd.py" = "blob:cb420bf4879c863d64c5e20ed535c42732b720a2"
 "pipelex/cli/commands/run/exceptions.py" = "blob:e9552226e597922b6ac0757f7b52eb880a2e1472"
