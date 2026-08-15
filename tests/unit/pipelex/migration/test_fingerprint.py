@@ -13,7 +13,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
-from pipelex.migration.fingerprint import ENUM_TYPE, TABLE_TYPE, compute_fingerprint
+from pipelex.migration.fingerprint import ENUM_TYPE, TABLE_TYPE, ConstraintKind, compute_fingerprint
 
 
 class _Mode(StrEnum):
@@ -34,6 +34,9 @@ class _Synthetic(BaseModel):
     labels: dict[str, str]
     tags: list[str]
     bounded: Annotated[int, Field(ge=1)] | Literal["unbounded"] = 1
+    retries: int = Field(default=3, ge=0, le=10)
+    lenient: str = Field(default="x", strict=False)
+    item_bounded: list[Annotated[int, Field(ge=1)]] = Field(default_factory=list[int])
 
 
 class _SelfReferential(BaseModel):
@@ -77,6 +80,9 @@ class TestFingerprintPaths:
             "labels.*",
             "tags",
             "bounded",
+            "retries",
+            "lenient",
+            "item_bounded",
         }
 
     def test_paths_are_stably_ordered(self) -> None:
@@ -150,6 +156,36 @@ class TestFingerprintRecords:
     def test_a_constraint_object_is_not_rendered_into_the_type(self) -> None:
         """`Annotated[int, Field(ge=1)]` renders as `int` — a pydantic upgrade must not move the golden."""
         assert _fingerprint().paths["bounded"].value_type == "int | literal"
+
+    def test_a_whitelisted_bound_is_recorded_under_its_own_key(self) -> None:
+        """A tightened bound breaks a user's file while moving nothing else in the projection."""
+        assert _fingerprint().paths["retries"].constraints == {ConstraintKind.GE: 0, ConstraintKind.LE: 10}
+
+    def test_a_bound_pydantic_folded_into_the_field_metadata_is_still_found(self) -> None:
+        """`Field(ge=0)` never appears in the annotation — pydantic moves it to the field's metadata,
+        so a walk reading the annotation alone would be blind to every bound declared the usual way.
+        """
+        assert ConstraintKind.GE in (_fingerprint().paths["retries"].constraints or {})
+
+    def test_a_bound_nested_inside_a_union_member_is_found_too(self) -> None:
+        """The shape `Annotated[int, Field(ge=1)] | Literal["unbounded"]`, which the type rendering strips."""
+        assert _fingerprint().paths["bounded"].constraints == {ConstraintKind.GE: 1}
+
+    def test_metadata_outside_the_whitelist_is_dropped_rather_than_serialized(self) -> None:
+        """The closed whitelist is what keeps the golden a function of our schema.
+
+        `Field(strict=False)` is on dozens of configuration fields as a house convention. Recording
+        it — or any other carrier the validation library invents — would move goldens for reasons
+        that have nothing to do with what a user's file may contain.
+        """
+        assert _fingerprint().paths["lenient"].constraints is None
+
+    def test_a_bound_on_a_container_item_is_not_attributed_to_the_container(self) -> None:
+        """`list[Annotated[int, Field(ge=1)]]` bounds the items, not the list."""
+        assert _fingerprint().paths["item_bounded"].constraints is None
+
+    def test_a_path_with_no_bound_records_none(self) -> None:
+        assert _fingerprint().paths["leaf.name"].constraints is None
 
     def test_a_nested_model_renders_as_a_table(self) -> None:
         assert _fingerprint().paths["leaf"].value_type == TABLE_TYPE

@@ -3,8 +3,8 @@
 The fingerprint is what the coverage gate diffs, so what it records and what it deliberately
 ignores is the whole design. It records, per TOML-addressable path: the type, whether the path is
 required within its parent, the enumerated member set where there is one, the value the surface's
-defaults layer supplies, and an open-node marker with the value-schema paths beneath it recorded
-under a `*` segment.
+defaults layer supplies, an open-node marker with the value-schema paths beneath it recorded under
+a `*` segment, and a projection of the value's numeric and length bounds.
 
 It is **deliberately not raw `model_json_schema()` output**, which moves for reasons that have
 nothing to do with our schema — reference layout, titles, ordering, the validation library's own
@@ -14,15 +14,26 @@ model renders as `table` and an enum as `enum`, so renaming a *Python class* mov
 renaming a *field* or an enum *member* — the things a user's file actually contains — moves the
 fingerprint and is caught.
 
+The bound projection is built on the same principle, which is why it is a **closed whitelist**:
+only the constraint kinds named in `CONSTRAINT_ATTRIBUTE_BY_CARRIER` are read, and anything else
+an annotation carries is dropped rather than serialized. What lands in the golden is then a
+function of our schema rather than of the validation library's representation of it — a strictness
+flag, a before-validator, a pattern object or a constraint kind invented by a future release moves
+nothing. `pattern` is excluded on purpose and permanently: regex containment is not decidable for
+real expressions, so every pattern edit would read as a tightening, produce false positives, and
+teach everyone to wave the gate through.
+
 See `docs/migration-ledger.md` → "The fingerprint".
 """
 
 import types
 from collections.abc import Mapping, Sequence
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import Annotated, Any, Literal, Union, cast, get_args, get_origin
 
+from annotated_types import Ge, Gt, Le, Lt, MaxLen, MinLen, MultipleOf
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic.fields import FieldInfo
 
 from pipelex.suggested_fix import WILDCARD_SEGMENT
 
@@ -33,6 +44,54 @@ TABLE_TYPE = "table"
 
 ENUM_TYPE = "enum"
 """The rendering of an enumerated type. The member set carries the shape; the class name does not."""
+
+LITERAL_TYPE = "literal"
+"""The rendering of a `Literal[...]`. Its spellings are recorded as enumerated members, like an enum's."""
+
+STRING_TYPE = "str"
+"""The rendering of `str` — the type every enumerated spelling widens into."""
+
+
+class ConstraintKind(StrEnum):
+    """The closed whitelist of constraint kinds the fingerprint records.
+
+    Each value is also the attribute name the matching `annotated_types` object carries, which is
+    what lets one mapping serve both the projection and the golden's key names.
+    """
+
+    GT = "gt"
+    GE = "ge"
+    LT = "lt"
+    LE = "le"
+    MIN_LENGTH = "min_length"
+    MAX_LENGTH = "max_length"
+    MULTIPLE_OF = "multiple_of"
+
+    @property
+    def widest_is_the_lower_value(self) -> bool:
+        """Which direction of this kind admits more values — the merge rule across union members.
+
+        A union's value domain is the union of its members' domains, so a bound found on one
+        member never binds the others: the widest of the two is the one the path really has.
+        """
+        match self:
+            case ConstraintKind.GT | ConstraintKind.GE | ConstraintKind.MIN_LENGTH | ConstraintKind.MULTIPLE_OF:
+                return True
+            case ConstraintKind.LT | ConstraintKind.LE | ConstraintKind.MAX_LENGTH:
+                return False
+
+
+CONSTRAINT_ATTRIBUTE_BY_CARRIER: dict[type[Any], ConstraintKind] = {
+    Gt: ConstraintKind.GT,
+    Ge: ConstraintKind.GE,
+    Lt: ConstraintKind.LT,
+    Le: ConstraintKind.LE,
+    MinLen: ConstraintKind.MIN_LENGTH,
+    MaxLen: ConstraintKind.MAX_LENGTH,
+    MultipleOf: ConstraintKind.MULTIPLE_OF,
+}
+"""The whitelist itself. `annotated_types` is a zero-dependency interchange vocabulary, not
+validation-library internals, which is what makes reading it compatible with the strip above."""
 
 
 class PathFingerprint(BaseModel):
@@ -53,6 +112,13 @@ class PathFingerprint(BaseModel):
     open_node: bool = False
     """A mapping from arbitrary user-owned keys to a value schema. The keys belong to the user;
     the value schema belongs to us and is recorded beneath a `*` segment."""
+
+    constraints: dict[ConstraintKind, int | float] | None = None
+    """The whitelisted bounds on the value, or `None` for none recorded. Recorded so that a bound
+    a schema change *tightens* is visible to the gate: it keeps every path and every enumerated
+    spelling, so nothing else in the projection moves, while a value a user's file legitimately
+    carries stops validating. What is deliberately absent is everything outside the whitelist —
+    see the module docstring."""
 
 
 class SurfaceFingerprint(BaseModel):
@@ -116,6 +182,10 @@ def _walk_model(
         _record_field(
             path=(*prefix, field_name),
             annotation=field_info.annotation,
+            # A top-level `Annotated[int, Field(ge=1)]` is unwrapped by pydantic before we ever see
+            # the annotation: the constraint is folded into the field's metadata instead, so a walk
+            # that read the annotation alone would be blind to every bound declared the usual way.
+            field_metadata=field_info.metadata,
             required=field_info.is_required(),
             defaults_value=_defaults_value(defaults=defaults, key=field_name),
             ancestry=ancestry,
@@ -131,6 +201,7 @@ def _record_field(
     defaults_value: Any,
     ancestry: tuple[type[BaseModel], ...],
     collected: dict[str, PathFingerprint],
+    field_metadata: Sequence[Any] = (),
 ) -> None:
     resolved = _strip_annotated(annotation=annotation)
     nested_model = _as_nested_model(annotation=resolved)
@@ -160,6 +231,7 @@ def _record_field(
         enum_members=_collect_enum_members(annotation=resolved),
         default=_json_safe(value=defaults_value),
         open_node=open_value_type is not None,
+        constraints=_collect_constraints(annotation=annotation, field_metadata=field_metadata),
     )
 
     if open_value_type is not None:
@@ -229,7 +301,9 @@ def _as_open_mapping_value(*, annotation: Any) -> Any:
 def _render_type(*, annotation: Any) -> str:
     # Strip at every level, not just the top one: a union member carrying its own constraint
     # (`Annotated[int, Field(ge=1)] | Literal["unbounded"]`) would otherwise render the
-    # constraint object into the golden, where a pydantic upgrade could move it.
+    # constraint object into the golden, where a pydantic upgrade could move it. The bounds are not
+    # lost — `_collect_constraints` records the whitelisted ones under their own field, in a
+    # vocabulary that is ours rather than the library's.
     annotation = _strip_annotated(annotation=annotation)
     if annotation is Any:
         return "any"
@@ -238,7 +312,7 @@ def _render_type(*, annotation: Any) -> str:
     if _is_union(annotation=annotation):
         return " | ".join(_render_type(annotation=member) for member in get_args(annotation))
     if get_origin(annotation) is Literal:
-        return "literal"
+        return LITERAL_TYPE
     origin = get_origin(annotation)
     if origin is not None:
         args = get_args(annotation)
@@ -257,6 +331,65 @@ def _render_bare(*, annotation: Any) -> str:
         return bare_type.__name__.lower()
     name: Any = getattr(annotation, "__name__", None)
     return name.lower() if isinstance(name, str) else "unknown"
+
+
+def _collect_constraints(*, annotation: Any, field_metadata: Sequence[Any]) -> dict[ConstraintKind, int | float] | None:
+    """The whitelisted bounds on one path's value, merged across the annotation's union members.
+
+    Two sources are read and no others: the field's own metadata, which is where a top-level
+    `Field(ge=1)` ends up, and the `Annotated` wrappers reachable through unions — the shape
+    `Annotated[int, Field(ge=1)] | Literal["unbounded"]` that the walk would otherwise miss.
+
+    A generic container's arguments are deliberately **not** descended into. A bound inside
+    `list[Annotated[int, Field(ge=1)]]` binds the items, not the list, and recording it at the
+    list's path would attribute to one path a constraint belonging to another — the value schema
+    beneath an open node gets its own `*` record and its own constraints there.
+    """
+    carriers: list[Any] = list(field_metadata)
+    _gather_constraint_carriers(annotation=annotation, carriers=carriers)
+    collected: dict[ConstraintKind, int | float] = {}
+    _absorb_constraint_carriers(carriers=carriers, collected=collected)
+    return {kind: collected[kind] for kind in sorted(collected)} if collected else None
+
+
+def _gather_constraint_carriers(*, annotation: Any, carriers: list[Any]) -> None:
+    if get_origin(annotation) is Annotated:
+        args = get_args(annotation)
+        carriers.extend(args[1:])
+        _gather_constraint_carriers(annotation=args[0], carriers=carriers)
+        return
+    if _is_union(annotation=annotation):
+        for member in get_args(annotation):
+            _gather_constraint_carriers(annotation=member, carriers=carriers)
+
+
+def _absorb_constraint_carriers(*, carriers: Sequence[Any], collected: dict[ConstraintKind, int | float]) -> None:
+    """Fold every carrier the whitelist recognizes into the projection, and drop the rest silently.
+
+    Dropping is the whole point: a carrier this function does not recognize — a strictness flag, a
+    before-validator, a pattern object, a kind a future release invents — must leave no trace in
+    the golden, or the gate starts moving for reasons that are not about our schema.
+    """
+    for carrier in carriers:
+        if isinstance(carrier, FieldInfo):
+            # `Field(...)` inside an `Annotated` arrives as a `FieldInfo` carrying its own metadata.
+            _absorb_constraint_carriers(carriers=carrier.metadata, collected=collected)
+            continue
+        kind = CONSTRAINT_ATTRIBUTE_BY_CARRIER.get(cast("type[Any]", type(carrier)))
+        if kind is None:
+            continue
+        value = getattr(carrier, kind, None)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            # A bound expressed over dates, decimals or anything else is outside the projection:
+            # it has no stable rendering here and no comparison this gate could make.
+            continue
+        existing = collected.get(kind)
+        if existing is None:
+            collected[kind] = value
+        elif kind.widest_is_the_lower_value:
+            collected[kind] = min(existing, value)
+        else:
+            collected[kind] = max(existing, value)
 
 
 def _collect_enum_members(*, annotation: Any) -> list[str] | None:

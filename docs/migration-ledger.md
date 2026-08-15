@@ -169,7 +169,7 @@ This exception is bounded to entries carrying the flag, and exists for the chang
 
 > **No declared path may appear in a fingerprint at or below the entry's own version.** A path some snapshot records is material whose removal *is* observable, so it is accounted against that snapshot like any other change. (A *later* version bringing a declared path back is a different failure with a different remedy, and [the reserved-path rule](#reserved-paths-and-names) reports it in those terms.)
 
-> **The fingerprint pair the entry sits between must show no removal at all.** Stated from the other side by the coverage gate, which is the gate the flag exempts: if something did go away between those two snapshots, the entry is not pre-history and the flag would be exempting a real removal from the operation it needs.
+> **The fingerprint pair the entry sits between must show no removal and no narrowing.** Stated from the other side by the coverage gate, which is the gate the flag exempts: if something did go away between those two snapshots — a path, a spelling, or the values a path accepts — the entry is not pre-history and the flag would be exempting a real change from the accounting it needs.
 
 > **Every operation's source must be declared material, or lie beneath some.** The ordinary op-legality rule reads the reserved-path registry, which a pre-history entry feeds by declaration; the effect is the same rule and the same refusal. Beneath, because a declaration names the shape that retired and an operation may address one key inside it.
 
@@ -239,6 +239,7 @@ Legality is defined over an entry's **sequential path state**, not operation by 
 - **Every path surviving the walk must be a path of the new fingerprint.** A survivor that is not is either an unaccounted removal or a misspelled destination; the two are the same defect seen from either end, and one containment check catches both.
 - **Every path of the new fingerprint that the walk removed must be a genuine addition** — that is, absent from the previous fingerprint. One that was present is **over-deletion**: an entry that dropped a parent table where it meant to drop one child.
 - **Every enumerated spelling lost between the two fingerprints must be remapped, following the path through the entry's own renames.** Members are compared by origin — an enumerated path of the previous schema is looked up at the path the walk carried it to — so a member lost by a path the same entry renamed still demands its `remap_value`, and the remap that supplies it addresses the key by its new name.
+- **Every path whose value domain narrowed must carry a remap, or the entry must be `unsafe`.** Compared by origin like the spellings, and for the same reason: a narrowing hidden behind a rename would otherwise read as an unrelated addition and removal. The remedies are the two the [coverage table](#coverage-every-schema-change-is-accounted-for) names, and they are fewer than a removal has, because no structural operation can repair a value.
 
 The end state is deliberately *not* compared as "the new fingerprint minus its additions". That formulation reads a rename's destination as an addition and its source as a removal, so it demands that the destination be absent from the end state — which is exactly where a correct rename puts it. Containment plus the over-deletion check is the same guarantee stated in a form renames satisfy.
 
@@ -266,17 +267,28 @@ The fingerprint is a normalized projection of a surface's model tree, checked in
 - whether the path is required;
 - the enum member set, where the type is enumerated;
 - the value in the surface's defaults layer, where one exists;
-- an open-node marker, with the value-schema paths beneath it recorded under a `*` segment.
+- an open-node marker, with the value-schema paths beneath it recorded under a `*` segment;
+- the numeric and length bounds on the value, where there are any.
 
 It is serialized in a stable order and is **deliberately not raw `model_json_schema()` output**, which moves for reasons that have nothing to do with our schema — reference layout, titles, ordering, the validation library's own version. A gate that cries wolf gets regenerated reflexively, and that is how a gate dies.
 
-The same reasoning drives two normalizations that look like information loss and are not. A nested model records its type as `table` and an enumerated one as `enum`, with no class name anywhere: renaming a *Python class* changes nothing in anybody's file and must move nothing, while renaming a *field* or an enum *member* — the things a file actually contains — moves the fingerprint and is caught. Constraint metadata is stripped for the same reason, at every level of an annotation rather than only the outermost one, so a validation-library upgrade that reshapes a constraint object cannot move a golden.
+The same reasoning drives two normalizations that look like information loss and are not. A nested model records its type as `table` and an enumerated one as `enum`, with no class name anywhere: renaming a *Python class* changes nothing in anybody's file and must move nothing, while renaming a *field* or an enum *member* — the things a file actually contains — moves the fingerprint and is caught. Constraint objects are stripped out of the recorded *type* for the same reason, at every level of an annotation rather than only the outermost one, so a validation-library upgrade that reshapes one cannot move a rendered type.
 
-An enumerated member set is collected from both sources that produce one: an enum class and a string literal type. To a TOML file they are the same thing — a closed set of legal spellings — and either can lose one.
+The bounds are recorded beside the type instead, and the same principle decides what a bound may be: the projection is a **closed whitelist** over `gt`, `ge`, `lt`, `le`, `min_length`, `max_length` and `multiple_of`, read from `annotated_types` — a zero-dependency interchange vocabulary rather than validation-library internals — and **anything unrecognized is dropped rather than serialized**. A strictness flag, a before-validator, a pattern object, a bound expressed over dates, a constraint kind a future release invents: none of them reach the golden. What lands there is a function of our schema, not of the library's representation of it, which is the property the strip above defends.
+
+> **`pattern` is excluded, permanently.** Regex containment is not decidable for real expressions, so a gate that compared patterns would read every pattern edit as a tightening, produce false positives on changes that break nobody, and be waved through until it caught nothing. There are no `pattern` constraints on any surface today, so saying so costs nothing.
+
+A bound is read from two places, because a bound written the ordinary way appears in neither the other: pydantic folds a top-level `Field(ge=1)` into the field's *metadata*, leaving the annotation bare, while a bound inside a union member (`Annotated[int, Field(ge=1)] | Literal["unbounded"]`) stays in the annotation. A generic container's arguments are deliberately not descended into — a bound inside `list[Annotated[int, Field(ge=1)]]` binds the items, not the list. Across union members the widest bound wins, since a union's value domain is the union of its members' and a bound on one never binds the others.
+
+An enumerated member set is collected from both sources that produce one: an enum class and a string literal type. To a TOML file they are the same thing — a closed set of legal spellings — and either can lose one. A member is only *lost*, though, when the new shape stops accepting it: an enumerated type relaxed into a free string records no members afterwards, and reading that raw set difference as the loss of every spelling would demand a bump and a remap for the most benign loosening a configuration model can undergo.
 
 Two shapes are recorded as terminal rather than descended into, because no operation can address what lies beneath them: an array of tables, which has no path segment syntax and no wildcard form, and a model reachable from itself, which has no finite path set at all.
 
-**What the fingerprint records is what the types say, and a validator can say something else.** Every recorded field is read from an annotation, so a constraint expressed as a validator instead is invisible here — and that is not a corner case, it reaches the enum member set and the open-node marker alike. A telemetry mode is a member of the recorded set and is still rejected unless the document also carries the user id that mode requires. Several nodes typed `dict[str, X]` on the main configuration surface reject any key outside a fixed set, so the open-node marker claims a key space that is not the user's after all. Nothing in the projection can be made to see either. A numeric bound is the same blind spot reached from the other side: constraint metadata is stripped deliberately, for the reason given above, so a field bounded at six accepts twelve as far as the fingerprint is concerned. The consequence for the gates is mild, because they compare a fingerprint against a fingerprint and a blind spot on both sides cancels. The consequence for anything that tries to *decide schema membership* from a fingerprint is total, and it is why [the neutrality property test](#replay-neutrality) asks the models rather than the projection.
+**What the fingerprint records is what the types say, and a validator can say something else.** Every recorded field is read from an annotation or from the metadata beside it, so a constraint expressed as a validator instead is invisible here — and that is not a corner case, it reaches the enum member set and the open-node marker alike. A telemetry mode is a member of the recorded set and is still rejected unless the document also carries the user id that mode requires. Several nodes typed `dict[str, X]` on the main configuration surface reject any key outside a fixed set, so the open-node marker claims a key space that is not the user's after all. A pair of validators demands every member of an enum as a key of every entry of an open mapping, which makes *adding* an enum member break a user's file — additively, as far as any projection can tell. Nothing here can be made to see any of it.
+
+> **The gate does not claim what it cannot see.** Domain narrowing expressed in a validator — a non-empty check, a cross-field invariant, a completeness rule over user-supplied keys — is not visible from the schema and stays the author's responsibility. The [coverage gate](#coverage-every-schema-change-is-accounted-for) catches the mechanical subset: types and the whitelisted bounds. It does not catch the rest, and the coverage table would overclaim without this sentence.
+
+The consequence for the gates is mild where they compare a fingerprint against a fingerprint, because a blind spot on both sides cancels. The consequence for anything that tries to *decide schema membership* from a fingerprint is total, and it is why [the neutrality property test](#replay-neutrality) asks the models rather than the projection.
 
 What each recorded field is for: requiredness and enum members are load-bearing for coverage and for remap legality; defaults are recorded so that a flipped default is *visible in the regeneration diff*, but a default value **never gates on its own** — it changes no shape and no operation can address it. The one place a default is decisive is [a required path that has none](#coverage-every-schema-change-is-accounted-for).
 
@@ -288,11 +300,14 @@ Checks with distinct failure meanings, so that a red gate says which guarantee b
 
 Recompute the fingerprint and diff it against the golden for the surface's current schema version:
 
+The verdict turns on **direction**, not on whether something moved: a change that leaves a user's file valid asks for a regeneration, and one that does not asks for a bump. That distinction is what the last row exists for — a narrowing removes no path and no spelling, so read as a raw diff it looks exactly like an addition.
+
 | Diff | Verdict |
 |---|---|
 | Unchanged | Pass. |
-| Paths or enum members added, or a type or default changed | Regenerate the golden. No version bump and no entry are demanded, because additive changes are absorbed by the defaults layer. |
+| Paths or enum members added, a default changed, or a type or bound **widened** | Regenerate the golden. No version bump and no entry are demanded, because additive changes are absorbed by the defaults layer and a widened domain still accepts every value a file already carries. Widening is defined so the fingerprint can decide it: a union whose members are a superset of the old ones, an enumerated type becoming `str`, and a bound dropped or relaxed. |
 | Any path or enum member removed or renamed | Require a schema version bump, an operation accounting for every removed path (wildcard paths included), and a remap or an `unsafe` entry for every removed enum member. Destinations are cross-checked against added paths. |
+| A type or bound **narrowed** — `int → str`, `str → SomeEnum`, `list[int] → list[str]`, `ge=1 → ge=5` | Require a schema version bump and an entry, exactly as a removal does. Every path survives and every spelling is still enumerated, and a file carrying an out-of-domain value stops validating all the same. No structural operation can repair a value, so the entry must carry a `remap_value` for each narrowed path — where the old spellings can be enumerated and [remap legality](#replay-neutrality) accepts it — or be marked `unsafe`, which is the only remedy a tightened numeric bound has. |
 
 Alongside the diff, one standing invariant is checked on the new fingerprint itself, whether or not anything changed:
 
@@ -473,7 +488,7 @@ These are measured properties of the TOML library the engine uses, not aspiratio
 The gate says what is missing; you should not be composing entries by hand from a diff. The intended loop:
 
 1. Make the schema change.
-2. Run the coverage check. It refuses the change and names every removed path and enum member that lacks accounting, every destination that does not match an added path, and every added path that has no default.
+2. Run the coverage check. It refuses the change and names every removed path and enum member that lacks accounting, every path whose value domain narrowed, every destination that does not match an added path, and every added path that has no default.
 3. Write the entry — or have the migration-authoring skill derive it from the fingerprint diff, bump the surface's schema version, regenerate the fingerprint golden and snapshot the transform goldens.
 4. Add the changelog entry. The changelog and the ledger are deliberately separate artifacts saying the same thing to different readers; the release process is where they are checked against each other.
 

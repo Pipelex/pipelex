@@ -23,6 +23,9 @@ question at once:
   a parent table where it meant to drop one child;
 - an enumerated member lost between the two fingerprints is looked up at the path the walk carried
   it to, so a member lost by a path the same entry renamed still demands its remap;
+- a path whose value domain **narrowed** — its type stopped accepting what it accepted, or a bound
+  tightened — is looked up the same way and demands the same accounting, because a change that
+  keeps every path and every spelling still breaks the file that carries an out-of-domain value;
 - everything the new fingerprint has and the walk does not is a genuine addition, which needs no
   operation because the defaults layer absorbs it.
 
@@ -43,6 +46,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pipelex.migration.fingerprint import PATH_SEPARATOR, TABLE_TYPE, SurfaceFingerprint, compute_fingerprint
 from pipelex.migration.goldens import defaults_golden_path, read_fingerprint_golden
 from pipelex.migration.ledger import MigrationEntry, MigrationLedger, MigrationSafety, load_ledger
+from pipelex.migration.narrowing import describe_narrowing, lost_enumerated_spellings
 from pipelex.migration.surfaces import Surface, SurfaceRegistry
 from pipelex.migration.walk import EntryWalk, walk_entry
 from pipelex.suggested_fix import WILDCARD_SEGMENT
@@ -61,6 +65,7 @@ class CoverageIssueKind(StrEnum):
     UNACCOUNTED_PATH = "unaccounted_path"
     OVER_DELETION = "over_deletion"
     ENUM_MEMBER_NOT_REMAPPED = "enum_member_not_remapped"
+    VALUE_DOMAIN_NARROWED = "value_domain_narrowed"
     REQUIRED_PATH_WITHOUT_DEFAULT = "required_path_without_default"
     PRE_HISTORY_HAS_A_DIFF = "pre_history_has_a_diff"
 
@@ -83,6 +88,10 @@ class FingerprintDiff(BaseModel):
     changed_paths: list[str] = Field(default_factory=list[str])
     added_enum_members: dict[str, list[str]] = Field(default_factory=dict[str, list[str]])
     removed_enum_members: dict[str, list[str]] = Field(default_factory=dict[str, list[str]])
+    narrowed_paths: dict[str, list[str]] = Field(default_factory=dict[str, list[str]])
+    """Paths whose value domain shrank without losing the path or an enumerated member, mapped to
+    the reasons. Every one is also in `changed_paths` — what this adds is the *direction*, which is
+    what separates a change a user's file survives from one it does not."""
 
     @property
     def is_empty(self) -> bool:
@@ -92,6 +101,12 @@ class FingerprintDiff(BaseModel):
     def has_removals(self) -> bool:
         return bool(self.removed_paths or self.removed_enum_members)
 
+    def render_removals(self) -> str:
+        return str(self.removed_paths + [f"{path}: {members}" for path, members in self.removed_enum_members.items()])
+
+    def render_narrowings(self) -> str:
+        return "; ".join(f"'{path}' ({', '.join(reasons)})" for path, reasons in self.narrowed_paths.items())
+
 
 def diff_fingerprints(*, before: SurfaceFingerprint, after: SurfaceFingerprint) -> FingerprintDiff:
     before_paths = before.path_names()
@@ -100,18 +115,19 @@ def diff_fingerprints(*, before: SurfaceFingerprint, after: SurfaceFingerprint) 
 
     added_enum_members: dict[str, list[str]] = {}
     removed_enum_members: dict[str, list[str]] = {}
+    narrowed_paths: dict[str, list[str]] = {}
     changed_paths: list[str] = []
     for path in shared:
         before_record = before.paths[path]
         after_record = after.paths[path]
         if before_record != after_record:
             changed_paths.append(path)
-        before_members = set(before_record.enum_members or [])
-        after_members = set(after_record.enum_members or [])
-        if added := sorted(after_members - before_members):
+        if added := sorted(set(after_record.enum_members or []) - set(before_record.enum_members or [])):
             added_enum_members[path] = added
-        if removed := sorted(before_members - after_members):
+        if removed := lost_enumerated_spellings(before=before_record, after=after_record):
             removed_enum_members[path] = removed
+        if narrowing := describe_narrowing(before=before_record, after=after_record):
+            narrowed_paths[path] = narrowing
 
     return FingerprintDiff(
         added_paths=sorted(after_paths - before_paths),
@@ -119,6 +135,7 @@ def diff_fingerprints(*, before: SurfaceFingerprint, after: SurfaceFingerprint) 
         changed_paths=changed_paths,
         added_enum_members=added_enum_members,
         removed_enum_members=removed_enum_members,
+        narrowed_paths=narrowed_paths,
     )
 
 
@@ -169,6 +186,7 @@ def check_entry_accounting(*, surface_id: str, entry: MigrationEntry, before: Su
         )
 
     issues.extend(_check_enum_accounting(surface_id=surface_id, entry=entry, before=before, after=after, walk=walk))
+    issues.extend(_check_narrowing_accounting(surface_id=surface_id, entry=entry, before=before, after=after, walk=walk))
     return issues
 
 
@@ -190,23 +208,28 @@ def _check_the_pre_history_claim(
 
     Additions are not the flag's business, here as everywhere: the defaults layer absorbs them.
 
+    A narrowed value domain is the same defect reached from the other side and is refused the same
+    way: the paths all survive, so nothing is *removed*, but a file valid at the previous version
+    stops validating at this one — which is a change with an observed diff, and the flag would
+    exempt it from the accounting that would have demanded a remap or an `unsafe` marking for it.
+
     What the declaration itself says, and whether the operations stay inside it, is `check-ledger`'s
     to verify against the checked-in chain and the entry's hand-authored `before` document — no
     live model is needed for either, and this gate exists to look at live models.
     """
     diff = diff_fingerprints(before=before, after=after)
-    if not diff.has_removals:
+    if not diff.has_removals and not diff.narrowed_paths:
         return []
-    removed = diff.removed_paths + [f"{path}: {members}" for path, members in diff.removed_enum_members.items()]
+    observed = diff.render_removals() if diff.has_removals else diff.render_narrowings()
     return [
         CoverageIssue(
             surface_id=surface_id,
             kind=CoverageIssueKind.PRE_HISTORY_HAS_A_DIFF,
             message=(
-                f"entry '{entry.id}' is marked pre_history, but schema version {after.schema_version} no longer has {removed} "
-                f"relative to version {before.schema_version} — that change is observable here, so the flag would exempt it "
-                f"from the accounting it needs. Drop the flag and account for each removed path with an operation; the flag is "
-                f"for material that predates the first fingerprint, which by definition no snapshot shows going away"
+                f"entry '{entry.id}' is marked pre_history, but between schema versions {before.schema_version} and "
+                f"{after.schema_version} a file already valid at the older one stops validating: {observed}. That change is "
+                f"observable here, so the flag would exempt it from the accounting it needs. Drop the flag and account for it; "
+                f"the flag is for material that predates the first fingerprint, which by definition no snapshot shows going away"
             ),
         )
     ]
@@ -244,7 +267,7 @@ def _check_enum_accounting(
             # The path does not survive into the new schema; the unaccounted-path or over-deletion
             # check has already said so in terms the author can act on.
             continue
-        removed_members = set(before_record.enum_members) - set(after_record.enum_members or [])
+        removed_members = set(lost_enumerated_spellings(before=before_record, after=after_record))
         unaccounted = sorted(removed_members - remapped_by_origin.get(origin, set()))
         if unaccounted:
             issues.append(
@@ -257,6 +280,60 @@ def _check_enum_accounting(
                     ),
                 )
             )
+    return issues
+
+
+def _check_narrowing_accounting(
+    *,
+    surface_id: str,
+    entry: MigrationEntry,
+    before: SurfaceFingerprint,
+    after: SurfaceFingerprint,
+    walk: EntryWalk,
+) -> list[CoverageIssue]:
+    """Every path whose value domain the entry narrows must carry a remap, or the entry must be unsafe.
+
+    Paths are compared by *origin*, exactly as enumerated members are: a path the same entry
+    renamed is looked up where the walk carried it, so a narrowing hidden behind a rename still
+    demands its accounting instead of slipping through as an unrelated addition and removal.
+
+    Only two remedies exist, because no structural operation can repair a value the new schema
+    refuses. A `remap_value` is the real fix where the old spellings can be enumerated and the
+    remap legality rule accepts it — a free string becoming enum-typed is the case that fits.
+    Everywhere else, a tightened numeric bound above all, the entry has to say `unsafe`: the
+    migration is then reported to the user and never applied, which is the honest answer when the
+    tool cannot tell a stale value from a deliberate one.
+    """
+    if entry.safety is MigrationSafety.UNSAFE:
+        # An unsafe entry is reported and never applied, so it is allowed to describe a change no
+        # operation can make. That is what `unsafe` is for.
+        return []
+    remapped_origins = {remap.origin_path for remap in walk.remaps}
+
+    issues: list[CoverageIssue] = []
+    for origin, before_record in before.paths.items():
+        if origin in remapped_origins:
+            continue
+        final_path = walk.state.final_path_of_origin(origin=origin)
+        after_record = after.paths.get(final_path) if final_path is not None else None
+        if after_record is None:
+            # The path does not survive into the new schema; the unaccounted-path or over-deletion
+            # check has already said so in terms the author can act on.
+            continue
+        reasons = describe_narrowing(before=before_record, after=after_record)
+        if not reasons:
+            continue
+        issues.append(
+            CoverageIssue(
+                surface_id=surface_id,
+                kind=CoverageIssueKind.VALUE_DOMAIN_NARROWED,
+                message=(
+                    f"entry '{entry.id}': '{final_path}' accepts fewer values than it did — {', '.join(reasons)}. A file "
+                    f"carrying one of the values it has stopped accepting no longer validates, and no structural operation "
+                    f"can repair a value, so the entry needs a remap_value for that path, or must be marked unsafe"
+                ),
+            )
+        )
     return issues
 
 
@@ -448,19 +525,39 @@ def _check_head_link(*, surface_id: str, current_version: int, live: SurfaceFing
     diff = diff_fingerprints(before=golden, after=live)
     if diff.is_empty:
         return []
+
+    breaking: list[CoverageIssue] = []
     if diff.has_removals:
-        removed = diff.removed_paths + [f"{path}: {members}" for path, members in diff.removed_enum_members.items()]
-        return [
+        breaking.append(
             CoverageIssue(
                 surface_id=surface_id,
                 kind=CoverageIssueKind.REMOVAL_NEEDS_A_BUMP,
                 message=(
-                    f"the models no longer have {removed}, which breaks every file that carries them. Bump "
+                    f"the models no longer have {diff.render_removals()}, which breaks every file that carries them. Bump "
                     f"current_schema_version to {current_version + 1}, add the entry '{surface_id}@{current_version + 1}' "
                     f"accounting for each, then run `make umig`"
                 ),
             )
-        ]
+        )
+    if diff.narrowed_paths:
+        # A narrowing keeps every path and every enumerated spelling, so the diff looks additive
+        # and would otherwise be answered with "regenerate the golden" — while a value a user's
+        # file legitimately carries has stopped validating.
+        breaking.append(
+            CoverageIssue(
+                surface_id=surface_id,
+                kind=CoverageIssueKind.REMOVAL_NEEDS_A_BUMP,
+                message=(
+                    f"the models still have every path, but they accept fewer values than the golden records: "
+                    f"{diff.render_narrowings()}. A file valid before this change is not valid after it, so this is a "
+                    f"removal like any other. Bump current_schema_version to {current_version + 1}, add the entry "
+                    f"'{surface_id}@{current_version + 1}' carrying a remap_value for each narrowed path — or marked "
+                    f"unsafe, where no remap can express it — then run `make umig`"
+                ),
+            )
+        )
+    if breaking:
+        return breaking
     return [
         CoverageIssue(
             surface_id=surface_id,
