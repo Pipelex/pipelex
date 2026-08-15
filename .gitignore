@@ -15,6 +15,7 @@ site/
 # Unit test / coverage reports
 htmlcov/
 .pytest_cache/
+.hypothesis/
 .coverage
 coverage.xml
 

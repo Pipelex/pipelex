@@ -110,6 +110,7 @@ docs = [
 dev = [
   "boto3-stubs>=1.35.24",
   "cryptography>=46.0.7",
+  "hypothesis>=6.140.3",
   "jsonschema>=4.20.0",
   "moto[dynamodb,s3]>=5.0.0",
   "mypy==1.19.1",
