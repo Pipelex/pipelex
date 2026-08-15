@@ -21,9 +21,9 @@ def drop_unknown_gateway_defaults(*, gateway_model_specs: BackendModelSpecs) -> 
     is version skew, and dropping it keeps a boot working across that skew; a *local* backend file
     stays strict, because there an unknown key really is the author's typo.
 
-    Scoped to `defaults` on purpose. A per-model key the blueprint does not know is already meaningful
-    — `InferenceBackendLibrary.load` reclassifies it as an outbound HTTP header — and that behaviour is not this
-    function's to reinterpret.
+    Scoped to `defaults` on purpose. A per-model key gets its own rule in `InferenceBackendLibrary.load`,
+    via `split_model_spec_keys`: header-shaped keys are outbound request headers, and the rest is pruned
+    from a remote payload (the same skew judgement as here) or fatal in a local file.
 
     Deliberately pure, and deliberately silent: it runs on the success path of every gateway-backend
     load, including loads that happen before `runtime_hub.set_config()` has configured the log

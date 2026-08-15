@@ -4,6 +4,10 @@ It is served by a component that deploys on its own schedule, so a client can re
 by a different release than itself. `InferenceModelSpecBlueprint` forbids extra fields, so without
 this pruning an unknown key in the remote `defaults` block hard-fails the boot — which is exactly
 what happened the day `prompting_target` was removed while the served config still declared it.
+
+The same skew tolerance applies per model, where it is the loader's rule rather than this function's —
+see `test_gateway_unknown_per_model_keys.py`. A local backend file gets the strict counterpart of both
+rules — see `test_backend_library_leniency.py`.
 """
 
 from typing import Any, cast
@@ -58,7 +62,7 @@ class TestGatewayUnknownDefaults:
         assert pruned["defaults"] == {"max_tokens": 4096}
 
     def test_per_model_unknown_keys_are_untouched(self) -> None:
-        """A per-model unknown key means something already — it becomes an outbound HTTP header."""
+        """This function is scoped to `defaults`; the per-model rule is the loader's, tested in `test_gateway_unknown_per_model_keys.py`."""
         # The unknown key in `defaults` is what forces the deep-copy prune to run at all: without it
         # the function early-returns and this test proves nothing.
         specs = self._specs(defaults={"max_tokens": 4096, "a_field_we_removed": "anthropic"})

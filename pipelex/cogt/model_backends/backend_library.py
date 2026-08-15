@@ -24,6 +24,7 @@ from pipelex.cogt.model_backends.model_spec_factory import (
     InferenceModelSpecBlueprint,
     InferenceModelSpecFactory,
 )
+from pipelex.cogt.model_backends.model_spec_keys import ModelSpecSource, describe_rejected_keys, split_model_spec_keys
 from pipelex.system.environment import get_optional_env
 from pipelex.system.pipelex_service.gateway_config_merger import GatewayConfigMerger
 from pipelex.system.runtime import runtime_manager
@@ -96,7 +97,6 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
 
         # We'll split the read settings into standard fields and extra config
         backend_blueprint_standard_fields = InferenceBackendBlueprint.model_fields.keys()
-        model_spec_blueprint_standard_fields = InferenceModelSpecBlueprint.model_fields.keys()
         for backend_name, backend_dict in backends_dict.items():
             extra_config: dict[str, Any] = {}
             inference_backend_blueprint_dict_raw = backend_dict.copy()
@@ -158,6 +158,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
 
                 # Handle pipelex_gateway specially - use remote config
                 backend_config_source: str
+                model_spec_source: ModelSpecSource
                 if PipelexBackend.is_gateway_backend(backend_name):
                     if gateway_config is None:
                         if lenient:
@@ -166,6 +167,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                         msg = "Pipelex Gateway backend is enabled but remote model specs were not provided"
                         raise InferenceBackendLibraryError(msg)
                     extra_config["aws_region"] = gateway_config.aws_region
+                    model_spec_source = ModelSpecSource.REMOTE_GATEWAY
                     model_specs_dict, backend_config_source = self._load_gateway_model_specs(
                         gateway_config=gateway_config,
                         backend_name=backend_name,
@@ -173,6 +175,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                         substitute_vars_with_provider=substitute_vars_with_provider,
                     )
                 else:
+                    model_spec_source = ModelSpecSource.LOCAL_FILE
                     model_specs_dict, backend_config_source = self._load_local_model_specs(
                         backend_name=backend_name,
                         backends_dir_path=backends_dir_path,
@@ -187,16 +190,28 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                         raise InferenceModelSpecError(msg)
                     model_spec_dict: dict[str, Any] = cast("dict[str, Any]", value)
                     try:
-                        # Start from the defaults
+                        # A per-model key the blueprint does not know is a request header only if it is shaped
+                        # like one; anything else is a typo or a dead field, and what happens to it depends on
+                        # where the table came from.
+                        key_split = split_model_spec_keys(model_spec_dict=model_spec_dict)
+                        if key_split.rejected:
+                            match model_spec_source:
+                                case ModelSpecSource.LOCAL_FILE:
+                                    # Fatal in lenient mode too: leniency covers credentials only (see the docstring),
+                                    # and this is not a credentials error, so the lenient `except` below lets it through.
+                                    plural = "s" if len(key_split.rejected) > 1 else ""
+                                    msg = (
+                                        f"Unknown key{plural} on model '{model_spec_name}' for backend '{backend_name}' "
+                                        f"from {backend_config_source}: {describe_rejected_keys(rejected=key_split.rejected)}"
+                                    )
+                                    raise InferenceBackendLibraryError(msg)
+                                case ModelSpecSource.REMOTE_GATEWAY:
+                                    # Version skew, the same judgement `drop_unknown_gateway_defaults` makes for the
+                                    # `defaults` block: pruned, and silently — this can run before the log hub is set.
+                                    pass
+                        # Start from the defaults, then override with the model's own fields
                         model_spec_blueprint_dict = defaults_dict.copy()
-                        # Override with the attributes from the model spec dict
-                        model_spec_blueprint_dict.update(model_spec_dict)
-
-                        # We'll split the read settings into standard fields and extra headers
-                        extra_headers: dict[str, str] = {}
-                        for model_spec_key in model_spec_dict:
-                            if model_spec_key not in model_spec_blueprint_standard_fields:
-                                extra_headers[model_spec_key] = model_spec_blueprint_dict.pop(model_spec_key)
+                        model_spec_blueprint_dict.update(key_split.fields)
                         model_spec_blueprint = InferenceModelSpecBlueprint.model_validate(model_spec_blueprint_dict)
                         model_spec = InferenceModelSpecFactory.make_inference_model_spec(
                             backend_name=backend_name,
@@ -204,7 +219,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                             blueprint=model_spec_blueprint,
                             backend_listed_constraints=backend_blueprint.listed_constraints,
                             backend_valued_constraints=backend_blueprint.valued_constraints,
-                            extra_headers=extra_headers,
+                            extra_headers=key_split.headers,
                         )
                         backend_model_specs[model_spec_name] = model_spec
                     except ValidationError as validation_error:

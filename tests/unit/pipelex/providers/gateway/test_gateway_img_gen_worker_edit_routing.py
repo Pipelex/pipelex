@@ -28,7 +28,7 @@ _PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8
 _PNG_FILE_TUPLE = ("image_0.png", _PNG_BYTES, "image/png")
 _PNG_FILE_TUPLE_2 = ("image_1.png", _PNG_BYTES, "image/png")
 
-# Production gateway config style: the explicit endpoint_path key on the model spec,
+# Production gateway config style: the explicit endpoint_path field on the model spec,
 # with no leading slash (httpx's base_url merge makes the two forms equivalent).
 _GENERATIONS_ENDPOINT_PATH = "openai/deployments/gpt-image-1-2025-04-15/images/generations?api-version=2025-04-01-preview"
 _EDITS_ENDPOINT_PATH = "openai/deployments/gpt-image-1-2025-04-15/images/edits?api-version=2025-04-01-preview"
@@ -41,7 +41,8 @@ def _make_worker(mocker: MockerFixture, *, endpoint_path: str = _GENERATIONS_END
     mock_model.model_id = "gpt-image-1"
     mock_model.name = "gpt-image-1"
     mock_model.desc = "test-gateway-img-model"
-    mock_model.extra_headers = {"endpoint_path": endpoint_path}
+    mock_model.endpoint_path = endpoint_path
+    mock_model.extra_headers = {}
     mock_model.rules = mocker.MagicMock()
     worker.inference_model = mock_model
 

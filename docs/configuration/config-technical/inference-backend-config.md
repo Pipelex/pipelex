@@ -316,6 +316,38 @@ outputs = ["image"]
 costs = { input = 0.04, output = 0.0 }
 ```
 
+#### Sending extra request headers per model
+
+A model table may carry keys beyond the model-spec fields. A key shaped like a request header — it contains a hyphen and its value is a string — is sent to the provider **as an HTTP request header** on each call to that model; this is how, for example, the Portkey backend routes each model to its upstream provider:
+
+```toml
+# portkey.toml
+[gpt-4o-mini]
+model_id = "gpt-4o-mini"
+x-portkey-provider = "@openai"   # forwarded as the `x-portkey-provider` request header
+```
+
+Because these strings go out over the network, an extra key is accepted as a header **only if it is shaped like one — it must contain a hyphen** (`x-portkey-provider`, `anthropic-beta`, `api-version`) **and its value must be a string** (quote it in TOML). Model-spec field names never contain a hyphen, so an unknown key without one is a misspelled setting or a field that no longer exists, and it is a configuration error rather than a header: the backend fails to load and the error names the key, the model and the file. A hyphenated spelling of a real field (`max-tokens` for `max_tokens`) is rejected the same way, with the field it resembles, and so is a header-shaped key whose value is not a string (`x-foo = 3`) — it is never stringified onto the wire. This holds in every boot mode, including the credential-free one used by `pipelex validate` and dry runs — a typo must never silently drop a backend and surface later as "model not found".
+
+```text
+Unknown key on model 'gpt-4o' for backend 'openai' from file '.pipelex/inference/backends/openai.toml':
+'max_tokns' is not a known model-spec field, and not header-shaped. A per-model key that is not a
+model-spec field is sent to the provider as a request header and must contain a hyphen
+(e.g. 'x-portkey-provider'): fix the typo, or name the key like a header if that is what it is meant to be.
+```
+
+A key that clears that gate must also be *usable* as a header, so the name and the value are checked against what HTTP itself allows. A header name may contain only letters, digits and the characters ``!#$%&'*+-.^_`|~`` — so a quoted key like `"x-foo bar"` is rejected — and a header value must be printable ASCII on a single line with no leading or trailing whitespace, which rules out a line break, a control character, an accented letter, and the invisible trailing space in `x-foo = "value "`. Without this check the backend loaded happily and the HTTP client refused the request on the first call to that model, far from the file that caused it.
+
+```text
+Unknown key on model 'gpt-4o' for backend 'openai' from file '.pipelex/inference/backends/openai.toml':
+'x-foo bar' cannot be a header name: ' ' is not allowed in one — a header name may contain only
+letters, digits and the characters !#$%&'*+-.^_`|~.
+```
+
+The Pipelex Gateway's model specs are fetched from Pipelex servers rather than read from a local file, and there the same rule is applied leniently: a header-shaped key whose name and value the wire can carry becomes a header, and any other unknown key — including a header-shaped one whose value is not a string, or whose name or value HTTP would refuse — is dropped instead of failing the boot, since a served config can legitimately be newer or older than the client reading it.
+
+`endpoint_path` is a declared model-spec field, not a header: it names the provider-side route for models that are called by raw path (the Gateway's image models), and is never sent on the wire.
+
 ## Routing Profiles
 
 Routing profiles determine which backend handles specific models. This is where you configure the **Mix & Match approach** (Option C) to optimize your setup. Configure them in `.pipelex/inference/routing_profiles.toml`:
