@@ -58,7 +58,7 @@ This section goes deeper on each piece:
 | `schema_reask_max_attempts` | `[inference.llm]` | `3` | `instructor` schema re-ask attempts (structured output) |
 | `max_concurrency` | `[interpreter.pipeline_execution]` | `8` | `PipeBatch` bounded fan-out (set `"unbounded"` to disable) |
 
-Durable execution (Tier 2) is **not** a core configuration toggle. You opt into it by booting the process under an orchestrator plugin — `boot_orchestrator` (config), `--orchestrator <name>` (CLI), or `Pipelex.make(boot_orchestrator=...)` (Python) — delivered through Pipelex's [durable execution offer](https://pipelex.com/products#durable-execution). See [Durable Execution](durable-execution.md) and [Distributed Execution](../distributed-execution/index.md).
+Durable execution (Tier 2) is **not** a core configuration toggle. You opt into it by booting the process under an orchestrator plugin — `--orchestrator <name>` (CLI) or `Pipelex.make(boot_orchestrator=...)` (Python); it is a boot argument, never a `pipelex.toml` setting — delivered through Pipelex's [durable execution offer](https://pipelex.com/products#durable-execution). See [Durable Execution](durable-execution.md) and [Distributed Execution](../distributed-execution/index.md).
 
 ---
 

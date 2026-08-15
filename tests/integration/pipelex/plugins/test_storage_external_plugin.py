@@ -1,5 +1,5 @@
 """End-to-end: an out-of-tree storage plugin discovered through a ``pipelex.plugins.kernel`` entry point is
-selectable via ``storage_config.method`` and lands on the hub.
+selectable via ``runtime.storage.method`` and lands on the hub.
 
 This exercises the whole discovery → selection → hub chain the built-in providers ride, with a fake
 external method token: a fake entry point loads a plugin registering ``method="test_mem"``, the boot

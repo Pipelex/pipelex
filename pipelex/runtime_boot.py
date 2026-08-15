@@ -684,10 +684,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
             log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done (except config & logs)")
         finally:
-            # The runtime hub releases its process-global config. ``class_registry_scoping`` is reset here
+            # The runtime hub releases its process-global config and boot-scoped flags. ``class_registry_scoping``
+            # is reset here
             # too: the interpreter half installs the resolver at boot, so releasing it belongs to whichever
             # teardown runs — and on a kernel-only boot nothing installed it, where the reset is a no-op.
-            self.runtime_hub.reset_config()
+            self.runtime_hub.reset_boot_state()
             class_registry_scoping.reset()
             # The same three ``_release_after_failed_boot`` releases, deliberately kept identical: these are
             # the ones that *poison* the next boot rather than merely dangle, so they must not sit above a
@@ -739,7 +740,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         deliberate: guarding them would let a half-built teardown look successful.
 
         It releases a **subset** of what ``teardown()`` does, and the subset is chosen: everything that
-        would otherwise *poison the next boot* is here — the hub config, the class-registry scoping, the
+        would otherwise *poison the next boot* is here — the hub config and its boot-scoped flags, the class-registry scoping, the
         ``KajsonManager``, the template registries, the telemetry singleton and the ``MetaSingleton``
         registration. What is deliberately absent is ``sdk_client_manager``, ``reporting_delegate``,
         ``func_registry``, ``inference_manager`` and ``class_registry``. The first three leave resources
@@ -758,7 +759,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         already stood its runtime up, and only the plugin knows what that cost. Our Temporal plugin's
         thunk registers its own process-global singletons and installs a sandbox predicate — it does not
         yet start a poller, which is a property of that thunk today and not of the slot. A failure
-        anywhere after that thunk — the ``pipe_func_config.execution_mode`` lookup raising on an unregistered mode is the
+        anywhere after that thunk — the ``interpreter.pipe_func.execution_mode`` lookup raising on an unregistered mode is the
         most reachable one, since it is a plain config error — would otherwise leak it, because nothing
         else on this path calls the callbacks. Not a hypothetical widened by the boot split: the thunk
         used to run *after* the pipe-func executor resolution, ``pipeline_manager.setup()`` and the
@@ -803,7 +804,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                     # (2) an injected telemetry manager is unbounded code; its exception surface cannot
                     # be enumerated, and the releases below must happen regardless.
                     log.error(f"Telemetry teardown failed while releasing a failed boot: {telemetry_exc}")
-            self.runtime_hub.reset_config()
+            self.runtime_hub.reset_boot_state()
             class_registry_scoping.reset()
             KajsonManager.teardown()
             TemplateLoader.reset()

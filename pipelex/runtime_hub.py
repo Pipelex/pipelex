@@ -168,9 +168,21 @@ class RuntimeHub:
             return
         self._config = config
 
-    def reset_config(self) -> None:
-        """Reset the global configuration instance and the config manager."""
+    def reset_boot_state(self) -> None:
+        """Release the process-global state a boot established: the config, the logs, and the boot-scoped flags.
+
+        Called from both teardown paths — the normal ``_teardown_runtime`` and ``_release_after_failed_boot``
+        — which is why the boot-scoped flags are cleared *here* rather than at either call site: a second
+        hand-maintained release list is exactly what drifts.
+
+        The flags are boot arguments, not configuration, so nothing reloads them: ``setup()`` writes both
+        unconditionally on the way up, and without this a torn-down process answers ``get_boot_orchestrator()``
+        with the previous boot's orchestrator (and ``is_dry_run_forced()`` with the previous boot's keyless
+        verdict) while no boot is active at all.
+        """
         self._config = None
+        self._is_dry_run_forced = False
+        self._boot_orchestrator = None
         log.reset()
 
     def set_console_print_target(self, target: ConsoleTarget):

@@ -149,7 +149,7 @@ def _skip_if_disabled(
         return False
     if name in core_unconditional_plugin_names:
         raise CoreUnconditionalPluginDisabledError(plugin_name=name)
-    log.info(f"Plugin '{name}' is disabled via plugins.disabled; skipping.")
+    log.info(f"Plugin '{name}' is disabled via runtime.plugins.disabled; skipping.")
     registrar.discoveries.append(
         PluginDiscovery(
             name=name,
@@ -157,7 +157,7 @@ def _skip_if_disabled(
             status=PluginStatus.DISABLED,
             targets_api=targets_api,
             group=group,
-            detail="disabled via plugins.disabled",
+            detail="disabled via runtime.plugins.disabled",
         )
     )
     return True

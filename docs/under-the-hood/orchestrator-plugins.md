@@ -132,7 +132,7 @@ Some orchestrators don't just serve a per-call mode — they reconfigure the who
 Not every orchestrator goes this far. A per-call-only plugin — our Mistral Workflows plugin is the minimal example — contributes just its `"mistral-workflows"` orchestrator and claims **no** hub slots: its router is installed per workflow invocation by the workflow body itself, so there is no process-global boot slot to claim and it never participates in the boot gate below. The boot-orchestrator machinery in this section applies only to a plugin that boots the process as its runtime (today, our Temporal plugin).
 
 ```python
-if registrar.config.boot_orchestrator == self.name:
+if registrar.boot_orchestrator == self.name:
     registrar.claim_content_generator(_make_temporal_content_generator)   # a thunk, not an instance
     registrar.claim_task_manager(_setup_temporal_task_manager)
     registrar.claim_pipe_router(_make_temporal_pipe_router)

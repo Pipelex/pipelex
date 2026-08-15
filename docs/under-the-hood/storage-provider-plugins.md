@@ -5,7 +5,7 @@ description: "How Pipelex selects a storage backend by config, the keyed-registr
 
 # Storage Provider Plugins
 
-Every asset Pipelex persists — a generated image, an uploaded document, a payload blob — is written through a single **storage provider** set on the hub at boot. Which provider that is comes entirely from data: one config field, `storage_config.method`, names a backend, and a **storage plugin** is what teaches Pipelex how to build the provider for that method.
+Every asset Pipelex persists — a generated image, an uploaded document, a payload blob — is written through a single **storage provider** set on the hub at boot. Which provider that is comes entirely from data: one config field, `runtime.storage.method`, names a backend, and a **storage plugin** is what teaches Pipelex how to build the provider for that method.
 
 Core names no storage backend by import or by string. The built-in providers (`local`, `in_memory`, `s3`, `gcp`) are a plugin too — the always-on `StoragePlugin` — riding the exact same seam an out-of-tree `pipelex-storage-<backend>` package would. This page documents that seam, the factory contract a plugin registers, and how to write one.
 
@@ -15,9 +15,9 @@ Core names no storage backend by import or by string. The built-in providers (`l
 
 The [inference-backend](inference-backend-plugins.md) and [orchestrator](orchestrator-plugins.md) registries are selected **per call** — a model's `sdk`, a request's `orchestration_mode`. Storage is not: it is a **process-global singleton selected by its own config key**, independent of the orchestrator. So it rides a net-new mechanism the track calls a **keyed registry + config-selected singleton**:
 
-> Plugins register N provider factories into a registry keyed by an open `method` token. At boot, core reads `storage_config.method`, looks that token up in the registry, and calls the factory to produce the one provider set on the hub.
+> Plugins register N provider factories into a registry keyed by an open `method` token. At boot, core reads `runtime.storage.method`, looks that token up in the registry, and calls the factory to produce the one provider set on the hub.
 
-This is deliberately **not** a hub slot (those are orchestrator-coupled, claimed only when `boot_orchestrator == plugin.name`). Storage selection has nothing to do with the orchestrator, so it gets its own registry and its own config key. The same mechanism also backs the [secrets provider](secrets-provider-plugins.md) seam (`secrets_config.method`).
+This is deliberately **not** a hub slot (those are orchestrator-coupled, claimed only when `boot_orchestrator == plugin.name`). Storage selection has nothing to do with the orchestrator, so it gets its own registry and its own config key. The same mechanism also backs the [secrets provider](secrets-provider-plugins.md) seam (`runtime.secrets.method`).
 
 ---
 
@@ -32,11 +32,11 @@ boot (Pipelex.setup)
             └─ plugin.register(registrar)            # side-effect-free
                  └─ registrar.add_storage_provider(method=…, factory=…)
   └─ StorageProviderRegistry(registrar.storage_providers)    # stored on the hub
-  └─ storage_provider = registry.get_required(method=storage_config.method)(storage_config)
+  └─ storage_provider = registry.get_required(method=runtime.storage.method)(runtime.storage)
   └─ set_storage_provider(storage_provider)          # the one provider every consumer reads
 ```
 
-There is no `match storage_config.method:` anywhere in boot — the token set is open, so validation *is* the registry lookup. Adding a backend means registering a factory for its token; nothing in core changes. Every downstream consumer (input normalizer, content generator, PDF/image utilities, delivery executor) keeps calling `get_storage_provider()` and is unaffected by which method was selected.
+There is no `match runtime.storage.method:` anywhere in boot — the token set is open, so validation *is* the registry lookup. Adding a backend means registering a factory for its token; nothing in core changes. Every downstream consumer (input normalizer, content generator, PDF/image utilities, delivery executor) keeps calling `get_storage_provider()` and is unaffected by which method was selected.
 
 The provider is resolved **after** the secrets provider is on the hub, so a factory may perform a hub secrets read at its apply-point (the `gcp` factory does — see below).
 
@@ -45,7 +45,7 @@ The provider is resolved **after** the secrets provider is on the hub, so a fact
 `Pipelex.setup` resolves the storage provider in this order:
 
 1. an explicit `setup(storage_provider=...)` parameter (test/host injection) — always wins;
-2. the config-selected registry factory (`get_required(method=storage_config.method)(config)`).
+2. the config-selected registry factory (`get_required(method=runtime.storage.method)(config)`).
 
 There is no separate core default: the built-in `StoragePlugin` *is* the default supplier of every method, so an ordinary boot always resolves through step 2.
 
@@ -113,7 +113,7 @@ def _make_gcp_storage_provider(config: StorageProviderConfig) -> StorageProvider
 
 ## Selecting a method by config
 
-`storage_config.method` is an **open `str` token** (Decision D1), not a closed enum. The built-ins use the `StorageMethod` values; an external `pipelex-storage-<backend>` plugin registers its own (e.g. `"azure"`). A config naming an external method **parses fine** — the per-method sub-config validator requires a matching sub-config only for the four built-in tokens and lets any other token through:
+`runtime.storage.method` is an **open `str` token** (Decision D1), not a closed enum. The built-ins use the `StorageMethod` values; an external `pipelex-storage-<backend>` plugin registers its own (e.g. `"azure"`). A config naming an external method **parses fine** — the per-method sub-config validator requires a matching sub-config only for the four built-in tokens and lets any other token through:
 
 ```toml
 # .pipelex/pipelex.toml
@@ -132,7 +132,7 @@ Whether that token names an *installed* provider is validated at **registry look
 
 | Condition | Error |
 |-----------|-------|
-| `storage_config.method` names no registered provider | `UnknownStorageMethodError` (lists the registered methods) |
+| `runtime.storage.method` names no registered provider | `UnknownStorageMethodError` (lists the registered methods) |
 | published under the retired `pipelex.plugins` group | `RetiredPluginEntryPointGroupError` (names the plugins and the group each should move to) |
 | two plugins register the same `method` | `DuplicateStorageProviderError` (names both plugins) |
 | `name` (`"storage"`) in `runtime.plugins.disabled` | `CoreUnconditionalPluginDisabledError` |
@@ -157,7 +157,7 @@ A third-party storage plugin is a distribution that:
 azure_storage = "pipelex_storage_azure.plugin:AzureStoragePlugin"
 ```
 
-Installing the distribution makes the method selectable (`storage_config.method = "azure"`); uninstalling removes it. No core change, no central registration list — *presence* is the source of truth. A discovered plugin can be quarantined without uninstalling via the `runtime.plugins.disabled` denylist (matched against the entry-point name *before* load, so a broken install can still be disabled to recover startup — see [Inference Backend Plugins](inference-backend-plugins.md) for the shared discovery/denylist machinery).
+Installing the distribution makes the method selectable (`runtime.storage.method = "azure"`); uninstalling removes it. No core change, no central registration list — *presence* is the source of truth. A discovered plugin can be quarantined without uninstalling via the `runtime.plugins.disabled` denylist (matched against the entry-point name *before* load, so a broken install can still be disabled to recover startup — see [Inference Backend Plugins](inference-backend-plugins.md) for the shared discovery/denylist machinery).
 
 Use `pipelex plugins list` to see every discovered plugin, the entry-point group it was found under, what each contributed, and its denylist state. The **Group** column is the first thing to read when a plugin is missing: a built-in shows `—`, and an external plugin that resolved to the wrong layer shows it there.
 

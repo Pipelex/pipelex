@@ -22,7 +22,7 @@ Pipelex separates **what the inference leaves do** (the run mode) from **where t
 | Backend | Trigger | What runs where |
 |---|---|---|
 | **Direct** (default) | — | Everything in your process |
-| **Temporal** | `--orchestrator temporal`, or config `boot_orchestrator = "temporal"` | Controllers as child workflows, inference leaves as activities on workers |
+| **Temporal** | `--orchestrator temporal`, or `Pipelex.setup(boot_orchestrator="temporal")` | Controllers as child workflows, inference leaves as activities on workers |
 
 !!! info "Durable backends are a commercial capability"
     The Temporal backend is part of Pipelex's [durable & distributed execution offer](https://pipelex.com/products#durable-execution) — the [Temporal backend](https://pipelex.com/products#temporal) is delivered through the Pipelex platform. The `--orchestrator <name>` flag (and its `boot_orchestrator` config equivalent) boots the process under the named orchestrator plugin; omit it for in-process execution.

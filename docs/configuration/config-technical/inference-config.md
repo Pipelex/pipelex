@@ -32,7 +32,7 @@ transport_max_retries = 2
 
 This is "Tier 1" of the retry model. It is wired uniformly into every inference SDK client factory — Anthropic, OpenAI / Azure OpenAI, the Pipelex Gateway clients, Mistral, and Google — as well as the raw-`httpx` Azure image-generation path, so the retry posture is a deliberate, uniform policy rather than a per-provider SDK default.
 
-It is distinct from `llm_config.schema_reask_max_attempts`, which is `instructor`'s schema re-ask count for structured-output validation failures — a different concern.
+It is distinct from `inference.llm.schema_reask_max_attempts`, which is `instructor`'s schema re-ask count for structured-output validation failures — a different concern.
 
 ## LLM Configuration
 

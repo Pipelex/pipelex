@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:d7b2752508bd036f93d7d26a91ec5918988e6b521e138386c4f77f9e74a9c452"
+digest = "sha256:164f50ff6c24573889e0cf42f61fed877ce5675a7d41bd8d8dbb5eca028a4b9a"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-15T16:00:48Z"
-rationale = "The configuration reshape gives runtime_hub boot-scoped state for the boot orchestrator: a private _boot_orchestrator field, the set_boot_orchestrator/get_boot_orchestrator pair on RuntimeHub, and a public module-level get_boot_orchestrator() accessor beside is_dry_run_forced. That last one is a new row the page owed, so the accessor table gained a boot orchestrator group naming it. Verified mechanically rather than by eye, the way this contract's staleness actually shows up: parsed both hub modules with ast for public module-level functions and checked each against the page, 34 on runtime_hub and 33 on interpreter_hub, zero untabulated after the edit. No layer boundary moved. The state is kernel-layer by the page's own lifecycle rule, being set once at boot and identical for every method the process runs, and it replaces a read of the config object, so this is a hub gaining what was already boot-scoped rather than a new concern crossing the line. check-hub-layering passes."
+reviewed_at = "2026-08-15T16:53:34Z"
+rationale = "PR review follow-up renamed RuntimeHub.reset_config to reset_boot_state and widened it to clear the boot-scoped flags (is_dry_run_forced, boot_orchestrator) alongside the config, so teardown no longer leaves a dead boot answering those accessors. Reviewed hub-layering.md: nothing stale. The page specifies the layering boundary and tabulates public module-level accessors, and this is an instance lifecycle method it has never tabulated; re-ran the mechanical check (ast-parsed both hub modules for public module-level functions, checked each against the page) and both are fully tabulated with zero untabulated. No layer boundary moved and no accessor was added or removed. check-hub-layering passes."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:2dbadcbab7d44364a7b5f1d16268b23b26700a00"
 "pipelex/interpreter_hub.py" = "blob:b8c35e37814f0e94c3bf1c364b06a98d0c22ee93"
-"pipelex/runtime_hub.py" = "blob:664e23eb6deec3a6e95c9b1749354528fc2c22d4"
+"pipelex/runtime_hub.py" = "blob:8ab74812dbf8d85b6972ff3233fa03bd6be9423a"
