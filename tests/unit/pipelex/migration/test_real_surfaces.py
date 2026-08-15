@@ -13,6 +13,7 @@ from pipelex.migration.coverage import check_registry
 from pipelex.migration.ledger import INITIAL_SCHEMA_VERSION, load_ledger
 from pipelex.migration.ledger_check import check_ledgers
 from pipelex.migration.surfaces import build_config_surface_registry, packaged_migration_dir
+from pipelex.migration.transform_check import check_transforms
 
 
 class TestTheRealRegistry:
@@ -57,3 +58,13 @@ class TestTheCheckedInGoldens:
         """
         ledger_issues = check_ledgers(registry=build_config_surface_registry(), migration_dir=packaged_migration_dir())
         assert ledger_issues == [], "\n".join(f"{issue.surface_id}: {issue.message}" for issue in ledger_issues)
+
+    def test_the_real_transform_chains_hold(self) -> None:
+        """Every entry, applied to the frozen document of the version before it, lands on the next one.
+
+        Vacuous while all three surfaces sit at schema version 1 with no entries — there is no link
+        to walk — and that is worth asserting anyway: the first real entry is the reshape, and this
+        is the assertion that will meet it.
+        """
+        transform_issues = check_transforms(registry=build_config_surface_registry(), migration_dir=packaged_migration_dir())
+        assert transform_issues == [], "\n".join(f"{issue.surface_id}: {issue.message}" for issue in transform_issues)
