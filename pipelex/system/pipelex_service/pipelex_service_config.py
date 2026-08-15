@@ -6,6 +6,7 @@ from pydantic import Field, ValidationError
 from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_model import ConfigModel
+from pipelex.system.configuration.config_surface import strip_reserved_meta
 from pipelex.system.pipelex_service.exceptions import PipelexServiceConfigValidationError
 from pipelex.system.pipelex_service.pipelex_service_agreement import (
     PIPELEX_SERVICE_CONFIG_FILE_NAME,
@@ -17,7 +18,10 @@ from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
 class PipelexServiceConfig(ConfigModel):
-    agreement: PipelexServiceAgreement
+    # A default_factory, not a required field: this is the surface's defaults layer. Every
+    # in-scope configuration surface must have one, because it is what makes an additive schema
+    # change absorbable and therefore never a migration — see docs/migration-ledger.md.
+    agreement: PipelexServiceAgreement = Field(default_factory=PipelexServiceAgreement)
     onboarding: PipelexServiceOnboarding = Field(default_factory=PipelexServiceOnboarding)
 
 
@@ -33,6 +37,7 @@ def load_pipelex_service_config_if_exists(config_dir: Path) -> PipelexServiceCon
     config_path = config_dir / PIPELEX_SERVICE_CONFIG_FILE_NAME
     try:
         config_toml = load_toml_from_path(path=config_path)
+        strip_reserved_meta(config_dict=config_toml)
         return PipelexServiceConfig.model_validate(config_toml)
     except FileNotFoundError:
         return None

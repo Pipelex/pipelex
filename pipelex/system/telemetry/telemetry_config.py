@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_model import ConfigModel
+from pipelex.system.configuration.config_surface import strip_reserved_meta
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.tools.misc.dict_utils import apply_to_strings_recursive
 from pipelex.tools.misc.toml_utils import load_toml_from_path_and_merge_with_overrides
@@ -277,6 +278,7 @@ def load_telemetry_config(*, secrets_provider: SecretsProviderAbstract) -> Telem
         telemetry_config_paths.append(project_config_dir / TELEMETRY_CONFIG_FILE_NAME)
         telemetry_config_paths.append(project_config_dir / TELEMETRY_CONFIG_OVERRIDE_FILE_NAME)
     telemetry_config_toml_raw = load_toml_from_path_and_merge_with_overrides(paths=telemetry_config_paths)
+    strip_reserved_meta(config_dict=telemetry_config_toml_raw)
 
     # Apply variable substitution to all string values (keep placeholders for missing vars)
     substitute_vars_with_provider = partial(substitute_vars, secrets_provider=secrets_provider, raise_on_missing_var=False)
