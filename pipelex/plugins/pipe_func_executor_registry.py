@@ -30,7 +30,7 @@ class PipeFuncExecutorRegistry:
     Keyed by the open ``execution_mode`` token (a ``str``; core owns ``direct``, an external plugin
     registers e.g. ``"daytona"``). Built once
     at boot from the registrar's accumulated ``pipe_func_executors`` and stored on the hub; core reads
-    ``pipe_func_config.execution_mode`` and calls the looked-up factory to produce the one executor set
+    ``interpreter.pipe_func.execution_mode`` and calls the looked-up factory to produce the one executor set
     on the hub. This is the config-selected-singleton sibling of ``StorageProviderRegistry`` — the
     PipeFunc execution axis, orthogonal to the orchestration axis (a ``temporal`` boot still resolves
     its executor mode through this registry on the worker side).

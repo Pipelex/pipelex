@@ -9,7 +9,7 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 def resolve_batch_max_concurrency(max_concurrency_setting: int | Literal["unbounded"]) -> int | None:
-    """Translate the ``pipeline_execution_config.max_concurrency`` setting into a ``gather_bounded`` bound.
+    """Translate the ``interpreter.pipeline_execution.max_concurrency`` setting into a ``gather_bounded`` bound.
 
     The config exposes the explicit literal ``"unbounded"``; ``gather_bounded`` takes ``None`` for no
     bound. Any int value is passed through unchanged. Centralizing this guards against passing the

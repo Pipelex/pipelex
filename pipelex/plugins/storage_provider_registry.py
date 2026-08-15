@@ -16,7 +16,7 @@ class StorageProviderRegistry:
     Keyed by the open storage ``method`` token (a ``str``; the built-ins keep the
     ``StorageMethod`` values, an external plugin registers e.g. ``"azure"``). Built once at
     boot from the registrar's accumulated ``storage_providers`` and stored on the hub; core
-    reads ``storage_config.method`` and calls the looked-up factory to produce the one provider.
+    reads ``runtime.storage.method`` and calls the looked-up factory to produce the one provider.
     """
 
     def __init__(self, storage_providers: dict[str, StorageProviderFactoryFn]):

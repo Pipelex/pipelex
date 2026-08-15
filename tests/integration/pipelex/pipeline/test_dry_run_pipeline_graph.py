@@ -2,7 +2,7 @@
 
 ``dry_run_pipeline`` explicitly requests a graph (``generate_graph=True``), so producing it must
 not depend on the host's ``tracing_config`` — the validation host that surfaced this (pipelex-api
-in direct mode) ships ``tracing_config.is_enabled = false``, which used to leave the tracer with
+in direct mode) ships ``runtime.tracing.is_enabled = false``, which used to leave the tracer with
 no transport and the run with ``graph_spec=None``. The function now installs a scoped in-memory
 event log around the run, so:
 

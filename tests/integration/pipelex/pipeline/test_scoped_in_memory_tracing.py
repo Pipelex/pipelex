@@ -6,7 +6,7 @@ A dry-run-with-graph executed under ``with scoped_event_log(InMemoryEventLog())`
 - write NO NDJSON file and touch NO configured backend (the factory is never called —
   the scoped instance is the single transport);
 - emit and assemble against the SAME instance (the fix for the two-instance problem);
-- assemble the graph even when ``tracing_config.is_enabled`` is False — a set override
+- assemble the graph even when ``runtime.tracing.is_enabled`` is False — a set override
   implies tracing-enabled (decision D1);
 - keep concurrently-scoped runs isolated from each other.
 """

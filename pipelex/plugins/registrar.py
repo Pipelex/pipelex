@@ -247,7 +247,7 @@ class PluginRegistrar:
 
         The built-in ``StoragePlugin`` registers the ``local`` / ``in_memory`` / ``s3`` / ``gcp``
         methods; an external ``pipelex-storage-<backend>`` plugin registers its own token (e.g.
-        ``"azure"``). Boot reads ``storage_config.method`` and calls the looked-up factory to
+        ``"azure"``). Boot reads ``runtime.storage.method`` and calls the looked-up factory to
         produce the one storage provider set on the hub. ``factory`` is invoked at that boot
         apply-point, never here — so a factory may do heavy work (SDK import, a hub secrets read)
         while ``register`` stays import-light. Fail-loud on a duplicate method, naming both plugins.
@@ -268,7 +268,7 @@ class PluginRegistrar:
 
         The built-in ``SecretsPlugin`` registers the ``env`` method; an external
         ``pipelex-secrets-<backend>`` plugin registers its own token (e.g. ``"vault"``). Boot reads
-        ``secrets_config.method`` and calls the looked-up factory to produce the one secrets provider
+        ``runtime.secrets.method`` and calls the looked-up factory to produce the one secrets provider
         set on the hub. ``factory`` is invoked at that boot apply-point, never here — so a factory may
         do heavy work (SDK import) while ``register`` stays import-light. Fail-loud on a duplicate
         method, naming both plugins.
@@ -289,7 +289,7 @@ class PluginRegistrar:
 
         The built-in ``PipeFuncPlugin`` registers ``direct`` (in-process); an external sandbox plugin
         (e.g. our Daytona plugin) registers its own token
-        (e.g. ``"daytona"``). Boot reads ``pipe_func_config.execution_mode`` and calls the looked-up
+        (e.g. ``"daytona"``). Boot reads ``interpreter.pipe_func.execution_mode`` and calls the looked-up
         factory to produce the one PipeFunc executor set on the hub. ``factory`` is invoked at that boot
         apply-point, never here — so a factory may do heavy work (SDK import, config self-load) while
         ``register`` stays import-light. This is the PipeFunc-execution axis, orthogonal to the

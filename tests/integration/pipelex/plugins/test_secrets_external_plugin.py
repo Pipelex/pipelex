@@ -4,7 +4,7 @@ and the storage↔secrets ordering guard.
 The built-in ``env`` method is the default and is selected onto the hub by an ordinary boot; an
 explicit ``setup(secrets_provider=...)`` still wins ahead of registry selection; a fake external
 method token discovered through a ``pipelex.plugins.kernel`` entry point is selectable via
-``secrets_config.method``. The final test is the ordering guard: with a non-env secrets method AND
+``runtime.secrets.method``. The final test is the ordering guard: with a non-env secrets method AND
 ``gcp`` storage, storage's gcp factory reads the config-selected secrets provider from the hub —
 proving secrets is resolved and set on the hub before storage selection runs.
 """

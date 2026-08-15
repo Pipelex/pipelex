@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:58e020681090ecc5d1f56e50b5e1fa4b79fced5a0ad416e139c8543568922b4c"
+digest = "sha256:4df537cfe3a924635b940cab600a4a7d00c570668a6a2cd16811c59e4a150739"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-15T16:01:41Z"
-rationale = "This is the contract's central case: the config model and the shipped defaults were both reshaped, so every user-facing configuration page named a section that no longer exists. Rewrote docs/configuration/ end to end against the new tree. index.md's 'Configuration Structure' listed four sections as [pipelex] core settings, [cogt] cognitive tools, [plugins] and [migration]; it now lists [runtime], [inference], [interpreter] and [kit] with what each owns, and says what the address tells a reader about which layer owns a setting. Every page's section header and TOML sample moved with its keys, including the deeper suffix drops that a naive sweep would miss: [runtime.log.rich_log], [inference.llm.instructor] and the four vendor tables, [inference.img_gen.img_gen_job], [interpreter.pipeline_execution.graph] with .mermaid and .reactflow under it. Per ruling R7, config-technical/cogt-config.md is renamed to inference-config.md with its title, description and prose rewritten off the codename, both mkdocs nav entries repointed, a redirect added from the old page, and the two inbound links in error-model.md and retries-and-resilience.md updated. Grepped the whole directory afterwards for any surviving old address: the only remaining hits are file names and Python import paths, which the reshape deliberately does not touch since no module moved. The reserved [meta] schema_version key stays undocumented here for the reason the previous ack gave, unchanged by this work."
+reviewed_at = "2026-08-15T21:19:55Z"
+rationale = "Trigger was a one-line comment inside PipeFuncConfig that still called the storage seam storage_config.method; corrected to runtime.storage.method as part of sweeping the stale-config-path class this PR keeps producing. Reviewed docs/configuration/ end to end for the same class and found nothing stale: grepping the whole directory for any bare-root X_config.key form and for the retired top-level tables returns no hits, so the end-to-end rewrite recorded in the previous ack still holds. The trigger key itself, interpreter.pipe_func.execution_mode, stays undocumented here on purpose, for the reason the model's own comment gives: it is a hosted-deploy concern rather than a client preference, and is deliberately absent from the .pipelex/ override file. The pipe_func hits in these pages are all the pipe_func decorator, which is unrelated. No doc change needed."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:02f71cb4a6b01aebda59c2e31f262ef9c865e17b"
@@ -15,7 +15,7 @@ rationale = "This is the contract's central case: the config model and the shipp
 "pipelex/system/configuration/config_root.py" = "blob:c7d43851270912d17413cfc6a511247d3c7cc160"
 "pipelex/system/configuration/config_surface.py" = "blob:18dc1521de776dbffaa27630896c0700c9edf100"
 "pipelex/system/configuration/configs.py" = "blob:60f346ba1205b762d4b6cff63494b0b34171e6ad"
-"pipelex/system/configuration/pipe_func_config.py" = "blob:df1cbd3698d51c96d8fa8a8c6fdf1c6be57e5771"
+"pipelex/system/configuration/pipe_func_config.py" = "blob:dc8890e914fbcdb611147e42eaa0cd87b32288a5"
 "pipelex/system/telemetry/telemetry_config.py" = "blob:db0457ba4214d5b0ecb18db75e1b164054181fed"
 "pipelex/tools/aws/aws_config.py" = "blob:c1aeafeae08d3921464db33795f11a29ff3892ba"
 "pipelex/tools/log/log_config.py" = "blob:d15fffd2fc438e09bf21a356ea911527933cb13a"

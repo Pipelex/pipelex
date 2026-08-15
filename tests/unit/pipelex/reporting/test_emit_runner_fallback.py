@@ -228,7 +228,7 @@ class TestEmitRunnerFallback:
         tmp_path: Path,
         mocker: MockerFixture,
     ) -> None:
-        """When tracing_config.is_enabled=False, the fallback returns without writing any file."""
+        """When runtime.tracing.is_enabled=False, the fallback returns without writing any file."""
         cfg = get_config().runtime.tracing
         mocker.patch.object(cfg, "is_enabled", False)
 

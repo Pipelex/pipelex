@@ -169,7 +169,7 @@ Each provider has an `effort_to_level_map` configured in its provider subconfig 
 
 ### OpenAI (Completions & Responses)
 
-OpenAI models use `thinking_mode = "manual"` and map `ReasoningEffort` to the `reasoning_effort` parameter via `openai_config.effort_to_level_map`:
+OpenAI models use `thinking_mode = "manual"` and map `ReasoningEffort` to the `reasoning_effort` parameter via `inference.llm.openai.effort_to_level_map`:
 
 ```toml
 [inference.llm.openai.effort_to_level_map]
@@ -201,7 +201,7 @@ When reasoning is active, `temperature` is omitted from the SDK call (OpenAI req
 
 ### Anthropic
 
-Anthropic supports both `manual` and `adaptive` thinking modes. The effort mapping is configured via `anthropic_config.effort_to_level_map`:
+Anthropic supports both `manual` and `adaptive` thinking modes. The effort mapping is configured via `inference.llm.anthropic.effort_to_level_map`:
 
 ```toml
 [inference.llm.anthropic.effort_to_level_map]
@@ -224,7 +224,7 @@ max = "max"
 | `XHIGH` | `"xhigh"` |
 | `MAX` | `"max"` |
 
-Both modes first check `anthropic_config.effort_to_level_map` to gate reasoning. If the map returns `"disabled"` (e.g., for `NONE` effort), thinking is disabled entirely — no `thinking` parameter is sent to the SDK.
+Both modes first check `inference.llm.anthropic.effort_to_level_map` to gate reasoning. If the map returns `"disabled"` (e.g., for `NONE` effort), thinking is disabled entirely — no `thinking` parameter is sent to the SDK.
 
 **ADAPTIVE mode** uses `{"type": "adaptive"}` with an `OutputConfigParam(effort=...)` where the effort value comes from the level map.
 
@@ -239,7 +239,7 @@ When thinking is active, `temperature` is suppressed (Anthropic requires `temper
 
 ### Google Gemini
 
-Google models use either `thinking_mode = "manual"` (Gemini 2.5 series) or `thinking_mode = "adaptive"` (Gemini 3 series). Both modes use `google_config.effort_to_level_map` as a gate:
+Google models use either `thinking_mode = "manual"` (Gemini 2.5 series) or `thinking_mode = "adaptive"` (Gemini 3 series). Both modes use `inference.llm.google.effort_to_level_map` as a gate:
 
 ```toml
 [inference.llm.google.effort_to_level_map]
@@ -286,7 +286,7 @@ Temperature is passed normally to the Google API regardless of reasoning mode.
 
 ### Mistral
 
-Mistral models use `thinking_mode = "manual"`. The effort mapping is configured via `mistral_config.effort_to_level_map`:
+Mistral models use `thinking_mode = "manual"`. The effort mapping is configured via `inference.llm.mistral.effort_to_level_map`:
 
 ```toml
 [inference.llm.mistral.effort_to_level_map]

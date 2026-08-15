@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:164f50ff6c24573889e0cf42f61fed877ce5675a7d41bd8d8dbb5eca028a4b9a"
+digest = "sha256:dfd360c5cc91e6644d82fe26653936f1cc0328636a910f026c31ca1267e1fe5c"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-15T16:53:34Z"
-rationale = "PR review follow-up renamed RuntimeHub.reset_config to reset_boot_state and widened it to clear the boot-scoped flags (is_dry_run_forced, boot_orchestrator) alongside the config, so teardown no longer leaves a dead boot answering those accessors. Reviewed hub-layering.md: nothing stale. The page specifies the layering boundary and tabulates public module-level accessors, and this is an instance lifecycle method it has never tabulated; re-ran the mechanical check (ast-parsed both hub modules for public module-level functions, checked each against the page) and both are fully tabulated with zero untabulated. No layer boundary moved and no accessor was added or removed. check-hub-layering passes."
+reviewed_at = "2026-08-15T21:20:03Z"
+rationale = "Trigger was a docstring-only edit in runtime_hub: the scoped_event_log docstring said a set override is honored even when tracing_config.is_enabled is False, naming a config root the reshape retired; it now names runtime.tracing.is_enabled, which is what pipelex.toml actually holds. Reviewed docs/contribute/hub-layering.md: nothing stale. No accessor was added, removed or renamed and no layer boundary moved, so the page's central claim is untouched; scoped_event_log is already tabulated under the tracing slot and is_in_isolated_execution under the reporting slot. Checked the page for the same stale-config-path class the rest of this change sweeps: its only X_config.key-shaped hits are graph_config.py, mermaid_config.py and reactflow_config.py, which are Python module filenames rather than config addresses and are correct as written. check-hub-layering passes."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:2dbadcbab7d44364a7b5f1d16268b23b26700a00"
 "pipelex/interpreter_hub.py" = "blob:b8c35e37814f0e94c3bf1c364b06a98d0c22ee93"
-"pipelex/runtime_hub.py" = "blob:8ab74812dbf8d85b6972ff3233fa03bd6be9423a"
+"pipelex/runtime_hub.py" = "blob:84b62b8668bed7d04aaf9df637c28b5acc62c379"

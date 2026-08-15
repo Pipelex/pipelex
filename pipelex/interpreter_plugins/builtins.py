@@ -31,7 +31,7 @@ INTERPRETER_BUILTIN_PLUGINS: list[PipelexPlugin] = [
 
 # Interpreter-layer built-ins core requires unconditionally: ``direct`` owns the DIRECT orchestrator
 # (you cannot boot without an in-process execution mode) and ``pipe_func`` owns the built-in PipeFunc
-# execution modes (``pipe_func_config.execution_mode`` must resolve to a registered factory or boot
+# execution modes (``interpreter.pipe_func.execution_mode`` must resolve to a registered factory or boot
 # fails loud — ``direct`` must always be present).
 INTERPRETER_CORE_UNCONDITIONAL_PLUGIN_NAMES: frozenset[str] = frozenset({"direct", "pipe_func"})
 

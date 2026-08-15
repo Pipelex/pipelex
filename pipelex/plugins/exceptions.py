@@ -317,7 +317,7 @@ class UnknownStorageMethodError(PluginError):
         available = ", ".join(sorted(registered_methods)) or "(none)"
         message = (
             f"No storage provider is registered for method '{method}'. Registered methods: {available}. "
-            "Check storage_config.method, or install/enable the plugin that provides that method."
+            "Check runtime.storage.method, or install/enable the plugin that provides that method."
         )
         super().__init__(message)
 
@@ -343,7 +343,7 @@ class UnknownPipeFuncExecutionModeError(PluginError):
         available = ", ".join(sorted(registered_modes)) or "(none)"
         message = (
             f"No PipeFunc executor is registered for execution mode '{mode}'. Registered modes: {available}. "
-            "Check pipe_func_config.execution_mode, or install/enable the plugin that provides that mode."
+            "Check interpreter.pipe_func.execution_mode, or install/enable the plugin that provides that mode."
         )
         super().__init__(message)
 
@@ -368,6 +368,6 @@ class UnknownSecretsMethodError(PluginError):
         available = ", ".join(sorted(registered_methods)) or "(none)"
         message = (
             f"No secrets provider is registered for method '{method}'. Registered methods: {available}. "
-            "Check secrets_config.method, or install/enable the plugin that provides that method."
+            "Check runtime.secrets.method, or install/enable the plugin that provides that method."
         )
         super().__init__(message)

@@ -73,7 +73,7 @@ class ObjectAssignment(BaseModel):
     object_class_schema: dict[str, Any]
     llm_assignment_for_object: LLMAssignment
     # Fixed list size for object-list generation (None = leaf mock falls back to
-    # `dry_run_config.nb_list_items`). Carried on the assignment so the leaf mock
+    # `inference.dry_run.nb_list_items`). Carried on the assignment so the leaf mock
     # preserves fixed-size list lengths on any backend (eng review D11). ge=0: a negative
     # count must fail loud at construction, not silently mock an empty list.
     nb_items: int | None = Field(default=None, ge=0)

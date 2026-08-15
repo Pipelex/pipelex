@@ -399,7 +399,7 @@ def dry_extract_page_contents(extract_assignment: ExtractAssignment) -> list[Pag
 def dry_render_page_views(render_assignment: RenderPageViewsAssignment) -> list[ImageContent]:
     """Dry leaf for page-view rendering: URL-only page-view image mocks, no pdf rendering, no storage IO.
 
-    Fake URLs come from ``dry_run_config.image_urls`` (validated non-empty) — the single configured
+    Fake URLs come from ``inference.dry_run.image_urls`` (validated non-empty) — the single configured
     source of truth for dry fake images, same as the img-gen mock.
     """
     log.verbose(f"🤡 DRY RUN: render_page_views for '{render_assignment.job_metadata.pipeline_run_id}'")

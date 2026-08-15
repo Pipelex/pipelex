@@ -16,7 +16,7 @@ class SecretsProviderRegistry:
 
     Keyed by the open secrets ``method`` token (a ``str``; the built-in ``SecretsPlugin`` registers
     ``"env"``, an external plugin registers e.g. ``"vault"``). Built once at boot from the registrar's
-    accumulated ``secrets_providers`` and stored on the hub; core reads ``secrets_config.method`` and
+    accumulated ``secrets_providers`` and stored on the hub; core reads ``runtime.secrets.method`` and
     calls the looked-up factory to produce the one provider. Mirrors ``StorageProviderRegistry``.
     """
 

@@ -608,7 +608,7 @@ def scoped_event_log(event_log: "EventLogProtocol") -> Generator[None, None, Non
     backend via ``make_event_log``, so emit and assemble share the SAME instance — which
     is what makes a plain in-memory event log usable for graph assembly (no external
     store bridges the two sides). A set override implies tracing-enabled: it is honored
-    even when ``tracing_config.is_enabled`` is False.
+    even when ``runtime.tracing.is_enabled`` is False.
 
     Lifecycle: the machinery never calls ``cleanup`` on the instance and the read side does
     not ``close`` it — but the write-side tracer DOES call ``close()`` on its event log at
