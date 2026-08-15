@@ -42,15 +42,6 @@ class ModelSpecKeyRejection(StrEnum):
     HYPHENATED_KNOWN_FIELD = "hyphenated_known_field"
     NON_STRING_VALUE = "non_string_value"
 
-    @property
-    def is_about_shape(self) -> bool:
-        """Whether the hyphen rule is the advice to give — a non-string value already has one."""
-        match self:
-            case ModelSpecKeyRejection.NOT_HEADER_SHAPED | ModelSpecKeyRejection.HYPHENATED_KNOWN_FIELD:
-                return True
-            case ModelSpecKeyRejection.NON_STRING_VALUE:
-                return False
-
 
 class RejectedModelSpecKey(NamedTuple):
     key: str
@@ -76,9 +67,13 @@ class ModelSpecKeySplit(NamedTuple):
 
 
 def describe_rejected_keys(*, rejected: list[RejectedModelSpecKey]) -> str:
-    """The reasons for every rejected key, then the hyphen rule once if any key broke it, phrased for the person who has to fix the file."""
+    """The reasons for every rejected key, then the hyphen rule once if any key lacked one, phrased for the person who has to fix the file.
+
+    Only a `NOT_HEADER_SHAPED` key earns the trailer: a near-miss already has a hyphen and is told which field to
+    use, and a non-string value is told to quote it — for either, "add a hyphen" would be wrong advice.
+    """
     reasons = "; ".join(rejected_key.describe() for rejected_key in rejected)
-    if not any(rejected_key.reason.is_about_shape for rejected_key in rejected):
+    if not any(rejected_key.reason is ModelSpecKeyRejection.NOT_HEADER_SHAPED for rejected_key in rejected):
         return f"{reasons}."
     return (
         f"{reasons}. A per-model key that is not a model-spec field is sent to the provider as a request header "

@@ -76,6 +76,17 @@ class TestSplitModelSpecKeys:
         assert "'max-tokens' looks like the model-spec field 'max_tokens'" in description
         assert description.count("must contain a hyphen") == 1
 
+    def test_a_near_miss_alone_is_explained_without_the_hyphen_rule(self) -> None:
+        """`max-tokens` already contains a hyphen and its own message already names the field to use;
+        telling the author the key "must contain a hyphen" would contradict both.
+        """
+        split = split_model_spec_keys(model_spec_dict={"max-tokens": 4096})
+
+        description = describe_rejected_keys(rejected=split.rejected)
+
+        assert "'max-tokens' looks like the model-spec field 'max_tokens'" in description
+        assert "must contain a hyphen" not in description
+
     def test_a_non_string_value_is_explained_without_the_hyphen_rule(self) -> None:
         """The key does contain a hyphen; telling the author to add one would be wrong advice."""
         split = split_model_spec_keys(model_spec_dict={"x-foo": 3})

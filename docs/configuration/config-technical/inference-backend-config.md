@@ -318,7 +318,7 @@ costs = { input = 0.04, output = 0.0 }
 
 #### Sending extra request headers per model
 
-A model table may carry keys beyond the model-spec fields. Every such key is sent to the provider **as an HTTP request header** on each call to that model — this is how, for example, the Portkey backend routes each model to its upstream provider:
+A model table may carry keys beyond the model-spec fields. A key shaped like a request header — it contains a hyphen and its value is a string — is sent to the provider **as an HTTP request header** on each call to that model; this is how, for example, the Portkey backend routes each model to its upstream provider:
 
 ```toml
 # portkey.toml
