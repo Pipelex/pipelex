@@ -1,0 +1,255 @@
+"""Unit tests for the file-level migration runner — backups, per-file scope, and what is written.
+
+The scope is the point. A surface's files are independent user documents, so one that cannot be
+processed is reported as blocked while every sibling is migrated normally — unlike the `.mthds`
+fix loop, whose files only make sense together and which commits a round all-or-nothing.
+"""
+
+import stat
+from datetime import UTC, datetime
+from pathlib import Path
+
+from pipelex.migration.backup import existing_backups_of
+from pipelex.migration.ledger import ledgers_dir
+from pipelex.migration.plan import FileBlockedReason
+from pipelex.migration.runner import migrate_directories, migrate_file
+from pipelex.migration.surfaces import SurfaceRegistry
+from pipelex.suggested_fix import RenameTableKeyOp
+from tests.unit.pipelex.migration.conftest import EntryBuilder, LedgerBuilder, SurfaceBuilder
+
+MOMENT = datetime(2026, 8, 15, 12, 0, 0, tzinfo=UTC)
+
+OLD_SHAPE = """\
+[reporting]
+output_config = { directory = "out" }
+"""
+
+
+class TestMigrationRunner:
+    def test_a_stale_file_is_rewritten_and_backed_up_exactly_once(
+        self,
+        tmp_path: Path,
+        build_entry: EntryBuilder,
+        build_ledger: LedgerBuilder,
+        build_surface: SurfaceBuilder,
+    ) -> None:
+        target = tmp_path / "example.toml"
+        target.write_text(OLD_SHAPE, encoding="utf-8")
+        ledger = build_ledger(
+            entries=[
+                build_entry(
+                    to_schema_version=2,
+                    ops=[RenameTableKeyOp(table_path=["reporting"], key="output_config", new_key="output")],
+                )
+            ]
+        )
+
+        plan = migrate_file(surface=build_surface(), ledger=ledger, file_path=target, dry_run=False, moment=MOMENT)
+
+        assert plan.was_written
+        assert "output = " in target.read_text(encoding="utf-8")
+        backups = existing_backups_of(path=target)
+        assert backups == [plan.backup_path]
+        assert backups[0].read_text(encoding="utf-8") == OLD_SHAPE
+        assert backups[0].name == "example.toml.bak.20260815T120000Z"
+
+    def test_a_backup_inherits_the_source_mode_rather_than_the_umask(
+        self,
+        tmp_path: Path,
+        build_entry: EntryBuilder,
+        build_ledger: LedgerBuilder,
+        build_surface: SurfaceBuilder,
+    ) -> None:
+        """A backup holds the user's values by definition, so a private file must not get a
+        world-readable copy sitting beside it.
+        """
+        target = tmp_path / "example.toml"
+        target.write_text(OLD_SHAPE, encoding="utf-8")
+        target.chmod(0o600)
+        ledger = build_ledger(
+            entries=[
+                build_entry(
+                    to_schema_version=2,
+                    ops=[RenameTableKeyOp(table_path=["reporting"], key="output_config", new_key="output")],
+                )
+            ]
+        )
+
+        plan = migrate_file(surface=build_surface(), ledger=ledger, file_path=target, dry_run=False, moment=MOMENT)
+
+        assert plan.backup_path is not None
+        assert stat.S_IMODE(plan.backup_path.stat().st_mode) == 0o600
+        assert stat.S_IMODE(target.stat().st_mode) == 0o600
+
+    def test_an_older_backup_is_pruned_only_after_the_new_file_is_committed(
+        self,
+        tmp_path: Path,
+        build_entry: EntryBuilder,
+        build_ledger: LedgerBuilder,
+        build_surface: SurfaceBuilder,
+    ) -> None:
+        target = tmp_path / "example.toml"
+        target.write_text(OLD_SHAPE, encoding="utf-8")
+        stale_backup = tmp_path / "example.toml.bak.20200101T000000Z"
+        stale_backup.write_text("from another era\n", encoding="utf-8")
+        ledger = build_ledger(
+            entries=[
+                build_entry(
+                    to_schema_version=2,
+                    ops=[RenameTableKeyOp(table_path=["reporting"], key="output_config", new_key="output")],
+                )
+            ]
+        )
+
+        plan = migrate_file(surface=build_surface(), ledger=ledger, file_path=target, dry_run=False, moment=MOMENT)
+
+        assert not stale_backup.exists()
+        assert existing_backups_of(path=target) == [plan.backup_path]
+
+    def test_a_dry_run_writes_nothing_and_backs_nothing_up(
+        self,
+        tmp_path: Path,
+        build_entry: EntryBuilder,
+        build_ledger: LedgerBuilder,
+        build_surface: SurfaceBuilder,
+    ) -> None:
+        target = tmp_path / "example.toml"
+        target.write_text(OLD_SHAPE, encoding="utf-8")
+        ledger = build_ledger(
+            entries=[
+                build_entry(
+                    to_schema_version=2,
+                    ops=[RenameTableKeyOp(table_path=["reporting"], key="output_config", new_key="output")],
+                )
+            ]
+        )
+
+        plan = migrate_file(surface=build_surface(), ledger=ledger, file_path=target, dry_run=True, moment=MOMENT)
+
+        assert not plan.was_written
+        assert plan.backup_path is None
+        assert len(plan.steps) == 1
+        assert target.read_text(encoding="utf-8") == OLD_SHAPE
+        assert not existing_backups_of(path=target)
+
+    def test_a_current_file_is_neither_written_nor_backed_up(
+        self,
+        tmp_path: Path,
+        build_entry: EntryBuilder,
+        build_ledger: LedgerBuilder,
+        build_surface: SurfaceBuilder,
+    ) -> None:
+        """The overwhelmingly common case under always-replay, and it must cost the user nothing."""
+        current = '[reporting]\noutput = { directory = "out" }\n'
+        target = tmp_path / "example.toml"
+        target.write_text(current, encoding="utf-8")
+        ledger = build_ledger(
+            entries=[
+                build_entry(
+                    to_schema_version=2,
+                    ops=[RenameTableKeyOp(table_path=["reporting"], key="output_config", new_key="output")],
+                )
+            ]
+        )
+
+        plan = migrate_file(surface=build_surface(), ledger=ledger, file_path=target, dry_run=False, moment=MOMENT)
+
+        assert plan.is_clean
+        assert not plan.was_written
+        assert target.read_text(encoding="utf-8") == current
+        assert not existing_backups_of(path=target)
+
+    def test_an_unparseable_file_is_blocked_and_its_siblings_are_still_migrated(
+        self,
+        tmp_path: Path,
+        build_entry: EntryBuilder,
+        build_ledger: LedgerBuilder,
+        build_surface: SurfaceBuilder,
+    ) -> None:
+        migration_dir = tmp_path / "migration"
+        surface = build_surface()
+        ledger = build_ledger(
+            entries=[
+                build_entry(
+                    to_schema_version=2,
+                    ops=[RenameTableKeyOp(table_path=["reporting"], key="output_config", new_key="output")],
+                )
+            ]
+        )
+        _write_ledger(migration_dir=migration_dir, ledger_toml=_LEDGER_TOML)
+
+        config_dir = tmp_path / ".pipelex"
+        config_dir.mkdir()
+        broken = config_dir / "example.toml"
+        broken.write_text("this is not = = toml\n", encoding="utf-8")
+        healthy = config_dir / "example_local.toml"
+        healthy.write_text(OLD_SHAPE, encoding="utf-8")
+
+        report = migrate_directories(
+            registry=SurfaceRegistry(surfaces=[surface]),
+            migration_dir=migration_dir,
+            config_dirs=[config_dir, tmp_path / "does-not-exist"],
+            dry_run=False,
+            moment=MOMENT,
+        )
+
+        assert len(report.plans) == 2
+        blocked_plan = next(plan for plan in report.plans if plan.file_path == broken)
+        assert blocked_plan.blocked_reason is FileBlockedReason.UNPARSEABLE
+        assert not blocked_plan.was_written
+        healthy_plan = next(plan for plan in report.plans if plan.file_path == healthy)
+        assert healthy_plan.was_written
+        assert "output = " in healthy.read_text(encoding="utf-8")
+        assert ledger.surface.current_schema_version == 2
+
+    def test_a_missing_configuration_directory_is_skipped_rather_than_refused(
+        self,
+        tmp_path: Path,
+        build_surface: SurfaceBuilder,
+    ) -> None:
+        migration_dir = tmp_path / "migration"
+        _write_ledger(migration_dir=migration_dir, ledger_toml=_LEDGER_TOML)
+
+        report = migrate_directories(
+            registry=SurfaceRegistry(surfaces=[build_surface()]),
+            migration_dir=migration_dir,
+            config_dirs=[tmp_path / "nowhere"],
+            dry_run=True,
+            moment=MOMENT,
+        )
+
+        assert not report.plans
+
+
+_LEDGER_TOML = """\
+[surface]
+id = "example-config"
+title = "An example configuration surface"
+base_file = "example.toml"
+tier_glob = "example_*.toml"
+current_schema_version = 2
+min_supported_schema_version = 0
+
+[[migration]]
+id = "example-config@2"
+to_schema_version = 2
+introduced_in = "0.46.0"
+breaking = true
+safety = "safe"
+title = "Rename the reporting output table"
+description = "The reporting output table lost its suffix."
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["reporting"]
+key = "output_config"
+new_key = "output"
+"""
+
+
+def _write_ledger(*, migration_dir: Path, ledger_toml: str) -> Path:
+    directory = ledgers_dir(migration_dir=migration_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / "example-config.toml"
+    path.write_text(ledger_toml, encoding="utf-8")
+    return path

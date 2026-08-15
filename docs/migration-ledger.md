@@ -28,9 +28,11 @@ File names are relative to a configuration directory, and every surface spans ex
 
 The tier set is **open**. Environment and run-mode names are dynamic, so the tier filenames of `pipelex-config` cannot be enumerated in advance — `pipelex_local.toml`, `pipelex_{environment}.toml`, `pipelex_{run_mode}.toml`, `pipelex_override.toml` and `pipelex_temporary_override.toml` are a description of today, not a closed list. That is why the registry matches tiers with a glob, and the glob is what makes the resolution rule necessary:
 
-> **Exact filenames claim before globs, across all surfaces.** A file matched by any surface's exact pattern belongs to that surface and is excluded from every surface's glob. A file claimed by two globs, or by two exact names, is a registry error and is rejected when the registry loads.
+> **Exact filenames claim before globs, across all surfaces.** A file matched by any surface's exact pattern belongs to that surface and is excluded from every surface's glob. A file claimed by two globs, or by two exact names, is a registry error.
 
 Without the rule, `pipelex_service.toml` is both the base file of one surface and a match for another's `pipelex_*.toml`, and which ledger runs over it becomes an accident of iteration order.
+
+The registry error is raised at the two moments it is decidable, and no earlier. Two surfaces sharing an id, a base file or a *literal* glob string are refused when the registry loads. Two surfaces whose globs merely *could* overlap are not: whether two glob languages intersect is not cheaply decidable, and a registry has no files to look at. That one is refused the moment a real file proves it — resolution stops by name, on the file, rather than picking whichever surface came first.
 
 Each surface also declares its **defaults-layer kind**, because the checks need to know where a current-schema default value comes from: a packaged TOML document merged beneath the user's files, or model-level field defaults. The distinction matters twice — for synthesizing the complete reference document of a surface that has no packaged file, and for refusing an added path that has no default anywhere. A model-defaults surface whose model cannot be built with nothing set has no defaults layer at all, and says so when its reference document is asked for rather than surfacing later as a missing value.
 
@@ -342,16 +344,23 @@ Every surface produces the same plan model:
 ```
 MigrationReport
   └── MigrationPlan (per file)
-        surface, file_path
-        blocked_reason → set when the file itself could not be processed at all
-        steps[]        → id, to_schema_version, title, breaking, safety, ops[], changelog
-        blocked[]      → id, reason, guidance
+        surface_id, file_path
+        blocked_reason, blocked_detail → set when the file itself could not be processed at all
+        backup_path, was_written       → set when the run wrote the file
+        steps[]        → entry_id, to_schema_version, title, description, breaking, safety, applied_ops[]
+        blocked[]      → entry_id, to_schema_version, reason, detail, guidance, applied_ops[]
         unexplained[]  → path, note
 ```
 
-There is no `from_version` and no trusted-version concept: nothing skips, so nothing needs one. Because a replay walks every entry while usually changing little, the report renders what actually changed — it filters on `APPLIED`, routes `CONFLICT` into `blocked`, and carries the downgrade diagnosis in `unexplained`.
+There is no `from_version` and no trusted-version concept: nothing skips, so nothing needs one. Because a replay walks every entry while usually changing little, the report renders what actually changed — a step lists only the operations that fired, not the many that skipped.
 
 Two different things can be blocked, and the report keeps them apart. An **entry** is blocked when it cannot be applied — it is `unsafe`, or one of its operations came back `CONFLICT` — and it lands in `blocked[]` with the reason and its guidance, while the rest of the file's entries proceed. A **file** is blocked when it cannot be processed at all: it is unparseable, it is unwritable, or it changed on disk between the read and the write. That reason sits on the plan itself, and a blocked file never stops its siblings — every other file in the surface is migrated and reported normally.
+
+Two rules govern how an entry appears, and both exist so that a report is never more optimistic than the file:
+
+> **An entry is reported once.** An entry with a conflicting operation lands in `blocked[]` and not in `steps[]`, carrying in its own `applied_ops` whichever of its operations did land before the conflict was found. Operation-level atomicity is the applier's — a conflicting operation writes nothing — but an entry is not atomic, and saying it arrived whole when part of it could not would be a lie the next run has to correct.
+
+> **An `unsafe` entry is reported only when it would do something.** It is rehearsed against the document and the result discarded, so an entry with nothing to do on this file stays silent. Reporting every `unsafe` entry regardless would warn every user with a perfectly current file, at every boot, forever — and a warning nobody can act on is a warning everybody learns to ignore.
 
 > **No value read from a user's file is ever rendered** — not in the command's output, not in the structured plan, not in an error. Paths, operation kinds and ledger-supplied values carry everything a plan needs to say.
 
@@ -392,9 +401,23 @@ The rules this encodes:
 
 The `.mthds` fix path follows its applier with a canonical reflow of the whole file. That is right for `.mthds` files, which are canonically formatted by CI, and wrong for a user-owned configuration, where a one-key rename must not also rewrite the user's spacing and layout. It is also load-bearing for the guarantees: byte-level replay neutrality only holds if serialization contributes no changes of its own.
 
+Stated more strongly than the library can promise on its own: **a replay in which no operation applies returns the very text it was given** — not a re-serialization of it. Neutrality is therefore a property of the engine rather than of the TOML library it happens to use, and a round-trip can never contribute a change of its own to a file that needed nothing.
+
+### The document is re-read between operations that applied
+
+> **Operations are applied one at a time, and the document is parsed afresh after each one that changed it.**
+
+This is a measured requirement, not caution. The position-preserving rename the applier depends on leaves the node's raw `dict` storage out of step with the body it renders from, for any value that is not a table: everything the library renders or looks up still works, but *addressing that key again in the same in-memory document* raises from inside the library. Always-replay runs many operations over one document, so migration is the caller that meets it — the `.mthds` fix path renames tables, which take the branch the library keeps consistent.
+
+Re-reading is exact, because serialization is byte-faithful, and it costs one parse per **applied** operation — which under always-replay is almost never, since the common case is a current file where everything skips. The behaviour is pinned by a characterization test so that a library upgrade which fixes it makes the workaround removable rather than invisible.
+
 ### Backups
 
 Always back up, before writing. Exactly one backup per file — a successful run replaces the previous one — named with a UTC timestamp, inheriting the source file's mode rather than the default umask, and with its path printed in the report. For files tracked in git, git remains the durable history; the backup covers the untracked ones and the moment between two commits.
+
+The name is the source file's whole name, extension included, followed by `.bak.` and a compact UTC stamp: `pipelex.toml` backs up to `pipelex.toml.bak.20260815T120000Z`. Extension-included so a backup never shadows a real `.toml`, and separator-free so no filesystem objects to it.
+
+The order of the three steps is itself a guarantee. The backup is written **first**, so there is never a moment with a rewritten file and no copy of the original; the older backups are pruned **last**, so there is never a moment with no backup at all; and a write that fails takes its own fresh backup with it, so a failed run leaves the directory exactly as it found it.
 
 ### Per-file transactions
 
@@ -408,6 +431,7 @@ These are measured properties of the TOML library the engine uses, not aspiratio
 - **A moved table loses its introducing comment.** A comment block written above a table is stored as trailing trivia of the *previous* sibling, not as part of the table it appears to introduce, so it does not travel with a move. Comments *inside* a moved table travel intact, including trailing comments on individual keys. The consequence is real: a file seeded from a heavily-commented template and then migrated ends up with banner comments labelling sections that have moved away. Nothing in the engine may rely on comment fidelity across a move, and the package's own files are corrected by hand rather than by migration.
 - **A migration is not byte-minimal.** A rename adds a small amount of whitespace, and a renamed table that was written out of order across several chunks loses its own bare header while a plain table keeps it. Both forms are semantically identical, both are stable under replay, and neither accumulates — but a migration diff is not the minimal diff a human would have written.
 - **A guarded skip is never an error.** Every operation whose target does not resolve reports itself skipped rather than raising. That guard is what makes always-replay possible, and it is why a misdirected operation is caught by the checks rather than by a crash on a user's machine.
+- **A renamed key cannot be addressed again in the same in-memory document.** The position-preserving rename updates the body the document renders from but leaves the node's raw `dict` storage stale, for any value that is not a table. Nothing the library renders or looks up is affected — which is why a single rename is correct, and why the `.mthds` fix path, whose renames target tables, never meets it. The engine [re-reads the document between operations that applied](#the-document-is-re-read-between-operations-that-applied), so nothing downstream has to know about this; it is recorded here because it explains a piece of the engine that would otherwise look like superstition.
 
 ## Authoring an entry
 

@@ -73,6 +73,19 @@ class FixOpOutcome(StrEnum):
             case FixOpOutcome.SKIPPED | FixOpOutcome.CONFLICT:
                 return False
 
+    @property
+    def is_conflict(self) -> bool:
+        """Whether the change could not be made without choosing on the user's behalf.
+
+        A separate question from ``did_apply``: both a skip and a conflict left the document
+        untouched, but only one of them is something a caller has to act on.
+        """
+        match self:
+            case FixOpOutcome.CONFLICT:
+                return True
+            case FixOpOutcome.APPLIED | FixOpOutcome.SKIPPED:
+                return False
+
 
 class FixOpApplication(BaseModel):
     """Per-op application report: the op, whether it applied, and why not when skipped."""
@@ -108,6 +121,18 @@ def _rename_key_in_place(*, parent_table: dict[str, Any], key: str, new_key: str
     among siblings and its comments — a ``del`` + re-add would append it to the bottom of the
     parent (the old fixer's reordering bug). The golden byte-compare tests are the CI tripwire if
     a tomlkit bump ever changes this.
+
+    ⚠ **A rename leaves the node's raw ``dict`` storage stale for a value that is not a Table.**
+    ``_replace_at`` deletes the old key from the dict and only writes the new one back inside its
+    table branch, so everything tomlkit renders or looks up stays right (``dumps``, ``in``, ``[]``,
+    ``.get()`` all read the authoritative body) while ``dict.__delitem__`` — which
+    ``Container.remove`` calls — can no longer find the key. Addressing a renamed **scalar or
+    inline-table** key again in the same DOM therefore raises ``KeyError`` from inside the library.
+    The ``.mthds`` fix path is unaffected because it renames ``[pipe.*]`` tables, which take the
+    branch tomlkit maintains; configuration migration re-reads the document between operations
+    that applied, for exactly this reason. Both facts are pinned by
+    ``tests/unit/pipelex/pipeline/fixes/test_fix_applier_rename_dom_consistency.py``, which is the
+    tripwire if a tomlkit bump ever changes it.
 
     ``_resolve_table`` hands back one of three dict-like shapes, each with its own route to the
     ``Container`` that owns the key:

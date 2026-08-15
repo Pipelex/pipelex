@@ -12,6 +12,7 @@ See `docs/migration-ledger.md` → "The ledger file".
 """
 
 from enum import StrEnum
+from functools import cache
 from pathlib import Path
 from typing import Any
 
@@ -180,3 +181,19 @@ def load_ledger(*, migration_dir: Path, surface_id: str) -> MigrationLedger:
     except ValidationError as exc:
         msg = f"invalid ledger for surface '{surface_id}' at {path}: {exc}"
         raise MigrationLedgerError(msg) from exc
+
+
+@cache
+def load_ledger_cached(*, migration_dir: Path, surface_id: str) -> MigrationLedger:
+    """`load_ledger`, parsed once per process.
+
+    Replaying a surface over a directory of files must not re-parse the same TOML per file: the
+    ledger is checked-in package data that cannot change under a running process, and the parsed
+    model is frozen. Use this everywhere that reads a ledger during a run; `load_ledger` itself
+    stays uncached for the gates, which are told which directory to read and are asked to see
+    what is on disk right now.
+
+    A raise is not cached — `lru_cache` only records successful calls — so a ledger fixed on disk
+    between two calls is re-read rather than failing forever.
+    """
+    return load_ledger(migration_dir=migration_dir, surface_id=surface_id)
