@@ -144,3 +144,10 @@ min_supported_schema_version = 0
         )
         with pytest.raises(MigrationLedgerError, match="invalid ledger for surface 'broken-config'"):
             load_ledger(migration_dir=tmp_path, surface_id="broken-config")
+
+    def test_a_ledger_that_is_not_toml_fails_as_a_ledger_error_not_a_parser_traceback(self, tmp_path: Path) -> None:
+        directory = ledgers_dir(migration_dir=tmp_path)
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "garbled-config.toml").write_text("[surface\nid = = 'nope'\n", encoding="utf-8")
+        with pytest.raises(MigrationLedgerError, match="unparseable ledger for surface 'garbled-config'"):
+            load_ledger(migration_dir=tmp_path, surface_id="garbled-config")

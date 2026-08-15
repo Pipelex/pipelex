@@ -7,6 +7,7 @@ things it does not, such as which Python class a table happens to be. A real-mod
 red on every legitimate configuration change and teach everyone to regenerate rather than read.
 """
 
+from collections.abc import Mapping
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
@@ -93,6 +94,18 @@ class TestFingerprintPaths:
         assert fingerprint.paths["deck"].open_node is True
         assert fingerprint.paths["deck.*"].value_type == TABLE_TYPE
         assert fingerprint.paths["deck.*.name"].value_type == "str"
+
+    def test_an_abstract_mapping_is_an_open_node_too(self) -> None:
+        """`Mapping[str, X]` is the same shape to a file as `dict[str, X]`; the gate must see it as open,
+        or a wildcard operation over it would be refused as addressing a path the fingerprint lacks.
+        """
+
+        class _WithMapping(BaseModel):
+            entries: Mapping[str, _Leaf]
+
+        fingerprint = compute_fingerprint(surface_id="synthetic", schema_version=1, config_model=_WithMapping, defaults_document={})
+        assert fingerprint.paths["entries"].open_node is True
+        assert fingerprint.paths["entries.*.name"].value_type == "str"
 
     def test_a_scalar_mapping_gets_a_wildcard_leaf_and_no_deeper_paths(self) -> None:
         fingerprint = _fingerprint()

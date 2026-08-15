@@ -285,7 +285,9 @@ def check_mthds_schema_command(
 
 @app.command(name="check-migration-schemas", help="Verify that every configuration surface has accounted for its schema changes")
 def check_migration_schemas_command(
-    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single validation line")] = False,
+    quiet: Annotated[
+        bool, typer.Option("--quiet", "-q", help="Light output on success (single line); the full issue list still prints on failure")
+    ] = False,
 ) -> None:
     """Verify that every configuration surface's schema changes are accounted for in its ledger."""
     try:

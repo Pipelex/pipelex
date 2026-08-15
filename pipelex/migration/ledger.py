@@ -20,6 +20,7 @@ from typing_extensions import Self
 
 from pipelex.migration.exceptions import MigrationLedgerError
 from pipelex.suggested_fix import MigrationOp
+from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 LEDGERS_DIR_NAME = "ledgers"
@@ -170,6 +171,9 @@ def load_ledger(*, migration_dir: Path, surface_id: str) -> MigrationLedger:
         raw: dict[str, Any] = load_toml_from_path(path=path)
     except FileNotFoundError as exc:
         msg = f"no ledger for surface '{surface_id}' at {path}"
+        raise MigrationLedgerError(msg) from exc
+    except TomlError as exc:
+        msg = f"unparseable ledger for surface '{surface_id}' at {path}: {exc}"
         raise MigrationLedgerError(msg) from exc
     try:
         return MigrationLedger.model_validate(raw)

@@ -416,7 +416,7 @@ cms: check-mthds-schema
 
 check-migration-schemas: env
 	$(call PRINT_TITLE,"Checking configuration surfaces have accounted for their schema changes")
-	$(VENV_PIPELEX_DEV) check-migration-schemas
+	$(VENV_PIPELEX_DEV) check-migration-schemas --quiet
 
 cmig: check-migration-schemas
 	@echo "> done: cmig = check-migration-schemas"

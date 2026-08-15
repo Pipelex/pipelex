@@ -165,11 +165,16 @@ class TestFixApplierMigrationOps:
         assert _value_at(text=text, path=["deck", "gpt", "quality"]) == "premium"
         assert _value_at(text=text, path=["deck", "claude", "quality"]) == "legacy"
 
-    def test_wildcard_conflict_in_one_entry_wins_over_siblings(self) -> None:
-        """A conflict anywhere surfaces: burying it under a sibling's success is what it exists to prevent."""
+    def test_wildcard_conflict_in_one_entry_wins_over_siblings_and_writes_nothing(self) -> None:
+        """A conflict anywhere surfaces: burying it under a sibling's success is what it exists to prevent.
+
+        And it writes nothing anywhere: `deck.gpt` would rename cleanly, but a conflicting operation
+        leaves the document byte-identical, matched entries included — the operation is one step.
+        """
         occupied = _DOC.replace('[deck.claude]\nprovider = "anthropic"', '[deck.claude]\nquality  = "taken"\nprovider = "anthropic"')
-        _, outcomes = _apply(text=occupied, ops=[RenameTableKeyOp(table_path=["deck", "*"], key="tier", new_key="quality")])
+        text, outcomes = _apply(text=occupied, ops=[RenameTableKeyOp(table_path=["deck", "*"], key="tier", new_key="quality")])
         assert outcomes == [FixOpOutcome.CONFLICT]
+        assert text == occupied
 
     def test_wildcard_over_an_absent_node_skips(self) -> None:
         """Nothing matches, so nothing happens — and the document is untouched."""

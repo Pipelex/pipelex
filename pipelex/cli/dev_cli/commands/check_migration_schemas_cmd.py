@@ -11,6 +11,8 @@ a gate goes permanently green while catching nothing.
 
 import sys
 
+from rich.markup import escape
+
 from pipelex.migration.coverage import CoverageIssue, check_registry
 from pipelex.migration.exceptions import MigrationError
 from pipelex.migration.surfaces import build_config_surface_registry, packaged_migration_dir
@@ -21,7 +23,9 @@ def check_migration_schemas_cmd(*, quiet: bool = False) -> None:
     """Verify that every configuration surface's schema changes are accounted for.
 
     Args:
-        quiet: If True, output only a single validation line (for use in Make targets).
+        quiet: If True, keep the success output to a single line (for Make targets / CI). Quiet
+            only trims success output: a failure always lists every issue, because the Make
+            targets invoke the check quietly and a red gate has to say what to do.
     """
     console = get_console()
 
@@ -34,7 +38,8 @@ def check_migration_schemas_cmd(*, quiet: bool = False) -> None:
     try:
         issues = check_registry(registry=registry, migration_dir=packaged_migration_dir())
     except MigrationError as exc:
-        console.print(f"[red]✗ Migration schema check: FAILED[/red] - {exc}")
+        # An error is always loud — quiet only trims success output, never failures.
+        console.print(f"[red]✗ Migration schema check: FAILED[/red] - {escape(str(exc))}")
         sys.exit(1)
 
     if not issues:
@@ -42,18 +47,16 @@ def check_migration_schemas_cmd(*, quiet: bool = False) -> None:
         console.print(f"[green]✓ Migration schema check: PASSED[/green] - {surface_count} surfaces accounted for")
         return
 
-    _print_issues(issues=issues, quiet=quiet)
+    _print_issues(issues=issues)
     sys.exit(1)
 
 
-def _print_issues(*, issues: list[CoverageIssue], quiet: bool) -> None:
+def _print_issues(*, issues: list[CoverageIssue]) -> None:
     console = get_console()
     console.print(f"[red]✗ Migration schema check: FAILED[/red] - {len(issues)} issues")
-    if quiet:
-        console.print("  Run [cyan]make cmig[/cyan] for the full report.")
-        return
     console.print()
     for issue in issues:
-        console.print(f"  [yellow]{issue.surface_id}[/yellow] [dim]({issue.kind})[/dim]")
-        console.print(f"    {issue.message}")
+        # Messages quote ledger text and path lists, both of which can look like Rich markup.
+        console.print(f"  [yellow]{escape(issue.surface_id)}[/yellow] [dim]({issue.kind})[/dim]")
+        console.print(f"    {escape(issue.message)}")
         console.print()

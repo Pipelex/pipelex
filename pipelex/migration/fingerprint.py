@@ -18,7 +18,7 @@ See `docs/migration-ledger.md` → "The fingerprint".
 """
 
 import types
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from enum import Enum
 from typing import Annotated, Any, Literal, Union, cast, get_args, get_origin
 
@@ -213,8 +213,12 @@ def _as_nested_model(*, annotation: Any) -> type[BaseModel] | None:
 
 
 def _as_open_mapping_value(*, annotation: Any) -> Any:
-    """The value schema of an open mapping, or `None` when the annotation is not one."""
-    if get_origin(annotation) is not dict:
+    """The value schema of an open mapping, or `None` when the annotation is not one.
+
+    `dict[str, X]` and `Mapping[str, X]` are the same shape to a file — a table whose keys are the
+    user's — so both are open nodes.
+    """
+    if get_origin(annotation) not in {dict, Mapping}:
         return None
     args = get_args(annotation)
     if len(args) != 2:

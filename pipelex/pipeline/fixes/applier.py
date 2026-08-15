@@ -19,6 +19,7 @@ TOML to patch) and against ops targeting a different file than the one being pat
 op is reported, never raised.
 """
 
+import copy
 from collections.abc import Sequence
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, NamedTuple, cast
@@ -242,14 +243,25 @@ def _expand_table_paths(*, toml_doc: TOMLDocument, table_path: list[str]) -> lis
 
 
 def _apply_one_op(*, toml_doc: TOMLDocument, fix_op: FixOp) -> FixOpApplication:
-    """Apply one op at every concrete path it addresses, folded into a single report."""
+    """Apply one op at every concrete path it addresses, folded into a single report.
+
+    An op is one step, and a conflicting step writes nothing — including a wildcard op whose
+    conflict sits in the *last* matched entry. Every handler decides its own conflict before it
+    writes, so a single path is atomic by construction; across several paths the op is first
+    rehearsed on a copy of the document, and touches the real one only once no match conflicts.
+    """
     concrete_paths = _expand_table_paths(toml_doc=toml_doc, table_path=fix_op.table_path)
     if not concrete_paths:
         detail = f"no table matches '{'.'.join(fix_op.table_path)}' in document"
         return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=detail)
+    if len(concrete_paths) == 1:
+        result = _apply_at_table_path(toml_doc=toml_doc, fix_op=fix_op, table_path=concrete_paths[0])
+        return FixOpApplication(op=fix_op, outcome=result.outcome, detail=result.detail)
+    rehearsal = copy.deepcopy(toml_doc)
+    rehearsed = [_apply_at_table_path(toml_doc=rehearsal, fix_op=fix_op, table_path=path) for path in concrete_paths]
+    if any(result.outcome is FixOpOutcome.CONFLICT for result in rehearsed):
+        return _fold_wildcard_results(fix_op=fix_op, results=rehearsed)
     results = [_apply_at_table_path(toml_doc=toml_doc, fix_op=fix_op, table_path=path) for path in concrete_paths]
-    if len(results) == 1:
-        return FixOpApplication(op=fix_op, outcome=results[0].outcome, detail=results[0].detail)
     return _fold_wildcard_results(fix_op=fix_op, results=results)
 
 

@@ -8,15 +8,20 @@ The centrepiece is the **sequential path state** walk. An entry's operations cha
 renamed and then keys inside it are renamed — so the intermediate paths belong to neither the old
 fingerprint nor the new one, and no ordering avoids that. The walk therefore replays the entry
 symbolically over the previous fingerprint's path set and compares the end state with the new
-fingerprint. One walk answers four questions at once:
+fingerprint. One walk answers every question at once:
 
-- an operation whose source is absent from the state is **dead** — it can never fire;
+- an operation whose source is absent from the state — or a `delete_table` aimed at a key — is
+  **dead**: it can never fire, and the applier's guarded skip would report success forever;
+- a rename or move onto a path the state already has is a **destination collision**: the applier
+  refuses to clobber, so a valid old-schema file carrying both keys conflicts on every run;
 - a path surviving the walk that the new fingerprint does not have is either an **unaccounted
   removal** or a **misspelled destination**, which is the failure the destination cross-check
   exists for: without it a typo passes coverage *and* convergence, then migrates every user file
   to a key `extra="forbid"` rejects, with the tool reporting success;
 - a path of the new fingerprint that the walk deleted is **over-deletion** — an entry that dropped
   a parent table where it meant to drop one child;
+- an enumerated member lost between the two fingerprints is looked up at the path the walk carried
+  it to, so a member lost by a path the same entry renamed still demands its remap;
 - everything the new fingerprint has and the walk does not is a genuine addition, which needs no
   operation because the defaults layer absorbs it.
 
@@ -29,7 +34,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex.migration.fingerprint import PATH_SEPARATOR, TABLE_TYPE, SurfaceFingerprint, compute_fingerprint
+from pipelex.migration.fingerprint import PATH_SEPARATOR, TABLE_TYPE, PathFingerprint, SurfaceFingerprint, compute_fingerprint
 from pipelex.migration.goldens import defaults_golden_path, read_fingerprint_golden
 from pipelex.migration.ledger import MigrationEntry, MigrationLedger, MigrationSafety, load_ledger
 from pipelex.migration.surfaces import Surface, SurfaceRegistry
@@ -53,6 +58,7 @@ class CoverageIssueKind(StrEnum):
     FINGERPRINT_DRIFTED = "fingerprint_drifted"
     REMOVAL_NEEDS_A_BUMP = "removal_needs_a_bump"
     DEAD_OP = "dead_op"
+    DESTINATION_OCCUPIED = "destination_occupied"
     UNACCOUNTED_PATH = "unaccounted_path"
     OVER_DELETION = "over_deletion"
     ENUM_MEMBER_NOT_REMAPPED = "enum_member_not_remapped"
@@ -166,29 +172,56 @@ class RecordedRemap(BaseModel):
     new_values: list[str]
 
 
+class EntryWalk(BaseModel):
+    """What replaying one entry over the previous fingerprint's path set found out."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    state: PathState
+    """The end state."""
+
+    dead_ops: list[str] = Field(default_factory=list[str])
+    """Descriptions of operations that can never fire: the source is absent, or the operation
+    kind cannot act on what the source is."""
+
+    occupied_destinations: list[str] = Field(default_factory=list[str])
+    """Descriptions of renames or moves onto a path the state already had. The applier refuses
+    to clobber an occupied destination, so a file carrying both keys — a valid file at the old
+    schema — would come back CONFLICT on every run."""
+
+    remaps: list[RecordedRemap] = Field(default_factory=list[RecordedRemap])
+    """The remaps that fired, attributed to the schema path they originated from."""
+
+
 def _joined(*, segments: Sequence[str]) -> str:
     return PATH_SEPARATOR.join(segments)
 
 
-def walk_entry(*, entry: MigrationEntry, before: SurfaceFingerprint) -> tuple[PathState, list[str], list[RecordedRemap]]:
-    """Replay an entry's operations symbolically over the previous fingerprint's path set.
-
-    Returns the end state, the descriptions of any operation whose source was absent (a dead
-    operation that can never fire), and the remaps that did fire, attributed to the schema path
-    they originated from.
-    """
-    state = PathState.make_from_fingerprint(fingerprint=before)
-    dead_ops: list[str] = []
-    remaps: list[RecordedRemap] = []
+def walk_entry(*, entry: MigrationEntry, before: SurfaceFingerprint) -> EntryWalk:
+    """Replay an entry's operations symbolically over the previous fingerprint's path set."""
+    walk = EntryWalk(state=PathState.make_from_fingerprint(fingerprint=before))
 
     for op in entry.ops:
         source = _op_source_path(op=op)
-        if source not in state.origin_by_current:
-            dead_ops.append(f"{op.kind} on '{source}' — no such path at schema version {before.schema_version}, so it can never fire")
+        if source not in walk.state.origin_by_current:
+            walk.dead_ops.append(f"{op.kind} on '{source}' — no such path at schema version {before.schema_version}, so it can never fire")
             continue
-        _apply_op_to_state(op=op, source=source, state=state, remaps=remaps)
+        origin_record = before.paths[walk.state.origin_by_current[source]]
+        if isinstance(op, DeleteTableOp) and not _is_table_like(record=origin_record):
+            walk.dead_ops.append(f"{op.kind} on '{source}' — that path is a key, not a table, so the applier would skip it forever; use delete_key")
+            continue
+        _apply_op_to_state(op=op, source=source, walk=walk)
 
-    return state, dead_ops, remaps
+    return walk
+
+
+def _is_table_like(*, record: PathFingerprint) -> bool:
+    """Whether the applier's `delete_table` finds a table at this path.
+
+    An open node counts: `dict[str, X]` is a `[table]` in a file, whatever the fingerprint calls
+    its value type.
+    """
+    return record.value_type == TABLE_TYPE or record.open_node
 
 
 def _op_source_path(*, op: MigrationOp) -> str:
@@ -199,22 +232,36 @@ def _op_source_path(*, op: MigrationOp) -> str:
             return _joined(segments=[*op.table_path, op.key])
 
 
-def _apply_op_to_state(*, op: MigrationOp, source: str, state: PathState, remaps: list[RecordedRemap]) -> None:
+def _apply_op_to_state(*, op: MigrationOp, source: str, walk: EntryWalk) -> None:
     match op:
         case DeleteKeyOp() | DeleteTableOp():
-            state.drop_subtree(path=source)
+            walk.state.drop_subtree(path=source)
         case RenameTableKeyOp():
-            state.move_subtree(source=source, destination=_joined(segments=[*op.table_path, op.new_key]))
+            _move_in_state(op=op, source=source, destination=_joined(segments=[*op.table_path, op.new_key]), walk=walk)
         case MoveKeyOp():
-            state.move_subtree(source=source, destination=_joined(segments=[*op.new_table_path, op.new_key]))
+            _move_in_state(op=op, source=source, destination=_joined(segments=[*op.new_table_path, op.new_key]), walk=walk)
         case RemapValueOp():
-            remaps.append(
+            walk.remaps.append(
                 RecordedRemap(
-                    origin_path=state.origin_by_current[source],
+                    origin_path=walk.state.origin_by_current[source],
                     old_values=sorted(op.mapping),
                     new_values=sorted(set(op.mapping.values())),
                 )
             )
+
+
+def _move_in_state(*, op: MigrationOp, source: str, destination: str, walk: EntryWalk) -> None:
+    """Move a subtree, recording a collision when the destination is already occupied.
+
+    The move is performed either way, so that the end-state comparison stays meaningful and the
+    collision is reported once rather than echoed as an unaccounted source.
+    """
+    if walk.state.subtree_of(path=destination):
+        walk.occupied_destinations.append(
+            f"{op.kind} moves '{source}' onto '{destination}', which the previous schema already has — "
+            f"a file carrying both is refused as a conflict on every run, so a safe entry cannot do this"
+        )
+    walk.state.move_subtree(source=source, destination=destination)
 
 
 def check_entry_accounting(*, surface_id: str, entry: MigrationEntry, before: SurfaceFingerprint, after: SurfaceFingerprint) -> list[CoverageIssue]:
@@ -228,14 +275,20 @@ def check_entry_accounting(*, surface_id: str, entry: MigrationEntry, before: Su
         return []
 
     issues: list[CoverageIssue] = []
-    state, dead_ops, remaps = walk_entry(entry=entry, before=before)
+    walk = walk_entry(entry=entry, before=before)
 
-    for description in dead_ops:
+    for description in walk.dead_ops:
         issues.append(CoverageIssue(surface_id=surface_id, kind=CoverageIssueKind.DEAD_OP, message=f"entry '{entry.id}': {description}"))
+    if entry.safety is MigrationSafety.SAFE:
+        # An unsafe entry is reported and never applied, so its operations never conflict.
+        for description in walk.occupied_destinations:
+            issues.append(
+                CoverageIssue(surface_id=surface_id, kind=CoverageIssueKind.DESTINATION_OCCUPIED, message=f"entry '{entry.id}': {description}")
+            )
 
     after_paths = after.path_names()
     before_paths = before.path_names()
-    end_paths = state.current_paths()
+    end_paths = walk.state.current_paths()
 
     for path in sorted(end_paths - after_paths):
         issues.append(
@@ -262,8 +315,8 @@ def check_entry_accounting(*, surface_id: str, entry: MigrationEntry, before: Su
             )
         )
 
-    issues.extend(_check_enum_accounting(surface_id=surface_id, entry=entry, before=before, after=after, remaps=remaps))
-    issues.extend(_check_remap_legality(surface_id=surface_id, entry=entry, after=after, state=state, remaps=remaps))
+    issues.extend(_check_enum_accounting(surface_id=surface_id, entry=entry, before=before, after=after, walk=walk))
+    issues.extend(_check_remap_legality(surface_id=surface_id, entry=entry, after=after, walk=walk))
     return issues
 
 
@@ -273,27 +326,41 @@ def _check_enum_accounting(
     entry: MigrationEntry,
     before: SurfaceFingerprint,
     after: SurfaceFingerprint,
-    remaps: list[RecordedRemap],
+    walk: EntryWalk,
 ) -> list[CoverageIssue]:
+    """Every enumerated spelling the entry loses must be remapped, following the path through the entry's own renames.
+
+    Members are compared by *origin*: an enumerated path of the previous schema is looked up at
+    the path the walk carried it to. A comparison over shared names would never look at a path
+    the same entry renamed, and would let a lost member ride into the new schema unremapped.
+    """
     if entry.safety is MigrationSafety.UNSAFE:
         # An unsafe entry is reported and never applied, so it is allowed to describe a change no
         # operation can make. That is what `unsafe` is for.
         return []
-    diff = diff_fingerprints(before=before, after=after)
     remapped_by_origin: dict[str, set[str]] = {}
-    for remap in remaps:
+    for remap in walk.remaps:
         remapped_by_origin.setdefault(remap.origin_path, set()).update(remap.old_values)
 
     issues: list[CoverageIssue] = []
-    for path, removed_members in diff.removed_enum_members.items():
-        unaccounted = sorted(set(removed_members) - remapped_by_origin.get(path, set()))
+    for origin, before_record in before.paths.items():
+        if not before_record.enum_members:
+            continue
+        final_path = walk.state.final_path_of_origin(origin=origin)
+        after_record = after.paths.get(final_path) if final_path is not None else None
+        if after_record is None:
+            # The path does not survive into the new schema; the unaccounted-path or over-deletion
+            # check has already said so in terms the author can act on.
+            continue
+        removed_members = set(before_record.enum_members) - set(after_record.enum_members or [])
+        unaccounted = sorted(removed_members - remapped_by_origin.get(origin, set()))
         if unaccounted:
             issues.append(
                 CoverageIssue(
                     surface_id=surface_id,
                     kind=CoverageIssueKind.ENUM_MEMBER_NOT_REMAPPED,
                     message=(
-                        f"entry '{entry.id}': '{path}' no longer accepts {unaccounted} — a file carrying one of those "
+                        f"entry '{entry.id}': '{final_path}' no longer accepts {unaccounted} — a file carrying one of those "
                         f"values no longer validates, so the entry needs a remap_value for each, or must be marked unsafe"
                     ),
                 )
@@ -306,8 +373,7 @@ def _check_remap_legality(
     surface_id: str,
     entry: MigrationEntry,
     after: SurfaceFingerprint,
-    state: PathState,
-    remaps: list[RecordedRemap],
+    walk: EntryWalk,
 ) -> list[CoverageIssue]:
     """A `safe` remap must be provably unable to fire on a current-valid file.
 
@@ -320,8 +386,8 @@ def _check_remap_legality(
         return []
 
     issues: list[CoverageIssue] = []
-    for remap in remaps:
-        final_path = state.final_path_of_origin(origin=remap.origin_path)
+    for remap in walk.remaps:
+        final_path = walk.state.final_path_of_origin(origin=remap.origin_path)
         record = after.paths.get(final_path) if final_path is not None else None
         if record is None:
             # The path the remap targets does not survive into the new schema; the unaccounted-path

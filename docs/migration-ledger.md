@@ -4,7 +4,7 @@ Pipelex configuration files live on users' machines and in users' repositories, 
 
 This page is the contract: what a ledger may contain, what the engine may do with it, and what is guaranteed to a user whose files are migrated. It is normative. Everything asserted here has, or will have, a test behind it, and where a rule exists to prevent a specific failure the failure is named — a rule whose reason is forgotten is a rule that gets relaxed.
 
-> **Status.** This specification was written before its implementation, deliberately: the guarantees below are what the engine is built against. The data format, the operation vocabulary and the checks land first; `pipelex migrate` and boot tolerance land last. Until the commands exist, this page is built but kept out of the documentation navigation.
+> **Status.** This specification was written before its implementation, deliberately: the guarantees below are what the engine is built against. The data format, the operation vocabulary and the checks land first; `pipelex migrate` and boot tolerance land last. Of the checks, the coverage gate (`make check-migration-schemas`) and its regenerator (`make up-migration-schemas`) exist today; `make check-ledger`, the transform-golden verifier and pre-history entries arrive with the engine. Until the commands exist, this page is built but kept out of the documentation navigation.
 
 ## What migrates, and what does not
 
@@ -198,7 +198,7 @@ The applier reports one outcome per operation:
 | `SKIPPED` | Nothing to do — the target is absent, or the change is already present. |
 | `CONFLICT` | The change cannot be made without choosing on the user's behalf. |
 
-`SKIPPED` is the overwhelmingly common outcome under always-replay and is entirely benign; reports suppress it. `CONFLICT` is not benign and must never travel inside `SKIPPED`: it is returned when a rename or move destination is already occupied, typically because a user hand-fixed part of their file. A conflicting step writes nothing, routes into the plan's `blocked` list with the path and both names, and never undermines replay neutrality — a document carrying both names is by definition not valid at the current schema.
+`SKIPPED` is the overwhelmingly common outcome under always-replay and is entirely benign; reports suppress it. `CONFLICT` is not benign and must never travel inside `SKIPPED`: it is returned when a rename or move destination is already occupied, typically because a user hand-fixed part of their file. A conflicting step writes nothing, routes into the plan's `blocked` list with the path and both names, and never undermines replay neutrality — a document carrying both names is by definition not valid at the current schema. An operation is one step whatever it expands to: a wildcard operation is checked across every entry it matches before any of them is written, so a conflict in the last matched entry leaves the first untouched.
 
 > **Outcomes are classified by the outcome enum, never by parsing a detail string.** Messages are presentation and are free to change; the outcome is the contract.
 
@@ -216,9 +216,11 @@ The guarantees above hold only if entries cannot say certain things. These rules
 
 Legality is defined over an entry's **sequential path state**, not operation by operation in isolation. An entry's operations chain: a parent is renamed and then keys inside it are renamed, so the intermediate paths belong to neither the old fingerprint nor the new one. The check therefore walks the previous fingerprint's path set through the entry's operations symbolically, carrying each surviving path together with the path it originated from, and then compares the end state with the new fingerprint in three ways:
 
-- **Every operation's source must exist in the state when the operation runs.** One that does not is a **dead operation** — it skips on every file forever and reports success, which is the quietest way for a migration to be wrong.
+- **Every operation's source must exist in the state when the operation runs, and must be what the operation acts on.** One whose source is absent — or a `delete_table` aimed at a key, which the applier's guarded skip refuses — is a **dead operation**: it skips on every file forever and reports success, which is the quietest way for a migration to be wrong.
+- **A `safe` rename or move must not land on a path the state already has.** The applier refuses to clobber an occupied destination, so a file carrying both keys — a perfectly valid file at the previous schema — would come back `CONFLICT` on every run. Such an entry is refused as **destination occupied**; it can be `unsafe`, or choose a destination the previous schema did not have.
 - **Every path surviving the walk must be a path of the new fingerprint.** A survivor that is not is either an unaccounted removal or a misspelled destination; the two are the same defect seen from either end, and one containment check catches both.
 - **Every path of the new fingerprint that the walk removed must be a genuine addition** — that is, absent from the previous fingerprint. One that was present is **over-deletion**: an entry that dropped a parent table where it meant to drop one child.
+- **Every enumerated spelling lost between the two fingerprints must be remapped, following the path through the entry's own renames.** Members are compared by origin — an enumerated path of the previous schema is looked up at the path the walk carried it to — so a member lost by a path the same entry renamed still demands its `remap_value`, and the remap that supplies it addresses the key by its new name.
 
 The end state is deliberately *not* compared as "the new fingerprint minus its additions". That formulation reads a rename's destination as an addition and its source as a removal, so it demands that the destination be absent from the end state — which is exactly where a correct rename puts it. Containment plus the over-deletion check is the same guarantee stated in a form renames satisfy.
 

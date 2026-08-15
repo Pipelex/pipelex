@@ -13,7 +13,7 @@ configuration models".
 
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import tomlkit
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -125,16 +125,26 @@ class Surface(BaseModel):
 
 
 def _drop_none_values(*, mapping: dict[str, Any]) -> dict[str, Any]:
-    """Recursively drop keys whose value is `None`, which TOML cannot express."""
+    """Recursively drop keys whose value is `None`, which TOML cannot express.
+
+    Descends through nested mappings and through lists — a list of nested models is a real shape,
+    and a `None` inside one item fails serialization exactly as a top-level one would. Only
+    mapping keys are dropped; a list keeps every item.
+    """
     kept: dict[str, Any] = {}
     for key, value in mapping.items():
         if value is None:
             continue
-        if isinstance(value, dict):
-            kept[key] = _drop_none_values(mapping=value)  # pyright: ignore[reportUnknownArgumentType]
-        else:
-            kept[key] = value
+        kept[key] = _without_none_values(value=value)
     return kept
+
+
+def _without_none_values(*, value: Any) -> Any:
+    if isinstance(value, dict):
+        return _drop_none_values(mapping=cast("dict[str, Any]", value))
+    if isinstance(value, list):
+        return [_without_none_values(value=item) for item in cast("list[Any]", value)]
+    return value
 
 
 class SurfaceRegistry(BaseModel):

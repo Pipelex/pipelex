@@ -19,7 +19,7 @@ from pydantic import BaseModel
 
 from pipelex.migration.coverage import CoverageIssue, CoverageIssueKind, check_surface, diff_fingerprints
 from pipelex.migration.fingerprint import compute_fingerprint
-from pipelex.migration.goldens import write_fingerprint_golden
+from pipelex.migration.goldens import write_defaults_golden, write_fingerprint_golden
 from pipelex.migration.ledger import ledgers_dir
 from pipelex.migration.surfaces import DefaultsLayerKind, Surface
 
@@ -61,6 +61,21 @@ class _SchemaTwoEnumMemberGone(BaseModel):
 
     label: str = "hello"
     tier: _TierWithoutBasic = _TierWithoutBasic.PREMIUM
+
+
+class _SchemaTwoTierRenamedAndMemberGone(BaseModel):
+    """`tier` renamed to `level` *and* `basic` dropped, in the same schema version."""
+
+    label: str = "hello"
+    level: _TierWithoutBasic = _TierWithoutBasic.PREMIUM
+
+
+class _SchemaOneWithBothNames(BaseModel):
+    """A starting shape that already has `title`, so a rename of `label` onto it collides."""
+
+    label: str = "hello"
+    title: str = "world"
+    tier: _Tier = _Tier.BASIC
 
 
 def _surface(*, config_model: type[BaseModel]) -> Surface:
@@ -107,14 +122,14 @@ def _kinds(issues: list[CoverageIssue]) -> list[CoverageIssueKind]:
     return [issue.kind for issue in issues]
 
 
-def _rename_entry(*, new_key: str = "title") -> str:
+def _rename_entry(*, new_key: str = "title", safety: str = "safe") -> str:
     return f"""
 [[migration]]
 id                = "{SURFACE_ID}@2"
 to_schema_version = 2
 introduced_in     = "0.46.0"
 breaking          = true
-safety            = "safe"
+safety            = "{safety}"
 title             = "Rename label to title"
 description       = "The key was renamed."
 
@@ -164,6 +179,18 @@ class TestTheHeadLink:
         issues = check_surface(surface=_surface(config_model=_SchemaTwoEnumMemberGone), migration_dir=tmp_path)
         assert _kinds(issues) == [CoverageIssueKind.REMOVAL_NEEDS_A_BUMP]
         assert "basic" in issues[0].message
+
+    def test_a_stale_reference_document_is_caught_even_when_the_fingerprint_matches(self, tmp_path: Path) -> None:
+        """`defaults@N.toml` is a checked-in copy of a live document, and the fingerprint diff
+        cannot see it drift — an edited value inside an unchanged path moves the file, not the
+        path set. Left unchecked, two copies of the same document quietly disagree.
+        """
+        _write_ledger(migration_dir=tmp_path, current_schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
+        write_defaults_golden(migration_dir=tmp_path, surface_id=SURFACE_ID, schema_version=1, document='label = "stale"\n')
+        issues = check_surface(surface=_surface(config_model=_SchemaOne), migration_dir=tmp_path)
+        assert _kinds(issues) == [CoverageIssueKind.FINGERPRINT_DRIFTED]
+        assert "defaults@1.toml" in issues[0].message
 
     def test_a_bump_whose_snapshot_has_not_been_taken_says_so(self, tmp_path: Path) -> None:
         _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=_rename_entry())
@@ -274,6 +301,52 @@ new_key    = "title"
         assert CoverageIssueKind.DEAD_OP in _kinds(issues)
         assert "lable" in issues[0].message
 
+    def test_a_delete_table_aimed_at_a_key_is_dead(self, tmp_path: Path) -> None:
+        """The applier deletes a table only where the path *is* a table; on a key it skips forever.
+
+        The walk has to say the same, or an entry that never fires passes the gate — and the
+        key it meant to remove is then reported unaccounted for, which is exactly right.
+        """
+        entry = f"""
+[[migration]]
+id                = "{SURFACE_ID}@2"
+to_schema_version = 2
+introduced_in     = "0.46.0"
+breaking          = true
+safety            = "safe"
+title             = "Drop label with the wrong operation"
+description       = "label is a key, not a table."
+
+[[migration.ops]]
+kind       = "delete_table"
+table_path = ["label"]
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=entry)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoRemoved, schema_version=2)
+        issues = check_surface(surface=_surface(config_model=_SchemaTwoRemoved), migration_dir=tmp_path)
+        assert _kinds(issues) == [CoverageIssueKind.DEAD_OP, CoverageIssueKind.UNACCOUNTED_PATH]
+        assert "delete_key" in issues[0].message
+
+    def test_a_safe_rename_onto_a_path_the_old_schema_already_had_is_refused(self, tmp_path: Path) -> None:
+        """The applier refuses to clobber an occupied destination, so a file carrying both keys —
+        a perfectly valid schema-1 file — would come back CONFLICT on every run. The walk must not
+        quietly overwrite what the applier will not.
+        """
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=_rename_entry())
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOneWithBothNames, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoRenamed, schema_version=2)
+        issues = check_surface(surface=_surface(config_model=_SchemaTwoRenamed), migration_dir=tmp_path)
+        assert _kinds(issues) == [CoverageIssueKind.DESTINATION_OCCUPIED]
+        assert "title" in issues[0].message
+
+    def test_an_unsafe_rename_onto_an_occupied_path_is_allowed(self, tmp_path: Path) -> None:
+        """An unsafe entry is reported and never applied, so its operations never conflict."""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=_rename_entry(safety="unsafe"))
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOneWithBothNames, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoRenamed, schema_version=2)
+        assert check_surface(surface=_surface(config_model=_SchemaTwoRenamed), migration_dir=tmp_path) == []
+
 
 class TestEnumAccounting:
     def _entry_with_ops(self, *, safety: str, ops: str) -> str:
@@ -290,6 +363,10 @@ description       = "The spelling changed."
 """
 
     def test_a_removed_member_with_no_remap_is_caught(self, tmp_path: Path) -> None:
+        """A `safe` entry needs at least one operation, and no live one exists for this schema
+        pair, so the fixture carries a filler `delete_key` on a path that never existed. That is
+        a dead operation by construction and is reported as one; the member loss is the finding.
+        """
         ops = """
 [[migration.ops]]
 kind       = "delete_key"
@@ -300,7 +377,49 @@ key        = "nothing_relevant"
         _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
         _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoEnumMemberGone, schema_version=2)
         issues = check_surface(surface=_surface(config_model=_SchemaTwoEnumMemberGone), migration_dir=tmp_path)
-        assert CoverageIssueKind.ENUM_MEMBER_NOT_REMAPPED in _kinds(issues)
+        assert _kinds(issues) == [CoverageIssueKind.DEAD_OP, CoverageIssueKind.ENUM_MEMBER_NOT_REMAPPED]
+        assert "basic" in issues[1].message
+
+    def test_a_member_lost_by_a_renamed_path_is_still_caught(self, tmp_path: Path) -> None:
+        """Enum accounting follows the path through the entry's own renames.
+
+        The old and new fingerprints share no name for this path — `tier` became `level` — so a
+        comparison over shared names would never look at it, and a file carrying `basic` would
+        be migrated to a key that rejects it.
+        """
+        ops = """
+[[migration.ops]]
+kind       = "rename_table_key"
+table_path = []
+key        = "tier"
+new_key    = "level"
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="safe", ops=ops))
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoTierRenamedAndMemberGone, schema_version=2)
+        issues = check_surface(surface=_surface(config_model=_SchemaTwoTierRenamedAndMemberGone), migration_dir=tmp_path)
+        assert _kinds(issues) == [CoverageIssueKind.ENUM_MEMBER_NOT_REMAPPED]
+        assert "basic" in issues[0].message
+
+    def test_a_remap_after_the_rename_accounts_for_the_lost_member(self, tmp_path: Path) -> None:
+        """Operations chain: the remap addresses the key by its *new* name, and is attributed to the origin."""
+        ops = """
+[[migration.ops]]
+kind       = "rename_table_key"
+table_path = []
+key        = "tier"
+new_key    = "level"
+
+[[migration.ops]]
+kind       = "remap_value"
+table_path = []
+key        = "level"
+mapping    = { basic = "standard" }
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="safe", ops=ops))
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoTierRenamedAndMemberGone, schema_version=2)
+        assert check_surface(surface=_surface(config_model=_SchemaTwoTierRenamedAndMemberGone), migration_dir=tmp_path) == []
 
     def test_a_removed_member_with_a_matching_remap_is_green(self, tmp_path: Path) -> None:
         ops = """

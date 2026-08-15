@@ -43,15 +43,28 @@ def defaults_golden_path(*, migration_dir: Path, surface_id: str, schema_version
 
 
 def read_fingerprint_golden(*, migration_dir: Path, surface_id: str, schema_version: int) -> SurfaceFingerprint | None:
-    """The stored fingerprint for one schema version, or `None` when it has never been snapshotted."""
+    """The stored fingerprint for one schema version, or `None` when it has never been snapshotted.
+
+    Raises:
+        MigrationGoldenError: the file cannot be read as a fingerprint, or its body describes a
+            different surface or schema version than its filename claims — a copied or misnamed
+            link must not be compared as the link it stands in for.
+    """
     path = fingerprint_golden_path(migration_dir=migration_dir, surface_id=surface_id, schema_version=schema_version)
     if not path.exists():
         return None
     try:
-        return SurfaceFingerprint.model_validate_json(path.read_text(encoding="utf-8"))
-    except ValueError as exc:
+        fingerprint = SurfaceFingerprint.model_validate_json(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
         msg = f"unreadable fingerprint golden at {path}: {exc}"
         raise MigrationGoldenError(msg) from exc
+    if fingerprint.surface_id != surface_id or fingerprint.schema_version != schema_version:
+        msg = (
+            f"fingerprint golden at {path} describes surface '{fingerprint.surface_id}' at schema version "
+            f"{fingerprint.schema_version}, not '{surface_id}' at schema version {schema_version} as its name says"
+        )
+        raise MigrationGoldenError(msg)
+    return fingerprint
 
 
 def render_fingerprint_golden(*, fingerprint: SurfaceFingerprint) -> str:

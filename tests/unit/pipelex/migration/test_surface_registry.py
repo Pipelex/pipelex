@@ -87,6 +87,28 @@ class TestSurfaceDeclarations:
         )
         assert surface.read_defaults_document() == {"label": "hello"}
 
+    def test_a_synthesized_document_drops_nulls_inside_lists_of_tables_too(self) -> None:
+        """A list of nested models is a real shape (telemetry's OTLP exporters); a `None` inside one
+        item would fail TOML serialization exactly as a top-level one would.
+        """
+
+        class _Exporter(BaseModel):
+            endpoint: str = "http://localhost"
+            headers: str | None = None
+
+        class _WithExporters(BaseModel):
+            exporters: list[_Exporter] = [_Exporter()]
+
+        surface = Surface(
+            surface_id="x",
+            title="x",
+            base_file="x.toml",
+            config_model=_WithExporters,
+            defaults_layer_kind=DefaultsLayerKind.MODEL_DEFAULTS,
+        )
+        assert surface.read_defaults_document() == {"exporters": [{"endpoint": "http://localhost"}]}
+        assert "headers" not in surface.render_reference_document()
+
 
 class TestRegistryConsistency:
     def test_two_surfaces_sharing_an_id_are_refused(self) -> None:
