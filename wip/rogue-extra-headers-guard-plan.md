@@ -130,10 +130,10 @@ Do not start Phase 3 without Louis' explicit go. This is where a config that boo
 
 ## Phase 3 — Docs, changelog, dogfood
 
-- [ ] `docs/configuration/config-technical/inference-backend-config.md` — document the mechanism for the first time: extra per-model keys are sent to the provider as request headers, they must be header-shaped, anything else is a configuration error, and `endpoint_path` is a declared field. Include what a rejected key looks like.
-- [ ] Changelog `## [Unreleased]`, condensed style, **breaking**: a per-model key that is neither a known model-spec field nor header-shaped now fails the backend load instead of being sent to the provider as a request header; `endpoint_path` is a declared model-spec field.
-- [ ] Append a dogfood entry to `wip/drift-contracts/dogfood-log.md`. The observation worth recording: **`backend_library.py` shapes user-facing configuration and sits in no contract's trigger set** — the same shape of finding as the Phase 4 templating entry (a config surface documented outside `docs/configuration/`), from the other direction. Record it; per the pilot's bias, do not act on it here.
-- [ ] Gates: stage + `make agent-check`.
+- [x] `docs/configuration/config-technical/inference-backend-config.md` — document the mechanism for the first time: extra per-model keys are sent to the provider as request headers, they must be header-shaped, anything else is a configuration error, and `endpoint_path` is a declared field. Include what a rejected key looks like.
+- [x] Changelog `## [Unreleased]`, condensed style, **breaking**: a per-model key that is neither a known model-spec field nor header-shaped now fails the backend load instead of being sent to the provider as a request header; `endpoint_path` is a declared model-spec field.
+- [x] Append a dogfood entry to `wip/drift-contracts/dogfood-log.md`. The observation worth recording: **`backend_library.py` shapes user-facing configuration and sits in no contract's trigger set** — the same shape of finding as the Phase 4 templating entry (a config surface documented outside `docs/configuration/`), from the other direction. Record it; per the pilot's bias, do not act on it here.
+- [x] Gates: stage + `make agent-check`.
 
 ## Cross-repo / release-gated follow-ups
 
@@ -181,4 +181,12 @@ Several rejected keys on one model are listed in one message ("Unknown keys on m
 - Leniency: fatal in both modes, as above. Confirm.
 - Commit/PR shape: two commits on one draft PR stacked on #1106. Confirm, or ask for a squash / a separate Phase 1 PR.
 
-**Not done, deliberately (Phase 3):** the docs page (`docs/configuration/config-technical/inference-backend-config.md`), the changelog entry, and the dogfood-log entry. Note for Phase 3: the current `## [Unreleased]` changelog already says, in the `prompting_target` removal entry, that "an unknown per-model key is sent to the provider as an HTTP header rather than rejected" — that sentence must be rewritten when this lands, since it is no longer true.
+### 2026-08-15 — Louis' rulings, and Phase 3 done
+
+**Rulings.** Leniency: **confirmed** — a rejected local key is fatal in both modes. D3 near-miss: **confirmed, kept**. PR shape: one PR (#1107), not a draft; two commits kept.
+
+**Phase 3.** The docs page gained a "Sending extra request headers per model" subsection under Model Specifications — the mechanism's first documentation: the header rule, the shape requirement, the error as a user sees it, the lenient treatment of the served Gateway config, and `endpoint_path` as a declared field. Changelog: a condensed breaking entry under `[Unreleased]`, and the `prompting_target` removal entry's sentence about per-model keys becoming headers rewritten to the new truth. Dogfood log: recorded the "no contract has a stake in the backend-TOML schema" observation, paired with the 2026-08-14 scope-miss.
+
+**Remaining:** nothing on this branch. The cross-repo / release-gated follow-ups below stand as written.
+
+**Superseded note (kept for the record) — Not done, deliberately (Phase 3):** the docs page (`docs/configuration/config-technical/inference-backend-config.md`), the changelog entry, and the dogfood-log entry. Note for Phase 3: the current `## [Unreleased]` changelog already says, in the `prompting_target` removal entry, that "an unknown per-model key is sent to the provider as an HTTP header rather than rejected" — that sentence must be rewritten when this lands, since it is no longer true.
