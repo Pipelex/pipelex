@@ -67,6 +67,73 @@ class TestSplitModelSpecKeys:
         assert [rejected.key for rejected in split.rejected] == ["x-foo"]
         assert split.rejected[0].reason == ModelSpecKeyRejection.NON_STRING_VALUE
 
+    @pytest.mark.parametrize(
+        ("illegal_key", "illegal_character"),
+        [
+            ("x-foo bar", " "),
+            ("x-foo@bar", "@"),
+            ("x-foo/bar", "/"),
+            ("x-foo(bar)", "("),
+            ("x-foo:bar", ":"),
+            ("x-foo\u00e9", "\u00e9"),
+            ("x-foo\u00a0bar", "\u00a0"),
+        ],
+        ids=["space", "at", "slash", "paren", "colon", "non_ascii", "non_breaking_space"],
+    )
+    def test_a_header_shaped_key_the_wire_cannot_carry_is_rejected(self, illegal_key: str, illegal_character: str) -> None:
+        """Shaped like a header is not the same as usable as one: a quoted TOML key can hold a character
+        no header name may carry, and the HTTP stack only says so on the first inference call.
+        """
+        split = split_model_spec_keys(model_spec_dict={"model_id": "gpt-4o", illegal_key: "value"})
+
+        assert split.headers == {}
+        assert [rejected.key for rejected in split.rejected] == [illegal_key]
+        assert split.rejected[0].reason == ModelSpecKeyRejection.ILLEGAL_HEADER_NAME
+        assert split.rejected[0].illegal_character == illegal_character
+
+    @pytest.mark.parametrize("header_key", ["x-foo_bar", "x-foo.bar", "x-foo|bar", "x-foo~bar", "x-foo!bar", "x-foo'bar"])
+    def test_an_unusual_token_character_is_still_a_legal_header_name(self, header_key: str) -> None:
+        """The guard against over-tightening: underscore, dot, pipe, tilde, bang and apostrophe are all
+        RFC 7230 token characters, so a header carrying one must keep working.
+        """
+        split = split_model_spec_keys(model_spec_dict={header_key: "value"})
+
+        assert split.headers == {header_key: "value"}
+        assert split.rejected == []
+
+    @pytest.mark.parametrize(
+        "illegal_value",
+        ["a\r\nb", "a\nb", "a\rb", "a\x00b", " lead", "trail ", "  ", "\ttab-led", "\u00e9acute", "a\x1bb", "a\x7fb"],
+        ids=["crlf", "lf", "cr", "nul", "leading_space", "trailing_space", "only_spaces", "leading_tab", "non_ascii", "escape", "del"],
+    )
+    def test_a_header_value_the_wire_cannot_carry_is_rejected(self, illegal_value: str) -> None:
+        """A line break, a control character, a non-ASCII character or an edge space is refused by the
+        HTTP stack at send time; the author should hear about it while reading the file, not mid-run.
+        """
+        split = split_model_spec_keys(model_spec_dict={"model_id": "gpt-4o", "x-foo": illegal_value})
+
+        assert split.headers == {}
+        assert [rejected.key for rejected in split.rejected] == ["x-foo"]
+        assert split.rejected[0].reason == ModelSpecKeyRejection.ILLEGAL_HEADER_VALUE
+
+    @pytest.mark.parametrize(
+        "legal_value",
+        ["pc-openai-6e7576", "@openai", "a b", "a\tb", "", "a-very/odd_value:with,punctuation"],
+        ids=["config_id", "provider", "inner_space", "inner_tab", "empty", "punctuation"],
+    )
+    def test_a_header_value_the_wire_accepts_is_kept(self, legal_value: str) -> None:
+        """The other half of the guard against over-tightening: everything the wire carries must still pass."""
+        split = split_model_spec_keys(model_spec_dict={"x-foo": legal_value})
+
+        assert split.headers == {"x-foo": legal_value}
+        assert split.rejected == []
+
+    def test_an_illegal_name_is_reported_before_an_illegal_value(self) -> None:
+        """One reason per key: the name is what the author reads first, so it is what the error names first."""
+        split = split_model_spec_keys(model_spec_dict={"x-foo bar": 3})
+
+        assert [rejected.reason for rejected in split.rejected] == [ModelSpecKeyRejection.ILLEGAL_HEADER_NAME]
+
     def test_rejected_keys_explain_themselves_and_state_the_rule_once(self) -> None:
         split = split_model_spec_keys(model_spec_dict={"max_tokns": 4096, "max-tokens": 4096})
 
@@ -95,6 +162,25 @@ class TestSplitModelSpecKeys:
 
         assert "'x-foo' is header-shaped, but its value is not a string" in description
         assert "must be a quoted string" in description
+        assert "must contain a hyphen" not in description
+
+    def test_an_illegal_header_name_is_explained_without_the_hyphen_rule(self) -> None:
+        """The key already has a hyphen; what it lacks is a legal character, and the message names it."""
+        split = split_model_spec_keys(model_spec_dict={"x-foo bar": "value"})
+
+        description = describe_rejected_keys(rejected=split.rejected)
+
+        assert "'x-foo bar' cannot be a header name" in description
+        assert "' '" in description
+        assert "must contain a hyphen" not in description
+
+    def test_an_illegal_header_value_is_explained_without_the_hyphen_rule(self) -> None:
+        split = split_model_spec_keys(model_spec_dict={"x-foo": "trailing "})
+
+        description = describe_rejected_keys(rejected=split.rejected)
+
+        assert "'x-foo' is header-shaped, but its value cannot be sent as a header value" in description
+        assert "no leading or trailing whitespace" in description
         assert "must contain a hyphen" not in description
 
     def test_a_shape_rejection_beside_a_value_rejection_still_states_the_hyphen_rule_once(self) -> None:

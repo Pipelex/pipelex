@@ -336,7 +336,15 @@ model-spec field is sent to the provider as a request header and must contain a 
 (e.g. 'x-portkey-provider'): fix the typo, or name the key like a header if that is what it is meant to be.
 ```
 
-The Pipelex Gateway's model specs are fetched from Pipelex servers rather than read from a local file, and there the same rule is applied leniently: a header-shaped key with a string value becomes a header, and any other unknown key — including a header-shaped one whose value is not a string — is dropped instead of failing the boot, since a served config can legitimately be newer or older than the client reading it.
+A key that clears that gate must also be *usable* as a header, so the name and the value are checked against what HTTP itself allows. A header name may contain only letters, digits and the characters ``!#$%&'*+-.^_`|~`` — so a quoted key like `"x-foo bar"` is rejected — and a header value must be printable ASCII on a single line with no leading or trailing whitespace, which rules out a line break, a control character, an accented letter, and the invisible trailing space in `x-foo = "value "`. Without this check the backend loaded happily and the HTTP client refused the request on the first call to that model, far from the file that caused it.
+
+```text
+Unknown key on model 'gpt-4o' for backend 'openai' from file '.pipelex/inference/backends/openai.toml':
+'x-foo bar' cannot be a header name: ' ' is not allowed in one — a header name may contain only
+letters, digits and the characters !#$%&'*+-.^_`|~.
+```
+
+The Pipelex Gateway's model specs are fetched from Pipelex servers rather than read from a local file, and there the same rule is applied leniently: a header-shaped key whose name and value the wire can carry becomes a header, and any other unknown key — including a header-shaped one whose value is not a string, or whose name or value HTTP would refuse — is dropped instead of failing the boot, since a served config can legitimately be newer or older than the client reading it.
 
 `endpoint_path` is a declared model-spec field, not a header: it names the provider-side route for models that are called by raw path (the Gateway's image models), and is never sent on the wire.
 

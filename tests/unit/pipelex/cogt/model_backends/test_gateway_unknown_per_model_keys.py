@@ -88,6 +88,32 @@ class TestGatewayUnknownPerModelKeys:
         assert backend is not None
         assert backend.model_specs["gpt-4o-mini"].extra_headers == {"x-portkey-config": "pc-openai-6e7576"}
 
+    def test_a_header_shaped_key_the_wire_cannot_carry_is_pruned_and_the_boot_survives(self, tmp_path: Path) -> None:
+        """A served key whose name no header may carry is skew like any other: pruned rather than kept and
+        left to raise `Illegal header name` on the first inference call.
+        """
+        library = self._load(
+            tmp_path,
+            model_specs=self._remote_specs(per_model_extras={"x-portkey-config": "pc-openai-6e7576", "x-weird key": "value"}),
+        )
+
+        backend = library.get_inference_backend(backend_name="pipelex_gateway")
+        assert backend is not None
+        assert backend.model_specs["gpt-4o-mini"].extra_headers == {"x-portkey-config": "pc-openai-6e7576"}
+
+    def test_a_header_value_the_wire_cannot_carry_is_pruned_and_the_boot_survives(self, tmp_path: Path) -> None:
+        """Same for a value the HTTP stack refuses — a line break here would otherwise travel all the way
+        to the provider call before anyone heard about it.
+        """
+        library = self._load(
+            tmp_path,
+            model_specs=self._remote_specs(per_model_extras={"x-portkey-config": "pc-openai-6e7576", "x-weird": "two\r\nlines"}),
+        )
+
+        backend = library.get_inference_backend(backend_name="pipelex_gateway")
+        assert backend is not None
+        assert backend.model_specs["gpt-4o-mini"].extra_headers == {"x-portkey-config": "pc-openai-6e7576"}
+
     def test_a_declared_field_that_used_to_ride_in_the_bag_lands_in_the_field(self, tmp_path: Path) -> None:
         """`endpoint_path` is served on the image models today. Had it stayed a bag entry, this rule
         would prune it — the whole reason it was promoted to a field first.

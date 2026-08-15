@@ -86,6 +86,26 @@ model_id = "acme-one"
 x-foo = 3
 """
 
+MODEL_SPECS_TOML_WITH_ILLEGAL_HEADER_NAME = """
+[defaults]
+model_type = "llm"
+sdk = "openai_responses"
+
+["acme-one"]
+model_id = "acme-one"
+"x-foo bar" = "value"
+"""
+
+MODEL_SPECS_TOML_WITH_ILLEGAL_HEADER_VALUE = """
+[defaults]
+model_type = "llm"
+sdk = "openai_responses"
+
+["acme-one"]
+model_id = "acme-one"
+x-foo = "trailing "
+"""
+
 MODEL_SPECS_TOML_WITH_MISSING_CREDENTIAL = f"""
 [defaults]
 model_type = "llm"
@@ -194,6 +214,44 @@ class TestBackendLibraryLeniency:
         assert "acme.toml" in message
         assert "must be a quoted string" in message
         assert "string_type" not in message
+
+    @pytest.mark.parametrize("lenient", [True, False])
+    def test_a_header_shaped_key_the_wire_cannot_carry_is_fatal_in_both_modes(self, tmp_path: Path, lenient: bool) -> None:
+        """A quoted TOML key can hold a character no header field name may carry. Such a key used to load
+        fine and raise `LocalProtocolError: Illegal header name` on the first inference call instead.
+        """
+        with pytest.raises(InferenceBackendLibraryError) as exc_info:
+            self._load(
+                tmp_path,
+                backends_toml=BACKENDS_TOML,
+                model_specs_toml=MODEL_SPECS_TOML_WITH_ILLEGAL_HEADER_NAME,
+                lenient=lenient,
+            )
+
+        message = str(exc_info.value)
+        assert "'x-foo bar'" in message
+        assert "'acme-one'" in message
+        assert "acme.toml" in message
+        assert "' '" in message
+
+    @pytest.mark.parametrize("lenient", [True, False])
+    def test_a_header_value_the_wire_cannot_carry_is_fatal_in_both_modes(self, tmp_path: Path, lenient: bool) -> None:
+        """`x-foo = "trailing "` is valid TOML and the mistake is invisible in the file, which is exactly
+        why the error must name it — the HTTP stack otherwise reports it much later, mid-run.
+        """
+        with pytest.raises(InferenceBackendLibraryError) as exc_info:
+            self._load(
+                tmp_path,
+                backends_toml=BACKENDS_TOML,
+                model_specs_toml=MODEL_SPECS_TOML_WITH_ILLEGAL_HEADER_VALUE,
+                lenient=lenient,
+            )
+
+        message = str(exc_info.value)
+        assert "'x-foo'" in message
+        assert "'acme-one'" in message
+        assert "acme.toml" in message
+        assert "no leading or trailing whitespace" in message
 
     def test_a_header_shaped_per_model_key_still_becomes_a_request_header(self, tmp_path: Path) -> None:
         """The regression that matters: `x-portkey-provider` in the local portkey.toml keeps working."""
