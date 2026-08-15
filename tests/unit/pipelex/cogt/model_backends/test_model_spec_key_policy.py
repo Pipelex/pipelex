@@ -10,7 +10,7 @@ loader, which is the only party that knows where the table came from.
 
 import pytest
 
-from pipelex.cogt.model_backends.model_spec_keys import describe_rejected_keys, split_model_spec_keys
+from pipelex.cogt.model_backends.model_spec_keys import ModelSpecKeyRejection, describe_rejected_keys, split_model_spec_keys
 
 
 class TestSplitModelSpecKeys:
@@ -39,7 +39,7 @@ class TestSplitModelSpecKeys:
         assert split.fields == {"model_id": "gpt-4o"}
         assert split.headers == {}
         assert [rejected.key for rejected in split.rejected] == [unknown_key]
-        assert split.rejected[0].near_miss_of is None
+        assert split.rejected[0].reason == ModelSpecKeyRejection.NOT_HEADER_SHAPED
 
     @pytest.mark.parametrize(
         ("near_miss", "known_field"), [("max-tokens", "max_tokens"), ("model-id", "model_id"), ("thinking-mode", "thinking_mode")]
@@ -52,7 +52,20 @@ class TestSplitModelSpecKeys:
 
         assert split.headers == {}
         assert [rejected.key for rejected in split.rejected] == [near_miss]
+        assert split.rejected[0].reason == ModelSpecKeyRejection.HYPHENATED_KNOWN_FIELD
         assert split.rejected[0].near_miss_of == known_field
+
+    @pytest.mark.parametrize("value", [3, True, 1.5, ["a"], {"k": "v"}], ids=["int", "bool", "float", "list", "dict"])
+    def test_a_header_shaped_key_with_a_non_string_value_is_rejected(self, value: object) -> None:
+        """A request header value is a string. `x-foo = 3` is an unquoted-value mistake, not a header
+        to stringify: `str(True)` or `str(["a"])` on the wire is exactly the rogue header this guards against.
+        """
+        split = split_model_spec_keys(model_spec_dict={"model_id": "gpt-4o", "x-foo": value})
+
+        assert split.fields == {"model_id": "gpt-4o"}
+        assert split.headers == {}
+        assert [rejected.key for rejected in split.rejected] == ["x-foo"]
+        assert split.rejected[0].reason == ModelSpecKeyRejection.NON_STRING_VALUE
 
     def test_rejected_keys_explain_themselves_and_state_the_rule_once(self) -> None:
         split = split_model_spec_keys(model_spec_dict={"max_tokns": 4096, "max-tokens": 4096})
@@ -61,6 +74,25 @@ class TestSplitModelSpecKeys:
 
         assert "'max_tokns' is not a known model-spec field" in description
         assert "'max-tokens' looks like the model-spec field 'max_tokens'" in description
+        assert description.count("must contain a hyphen") == 1
+
+    def test_a_non_string_value_is_explained_without_the_hyphen_rule(self) -> None:
+        """The key does contain a hyphen; telling the author to add one would be wrong advice."""
+        split = split_model_spec_keys(model_spec_dict={"x-foo": 3})
+
+        description = describe_rejected_keys(rejected=split.rejected)
+
+        assert "'x-foo' is header-shaped, but its value is not a string" in description
+        assert "must be a quoted string" in description
+        assert "must contain a hyphen" not in description
+
+    def test_a_shape_rejection_beside_a_value_rejection_still_states_the_hyphen_rule_once(self) -> None:
+        split = split_model_spec_keys(model_spec_dict={"max_tokns": 4096, "x-foo": 3})
+
+        description = describe_rejected_keys(rejected=split.rejected)
+
+        assert "'max_tokns' is not a known model-spec field" in description
+        assert "'x-foo' is header-shaped, but its value is not a string" in description
         assert description.count("must contain a hyphen") == 1
 
     def test_the_input_table_is_left_untouched(self) -> None:

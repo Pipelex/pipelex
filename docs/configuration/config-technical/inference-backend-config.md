@@ -327,7 +327,7 @@ model_id = "gpt-4o-mini"
 x-portkey-provider = "@openai"   # forwarded as the `x-portkey-provider` request header
 ```
 
-Because these strings go out over the network, an extra key is accepted as a header **only if it is shaped like one — it must contain a hyphen** (`x-portkey-provider`, `anthropic-beta`, `api-version`). Model-spec field names never contain a hyphen, so an unknown key without one is a misspelled setting or a field that no longer exists, and it is a configuration error rather than a header: the backend fails to load and the error names the key, the model and the file. A hyphenated spelling of a real field (`max-tokens` for `max_tokens`) is rejected the same way, with the field it resembles. This holds in every boot mode, including the credential-free one used by `pipelex validate` and dry runs — a typo must never silently drop a backend and surface later as "model not found".
+Because these strings go out over the network, an extra key is accepted as a header **only if it is shaped like one — it must contain a hyphen** (`x-portkey-provider`, `anthropic-beta`, `api-version`) **and its value must be a string** (quote it in TOML). Model-spec field names never contain a hyphen, so an unknown key without one is a misspelled setting or a field that no longer exists, and it is a configuration error rather than a header: the backend fails to load and the error names the key, the model and the file. A hyphenated spelling of a real field (`max-tokens` for `max_tokens`) is rejected the same way, with the field it resembles, and so is a header-shaped key whose value is not a string (`x-foo = 3`) — it is never stringified onto the wire. This holds in every boot mode, including the credential-free one used by `pipelex validate` and dry runs — a typo must never silently drop a backend and surface later as "model not found".
 
 ```text
 Unknown key on model 'gpt-4o' for backend 'openai' from file '.pipelex/inference/backends/openai.toml':
@@ -336,7 +336,7 @@ model-spec field is sent to the provider as a request header and must contain a 
 (e.g. 'x-portkey-provider'): fix the typo, or name the key like a header if that is what it is meant to be.
 ```
 
-The Pipelex Gateway's model specs are fetched from Pipelex servers rather than read from a local file, and there the same rule is applied leniently: a header-shaped key becomes a header, and any other unknown key is dropped instead of failing the boot, since a served config can legitimately be newer or older than the client reading it.
+The Pipelex Gateway's model specs are fetched from Pipelex servers rather than read from a local file, and there the same rule is applied leniently: a header-shaped key with a string value becomes a header, and any other unknown key — including a header-shaped one whose value is not a string — is dropped instead of failing the boot, since a served config can legitimately be newer or older than the client reading it.
 
 `endpoint_path` is a declared model-spec field, not a header: it names the provider-side route for models that are called by raw path (the Gateway's image models), and is never sent on the wire.
 

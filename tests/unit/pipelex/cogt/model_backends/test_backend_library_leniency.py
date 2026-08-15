@@ -76,6 +76,16 @@ model_id = "acme-one"
 x-portkey-provider = "@openai"
 """
 
+MODEL_SPECS_TOML_WITH_NON_STRING_HEADER_VALUE = """
+[defaults]
+model_type = "llm"
+sdk = "openai_responses"
+
+["acme-one"]
+model_id = "acme-one"
+x-foo = 3
+"""
+
 MODEL_SPECS_TOML_WITH_MISSING_CREDENTIAL = f"""
 [defaults]
 model_type = "llm"
@@ -164,6 +174,26 @@ class TestBackendLibraryLeniency:
                 model_specs_toml=MODEL_SPECS_TOML_WITH_NEAR_MISS_PER_MODEL_KEY,
                 lenient=False,
             )
+
+    @pytest.mark.parametrize("lenient", [True, False])
+    def test_a_header_shaped_key_with_a_non_string_value_is_fatal_in_both_modes(self, tmp_path: Path, lenient: bool) -> None:
+        """`x-foo = 3` is an unquoted value, not a header to stringify. The message is the rule's, not pydantic's:
+        it names the key, the model and the file, and says the value must be a quoted string.
+        """
+        with pytest.raises(InferenceBackendLibraryError) as exc_info:
+            self._load(
+                tmp_path,
+                backends_toml=BACKENDS_TOML,
+                model_specs_toml=MODEL_SPECS_TOML_WITH_NON_STRING_HEADER_VALUE,
+                lenient=lenient,
+            )
+
+        message = str(exc_info.value)
+        assert "'x-foo'" in message
+        assert "'acme-one'" in message
+        assert "acme.toml" in message
+        assert "must be a quoted string" in message
+        assert "string_type" not in message
 
     def test_a_header_shaped_per_model_key_still_becomes_a_request_header(self, tmp_path: Path) -> None:
         """The regression that matters: `x-portkey-provider` in the local portkey.toml keeps working."""
