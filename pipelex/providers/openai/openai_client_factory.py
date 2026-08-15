@@ -46,7 +46,7 @@ class OpenAIClientFactory:
 
         # Tier 1 transport retry: set the SDK client's retry budget explicitly from config
         # instead of inheriting the silent SDK default (openai's own DEFAULT_MAX_RETRIES).
-        transport_max_retries = get_config().cogt.transport_max_retries
+        transport_max_retries = get_config().inference.transport_max_retries
 
         the_client: openai.AsyncOpenAI
         match sdk_variant:

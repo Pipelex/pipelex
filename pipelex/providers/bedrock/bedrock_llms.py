@@ -26,7 +26,7 @@ def bedrock_list_available_models(
         MissingDependencyError: If boto3 is not installed
     """
     try:
-        aws_config = get_config().pipelex.aws_config
+        aws_config = get_config().runtime.aws
         aws_access_key_id, aws_secret_access_key, aws_region = aws_config.get_aws_access_keys()
     except AwsCredentialsError as exc:
         msg = f"Error getting AWS credentials for Bedrock: {exc}"

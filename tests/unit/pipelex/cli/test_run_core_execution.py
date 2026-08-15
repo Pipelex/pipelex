@@ -63,7 +63,7 @@ class TestRunCoreExecution:
     @pytest.fixture
     def config_mock(self, mocker: MockerFixture) -> Any:
         fake_config = mocker.MagicMock()
-        fake_config.pipelex.pipeline_execution_config.with_execution_overrides.return_value = mocker.MagicMock()
+        fake_config.interpreter.pipeline_execution.with_execution_overrides.return_value = mocker.MagicMock()
         mocker.patch("pipelex.cli.commands.run._run_core.get_config", return_value=fake_config)
         return fake_config
 

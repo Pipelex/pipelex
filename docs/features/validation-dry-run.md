@@ -35,7 +35,7 @@ Execute pipelines with mocked LLM responses to test pipeline logic, data flow, a
 
 ## Allowed-to-Fail Pipes
 
-List specific pipe codes in `pipelex.dry_run_config.allowed_to_fail_pipes` so dry-run validation can tolerate expected failures without failing the overall validation pass.
+List specific pipe codes in `inference.dry_run.allowed_to_fail_pipes` so dry-run validation can tolerate expected failures without failing the overall validation pass.
 
 ## CLI Usage
 

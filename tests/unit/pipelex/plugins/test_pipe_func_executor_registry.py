@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 
 def _make_registrar() -> PluginRegistrar:
-    return PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(plugins=SimpleNamespace(disabled=[]))))
+    return PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(runtime=SimpleNamespace(plugins=SimpleNamespace(disabled=[])))))
 
 
 def _fake_factory(_config: PipeFuncConfig) -> PipeFuncExecutorProtocol:

@@ -33,20 +33,20 @@ class TestGetPreferredTargetsFromToml:
         ("toml_body", "expected"),
         [
             (
-                '[pipelex.kit_config]\npreferred_agent_targets = ["claude", "agents"]\n',
+                '[kit]\npreferred_agent_targets = ["claude", "agents"]\n',
                 [AgentTarget.CLAUDE, AgentTarget.AGENTS],
             ),
             (
-                '[pipelex.kit_config]\npreferred_agent_targets = ["cursor"]\n',
+                '[kit]\npreferred_agent_targets = ["cursor"]\n',
                 [AgentTarget.CURSOR],
             ),
             # Empty list must NOT silently disable the sync check —
             # it should fall back to defaults.
-            ("[pipelex.kit_config]\npreferred_agent_targets = []\n", _DEFAULT_TARGETS),
+            ("[kit]\npreferred_agent_targets = []\n", _DEFAULT_TARGETS),
             # Unknown value triggers ValueError → fallback.
-            ('[pipelex.kit_config]\npreferred_agent_targets = ["unknown"]\n', _DEFAULT_TARGETS),
+            ('[kit]\npreferred_agent_targets = ["unknown"]\n', _DEFAULT_TARGETS),
             # Missing key triggers KeyError → fallback.
-            ("[pipelex.kit_config]\n", _DEFAULT_TARGETS),
+            ("[kit]\n", _DEFAULT_TARGETS),
         ],
     )
     def test_parses_toml_targets_with_safe_fallbacks(

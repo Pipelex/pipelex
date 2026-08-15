@@ -20,7 +20,7 @@ def generated_content_factory(tmp_path: Path) -> GeneratedContentFactory:
 
     Applies test overrides for bucket names and signed URL lifespans.
     """
-    storage_provider_config = get_config().pipelex.storage_config
+    storage_provider_config = get_config().runtime.storage
     match storage_provider_config.method:
         case StorageMethod.S3:
             assert storage_provider_config.s3 is not None

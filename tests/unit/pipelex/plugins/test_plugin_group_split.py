@@ -58,7 +58,7 @@ def _noop_make_worker(**_kwargs: object) -> InferenceWorkerAbstract:
 
 
 def _fake_config() -> PipelexConfig:
-    return cast("PipelexConfig", SimpleNamespace(plugins=SimpleNamespace(disabled=[])))
+    return cast("PipelexConfig", SimpleNamespace(runtime=SimpleNamespace(plugins=SimpleNamespace(disabled=[]))))
 
 
 class _ContributingPlugin:
@@ -114,6 +114,7 @@ def _discover(
     mocker.patch("importlib.metadata.entry_points", side_effect=_installed)
     return build_registrar(
         config=_fake_config(),
+        boot_orchestrator=None,
         builtin_plugins=cast("Sequence[PipelexPlugin]", builtins),
         core_unconditional_plugin_names=frozenset(),
         entry_point_groups=groups,
@@ -247,6 +248,7 @@ class TestPluginGroupSplit:
         mocker.patch("importlib.metadata.entry_points", side_effect=_record)
         build_registrar(
             config=_fake_config(),
+            boot_orchestrator=None,
             builtin_plugins=[],
             core_unconditional_plugin_names=frozenset(),
             entry_point_groups=(PluginGroup.KERNEL,),

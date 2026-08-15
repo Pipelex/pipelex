@@ -127,7 +127,7 @@ class TestSecretsExternalPlugin:
         Pipelex.make(
             integration_mode=_test_integration_mode(),
             needs_inference=False,
-            config_overrides={"pipelex": {"secrets_config": {"method": EXTERNAL_SECRETS_METHOD}}},
+            config_overrides={"runtime": {"secrets": {"method": EXTERNAL_SECRETS_METHOD}}},
         )
 
         assert get_secrets_provider_registry().has(method=EXTERNAL_SECRETS_METHOD)
@@ -145,9 +145,9 @@ class TestSecretsExternalPlugin:
             integration_mode=_test_integration_mode(),
             needs_inference=False,
             config_overrides={
-                "pipelex": {
-                    "secrets_config": {"method": EXTERNAL_SECRETS_METHOD},
-                    "storage_config": {"method": "gcp", "gcp": {"bucket_name": "test-bucket", "project_id": "test-project"}},
+                "runtime": {
+                    "secrets": {"method": EXTERNAL_SECRETS_METHOD},
+                    "storage": {"method": "gcp", "gcp": {"bucket_name": "test-bucket", "project_id": "test-project"}},
                 }
             },
         )

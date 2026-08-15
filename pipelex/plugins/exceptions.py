@@ -273,12 +273,12 @@ class BrokenPluginError(PluginError):
 class UnknownBootOrchestratorError(PluginError):
     """An explicit boot orchestrator was requested, but no plugin of that name is registered.
 
-    ``plugins.boot_orchestrator`` (set via the CLI ``--orchestrator`` flag or
-    ``Pipelex.setup(boot_orchestrator=...)``) names the *plugin* this process should boot under:
-    a boot-orchestrator plugin claims the process-global hub slots iff
-    ``plugins.boot_orchestrator == its own name``. When no discovered, registered plugin carries
-    that name — the plugin is not installed, was disabled via ``plugins.disabled``, or the name is
-    a typo — nothing claims the slots and execution would silently fall back to the in-process core
+    The boot orchestrator (a boot argument, set via the CLI ``--orchestrator`` flag or
+    ``Pipelex.setup(boot_orchestrator=...)``; never a ``pipelex.toml`` setting) names the *plugin*
+    this process should boot under: a boot-orchestrator plugin claims the process-global hub slots
+    iff ``boot_orchestrator == its own name``. When no discovered, registered plugin carries that
+    name — the plugin is not installed, was disabled via ``runtime.plugins.disabled``, or the name
+    is a typo — nothing claims the slots and execution would silently fall back to the in-process core
     defaults. We fail loud at boot instead. The message names no specific plugin, so core stays
     decoupled from its plugins.
     """

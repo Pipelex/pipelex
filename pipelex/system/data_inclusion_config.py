@@ -2,10 +2,10 @@
 
 Lives below both ``graph`` and ``tracing`` because it rides in every job's
 ``TraceContext`` — the transport that reaches the inference layer — while the
-TOML nests it under ``[...graph_config.data_inclusion]``, which is where an
+TOML nests it under ``[...graph.data_inclusion]``, which is where an
 operator expects to tune it. Keeping the class here is what lets
 :mod:`pipelex.system.trace_context` stay independent of the graph rendering
-configs (``mermaid_config`` / ``reactflow_config``) that ``GraphConfig`` pulls in.
+configs (``mermaid`` / ``reactflow``) that ``GraphConfig`` pulls in.
 """
 
 from pipelex.system.configuration.config_model import ConfigModel

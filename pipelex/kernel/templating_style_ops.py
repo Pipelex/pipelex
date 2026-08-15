@@ -12,4 +12,4 @@ from pipelex.tools.templating.templating_style import TemplatingStyle
 
 def resolve_templating_style(*, authored: TemplatingStyle | None) -> TemplatingStyle:
     """The style a prompt renders under: the authored one, else the configured default."""
-    return authored or get_config().pipelex.templating_config.default_templating_style
+    return authored or get_config().inference.templating.default_templating_style

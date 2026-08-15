@@ -45,7 +45,7 @@ prompt = "Echo the $subject as a topic"
 
 
 def _config(*, generate_graph: bool, generate_usage: bool, full_data: bool = False) -> PipelineExecutionConfig:
-    return get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+    return get_config().interpreter.pipeline_execution.with_execution_overrides(
         generate_graph=generate_graph,
         generate_usage=generate_usage,
         mock_inputs=True,
@@ -56,7 +56,7 @@ def _config(*, generate_graph: bool, generate_usage: bool, full_data: bool = Fal
 @pytest.mark.asyncio(loop_scope="class")
 class TestDirectTracingAssembly:
     def _enable_ndjson_tracing(self, mocker: MockerFixture, traces_dir: str) -> None:
-        cfg = get_config().pipelex.tracing_config
+        cfg = get_config().runtime.tracing
         mocker.patch.object(cfg, "is_enabled", True)
         mocker.patch.object(cfg, "backend", TracingBackend.NDJSON)
         mocker.patch.object(cfg, "ndjson", NdjsonTracingConfig(traces_dir=traces_dir))

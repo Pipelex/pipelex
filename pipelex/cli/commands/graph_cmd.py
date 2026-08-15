@@ -67,7 +67,7 @@ def _do_graph_render(
     include_mermaidflow = mermaidflow or (not mermaidflow and not reactflow)
     include_reactflow = reactflow or (not mermaidflow and not reactflow)
 
-    base_graph_config = get_config().pipelex.pipeline_execution_config.graph_config
+    base_graph_config = get_config().interpreter.pipeline_execution.graph
     flow_direction = direction or FlowchartDirection.TOP_DOWN
 
     saved_files = asyncio.run(

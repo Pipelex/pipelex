@@ -17,7 +17,7 @@ class TestSmokeHtmlRender:
             nodes=[node],
             edges=[],
         )
-        config = get_config().pipelex.pipeline_execution_config.graph_config.reactflow_config
+        config = get_config().interpreter.pipeline_execution.graph.reactflow
 
         html = generate_reactflow_html(graph, config=config)
 

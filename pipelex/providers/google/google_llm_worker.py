@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 
 
 class GoogleLLMWorker(LLMWorkerAbstract):
-    # Key into cogt.llm_config.effort_to_budget_maps for manual-thinking budget resolution
+    # Key into inference.llm.effort_to_budget_maps for manual-thinking budget resolution
     reasoning_budget_family: ClassVar[str] = "gemini"
 
     def __init__(
@@ -58,7 +58,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
         else:
             self.instructor_for_objects = from_genai(client=sdk_instance, use_async=True)
 
-        instructor_config = get_config().cogt.llm_config.instructor_config
+        instructor_config = get_config().inference.llm.instructor
         if instructor_config.is_dump_kwargs_enabled:
             self.instructor_for_objects.on(hook_name="completion:kwargs", handler=dump_kwargs)
         if instructor_config.is_dump_response_enabled:
@@ -145,11 +145,11 @@ class GoogleLLMWorker(LLMWorkerAbstract):
         """Build thinking config when reasoning_effort is specified."""
         match thinking_mode:
             case ThinkingMode.MANUAL:
-                google_level = get_config().cogt.llm_config.google_config.get_reasoning_level(effort=effort)
+                google_level = get_config().inference.llm.google.get_reasoning_level(effort=effort)
                 if google_level is None:
                     log.verbose("Google manual thinking disabled (effort mapped to disabled)")
                     return genai_types.ThinkingConfig(thinking_budget=0)
-                budget = get_config().cogt.llm_config.get_reasoning_budget(
+                budget = get_config().inference.llm.get_reasoning_budget(
                     family=self.reasoning_budget_family,
                     effort=effort,
                 )
@@ -158,7 +158,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 log.verbose(f"Google manual thinking with thinking_budget={budget} (from effort={effort})")
                 return genai_types.ThinkingConfig(thinking_budget=budget)
             case ThinkingMode.ADAPTIVE:
-                thinking_level = get_config().cogt.llm_config.google_config.get_reasoning_level(effort=effort)
+                thinking_level = get_config().inference.llm.google.get_reasoning_level(effort=effort)
                 if thinking_level is None:
                     log.verbose("Google adaptive thinking disabled (effort=NONE)")
                     return genai_types.ThinkingConfig(thinking_budget=0)

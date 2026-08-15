@@ -7,7 +7,7 @@ class TestStorageConfigIntegration:
 
     def test_config_has_local_uri_format(self) -> None:
         """Test that local storage config has uri_format defined."""
-        storage_config = get_config().pipelex.storage_config
+        storage_config = get_config().runtime.storage
         assert storage_config.local is not None
         assert storage_config.local.uri_format is not None
         assert "{primary_id}" in storage_config.local.uri_format
@@ -17,7 +17,7 @@ class TestStorageConfigIntegration:
 
     def test_config_has_in_memory_uri_format(self) -> None:
         """Test that in-memory storage config has uri_format defined."""
-        storage_config = get_config().pipelex.storage_config
+        storage_config = get_config().runtime.storage
         assert storage_config.in_memory is not None
         assert storage_config.in_memory.uri_format is not None
         assert "{primary_id}" in storage_config.in_memory.uri_format
@@ -27,7 +27,7 @@ class TestStorageConfigIntegration:
 
     def test_uri_format_property_returns_correct_format_for_local(self) -> None:
         """Test that the uri_format property returns the correct format when method is local."""
-        storage_config = get_config().pipelex.storage_config
+        storage_config = get_config().runtime.storage
         match storage_config.method:
             case StorageMethod.LOCAL:
                 assert storage_config.local is not None

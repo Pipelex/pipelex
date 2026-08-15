@@ -4,7 +4,7 @@ description: "Manage cost reporting for LLM usage, OCR processing, and other ope
 
 # Reporting Configuration
 
-Configuration section: `[pipelex.reporting_config]`
+Configuration section: `[runtime.reporting]`
 
 ## Overview
 
@@ -70,7 +70,7 @@ cost_report_unit_scale = 1.0
 ## Example Configuration
 
 ```toml
-[pipelex.reporting_config]
+[runtime.reporting]
 # Enable console logging for development
 is_log_costs_to_console = true
 

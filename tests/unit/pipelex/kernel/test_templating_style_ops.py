@@ -10,7 +10,7 @@ class TestResolveTemplatingStyle:
     def test_none_resolves_to_config_default(self):
         """Totality: with nothing authored, the resolver returns the config default — never None."""
         resolved = resolve_templating_style(authored=None)
-        assert resolved == get_config().pipelex.templating_config.default_templating_style
+        assert resolved == get_config().inference.templating.default_templating_style
 
     def test_house_default_is_xml_plain(self):
         """Pins the shipped default declared in pipelex.toml: xml tags, plain text format."""

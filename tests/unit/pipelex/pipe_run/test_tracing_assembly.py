@@ -44,11 +44,11 @@ def _make_usage_event(pipeline_run_id: str, node_id: str) -> UsageReportEvent:
 class TestTracingAssembly:
     def _enable_tracing(self, mocker: MockerFixture) -> None:
         mock_config = mocker.patch(f"{_MODULE}.get_config")
-        mock_config.return_value.pipelex.tracing_config.is_enabled = True
+        mock_config.return_value.runtime.tracing.is_enabled = True
 
     def _disable_tracing(self, mocker: MockerFixture) -> None:
         mock_config = mocker.patch(f"{_MODULE}.get_config")
-        mock_config.return_value.pipelex.tracing_config.is_enabled = False
+        mock_config.return_value.runtime.tracing.is_enabled = False
 
     def test_returns_empty_when_tracing_disabled(self, mocker: MockerFixture) -> None:
         self._disable_tracing(mocker)

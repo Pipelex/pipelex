@@ -15,7 +15,7 @@ def aws_key_method(request: pytest.FixtureRequest) -> AwsKeyMethod:
 @pytest.mark.gha_disabled
 @pytest.mark.codex_disabled
 def test_get_aws_access_keys(aws_key_method: AwsKeyMethod):
-    aws_config = get_config().pipelex.aws_config
+    aws_config = get_config().runtime.aws
     aws_access_key_id, aws_secret_access_key, aws_region = aws_config.get_aws_access_keys_with_method(api_key_method=aws_key_method)
     assert aws_access_key_id
     assert aws_secret_access_key

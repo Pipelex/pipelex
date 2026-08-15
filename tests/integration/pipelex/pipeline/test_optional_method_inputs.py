@@ -61,7 +61,7 @@ class TestOptionalMethodInputs:
         """prepare_pipe_job seeds a not-provided absence record for each omitted `?` input."""
         library_id = load_empty_library()
         pipe = _make_method_pipe()
-        execution_config = get_config().pipelex.pipeline_execution_config
+        execution_config = get_config().interpreter.pipeline_execution
 
         pipe_job = await prepare_pipe_job(
             pipe=pipe,
@@ -91,7 +91,7 @@ class TestOptionalMethodInputs:
     async def test_provided_optional_input_leaves_no_record(self, load_empty_library: Callable[[], str]):
         library_id = load_empty_library()
         pipe = _make_method_pipe()
-        execution_config = get_config().pipelex.pipeline_execution_config
+        execution_config = get_config().interpreter.pipeline_execution
 
         pipe_job = await prepare_pipe_job(
             pipe=pipe,
@@ -115,7 +115,7 @@ class TestOptionalMethodInputs:
         """
         library_id = load_empty_library()
         pipe = _make_method_pipe()
-        execution_config = get_config().pipelex.pipeline_execution_config
+        execution_config = get_config().interpreter.pipeline_execution
 
         chained_memory = WorkingMemoryFactory.make_from_single_stuff(StuffFactory.make_from_str("penalties", name="topic"))
         upstream_record = AbsenceRecord(
@@ -167,7 +167,7 @@ class TestOptionalMethodInputs:
         """Dry-run mock seeding stays all-present (D6): optional inputs get mocks, no records."""
         library_id = load_empty_library()
         pipe = _make_method_pipe()
-        execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+        execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
             generate_graph=False,
             mock_inputs=True,
         )

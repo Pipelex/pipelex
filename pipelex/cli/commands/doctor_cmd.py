@@ -137,7 +137,7 @@ def check_config_files(*, config_dir: Path | None = None) -> tuple[bool, int, st
                 config = config_manager.load_config(config_dir=config_dir)
                 PipelexConfig.model_validate(config)
         except ValidationError as validation_error:
-            validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
+            validation_error_msg = report_validation_error(validation_error=validation_error)
             msg = f"Configuration validation failed:\n{validation_error_msg}"
             return False, 0, msg
         except ConfigValidationError as exc:
@@ -145,7 +145,7 @@ def check_config_files(*, config_dir: Path | None = None) -> tuple[bool, int, st
             # recover the original via __cause__ so we still emit the migration-aware report.
             underlying = exc.__cause__
             if isinstance(underlying, ValidationError):
-                validation_error_msg = report_validation_error(category="config", validation_error=underlying)
+                validation_error_msg = report_validation_error(validation_error=underlying)
                 msg = f"Configuration validation failed:\n{validation_error_msg}"
             else:
                 msg = f"Configuration validation failed: {exc.message}"
@@ -776,11 +776,11 @@ def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = Non
     try:
         runtime_hub.setup_config(config_cls=PipelexConfig, config_dir=config_dir)
     except ValidationError as validation_error:
-        validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
+        validation_error_msg = report_validation_error(validation_error=validation_error)
         msg = f"Could not setup config because of: {validation_error_msg}"
         raise PipelexConfigError(msg) from validation_error
 
-    log_config = get_config().pipelex.log_config
+    log_config = get_config().runtime.log
     if log_config_overrides is not None:
         merged = log_config.model_dump()
         deep_update(merged, updates=log_config_overrides)

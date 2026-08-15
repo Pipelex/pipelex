@@ -233,7 +233,7 @@ class BundleValidator:
         #    rides on PipeOutput) the sweep accumulates no per-run state on the process-global reporting
         #    manager, so overlapping sweeps (e.g. concurrent `/validate` API requests) cannot collide.
         #    Mock inputs are built by prepare_pipe_job from this DRY + is_mock_inputs config.
-        execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+        execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
             generate_graph=False,
             mock_inputs=True,
         )
@@ -304,7 +304,7 @@ class BundleValidator:
         A single ``allowed_to_fail`` match on the namespaced ``pipe_ref`` (the dict key). Collect-all,
         not first-failure-abort: every non-allowed failure is reported in one error.
         """
-        allowed_to_fail_pipes = get_config().pipelex.dry_run_config.allowed_to_fail_pipes
+        allowed_to_fail_pipes = get_config().inference.dry_run.allowed_to_fail_pipes
 
         # Only the failed refs feed logic (the allowed_to_fail match); success/skipped counts are
         # log-only, so derive them inline rather than accumulating dead lists.

@@ -379,7 +379,7 @@ class ModelManager(ModelManagerAbstract):
             search_waterfalls=model_deck_blueprint.search.waterfalls,
             search_presets=model_deck_blueprint.search.presets,
             search_choice_default=model_deck_blueprint.search.choice_default,
-            model_deck_config=get_config().cogt.model_deck_config,
+            model_deck_config=get_config().inference.model_deck,
         )
 
     @override

@@ -4,7 +4,7 @@ description: "Fine-tune Pipelex logging levels, Rich console output, and message
 
 # Logging Configuration
 
-Configuration section: `[pipelex.log_config]`
+Configuration section: `[runtime.log]`
 
 ## Overview
 
@@ -24,7 +24,7 @@ default_log_level = "INFO"
 ### Package-Specific Log Levels
 
 ```toml
-[pipelex.log_config.package_log_levels]
+[runtime.log.package_log_levels]
 anthropic = "INFO"
 asyncio = "INFO"
 botocore = "INFO"
@@ -96,7 +96,7 @@ poor_loggers = [
 
 ## Rich Console Configuration
 
-Configuration section: `[pipelex.log_config.rich_log_config]`
+Configuration section: `[runtime.log.rich_log]`
 
 ### Display Options
 
@@ -145,7 +145,7 @@ keywords_to_hilight = []
 ## Example Configuration
 
 ```toml
-[pipelex.log_config]
+[runtime.log]
 default_log_level = "INFO"
 log_mode = "rich"
 is_console_logging_enabled = true
@@ -158,12 +158,12 @@ silenced_problem_ids = []
 generic_poor_logger = "#poor-log"
 poor_loggers = []
 
-[pipelex.log_config.package_log_levels]
+[runtime.log.package_log_levels]
 pipelex = "INFO"
 openai = "WARNING"
 anthropic = "INFO"
 
-[pipelex.log_config.rich_log_config]
+[runtime.log.rich_log]
 is_show_time = false
 is_show_level = true
 is_link_path_enabled = true

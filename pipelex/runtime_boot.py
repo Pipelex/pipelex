@@ -192,11 +192,11 @@ class RuntimeBoot(metaclass=MetaSingleton):
                 config_dir=config_dir,
             )
         except ValidationError as validation_error:
-            validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
+            validation_error_msg = report_validation_error(validation_error=validation_error)
             msg = f"Could not setup config because of: {validation_error_msg}"
             raise PipelexConfigError(msg) from validation_error
 
-        log_config = get_config().pipelex.log_config
+        log_config = get_config().runtime.log
         self.runtime_hub.set_console_print_target(target=log_config.console_print_target)
         log.configure(log_config=log_config)
         log.verbose("Logs are configured")
@@ -232,7 +232,7 @@ class RuntimeBoot(metaclass=MetaSingleton):
         if not isinstance(cause_exc, ValidationError):
             msg += f"\nUnexpexted cause:{cause_exc}"
             raise PipelexSetupError(msg) from cause_exc
-        report = report_validation_error(category="config", validation_error=cause_exc)
+        report = report_validation_error(validation_error=cause_exc)
         return f"""{msg}
 {report}
 
@@ -279,12 +279,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if kwargs:
             msg = f"The base setup method does not support any additional arguments: {kwargs}"
             raise PipelexSetupError(msg)
-
-        # Boot this process under the named orchestrator plugin, when explicitly provided.
-        # The matching boot-orchestrator plugin (e.g. Temporal) claims the hub slots in its
-        # register() iff plugins.boot_orchestrator == its own name; any other value is in-process.
-        if boot_orchestrator is not None:
-            get_config().plugins.boot_orchestrator = boot_orchestrator
 
         # --- Pipelex Service and Telemetry --------------------------------------------------
 
@@ -366,6 +360,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # applied at their ordered apply-points in later phases.
         plugin_registrar = build_registrar(
             config=get_config(),
+            boot_orchestrator=boot_orchestrator,
             builtin_plugins=KERNEL_BUILTIN_PLUGINS if builtin_plugins is None else builtin_plugins,
             core_unconditional_plugin_names=(
                 KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES if core_unconditional_plugin_names is None else core_unconditional_plugin_names
@@ -374,7 +369,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         )
         self._plugin_registrar = plugin_registrar
         # Reject an unknown boot orchestrator before falling through to the core defaults. The requested
-        # name (CLI --orchestrator / setup(boot_orchestrator=...) / config) is matched against registered
+        # name (CLI --orchestrator / setup(boot_orchestrator=...)) is matched against registered
         # plugin names — the same namespace the slot-claim gate uses (boot_orchestrator == plugin.name).
         # When no plugin of that name registered (not installed, disabled, or a typo) nothing claims the
         # hub slots, so without this guard the run would silently execute in-process instead of under the
@@ -390,9 +385,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # ``PIPE_FUNC_EXECUTOR``, all applied in ``Pipelex.setup``). What closed it is the entry-point
         # group split: the layer signal that remedy needed is now carried by the plugin's own
         # declaration.
-        requested_boot_orchestrator = get_config().plugins.boot_orchestrator
-        if requested_boot_orchestrator is not None and requested_boot_orchestrator not in plugin_registrar.registered_plugin_names:
-            raise UnknownBootOrchestratorError(requested=requested_boot_orchestrator)
+        if boot_orchestrator is not None and boot_orchestrator not in plugin_registrar.registered_plugin_names:
+            raise UnknownBootOrchestratorError(requested=boot_orchestrator)
 
         # Secrets provider precedence: explicit setup() param > config-selected registry factory.
         # The built-in SecretsPlugin supplies the "env" method, so there is no separate core default.
@@ -400,7 +394,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         secrets_provider_registry = SecretsProviderRegistry(plugin_registrar.secrets_providers)
         self.runtime_hub.set_secrets_provider_registry(secrets_provider_registry)
         if secrets_provider is None:
-            secrets_config = get_config().pipelex.secrets_config
+            secrets_config = get_config().runtime.secrets
             secrets_provider = secrets_provider_registry.get_required(method=secrets_config.method)(secrets_config)
 
         # Disable Pipelex telemetry when:
@@ -526,7 +520,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # The built-in StoragePlugin supplies every method, so there is no separate core default.
         # Resolves here (after secrets is on the hub) so the GCP factory's secret read works.
         if storage_provider is None:
-            storage_config = get_config().pipelex.storage_config
+            storage_config = get_config().runtime.storage
             storage_provider = storage_provider_registry.get_required(method=storage_config.method)(storage_config)
         self.runtime_hub.set_storage_provider(storage_provider)
 
@@ -537,6 +531,13 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # dispatch activities and mock inside them, so `needs_inference` plays no role in picking the
         # generator. Its other boot roles (gateway/model setup, credentials, telemetry) are unchanged.
         self.runtime_hub.set_dry_run_forced(is_forced=not needs_inference)
+        # The orchestrator plugin this process booted under, recorded as boot-scoped hub state rather
+        # than written into the config object — nothing in a pipelex.toml names an orchestrator, and
+        # routing a boot argument through the config would make it look settable. The slot-claim *gate*
+        # does not read this: a plugin's register() matched `registrar.boot_orchestrator` back at
+        # discovery, and the unknown-name guard above reads the argument. What reads it is run-time
+        # code asking whether it owns the process, so it must be set before the thunks below run.
+        self.runtime_hub.set_boot_orchestrator(boot_orchestrator=boot_orchestrator)
         # Injection precedence (codex C8): explicit setup() param > plugin slot-claim thunk > core default.
         # A boot-orchestrator plugin (Temporal worker) claims the CONTENT_GENERATOR slot; its thunk runs
         # only here, never at register, so booting a non-worker process imports no host-runtime SDK.
@@ -729,8 +730,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         A failed boot must release the process-global singletons it acquired, not just the singleton
         registration — otherwise they leak and poison the next boot in the same process. ``setup()``
         establishes these progressively (logging + hub config in ``__init__``, the ``KajsonManager``
-        class registry, the template registries) and may mutate config (e.g.
-        ``plugins.boot_orchestrator``); failing partway skips ``teardown()``, the normal release point.
+        class registry, the template registries) and sets boot-scoped hub state (e.g. the boot
+        orchestrator); failing partway skips ``teardown()``, the normal release point.
 
         It exists rather than calling ``teardown()`` because that path reads ``self.inference_manager``
         (and, on the interpreter half, ``self.pipeline_manager``) unguarded, and both are assigned

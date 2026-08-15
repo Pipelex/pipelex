@@ -126,9 +126,9 @@ def silence_logging_for_agent_cli() -> None:
 # without wiping out third-party package levels. Frozen so callers can't mutate it.
 AGENT_CLI_CONFIG_OVERRIDES: Mapping[str, Any] = MappingProxyType(
     {
-        "pipelex": MappingProxyType(
+        "runtime": MappingProxyType(
             {
-                "log_config": AGENT_CLI_STDERR_LOG_FIELDS,
+                "log": AGENT_CLI_STDERR_LOG_FIELDS,
             },
         ),
     }

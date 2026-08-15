@@ -146,7 +146,7 @@ class TestLeafDryObjectMocks:
         """Without nb_items the dry list falls back to dry_run_config.nb_list_items."""
         mocks = dry_llm_gen_object_list(_dry_object_assignment(RepresentativeInvoiceLine))
 
-        assert len(mocks) == get_config().pipelex.dry_run_config.nb_list_items
+        assert len(mocks) == get_config().inference.dry_run.nb_list_items
 
     async def test_generator_dry_object_list_keeps_fixed_length(self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol) -> None:
         """End-to-end through ContentGenerator: a fixed nb_items survives down to the dry leaf (D11 regression)."""

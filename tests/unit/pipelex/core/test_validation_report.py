@@ -50,7 +50,7 @@ class TestReportValidationError:
         mocker.patch.object(RuntimeHub, "_instance", None)
 
         validation_error = _make_validation_error()
-        report = report_validation_error(category="config", validation_error=validation_error)
+        report = report_validation_error(validation_error=validation_error)
 
         assert "required_field" in report
 
@@ -64,6 +64,6 @@ class TestReportValidationError:
         mocker.patch.object(RuntimeHub, "_instance", hub_without_config)
 
         validation_error = _make_validation_error()
-        report = report_validation_error(category="config", validation_error=validation_error)
+        report = report_validation_error(validation_error=validation_error)
 
         assert "required_field" in report

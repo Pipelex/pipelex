@@ -43,6 +43,7 @@ class GroupedEntryPoint(NamedTuple):
 def build_registrar(
     *,
     config: "PipelexConfig",
+    boot_orchestrator: str | None,
     builtin_plugins: "Sequence[PipelexPlugin]",
     core_unconditional_plugin_names: frozenset[str],
     entry_point_groups: "Sequence[PluginGroup]",
@@ -53,14 +54,17 @@ def build_registrar(
     so it is safe to call more than once (it runs at boot and again in the
     ``pipelex plugins list`` diagnostic command). Iterates ``builtin_plugins`` first, then the
     external entry points published under ``entry_point_groups``; version-checks each; skips (and
-    logs) any plugin named in ``config.plugins.disabled`` — externals are denylisted by their
+    logs) any plugin named in ``config.runtime.plugins.disabled`` — externals are denylisted by their
     entry-point name *before* ``load()`` so a broken installed plugin can still be
     disabled; and is fail-loud on every conflict (duplicate backend/mode/slot,
     version mismatch, broken plugin, a kernel-group plugin reaching the interpreter tier).
 
     Args:
-        config: The fully-resolved config; supplies the ``plugins.disabled`` denylist and is handed
-            to the registrar for the plugins that read it.
+        config: The fully-resolved config; supplies the ``runtime.plugins.disabled`` denylist and is
+            handed to the registrar for the plugins that read it.
+        boot_orchestrator: The orchestrator plugin this process boots under, or ``None`` for
+            in-process execution. A boot argument rather than a setting — no TOML names it — so it
+            travels as a parameter and is exposed on the registrar for the slot-claim gate to match.
         builtin_plugins: The built-ins to discover, in order. Injected rather than imported: some
             built-ins adapt interpreter-layer ports, and this module is kernel-layer, so importing
             the list here would put the method interpreter back into every kernel closure. The
@@ -76,8 +80,8 @@ def build_registrar(
             imported — which is what a kernel-only trust-base claim actually rests on.
     """
     _reject_retired_entry_point_group()
-    registrar = PluginRegistrar(config=config)
-    disabled = set(config.plugins.disabled)
+    registrar = PluginRegistrar(config=config, boot_orchestrator=boot_orchestrator)
+    disabled = set(config.runtime.plugins.disabled)
 
     # Built-ins are already instantiated, so their name is known up front. They carry no group: they
     # are filed by layer in-tree, and the caller passes only the halves its layer may run.

@@ -454,5 +454,5 @@ InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
 
 - [Pipe Routing & Execution](./pipe-routing-and-execution.md) — the layer model errors rise through
 - [Runtime Bridge & Transport](./runtime-bridge-and-transport.md) — the process boundary the error bridge spans (the per-backend error converters live in the host-runtime plugins)
-- [Cogt Configuration](../configuration/config-technical/cogt-config.md) — `transport_max_retries` and the Tier 1 retry policy
+- [Inference Configuration](../configuration/config-technical/inference-config.md) — `transport_max_retries` and the Tier 1 retry policy
 - [Agent CLI](../tools/cli/agent-cli.md) — the JSON / markdown error contract

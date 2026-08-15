@@ -31,7 +31,7 @@ def log_config() -> LogConfig:
 
     loader = ConfigLoader()
     config_dict = load_toml_from_path(loader.pipelex_root_dir / "pipelex.toml")
-    return LogConfig.model_validate(config_dict["pipelex"]["log_config"])
+    return LogConfig.model_validate(config_dict["runtime"]["log"])
 
 
 @pytest.fixture

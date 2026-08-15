@@ -96,7 +96,7 @@ class TestStorageExternalPlugin:
         Pipelex.make(
             integration_mode=_test_integration_mode(),
             needs_inference=False,
-            config_overrides={"pipelex": {"storage_config": {"method": EXTERNAL_STORAGE_METHOD}}},
+            config_overrides={"runtime": {"storage": {"method": EXTERNAL_STORAGE_METHOD}}},
         )
 
         assert get_storage_provider_registry().has(method=EXTERNAL_STORAGE_METHOD)

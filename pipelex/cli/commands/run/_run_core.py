@@ -187,7 +187,7 @@ async def _execute_run(
     pipe_run_mode = PipeRunMode.DRY if dry_run else None
 
     # Build effective execution config with CLI overrides
-    execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+    execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
         generate_graph=graph,
         generate_usage=costs,
         force_include_full_data=graph_full_data,
@@ -249,7 +249,7 @@ async def _execute_run(
 
         graph_outputs = await generate_graph_outputs(
             graph_spec=graph_spec,
-            graph_config=execution_config.graph_config,
+            graph_config=execution_config.graph,
             pipe_code=pipe_code,
         )
 

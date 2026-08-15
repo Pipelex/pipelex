@@ -50,6 +50,15 @@ _PACKAGED_DEFAULTS = Path("pipelex/pipelex.toml")
 _KIT_TEMPLATE = Path("pipelex/kit/configs/pipelex.toml")
 _ARRAY_OF_TABLES_FILE = Path("pipelex/kit/configs/plxt.toml")
 
+# The out-of-order specimen. The packaged defaults used to be written out of order — `[pipelex]` and
+# `[migration]` each split into several chunks — and the proxy tests below were written against them.
+# The configuration reshape (`pipelex-config@2`) rewrote that file in order, so the live document
+# produces no proxy at all and can no longer witness the behaviour. Its schema-1 golden can: it is a
+# byte copy of the pre-reshape file, and every golden below the chain's head is frozen, so this
+# specimen keeps the shape permanently. Reaching for it here is deliberate — the alternative, a
+# hand-written fixture, would drift from the document these tests exist to characterize.
+_OUT_OF_ORDER_SPECIMEN = Path("pipelex/migration/goldens/pipelex-config/defaults@1.toml")
+
 _ABSENT_KEY = "key_that_no_configuration_file_declares"
 
 
@@ -84,6 +93,21 @@ def _table_paths(node: object, prefix: list[str]) -> list[list[str]]:
             collected.append(path)
             collected.extend(_table_paths(_as_mapping(value), path))
     return collected
+
+
+def _move_storage_under_a_fresh_root(toml_doc: TOMLDocument) -> None:
+    """Move ``runtime.storage`` to ``relocated.storage``, creating the destination root as it goes.
+
+    The two placement tests need a move whose destination parent does *not* already exist, which is
+    the case that makes tomlkit append at the end of the document. ``relocated`` is a name no
+    configuration surface uses, so it can never collide with a real section.
+    """
+    runtime_table = _as_mapping(toml_doc["runtime"])
+    moved = runtime_table["storage"]
+    del runtime_table["storage"]
+    created_parent = tomlkit.table()
+    created_parent["storage"] = moved
+    toml_doc["relocated"] = created_parent
 
 
 def _probe_reachability(*, toml_doc: TOMLDocument, table_path: list[str]) -> str | None:
@@ -148,7 +172,7 @@ class TestFixApplierConfigSurfaceShapes:
             toml_doc=toml_doc,
             ops=[
                 RenameTableKeyOp(
-                    table_path=["cogt", "img_gen_config", "quality_to_steps_maps", "flux"],
+                    table_path=["inference", "img_gen", "quality_to_steps_maps", "flux"],
                     key="low",
                     new_key="lowest",
                 )
@@ -173,15 +197,21 @@ class TestFixApplierConfigSurfaceShapes:
         assert detail is not None
         assert "not found in table" in detail
 
-    def test_packaged_defaults_produce_out_of_order_proxies(self) -> None:
-        """The packaged document is written out of order, so two of its root tables are proxies.
+    def test_the_specimen_produces_out_of_order_proxies_and_the_live_defaults_do_not(self) -> None:
+        """The specimen is written out of order, so two of its root tables are proxies; the live file is not.
 
-        This is the premise of every proxy test below; if a reordering of ``pipelex.toml`` ever makes
-        it false, those tests stop measuring what they claim to.
+        The first half is the premise of every proxy test below; if the specimen ever stops
+        witnessing the shape, those tests stop measuring what they claim to. The second half pins
+        what the configuration reshape delivered (ruling R6): the packaged defaults are written in
+        order now, so no root table of the document users actually read is a proxy.
         """
-        toml_doc = _parse(_PACKAGED_DEFAULTS)
-        proxy_roots = [str(key) for key in toml_doc if type(toml_doc[key]).__name__ == "OutOfOrderTableProxy"]
-        assert proxy_roots == ["pipelex", "migration"]
+        specimen = _parse(_OUT_OF_ORDER_SPECIMEN)
+        specimen_proxies = [str(key) for key in specimen if type(specimen[key]).__name__ == "OutOfOrderTableProxy"]
+        assert specimen_proxies == ["pipelex", "migration"]
+
+        live = _parse(_PACKAGED_DEFAULTS)
+        live_proxies = [str(key) for key in live if type(live[key]).__name__ == "OutOfOrderTableProxy"]
+        assert live_proxies == []
 
     @pytest.mark.parametrize(
         "table_path",
@@ -193,7 +223,7 @@ class TestFixApplierConfigSurfaceShapes:
     )
     def test_delete_table_removes_every_chunk_of_an_out_of_order_table(self, table_path: list[str]) -> None:
         """``delete_table`` removes all of an out-of-order table, leaving no orphaned header behind."""
-        toml_doc = _parse(_PACKAGED_DEFAULTS)
+        toml_doc = _parse(_OUT_OF_ORDER_SPECIMEN)
         applications = apply_fix_ops(toml_doc=toml_doc, ops=[DeleteTableOp(table_path=table_path)])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
         rendered = _dumps(toml_doc)
@@ -207,9 +237,11 @@ class TestFixApplierConfigSurfaceShapes:
 
         This is the configuration reshape's hardest shape (``[pipelex]`` becomes ``[interpreter]``)
         and it goes through ``Container._replace``, a tomlkit internal — so this test is the tripwire.
+        It runs the reshape's own op over the pre-reshape specimen, which is the document that op
+        was actually authored against.
         """
-        toml_doc = _parse(_PACKAGED_DEFAULTS)
-        original = _parse(_PACKAGED_DEFAULTS)
+        toml_doc = _parse(_OUT_OF_ORDER_SPECIMEN)
+        original = _parse(_OUT_OF_ORDER_SPECIMEN)
         applications = apply_fix_ops(toml_doc=toml_doc, ops=[RenameTableKeyOp(table_path=[], key="pipelex", new_key="interpreter")])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
         rendered = _dumps(toml_doc)
@@ -224,7 +256,7 @@ class TestFixApplierConfigSurfaceShapes:
         every run, so an entry that has already been applied must be a byte-level no-op.
         """
         rename_op = RenameTableKeyOp(table_path=[], key="cogt", new_key="inference")
-        toml_doc = _parse(_PACKAGED_DEFAULTS)
+        toml_doc = _parse(_OUT_OF_ORDER_SPECIMEN)
         apply_fix_ops(toml_doc=toml_doc, ops=[rename_op])
         once = _dumps(toml_doc)
 
@@ -245,7 +277,7 @@ class TestFixApplierConfigSurfaceShapes:
         to create a destination section.
         """
         toml_doc = _parse(_PACKAGED_DEFAULTS)
-        applications = apply_fix_ops(toml_doc=toml_doc, ops=[EnsureTableOp(table_path=["pipelex", "freshly_ensured"])])
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[EnsureTableOp(table_path=["interpreter", "freshly_ensured"])])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
         assert "freshly_ensured = {}" in _dumps(toml_doc)
 
@@ -256,17 +288,12 @@ class TestFixApplierConfigSurfaceShapes:
         migration contract has to state, because a migrated file will not look like the original.
         """
         toml_doc = _parse(_KIT_TEMPLATE)
-        pipelex_table = _as_mapping(toml_doc["pipelex"])
-        moved = pipelex_table["storage_config"]
-        del pipelex_table["storage_config"]
-        created_parent = tomlkit.table()
-        created_parent["storage"] = moved
-        toml_doc["runtime"] = created_parent
+        _move_storage_under_a_fresh_root(toml_doc)
 
         rendered_lines = _dumps(toml_doc).splitlines()
-        header_indexes = [index for index, line in enumerate(rendered_lines) if line.startswith("[runtime.storage]")]
+        header_indexes = [index for index, line in enumerate(rendered_lines) if line.startswith("[relocated.storage]")]
         assert len(header_indexes) == 1
-        remaining_headers = [line for line in rendered_lines[header_indexes[0] :] if line.startswith("[") and not line.startswith("[runtime")]
+        remaining_headers = [line for line in rendered_lines[header_indexes[0] :] if line.startswith("[") and not line.startswith("[relocated")]
         assert remaining_headers == []
 
     def test_moved_table_leaves_its_banner_comment_behind(self) -> None:
@@ -281,17 +308,12 @@ class TestFixApplierConfigSurfaceShapes:
         banner = "# Storage Config"
         source_lines = _dumps(toml_doc).splitlines()
         banner_index = source_lines.index(banner)
-        assert source_lines[banner_index + 2 : banner_index + 4] == ["", "[pipelex.storage_config]"]
+        assert source_lines[banner_index + 2 : banner_index + 4] == ["", "[runtime.storage]"]
 
-        pipelex_table = _as_mapping(toml_doc["pipelex"])
-        moved = pipelex_table["storage_config"]
-        del pipelex_table["storage_config"]
-        created_parent = tomlkit.table()
-        created_parent["storage"] = moved
-        toml_doc["runtime"] = created_parent
+        _move_storage_under_a_fresh_root(toml_doc)
 
         migrated_lines = _dumps(toml_doc).splitlines()
         migrated_banner_index = migrated_lines.index(banner)
-        assert migrated_lines[migrated_banner_index + 2] != "[runtime.storage]"
-        destination_index = migrated_lines.index("[runtime.storage]")
+        assert migrated_lines[migrated_banner_index + 2] != "[relocated.storage]"
+        destination_index = migrated_lines.index("[relocated.storage]")
         assert banner not in migrated_lines[destination_index - 3 : destination_index]

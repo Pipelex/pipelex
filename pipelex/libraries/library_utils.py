@@ -23,7 +23,7 @@ def get_pipelex_mthds_files_from_package() -> list[Path]:
 
     def _find_mthds_in_traversable(traversable: Traversable, *, collected: list[Path]) -> None:
         """Recursively find .mthds files in a Traversable."""
-        excluded_dirs = get_config().pipelex.scan_config.excluded_dirs
+        excluded_dirs = get_config().interpreter.scan.excluded_dirs
         try:
             if not traversable.is_dir():
                 return
@@ -75,7 +75,7 @@ def get_pipelex_mthds_files_from_dirs(dirs: set[Path]) -> list[Path]:
         mthds_files = find_files_in_dir(
             dir_path=dir_path,
             pattern=f"*{MTHDS_EXTENSION}",
-            excluded_dirs=list(get_config().pipelex.scan_config.excluded_dirs),
+            excluded_dirs=list(get_config().interpreter.scan.excluded_dirs),
             force_include_dirs=[str(Path(builder_pkg.__file__).parent)],
         )
 

@@ -30,7 +30,7 @@ PIPE_CATEGORY_FIELD_KEY = "pipe_category"
 class MthdsFactory:
     @classmethod
     def _mthds_config(cls) -> MthdsConfig:
-        return get_config().pipelex.mthds_config
+        return get_config().interpreter.mthds
 
     @classmethod
     def format_tomlkit_string(cls, text: str) -> Any:  # Can't type this because of tomlkit

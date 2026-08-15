@@ -324,7 +324,7 @@ class TestReportingEventEmission:
         tracing is enabled.
         """
         # Force tracing to disabled regardless of process config.
-        mocker.patch.object(get_config().pipelex.tracing_config, "is_enabled", False)
+        mocker.patch.object(get_config().runtime.tracing, "is_enabled", False)
 
         manager = ReportingManager()
         manager.setup()

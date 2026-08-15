@@ -1,11 +1,9 @@
 from enum import StrEnum
 from typing import Annotated, Literal, Self
 
-import shortuuid
 from pydantic import Field, field_validator, model_validator
 
-from pipelex.base_exceptions import PipelexConfigError
-from pipelex.cogt.config_cogt import Cogt
+from pipelex.cogt.config_cogt import InferenceConfig
 from pipelex.graph.graph_config import GraphConfig
 from pipelex.language.mthds_config import MthdsConfig
 from pipelex.system.configuration.config_model import ConfigModel
@@ -15,7 +13,6 @@ from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.secrets.secrets_config import SecretsProviderConfig
 from pipelex.tools.storage.storage_config import StorageConfig
-from pipelex.tools.templating.templating_style import TemplatingStyle
 
 
 class ConfigPaths:
@@ -58,26 +55,6 @@ class KitConfig(ConfigModel):
 
 class PipeRunConfig(ConfigModel):
     pipe_stack_limit: int
-
-
-class DryRunConfig(ConfigModel):
-    text_gen_truncate_length: int
-    nb_list_items: int
-    nb_extract_pages: int
-    image_urls: list[str]
-    allowed_to_fail_pipes: list[str] = Field(default_factory=list)
-
-    @field_validator("image_urls", mode="before")
-    @classmethod
-    def validate_image_urls(cls, value: list[str]) -> list[str]:
-        if not value:
-            msg = "dry_run_config.image_urls must be a non-empty list"
-            raise PipelexConfigError(msg)
-        return value
-
-
-class TemplatingConfig(ConfigModel):
-    default_templating_style: TemplatingStyle
 
 
 class ReportingConfig(ConfigModel):
@@ -137,7 +114,7 @@ class PipelineExecutionConfig(ConfigModel):
     is_mock_inputs: bool
     is_generate_graph: bool
     is_generate_usage: bool
-    graph_config: GraphConfig
+    graph: GraphConfig
 
     # Bounded fan-out concurrency for PipeBatch (the in-process backpressure pillar, short of a durable execution backend).
     # An integer caps the number of branches executed at once; the literal "unbounded" disables the bound.
@@ -156,7 +133,7 @@ class PipelineExecutionConfig(ConfigModel):
         Args:
             generate_graph: If not None, overrides is_generate_graph (graph node/edge events + GraphSpec assembly).
             generate_usage: If not None, overrides is_generate_usage (emit usage/cost tracing events).
-            force_include_full_data: If not None, overrides all graph_config.data_inclusion flags
+            force_include_full_data: If not None, overrides all graph.data_inclusion flags
                 (stuff_json_content, stuff_text_content, stuff_html_content, error_stack_traces).
             mock_inputs: If not None, overrides is_mock_inputs. When True, generates mock
                 data for missing required inputs (for dry-run validation).
@@ -176,7 +153,7 @@ class PipelineExecutionConfig(ConfigModel):
             updates["is_mock_inputs"] = mock_inputs
 
         if force_include_full_data is not None:
-            new_data_inclusion = self.graph_config.data_inclusion.model_copy(
+            new_data_inclusion = self.graph.data_inclusion.model_copy(
                 update={
                     "stuff_json_content": force_include_full_data,
                     "stuff_text_content": force_include_full_data,
@@ -184,48 +161,11 @@ class PipelineExecutionConfig(ConfigModel):
                     "error_stack_traces": force_include_full_data,
                 }
             )
-            updates["graph_config"] = self.graph_config.model_copy(update={"data_inclusion": new_data_inclusion})
+            updates["graph"] = self.graph.model_copy(update={"data_inclusion": new_data_inclusion})
 
         if updates:
             return self.model_copy(update=updates)
         return self
-
-
-class Pipelex(ConfigModel):
-    storage_config: StorageConfig
-    secrets_config: SecretsProviderConfig
-    log_config: LogConfig
-    aws_config: AwsConfig
-
-    templating_config: TemplatingConfig
-    mthds_config: MthdsConfig
-
-    dry_run_config: DryRunConfig
-    pipe_run_config: PipeRunConfig
-    pipe_func_config: PipeFuncConfig
-    pipeline_execution_config: PipelineExecutionConfig
-    reporting_config: ReportingConfig
-    tracing_config: TracingConfig
-    observer_config: ObserverConfig
-    scan_config: ScanConfig
-    builder_config: BuilderConfig
-    kit_config: KitConfig
-
-
-class MigrationConfig(ConfigModel):
-    migration_maps: dict[str, dict[str, str]]
-
-    def text_in_renaming_keys(self, text: str, *, category: str) -> list[tuple[str, str]]:
-        renaming_map = self.migration_maps.get(category)
-        if not renaming_map:
-            return []
-        return [(key, value) for key, value in renaming_map.items() if text in key]
-
-    def text_in_renaming_values(self, text: str, *, category: str) -> list[tuple[str, str]]:
-        renaming_map = self.migration_maps.get(category)
-        if not renaming_map:
-            return []
-        return [(key, value) for key, value in renaming_map.items() if text in value]
 
 
 class PluginsConfig(ConfigModel):
@@ -234,18 +174,42 @@ class PluginsConfig(ConfigModel):
     # unconditionally is a startup error. There is intentionally no allowlist.
     disabled: list[str]
 
-    # Boot *this process* under the orchestrator plugin of this name. A boot-orchestrator
-    # plugin (e.g. the Temporal plugin) claims the process-global hub slots in its
-    # ``register`` iff ``plugins.boot_orchestrator == <its own name>``; any other value
-    # (or ``None``) leaves execution in-process. Core names no orchestrator — the gate is
-    # a plain name match, set programmatically (CLI ``--orchestrator`` / ``Pipelex.setup``),
-    # not from ``pipelex.toml``. Optional, so it stays absent from the TOML defaults.
-    boot_orchestrator: str | None = None
+
+class RuntimeConfig(ConfigModel):
+    """Kernel-layer, process-scoped infrastructure — what ``runtime_hub`` brokers.
+
+    The machinery present at execution time whatever is loaded, per
+    ``docs/contribute/hub-layering.md``: storage, secrets, logging, cloud credentials,
+    reporting, tracing, observation, and the plugin system's own denylist.
+    """
+
+    storage: StorageConfig
+    secrets: SecretsProviderConfig
+    log: LogConfig
+    aws: AwsConfig
+    reporting: ReportingConfig
+    tracing: TracingConfig
+    observer: ObserverConfig
+    plugins: PluginsConfig
+
+
+class InterpreterConfig(ConfigModel):
+    """Library-scoped method machinery — what ``interpreter_hub`` brokers.
+
+    Everything that only means something once ``.mthds`` content is loaded: parsing,
+    pipe execution parameters, pipeline orchestration, source discovery and authoring.
+    """
+
+    mthds: MthdsConfig
+    pipe_run: PipeRunConfig
+    pipe_func: PipeFuncConfig
+    pipeline_execution: PipelineExecutionConfig
+    scan: ScanConfig
+    builder: BuilderConfig
 
 
 class PipelexConfig(ConfigRoot):
-    session_id: str = shortuuid.uuid()
-    cogt: Cogt
-    pipelex: Pipelex
-    plugins: PluginsConfig
-    migration: MigrationConfig
+    runtime: RuntimeConfig
+    inference: InferenceConfig
+    interpreter: InterpreterConfig
+    kit: KitConfig

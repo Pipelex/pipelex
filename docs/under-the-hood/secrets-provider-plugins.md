@@ -115,7 +115,7 @@ def _make_env_secrets_provider(config: SecretsProviderConfig) -> SecretsProvider
 
 ```toml
 # .pipelex/pipelex.toml
-[pipelex.secrets_config]
+[runtime.secrets]
 method = "vault"          # an out-of-tree provider — selected iff its plugin is installed
 ```
 
@@ -133,7 +133,7 @@ Whether that token names an *installed* provider is validated at **registry look
 | `secrets_config.method` names no registered provider | `UnknownSecretsMethodError` (lists the registered methods) |
 | published under the retired `pipelex.plugins` group | `RetiredPluginEntryPointGroupError` (names the plugins and the group each should move to) |
 | two plugins register the same `method` | `DuplicateSecretsProviderError` (names both plugins) |
-| `name` (`"secrets"`) in `plugins.disabled` | `CoreUnconditionalPluginDisabledError` |
+| `name` (`"secrets"`) in `runtime.plugins.disabled` | `CoreUnconditionalPluginDisabledError` |
 | entry point raises while loading/registering | `BrokenPluginError` |
 | optional SDK missing at use | `MissingDependencyError` (package + `pipelex[<extra>]` hint) |
 
@@ -155,7 +155,7 @@ A third-party secrets plugin is a distribution that:
 vault_secrets = "pipelex_secrets_vault.plugin:VaultSecretsPlugin"
 ```
 
-Installing the distribution makes the method selectable (`secrets_config.method = "vault"`); uninstalling removes it. No core change, no central registration list — *presence* is the source of truth. A discovered plugin can be quarantined without uninstalling via the `plugins.disabled` denylist (matched against the entry-point name *before* load, so a broken install can still be disabled to recover startup — see [Inference Backend Plugins](inference-backend-plugins.md) for the shared discovery/denylist machinery).
+Installing the distribution makes the method selectable (`secrets_config.method = "vault"`); uninstalling removes it. No core change, no central registration list — *presence* is the source of truth. A discovered plugin can be quarantined without uninstalling via the `runtime.plugins.disabled` denylist (matched against the entry-point name *before* load, so a broken install can still be disabled to recover startup — see [Inference Backend Plugins](inference-backend-plugins.md) for the shared discovery/denylist machinery).
 
 Use `pipelex plugins list` to see every discovered plugin, the entry-point group it was found under, what each contributed, and its denylist state. The **Group** column is the first thing to read when a plugin is missing: a built-in shows `—`, and an external plugin that resolved to the wrong layer shows it there.
 

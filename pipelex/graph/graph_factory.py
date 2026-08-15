@@ -85,10 +85,10 @@ async def generate_graph_outputs(
         graphspec_json = graph_spec.to_json()
 
     # Get the mermaid theme from config
-    mermaid_theme = graph_config.mermaid_config.style.theme
+    mermaid_theme = graph_config.mermaid.style.theme
 
     # Resolve mermaid direction: explicit override takes priority, then config
-    effective_direction = direction or graph_config.mermaid_config.direction
+    effective_direction = direction or graph_config.mermaid.direction
 
     # Generate mermaidflow view
     if inclusion.mermaidflow_mmd or inclusion.mermaidflow_html:
@@ -115,7 +115,7 @@ async def generate_graph_outputs(
 
     # Generate ReactFlow HTML
     if inclusion.reactflow_html:
-        effective_rf_config = graph_config.reactflow_config
+        effective_rf_config = graph_config.reactflow
         if direction is not None:
             effective_rf_config = effective_rf_config.model_copy(update={"layout_direction": direction})
         reactflow_html = await generate_reactflow_html_async(

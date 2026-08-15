@@ -28,7 +28,7 @@ class DryRunConfig(ConfigModel):
 ## Example Configuration
 
 ```toml
-[pipelex.dry_run_config]
+[inference.dry_run]
 text_gen_truncate_length = 100
 nb_list_items = 3
 nb_extract_pages = 2

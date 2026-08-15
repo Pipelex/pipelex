@@ -21,7 +21,7 @@ class _FakeTransportError(Exception):
 
 
 def _make_registrar() -> PluginRegistrar:
-    return PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(plugins=SimpleNamespace(disabled=[]))))
+    return PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(runtime=SimpleNamespace(plugins=SimpleNamespace(disabled=[])))))
 
 
 def _to_report(exc: Exception) -> ErrorReport:

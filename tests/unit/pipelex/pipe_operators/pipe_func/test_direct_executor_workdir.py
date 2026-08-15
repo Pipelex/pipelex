@@ -114,7 +114,7 @@ class TestDirectExecutorWorkdir:
         """
         # Build a real crate from the .mthds (hosted mode: the loader tolerates the yet-unregistered
         # function), then attach ONLY the PipeFunc source — deliberately NO structures/ source.
-        pipe_func_config = get_config().pipelex.pipe_func_config
+        pipe_func_config = get_config().interpreter.pipe_func
         previous_mode = pipe_func_config.execution_mode
         pipe_func_config.execution_mode = "local_sandbox"
         library_manager = get_library_manager()

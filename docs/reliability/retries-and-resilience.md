@@ -54,11 +54,11 @@ This section goes deeper on each piece:
 
 | Setting | Location | Default | Controls |
 |---------|----------|---------|----------|
-| `transport_max_retries` | `[cogt]` | `2` | Tier 1 — transport retry attempts per request |
-| `schema_reask_max_attempts` | `[cogt.llm_config]` | `3` | `instructor` schema re-ask attempts (structured output) |
-| `max_concurrency` | `[pipelex.pipeline_execution_config]` | `8` | `PipeBatch` bounded fan-out (set `"unbounded"` to disable) |
+| `transport_max_retries` | `[inference]` | `2` | Tier 1 — transport retry attempts per request |
+| `schema_reask_max_attempts` | `[inference.llm]` | `3` | `instructor` schema re-ask attempts (structured output) |
+| `max_concurrency` | `[interpreter.pipeline_execution]` | `8` | `PipeBatch` bounded fan-out (set `"unbounded"` to disable) |
 
-Durable execution (Tier 2) is **not** a core configuration toggle. You opt into it by booting the process under an orchestrator plugin — `plugins.boot_orchestrator` (config), `--orchestrator <name>` (CLI), or `Pipelex.make(boot_orchestrator=...)` (Python) — delivered through Pipelex's [durable execution offer](https://pipelex.com/products#durable-execution). See [Durable Execution](durable-execution.md) and [Distributed Execution](../distributed-execution/index.md).
+Durable execution (Tier 2) is **not** a core configuration toggle. You opt into it by booting the process under an orchestrator plugin — `boot_orchestrator` (config), `--orchestrator <name>` (CLI), or `Pipelex.make(boot_orchestrator=...)` (Python) — delivered through Pipelex's [durable execution offer](https://pipelex.com/products#durable-execution). See [Durable Execution](durable-execution.md) and [Distributed Execution](../distributed-execution/index.md).
 
 ---
 
@@ -69,4 +69,4 @@ Durable execution (Tier 2) is **not** a core configuration toggle. You opt into 
 - [Durable Execution](durable-execution.md) — when to move to a durable backend, and what it adds
 - [Distributed Execution](../distributed-execution/index.md) — set up the durable backend (Temporal or Mistral Workflows)
 - [Error Model](../under-the-hood/error-model.md) — how failures are classified and reported under the hood
-- [Cogt Configuration](../configuration/config-technical/cogt-config.md) — the full `[cogt]` reference
+- [Inference Configuration](../configuration/config-technical/inference-config.md) — the full `[inference]` reference

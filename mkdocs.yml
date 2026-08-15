@@ -157,7 +157,9 @@ plugins:
         'home/7-configuration/config-practical/reporting-config.md': 'configuration/config-practical/reporting-config.md'
         'home/7-configuration/config-practical/telemetry-config.md': 'configuration/config-practical/telemetry-config.md'
         'home/7-configuration/config-technical/aws-config.md': 'configuration/config-technical/aws-config.md'
-        'home/7-configuration/config-technical/cogt-config.md': 'configuration/config-technical/cogt-config.md'
+        'home/7-configuration/config-technical/cogt-config.md': 'configuration/config-technical/inference-config.md'
+        # Renamed by the configuration reshape: `[cogt]` became `[inference]`, so the page did too.
+        'configuration/config-technical/cogt-config.md': 'configuration/config-technical/inference-config.md'
         'home/7-configuration/config-technical/inference-backend-config.md': 'configuration/config-technical/inference-backend-config.md'
         'home/7-configuration/config-technical/library-config.md': 'configuration/config-technical/library-config.md'
         'home/7-configuration/index.md': 'configuration/index.md'
@@ -292,7 +294,7 @@ plugins:
         - configuration/config-practical/reporting-config.md: "Reporting Configuration"
         - configuration/config-practical/telemetry-config.md: "Telemetry Configuration"
         - configuration/config-technical/aws-config.md: "AWS Configuration"
-        - configuration/config-technical/cogt-config.md: "Cogt Configuration"
+        - configuration/config-technical/inference-config.md: "Inference Configuration"
         - configuration/config-technical/inference-backend-config.md: "LLM Providers & Models Configuration"
         - configuration/config-technical/library-config.md: "Library Configuration"
         - tools/plxt.md: "plxt (Formatter & Linter)"
@@ -543,7 +545,7 @@ nav:
         - Telemetry: configuration/config-practical/telemetry-config.md
       - Technical Configuration:
         - AWS: configuration/config-technical/aws-config.md
-        - Cogt: configuration/config-technical/cogt-config.md
+        - Inference: configuration/config-technical/inference-config.md
         - LLM Providers & Models: configuration/config-technical/inference-backend-config.md
         - Library: configuration/config-technical/library-config.md
   - Advanced:

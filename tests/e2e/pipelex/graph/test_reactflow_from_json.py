@@ -56,7 +56,7 @@ class TestReactFlowFromJson:
         assert len(graph_spec.edges) > 0
 
         # Generate ReactFlow HTML directly from GraphSpec
-        rf_config = get_config().pipelex.pipeline_execution_config.graph_config.reactflow_config
+        rf_config = get_config().interpreter.pipeline_execution.graph.reactflow
         reactflow_html = await generate_reactflow_html_async(graph_spec, config=rf_config, title=f"Graph: {topic}")
 
         # Save outputs to TEST_OUTPUTS_DIR
@@ -97,7 +97,7 @@ class TestReactFlowFromJson:
         graph_spec = GraphSpec.model_validate_json(json_str)
 
         # Generate ReactFlow HTML
-        rf_config = get_config().pipelex.pipeline_execution_config.graph_config.reactflow_config
+        rf_config = get_config().interpreter.pipeline_execution.graph.reactflow
         reactflow_html = await generate_reactflow_html_async(graph_spec, config=rf_config, title="Test Graph")
 
         # Verify GraphSpec is embedded

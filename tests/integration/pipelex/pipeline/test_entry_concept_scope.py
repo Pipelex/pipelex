@@ -44,7 +44,7 @@ refines = "Text"
 @pytest.mark.asyncio(loop_scope="class")
 class TestEntryConceptScope:
     async def test_bare_envelope_concept_resolves_to_the_entry_pipe_domain(self) -> None:
-        execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+        execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
             generate_graph=False,
             mock_inputs=False,
         )

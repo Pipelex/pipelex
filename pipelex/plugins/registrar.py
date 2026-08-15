@@ -145,8 +145,13 @@ class PluginRegistrar:
     All duplicate detection is fail-loud and names both contributing plugins.
     """
 
-    def __init__(self, *, config: "PipelexConfig"):
+    def __init__(self, *, config: "PipelexConfig", boot_orchestrator: str | None = None):
         self.config = config
+        # The orchestrator plugin this process boots under, or ``None``. A boot argument, not a
+        # setting: it arrives from ``build_registrar`` rather than off ``config``, so a plugin's
+        # ``register`` gates on ``registrar.boot_orchestrator == self.name``. Defaulted so a focused
+        # unit test can build a registrar without naming one.
+        self.boot_orchestrator = boot_orchestrator
         self.inference_backends: dict[tuple[InferenceFamily, str], MakeWorkerFn] = {}
         self.model_listers: dict[str, ListModelsFn] = {}
         self.orchestrators: dict[OrchestrationMode, OrchestratorProtocol] = {}
@@ -354,7 +359,7 @@ class PluginRegistrar:
     def registered_plugin_names(self) -> set[str]:
         """Names of plugins that discovered and registered successfully.
 
-        The authoritative namespace the ``plugins.boot_orchestrator`` gate matches against: a
+        The authoritative namespace the ``boot_orchestrator`` gate matches against: a
         boot-orchestrator plugin claims its hub slots iff ``boot_orchestrator == its own name``.
         Disabled/broken discoveries are excluded — they never run ``register`` and so never claim a
         slot, making them invalid boot-orchestrator targets.

@@ -30,7 +30,7 @@ def _patch_gateway_accessors(
     mocker.patch(f"{_FACTORY_NAMESPACE}.GatewayFactory.get_endpoint", return_value=endpoint)
     mocker.patch(f"{_FACTORY_NAMESPACE}.GatewayFactory.get_api_key", return_value=api_key)
     config = mocker.MagicMock()
-    config.cogt.transport_max_retries = 2
+    config.inference.transport_max_retries = 2
     mocker.patch(f"{_FACTORY_NAMESPACE}.get_config", return_value=config)
 
 

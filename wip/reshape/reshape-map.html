@@ -1,0 +1,954 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Configuration Reshape</title>
+<style>
+:root {
+  --paper: #f6f7f8;
+  --surface: #ffffff;
+  --sunken: #eef1f3;
+  --ink: #141a20;
+  --ink-soft: #5a6672;
+  --ink-faint: #8592a0;
+  --rule: #dce1e6;
+  --rule-strong: #c3ccd4;
+
+  --runtime: #0d6a78;
+  --inference: #9c5a0c;
+  --interpreter: #4a4bab;
+  --kit: #5d7080;
+  --gone: #a8323f;
+
+  --runtime-wash: rgba(13, 106, 120, 0.10);
+  --inference-wash: rgba(156, 90, 12, 0.10);
+  --interpreter-wash: rgba(74, 75, 171, 0.10);
+  --kit-wash: rgba(93, 112, 128, 0.10);
+  --gone-wash: rgba(168, 50, 63, 0.10);
+
+  --ribbon-op: 0.42;
+
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Cascadia Mono", "DejaVu Sans Mono", Consolas, monospace;
+  --serif: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, "Times New Roman", serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f1317;
+    --surface: #161c22;
+    --sunken: #1b232a;
+    --ink: #e5eaee;
+    --ink-soft: #97a4b0;
+    --ink-faint: #6d7c89;
+    --rule: #262f38;
+    --rule-strong: #35414c;
+
+    --runtime: #3fb8c8;
+    --inference: #e2a24c;
+    --interpreter: #9295ec;
+    --kit: #94a5b4;
+    --gone: #f0737f;
+
+    --runtime-wash: rgba(63, 184, 200, 0.13);
+    --inference-wash: rgba(226, 162, 76, 0.13);
+    --interpreter-wash: rgba(146, 149, 236, 0.13);
+    --kit-wash: rgba(148, 165, 180, 0.13);
+    --gone-wash: rgba(240, 115, 127, 0.13);
+
+    --ribbon-op: 0.36;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #0f1317;
+  --surface: #161c22;
+  --sunken: #1b232a;
+  --ink: #e5eaee;
+  --ink-soft: #97a4b0;
+  --ink-faint: #6d7c89;
+  --rule: #262f38;
+  --rule-strong: #35414c;
+
+  --runtime: #3fb8c8;
+  --inference: #e2a24c;
+  --interpreter: #9295ec;
+  --kit: #94a5b4;
+  --gone: #f0737f;
+
+  --runtime-wash: rgba(63, 184, 200, 0.13);
+  --inference-wash: rgba(226, 162, 76, 0.13);
+  --interpreter-wash: rgba(146, 149, 236, 0.13);
+  --kit-wash: rgba(148, 165, 180, 0.13);
+  --gone-wash: rgba(240, 115, 127, 0.13);
+
+  --ribbon-op: 0.36;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 28px 120px;
+}
+
+.col {
+  max-width: 68ch;
+}
+
+p { margin: 0 0 1.05em; }
+p + p { margin-top: -0.15em; }
+
+a { color: inherit; text-decoration-color: var(--rule-strong); text-underline-offset: 3px; }
+a:focus-visible, .legend-item:focus-visible { outline: 2px solid var(--interpreter); outline-offset: 3px; }
+
+code, .mono { font-family: var(--mono); }
+
+code {
+  font-size: 0.86em;
+  background: var(--sunken);
+  padding: 0.1em 0.36em;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+/* ---------- masthead ---------- */
+
+.masthead {
+  border-bottom: 1px solid var(--rule-strong);
+  padding: 64px 0 34px;
+  margin-bottom: 52px;
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 20px;
+}
+
+h1 {
+  font-family: var(--mono);
+  font-size: clamp(30px, 5.4vw, 50px);
+  font-weight: 600;
+  letter-spacing: -0.028em;
+  line-height: 1.05;
+  margin: 0 0 22px;
+  text-wrap: balance;
+}
+
+.standfirst {
+  font-size: 20px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  max-width: 60ch;
+  margin: 0 0 30px;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 26px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+.meta b { font-weight: 600; color: var(--ink-soft); }
+
+/* ---------- sections ---------- */
+
+section { margin: 0 0 76px; }
+
+h2 {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 0 0 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-family: var(--mono);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  margin: 30px 0 12px;
+  text-wrap: balance;
+}
+
+h2 + h3 { margin-top: 24px; }
+
+/* ---------- figures ---------- */
+
+figure {
+  margin: 34px 0 0;
+  padding: 0;
+}
+
+.fig-frame {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 20px 18px 12px;
+  overflow-x: auto;
+}
+
+figure svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+figcaption {
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  margin-top: 14px;
+  max-width: 78ch;
+}
+figcaption b { color: var(--ink); font-weight: 600; }
+
+.svg-title { font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; }
+.svg-node  { font-family: var(--mono); font-size: 14px; font-weight: 600; }
+.svg-sub   { font-family: var(--mono); font-size: 11px; }
+.svg-lab   { font-family: var(--mono); font-size: 11px; }
+.rib-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 3.5px;
+  stroke-linejoin: round;
+}
+
+.c-runtime { color: var(--runtime); }
+.c-inference { color: var(--inference); }
+.c-interpreter { color: var(--interpreter); }
+.c-kit { color: var(--kit); }
+.c-gone { color: var(--gone); }
+
+.f-runtime { fill: var(--runtime); }
+.f-inference { fill: var(--inference); }
+.f-interpreter { fill: var(--interpreter); }
+.f-kit { fill: var(--kit); }
+.f-gone { fill: var(--gone); }
+.f-ink { fill: var(--ink); }
+.f-soft { fill: var(--ink-soft); }
+.f-faint { fill: var(--ink-faint); }
+.f-surface { fill: var(--surface); }
+
+.s-ink { stroke: var(--ink); }
+.s-soft { stroke: var(--ink-soft); }
+.s-rule { stroke: var(--rule-strong); }
+.s-gone { stroke: var(--gone); }
+
+.ribbon { opacity: var(--ribbon-op); }
+
+/* ---------- legend ---------- */
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.legend li { display: flex; align-items: center; gap: 8px; }
+.swatch { width: 11px; height: 11px; border-radius: 2px; flex: none; }
+
+/* ---------- tables ---------- */
+
+.table-scroll { overflow-x: auto; margin-top: 26px; }
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 660px;
+  font-size: 14px;
+}
+
+th {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  text-align: left;
+  padding: 0 14px 9px 0;
+  border-bottom: 1px solid var(--rule-strong);
+  white-space: nowrap;
+}
+
+td {
+  padding: 9px 14px 9px 0;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+
+tbody tr:last-child td { border-bottom: 1px solid var(--rule-strong); }
+
+.addr { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+.addr-old { color: var(--ink-soft); }
+.note { font-size: 13px; color: var(--ink-soft); font-family: var(--serif); }
+
+.grp td {
+  padding-top: 22px;
+  border-bottom: none;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+tbody tr.grp:first-child td { padding-top: 8px; }
+
+.tag {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+.tag-runtime { color: var(--runtime); background: var(--runtime-wash); }
+.tag-inference { color: var(--inference); background: var(--inference-wash); }
+.tag-interpreter { color: var(--interpreter); background: var(--interpreter-wash); }
+.tag-kit { color: var(--kit); background: var(--kit-wash); }
+.tag-gone { color: var(--gone); background: var(--gone-wash); }
+
+/* ---------- panels ---------- */
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 20px 22px;
+  margin-top: 26px;
+}
+
+.panel h4 {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 10px;
+}
+
+.panel p:last-child { margin-bottom: 0; }
+
+.rail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  margin-top: 26px;
+  overflow: hidden;
+}
+
+.rail > div {
+  background: var(--surface);
+  padding: 18px 20px;
+}
+
+.rail dt {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.rail dd {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.count {
+  font-family: var(--mono);
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  display: block;
+  margin-bottom: 10px;
+}
+
+ul.plain { padding-left: 1.15em; margin: 0 0 1em; }
+ul.plain li { margin-bottom: 0.4em; }
+
+.ops {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.85;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 18px 20px;
+  margin-top: 26px;
+  overflow-x: auto;
+  white-space: pre;
+  color: var(--ink-soft);
+}
+.ops b { color: var(--ink); font-weight: 600; }
+
+.footer {
+  border-top: 1px solid var(--rule-strong);
+  padding-top: 22px;
+  margin-top: 84px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-faint);
+  line-height: 1.8;
+}
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .wrap { padding: 0 18px 80px; }
+  .masthead { padding-top: 40px; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Migrator v3 &middot; Lane R &middot; session S4</p>
+  <h1>The Configuration Reshape</h1>
+  <p class="standfirst">Twenty-six things live at the root of <code>PipelexConfig</code> today under three different organizing principles. This is what they become, why, and in what order the migration touches them.</p>
+  <div class="meta">
+    <span><b>ledger entry</b> pipelex-config@2</span>
+    <span><b>base</b> dev @ 052b9df06</span>
+    <span><b>ops</b> 37</span>
+    <span><b>normative source</b> wip/migrator-3/reshape.md</span>
+  </div>
+</header>
+
+<section class="col">
+  <h2>What this changes</h2>
+  <h3>One address change, no value changes</h3>
+  <p>The reshape rewrites <code>PipelexConfig</code> and the TOML it validates so the root carries <em>one</em> scheme &mdash; the layers the code already has &mdash; instead of the five unrelated entries it carries now. Every setting keeps its value. Only its address moves.</p>
+  <p>The axis is not invented for the occasion. <code>docs/contribute/hub-layering.md</code> already names a <strong>kernel layer</strong> (brokered by <code>runtime_hub</code>) and an <strong>interpreter layer</strong> (brokered by <code>interpreter_hub</code>), and <code>pipelex/kernel/</code> already holds operator-execution semantics callable on a <code>RuntimeBoot</code>-only process. The configuration is the last surface that still says &ldquo;one blob&rdquo; while the code says two layers plus an inference seam.</p>
+  <p>It ships as a Migrator ledger entry, so every user&rsquo;s <code>~/.pipelex/pipelex.toml</code> migrates in place rather than breaking. The <code>_config</code> suffix is dropped in the same pass at every depth, because each read site is touched exactly once either way.</p>
+</section>
+
+<section>
+  <h2>The map</h2>
+
+  <div class="col">
+    <h3>Where all 26 root entries go</h3>
+    <p>Ribbon width is the number of configuration sections carried. The left column is in the order the fields actually appear on <code>PipelexConfig</code>; the crossings are the finding, not a drawing artifact.</p>
+  </div>
+
+  <figure>
+    <div class="fig-frame">
+      <svg viewBox="0 0 1120 650" role="img" aria-label="Sankey diagram: session_id, cogt, pipelex, plugins and migration at the config root redistribute into runtime, inference, interpreter, kit, and three deletions.">
+        <text class="svg-title f-faint" x="20" y="26">TODAY &mdash; PipelexConfig root</text>
+        <text class="svg-title f-faint" x="930" y="26">AFTER &mdash; pipelex-config@2</text>
+
+        <!-- ribbons -->
+        <g class="ribbon">
+          <path class="f-gone"        d="M210,48 C555,48 555,550 900,550 L900,568 C555,568 555,66 210,66 Z"/>
+          <path class="f-inference"   d="M210,88 C555,88 555,214 900,214 L900,322 C555,322 555,196 210,196 Z"/>
+          <path class="f-runtime"     d="M210,218 C555,218 555,48 900,48 L900,174 C555,174 555,344 210,344 Z"/>
+          <path class="f-inference"   d="M210,344 C555,344 555,322 900,322 L900,358 C555,358 555,380 210,380 Z"/>
+          <path class="f-interpreter" d="M210,380 C555,380 555,380 900,380 L900,488 C555,488 555,488 210,488 Z"/>
+          <path class="f-kit"         d="M210,488 C555,488 555,510 900,510 L900,528 C555,528 555,506 210,506 Z"/>
+          <path class="f-runtime"     d="M210,528 C555,528 555,174 900,174 L900,192 C555,192 555,546 210,546 Z"/>
+          <path class="f-gone"        d="M210,546 C555,546 555,568 900,568 L900,586 C555,586 555,564 210,564 Z"/>
+          <path class="f-gone"        d="M210,586 C555,586 555,586 900,586 L900,604 C555,604 555,604 210,604 Z"/>
+        </g>
+
+        <!-- left nodes -->
+        <rect class="f-gone"     x="190" y="48"  width="20" height="18"/>
+        <rect class="f-inference" x="190" y="88"  width="20" height="108"/>
+        <rect class="f-ink"      x="190" y="218" width="20" height="288"/>
+        <rect class="f-runtime"  x="190" y="528" width="20" height="18"/>
+        <rect class="f-gone"     x="190" y="546" width="20" height="18"/>
+        <rect class="f-gone"     x="190" y="586" width="20" height="18"/>
+
+        <text class="svg-node f-ink"  x="182" y="53"  text-anchor="end">session_id</text>
+        <text class="svg-sub f-faint" x="182" y="67"  text-anchor="end">root scalar</text>
+
+        <text class="svg-node f-ink"  x="182" y="138" text-anchor="end">[cogt]</text>
+        <text class="svg-sub f-faint" x="182" y="153" text-anchor="end">6 sections &middot; a codename</text>
+
+        <text class="svg-node f-ink"  x="182" y="356" text-anchor="end">[pipelex]</text>
+        <text class="svg-sub f-faint" x="182" y="371" text-anchor="end">16 sections &middot; a grab-bag</text>
+
+        <text class="svg-node f-ink"  x="182" y="542" text-anchor="end">[plugins]</text>
+        <text class="svg-sub f-faint" x="182" y="557" text-anchor="end">2 keys</text>
+
+        <text class="svg-node f-ink"  x="182" y="597" text-anchor="end">[migration]</text>
+        <text class="svg-sub f-faint" x="182" y="611" text-anchor="end">retiring</text>
+
+        <!-- per-ribbon source labels -->
+        <text class="rib-label f-gone"        x="224" y="61">deleted</text>
+        <text class="rib-label f-inference"   x="224" y="146">6 &rarr; inference</text>
+        <text class="rib-label f-runtime"     x="224" y="285">7 &rarr; runtime</text>
+        <text class="rib-label f-inference"   x="224" y="366">2 &rarr; inference</text>
+        <text class="rib-label f-interpreter" x="224" y="438">6 &rarr; interpreter</text>
+        <text class="rib-label f-kit"         x="224" y="501">1 &rarr; kit</text>
+        <text class="rib-label f-runtime"     x="224" y="541">disabled</text>
+        <text class="rib-label f-gone"        x="224" y="559">boot_orchestrator</text>
+        <text class="rib-label f-gone"        x="224" y="599">migration_maps</text>
+
+        <!-- right nodes -->
+        <rect class="f-runtime"     x="900" y="48"  width="20" height="144"/>
+        <rect class="f-inference"   x="900" y="214" width="20" height="144"/>
+        <rect class="f-interpreter" x="900" y="380" width="20" height="108"/>
+        <rect class="f-kit"         x="900" y="510" width="20" height="18"/>
+        <rect class="f-gone"        x="900" y="550" width="20" height="54"/>
+
+        <text class="svg-node f-runtime"      x="932" y="114">[runtime]</text>
+        <text class="svg-sub f-faint"         x="932" y="129">kernel layer &middot; 8</text>
+
+        <text class="svg-node f-inference"    x="932" y="281">[inference]</text>
+        <text class="svg-sub f-faint"         x="932" y="296">kernel layer, the seam &middot; 8</text>
+
+        <text class="svg-node f-interpreter"  x="932" y="430">[interpreter]</text>
+        <text class="svg-sub f-faint"         x="932" y="445">interpreter layer &middot; 6</text>
+
+        <text class="svg-node f-kit"          x="932" y="516">[kit]</text>
+        <text class="svg-sub f-faint"         x="932" y="531">dev tooling &middot; 1</text>
+
+        <text class="svg-node f-gone"         x="932" y="573">deleted</text>
+        <text class="svg-sub f-faint"         x="932" y="588">no equivalent &middot; 3</text>
+      </svg>
+    </div>
+    <figcaption><b>The two long sweeps are the argument.</b> <code>session_id</code> sits first on the config root and travels to nothing; <code>plugins.disabled</code> sits second-to-last and belongs at the top with the rest of the kernel-layer infrastructure. And <code>[pipelex]</code> is not one thing &mdash; it is four groups that were never distinguished, which is why it fans into every destination on the board.</figcaption>
+  </figure>
+
+  <ul class="legend">
+    <li><span class="swatch" style="background: var(--runtime)"></span> runtime &mdash; kernel-layer infrastructure</li>
+    <li><span class="swatch" style="background: var(--inference)"></span> inference &mdash; the model seam</li>
+    <li><span class="swatch" style="background: var(--interpreter)"></span> interpreter &mdash; method machinery</li>
+    <li><span class="swatch" style="background: var(--kit)"></span> kit &mdash; dev tooling, neither layer</li>
+    <li><span class="swatch" style="background: var(--gone)"></span> deleted</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Why these three names</h2>
+
+  <div class="col">
+    <h3>The layer axis already exists in the code</h3>
+    <p>Ruling R3 placed the four ambiguous sections by measuring which layer actually reads them, and the census settled every one. A read <em>downward</em> &mdash; the interpreter reading kernel configuration &mdash; is permitted, so it never forces a section upward.</p>
+  </div>
+
+  <figure>
+    <div class="fig-frame">
+      <svg viewBox="0 0 1120 360" role="img" aria-label="Layer diagram: the interpreter layer sits above the kernel layer, which contains runtime and inference. Downward reads are permitted; two upward reads are recorded inversions.">
+        <!-- interpreter layer -->
+        <rect class="f-interpreter" x="60" y="40" width="700" height="86" opacity="0.10" rx="3"/>
+        <rect x="60" y="40" width="700" height="86" rx="3" fill="none" stroke="var(--interpreter)" stroke-width="1.25"/>
+        <text class="svg-node f-interpreter" x="80" y="70">[interpreter]</text>
+        <text class="svg-sub f-soft" x="80" y="90">mthds &middot; pipe_run &middot; pipe_func &middot; pipeline_execution (&rarr; graph) &middot; scan &middot; builder</text>
+        <text class="svg-sub f-faint" x="80" y="110">library-scoped method machinery &mdash; what interpreter_hub brokers</text>
+
+        <!-- kernel layer -->
+        <rect x="60" y="176" width="700" height="150" rx="3" fill="none" stroke="var(--rule-strong)" stroke-width="1.25" stroke-dasharray="4 3"/>
+        <text class="svg-lab f-faint" x="80" y="196">KERNEL LAYER &mdash; what runtime_hub brokers, present whatever is loaded</text>
+
+        <rect class="f-runtime" x="80" y="208" width="330" height="100" opacity="0.10" rx="3"/>
+        <rect x="80" y="208" width="330" height="100" rx="3" fill="none" stroke="var(--runtime)" stroke-width="1.25"/>
+        <text class="svg-node f-runtime" x="98" y="234">[runtime]</text>
+        <text class="svg-sub f-soft" x="98" y="254">storage &middot; secrets &middot; log &middot; aws</text>
+        <text class="svg-sub f-soft" x="98" y="270">reporting &middot; tracing &middot; observer &middot; plugins</text>
+        <text class="svg-sub f-faint" x="98" y="292">process-scoped infrastructure</text>
+
+        <rect class="f-inference" x="430" y="208" width="310" height="100" opacity="0.10" rx="3"/>
+        <rect x="430" y="208" width="310" height="100" rx="3" fill="none" stroke="var(--inference)" stroke-width="1.25"/>
+        <text class="svg-node f-inference" x="448" y="234">[inference]</text>
+        <text class="svg-sub f-soft" x="448" y="254">model_deck &middot; llm &middot; img_gen &middot; extract</text>
+        <text class="svg-sub f-soft" x="448" y="270">gateway_test &middot; templating &middot; dry_run</text>
+        <text class="svg-sub f-faint" x="448" y="292">the model seam &mdash; was [cogt]</text>
+
+        <!-- kit, outside -->
+        <rect class="f-kit" x="810" y="208" width="250" height="100" opacity="0.10" rx="3"/>
+        <rect x="810" y="208" width="250" height="100" rx="3" fill="none" stroke="var(--kit)" stroke-width="1.25" stroke-dasharray="4 3"/>
+        <text class="svg-node f-kit" x="828" y="234">[kit]</text>
+        <text class="svg-sub f-soft" x="828" y="256">preferred_agent_targets</text>
+        <text class="svg-sub f-faint" x="828" y="278">read only by two pipelex-dev</text>
+        <text class="svg-sub f-faint" x="828" y="292">commands &mdash; neither layer</text>
+
+        <!-- permitted downward read -->
+        <path d="M180,126 L180,172" fill="none" stroke="var(--ink-soft)" stroke-width="1.5" marker-end="url(#ah-soft)"/>
+        <text class="svg-lab f-soft" x="192" y="146">permitted: reads downward</text>
+        <text class="svg-lab f-faint" x="192" y="162">e.g. bundle_validator reads inference.dry_run</text>
+
+        <!-- recorded inversion upward -->
+        <path d="M640,172 L640,130" fill="none" stroke="var(--gone)" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#ah-gone)"/>
+        <text class="svg-lab f-gone" x="652" y="146">recorded inversion, not fixed by the reshape:</text>
+        <text class="svg-lab f-faint" x="652" y="162">kernel-layer readers of interpreter.scan and interpreter.pipe_func</text>
+
+        <defs>
+          <marker id="ah-soft" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--ink-soft)"/>
+          </marker>
+          <marker id="ah-gone" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--gone)"/>
+          </marker>
+          <marker id="ah-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--ink)"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+    <figcaption>The reshape makes the two inversions <b>visible</b> rather than fixing them &mdash; <code>get_pipe_func_execution_mode</code> in <code>config.py</code> and the kernel-layer registry helpers that read <code>scan</code>. Visible is the honest state to hand to the layering work; fixing them is that work.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>Section by section</h2>
+
+  <div class="col">
+    <h3>Every address, old and new</h3>
+    <p>Grouped by where each section lives today. The <code>_config</code> suffix goes at every depth (R2), so a nested key such as <code>graph_config.mermaid_config</code> becomes <code>graph.mermaid</code>.</p>
+  </div>
+
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Today</th>
+          <th>Becomes</th>
+          <th>Destination</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="grp"><td colspan="4">from <span class="mono">[pipelex]</span> &mdash; the grab-bag, 16 sections</td></tr>
+        <tr><td class="addr addr-old">pipelex.storage_config</td><td class="addr c-runtime">runtime.storage</td><td><span class="tag tag-runtime">runtime</span></td><td class="note">with <span class="mono">.local / .in_memory / .s3 / .gcp</span></td></tr>
+        <tr><td class="addr addr-old">pipelex.secrets_config</td><td class="addr c-runtime">runtime.secrets</td><td><span class="tag tag-runtime">runtime</span></td><td class="note"></td></tr>
+        <tr><td class="addr addr-old">pipelex.log_config</td><td class="addr c-runtime">runtime.log</td><td><span class="tag tag-runtime">runtime</span></td><td class="note"><span class="mono">rich_log_config &rarr; rich_log</span></td></tr>
+        <tr><td class="addr addr-old">pipelex.aws_config</td><td class="addr c-runtime">runtime.aws</td><td><span class="tag tag-runtime">runtime</span></td><td class="note"></td></tr>
+        <tr><td class="addr addr-old">pipelex.reporting_config</td><td class="addr c-runtime">runtime.reporting</td><td><span class="tag tag-runtime">runtime</span></td><td class="note"></td></tr>
+        <tr><td class="addr addr-old">pipelex.tracing_config</td><td class="addr c-runtime">runtime.tracing</td><td><span class="tag tag-runtime">runtime</span></td><td class="note">second most-read section workspace-wide</td></tr>
+        <tr><td class="addr addr-old">pipelex.observer_config</td><td class="addr c-runtime">runtime.observer</td><td><span class="tag tag-runtime">runtime</span></td><td class="note"></td></tr>
+        <tr><td class="addr addr-old">pipelex.templating_config</td><td class="addr c-inference">inference.templating</td><td><span class="tag tag-inference">inference</span></td><td class="note">R3 &mdash; its only reader is the kernel&rsquo;s prompt-rendering seam</td></tr>
+        <tr><td class="addr addr-old">pipelex.dry_run_config</td><td class="addr c-inference">inference.dry_run</td><td><span class="tag tag-inference">inference</span></td><td class="note">R3 &mdash; four of five fields configure mock inference output</td></tr>
+        <tr><td class="addr addr-old">pipelex.mthds_config</td><td class="addr c-interpreter">interpreter.mthds</td><td><span class="tag tag-interpreter">interpreter</span></td><td class="note"></td></tr>
+        <tr><td class="addr addr-old">pipelex.pipe_run_config</td><td class="addr c-interpreter">interpreter.pipe_run</td><td><span class="tag tag-interpreter">interpreter</span></td><td class="note"></td></tr>
+        <tr><td class="addr addr-old">pipelex.pipe_func_config</td><td class="addr c-interpreter">interpreter.pipe_func</td><td><span class="tag tag-interpreter">interpreter</span></td><td class="note">R3 &mdash; kernel-layer reader is a recorded inversion</td></tr>
+        <tr><td class="addr addr-old">pipelex.pipeline_execution_config</td><td class="addr c-interpreter">interpreter.pipeline_execution</td><td><span class="tag tag-interpreter">interpreter</span></td><td class="note">most-read section workspace-wide; <span class="mono">graph_config &rarr; graph</span> stays nested</td></tr>
+        <tr><td class="addr addr-old">pipelex.scan_config</td><td class="addr c-interpreter">interpreter.scan</td><td><span class="tag tag-interpreter">interpreter</span></td><td class="note">R3 &mdash; kernel-layer readers are a recorded inversion</td></tr>
+        <tr><td class="addr addr-old">pipelex.builder_config</td><td class="addr c-interpreter">interpreter.builder</td><td><span class="tag tag-interpreter">interpreter</span></td><td class="note"></td></tr>
+        <tr><td class="addr addr-old">pipelex.kit_config</td><td class="addr c-kit">kit</td><td><span class="tag tag-kit">kit</span></td><td class="note">R3 &mdash; to the root; nothing in the package proper reads it</td></tr>
+
+        <tr class="grp"><td colspan="4">from <span class="mono">[cogt]</span> &mdash; renamed whole, every child follows</td></tr>
+        <tr><td class="addr addr-old">cogt.transport_max_retries</td><td class="addr c-inference">inference.transport_max_retries</td><td><span class="tag tag-inference">inference</span></td><td class="note">scalar</td></tr>
+        <tr><td class="addr addr-old">cogt.model_deck_config</td><td class="addr c-inference">inference.model_deck</td><td><span class="tag tag-inference">inference</span></td><td class="note"></td></tr>
+        <tr><td class="addr addr-old">cogt.llm_config</td><td class="addr c-inference">inference.llm</td><td><span class="tag tag-inference">inference</span></td><td class="note"><span class="mono">instructor_config</span> and the four vendor sections drop the suffix too</td></tr>
+        <tr><td class="addr addr-old">cogt.img_gen_config</td><td class="addr c-inference">inference.img_gen</td><td><span class="tag tag-inference">inference</span></td><td class="note"><span class="mono">img_gen_job_config &rarr; img_gen_job</span></td></tr>
+        <tr><td class="addr addr-old">cogt.extract_config</td><td class="addr c-inference">inference.extract</td><td><span class="tag tag-inference">inference</span></td><td class="note"></td></tr>
+        <tr><td class="addr addr-old">cogt.gateway_test_config</td><td class="addr c-inference">inference.gateway_test</td><td><span class="tag tag-inference">inference</span></td><td class="note"></td></tr>
+
+        <tr class="grp"><td colspan="4">from <span class="mono">[plugins]</span>, <span class="mono">[migration]</span> and the root</td></tr>
+        <tr><td class="addr addr-old">plugins.disabled</td><td class="addr c-runtime">runtime.plugins.disabled</td><td><span class="tag tag-runtime">runtime</span></td><td class="note">all that remains of the table</td></tr>
+        <tr><td class="addr addr-old">plugins.boot_orchestrator</td><td class="addr c-gone">&mdash;</td><td><span class="tag tag-gone">deleted</span></td><td class="note">R5 &mdash; becomes a boot argument</td></tr>
+        <tr><td class="addr addr-old">migration.migration_maps</td><td class="addr c-gone">&mdash;</td><td><span class="tag tag-gone">deleted</span></td><td class="note">the Migrator ledger supersedes it</td></tr>
+        <tr><td class="addr addr-old">session_id</td><td class="addr c-gone">&mdash;</td><td><span class="tag tag-gone">deleted</span></td><td class="note">R4 &mdash; no replacement accessor in <span class="mono">pipelex</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>The three deletions</h2>
+
+  <div class="col">
+    <p>Two of these were never configuration at all &mdash; they were process state and a boot argument that happened to live on the config object. Neither is set in any TOML anywhere in the workspace, so both <code>delete_key</code> ops skip on every real file and exist only to account for a schema path.</p>
+  </div>
+
+  <div class="rail">
+    <div>
+      <dt class="c-gone">session_id</dt>
+      <dd>Process state on the config object since the initial commit, and <code>extra="forbid"</code> let a user pin it from TOML by accident. Nothing in <code>pipelex/pipelex/</code> reads it. Its one chain ends at a Temporal search attribute that is disabled in every deployed environment and queried by nothing. The plugin will mint its own per-process id; <code>JobMetadata.session_id</code> stays as its wire carrier.</dd>
+    </div>
+    <div>
+      <dt class="c-gone">plugins.boot_orchestrator</dt>
+      <dd>Set in no TOML anywhere. <code>RuntimeBoot.setup</code> writes the <em>argument</em> into the config object and the plugin gate reads it straight back &mdash; the config was being used as a side channel. It becomes boot-scoped state on <code>RuntimeHub</code> with an accessor (the precedent is <code>is_dry_run_forced</code>) plus a <code>build_registrar</code> parameter.</dd>
+    </div>
+    <div>
+      <dt class="c-gone">[migration]</dt>
+      <dd>One field, <code>migration_maps</code>, whose only consumer annotated validation errors with renaming hints. Migrator&rsquo;s own ledger supersedes it. The <code>.mthds</code> renaming hints are an accepted loss, recorded, until the language-surface project restores them.</dd>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>The file itself</h2>
+
+  <div class="col">
+    <h3>Two tables are interleaved today</h3>
+    <p>The packaged defaults file is physically out of order: <code>[pipelex]</code> is split across three spans and <code>[migration]</code> across two, which is what makes both resolve to a tomlkit <code>OutOfOrderTableProxy</code>. Ruling R6 rewrites the file in order &mdash; a content edit of a reference document, not a schema change, since the transform comparator is path-based.</p>
+  </div>
+
+  <figure>
+    <div class="fig-frame">
+      <svg viewBox="0 0 1120 420" role="img" aria-label="The packaged pipelex.toml today reads as seven spans in which the pipelex table appears three times and migration twice; after the reshape it is four contiguous blocks.">
+        <text class="svg-title f-faint" x="140" y="30">TODAY &mdash; pipelex/pipelex.toml, 7 spans</text>
+        <text class="svg-title f-faint" x="700" y="30">AFTER &mdash; 4 contiguous blocks</text>
+
+        <!-- today: 7 spans, equal blocks -->
+        <g>
+          <rect x="140" y="46" width="230" height="44" rx="2" fill="var(--ink)" opacity="0.10"/>
+          <rect x="140" y="46" width="4" height="44" fill="var(--ink)"/>
+          <text class="svg-node f-ink" x="158" y="66">[pipelex]</text>
+          <text class="svg-sub f-faint" x="158" y="82">lines 3&ndash;134 &middot; span 1 of 3</text>
+
+          <rect x="140" y="94" width="230" height="44" rx="2" fill="var(--inference)" opacity="0.12"/>
+          <rect x="140" y="94" width="4" height="44" fill="var(--inference)"/>
+          <text class="svg-node f-inference" x="158" y="114">[cogt]</text>
+          <text class="svg-sub f-faint" x="158" y="130">lines 135&ndash;271</text>
+
+          <rect x="140" y="142" width="230" height="44" rx="2" fill="var(--ink)" opacity="0.10"/>
+          <rect x="140" y="142" width="4" height="44" fill="var(--ink)"/>
+          <text class="svg-node f-ink" x="158" y="162">[pipelex]</text>
+          <text class="svg-sub f-faint" x="158" y="178">lines 272&ndash;413 &middot; span 2 of 3</text>
+
+          <rect x="140" y="190" width="230" height="44" rx="2" fill="var(--gone)" opacity="0.12"/>
+          <rect x="140" y="190" width="4" height="44" fill="var(--gone)"/>
+          <text class="svg-node f-gone" x="158" y="210">[migration]</text>
+          <text class="svg-sub f-faint" x="158" y="226">lines 414&ndash;439 &middot; span 1 of 2</text>
+
+          <rect x="140" y="238" width="230" height="44" rx="2" fill="var(--ink)" opacity="0.10"/>
+          <rect x="140" y="238" width="4" height="44" fill="var(--ink)"/>
+          <text class="svg-node f-ink" x="158" y="258">[pipelex]</text>
+          <text class="svg-sub f-faint" x="158" y="274">lines 440&ndash;446 &middot; span 3 of 3</text>
+
+          <rect x="140" y="286" width="230" height="44" rx="2" fill="var(--gone)" opacity="0.12"/>
+          <rect x="140" y="286" width="4" height="44" fill="var(--gone)"/>
+          <text class="svg-node f-gone" x="158" y="306">[migration]</text>
+          <text class="svg-sub f-faint" x="158" y="322">lines 447&ndash;448 &middot; span 2 of 2</text>
+
+          <rect x="140" y="334" width="230" height="44" rx="2" fill="var(--runtime)" opacity="0.12"/>
+          <rect x="140" y="334" width="4" height="44" fill="var(--runtime)"/>
+          <text class="svg-node f-runtime" x="158" y="354">[plugins]</text>
+          <text class="svg-sub f-faint" x="158" y="370">lines 449&ndash;452</text>
+        </g>
+
+        <!-- brace annotations -->
+        <path d="M382,46 L394,46 L394,282 L382,282" fill="none" stroke="var(--ink-soft)" stroke-width="1.25"/>
+        <text class="svg-lab f-soft" x="402" y="158">two OutOfOrderTableProxy</text>
+        <text class="svg-lab f-faint" x="402" y="174">objects the migrator would</text>
+        <text class="svg-lab f-faint" x="402" y="190">otherwise have to reason about</text>
+
+        <path d="M578,218 L680,218" fill="none" stroke="var(--ink)" stroke-width="1.5" marker-end="url(#ah-ink2)"/>
+        <text class="svg-lab f-soft" x="560" y="200">rewritten in order (R6)</text>
+
+        <!-- after: 4 contiguous blocks -->
+        <g>
+          <rect x="700" y="46" width="240" height="78" rx="2" fill="var(--runtime)" opacity="0.12"/>
+          <rect x="700" y="46" width="4" height="78" fill="var(--runtime)"/>
+          <text class="svg-node f-runtime" x="718" y="72">[runtime]</text>
+          <text class="svg-sub f-faint" x="718" y="90">storage, secrets, log, aws,</text>
+          <text class="svg-sub f-faint" x="718" y="106">reporting, tracing, observer, plugins</text>
+
+          <rect x="700" y="128" width="240" height="78" rx="2" fill="var(--inference)" opacity="0.12"/>
+          <rect x="700" y="128" width="4" height="78" fill="var(--inference)"/>
+          <text class="svg-node f-inference" x="718" y="154">[inference]</text>
+          <text class="svg-sub f-faint" x="718" y="172">model_deck, llm, img_gen, extract,</text>
+          <text class="svg-sub f-faint" x="718" y="188">gateway_test, templating, dry_run</text>
+
+          <rect x="700" y="210" width="240" height="78" rx="2" fill="var(--interpreter)" opacity="0.12"/>
+          <rect x="700" y="210" width="4" height="78" fill="var(--interpreter)"/>
+          <text class="svg-node f-interpreter" x="718" y="236">[interpreter]</text>
+          <text class="svg-sub f-faint" x="718" y="254">mthds, pipe_run, pipe_func,</text>
+          <text class="svg-sub f-faint" x="718" y="270">pipeline_execution, scan, builder</text>
+
+          <rect x="700" y="292" width="240" height="78" rx="2" fill="var(--kit)" opacity="0.12"/>
+          <rect x="700" y="292" width="4" height="78" fill="var(--kit)"/>
+          <text class="svg-node f-kit" x="718" y="318">[kit]</text>
+          <text class="svg-sub f-faint" x="718" y="336">preferred_agent_targets</text>
+        </g>
+
+        <text class="svg-lab f-faint" x="960" y="72">one scheme,</text>
+        <text class="svg-lab f-faint" x="960" y="88">read top to bottom</text>
+
+        <defs>
+          <marker id="ah-ink2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--ink)"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+    <figcaption>Blocks are spans, not to scale &mdash; the message is the repetition. Line numbers are real, measured on <code>dev</code> at <code>052b9df06</code>. The kit template that seeds every user&rsquo;s <code>~/.pipelex/pipelex.toml</code> carries only <span class="mono">[pipelex.*]</span>, <span class="mono">[cogt.*]</span> and <span class="mono">[plugins]</span> sections, so <b>every installation exercises the full set of moves</b>. The migration is not an edge case; it is the common case.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>The ledger entry</h2>
+
+  <div class="col">
+    <h3>37 ops, and the order is load-bearing</h3>
+    <p>Children move <em>out</em> of <code>[pipelex]</code> before <code>[pipelex]</code> is renamed. <code>[cogt]</code> is renamed before anything moves <em>into</em> <code>[inference]</code>. A parent is renamed before the suffix renames inside it, so a root rename keeps every child in place in the user&rsquo;s file. A <code>delete_key</code> whose source sits inside a table that later moves comes first, so its source is still a schema-1 path. Whole-table deletions go last.</p>
+  </div>
+
+  <div class="ops"><b> 1.</b> move_key    pipelex.storage_config            &rarr; runtime.storage
+<b> 2.</b> move_key    pipelex.secrets_config            &rarr; runtime.secrets
+<b> 3.</b> move_key    pipelex.log_config                &rarr; runtime.log
+<b> 4.</b> rename      runtime.log.rich_log_config       &rarr; rich_log
+<b> 5.</b> move_key    pipelex.aws_config                &rarr; runtime.aws
+<b> 6.</b> move_key    pipelex.reporting_config          &rarr; runtime.reporting
+<b> 7.</b> move_key    pipelex.tracing_config            &rarr; runtime.tracing
+<b> 8.</b> move_key    pipelex.observer_config           &rarr; runtime.observer
+<b> 9.</b> delete_key  plugins.boot_orchestrator                              <span class="c-gone">R5 &mdash; before the move; always skips</span>
+<b>10.</b> move_key    plugins                           &rarr; runtime.plugins
+<b>11.</b> rename      cogt                              &rarr; inference      <span class="c-inference">every [cogt.*] header follows</span>
+<b>12.</b> rename      inference.model_deck_config       &rarr; model_deck
+<b>13.</b> rename      inference.llm_config              &rarr; llm
+<b>14.</b> rename      inference.llm.instructor_config   &rarr; instructor
+<b>15.</b> rename      inference.llm.openai_config       &rarr; openai
+<b>16.</b> rename      inference.llm.anthropic_config    &rarr; anthropic
+<b>17.</b> rename      inference.llm.google_config       &rarr; google
+<b>18.</b> rename      inference.llm.mistral_config      &rarr; mistral
+<b>19.</b> rename      inference.img_gen_config          &rarr; img_gen
+<b>20.</b> rename      inference.img_gen.img_gen_job_config &rarr; img_gen_job
+<b>21.</b> rename      inference.extract_config          &rarr; extract
+<b>22.</b> rename      inference.gateway_test_config     &rarr; gateway_test
+<b>23.</b> move_key    pipelex.templating_config         &rarr; inference.templating
+<b>24.</b> move_key    pipelex.dry_run_config            &rarr; inference.dry_run
+<b>25.</b> move_key    pipelex.kit_config                &rarr; kit
+<b>26.</b> rename      pipelex                           &rarr; interpreter
+<b>27.</b> rename      interpreter.mthds_config          &rarr; mthds
+<b>28.</b> rename      interpreter.pipe_run_config       &rarr; pipe_run
+<b>29.</b> rename      interpreter.pipe_func_config      &rarr; pipe_func
+<b>30.</b> rename      interpreter.pipeline_execution_config &rarr; pipeline_execution
+<b>31.</b> rename      interpreter.pipeline_execution.graph_config &rarr; graph
+<b>32.</b> rename      interpreter.pipeline_execution.graph.mermaid_config   &rarr; mermaid
+<b>33.</b> rename      interpreter.pipeline_execution.graph.reactflow_config &rarr; reactflow
+<b>34.</b> rename      interpreter.scan_config           &rarr; scan
+<b>35.</b> rename      interpreter.builder_config        &rarr; builder
+<b>36.</b> delete_table  migration                                            <span class="c-gone">the parent goes with its one field</span>
+<b>37.</b> delete_key    session_id                                           <span class="c-gone">R4</span></div>
+
+  <div class="col">
+    <h3>The consequence nobody had written down</h3>
+    <p>Because the ops chain, a nested rename under a moved parent always has an intermediate address at one end &mdash; whichever way you order it. Rename the child first and the <em>destination</em> is intermediate; move the parent first and the <em>source</em> is.</p>
+  </div>
+
+  <figure>
+    <div class="fig-frame">
+      <svg viewBox="0 0 1120 220" role="img" aria-label="An address passes through an intermediate state that belongs to neither fingerprint: cogt.llm_config.instructor_config becomes inference.llm_config.instructor_config after op 11, then inference.llm.instructor after ops 13 and 14.">
+        <rect x="30" y="60" width="300" height="60" rx="3" fill="var(--sunken)" stroke="var(--rule-strong)" stroke-width="1"/>
+        <text class="svg-lab f-ink" x="46" y="88">cogt.llm_config.instructor_config</text>
+        <text class="svg-sub f-runtime" x="46" y="107">in fingerprint@1</text>
+
+        <path d="M340,90 L400,90" fill="none" stroke="var(--ink-soft)" stroke-width="1.5" marker-end="url(#ah-soft2)"/>
+        <text class="svg-lab f-soft" x="344" y="78">op 11</text>
+
+        <rect x="410" y="60" width="310" height="60" rx="3" fill="var(--gone-wash)" stroke="var(--gone)" stroke-width="1.25" stroke-dasharray="4 3"/>
+        <text class="svg-lab f-ink" x="426" y="88">inference.llm_config.instructor_config</text>
+        <text class="svg-sub f-gone" x="426" y="107">in neither fingerprint</text>
+
+        <path d="M730,90 L790,90" fill="none" stroke="var(--ink-soft)" stroke-width="1.5" marker-end="url(#ah-soft2)"/>
+        <text class="svg-lab f-soft" x="734" y="78">ops 13, 14</text>
+
+        <rect x="800" y="60" width="290" height="60" rx="3" fill="var(--sunken)" stroke="var(--rule-strong)" stroke-width="1"/>
+        <text class="svg-lab f-ink" x="816" y="88">inference.llm.instructor</text>
+        <text class="svg-sub f-interpreter" x="816" y="107">in fingerprint@2</text>
+
+        <path d="M565,132 L565,166" fill="none" stroke="var(--gone)" stroke-width="1.25" marker-end="url(#ah-gone2)"/>
+        <text class="svg-lab f-gone" x="565" y="186" text-anchor="middle">so op legality and the destination cross-check must be walked over the entry&rsquo;s sequential path state,</text>
+        <text class="svg-lab f-faint" x="565" y="202" text-anchor="middle">not against fingerprint@1 and fingerprint@2 alone</text>
+
+        <defs>
+          <marker id="ah-soft2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--ink-soft)"/>
+          </marker>
+          <marker id="ah-gone2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--gone)"/>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+    <figcaption>Found by writing the entry down at session S3, and folded into the Phase&nbsp;0 contract and the Phase&nbsp;1 coverage check. It changes no op above &mdash; the alternative ordering (one op per leaf section, every source a schema-1 path) cannot avoid the intermediate ends either.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>What catches a mistake</h2>
+
+  <div class="col">
+    <p>A 37-op entry written by hand needs more than review. Three checks read it from different ends, and each is red at authoring time on the branch &mdash; not at a user&rsquo;s boot.</p>
+  </div>
+
+  <div class="rail">
+    <div>
+      <dt>Coverage</dt>
+      <dd>Every removed path is the source of some op, and every destination is an added path of <code>fingerprint@2</code>. Catches an unaccounted removal and a misspelled destination with the same test &mdash; they are the same defect seen from either end.</dd>
+    </div>
+    <div>
+      <dt>Convergence</dt>
+      <dd>Replays the entry over the <em>new</em> packaged defaults and the <em>new</em> kit template. It must apply nothing. A migration that still finds work to do on an already-migrated file is not finished.</dd>
+    </div>
+    <div>
+      <dt>Transform golden</dt>
+      <dd>Applies the entry to <code>defaults@1</code> and demands exactly the paths of <code>defaults@2</code>. Renaming <code>pipelex</code> before its runtime children moved out, or deleting <code>boot_orchestrator</code> after <code>plugins</code> moved, is red here.</dd>
+    </div>
+    <div>
+      <dt>The type checker</dt>
+      <dd>Field names equal TOML keys with no aliases, so every one of the ~145 package read sites that is missed is a pyright error. The two shapes it cannot see &mdash; raw-dict TOML reads and inline-TOML test fixtures &mdash; get a hand pass.</dd>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>How it ships</h2>
+
+  <div class="col">
+    <h3>The reshape cannot land alone</h3>
+    <p>A user whose <code>~/.pipelex/pipelex.toml</code> is in the old shape needs two things to exist before the new shape reaches PyPI: a boot that tolerates the old file with a warning instead of failing, and a <code>pipelex migrate</code> that rewrites it. Both are Migrator Phase&nbsp;3. Releases have run every one to three days lately, so &ldquo;it will not be cut into a release&rdquo; is not a plan.</p>
+    <p>Enforcement is by ordering, plus two tripwires: this branch&rsquo;s pull request is titled <code>MERGE AFTER Migrator Phase 3 &mdash; &hellip;</code>, and Phase&nbsp;3 adds a step to <code>/release</code> that refuses a moved schema without its ledger entry.</p>
+  </div>
+
+  <div class="panel">
+    <h4>Read next</h4>
+    <p><code>wip/migrator-3/reshape.md</code> is the normative source for everything on this page &mdash; the census with its per-section reader measurements, the full rulings R1&ndash;R7 with the reasoning that was in front of Louis, what the reshape explicitly does <em>not</em> do, and the downstream repo sweep. <code>wip/migrator-3/sequencing.md</code> orders the sessions; this branch is S4.</p>
+  </div>
+</section>
+
+<footer class="footer">
+  Reading aid for session S4 &middot; drawn against <span class="mono">dev @ 052b9df06</span> &middot; line numbers and field lists measured from <span class="mono">pipelex/pipelex.toml</span>, <span class="mono">system/configuration/configs.py</span> and <span class="mono">cogt/config_cogt.py</span> on 2026-08-15.<br>
+  Not normative. Where this page and <span class="mono">reshape.md</span> disagree, <span class="mono">reshape.md</span> is right.
+</footer>
+
+</div>
+</body>
+</html>

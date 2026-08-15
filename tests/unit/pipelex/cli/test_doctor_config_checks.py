@@ -100,7 +100,7 @@ class TestDoctorConfigChecks:
 
     def test_check_config_files_validation_error(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """A pydantic ValidationError on the merged config produces the migration-aware report."""
-        (tmp_path / "pipelex.toml").write_text("[pipelex]\n", encoding="utf-8")
+        (tmp_path / "pipelex.toml").write_text("[runtime]\n", encoding="utf-8")
         mocker.patch("pipelex.cli.commands.doctor_cmd.init_config", return_value=0)
         mocker.patch.object(config_manager, "load_config", return_value={})
         mocker.patch.object(PipelexConfig, "model_validate", side_effect=_make_validation_error())
@@ -113,7 +113,7 @@ class TestDoctorConfigChecks:
 
     def test_check_config_files_config_validation_error_with_cause(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """A ConfigValidationError wrapping a ValidationError recovers the original report."""
-        (tmp_path / "pipelex.toml").write_text("[pipelex]\n", encoding="utf-8")
+        (tmp_path / "pipelex.toml").write_text("[runtime]\n", encoding="utf-8")
         mocker.patch("pipelex.cli.commands.doctor_cmd.init_config", return_value=0)
         wrapped_error = ConfigValidationError("wrapped")
         wrapped_error.__cause__ = _make_validation_error()
@@ -127,7 +127,7 @@ class TestDoctorConfigChecks:
 
     def test_check_config_files_config_validation_error_without_cause(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """A ConfigValidationError without an underlying ValidationError uses its own message."""
-        (tmp_path / "pipelex.toml").write_text("[pipelex]\n", encoding="utf-8")
+        (tmp_path / "pipelex.toml").write_text("[runtime]\n", encoding="utf-8")
         mocker.patch("pipelex.cli.commands.doctor_cmd.init_config", return_value=0)
         mocker.patch.object(config_manager, "load_config", side_effect=ConfigValidationError("plain failure"))
 
@@ -154,7 +154,7 @@ class TestDoctorConfigChecks:
 
     def test_check_config_files_os_error(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """An OSError while loading the config is reported as a load error."""
-        (tmp_path / "pipelex.toml").write_text("[pipelex]\n", encoding="utf-8")
+        (tmp_path / "pipelex.toml").write_text("[runtime]\n", encoding="utf-8")
         mocker.patch("pipelex.cli.commands.doctor_cmd.init_config", return_value=0)
         mocker.patch.object(config_manager, "load_config", side_effect=OSError("permission denied"))
 

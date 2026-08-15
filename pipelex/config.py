@@ -14,7 +14,7 @@ def get_config() -> PipelexConfig:
 def get_pipe_func_execution_mode() -> str:
     """The selected PipeFunc execution mode in this process (non-raising; defaults to ``direct``).
 
-    Read from the optional config (``pipelex.pipe_func_config.execution_mode``) so it is safe to call
+    Read from the optional config (``interpreter.pipe_func.execution_mode``) so it is safe to call
     from pydantic validators that may run before the global config is set (e.g. very early boot or
     isolated unit tests). When no config is set, or it is not a PipelexConfig, the answer is
     ``direct`` — the in-process mode, which keeps the default path byte-identical to the pre-seam
@@ -24,7 +24,7 @@ def get_pipe_func_execution_mode() -> str:
     optional_config = get_optional_config()
     if not isinstance(optional_config, PipelexConfig):
         return DIRECT_PIPE_FUNC_EXECUTION_MODE
-    return optional_config.pipelex.pipe_func_config.execution_mode
+    return optional_config.interpreter.pipe_func.execution_mode
 
 
 def is_pipe_func_sandbox_hosted() -> bool:

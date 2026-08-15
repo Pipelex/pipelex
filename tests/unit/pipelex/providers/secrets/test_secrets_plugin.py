@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 def _build_secrets_registry() -> SecretsProviderRegistry:
-    registrar = PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(plugins=SimpleNamespace(disabled=[]))))
+    registrar = PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(runtime=SimpleNamespace(plugins=SimpleNamespace(disabled=[])))))
     SecretsPlugin().register(registrar)
     return SecretsProviderRegistry(registrar.secrets_providers)
 
@@ -35,7 +35,7 @@ class TestSecretsPlugin:
         assert plugin.name == "secrets"
         assert plugin.targets_api == PLUGIN_API_VERSION
 
-        registrar = PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(plugins=SimpleNamespace(disabled=[]))))
+        registrar = PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(runtime=SimpleNamespace(plugins=SimpleNamespace(disabled=[])))))
         discovery = registrar.begin_plugin(name="secrets", origin=PluginOrigin.BUILTIN, targets_api=PLUGIN_API_VERSION, group=None)
         plugin.register(registrar)
 

@@ -96,7 +96,8 @@ _DISCOVERY_SCRIPT = textwrap.dedent(
         raise SystemExit(2)
 
     both = build_registrar(
-        config=SimpleNamespace(plugins=SimpleNamespace(disabled=[])),
+        config=SimpleNamespace(runtime=SimpleNamespace(plugins=SimpleNamespace(disabled=[]))),
+        boot_orchestrator=None,
         builtin_plugins=[],
         core_unconditional_plugin_names=frozenset(),
         entry_point_groups=(PluginGroup.KERNEL, PluginGroup.INTERPRETER),

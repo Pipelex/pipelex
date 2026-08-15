@@ -117,7 +117,7 @@ class LogConfig(ConfigModel):
 
     silenced_problem_ids: list[str]
 
-    rich_log_config: RichLogConfig
+    rich_log: RichLogConfig
 
     # logger name to use for safe logging without fancy features like code filepath and stuff
     generic_poor_logger: str

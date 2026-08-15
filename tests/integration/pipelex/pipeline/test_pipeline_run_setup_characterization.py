@@ -90,14 +90,14 @@ prompt = "Echo the $subject as a topic"
 
 
 def _dry_mock_config() -> PipelineExecutionConfig:
-    return get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+    return get_config().interpreter.pipeline_execution.with_execution_overrides(
         generate_graph=False,
         mock_inputs=True,
     )
 
 
 def _no_mock_config() -> PipelineExecutionConfig:
-    return get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+    return get_config().interpreter.pipeline_execution.with_execution_overrides(
         generate_graph=False,
         mock_inputs=False,
     )
@@ -222,7 +222,7 @@ class TestPipelineRunSetupCharacterization:
         # registered during the run), then assert the ReportingManager carries NO per-run state afterward:
         # the registry concept no longer exists, and the event-log context was cleared on the success path.
         traces_dir = str(tmp_path_factory.mktemp("char_no_leak"))
-        tracing_config = get_config().pipelex.tracing_config
+        tracing_config = get_config().runtime.tracing
         mocker.patch.object(tracing_config, "is_enabled", True)
         mocker.patch.object(tracing_config, "backend", TracingBackend.NDJSON)
         mocker.patch.object(tracing_config, "ndjson", NdjsonTracingConfig(traces_dir=traces_dir))
@@ -231,7 +231,7 @@ class TestPipelineRunSetupCharacterization:
         # The registry attribute is gone for good — the leak cannot recur.
         assert not hasattr(delegate, "_usage_registries")
 
-        execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+        execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
             generate_graph=False,
             generate_usage=True,
             mock_inputs=True,

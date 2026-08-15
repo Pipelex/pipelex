@@ -108,6 +108,12 @@ class RuntimeHub:
         # review D4): the backend still picks inline vs in-workflow on its own; the leaf mocks.
         # Consumed by ``PipeRunParamsFactory.make_run_params`` (the single writer of run_mode).
         self._is_dry_run_forced: bool = False
+        # The orchestrator plugin this process booted under, when one was named (CLI ``--orchestrator``
+        # / ``Pipelex.setup(boot_orchestrator=...)``). Boot-scoped state rather than a configuration
+        # value: it is never written in a TOML, and a boot argument stored on the config object would
+        # be a side channel. A boot-orchestrator plugin claims the process-global hub slots in its
+        # ``register`` iff this equals its own name; ``None`` leaves execution in-process.
+        self._boot_orchestrator: str | None = None
         # Ambient probe claimed by a boot-orchestrator plugin (ISOLATED_EXECUTION_PROBE): True when
         # the current call runs inside an isolated sub-execution (a Temporal activity) whose emissions
         # must bypass the parent run's registered buffer. Core default never isolated (see
@@ -229,6 +235,12 @@ class RuntimeHub:
 
     def is_dry_run_forced(self) -> bool:
         return self._is_dry_run_forced
+
+    def set_boot_orchestrator(self, *, boot_orchestrator: str | None) -> None:
+        self._boot_orchestrator = boot_orchestrator
+
+    def get_boot_orchestrator(self) -> str | None:
+        return self._boot_orchestrator
 
     def set_isolated_execution_probe(self, probe: Callable[[], bool]) -> None:
         self._isolated_execution_probe = probe
@@ -525,6 +537,16 @@ def scoped_content_generator(content_generator: ContentGeneratorProtocol) -> Gen
 def is_dry_run_forced() -> bool:
     """True when the boot was keyless (``needs_inference=False``): every run is forced to DRY (D4)."""
     return get_runtime_hub().is_dry_run_forced()
+
+
+def get_boot_orchestrator() -> str | None:
+    """The orchestrator plugin this process booted under, or ``None`` for in-process execution.
+
+    The read side of a boot argument, not of a setting: nothing in a ``pipelex.toml`` names it.
+    A boot-orchestrator plugin gates its slot claim on ``boot_orchestrator == its own name``, and
+    reads it back here at run time when it needs to know whether it owns the process.
+    """
+    return get_runtime_hub().get_boot_orchestrator()
 
 
 def resolve_run_mode_for_boot(*, requested: PipeRunMode) -> PipeRunMode:

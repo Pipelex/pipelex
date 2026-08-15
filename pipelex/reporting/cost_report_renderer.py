@@ -51,7 +51,7 @@ def render_run_cost_report(
     if not is_generate_costs or not tokens_usages:
         return
 
-    reporting_config = get_config().pipelex.reporting_config
+    reporting_config = get_config().runtime.reporting
     print_to_console = reporting_config.is_log_costs_to_console
     is_csv_enabled = reporting_config.is_generate_cost_report_file_enabled
     if not (print_to_console or is_csv_enabled):

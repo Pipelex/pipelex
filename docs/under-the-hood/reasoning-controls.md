@@ -172,7 +172,7 @@ Each provider has an `effort_to_level_map` configured in its provider subconfig 
 OpenAI models use `thinking_mode = "manual"` and map `ReasoningEffort` to the `reasoning_effort` parameter via `openai_config.effort_to_level_map`:
 
 ```toml
-[cogt.llm_config.openai_config.effort_to_level_map]
+[inference.llm.openai.effort_to_level_map]
 none = "none"
 minimal = "minimal"
 low = "low"
@@ -204,7 +204,7 @@ When reasoning is active, `temperature` is omitted from the SDK call (OpenAI req
 Anthropic supports both `manual` and `adaptive` thinking modes. The effort mapping is configured via `anthropic_config.effort_to_level_map`:
 
 ```toml
-[cogt.llm_config.anthropic_config.effort_to_level_map]
+[inference.llm.anthropic.effort_to_level_map]
 none = "disabled"
 minimal = "low"
 low = "low"
@@ -242,7 +242,7 @@ When thinking is active, `temperature` is suppressed (Anthropic requires `temper
 Google models use either `thinking_mode = "manual"` (Gemini 2.5 series) or `thinking_mode = "adaptive"` (Gemini 3 series). Both modes use `google_config.effort_to_level_map` as a gate:
 
 ```toml
-[cogt.llm_config.google_config.effort_to_level_map]
+[inference.llm.google.effort_to_level_map]
 none = "disabled"
 minimal = "minimal"
 low = "low"
@@ -289,7 +289,7 @@ Temperature is passed normally to the Google API regardless of reasoning mode.
 Mistral models use `thinking_mode = "manual"`. The effort mapping is configured via `mistral_config.effort_to_level_map`:
 
 ```toml
-[cogt.llm_config.mistral_config.effort_to_level_map]
+[inference.llm.mistral.effort_to_level_map]
 none = "disabled"
 minimal = "reasoning"
 low = "reasoning"
@@ -341,7 +341,7 @@ The level is resolved at runtime via `<ProviderConfig>.get_reasoning_level()` in
 For providers that use token budgets (Anthropic MANUAL, Google MANUAL), `ReasoningEffort` is resolved to a token count via the `effort_to_budget_maps` in `pipelex.toml`:
 
 ```toml
-[cogt.llm_config.effort_to_budget_maps.anthropic]
+[inference.llm.effort_to_budget_maps.anthropic]
 none = 0
 minimal = 512
 low = 1024
@@ -350,7 +350,7 @@ high = 16384
 xhigh = 32768
 max = 65536
 
-[cogt.llm_config.effort_to_budget_maps.gemini]
+[inference.llm.effort_to_budget_maps.gemini]
 none = 0
 minimal = 512
 low = 1024

@@ -1,6 +1,6 @@
 """Tests for init-time log suppression via config_overrides in the agent CLI factory.
 
-Regression guard: a user TOML with ``[pipelex.log_config.package_log_levels] pipelex =
+Regression guard: a user TOML with ``[runtime.log.package_log_levels] pipelex =
 "DEBUG"`` used to leak setup-time logs (e.g. ``telemetry_factory.py``'s
 ``log.debug("Telemetry is disabled...")``, ``validation_error_categorizer.py``'s
 ``log.warning``) onto stderr — corrupting the JSON error envelope that downstream agent
@@ -86,7 +86,7 @@ class TestAgentCliFactoryInitOverrides:
         make_pipelex_for_agent_cli()
 
         config_overrides = mock_make.call_args.kwargs["config_overrides"]
-        log_config_overrides = config_overrides["pipelex"]["log_config"]
+        log_config_overrides = config_overrides["runtime"]["log"]
         assert log_config_overrides["default_log_level"] is LogLevel.OFF
         assert log_config_overrides["package_log_levels"]["pipelex"] is LogLevel.OFF
         assert log_config_overrides["console_log_target"] is ConsoleTarget.STDERR

@@ -45,7 +45,7 @@ class TestClassRegistryUtilsUnit:
         """Unit test for registering classes from a folder using mocks."""
         # Mock get_config to return excluded_dirs
         mock_config = mocker.MagicMock()
-        mock_config.pipelex.scan_config.excluded_dirs = ["__pycache__", ".git"]
+        mock_config.interpreter.scan.excluded_dirs = ["__pycache__", ".git"]
         mocker.patch("pipelex.system.registries.class_registry_utils.get_config", return_value=mock_config)
 
         # Mock the file finding and registration

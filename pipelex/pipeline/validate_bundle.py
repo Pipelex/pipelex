@@ -154,7 +154,7 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
         ) from pipe_error
     except ValidationError as validation_error:
         pipe_validation_errors = categorize_pipe_validation_error(validation_error=validation_error)
-        validation_error_msg = report_validation_error(category="mthds", validation_error=validation_error)
+        validation_error_msg = report_validation_error(validation_error=validation_error)
         msg = f"Could not load blueprints because of: {validation_error_msg}"
         raise ValidateBundleError(
             message=msg,

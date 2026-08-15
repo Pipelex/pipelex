@@ -77,13 +77,13 @@ def _free_model_usage(job_metadata: JobMetadata) -> LLMTokensUsage:
 @pytest.mark.asyncio(loop_scope="class")
 class TestCostReportRendering:
     def _enable_ndjson_tracing(self, mocker: MockerFixture, traces_dir: str) -> None:
-        cfg = get_config().pipelex.tracing_config
+        cfg = get_config().runtime.tracing
         mocker.patch.object(cfg, "is_enabled", True)
         mocker.patch.object(cfg, "backend", TracingBackend.NDJSON)
         mocker.patch.object(cfg, "ndjson", NdjsonTracingConfig(traces_dir=traces_dir))
 
     def _config(self, *, generate_usage: bool) -> PipelineExecutionConfig:
-        return get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+        return get_config().interpreter.pipeline_execution.with_execution_overrides(
             generate_graph=False,
             generate_usage=generate_usage,
             mock_inputs=True,
@@ -96,7 +96,7 @@ class TestCostReportRendering:
 
     async def test_renders_correct_non_zero_totals(self, mocker: MockerFixture, job_metadata: JobMetadata) -> None:
         """Hand-built usage: the console channel renders the model, totals, and total cost."""
-        reporting_config = get_config().pipelex.reporting_config
+        reporting_config = get_config().runtime.reporting
         mocker.patch.object(reporting_config, "is_log_costs_to_console", True)
         mocker.patch.object(reporting_config, "is_generate_cost_report_file_enabled", False)
         console = _recording_console()
@@ -113,7 +113,7 @@ class TestCostReportRendering:
         """A free/zero-price model with real tokens IS rendered (token counts shown, cost 0.0000) — NOT
         suppressed like a dry run. Gating on zero cost alone would wrongly hide a real local-model run.
         """
-        reporting_config = get_config().pipelex.reporting_config
+        reporting_config = get_config().runtime.reporting
         mocker.patch.object(reporting_config, "is_log_costs_to_console", True)
         mocker.patch.object(reporting_config, "is_generate_cost_report_file_enabled", False)
         console = _recording_console()
@@ -129,7 +129,7 @@ class TestCostReportRendering:
 
     async def test_csv_channel_writes_file(self, mocker: MockerFixture, job_metadata: JobMetadata, tmp_path: Path) -> None:
         """The CSV channel writes a populated report file under the configured directory."""
-        reporting_config = get_config().pipelex.reporting_config
+        reporting_config = get_config().runtime.reporting
         mocker.patch.object(reporting_config, "is_log_costs_to_console", False)
         mocker.patch.object(reporting_config, "is_generate_cost_report_file_enabled", True)
         mocker.patch.object(reporting_config, "cost_report_dir_path", str(tmp_path))
@@ -147,7 +147,7 @@ class TestCostReportRendering:
         a free model with real tokens would still render.
         """
         self._enable_ndjson_tracing(mocker, str(tmp_path_factory.mktemp("traces_render")))
-        reporting_config = get_config().pipelex.reporting_config
+        reporting_config = get_config().runtime.reporting
         mocker.patch.object(reporting_config, "is_log_costs_to_console", True)
         mocker.patch.object(reporting_config, "is_generate_cost_report_file_enabled", False)
         console = _recording_console()
@@ -169,7 +169,7 @@ class TestCostReportRendering:
     async def test_no_costs_renders_nothing(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:
         """--no-costs assembles no usage, so the renderer prints nothing."""
         self._enable_ndjson_tracing(mocker, str(tmp_path_factory.mktemp("traces_no_costs")))
-        reporting_config = get_config().pipelex.reporting_config
+        reporting_config = get_config().runtime.reporting
         mocker.patch.object(reporting_config, "is_log_costs_to_console", True)
         console = _recording_console()
         mocker.patch("pipelex.cogt.usage.cost_registry.get_console", return_value=console)

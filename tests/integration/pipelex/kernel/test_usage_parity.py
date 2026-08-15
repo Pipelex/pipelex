@@ -88,12 +88,12 @@ class TestKernelUsageParity:
         return [make_tokens_usage_record(tokens_usage) for tokens_usage in tokens_usages]
 
     async def _run_through_the_interpreter(self, mocker: MockerFixture, traces_dir: str) -> list[TokensUsageRecord]:
-        tracing_config = get_config().pipelex.tracing_config
+        tracing_config = get_config().runtime.tracing
         mocker.patch.object(tracing_config, "is_enabled", True)
         mocker.patch.object(tracing_config, "backend", TracingBackend.NDJSON)
         mocker.patch.object(tracing_config, "ndjson", NdjsonTracingConfig(traces_dir=traces_dir))
 
-        execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+        execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
             generate_graph=False,
             generate_usage=True,
         )
@@ -115,7 +115,7 @@ class TestKernelUsageParity:
         event_log = InMemoryEventLog()
         trace_context = TraceContext(
             graph_id="kernel-usage-parity",
-            data_inclusion=get_config().pipelex.pipeline_execution_config.graph_config.data_inclusion,
+            data_inclusion=get_config().interpreter.pipeline_execution.graph.data_inclusion,
             emit_graph_events=False,
             emit_usage_events=True,
         )

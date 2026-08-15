@@ -66,7 +66,7 @@ prompt = "Echo the $subject as a topic"
 
 
 def _dry_mock_config() -> PipelineExecutionConfig:
-    return get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+    return get_config().interpreter.pipeline_execution.with_execution_overrides(
         generate_graph=False,
         mock_inputs=True,
     )
@@ -171,7 +171,7 @@ class TestPipelineRunIdResubmission:
         ``PipeRun.run``'s close_tracer handling.
         """
         explicit_run_id = "resubmission-teardown-raise-run-id"
-        graph_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+        graph_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
             generate_graph=True,
             mock_inputs=True,
         )

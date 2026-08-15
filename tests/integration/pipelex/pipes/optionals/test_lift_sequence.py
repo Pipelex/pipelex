@@ -251,7 +251,7 @@ class TestLiftSequence:
         pipe_job = await prepare_pipe_job(
             pipe=sequence,
             library_id=library_id,
-            execution_config=get_config().pipelex.pipeline_execution_config,
+            execution_config=get_config().interpreter.pipeline_execution,
             pipe_run_mode=PipeRunMode.LIVE,
             pipeline_run_id="test-optional-boundary-seeding",
             user_id="pytest",

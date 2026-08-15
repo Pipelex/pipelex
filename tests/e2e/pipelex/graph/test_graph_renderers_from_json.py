@@ -38,7 +38,7 @@ class TestGraphRenderersFromJson:
 
     def _get_graph_config_with_data(self):
         """Get a graph config with all stuff data inclusion flags enabled."""
-        base_graph_config = get_config().pipelex.pipeline_execution_config.graph_config
+        base_graph_config = get_config().interpreter.pipeline_execution.graph
         new_data_inclusion = base_graph_config.data_inclusion.model_copy(
             update={
                 "stuff_json_content": True,
@@ -104,7 +104,7 @@ class TestGraphRenderersFromJson:
         # Generate ReactFlow HTML directly from GraphSpec
         reactflow_html = await generate_reactflow_html_async(
             graph_spec,
-            config=graph_config.reactflow_config,
+            config=graph_config.reactflow,
             title=f"ReactFlow: {topic}",
         )
         reactflow_path = output_dir / "reactflow.html"

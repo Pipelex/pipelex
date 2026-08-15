@@ -416,16 +416,16 @@ ReactFlow HTML is generated directly from GraphSpec — no intermediate ViewSpec
 
 ```toml
 # pipelex.toml (default values)
-[pipelex.pipeline_execution_config.graph_config]
+[interpreter.pipeline_execution.graph]
 
-[pipelex.pipeline_execution_config.graph_config.data_inclusion]
+[interpreter.pipeline_execution.graph.data_inclusion]
 stuff_json_content = true       # Include full serialized data
 stuff_text_content = true       # Include ASCII text representation
 stuff_html_content = true       # Include HTML representation
 error_stack_traces = true       # Include full stack traces
 pipe_and_concept_registry = true  # Include pipe and concept registries in the GraphSpec
 
-[pipelex.pipeline_execution_config.graph_config.graphs_inclusion]
+[interpreter.pipeline_execution.graph.graphs_inclusion]
 graphspec_json = true           # Generate GraphSpec JSON
 mermaidflow_mmd = true          # Generate Mermaid code
 mermaidflow_html = true         # Generate Mermaid HTML

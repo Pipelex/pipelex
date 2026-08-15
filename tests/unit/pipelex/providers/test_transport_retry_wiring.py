@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 def _config_with(mocker: MockerFixture, transport_max_retries: int) -> object:
     config = mocker.MagicMock()
-    config.cogt.transport_max_retries = transport_max_retries
+    config.inference.transport_max_retries = transport_max_retries
     return config
 
 

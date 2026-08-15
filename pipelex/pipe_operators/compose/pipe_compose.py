@@ -303,7 +303,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
                     raise
                 # Only swallow the error when running with mock inputs (e.g., graph generation).
                 # With real inputs (e.g., pipelex validate), unresolvable paths are real bugs.
-                if not get_config().pipelex.pipeline_execution_config.is_mock_inputs:
+                if not get_config().interpreter.pipeline_execution.is_mock_inputs:
                     raise
                 return self._make_mock_construct_output(
                     job_metadata=job_metadata,

@@ -30,7 +30,7 @@ def _get_preferred_targets_from_toml() -> list[AgentTarget]:
     config = load_toml_from_path(str(pipelex_toml))
 
     try:
-        raw_targets = config["pipelex"]["kit_config"]["preferred_agent_targets"]
+        raw_targets = config["kit"]["preferred_agent_targets"]
         parsed_targets = [AgentTarget(item) for item in raw_targets]
     except (KeyError, ValueError, TypeError):
         return _DEFAULT_TARGETS

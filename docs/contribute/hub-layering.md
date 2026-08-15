@@ -46,6 +46,7 @@ There is deliberately **no** `pipelex.hub`. It was deleted rather than kept as a
 | content generation | `get_content_generator`, `scoped_content_generator` |
 | reporting | `get_report_delegate`, `is_in_isolated_execution` |
 | run mode | `is_dry_run_forced`, `resolve_run_mode_for_boot` |
+| boot orchestrator | `get_boot_orchestrator` |
 | tracing | `scoped_event_log`, `get_event_log_override` |
 | plugin registries | `get_inference_backend_registry`, `get_model_lister_registry`, `get_orchestrator_registry`, `get_bundle_validator_registry`, `get_storage_provider_registry`, `get_secrets_provider_registry` |
 
@@ -194,7 +195,7 @@ Splitting the hub removes the *lookups* that crossed the boundary. It does not m
 
 **`JobMetadata` moved to `pipelex/system/`.** It is an argument to essentially every `cogt` call, yet it lived in `pipelex/pipeline/` — which made `cogt → pipeline` the fattest remaining edge and pulled `graph.trace_context` into every closure that touched inference. `JobMetadata`, `JobCategory` and `UnitJobId` now live in `pipelex/system/job_metadata.py`, and `JobMetadataError` moved from `pipeline/exceptions.py` to `pipelex/system/exceptions.py`. `cogt → pipeline` is now **zero statements**.
 
-`TraceContext` moved with it, to `pipelex/system/trace_context.py`: it is the transport `JobMetadata` carries, so leaving it in `graph/` would only have renamed the inversion to `system → graph`. Its one dependency on the graph package — `DataInclusionConfig`, nested under `[...graph_config.data_inclusion]` in the TOML — moved down to `pipelex/system/data_inclusion_config.py`, which `graph_config.py` now imports. The TOML shape is unchanged; only the class's home moved, which is what keeps `trace_context` from re-importing `mermaid_config` and `reactflow_config` through `GraphConfig`.
+`TraceContext` moved with it, to `pipelex/system/trace_context.py`: it is the transport `JobMetadata` carries, so leaving it in `graph/` would only have renamed the inversion to `system → graph`. Its one dependency on the graph package — `DataInclusionConfig`, nested under `[...graph.data_inclusion]` in the TOML — moved down to `pipelex/system/data_inclusion_config.py`, which `graph_config.py` now imports. The TOML shape is unchanged; only the class's home moved, which is what keeps `trace_context` from re-importing `mermaid_config` and `reactflow_config` through `GraphConfig`.
 
 **The templating primitives moved down into `tools/`.** `TemplateCategory`, `TemplatingStyle`, `TagStyle` and `TextFormat` sat under `cogt/templating/` while eight `tools/jinja2/` and `tools/mermaid/` modules imported them — so `tools`, the intended bottom layer, depended on `cogt`. None of the three modules holding them named anything from `cogt`, so this was pure misfiling:
 

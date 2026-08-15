@@ -31,12 +31,12 @@ def _make_worker(mocker: MockerFixture, thinking_mode: ThinkingMode) -> Anthropi
 def _mock_config(mocker: MockerFixture, budget_mock: object | None = None) -> None:
     """Mock get_config() with a real anthropic_config and an optional get_reasoning_budget mock."""
     anthropic_config = AnthropicConfig(structured_output_timeout_seconds=1200, effort_to_level_map=_ANTHROPIC_LEVEL_MAP)
-    llm_config = mocker.MagicMock(anthropic_config=anthropic_config)
+    llm_config = mocker.MagicMock(anthropic=anthropic_config)
     if budget_mock is not None:
         llm_config.get_reasoning_budget = budget_mock
     mocker.patch(
         "pipelex.providers.anthropic.anthropic_llm_worker.get_config",
-        return_value=mocker.MagicMock(cogt=mocker.MagicMock(llm_config=llm_config)),
+        return_value=mocker.MagicMock(inference=mocker.MagicMock(llm=llm_config)),
     )
 
 

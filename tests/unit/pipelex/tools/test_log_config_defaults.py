@@ -62,7 +62,7 @@ class TestShippedConsoleTargets:
         with toml_path.open("rb") as toml_file:
             raw_config: dict[str, Any] = tomli.load(toml_file)
 
-        log_config_section = raw_config["pipelex"]["log_config"]
+        log_config_section = raw_config["runtime"]["log"]
         log_target_raw = log_config_section.get("console_log_target")
         print_target_raw = log_config_section.get("console_print_target")
 

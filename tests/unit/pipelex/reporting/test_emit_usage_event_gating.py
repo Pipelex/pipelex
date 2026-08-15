@@ -76,7 +76,7 @@ def _make_trace_context(graph_id: str, *, emit_usage_events: bool, emit_graph_ev
 
 
 def _enable_ndjson_tracing(mocker: MockerFixture, traces_dir: Path) -> None:
-    cfg = get_config().pipelex.tracing_config
+    cfg = get_config().runtime.tracing
     mocker.patch.object(cfg, "is_enabled", True)
     mocker.patch.object(cfg, "backend", TracingBackend.NDJSON)
     mocker.patch.object(cfg, "ndjson", NdjsonTracingConfig(traces_dir=str(traces_dir)))
