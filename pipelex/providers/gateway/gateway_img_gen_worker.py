@@ -83,7 +83,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
             model_name=self.inference_model.name,
         )
 
-        endpoint_path = (self.inference_model.extra_headers or {}).get("endpoint_path")
+        endpoint_path = self.inference_model.endpoint_path
         if not endpoint_path:
             msg = f"Model '{self.inference_model.name}' does not have an endpoint_path configured but it's required for this model/sdk."
             raise ImgGenParameterError(msg)

@@ -33,6 +33,7 @@ class InferenceModelSpec(ConfigModel):
     valued_constraints: dict[ValuedConstraint, Any] = Field(default_factory=empty_dict_factory_of(ValuedConstraint))
     extra_headers: dict[str, str] | None = None
     rules: ImgGenModelRules | None = None
+    endpoint_path: str | None = None
 
     @property
     def tag(self) -> str:
