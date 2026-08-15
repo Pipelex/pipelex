@@ -102,4 +102,11 @@ own page. Classes are grouped by subsystem.
 - [`CodegenLockError`](codegen-lock-error.md) — Codegen lock error
 - [`CodegenStampError`](codegen-stamp-error.md) — Codegen stamp error
 
+## Migration
+
+- [`MigrationError`](migration-error.md) — Migration error
+- [`MigrationGoldenError`](migration-golden-error.md) — Migration golden error
+- [`MigrationLedgerError`](migration-ledger-error.md) — Migration ledger error
+- [`MigrationRegistryError`](migration-registry-error.md) — Migration registry error
+
 [Back to Error Reference](index.md)

@@ -102,6 +102,10 @@ make generate-mthds-schema    - Generate JSON Schema for .mthds files
 make gms                      - Shorthand -> generate-mthds-schema
 make check-mthds-schema       - Check MTHDS JSON Schema is up-to-date
 make cms                      - Shorthand -> check-mthds-schema
+make check-migration-schemas  - Check configuration surfaces have accounted for their schema changes
+make cmig                     - Shorthand -> check-migration-schemas
+make up-migration-schemas     - Regenerate the migration fingerprint and defaults goldens
+make umig                     - Shorthand -> up-migration-schemas
 make generate-error-pages     - Generate one docs page per PipelexError subclass under docs/errors/
 make gep                      - Shorthand -> generate-error-pages
 make generate-error-identity  - Regenerate the committed PipelexError wire-identity snapshot
@@ -114,7 +118,7 @@ make regenerate-test-models   - Regenerate test model fixtures from backend conf
 make rtm                      - Shorthand -> regenerate-test-models
 make insert-skeleton          - Insert skeleton from $(SKELETON_DIR)
 
-make up                       - Shorthand -> generate-mthds-schema update-gateway-models up-kit-configs rules
+make up                       - Shorthand -> generate-mthds-schema update-gateway-models up-kit-configs up-migration-schemas rules
 make cleanenv                 - Remove virtual env
 make cleanderived             - Remove extraneous compiled files, caches, logs, etc.
 make cleanall                 - Remove all -> cleanenv + cleanderived
@@ -211,6 +215,7 @@ export HELP
 	li check-unused-imports fix-unused-imports check-TODOs check-uv \
 	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-specific-version docs-delete \
 	generate-mthds-schema generate-mthds-schema-quiet gms check-mthds-schema cms \
+	check-migration-schemas cmig up-migration-schemas up-migration-schemas-quiet umig \
 	generate-error-pages generate-error-pages-quiet gep \
 	generate-error-identity generate-error-identity-quiet gei \
 	update-gateway-models update-gateway-models-quiet ugm check-gateway-models cgm up \
@@ -408,6 +413,23 @@ check-mthds-schema: env
 
 cms: check-mthds-schema
 	@echo "> done: cms = check-mthds-schema"
+
+check-migration-schemas: env
+	$(call PRINT_TITLE,"Checking configuration surfaces have accounted for their schema changes")
+	$(VENV_PIPELEX_DEV) check-migration-schemas
+
+cmig: check-migration-schemas
+	@echo "> done: cmig = check-migration-schemas"
+
+up-migration-schemas: env
+	$(call PRINT_TITLE,"Updating migration fingerprint and defaults goldens")
+	$(VENV_PIPELEX_DEV) update-migration-schemas
+
+up-migration-schemas-quiet: env
+	$(VENV_PIPELEX_DEV) update-migration-schemas --quiet
+
+umig: up-migration-schemas
+	@echo "> done: umig = up-migration-schemas"
 
 generate-error-pages: env
 	$(call PRINT_TITLE,"Generating per-class error documentation pages")
@@ -1156,10 +1178,10 @@ c: check-keyword-only format lint pyright mypy
 cc: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet c
 	@echo "> done: cc = cleanderived regenerate-test-models generate-mthds-schema update-gateway-models format lint pyright mypy"
 
-up: generate-mthds-schema-quiet update-gateway-models-quiet up-kit-configs rules
-	@echo "> done: up = generate-mthds-schema update-gateway-models up-kit-configs rules"
+up: generate-mthds-schema-quiet update-gateway-models-quiet up-kit-configs up-migration-schemas-quiet rules
+	@echo "> done: up = generate-mthds-schema update-gateway-models up-kit-configs up-migration-schemas rules"
 
-check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema check-keyword-only check-hub-layering drift-check format lint pyright mypy pylint
+check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema check-migration-schemas check-keyword-only check-hub-layering drift-check format lint pyright mypy pylint
 	@echo "> done: check"
 
 agent-check: fix-unused-imports fix-keyword-only format lint pyright mypy check-keyword-only check-hub-layering drift-check

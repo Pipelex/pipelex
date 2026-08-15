@@ -21,7 +21,7 @@ A **surface** is one artifact family with one schema version and one ledger. The
 | Surface id | Base file | Tier files | Model | Defaults layer |
 |---|---|---|---|---|
 | `pipelex-config` | `pipelex.toml` | `pipelex_*.toml` | `PipelexConfig` | Packaged document (`pipelex/pipelex.toml`) |
-| `telemetry-config` | `telemetry.toml` | `telemetry_override.toml` | `TelemetryConfig` | Model defaults |
+| `telemetry-config` | `telemetry.toml` | `telemetry_*.toml` | `TelemetryConfig` | Model defaults |
 | `pipelex-service-config` | `pipelex_service.toml` | — | `PipelexServiceConfig` | Model defaults |
 
 File names are relative to a configuration directory, and every surface spans exactly two of them: the global `~/.pipelex/` and the project's `.pipelex/`. `pipelex migrate` walks both, and only those. Two paths that look like configuration are outside the walk by design: the unit-testing tier `./tests/pipelex_{run_mode}.toml`, and any file reached through an explicit `load_config(config_dir=…)`, which is a repository-internal mechanism rather than a user's configuration.
@@ -32,7 +32,9 @@ The tier set is **open**. Environment and run-mode names are dynamic, so the tie
 
 Without the rule, `pipelex_service.toml` is both the base file of one surface and a match for another's `pipelex_*.toml`, and which ledger runs over it becomes an accident of iteration order.
 
-Each surface also declares its **defaults-layer kind**, because the checks need to know where a current-schema default value comes from: a packaged TOML document merged beneath the user's files, or model-level field defaults. The distinction matters twice — for synthesizing the complete reference document of a surface that has no packaged file, and for refusing an added path that has no default anywhere.
+Each surface also declares its **defaults-layer kind**, because the checks need to know where a current-schema default value comes from: a packaged TOML document merged beneath the user's files, or model-level field defaults. The distinction matters twice — for synthesizing the complete reference document of a surface that has no packaged file, and for refusing an added path that has no default anywhere. A model-defaults surface whose model cannot be built with nothing set has no defaults layer at all, and says so when its reference document is asked for rather than surfacing later as a missing value.
+
+The registry and each ledger's `[surface]` block both describe the same thing, and both are read as truth — the ledger's when a migration walks a directory, the registry's when a gate fingerprints a model. A disagreement between them is therefore checked, not trusted: it would otherwise wait silently for the day the two readers meet.
 
 Every surface starts at `schema_version = 1` with an empty ledger. There is no retroactive numbering of changes that predate the ledger; the one case that genuinely needs to reach backwards has its own bounded mechanism, described under [pre-history entries](#pre-history-entries).
 
@@ -212,17 +214,25 @@ The guarantees above hold only if entries cannot say certain things. These rules
 
 ### Sequential path state
 
-Legality is defined over an entry's **sequential path state**, not operation by operation in isolation. An entry's operations chain: a parent is renamed and then keys inside it are renamed, so the intermediate paths belong to neither the old fingerprint nor the new one. The check therefore walks the previous fingerprint's path set through the entry's operations symbolically, and requires that each operation's source exists in the state at that point, that each operation's *final* destination is a path of the new fingerprint, and that the end state equals the new fingerprint minus its additions.
+Legality is defined over an entry's **sequential path state**, not operation by operation in isolation. An entry's operations chain: a parent is renamed and then keys inside it are renamed, so the intermediate paths belong to neither the old fingerprint nor the new one. The check therefore walks the previous fingerprint's path set through the entry's operations symbolically, carrying each surviving path together with the path it originated from, and then compares the end state with the new fingerprint in three ways:
 
-No ordering avoids the intermediate state — a nested rename under a moved parent produces one however the operations are sorted — so this is a property of the checker, not a constraint on authors.
+- **Every operation's source must exist in the state when the operation runs.** One that does not is a **dead operation** — it skips on every file forever and reports success, which is the quietest way for a migration to be wrong.
+- **Every path surviving the walk must be a path of the new fingerprint.** A survivor that is not is either an unaccounted removal or a misspelled destination; the two are the same defect seen from either end, and one containment check catches both.
+- **Every path of the new fingerprint that the walk removed must be a genuine addition** — that is, absent from the previous fingerprint. One that was present is **over-deletion**: an entry that dropped a parent table where it meant to drop one child.
+
+The end state is deliberately *not* compared as "the new fingerprint minus its additions". That formulation reads a rename's destination as an addition and its source as a removal, so it demands that the destination be absent from the end state — which is exactly where a correct rename puts it. Containment plus the over-deletion check is the same guarantee stated in a form renames satisfy.
+
+No ordering avoids the intermediate state — a nested rename under a moved parent produces one however the operations are sorted — so this is a property of the checker, not a constraint on authors. The `*` wildcard needs no special handling either: the fingerprint records value-schema paths under a literal `*` segment, so an operation addressing an open node matches it by name like any other.
 
 ### Destination cross-check
 
-Every rename and move destination is cross-checked against the paths the fingerprint diff records as **added**. A rename to a name the current schema does not know is refused at the gate, with the mismatch named. Without the cross-check, a misspelled destination passes both coverage and convergence — the removed path is accounted for, and over a current document the source is absent, so the operation skips — and then migrates every user file to a key `extra="forbid"` rejects, with the tool reporting success.
+The containment half of the walk above *is* the destination cross-check: a rename to a name the current schema does not know leaves a path the new fingerprint lacks, and is refused with the mismatch named. Without it, a misspelled destination passes both coverage and convergence — the removed path is accounted for, and over a current document the source is absent, so the operation skips — and then migrates every user file to a key `extra="forbid"` rejects, with the tool reporting success.
 
 ### Reserved paths and names
 
-The **reserved-path registry** is an append-only record of every path, and every remapped-away enumerated value, that a ledger entry has ever removed. Reuse is refused outright, with no escape-hatch marker: an author who hits the rule picks another name.
+The **reserved-path registry** is the record of every path, and every remapped-away enumerated value, that a ledger entry has ever removed. Reuse is refused outright, with no escape-hatch marker: an author who hits the rule picks another name.
+
+**The registry is derived, not stored.** Every path a schema version removed is `fingerprint@N-1` minus `fingerprint@N`, so the whole registry is a walk of the golden chain, plus the declarations of any [pre-history entry](#pre-history-entries). A stored copy would be a second source of truth that could disagree with the chain it summarizes, and the only way to check it would be to recompute it — at which point the stored copy has no reader left.
 
 The registry is diagnostic as much as preventive. When convergence or a transform golden fails, it is what turns the failure into a sentence naming the path and the schema version that reserved it.
 
@@ -240,7 +250,13 @@ The fingerprint is a normalized projection of a surface's model tree, checked in
 
 It is serialized in a stable order and is **deliberately not raw `model_json_schema()` output**, which moves for reasons that have nothing to do with our schema — reference layout, titles, ordering, the validation library's own version. A gate that cries wolf gets regenerated reflexively, and that is how a gate dies.
 
-What each recorded field is for: requiredness and enum members are load-bearing for coverage and for remap legality; defaults are recorded so that a flipped default is *visible in the regeneration diff*, but a default value **never gates on its own** — it changes no shape and no operation can address it. The one place a default is decisive is an added path that has none, which is breaking.
+The same reasoning drives two normalizations that look like information loss and are not. A nested model records its type as `table` and an enumerated one as `enum`, with no class name anywhere: renaming a *Python class* changes nothing in anybody's file and must move nothing, while renaming a *field* or an enum *member* — the things a file actually contains — moves the fingerprint and is caught. Constraint metadata is stripped for the same reason, at every level of an annotation rather than only the outermost one, so a validation-library upgrade that reshapes a constraint object cannot move a golden.
+
+An enumerated member set is collected from both sources that produce one: an enum class and a string literal type. To a TOML file they are the same thing — a closed set of legal spellings — and either can lose one.
+
+Two shapes are recorded as terminal rather than descended into, because no operation can address what lies beneath them: an array of tables, which has no path segment syntax and no wildcard form, and a model reachable from itself, which has no finite path set at all.
+
+What each recorded field is for: requiredness and enum members are load-bearing for coverage and for remap legality; defaults are recorded so that a flipped default is *visible in the regeneration diff*, but a default value **never gates on its own** — it changes no shape and no operation can address it. The one place a default is decisive is [a required path that has none](#coverage-every-schema-change-is-accounted-for).
 
 ## The checks
 
@@ -248,13 +264,21 @@ Checks with distinct failure meanings, so that a red gate says which guarantee b
 
 ### Coverage — every schema change is accounted for
 
-Recompute the fingerprint and diff it against the golden:
+Recompute the fingerprint and diff it against the golden for the surface's current schema version:
 
 | Diff | Verdict |
 |---|---|
 | Unchanged | Pass. |
-| Paths or enum members added only | Regenerate the golden. No version bump and no entry are demanded, because additive changes are absorbed by the defaults layer — **unless** an added path has no value in its surface's defaults layer, which is breaking and is refused with "give it a default". |
+| Paths or enum members added, or a type or default changed | Regenerate the golden. No version bump and no entry are demanded, because additive changes are absorbed by the defaults layer. |
 | Any path or enum member removed or renamed | Require a schema version bump, an operation accounting for every removed path (wildcard paths included), and a remap or an `unsafe` entry for every removed enum member. Destinations are cross-checked against added paths. |
+
+Alongside the diff, one standing invariant is checked on the new fingerprint itself, whether or not anything changed:
+
+> **Every path a document must carry has to have a value beneath it.** A path that is required, and whose ancestors are all required, must have a value in its surface's defaults layer — otherwise it is breaking on the day it lands, and the refusal names the only remedy the vocabulary allows: give it a default. Wildcard paths are exempt by construction, since the keys beneath an open node are the user's and there is no single value to supply.
+
+Stating it over every required path rather than only over newly added ones costs nothing — it holds across all three configuration surfaces today — and it catches the same defect arriving by the other door, a path that becomes required without gaining a default.
+
+**Every entry is re-checked on every run**, not only the one being authored: the walk above runs for each link of the chain, `fingerprint@N-1` against `fingerprint@N`. An entry verified once at bump time and never again would silently stop matching its own diff the first time somebody edited it.
 
 > **There is no escape hatch.** No `no_migration_needed` marker exists. A path that was never shipped to anyone still carries a one-line `delete_key`, which always skips and costs nothing — because "this one does not need an entry" is a judgment the next person cannot re-derive, and one such marker teaches everyone that the gate is negotiable.
 
@@ -266,7 +290,13 @@ A full replay of a surface's ledger over each of its reference documents produce
 
 Coverage proves an entry *exists* for every removal. Convergence proves replay is *harmless* on current files. Neither proves the entry is *right*, which is what the transform goldens close.
 
-When a surface bumps to version N, the regenerator freezes the reference documents and the fingerprint as `defaults@N`, `template@N` and `fingerprint@N`. The check then asserts, pairwise over the complete-defaults family:
+The regenerator writes, for each surface, the snapshot of its **current** schema version: `fingerprint@N` and the complete reference document `defaults@N`. A bump simply leaves the previous version's files behind, so the chain accumulates one frozen link per historical version.
+
+> **The head link tracks; every link below it is frozen.** The snapshot for the current version is rewritten from live sources on every regeneration.
+
+Freezing the head instead would rot. An additive change is absorbed by the defaults layer and needs no bump, so a head frozen at the last bump would drift from the live model and eventually stop validating against it — while the whole point of the last link is that it is what the current model reads. Only the sparse kit template is not snapshotted at all: it is a convergence and neutrality witness, and both read it live, so a snapshot of it would have no reader.
+
+The check then asserts, pairwise over the complete-defaults family:
 
 > `paths(apply(entry N, defaults@N−1)) == paths(defaults@N) − added_at_N`, where `added_at_N` is `fingerprint@N` minus `fingerprint@N−1`; plus value equality on every path an operation wrote; plus validation of the last link against the current model.
 
@@ -295,10 +325,13 @@ Only `check-ledger` joins `agent-check`: it regenerates nothing and each failure
 The checked-in data it all reads:
 
 ```
-pipelex/migration/ledgers/<surface-id>.toml     the ledgers
-pipelex/migration/schemas/<surface-id>.json     fingerprint goldens and the reserved-path registry
-pipelex/migration/goldens/<surface-id>/         the transform-golden chain: defaults@N, template@N, fingerprint@N
+pipelex/migration/ledgers/<surface-id>.toml            the ledgers
+pipelex/migration/goldens/<surface-id>/
+    fingerprint@N.json                                 the fingerprint at schema version N
+    defaults@N.toml                                    the complete reference document at schema version N
 ```
+
+Two files per version and nothing else. The fingerprint the coverage check diffs against is the chain's head link, `fingerprint@<current>`, rather than a separate always-current copy — one file with one writer cannot disagree with itself. The reserved-path registry is [derived from the chain](#reserved-paths-and-names), and the sparse kit template is read live rather than snapshotted.
 
 ## What the engine reports
 

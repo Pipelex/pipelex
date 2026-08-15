@@ -55,6 +55,7 @@ Load order:
 - If you change **defaults**, update `pipelex/pipelex.toml` (and consider whether templates in `pipelex/kit/configs/…` should also be updated).
 - If you change **templates**, keep them user-focused and stable; avoid adding internal-only details.
 - If you change **merge order or override semantics**, treat it as a potentially breaking change and document it (changelog + migration notes if needed).
+- If you change the **shape** of a configuration model — renaming, moving or removing a key, or dropping an enumerated value — `make check` will stop you until the change is recorded in that surface's migration ledger. Adding a key is not a shape change and needs nothing, provided the key has a default: the defaults layer is what an old file falls back on, and a required key with no default breaks every existing file. The gate is `make check-migration-schemas` (alias `cmig`) and its regenerator is `make up-migration-schemas` (alias `umig`). The contract, including what a ledger may contain and what is guaranteed to a user whose files are migrated, is in [The Migration Ledger](../migration-ledger.md).
 
 ---
 

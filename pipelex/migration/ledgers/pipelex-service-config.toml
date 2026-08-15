@@ -1,0 +1,13 @@
+# The migration ledger for the Pipelex service agreement and onboarding state.
+#
+# This surface has no tier files: there is one `pipelex_service.toml` per configuration directory
+# and nothing layers over it.
+#
+# See docs/migration-ledger.md for the contract this file obeys.
+
+[surface]
+id = "pipelex-service-config"
+title = "Pipelex service agreement and onboarding state"
+base_file = "pipelex_service.toml"
+current_schema_version = 1
+min_supported_schema_version = 0

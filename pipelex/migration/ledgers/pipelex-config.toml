@@ -1,0 +1,16 @@
+# The migration ledger for the main Pipelex configuration.
+#
+# Every shape change this surface undergoes is recorded here as data, in order, and replayed in
+# full over every one of the surface's files on every run. See docs/migration-ledger.md — it is
+# normative, and it explains why there are no `set_key`-style operations in this vocabulary and
+# why no version record ever causes work to be skipped.
+#
+# Entries are appended by `make umig` through the add-migration skill, never hand-invented.
+
+[surface]
+id = "pipelex-config"
+title = "The main Pipelex configuration"
+base_file = "pipelex.toml"
+tier_glob = "pipelex_*.toml"
+current_schema_version = 1
+min_supported_schema_version = 0
