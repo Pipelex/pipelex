@@ -4,7 +4,7 @@ Pipelex configuration files live on users' machines and in users' repositories, 
 
 This page is the contract: what a ledger may contain, what the engine may do with it, and what is guaranteed to a user whose files are migrated. It is normative. Everything asserted here has, or will have, a test behind it, and where a rule exists to prevent a specific failure the failure is named — a rule whose reason is forgotten is a rule that gets relaxed.
 
-> **Status.** This specification was written before its implementation, deliberately: the guarantees below are what the engine is built against. The data format, the operation vocabulary and the checks land first; `pipelex migrate` and boot tolerance land last. Of the checks, the coverage gate (`make check-migration-schemas`) and its regenerator (`make up-migration-schemas`) exist today; `make check-ledger`, the transform-golden verifier and pre-history entries arrive with the engine. Until the commands exist, this page is built but kept out of the documentation navigation.
+> **Status.** This specification was written before its implementation, deliberately: the guarantees below are what the engine is built against. The data format, the operation vocabulary and the checks land first; `pipelex migrate` and boot tolerance land last. Of the checks, the coverage gate (`make check-migration-schemas`), its regenerator (`make up-migration-schemas`) and the ledger check (`make check-ledger`) exist today; the transform-golden verifier and the verification of a pre-history entry do not, and **an entry carrying `pre_history = true` is refused by `make check-ledger` until its verification lands** — the flag exempts an entry from the coverage gate, and an entry no gate verifies is exactly the escape hatch this contract refuses. Until the commands exist, this page is built but kept out of the documentation navigation.
 
 ## What migrates, and what does not
 
@@ -210,7 +210,9 @@ The guarantees above hold only if entries cannot say certain things. These rules
 
 ### Op legality
 
-- **Every operation's source must be a path some schema version removed** — recorded as such in the reserved-path registry by the entry that removes it. An operation whose source is still a live path of the current schema would act on a valid file, and replay neutrality would be false.
+Enforced by [`make check-ledger`](#the-targets-and-where-the-data-lives), against the entry's [sequential path state](#sequential-path-state) rather than against the literal path an operation spells — an operation acting inside a table an earlier operation of the same entry renamed is judged on the node it really addresses.
+
+- **Every operation's source must be a path some schema version removed** — recorded as such in the reserved-path registry by the entry that removes it. An operation whose source is still a live path of the current schema would act on a valid file, and replay neutrality would be false. A `remap_value` is exempt by construction: what it retires is an enumerated *spelling*, not the path, which survives into the new schema — the remap legality rule is what governs it instead.
 - **No operation may address a concrete key beneath an open node.** Those keys are the user's, they are unbounded, and no schema change can remove one.
 - **A `*` segment is legal exactly at an open node**, and nowhere else.
 
@@ -288,7 +290,9 @@ Stating it over every required path rather than only over newly added ones costs
 
 ### Convergence — replay is neutral on the witnesses
 
-A full replay of a surface's ledger over each of its reference documents produces zero applied operations. The same target checks what else is cheap and unambiguous: the ledger parses into the migration-operation subset, versions are contiguous and match ids, every `safe` remap satisfies the legality rule, and no entry reintroduces a reserved path.
+A full replay of a surface's ledger over each of its reference documents produces zero applied operations, reports nothing about them, and returns the very bytes it was given. The same target checks what else is cheap and unambiguous: the ledger parses into the migration-operation subset, versions are contiguous and match ids, every operation is legal, every `safe` remap satisfies the legality rule, and no entry reintroduces a reserved path or a remapped-away spelling.
+
+> **This target reads checked-in files and nothing else** — the ledgers, the stored golden chain, the two reference documents. It never fingerprints a live model, and that restraint is what earns it a place in `make agent-check`: every failure is a statement about a file the author wrote, and every remedy is to fix one. A check that read the models would go red on an ordinary configuration edit with *regenerate the golden* as its remedy, which is the fail-regenerate-fail cycle that keeps the coverage gate out of the loop agents run constantly. The cost is bounded and visible: between a version bump and the `make up-migration-schemas` that snapshots it, the new link does not exist, so the entry checks that need a fingerprint pair report the missing link by name instead of running.
 
 ### Transform goldens — the operations say what the schema change did
 
@@ -320,7 +324,7 @@ Without this, every legitimate configuration change turns the gate's own suite r
 
 | Target | Alias | Aggregates | What it does |
 |---|---|---|---|
-| `make check-ledger` | `cl` | `check`, `agent-check` | The ledger parses into migration operations, versions are contiguous and match ids, legality and remap legality hold, no entry reintroduces a reserved path, and replay over both reference documents applies nothing. Reads checked-in data and regenerates nothing. |
+| `make check-ledger` | `cl` | `check`, `agent-check` | The ledger parses into migration operations, versions are contiguous and match ids, legality and remap legality hold, no entry reintroduces a reserved path, and replay over both reference documents applies nothing. Reads checked-in data only — no live model is fingerprinted and nothing is regenerated. |
 | `make check-migration-schemas` | `cmig` | `check` | Fingerprints every surface, diffs against the goldens, demands a bump and full accounting for every removal, cross-checks destinations, and verifies the pairwise transform-golden chain. |
 | `make up-migration-schemas` | `umig` | `up` | Regenerates the fingerprint goldens, and snapshots the reference documents into the transform-golden chain when a schema version bumped. |
 

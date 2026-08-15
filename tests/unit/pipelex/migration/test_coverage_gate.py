@@ -441,61 +441,6 @@ mapping    = { basic = "standard" }
         _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoEnumMemberGone, schema_version=2)
         assert check_surface(surface=_surface(config_model=_SchemaTwoEnumMemberGone), migration_dir=tmp_path) == []
 
-    def test_a_safe_remap_of_a_value_that_is_still_legal_is_refused(self, tmp_path: Path) -> None:
-        """The remap legality rule, and the reason replay neutrality holds.
-
-        `premium` is still a legal tier at schema 2, so a user who chose it deliberately would
-        have it rewritten on every run — and replay over a current-valid file would not be a no-op.
-        """
-        ops = """
-[[migration.ops]]
-kind       = "remap_value"
-table_path = []
-key        = "tier"
-mapping    = { basic = "standard", premium = "standard" }
-"""
-        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="safe", ops=ops))
-        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
-        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoEnumMemberGone, schema_version=2)
-        issues = check_surface(surface=_surface(config_model=_SchemaTwoEnumMemberGone), migration_dir=tmp_path)
-        assert CoverageIssueKind.ILLEGAL_REMAP in _kinds(issues)
-        assert "premium" in " ".join(issue.message for issue in issues)
-
-    def test_a_remap_to_a_spelling_the_new_schema_rejects_is_refused(self, tmp_path: Path) -> None:
-        """The value-side twin of the misspelled rename destination.
-
-        Rewriting to a spelling the new schema does not accept migrates every file to something
-        the model rejects, with the tool reporting success.
-        """
-        ops = """
-[[migration.ops]]
-kind       = "remap_value"
-table_path = []
-key        = "tier"
-mapping    = { basic = "standrad" }
-"""
-        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="safe", ops=ops))
-        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
-        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoEnumMemberGone, schema_version=2)
-        issues = check_surface(surface=_surface(config_model=_SchemaTwoEnumMemberGone), migration_dir=tmp_path)
-        assert CoverageIssueKind.ILLEGAL_REMAP in _kinds(issues)
-        assert "standrad" in " ".join(issue.message for issue in issues)
-
-    def test_a_safe_remap_of_a_free_string_is_refused(self, tmp_path: Path) -> None:
-        """Where the schema does not enumerate, staleness cannot be proven and the entry must be unsafe."""
-        ops = """
-[[migration.ops]]
-kind       = "remap_value"
-table_path = []
-key        = "label"
-mapping    = { hello = "hi" }
-"""
-        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="safe", ops=ops))
-        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
-        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=2)
-        issues = check_surface(surface=_surface(config_model=_SchemaOne), migration_dir=tmp_path)
-        assert CoverageIssueKind.ILLEGAL_REMAP in _kinds(issues)
-
 
 class TestTheDefaultsLayerRule:
     def test_a_required_path_with_no_defaults_layer_value_is_refused(self, tmp_path: Path) -> None:
