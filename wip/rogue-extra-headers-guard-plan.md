@@ -1,6 +1,6 @@
 # Guarding against rogue outbound headers — implementation plan
 
-**Written 2026-08-14, to be executed after the templating-style branch merges.** This answers item 2 of [`prompting-style/gateway-config-still-declares-prompting-target.md`](prompting-style/gateway-config-still-declares-prompting-target.md) — "decide whether the per-model unknown-key → HTTP-header rule should survive" — which that document deliberately left open because it is a design question about the backend loader, not part of the templating change.
+**Written 2026-08-14, to be executed after the templating-style branch merges.** This answers item 2 of [`prompting-style/gateway-config-outlived-prompting-target.md`](prompting-style/gateway-config-outlived-prompting-target.md) — "decide whether the per-model unknown-key → HTTP-header rule should survive" — which that document deliberately left open because it is a design question about the backend loader, not part of the templating change.
 
 Progress is tracked with the checkboxes below. **The checkpoint marked ✋ is a hard stop: the executing agent must not proceed past it without Louis' explicit go.** At the checkpoint, update this doc first — tick boxes, fill the checkpoint log at the bottom — so the work can hand off into a fresh session with nothing lost.
 

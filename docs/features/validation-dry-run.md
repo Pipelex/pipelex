@@ -31,6 +31,7 @@ Execute pipelines with mocked LLM responses to test pipeline logic, data flow, a
 - **Mock generation** — Format-compliant mock values for constrained fields, including structured outputs
 - **Configurable mock behavior** — Control mock list sizes, template handling, and response formats
 - **Full pipeline execution** — Working memory, controllers, and data flow all work as in production
+- **No credentials needed** — A dry run boots without inference credentials, on both `pipelex run --dry-run` and `pipelex-agent run --dry-run`. A backend whose API key is missing is skipped rather than fatal, so a dry run executes on a machine that holds no key at all. The one limit: a model handle that lives on a skipped backend cannot be resolved there, so a pipe pinning a bare handle such as `model = "gpt-4o-mini"` reports it as not found in the model deck; presets and the default model are unaffected
 
 ## Allowed-to-Fail Pipes
 
