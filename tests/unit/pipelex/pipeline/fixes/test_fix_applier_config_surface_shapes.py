@@ -27,7 +27,7 @@ import tomlkit
 from tomlkit import TOMLDocument
 
 from pipelex.pipeline.fixes.applier import FixOpOutcome, apply_fix_ops
-from pipelex.suggested_fix import FixOp, FixOpKind
+from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, EnsureTableOp, RenameTableKeyOp
 
 # Every configuration file this repository owns and tracks. The packaged defaults are the complete
 # witness (every path present); the kit templates are the sparse shape real user files have — and
@@ -92,7 +92,7 @@ def _probe_reachability(*, toml_doc: TOMLDocument, table_path: list[str]) -> str
     A ``delete_key`` for a key no configuration file declares always skips; *why* it skipped is the
     measurement — "table … not found" means the path model could not walk there.
     """
-    applications = apply_fix_ops(toml_doc=toml_doc, ops=[FixOp(kind=FixOpKind.DELETE_KEY, table_path=table_path, key=_ABSENT_KEY)])
+    applications = apply_fix_ops(toml_doc=toml_doc, ops=[DeleteKeyOp(table_path=table_path, key=_ABSENT_KEY)])
     assert applications[0].outcome == FixOpOutcome.SKIPPED
     return applications[0].detail
 
@@ -147,8 +147,7 @@ class TestFixApplierConfigSurfaceShapes:
         applications = apply_fix_ops(
             toml_doc=toml_doc,
             ops=[
-                FixOp(
-                    kind=FixOpKind.RENAME_TABLE_KEY,
+                RenameTableKeyOp(
                     table_path=["cogt", "img_gen_config", "quality_to_steps_maps", "flux"],
                     key="low",
                     new_key="lowest",
@@ -163,9 +162,7 @@ class TestFixApplierConfigSurfaceShapes:
     def test_dotted_key_assignment_is_addressable_and_renames(self) -> None:
         """``a.b = 1`` is a table to tomlkit, so it is addressable and stays a dotted key on rename."""
         toml_doc = tomlkit.parse("[section]\nnested.leaf = 1\nother = 2\n")
-        applications = apply_fix_ops(
-            toml_doc=toml_doc, ops=[FixOp(kind=FixOpKind.RENAME_TABLE_KEY, table_path=["section", "nested"], key="leaf", new_key="renamed")]
-        )
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[RenameTableKeyOp(table_path=["section", "nested"], key="leaf", new_key="renamed")])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
         assert _dumps(toml_doc) == "[section]\nnested.renamed = 1\nother = 2\n"
 
@@ -197,7 +194,7 @@ class TestFixApplierConfigSurfaceShapes:
     def test_delete_table_removes_every_chunk_of_an_out_of_order_table(self, table_path: list[str]) -> None:
         """``delete_table`` removes all of an out-of-order table, leaving no orphaned header behind."""
         toml_doc = _parse(_PACKAGED_DEFAULTS)
-        applications = apply_fix_ops(toml_doc=toml_doc, ops=[FixOp(kind=FixOpKind.DELETE_TABLE, table_path=table_path)])
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[DeleteTableOp(table_path=table_path)])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
         rendered = _dumps(toml_doc)
         header_prefix = f"[{'.'.join(table_path)}"
@@ -213,9 +210,7 @@ class TestFixApplierConfigSurfaceShapes:
         """
         toml_doc = _parse(_PACKAGED_DEFAULTS)
         original = _parse(_PACKAGED_DEFAULTS)
-        applications = apply_fix_ops(
-            toml_doc=toml_doc, ops=[FixOp(kind=FixOpKind.RENAME_TABLE_KEY, table_path=[], key="pipelex", new_key="interpreter")]
-        )
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[RenameTableKeyOp(table_path=[], key="pipelex", new_key="interpreter")])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
         rendered = _dumps(toml_doc)
         assert [line for line in rendered.splitlines() if line.startswith("[pipelex")] == []
@@ -228,7 +223,7 @@ class TestFixApplierConfigSurfaceShapes:
         Replay neutrality is the migration engine's central guarantee: every entry is replayed on
         every run, so an entry that has already been applied must be a byte-level no-op.
         """
-        rename_op = FixOp(kind=FixOpKind.RENAME_TABLE_KEY, table_path=[], key="cogt", new_key="inference")
+        rename_op = RenameTableKeyOp(table_path=[], key="cogt", new_key="inference")
         toml_doc = _parse(_PACKAGED_DEFAULTS)
         apply_fix_ops(toml_doc=toml_doc, ops=[rename_op])
         once = _dumps(toml_doc)
@@ -244,7 +239,7 @@ class TestFixApplierConfigSurfaceShapes:
         Pinned so the fix is a visible, deliberate change to this expectation rather than a silent one.
         """
         toml_doc = _parse(_PACKAGED_DEFAULTS)
-        applications = apply_fix_ops(toml_doc=toml_doc, ops=[FixOp(kind=FixOpKind.ENSURE_TABLE, table_path=["pipelex", "freshly_ensured"])])
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[EnsureTableOp(table_path=["pipelex", "freshly_ensured"])])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
         assert "freshly_ensured = {}" in _dumps(toml_doc)
 

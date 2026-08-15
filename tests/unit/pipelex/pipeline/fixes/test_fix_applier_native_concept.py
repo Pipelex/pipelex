@@ -14,7 +14,7 @@ import pytest
 import tomlkit
 
 from pipelex.pipeline.fixes.applier import FixOpOutcome, apply_fix_ops, serialize_and_format
-from pipelex.suggested_fix import FixOp, FixOpKind
+from pipelex.suggested_fix import DeleteKeyOp, FixOp
 
 _DATA = Path("tests/data/fixes")
 
@@ -25,7 +25,7 @@ def _dumps(toml_doc: tomlkit.TOMLDocument) -> str:
 
 
 def _delete_concept_op(*, key: str) -> FixOp:
-    return FixOp(kind=FixOpKind.DELETE_KEY, table_path=["concept"], key=key)
+    return DeleteKeyOp(table_path=["concept"], key=key)
 
 
 class TestFixApplierNativeConcept:

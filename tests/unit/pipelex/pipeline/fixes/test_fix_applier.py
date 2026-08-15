@@ -16,7 +16,7 @@ from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.pipeline.fixes.applier import FixOpOutcome, apply_fix_ops, serialize_and_format
-from pipelex.suggested_fix import FixOp, FixOpKind
+from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, FixOp, SetKeyOp
 
 _FIXTURE_PATH = Path("tests/data/fixes/sequence_wrong_output.mthds")
 _GOLDEN_PATH = Path("tests/data/fixes/sequence_wrong_output.golden.mthds")
@@ -28,7 +28,7 @@ def _dumps(toml_doc: tomlkit.TOMLDocument) -> str:
 
 
 def _set_output_op(*, pipe_code: str = "list_ideas", value: str = "Idea[]") -> FixOp:
-    return FixOp(kind=FixOpKind.SET_KEY, table_path=["pipe", pipe_code], key="output", value=value)
+    return SetKeyOp(table_path=["pipe", pipe_code], key="output", value=value)
 
 
 class TestFixApplier:
@@ -61,7 +61,7 @@ class TestFixApplier:
     def test_delete_key_removes_key_preserving_rest(self) -> None:
         """delete_key removes exactly the addressed key; everything else survives byte-for-byte."""
         toml_doc = tomlkit.loads(_FIXTURE_PATH.read_text(encoding="utf-8"))
-        delete_op = FixOp(kind=FixOpKind.DELETE_KEY, table_path=["pipe", "gen_ideas"], key="prompt")
+        delete_op = DeleteKeyOp(table_path=["pipe", "gen_ideas"], key="prompt")
         applications = apply_fix_ops(toml_doc=toml_doc, ops=[delete_op])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
         dumped = _dumps(toml_doc)
@@ -72,7 +72,7 @@ class TestFixApplier:
     def test_delete_key_missing_is_skipped(self) -> None:
         """delete_key on an absent key is skipped and reported, not raised."""
         toml_doc = tomlkit.loads(_FIXTURE_PATH.read_text(encoding="utf-8"))
-        delete_op = FixOp(kind=FixOpKind.DELETE_KEY, table_path=["pipe", "gen_ideas"], key="not_a_key")
+        delete_op = DeleteKeyOp(table_path=["pipe", "gen_ideas"], key="not_a_key")
         applications = apply_fix_ops(toml_doc=toml_doc, ops=[delete_op])
         assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED]
 
@@ -80,7 +80,7 @@ class TestFixApplier:
         """delete_table whose final segment names a scalar (a drifted target) is skipped, not deleted."""
         toml_doc = tomlkit.loads(_FIXTURE_PATH.read_text(encoding="utf-8"))
         source_bytes = _dumps(toml_doc)
-        delete_op = FixOp(kind=FixOpKind.DELETE_TABLE, table_path=["pipe", "gen_ideas", "prompt"])
+        delete_op = DeleteTableOp(table_path=["pipe", "gen_ideas", "prompt"])
         applications = apply_fix_ops(toml_doc=toml_doc, ops=[delete_op])
         assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED]
         assert applications[0].detail is not None
@@ -89,7 +89,7 @@ class TestFixApplier:
     def test_delete_table_removes_whole_table(self) -> None:
         """delete_table removes the addressed table and its keys; sibling tables survive."""
         toml_doc = tomlkit.loads(_FIXTURE_PATH.read_text(encoding="utf-8"))
-        delete_op = FixOp(kind=FixOpKind.DELETE_TABLE, table_path=["pipe", "gen_ideas"])
+        delete_op = DeleteTableOp(table_path=["pipe", "gen_ideas"])
         applications = apply_fix_ops(toml_doc=toml_doc, ops=[delete_op])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
         dumped = _dumps(toml_doc)

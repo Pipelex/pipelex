@@ -14,7 +14,7 @@ from typing import Any, cast
 import tomlkit
 
 from pipelex.pipeline.fixes.applier import FixOpOutcome, apply_fix_ops, serialize_and_format
-from pipelex.suggested_fix import FixOp, FixOpKind
+from pipelex.suggested_fix import FixOp, RenameTableKeyOp, SetKeyOp
 
 _DATA = Path("tests/data/fixes")
 
@@ -25,11 +25,11 @@ def _dumps(toml_doc: tomlkit.TOMLDocument) -> str:
 
 
 def _rename_op(*, key: str, new_key: str) -> FixOp:
-    return FixOp(kind=FixOpKind.RENAME_TABLE_KEY, table_path=["pipe"], key=key, new_key=new_key)
+    return RenameTableKeyOp(table_path=["pipe"], key=key, new_key=new_key)
 
 
 def _strip_main_pipe_op(*, value: str) -> FixOp:
-    return FixOp(kind=FixOpKind.SET_KEY, table_path=[], key="main_pipe", value=value)
+    return SetKeyOp(table_path=[], key="main_pipe", value=value)
 
 
 _STRIP_OPS = [

@@ -11,7 +11,7 @@ all normalize to a ``concept.<Code>`` key).
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.pipeline.fixes.planner import plan_fix_for_blueprint_validation_error
-from pipelex.suggested_fix import FixOpKind, FixSafety
+from pipelex.suggested_fix import DeleteKeyOp, FixSafety, RenameTableKeyOp, SetKeyOp
 
 
 def _blueprint_error_data(
@@ -53,19 +53,14 @@ class TestBlueprintFixPlanner:
         assert fix.fix_code == "strip-native-concept-redecl"
         assert fix.safety == FixSafety.SAFE
         assert fix.source == "main.mthds"
-        assert len(fix.ops) == 1
-        the_op = fix.ops[0]
-        assert the_op.kind == FixOpKind.DELETE_KEY
-        assert the_op.table_path == ["concept"]
-        assert the_op.key == "Text"
-        assert the_op.value is None
+        assert fix.ops == [DeleteKeyOp(table_path=["concept"], key="Text")]
         assert "Text" in fix.description
 
     def test_fix_carries_the_offending_concept_code(self) -> None:
         """The deleted key is exactly the offending code, whatever it is."""
         fix = plan_fix_for_blueprint_validation_error(_blueprint_error_data(concept_code="Number"))
         assert fix is not None
-        assert fix.ops[0].key == "Number"
+        assert fix.ops == [DeleteKeyOp(table_path=["concept"], key="Number")]
 
     def test_source_is_threaded_onto_the_fix(self) -> None:
         """A blueprint error's ``source`` rides the fix so the loop can target the declaring file."""
@@ -101,12 +96,7 @@ class TestBlueprintFixPlanner:
         assert fix is not None
         assert fix.fix_code == "strip-namespace"
         assert fix.safety == FixSafety.SAFE
-        assert len(fix.ops) == 1
-        op = fix.ops[0]
-        assert op.kind == FixOpKind.RENAME_TABLE_KEY
-        assert op.table_path == ["pipe"]
-        assert op.key == "greetings.hello"
-        assert op.new_key == "hello"
+        assert fix.ops == [RenameTableKeyOp(table_path=["pipe"], key="greetings.hello", new_key="hello")]
 
     def test_dotted_main_pipe_yields_root_set_key(self) -> None:
         """A strippable main_pipe strip (no pipe_code) yields a set_key of main_pipe at the root."""
@@ -114,12 +104,7 @@ class TestBlueprintFixPlanner:
         fix = plan_fix_for_blueprint_validation_error(error_data)
         assert fix is not None
         assert fix.fix_code == "strip-namespace"
-        assert len(fix.ops) == 1
-        op = fix.ops[0]
-        assert op.kind == FixOpKind.SET_KEY
-        assert op.table_path == []
-        assert op.key == "main_pipe"
-        assert op.value == "hello"
+        assert fix.ops == [SetKeyOp(table_path=[], key="main_pipe", value="hello")]
 
     def test_unstrippable_syntax_error_yields_none(self) -> None:
         """An INVALID_PIPE_CODE_SYNTAX error without ``stripped_pipe_code`` is not fixable."""

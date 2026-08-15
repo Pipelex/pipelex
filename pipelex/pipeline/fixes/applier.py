@@ -19,6 +19,7 @@ TOML to patch) and against ops targeting a different file than the one being pat
 op is reported, never raised.
 """
 
+from collections.abc import Sequence
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, cast
 
@@ -30,7 +31,7 @@ from tomlkit.container import Container, OutOfOrderTableProxy
 from tomlkit.items import AbstractTable, Item
 
 from pipelex.base_exceptions import PipelexUnexpectedError
-from pipelex.suggested_fix import FixOp, FixOpKind, TomlValue
+from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, EnsureTableOp, FixOp, RenameTableKeyOp, SetKeyOp, TomlValue
 
 if TYPE_CHECKING:
     # ``Diagnostic`` is a type-only TypedDict from the stub — declared in ``__all__`` but not a
@@ -173,7 +174,7 @@ def _render_syntax_diagnostic(diagnostic: "Diagnostic") -> str:
     return f"{diagnostic['message']} (line {diagnostic_range['start_line']}:{diagnostic_range['start_col']})"
 
 
-def apply_fix_ops(*, toml_doc: TOMLDocument, ops: list[FixOp]) -> list[FixOpApplication]:
+def apply_fix_ops(*, toml_doc: TOMLDocument, ops: Sequence[FixOp]) -> list[FixOpApplication]:
     """Apply each op to the DOM in place, returning one application report per op, in order.
 
     Idempotent: re-applying an already-applied op sets the same value / finds the key
@@ -186,21 +187,22 @@ def apply_fix_ops(*, toml_doc: TOMLDocument, ops: list[FixOp]) -> list[FixOpAppl
 
 
 def _apply_one_op(*, toml_doc: TOMLDocument, fix_op: FixOp) -> FixOpApplication:
+    """Dispatch one op to its handler.
+
+    Matching on the op **type** rather than on its ``kind`` is what removes the shape checks
+    this function used to open with: each variant of the union declares exactly the fields its
+    handler reads, so "a set_key without a value" is a pydantic error at construction and can no
+    longer reach the applier as a runtime "planner bug" raise.
+    """
     table_path_str = ".".join(fix_op.table_path)
-    match fix_op.kind:
-        case FixOpKind.SET_KEY:
-            if fix_op.key is None or fix_op.value is None:
-                msg = f"set_key op on '{table_path_str}' requires both key and value — planner bug"
-                raise PipelexUnexpectedError(msg)
+    match fix_op:
+        case SetKeyOp():
             target_table = _resolve_table(toml_doc=toml_doc, table_path=fix_op.table_path)
             if target_table is None:
                 return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"table '{table_path_str}' not found in document")
             target_table[fix_op.key] = _as_tomlkit_value(fix_op.value)
             return FixOpApplication(op=fix_op, outcome=FixOpOutcome.APPLIED)
-        case FixOpKind.ENSURE_TABLE:
-            if not fix_op.table_path:
-                msg = "ensure_table op requires a non-empty table_path — planner bug"
-                raise PipelexUnexpectedError(msg)
+        case EnsureTableOp():
             existing_table = _resolve_table(toml_doc=toml_doc, table_path=fix_op.table_path)
             if existing_table is not None:
                 return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"table '{table_path_str}' already exists")
@@ -210,10 +212,7 @@ def _apply_one_op(*, toml_doc: TOMLDocument, fix_op: FixOp) -> FixOpApplication:
                 return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"parent of table '{table_path_str}' not found")
             parent_table[table_key] = tomlkit.inline_table()
             return FixOpApplication(op=fix_op, outcome=FixOpOutcome.APPLIED)
-        case FixOpKind.DELETE_KEY:
-            if fix_op.key is None:
-                msg = f"delete_key op on '{table_path_str}' requires a key — planner bug"
-                raise PipelexUnexpectedError(msg)
+        case DeleteKeyOp():
             target_table = _resolve_table(toml_doc=toml_doc, table_path=fix_op.table_path)
             if target_table is None:
                 return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"table '{table_path_str}' not found in document")
@@ -221,10 +220,7 @@ def _apply_one_op(*, toml_doc: TOMLDocument, fix_op: FixOp) -> FixOpApplication:
                 return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"key '{fix_op.key}' not found in table '{table_path_str}'")
             del target_table[fix_op.key]
             return FixOpApplication(op=fix_op, outcome=FixOpOutcome.APPLIED)
-        case FixOpKind.DELETE_TABLE:
-            if not fix_op.table_path:
-                msg = "delete_table op requires a non-empty table_path — planner bug"
-                raise PipelexUnexpectedError(msg)
+        case DeleteTableOp():
             parent_table = _resolve_table(toml_doc=toml_doc, table_path=fix_op.table_path[:-1])
             table_key = fix_op.table_path[-1]
             # The final segment must itself be a table — a scalar there is a drifted target
@@ -233,10 +229,7 @@ def _apply_one_op(*, toml_doc: TOMLDocument, fix_op: FixOp) -> FixOpApplication:
                 return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"table '{table_path_str}' not found in document")
             del parent_table[table_key]
             return FixOpApplication(op=fix_op, outcome=FixOpOutcome.APPLIED)
-        case FixOpKind.RENAME_TABLE_KEY:
-            if fix_op.key is None or fix_op.new_key is None:
-                msg = f"rename_table_key op on '{table_path_str}' requires both key and new_key — planner bug"
-                raise PipelexUnexpectedError(msg)
+        case RenameTableKeyOp():
             parent_table = _resolve_table(toml_doc=toml_doc, table_path=fix_op.table_path)
             if parent_table is None or fix_op.key not in parent_table:
                 return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"key '{fix_op.key}' not found in table '{table_path_str}'")

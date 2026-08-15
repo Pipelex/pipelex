@@ -16,7 +16,7 @@ from pipelex.core.exceptions import PipeFactoryErrorData, PipelexBundleBlueprint
 from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validation_errors import build_validation_error_items
-from pipelex.suggested_fix import FixOpKind
+from pipelex.suggested_fix import DeleteKeyOp, RenameTableKeyOp, SetKeyOp
 
 
 def _build_items(exc: ValidateBundleError) -> list[ValidationErrorItem]:
@@ -292,8 +292,7 @@ class TestBuildValidationErrorItems:
         suggested_fix = items[0].suggested_fix
         assert suggested_fix is not None
         assert suggested_fix.fix_code == "match-sequence-output"
-        assert suggested_fix.ops[0].table_path == ["pipe", "list_ideas"]
-        assert suggested_fix.ops[0].value == "Idea[]"
+        assert suggested_fix.ops == [SetKeyOp(table_path=["pipe", "list_ideas"], key="output", value="Idea[]")]
 
     def test_input_drift_error_rides_a_sync_controller_inputs_fix(self) -> None:
         """An enriched controller input-drift error data yields an item carrying the multi-op fix."""
@@ -318,9 +317,10 @@ class TestBuildValidationErrorItems:
         assert suggested_fix is not None
         assert suggested_fix.fix_code == "sync-controller-inputs"
         assert suggested_fix.source == "main.mthds"
-        assert [(op.kind, op.key) for op in suggested_fix.ops] == [
-            (FixOpKind.SET_KEY, "text"),
-            (FixOpKind.DELETE_KEY, "note"),
+        inputs_table_path = ["pipe", "make_summary", "inputs"]
+        assert suggested_fix.ops == [
+            SetKeyOp(table_path=inputs_table_path, key="text", value="Text"),
+            DeleteKeyOp(table_path=inputs_table_path, key="note"),
         ]
 
     def test_blueprint_native_redeclaration_rides_a_strip_fix(self) -> None:
@@ -347,7 +347,7 @@ class TestBuildValidationErrorItems:
         assert suggested_fix is not None
         assert suggested_fix.fix_code == "strip-native-concept-redecl"
         assert suggested_fix.source == "main.mthds"
-        assert [(op.kind, op.table_path, op.key) for op in suggested_fix.ops] == [(FixOpKind.DELETE_KEY, ["concept"], "Text")]
+        assert suggested_fix.ops == [DeleteKeyOp(table_path=["concept"], key="Text")]
 
     def test_blueprint_strip_namespace_rides_a_rename_fix(self) -> None:
         """An enriched same-domain dotted declaration carries a strip-namespace rename through the builder."""
@@ -369,9 +369,7 @@ class TestBuildValidationErrorItems:
         suggested_fix = items[0].suggested_fix
         assert suggested_fix is not None
         assert suggested_fix.fix_code == "strip-namespace"
-        assert [(op.kind, op.table_path, op.key, op.new_key) for op in suggested_fix.ops] == [
-            (FixOpKind.RENAME_TABLE_KEY, ["pipe"], "greetings.hello", "hello"),
-        ]
+        assert suggested_fix.ops == [RenameTableKeyOp(table_path=["pipe"], key="greetings.hello", new_key="hello")]
 
     def test_non_fixable_blueprint_error_has_no_suggested_fix(self) -> None:
         """An un-enriched INVALID_PIPE_CODE_SYNTAX (no ``stripped_pipe_code``) keeps ``suggested_fix`` unset."""
