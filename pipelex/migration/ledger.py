@@ -94,6 +94,17 @@ class MigrationEntry(BaseModel):
     such an entry declares its own removed paths instead."""
 
     declared_removed_paths: list[str] = Field(default_factory=list[str])
+
+    declared_narrowed_paths: list[str] = Field(default_factory=list[str])
+    """The paths whose *value domain* this entry narrowed — a tightened bound, a lost numeric
+    member, anything no operation can repair. Spelled as the fingerprint at this entry's own
+    version records them, `*` included.
+
+    This is what an `unsafe` entry is *about*, and the engine questions the document for it. An
+    entry with operations is questioned by rehearsing them; an entry with none has nothing to
+    rehearse, so without a declaration it would be reported to nobody, ever — which is why one is
+    mandatory there. See `docs/migration-ledger.md` → "What an `unsafe` entry promises"."""
+
     ops: list[MigrationOp] = Field(default_factory=list[MigrationOp])
     """May legitimately be empty, with `safety = "unsafe"`, for a change only a human can make."""
 
@@ -122,6 +133,35 @@ class MigrationEntry(BaseModel):
     def check_an_op_free_entry_is_unsafe(self) -> Self:
         if not self.ops and self.safety is MigrationSafety.SAFE:
             msg = f"entry '{self.id}': an entry with no operations cannot be 'safe' — there is nothing for the applier to do"
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def check_narrowing_declarations_belong_to_an_unsafe_entry(self) -> Self:
+        if self.declared_narrowed_paths and self.safety is MigrationSafety.SAFE:
+            msg = (
+                f"entry '{self.id}': declared_narrowed_paths is for unsafe entries only — a narrowing a remap_value can "
+                f"repair is accounted for by that remap, and one it cannot repair is exactly what makes an entry unsafe"
+            )
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def check_an_op_free_entry_declares_what_it_is_about(self) -> Self:
+        """An entry with neither operations nor a declaration can be reported to nobody, ever.
+
+        The engine questions an `unsafe` entry before reporting it, so that a user whose file is
+        already fine is not warned at every boot forever. Operations are questioned by rehearsing
+        them; a declaration is questioned by looking its paths up in the document. An entry
+        carrying neither answers "nothing to say" for every file there will ever be — the ledger
+        would accept it, and the user it exists for would never hear of it.
+        """
+        if not self.ops and not self.declared_narrowed_paths:
+            msg = (
+                f"entry '{self.id}': an entry with no operations declares the paths whose value domain narrowed — that "
+                f"declaration is the only thing the engine can question a document about, so an entry with neither "
+                f"operations nor a declaration is reported to nobody, ever"
+            )
             raise ValueError(msg)
         return self
 

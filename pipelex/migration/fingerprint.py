@@ -54,6 +54,13 @@ LITERAL_TYPE = "literal"
 STRING_TYPE = "str"
 """The rendering of `str` — the type every enumerated spelling widens into."""
 
+INTEGER_TYPE = "int"
+"""The rendering of `int`. Named because two relations read it: `int` widens into `float`, and a
+bound over the integers has two equivalent spellings (`gt=n` and `ge=n+1`)."""
+
+REAL_TYPE = "float"
+"""The rendering of `float` — the type every integer widens into, strict validation included."""
+
 
 class ConstraintKind(StrEnum):
     """The closed whitelist of constraint kinds the fingerprint records.
@@ -231,7 +238,10 @@ def _record_field(
     collected[dotted] = PathFingerprint(
         value_type=_render_type(annotation=resolved),
         required=required,
-        enum_members=_collect_enum_members(annotation=resolved),
+        # The members of an open node's value schema belong on the `*` child recorded below, whose
+        # own value is the enumerated one — the only place an operation can address them. Every
+        # other container keeps its members here, because it gets no child record at all.
+        enum_members=None if open_value_type is not None else _collect_enum_members(annotation=resolved),
         default=_json_safe(value=defaults_value),
         open_node=open_value_type is not None,
         constraints=_collect_constraints(annotation=annotation, field_metadata=field_metadata),
@@ -337,46 +347,77 @@ def _render_bare(*, annotation: Any) -> str:
 
 
 def _collect_constraints(*, annotation: Any, field_metadata: Sequence[Any]) -> dict[ConstraintKind, int | float] | None:
-    """The whitelisted bounds on one path's value, merged across the annotation's union members.
+    """The whitelisted bounds on one path's value — what the schema really lets a file carry.
 
-    Two sources are read and no others: the field's own metadata, which is where a top-level
-    `Field(ge=1)` ends up, and the `Annotated` wrappers reachable through unions — the shape
-    `Annotated[int, Field(ge=1)] | Literal["unbounded"]` that the walk would otherwise miss.
+    Two sources are read and no others, and **they do not merge the same way**, because they do
+    not mean the same thing:
+
+    - The **binding** source is the field's own metadata plus any `Annotated` wrapper outside the
+      union — where a top-level `Field(ge=1)` ends up. Pydantic applies it to the whole field, on
+      top of whatever a member declares, so several binding bounds of one kind intersect and the
+      *strictest* is the one a file meets.
+    - The **member** source is the `Annotated` wrappers reachable inside a union's members — the
+      shape `Annotated[int, Field(ge=1)] | Literal["unbounded"]`. A union accepts a value if any
+      member does, so a bound on one member never binds the others and the *widest* is the one
+      the path really has.
+
+    Mixing the two pools into one and taking the widest was the hole: a binding `Field(le=6)`
+    beside a member's own `le=100` recorded `le=100`, and a later tightening of the binding bound
+    then read as a change to an already-looser one — the gate going quiet on exactly the values
+    that stop validating. The two pools are merged separately and then intersected, since a value
+    must satisfy the binding bound *and* some member's.
 
     A generic container's arguments are deliberately **not** descended into. A bound inside
     `list[Annotated[int, Field(ge=1)]]` binds the items, not the list, and recording it at the
     list's path would attribute to one path a constraint belonging to another — the value schema
     beneath an open node gets its own `*` record and its own constraints there.
     """
-    carriers: list[Any] = list(field_metadata)
-    _gather_constraint_carriers(annotation=annotation, carriers=carriers)
-    collected: dict[ConstraintKind, int | float] = {}
-    _absorb_constraint_carriers(carriers=carriers, collected=collected)
+    binding_carriers: list[Any] = list(field_metadata)
+    member_pools: list[list[Any]] = []
+    _split_constraint_carriers(annotation=annotation, binding_carriers=binding_carriers, member_pools=member_pools)
+
+    collected = _merge_carriers(carriers=binding_carriers, keep_widest=False)
+    across_members: dict[ConstraintKind, int | float] = {}
+    for pool in member_pools:
+        _fold_bound(collected=across_members, other=_merge_carriers(carriers=pool, keep_widest=False), keep_widest=True)
+    # The two pools intersect: a value must satisfy the binding bound *and* land inside some
+    # member's domain, so the strictest of the two is what a file actually meets.
+    _fold_bound(collected=collected, other=across_members, keep_widest=False)
     return {kind: collected[kind] for kind in sorted(collected)} if collected else None
 
 
-def _gather_constraint_carriers(*, annotation: Any, carriers: list[Any]) -> None:
+def _split_constraint_carriers(*, annotation: Any, binding_carriers: list[Any], member_pools: list[list[Any]]) -> None:
+    """Sort an annotation's constraint carriers into the binding pool and one pool per union member.
+
+    An `Annotated` wrapper met before any union binds the whole field; one met inside a member
+    binds that member alone. A union nested inside a union is flat — a union of unions accepts
+    exactly what the flattened one does — so its members become sibling pools.
+    """
     if get_origin(annotation) is Annotated:
         args = get_args(annotation)
-        carriers.extend(args[1:])
-        _gather_constraint_carriers(annotation=args[0], carriers=carriers)
+        binding_carriers.extend(args[1:])
+        _split_constraint_carriers(annotation=args[0], binding_carriers=binding_carriers, member_pools=member_pools)
         return
     if _is_union(annotation=annotation):
         for member in get_args(annotation):
-            _gather_constraint_carriers(annotation=member, carriers=carriers)
+            pool: list[Any] = []
+            _split_constraint_carriers(annotation=member, binding_carriers=pool, member_pools=member_pools)
+            if pool:
+                member_pools.append(pool)
 
 
-def _absorb_constraint_carriers(*, carriers: Sequence[Any], collected: dict[ConstraintKind, int | float]) -> None:
-    """Fold every carrier the whitelist recognizes into the projection, and drop the rest silently.
+def _merge_carriers(*, carriers: Sequence[Any], keep_widest: bool) -> dict[ConstraintKind, int | float]:
+    """Fold every carrier the whitelist recognizes into a bound map, dropping the rest silently.
 
     Dropping is the whole point: a carrier this function does not recognize — a strictness flag, a
     before-validator, a pattern object, a kind a future release invents — must leave no trace in
     the golden, or the gate starts moving for reasons that are not about our schema.
     """
+    collected: dict[ConstraintKind, int | float] = {}
     for carrier in carriers:
         if isinstance(carrier, FieldInfo):
             # `Field(...)` inside an `Annotated` arrives as a `FieldInfo` carrying its own metadata.
-            _absorb_constraint_carriers(carriers=carrier.metadata, collected=collected)
+            _fold_bound(collected=collected, other=_merge_carriers(carriers=carrier.metadata, keep_widest=keep_widest), keep_widest=keep_widest)
             continue
         kind = CONSTRAINT_ATTRIBUTE_BY_CARRIER.get(cast("type[Any]", type(carrier)))
         if kind is None:
@@ -386,13 +427,35 @@ def _absorb_constraint_carriers(*, carriers: Sequence[Any], collected: dict[Cons
             # A bound expressed over dates, decimals or anything else is outside the projection:
             # it has no stable rendering here and no comparison this gate could make.
             continue
+        _fold_bound(collected=collected, other={kind: value}, keep_widest=keep_widest)
+    return collected
+
+
+def _fold_bound(*, collected: dict[ConstraintKind, int | float], other: dict[ConstraintKind, int | float], keep_widest: bool) -> None:
+    """Merge one bound map into another, keeping the widest or the strictest of each kind.
+
+    A kind present on only one side is kept as it is. For the member pools that is a deliberate
+    overclaim — a union member with no bound of that kind is unbounded in it, so the honest union
+    would drop the kind entirely — and the overclaim is what keeps a tightening visible on the
+    common `Annotated[int, Field(ge=1)] | Literal["auto"]` shape, where the literal member can
+    carry no numeric bound at all.
+
+    It is symmetric, so it costs nothing while a union's member set holds still. Where that set
+    *moves* between two versions, the per-kind aggregate loses which member each bound came from
+    and can travel in a direction the accepted values did not — a union of two separately bounded
+    members can report a tightening that widened, and hide one that really narrowed. Reading it
+    correctly means recording bounds per member in the golden; no surface has a union with two
+    bound-carrying members today, and the alternative that needs no format change — dropping a kind
+    absent from some pool — cannot tell `gt` from `ge` here and would trade this over-report for a
+    silent under-report, which is the worse of the two. See `wip/pr-1113-review-notes.md`.
+    """
+    for kind, value in other.items():
         existing = collected.get(kind)
         if existing is None:
             collected[kind] = value
-        elif kind.widest_is_the_lower_value:
-            collected[kind] = min(existing, value)
-        else:
-            collected[kind] = max(existing, value)
+            continue
+        prefer_lower = kind.widest_is_the_lower_value if keep_widest else not kind.widest_is_the_lower_value
+        collected[kind] = min(existing, value) if prefer_lower else max(existing, value)
 
 
 def _collect_enum_members(*, annotation: Any) -> list[str] | None:
@@ -409,7 +472,12 @@ def _collect_enum_members(*, annotation: Any) -> list[str] | None:
 
 def _gather_enum_members(*, annotation: Any, members: set[str]) -> None:
     if isinstance(annotation, type) and issubclass(annotation, Enum):
-        members.update(str(member.value) for member in annotation)
+        # Only the string-valued members, exactly as a `Literal` is read below and for the same
+        # reason: a `remap_value` rewrites a *string*, so recording `1` as a spelling would let the
+        # accounting credit a remap the applier skips on every run, leaving a green gate over a file
+        # the new schema rejects. An enum over non-strings records nothing, which is the honest
+        # answer — and the same blind spot `Literal[1, 2]` already declares.
+        members.update(member.value for member in annotation if isinstance(member.value, str))
         return
     if get_origin(annotation) is Literal:
         members.update(str(arg) for arg in get_args(annotation) if isinstance(arg, str))

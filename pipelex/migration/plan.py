@@ -56,6 +56,12 @@ class BlockedEntryReason(StrEnum):
     """An operation's destination is already occupied — typically because the user hand-fixed
     part of their file — so applying it would choose on their behalf."""
 
+    VALUE_DOMAIN_NARROWED = "value_domain_narrowed"
+    """The file sets a path whose accepted values the entry narrowed, and no operation can repair
+    a value. Weaker than `UNSAFE`, and deliberately so: this says *check this key*, not *this file
+    has the old shape*. The engine is model-free, so it knows the file sets the path and not
+    whether the value it holds is one the new schema refuses."""
+
 
 class BlockedEntry(BaseModel):
     """An entry that this file needs and the run would not apply."""
@@ -75,13 +81,47 @@ class BlockedEntry(BaseModel):
     """Operations of this entry that did apply before the conflict was found. Always empty for
     an `unsafe` entry, which is rehearsed on a copy and never written."""
 
+    narrowed_paths: list[str] = Field(default_factory=list[str])
+    """The entry's declared narrowed paths that this file has something at, as the *ledger*
+    spells them — `levels.*` rather than the user's own `levels.my_package`, so that no key a user
+    chose is rendered any more than a value is — and at the spelling the file this run wrote
+    carries, since that is the file being sent back to be checked.
+
+    Keys to check by hand, never a list of errors: telling one from the other needs the model, and
+    the engine has none by design."""
+
 
 class FileBlockedReason(StrEnum):
-    """Why a file could not be processed at all."""
+    """Why a file could not be processed at all.
+
+    One member per *state the file is in*, because that is what decides what the user does next —
+    not one per exception the run happened to catch. Four of the five leave the file exactly as it
+    was found; the fifth is the one that does not, and it says so.
+    """
+
+    UNREADABLE = "unreadable"
+    """The file is there and its bytes could not be read. Nothing was written."""
 
     UNPARSEABLE = "unparseable"
+    """The file was read and is not valid UTF-8, or not valid TOML. Nothing was written."""
+
     UNWRITABLE = "unwritable"
+    """The file needed a change and the run could not make it — the backup would not go down, or
+    the replacement would not. The file is exactly as it was found."""
+
     CHANGED_DURING_RUN = "changed_during_run"
+    """The file was removed or edited between the read and the write, so the run refused to write
+    over work it had not seen. The file is whatever that other writer left."""
+
+    STATE_UNCERTAIN = "state_uncertain"
+    """The write could not be confirmed: the transaction could not describe what it left behind,
+    and the file does not hold what this run wrote. The one reason that cannot promise the file is
+    as it was found, which is why it is not folded into `UNWRITABLE` — the user's next move is to
+    compare the file against the rescue copy the plan names, not to fix a permission and re-run.
+
+    For the single-file commit the runner performs it is also the *only* transaction failure that
+    reaches the plan at all: a replacement that fails re-raises its own `OSError`, because rolling
+    back nothing is trivially complete."""
 
 
 class UnexplainedPath(BaseModel):

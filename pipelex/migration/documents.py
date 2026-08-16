@@ -12,6 +12,7 @@ Used by the checks that compare a migrated document against the one the new sche
 from typing import Any, cast
 
 from pipelex.migration.fingerprint import PATH_SEPARATOR
+from pipelex.suggested_fix import WILDCARD_SEGMENT
 
 
 def document_paths(*, document: dict[str, Any]) -> set[str]:
@@ -43,3 +44,23 @@ def _flatten_into(*, mapping: dict[str, Any], prefix: tuple[str, ...], flattened
             _flatten_into(mapping=cast("dict[str, Any]", value), prefix=path, flattened=flattened)
             continue
         flattened[dotted] = value
+
+
+def document_carries_path(*, paths: set[str], pattern: str) -> bool:
+    """Whether a document has anything at a schema path, `*` standing for one key of an open node.
+
+    A schema path is not a document path: beneath an open mapping the schema says `levels.*` while
+    the document says `levels.my_package`, and a literal lookup would answer "no" for every file
+    that has ever set one. Each `*` matches exactly one segment, which is what it means in the
+    fingerprint and in an operation alike — never a whole subtree.
+    """
+    if WILDCARD_SEGMENT not in pattern:
+        return pattern in paths
+    expected = pattern.split(PATH_SEPARATOR)
+    for path in paths:
+        segments = path.split(PATH_SEPARATOR)
+        if len(segments) != len(expected):
+            continue
+        if all(wanted in {WILDCARD_SEGMENT, found} for wanted, found in zip(expected, segments, strict=True)):
+            return True
+    return False

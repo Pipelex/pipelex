@@ -24,3 +24,13 @@ class MigrationGoldenError(MigrationError):
     """A checked-in golden is missing or unreadable, so no verdict can be produced."""
 
     _declared_title = "Migration golden error"
+
+
+class MigrationSnapshotRefusedError(MigrationError):
+    """The regenerator refused to overwrite a head golden that records material the models lost.
+
+    Raised so that a habitual regeneration cannot quietly erase the very removal the coverage gate
+    exists to catch. The refusal names both readings of the situation and the flag that resolves it.
+    """
+
+    _declared_title = "Migration snapshot refused"

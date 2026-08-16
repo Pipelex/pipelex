@@ -9,7 +9,7 @@ red on every legitimate configuration change and teach everyone to regenerate ra
 
 from collections.abc import Mapping
 from decimal import Decimal
-from enum import StrEnum
+from enum import Enum, StrEnum
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
@@ -20,6 +20,13 @@ from pipelex.migration.fingerprint import ENUM_TYPE, TABLE_TYPE, ConstraintKind,
 class _Mode(StrEnum):
     FAST = "fast"
     SLOW = "slow"
+
+
+class _Level(int, Enum):
+    """Deliberately not a `StrEnum`: the projection has to say so rather than stringify it."""
+
+    LOW = 1
+    HIGH = 2
 
 
 class _Leaf(BaseModel):
@@ -33,8 +40,16 @@ class _Synthetic(BaseModel):
     optional_leaf: _Leaf | None = None
     deck: dict[str, _Leaf]
     labels: dict[str, str]
+    modes: dict[str, _Mode]
+    mode_list: list[_Mode]
+    mode_maps: list[dict[str, _Mode]]
+    level: _Level = _Level.LOW
     tags: list[str]
     bounded: Annotated[int, Field(ge=1)] | Literal["unbounded"] = 1
+    # A field-level bound binds the whole field, whatever a union member declares for itself —
+    # pydantic applies it on top of the member's own. The field is never validated here; the
+    # fingerprint reads the annotation and the metadata, and this is the shape that separates them.
+    capped: Annotated[int, Field(le=100)] | Literal["auto"] = Field(default="auto", le=6)
     retries: int = Field(default=3, ge=0, le=10)
     lenient: str = Field(default="x", strict=False)
     item_bounded: list[Annotated[int, Field(ge=1)]] = Field(default_factory=list[int])
@@ -80,8 +95,14 @@ class TestFingerprintPaths:
             "deck.*.count",
             "labels",
             "labels.*",
+            "modes",
+            "modes.*",
+            "mode_list",
+            "mode_maps",
+            "level",
             "tags",
             "bounded",
+            "capped",
             "retries",
             "lenient",
             "item_bounded",
@@ -152,6 +173,47 @@ class TestFingerprintRecords:
         assert record.value_type == ENUM_TYPE
         assert record.enum_members == ["fast", "slow"]
 
+    def test_the_members_beneath_an_open_mapping_are_recorded_on_the_wildcard_and_not_on_the_table(self) -> None:
+        """The container's own value is a table, not an enumerated spelling.
+
+        Recording the members twice made the coverage gate demand a `remap_value` at the container
+        path as well as at the wildcard one — and a remap of a table value can never fire, so the
+        demand had no legal answer. The wildcard record is the one an operation can address.
+        """
+        fingerprint = _fingerprint()
+        assert fingerprint.paths["modes"].enum_members is None
+        assert fingerprint.paths["modes.*"].enum_members == ["fast", "slow"]
+
+    def test_the_members_inside_a_list_are_recorded_on_the_list_itself(self) -> None:
+        """A list gets no child record, so the list's own path is the only place they can live.
+
+        Dropping them there would make a member removed from a `list[enum]` invisible to the gate;
+        the remedy for one is an `unsafe` entry, which the coverage gate asks for by name.
+        """
+        assert _fingerprint().paths["mode_list"].enum_members == ["fast", "slow"]
+
+    def test_the_members_of_a_mapping_nested_in_a_list_are_recorded_on_the_list_itself(self) -> None:
+        """The suppression belongs to the field's own open node, not to every mapping anywhere inside it.
+
+        A `list[dict[str, enum]]` has no `*` child — the field's open node is the list, and a list
+        gets no child record — so suppressing the mapping's members here dropped them entirely, and
+        retiring one moved nothing in the fingerprint at all. The gate would have passed a change
+        that breaks every file carrying the spelling.
+        """
+        fingerprint = _fingerprint()
+        assert fingerprint.paths["mode_maps"].enum_members == ["fast", "slow"]
+        assert "mode_maps.*" not in fingerprint.path_names()
+
+    def test_an_enum_over_non_string_values_records_no_spelling(self) -> None:
+        """The same rule a `Literal` over non-strings already follows, for the same reason.
+
+        A remap rewrites a *string* value, so recording `1` and `2` as spellings would let the
+        accounting credit a `remap_value` the applier skips on every run — a green gate over a file
+        the new schema rejects. Recording nothing makes the projection's blind spot visible as a
+        blind spot, which is what the `Literal` rule already does.
+        """
+        assert _fingerprint().paths["level"].enum_members is None
+
     def test_a_string_literal_counts_as_an_enumerated_spelling(self) -> None:
         """A `Literal` and an `Enum` are the same thing to a TOML file: a closed set of spellings."""
         assert _fingerprint().paths["bounded"].enum_members == ["unbounded"]
@@ -169,6 +231,15 @@ class TestFingerprintRecords:
         so a walk reading the annotation alone would be blind to every bound declared the usual way.
         """
         assert ConstraintKind.GE in (_fingerprint().paths["retries"].constraints or {})
+
+    def test_a_field_level_bound_binds_the_whole_field_and_a_member_may_not_loosen_it(self) -> None:
+        """`Field(le=6)` on the field is applied on top of whatever a union member declares.
+
+        Merging the two sources by "widest wins" would record `le=100` and read a later tightening
+        of the field-level bound as a change to an already-looser one — the gate going quiet on
+        exactly the values that stop validating.
+        """
+        assert _fingerprint().paths["capped"].constraints == {ConstraintKind.LE: 6}
 
     def test_a_bound_nested_inside_a_union_member_is_found_too(self) -> None:
         """The shape `Annotated[int, Field(ge=1)] | Literal["unbounded"]`, which the type rendering strips."""

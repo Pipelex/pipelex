@@ -108,6 +108,8 @@ make check-migration-schemas  - Check configuration surfaces have accounted for 
 make cmig                     - Shorthand -> check-migration-schemas
 make up-migration-schemas     - Regenerate the migration fingerprint and defaults goldens
 make umig                     - Shorthand -> up-migration-schemas
+make up-migration-schemas-force - Same, over a head golden recording material the models lost
+make umigf                    - Shorthand -> up-migration-schemas-force
 make generate-error-pages     - Generate one docs page per PipelexError subclass under docs/errors/
 make gep                      - Shorthand -> generate-error-pages
 make generate-error-identity  - Regenerate the committed PipelexError wire-identity snapshot
@@ -120,7 +122,7 @@ make regenerate-test-models   - Regenerate test model fixtures from backend conf
 make rtm                      - Shorthand -> regenerate-test-models
 make insert-skeleton          - Insert skeleton from $(SKELETON_DIR)
 
-make up                       - Shorthand -> generate-mthds-schema update-gateway-models up-kit-configs up-migration-schemas rules
+make up                       - Shorthand -> generate-mthds-schema update-gateway-models up-kit-configs rules
 make cleanenv                 - Remove virtual env
 make cleanderived             - Remove extraneous compiled files, caches, logs, etc.
 make cleanall                 - Remove all -> cleanenv + cleanderived
@@ -217,7 +219,7 @@ export HELP
 	li check-unused-imports fix-unused-imports check-TODOs check-uv \
 	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-specific-version docs-delete \
 	generate-mthds-schema generate-mthds-schema-quiet gms check-mthds-schema cms \
-	check-ledger cl check-migration-schemas cmig up-migration-schemas up-migration-schemas-quiet umig \
+	check-ledger cl check-migration-schemas cmig up-migration-schemas up-migration-schemas-force umig umigf \
 	generate-error-pages generate-error-pages-quiet gep \
 	generate-error-identity generate-error-identity-quiet gei \
 	update-gateway-models update-gateway-models-quiet ugm check-gateway-models cgm up \
@@ -434,11 +436,15 @@ up-migration-schemas: env
 	$(call PRINT_TITLE,"Updating migration fingerprint and defaults goldens")
 	$(VENV_PIPELEX_DEV) update-migration-schemas
 
-up-migration-schemas-quiet: env
-	$(VENV_PIPELEX_DEV) update-migration-schemas --quiet
+up-migration-schemas-force: env
+	$(call PRINT_TITLE,"Re-recording migration goldens over material the models lost")
+	$(VENV_PIPELEX_DEV) update-migration-schemas --force
 
 umig: up-migration-schemas
 	@echo "> done: umig = up-migration-schemas"
+
+umigf: up-migration-schemas-force
+	@echo "> done: umigf = up-migration-schemas-force"
 
 generate-error-pages: env
 	$(call PRINT_TITLE,"Generating per-class error documentation pages")
@@ -1187,8 +1193,12 @@ c: check-keyword-only format lint pyright mypy
 cc: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet c
 	@echo "> done: cc = cleanderived regenerate-test-models generate-mthds-schema update-gateway-models format lint pyright mypy"
 
-up: generate-mthds-schema-quiet update-gateway-models-quiet up-kit-configs up-migration-schemas-quiet rules
-	@echo "> done: up = generate-mthds-schema update-gateway-models up-kit-configs up-migration-schemas rules"
+# `up-migration-schemas` is deliberately NOT part of this aggregate. Every other regenerator here
+# rewrites a derived artifact from a live source; the migration head golden is a *proof obligation*
+# the coverage gate reads, so folding it into a habitual bulk regeneration would let a removal be
+# erased by muscle memory. Run `make umig` on purpose, and read its diff.
+up: generate-mthds-schema-quiet update-gateway-models-quiet up-kit-configs rules
+	@echo "> done: up = generate-mthds-schema update-gateway-models up-kit-configs rules"
 
 check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema check-ledger check-migration-schemas check-keyword-only check-hub-layering drift-check format lint pyright mypy pylint
 	@echo "> done: check"

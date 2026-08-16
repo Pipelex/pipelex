@@ -21,6 +21,10 @@ The questions, each with its own failure kind:
   declare material no fingerprint records, and may address nothing outside that declaration —
   otherwise the flag, which exempts an entry from being accounted against a diff, would be a way
   to opt out of accounting for a change that has one.
+- **Narrowing declarations.** An `unsafe` entry's `declared_narrowed_paths` is what the engine
+  questions a document about, so every declared path must be one the fingerprint at the entry's
+  own version records. A path that version does not have is questioned of every file and found in
+  none — the entry would be, once more, reported to nobody.
 - **Convergence.** Replaying the whole ledger over each reference document must apply nothing
   and return the very bytes it was given.
 
@@ -39,6 +43,7 @@ from pipelex.migration.engine import replay_ledger_over_text
 from pipelex.migration.fingerprint import PATH_SEPARATOR, SurfaceFingerprint
 from pipelex.migration.goldens import read_fingerprint_golden
 from pipelex.migration.ledger import INITIAL_SCHEMA_VERSION, MigrationEntry, MigrationLedger, MigrationSafety, load_ledger
+from pipelex.migration.plan import BlockedEntryReason
 from pipelex.migration.reserved import ReservedRegistry, derive_reserved_registry
 from pipelex.migration.surfaces import Surface, SurfaceRegistry
 from pipelex.migration.walk import EntryWalk, WalkedOp, op_source_path, walk_entry
@@ -56,6 +61,7 @@ class LedgerIssueKind(StrEnum):
     RESERVED_PATH_REUSED = "reserved_path_reused"
     RESERVED_VALUE_REUSED = "reserved_value_reused"
     PRE_HISTORY_PATH_IS_RECORDED = "pre_history_path_is_recorded"
+    DECLARED_NARROWED_PATH_IS_ABSENT = "declared_narrowed_path_is_absent"
     CONVERGENCE_BROKEN = "convergence_broken"
 
 
@@ -147,12 +153,42 @@ def _check_entries(
             # The chain check above already named the missing link and its remedy. Checking the
             # entry against a shape nobody snapshotted would blame the entry for that gap.
             continue
+        issues.extend(_check_narrowing_declaration(surface_id=surface_id, entry=entry, after=after))
         if entry.pre_history:
             issues.extend(_check_pre_history_entry(surface_id=surface_id, entry=entry, chain=chain, before=before, after=after, reserved=reserved))
             continue
         walk = walk_entry(entry=entry, before=before)
         issues.extend(_check_op_legality(surface_id=surface_id, entry=entry, before=before, walk=walk, reserved=reserved))
         issues.extend(_check_remap_legality(surface_id=surface_id, entry=entry, after=after, walk=walk))
+    return issues
+
+
+def _check_narrowing_declaration(*, surface_id: str, entry: MigrationEntry, after: SurfaceFingerprint) -> list[LedgerIssue]:
+    """Every declared narrowed path is one the entry's own version records.
+
+    A narrowing is a path that *survives* with a smaller value domain, so the fingerprint at the
+    entry's own version has it — that is what distinguishes a narrowing from a removal, which the
+    coverage gate accounts against the diff and which no declaration may stand in for. It is also
+    what makes the declaration answerable: the engine looks these paths up in the user's document,
+    and one no version records is looked for in every file and found in none, which puts the entry
+    right back where R9 found it — accepted by the accounting, reported to nobody.
+    """
+    issues: list[LedgerIssue] = []
+    for path in entry.declared_narrowed_paths:
+        if path in after.paths:
+            continue
+        issues.append(
+            LedgerIssue(
+                surface_id=surface_id,
+                kind=LedgerIssueKind.DECLARED_NARROWED_PATH_IS_ABSENT,
+                message=(
+                    f"entry '{entry.id}' declares '{path}' as narrowed, but schema version {after.schema_version} has no such "
+                    f"path — a narrowing keeps its path and shrinks what it accepts, so this is either a misspelling or a "
+                    f"removal, and a removal is accounted for by the operation that removes it. Spell the path as the "
+                    f"fingerprint at version {after.schema_version} records it, '{WILDCARD_SEGMENT}' segments included"
+                ),
+            )
+        )
     return issues
 
 
@@ -543,6 +579,16 @@ def _check_convergence(*, surface: Surface, ledger: MigrationLedger) -> list[Led
     back merely equal would mean something applied and was not reported — which is the one failure
     a report cannot describe. Where the replay *did* report something, the changed bytes are that
     finding's consequence and saying it twice adds nothing.
+
+    **One exemption, and it is the narrowest one that leaves R9's shape usable.** An entry reported
+    as `VALUE_DOMAIN_NARROWED` is reported because the document *sets* a path whose accepted values
+    the entry narrowed — presence, not violation, because the engine is model-free by design and
+    the ruling that put the declaration in the ledger is the same ruling that refused to thread a
+    model into the engine. A witness at the current schema sets the path like any healthy file
+    does, so without the exemption every op-free `unsafe` entry would fail this check and the only
+    remedy the coverage gate offers for a tightened bound could never be written. An `unsafe`
+    entry whose *operations* fire on a witness is a different matter and still fails: that says the
+    checked-in reference document carries retired material.
     """
     issues: list[LedgerIssue] = []
     for label, text in surface.reference_documents():
@@ -560,7 +606,7 @@ def _check_convergence(*, surface: Surface, ledger: MigrationLedger) -> list[Led
                     ),
                 )
             )
-        blocked = [blocked_entry.entry_id for blocked_entry in replay.blocked]
+        blocked = [blocked_entry.entry_id for blocked_entry in replay.blocked if blocked_entry.reason is not BlockedEntryReason.VALUE_DOMAIN_NARROWED]
         if blocked:
             issues.append(
                 LedgerIssue(

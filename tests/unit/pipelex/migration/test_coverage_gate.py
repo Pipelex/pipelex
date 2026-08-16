@@ -23,6 +23,7 @@ from pipelex.migration.fingerprint import compute_fingerprint
 from pipelex.migration.goldens import write_defaults_golden, write_fingerprint_golden
 from pipelex.migration.ledger import ledgers_dir
 from pipelex.migration.surfaces import DefaultsLayerKind, Surface
+from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 SURFACE_ID = "synthetic-config"
 
@@ -61,6 +62,13 @@ class _SchemaTwoEnumMemberGone(BaseModel):
     """`basic` is no longer a legal spelling of `tier`."""
 
     label: str = "hello"
+    tier: _TierWithoutBasic = _TierWithoutBasic.PREMIUM
+
+
+class _SchemaTwoRenamedWithMemberGone(BaseModel):
+    """`label` renamed *and* a spelling of `tier` retired — an entry that is about the rename only."""
+
+    title: str = "hello"
     tier: _TierWithoutBasic = _TierWithoutBasic.PREMIUM
 
 
@@ -118,6 +126,19 @@ class _BoundedTightenedAndRenamed(BaseModel):
     retries: int = Field(default=3, ge=2)
 
 
+class _MixedItemList(BaseModel):
+    """A list whose items may be numbers or strings, beside a key the entry has an operation for."""
+
+    gone: str = "x"
+    items: list[int | str] = Field(default_factory=list[int | str])
+
+
+class _IntegerItemList(BaseModel):
+    """The items narrowed to numbers. No operation can reach inside the list to repair one."""
+
+    items: list[int] = Field(default_factory=empty_list_factory_of(int))
+
+
 class _BoundedOrAuto(BaseModel):
     """A bounded number that may also be spelled `auto` — the `int | literal` shape real surfaces carry."""
 
@@ -149,6 +170,18 @@ class _EnumeratedTier(BaseModel):
     """`tier` accepts two spellings and nothing else."""
 
     tier: _Tier = _Tier.BASIC
+
+
+class _EnumeratedTierList(BaseModel):
+    """`tiers` accepts a list of the two spellings — the shape a real surface already has."""
+
+    tiers: list[_Tier] = Field(default_factory=empty_list_factory_of(_Tier))
+
+
+class _FreeStringTierList(BaseModel):
+    """The same list, relaxed to accept any string."""
+
+    tiers: list[str] = Field(default_factory=list)
 
 
 class _SchemaOneWithBothNames(BaseModel):
@@ -357,6 +390,7 @@ class TestEntryAccounting:
         assert "titel" in issues[0].message
 
     def test_a_removal_with_no_operation_accounting_for_it_is_caught(self, tmp_path: Path) -> None:
+        """An entry that is genuinely about something else still owes the version's removals."""
         entry = f"""
 [[migration]]
 id                = "{SURFACE_ID}@2"
@@ -366,6 +400,7 @@ breaking          = true
 safety            = "unsafe"
 title             = "Drop label"
 description       = "The key is gone, and this entry forgot to say so."
+declared_narrowed_paths = ["tier"]
 """
         _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=entry)
         _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
@@ -533,7 +568,7 @@ table_path = ["label"]
 
 
 class TestEnumAccounting:
-    def _entry_with_ops(self, *, safety: str, ops: str) -> str:
+    def _entry_with_ops(self, *, safety: str, ops: str, declared_narrowed_paths: str = "") -> str:
         return f"""
 [[migration]]
 id                = "{SURFACE_ID}@2"
@@ -543,6 +578,7 @@ breaking          = true
 safety            = "{safety}"
 title             = "Retire the basic tier"
 description       = "The spelling changed."
+{declared_narrowed_paths}
 {ops}
 """
 
@@ -618,12 +654,90 @@ mapping    = { basic = "standard" }
         _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoEnumMemberGone, schema_version=2)
         assert check_surface(surface=_surface(config_model=_SchemaTwoEnumMemberGone), migration_dir=tmp_path) == []
 
-    def test_an_unsafe_entry_may_leave_a_removed_member_unremapped(self, tmp_path: Path) -> None:
+    def test_an_unsafe_entry_that_declares_the_path_may_leave_a_removed_member_unremapped(self, tmp_path: Path) -> None:
         """`unsafe` means reported and never applied, so it is allowed to describe what no operation can do."""
-        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="unsafe", ops=""))
+        entry = self._entry_with_ops(safety="unsafe", ops="", declared_narrowed_paths='declared_narrowed_paths = ["tier"]')
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=entry)
         _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
         _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoEnumMemberGone, schema_version=2)
         assert check_surface(surface=_surface(config_model=_SchemaTwoEnumMemberGone), migration_dir=tmp_path) == []
+
+    def test_an_unsafe_entry_that_names_no_path_does_not_account_for_the_lost_member(self, tmp_path: Path) -> None:
+        """R9, on the enum half: the word `unsafe` satisfies a reader and reaches no user.
+
+        The entry has an operation, so it is not the op-free shape the parser refuses — and the
+        operation is about something else entirely, so rehearsing it says nothing to the user
+        whose `tier = "basic"` the new schema rejects.
+        """
+        ops = """
+[[migration.ops]]
+kind       = "rename_table_key"
+table_path = []
+key        = "label"
+new_key    = "title"
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="unsafe", ops=ops))
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoRenamedWithMemberGone, schema_version=2)
+        issues = check_surface(surface=_surface(config_model=_SchemaTwoRenamedWithMemberGone), migration_dir=tmp_path)
+        assert _kinds(issues) == [CoverageIssueKind.ENUM_MEMBER_NOT_REMAPPED]
+        assert "declared_narrowed_paths" in issues[0].message
+
+    def test_a_member_lost_inside_a_list_cannot_be_remapped_and_the_gate_says_so(self, tmp_path: Path) -> None:
+        """A remap rewrites a string value, and the value here is a list.
+
+        Crediting the remap would leave a green gate over a file that stops validating: the
+        operation is a guarded skip on every run. `unsafe` is the only remedy, and the message
+        has to say that rather than offer a remap the author would write and never see fire.
+        """
+        ops = """
+[[migration.ops]]
+kind       = "remap_value"
+table_path = []
+key        = "tiers"
+mapping    = { basic = "standard" }
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="safe", ops=ops))
+        _snapshot(migration_dir=tmp_path, config_model=_ListOfTiers, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_ListOfTiersMemberGone, schema_version=2)
+        issues = check_surface(surface=_surface(config_model=_ListOfTiersMemberGone), migration_dir=tmp_path)
+        assert _kinds(issues) == [CoverageIssueKind.ENUM_MEMBER_NOT_REMAPPED]
+        assert "must be marked unsafe" in issues[0].message
+        assert "remap_value" not in issues[0].message
+
+    def test_a_member_lost_beneath_an_open_mapping_is_remapped_through_the_wildcard_key(self, tmp_path: Path) -> None:
+        """The keys are the user's, so `key = "*"` is the only operation that reaches the values."""
+        ops = """
+[[migration.ops]]
+kind       = "remap_value"
+table_path = ["levels"]
+key        = "*"
+mapping    = { basic = "standard" }
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="safe", ops=ops))
+        _snapshot(migration_dir=tmp_path, config_model=_MappingOfTiers, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_MappingOfTiersMemberGone, schema_version=2)
+        assert check_surface(surface=_surface(config_model=_MappingOfTiersMemberGone), migration_dir=tmp_path) == []
+
+
+class _ListOfTiers(BaseModel):
+    """An enumerated type inside a list: the members live on the list's own path, with no child record."""
+
+    tiers: list[_Tier] = Field(default_factory=lambda: [_Tier.BASIC])
+
+
+class _ListOfTiersMemberGone(BaseModel):
+    tiers: list[_TierWithoutBasic] = Field(default_factory=lambda: [_TierWithoutBasic.STANDARD])
+
+
+class _MappingOfTiers(BaseModel):
+    """An enumerated type beneath an open mapping: the members live on the `*` record."""
+
+    levels: dict[str, _Tier] = Field(default_factory=lambda: {"one": _Tier.BASIC})
+
+
+class _MappingOfTiersMemberGone(BaseModel):
+    levels: dict[str, _TierWithoutBasic] = Field(default_factory=lambda: {"one": _TierWithoutBasic.STANDARD})
 
 
 class TestValueDomainNarrowing:
@@ -634,7 +748,7 @@ class TestValueDomainNarrowing:
     reject a file that was valid the day before with a green gate behind it.
     """
 
-    def _entry_with_ops(self, *, safety: str, ops: str) -> str:
+    def _entry_with_ops(self, *, safety: str, ops: str, declared_narrowed_paths: str = "") -> str:
         return f"""
 [[migration]]
 id                = "{SURFACE_ID}@2"
@@ -644,6 +758,7 @@ breaking          = true
 safety            = "{safety}"
 title             = "Narrow what a value may be"
 description       = "The domain shrank."
+{declared_narrowed_paths}
 {ops}
 """
 
@@ -680,6 +795,20 @@ description       = "The domain shrank."
         issues = check_surface(surface=_surface(config_model=_FreeStringTier), migration_dir=tmp_path)
         assert _kinds(issues) == [CoverageIssueKind.FINGERPRINT_DRIFTED]
 
+    def test_an_enumerated_list_relaxed_into_free_strings_asks_only_for_a_regeneration(self, tmp_path: Path) -> None:
+        """The same widening one container down, which a real surface already carries as `list[AgentTarget]`.
+
+        The type half reads a container structurally; the member half read its exemption only at the
+        top level, so this change reported no narrowing and every spelling lost at once. The remedy
+        the gate then named — bump the version and mark the entry `unsafe`, because no operation can
+        rewrite a value inside a list — would be reported to every user, at every boot, forever, for
+        a change that invalidates nothing.
+        """
+        _write_ledger(migration_dir=tmp_path, current_schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_EnumeratedTierList, schema_version=1)
+        issues = check_surface(surface=_surface(config_model=_FreeStringTierList), migration_dir=tmp_path)
+        assert _kinds(issues) == [CoverageIssueKind.FINGERPRINT_DRIFTED]
+
     def test_a_bumped_entry_that_does_not_account_for_the_narrowing_is_refused(self, tmp_path: Path) -> None:
         """The entry explains the rename it made and says nothing about the bound it moved."""
         ops = """
@@ -695,6 +824,28 @@ new_key    = "title"
         issues = check_surface(surface=_surface(config_model=_BoundedTightenedAndRenamed), migration_dir=tmp_path)
         assert _kinds(issues) == [CoverageIssueKind.VALUE_DOMAIN_NARROWED]
         assert "'retries'" in issues[0].message
+
+    def test_a_narrowed_container_is_sent_to_unsafe_rather_than_to_a_remap_it_cannot_write(self, tmp_path: Path) -> None:
+        """The remedy a gate names has to be one the other gates accept.
+
+        A `remap_value` rewrites a string value, so it never reaches an item inside a list — and
+        `make check-ledger` refuses one on a path that is not enumerated, as illegal. Offering it
+        here sent the author to write an operation one gate demanded and the other rejected.
+        """
+        ops = """
+[[migration.ops]]
+kind       = "delete_key"
+table_path = []
+key        = "gone"
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="safe", ops=ops))
+        _snapshot(migration_dir=tmp_path, config_model=_MixedItemList, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_IntegerItemList, schema_version=2)
+        issues = check_surface(surface=_surface(config_model=_IntegerItemList), migration_dir=tmp_path)
+        narrowings = [issue for issue in issues if issue.kind is CoverageIssueKind.VALUE_DOMAIN_NARROWED]
+        assert len(narrowings) == 1
+        assert "must be marked unsafe" in narrowings[0].message
+        assert "remap_value" not in narrowings[0].message
 
     def test_a_remap_on_the_narrowed_path_accounts_for_it(self, tmp_path: Path) -> None:
         """The remedy that repairs the file rather than only warning about it, where it applies."""
@@ -751,14 +902,51 @@ mapping    = { auto = "unbounded" }
         assert _kinds(issues) == [CoverageIssueKind.VALUE_DOMAIN_NARROWED]
         assert "its type went from 'int | literal' to 'literal'" in issues[0].message
 
-    def test_an_unsafe_entry_may_leave_a_narrowing_unremapped(self, tmp_path: Path) -> None:
+    def test_an_unsafe_entry_that_declares_the_narrowing_leaves_it_unremapped(self, tmp_path: Path) -> None:
         """For a tightened numeric bound this is the only remedy there is: no mapping can enumerate
         the values a bound retires, so the migration is reported to the user and never applied.
         """
-        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="unsafe", ops=""))
+        entry = self._entry_with_ops(safety="unsafe", ops="", declared_narrowed_paths='declared_narrowed_paths = ["retries"]')
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=entry)
         _snapshot(migration_dir=tmp_path, config_model=_BoundedOne, schema_version=1)
         _snapshot(migration_dir=tmp_path, config_model=_BoundedTightened, schema_version=2)
         assert check_surface(surface=_surface(config_model=_BoundedTightened), migration_dir=tmp_path) == []
+
+    def test_an_unsafe_entry_that_declares_nothing_about_its_narrowing_is_refused(self, tmp_path: Path) -> None:
+        """R9 — `unsafe` on its own accounts for nothing, because the engine reports it to nobody.
+
+        The word satisfies a reader; the declaration is what the engine can question a user's file
+        about. An entry that says `unsafe` and names no path passes this gate while every user
+        whose value the new schema refuses is left with a failing boot and no message.
+        """
+        ops = """
+[[migration.ops]]
+kind       = "rename_table_key"
+table_path = []
+key        = "label"
+new_key    = "title"
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="unsafe", ops=ops))
+        _snapshot(migration_dir=tmp_path, config_model=_BoundedOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_BoundedTightenedAndRenamed, schema_version=2)
+        issues = check_surface(surface=_surface(config_model=_BoundedTightenedAndRenamed), migration_dir=tmp_path)
+        assert _kinds(issues) == [CoverageIssueKind.VALUE_DOMAIN_NARROWED]
+        assert "declared_narrowed_paths" in issues[0].message
+
+    def test_an_unsafe_entry_declaring_its_narrowing_beside_a_rename_is_green(self, tmp_path: Path) -> None:
+        """The same entry, with the one line that makes it reach the user it is written for."""
+        ops = """
+[[migration.ops]]
+kind       = "rename_table_key"
+table_path = []
+key        = "label"
+new_key    = "title"
+"""
+        entry = self._entry_with_ops(safety="unsafe", ops=ops, declared_narrowed_paths='declared_narrowed_paths = ["retries"]')
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=entry)
+        _snapshot(migration_dir=tmp_path, config_model=_BoundedOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_BoundedTightenedAndRenamed, schema_version=2)
+        assert check_surface(surface=_surface(config_model=_BoundedTightenedAndRenamed), migration_dir=tmp_path) == []
 
     def test_a_pre_history_entry_cannot_hide_a_narrowing_either(self, tmp_path: Path) -> None:
         """The flag exempts an entry from accounting, so it must not be a way past this one."""

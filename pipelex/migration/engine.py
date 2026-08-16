@@ -25,12 +25,15 @@ Three properties this module is responsible for:
   function rather than a property of the TOML library we happen to use. When something does
   apply, the output is `tomlkit.dumps` of the mutated document and nothing else: no canonical
   reflow, because a one-key rename must not rewrite a user's spacing.
-- **An `unsafe` entry is never written, and is only *reported* when it would do something.** It
-  is rehearsed against the text and the result discarded: on a file already at the current schema
-  every operation skips, so a correct file stays silent instead of warning at every boot.
+- **An `unsafe` entry is never written, and is only *reported* when the file still carries the
+  material it is about.** Its operations are rehearsed against the text and the result discarded,
+  and the paths it declares narrowed are looked up — at every spelling later entries have given
+  them, and reported at the one this replay leaves behind, because the file the user is sent to
+  check is the file this run wrote. On a file the entry has nothing to say to, it stays silent
+  instead of warning at every boot. Where that material lives is `material.py`'s question.
 
 See `docs/migration-ledger.md` → "Schema versions, and why every run replays everything",
-"Applying", and "What the engine reports".
+"Applying", "What an `unsafe` entry promises", and "What the engine reports".
 """
 
 from collections.abc import Sequence
@@ -38,7 +41,9 @@ from collections.abc import Sequence
 import tomlkit
 from pydantic import BaseModel, ConfigDict, Field
 
+from pipelex.migration.documents import document_carries_path, document_paths
 from pipelex.migration.ledger import MigrationEntry, MigrationLedger, MigrationSafety
+from pipelex.migration.material import declared_path_spellings, spelling_after_replay, unsafe_op_variants
 from pipelex.migration.plan import BlockedEntry, BlockedEntryReason, MigrationStep
 from pipelex.pipeline.fixes.applier import FixOpApplication, apply_fix_ops
 from pipelex.suggested_fix import MigrationOp
@@ -110,34 +115,89 @@ def replay_ledger_over_text(*, ledger: MigrationLedger, text: str) -> DocumentRe
     for entry in ledger.migration:
         match entry.safety:
             case MigrationSafety.UNSAFE:
-                _rehearse_unsafe_entry(entry=entry, text=current_text, blocked=blocked)
+                _rehearse_unsafe_entry(entry=entry, ledger=ledger, text=current_text, blocked=blocked)
             case MigrationSafety.SAFE:
                 current_text = _apply_safe_entry(entry=entry, text=current_text, steps=steps, blocked=blocked)
     return DocumentReplay(text=current_text, steps=steps, blocked=blocked)
 
 
-def _rehearse_unsafe_entry(*, entry: MigrationEntry, text: str, blocked: list[BlockedEntry]) -> None:
+def _rehearse_unsafe_entry(*, entry: MigrationEntry, ledger: MigrationLedger, text: str, blocked: list[BlockedEntry]) -> None:
     """Find out whether an `unsafe` entry has anything to say about this file, writing nothing.
 
-    The rehearsal's text is discarded, so the file is untouched whatever the outcome. An entry
-    with nothing to do stays silent: reporting it regardless would warn every user with a
+    Every rehearsal's text is discarded, so the file is untouched whatever the outcome. An entry
+    with nothing to say stays silent: reporting it regardless would warn every user with a
     perfectly current file, at every boot, forever.
     """
-    rehearsal = apply_ops_over_text(text=text, ops=entry.ops)
-    if not rehearsal.applied_count and not rehearsal.conflicts:
+    operations_would_fire = _operations_would_fire(entry=entry, ledger=ledger, text=text)
+    narrowed_paths = _declared_paths_this_file_carries(entry=entry, ledger=ledger, text=text)
+    if not operations_would_fire and not narrowed_paths:
         return
+    if operations_would_fire:
+        reason = BlockedEntryReason.UNSAFE
+        detail = (
+            f"this file needs the changes of '{entry.id}', but the entry is marked unsafe: the applier cannot "
+            f"tell a stale value from a deliberate choice, so it is reported and never applied"
+        )
+    else:
+        reason = BlockedEntryReason.VALUE_DOMAIN_NARROWED
+        detail = (
+            f"'{entry.id}' narrowed what {', '.join(narrowed_paths)} may hold, and this file sets a value there. No "
+            f"operation can repair a value, so the entry is reported and never applied — check those keys by hand"
+        )
     blocked.append(
         BlockedEntry(
             entry_id=entry.id,
             to_schema_version=entry.to_schema_version,
-            reason=BlockedEntryReason.UNSAFE,
-            detail=(
-                f"this file needs the changes of '{entry.id}', but the entry is marked unsafe: the applier cannot "
-                f"tell a stale value from a deliberate choice, so it is reported and never applied"
-            ),
+            reason=reason,
+            detail=detail,
             guidance=entry.guidance,
+            narrowed_paths=narrowed_paths,
         )
     )
+
+
+def _operations_would_fire(*, entry: MigrationEntry, ledger: MigrationLedger, text: str) -> bool:
+    """Whether rehearsing the entry's operations against this file would do anything.
+
+    Value-sensitive by construction, because a remap is about a stale *spelling* rather than about
+    a path: reporting on the path alone would warn a user whose value was never stale. Asked at
+    every spelling `material.py` says the material can have, so that an entry which reported on
+    the first run does not go silent on the second because a later `safe` entry renamed the table
+    around it.
+    """
+    for ops in unsafe_op_variants(ledger=ledger, entry=entry):
+        rehearsal = apply_ops_over_text(text=text, ops=ops)
+        if rehearsal.applied_count or rehearsal.conflicts:
+            return True
+    return False
+
+
+def _declared_paths_this_file_carries(*, entry: MigrationEntry, ledger: MigrationLedger, text: str) -> list[str]:
+    """The entry's declared narrowed paths that this file has a value at, as the migrated file spells them.
+
+    Presence is the whole predicate. No operation can express a value the new schema refuses, so
+    there is nothing to rehearse — and the engine is deliberately model-free, so it cannot tell a
+    value the narrowed domain rejects from one it accepts. What comes back is a list of keys for a
+    human to check, and it is reported as the *ledger* spells it, `*` included, so that a key the
+    user chose beneath an open mapping is no more rendered than a value would be.
+
+    Looked up at every spelling the material has ever had, and reported at the one the *end of this
+    replay* leaves: the entry is questioned against the text as it stands here, and the later `safe`
+    entries then rename the material before the file is written. The file the user is sent to check
+    is the one the run wrote, so naming the spelling that matched would name a key it no longer has.
+    """
+    spellings = declared_path_spellings(ledger=ledger, entry=entry)
+    if not spellings:
+        return []
+    present = document_paths(document=tomlkit.loads(text))
+    carried: list[str] = []
+    for spelling in spellings:
+        if not document_carries_path(paths=present, pattern=spelling):
+            continue
+        after_replay = spelling_after_replay(ledger=ledger, entry=entry, spelling=spelling)
+        if after_replay not in carried:
+            carried.append(after_replay)
+    return carried
 
 
 def _apply_safe_entry(*, entry: MigrationEntry, text: str, steps: list[MigrationStep], blocked: list[BlockedEntry]) -> str:

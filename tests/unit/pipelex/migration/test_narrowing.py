@@ -72,6 +72,90 @@ class TestTheNarrowingRelation:
         assert reasons == ["its type went from 'list[int | str]' to 'int'"]
 
     @pytest.mark.parametrize(
+        ("before_type", "after_type"),
+        [
+            ("list[int]", "list[int | str]"),
+            ("dict[str, int]", "dict[str, int | str]"),
+            ("list[enum]", "list[str]"),
+            ("dict[str, list[int]]", "dict[str, list[int | str]]"),
+            ("int", "float"),
+            ("list[int]", "list[float]"),
+            ("enum", "literal"),
+            ("literal", "enum"),
+        ],
+    )
+    def test_a_container_or_scalar_that_only_gained_room_is_not_a_narrowing(self, before_type: str, after_type: str) -> None:
+        """Four crying-wolf shapes, each a widening no file notices.
+
+        A container whose item type widened is a widening of the container; `int` is accepted
+        wherever `float` is, in strict validation as well as lax; and `enum` and `literal` are two
+        renderings of the same thing — a closed set of string spellings — whose *member* movement
+        is reported by the enumerated-spelling half rather than by the type half.
+        """
+        assert describe_narrowing(before=_record(value_type=before_type), after=_record(value_type=after_type)) == []
+
+    @pytest.mark.parametrize(
+        ("before_type", "after_type"),
+        [
+            ("list[int | str]", "list[int]"),
+            ("dict[str, int]", "dict[str, str]"),
+            ("float", "int"),
+            ("list[int]", "list[int, str]"),
+        ],
+    )
+    def test_a_container_whose_items_narrowed_is_still_a_narrowing(self, before_type: str, after_type: str) -> None:
+        """The structural reading must not become a licence: same head, narrower argument, still red."""
+        assert describe_narrowing(before=_record(value_type=before_type), after=_record(value_type=after_type)) == [
+            f"its type went from '{before_type}' to '{after_type}'"
+        ]
+
+    @pytest.mark.parametrize(
+        ("value_type", "before_constraints", "after_constraints"),
+        [
+            ("int", {ConstraintKind.GT: 0}, {ConstraintKind.GE: 1}),
+            ("int", {ConstraintKind.GE: 1}, {ConstraintKind.GT: 0}),
+            ("int", {ConstraintKind.LT: 10}, {ConstraintKind.LE: 9}),
+            ("int | literal", {ConstraintKind.GT: 0}, {ConstraintKind.GE: 1}),
+            # A fractional threshold names no integer of its own, so it is the same bound as the
+            # whole number it rounds to — in both directions, and inclusive as well as exclusive.
+            ("int", {ConstraintKind.GT: 1.5}, {ConstraintKind.GE: 2}),
+            ("int", {ConstraintKind.GE: 2}, {ConstraintKind.GT: 1.5}),
+            ("int", {ConstraintKind.GT: 0.5}, {ConstraintKind.GT: 0.9}),
+            ("int", {ConstraintKind.GE: 0.5}, {ConstraintKind.GE: 1}),
+            ("int", {ConstraintKind.LE: 10}, {ConstraintKind.LT: 10.5}),
+            ("int", {ConstraintKind.LT: 10.5}, {ConstraintKind.LT: 10.1}),
+            ("int", {ConstraintKind.LE: 9.5}, {ConstraintKind.LE: 9}),
+            ("int", {ConstraintKind.GE: 0}, {ConstraintKind.GT: -0.5}),
+        ],
+    )
+    def test_two_spellings_of_one_integer_bound_are_the_same_bound(
+        self,
+        value_type: str,
+        before_constraints: dict[ConstraintKind, int | float],
+        after_constraints: dict[ConstraintKind, int | float],
+    ) -> None:
+        """Over the integers `gt=0` and `ge=1` admit exactly the same values.
+
+        Reading the swap as a tightening is a false breaking verdict on a schema nobody's file can
+        tell apart, and the remedy the gate would name — bump the version, write an unsafe entry —
+        is work with no beneficiary.
+        """
+        assert (
+            describe_narrowing(
+                before=_record(value_type=value_type, constraints=before_constraints),
+                after=_record(value_type=value_type, constraints=after_constraints),
+            )
+            == []
+        )
+
+    def test_the_integer_reading_is_not_applied_to_a_float(self) -> None:
+        """`gt=0` and `ge=1` are different bounds over the reals, and `0.5` is between them."""
+        assert describe_narrowing(
+            before=_record(value_type="float", constraints={ConstraintKind.GT: 0}),
+            after=_record(value_type="float", constraints={ConstraintKind.GE: 1}),
+        ) == ["its lower bound tightened from gt=0 to ge=1"]
+
+    @pytest.mark.parametrize(
         ("before_constraints", "after_constraints", "expected_fragment"),
         [
             ({}, {ConstraintKind.GE: 1}, "its lower bound tightened from unbounded to ge=1"),
@@ -143,6 +227,36 @@ class TestTheNarrowingRelation:
             after=_record(value_type="str"),
         )
         assert lost == []
+
+    def test_an_enumerated_container_relaxed_into_free_strings_loses_no_spelling(self) -> None:
+        """The same relaxation one container down, which the type half already reads structurally.
+
+        `list[enum]` to `list[str]` is the widening `test_a_container_or_scalar_that_only_gained_room_is_not_a_narrowing`
+        asserts it is. Reading the exemption only at the top level made this half disagree with that
+        one: no narrowing, and every spelling lost — a bump and an `unsafe` entry demanded, then
+        reported to every user forever, for a change no file notices.
+        """
+        lost = lost_enumerated_spellings(
+            before=_record(value_type="list[enum]", enum_members=["basic", "premium"]),
+            after=_record(value_type="list[str]"),
+        )
+        assert lost == []
+
+    def test_an_enumerated_container_relaxed_into_something_else_still_loses_its_spellings(self) -> None:
+        """The exemption travels into the container, and so does its limit: `list[int]` accepts no spelling."""
+        lost = lost_enumerated_spellings(
+            before=_record(value_type="list[enum]", enum_members=["basic", "premium"]),
+            after=_record(value_type="list[int]"),
+        )
+        assert lost == ["basic", "premium"]
+
+    def test_an_enumerated_container_flattened_to_a_bare_string_still_loses_its_spellings(self) -> None:
+        """A `list[enum]` is not absorbed by `str`: a file carrying a list stops validating outright."""
+        lost = lost_enumerated_spellings(
+            before=_record(value_type="list[enum]", enum_members=["basic", "premium"]),
+            after=_record(value_type="str"),
+        )
+        assert lost == ["basic", "premium"]
 
     def test_an_enum_that_became_something_else_entirely_still_loses_its_spellings(self) -> None:
         """The exemption is for widening only — `int` accepts none of the spellings `str` did."""

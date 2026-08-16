@@ -91,12 +91,32 @@ class FixOpBase(BaseModel):
     table_path: list[str]
 
 
+def _refuse_wildcard_key(*, key: str, what: str) -> str:
+    """Refuse ``*`` where a fixed key is the only thing the semantics can mean.
+
+    The segment means "each of these", and only a remap has a per-key answer to give. Deleting
+    every key of a table is ``delete_table``; renaming or moving every key onto one fixed name is
+    many-to-one and conflicts on the second match; writing a value under ``*`` names no key at
+    all. Left unrefused each is a *dead* operation rather than a wrong one — the applier looks up
+    a key literally spelled ``*``, never finds it, and reports a guarded skip forever.
+    """
+    if key == WILDCARD_SEGMENT:
+        msg = f"{what} may not be the wildcard segment '{WILDCARD_SEGMENT}': only remap_value has a per-key meaning for it"
+        raise ValueError(msg)
+    return key
+
+
 class SetKeyOp(FixOpBase):
     """Write ``key = value`` in the addressed table, whatever it currently holds."""
 
     kind: Literal[FixOpKind.SET_KEY] = FixOpKind.SET_KEY
     key: str
     value: TomlValue
+
+    @field_validator("key")
+    @classmethod
+    def refuse_wildcard_key(cls, key: str) -> str:
+        return _refuse_wildcard_key(key=key, what="a set_key key")
 
 
 class EnsureTableOp(FixOpBase):
@@ -115,6 +135,11 @@ class DeleteKeyOp(FixOpBase):
 
     kind: Literal[FixOpKind.DELETE_KEY] = FixOpKind.DELETE_KEY
     key: str
+
+    @field_validator("key")
+    @classmethod
+    def refuse_wildcard_key(cls, key: str) -> str:
+        return _refuse_wildcard_key(key=key, what="a delete_key key")
 
 
 class DeleteTableOp(FixOpBase):
@@ -135,6 +160,11 @@ class RenameTableKeyOp(FixOpBase):
     key: str
     new_key: str
 
+    @field_validator("key", "new_key")
+    @classmethod
+    def refuse_wildcard_key(cls, key: str) -> str:
+        return _refuse_wildcard_key(key=key, what="a rename_table_key key")
+
 
 class MoveKeyOp(FixOpBase):
     """Relocate ``key`` from the addressed table into ``new_table_path``, under ``new_key``.
@@ -149,6 +179,11 @@ class MoveKeyOp(FixOpBase):
     key: str
     new_table_path: list[str]
     new_key: str
+
+    @field_validator("key", "new_key")
+    @classmethod
+    def refuse_wildcard_key(cls, key: str) -> str:
+        return _refuse_wildcard_key(key=key, what="a move_key key")
 
     @field_validator("new_table_path")
     @classmethod
@@ -185,6 +220,12 @@ class RemapValueOp(FixOpBase):
 
     Only string values are remapped: the operation exists for renamed enumerated values, whose
     TOML representation is always a string.
+
+    ``key`` may be the wildcard segment, and this is the one kind for which it means anything:
+    "each key of the addressed table". A mapping from the user's own keys to an enumerated value
+    — ``dict[str, LogLevel]`` — keeps its spellings under keys only the document can enumerate,
+    so no fixed ``key`` reaches them and this is the only shape in which a member renamed beneath
+    an open mapping can be repaired at all.
     """
 
     kind: Literal[FixOpKind.REMAP_VALUE] = FixOpKind.REMAP_VALUE

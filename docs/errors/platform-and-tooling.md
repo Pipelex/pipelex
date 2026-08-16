@@ -108,5 +108,6 @@ own page. Classes are grouped by subsystem.
 - [`MigrationGoldenError`](migration-golden-error.md) — Migration golden error
 - [`MigrationLedgerError`](migration-ledger-error.md) — Migration ledger error
 - [`MigrationRegistryError`](migration-registry-error.md) — Migration registry error
+- [`MigrationSnapshotRefusedError`](migration-snapshot-refused-error.md) — Migration snapshot refused
 
 [Back to Error Reference](index.md)

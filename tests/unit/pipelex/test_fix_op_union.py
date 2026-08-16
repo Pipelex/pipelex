@@ -131,6 +131,33 @@ class TestFixOpUnion:
         assert isinstance(op, RenameTableKeyOp)
         assert op.table_path == ["deck", "*"]
 
+    def test_a_wildcard_key_is_accepted_only_by_a_remap(self) -> None:
+        """`key = "*"` means "each key of this table", and only a remap has a per-key answer.
+
+        Deleting every key is `delete_table`; renaming or moving every key onto one fixed name is
+        many-to-one and conflicts on the second one. Left unrefused they are dead operations: the
+        applier looks up a key literally named `*`, never finds it, and reports a guarded skip
+        forever.
+        """
+        op = _FixOpHolder.model_validate({"op": {"kind": "remap_value", "table_path": ["levels"], "key": "*", "mapping": {"a": "b"}}}).op
+        assert isinstance(op, RemapValueOp)
+        assert op.key == "*"
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            {"kind": "delete_key", "table_path": ["s"], "key": "*"},
+            {"kind": "rename_table_key", "table_path": ["s"], "key": "*", "new_key": "n"},
+            {"kind": "rename_table_key", "table_path": ["s"], "key": "k", "new_key": "*"},
+            {"kind": "move_key", "table_path": ["s"], "key": "*", "new_table_path": ["t"], "new_key": "k"},
+            {"kind": "move_key", "table_path": ["s"], "key": "k", "new_table_path": ["t"], "new_key": "*"},
+            {"kind": "set_key", "table_path": ["s"], "key": "*", "value": "v"},
+        ],
+    )
+    def test_a_wildcard_key_is_refused_everywhere_else(self, payload: dict[str, object]) -> None:
+        with pytest.raises(ValidationError, match="wildcard"):
+            _FixOpHolder.model_validate({"op": payload})
+
     def test_a_remap_needs_a_non_empty_mapping(self) -> None:
         """An empty mapping is an operation that can never do anything — an authoring mistake."""
         with pytest.raises(ValidationError):

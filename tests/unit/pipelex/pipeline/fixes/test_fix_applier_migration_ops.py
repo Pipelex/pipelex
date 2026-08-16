@@ -41,6 +41,11 @@ tier     = "premium"
 [deck.claude]
 provider = "anthropic"
 tier     = "legacy"
+
+[levels]
+httpx   = "loud"
+openai  = "quiet"
+urllib3 = "info"
 """
 
 
@@ -175,6 +180,36 @@ class TestFixApplierMigrationOps:
         text, outcomes = _apply(text=occupied, ops=[RenameTableKeyOp(table_path=["deck", "*"], key="tier", new_key="quality")])
         assert outcomes == [FixOpOutcome.CONFLICT]
         assert text == occupied
+
+    def test_a_wildcard_key_remaps_every_value_of_the_addressed_table(self) -> None:
+        """The "each of these" reading of `*`, applied to keys rather than to tables.
+
+        A mapping from the user's own keys to an enumerated value — `dict[str, LogLevel]` — has its
+        spellings beneath keys nobody but the document can enumerate, so this is the only shape in
+        which a renamed enum member under an open mapping can be repaired at all.
+        """
+        text, outcomes = _apply(
+            text=_DOC,
+            ops=[RemapValueOp(table_path=["levels"], key="*", mapping={"loud": "verbose", "quiet": "warning"})],
+        )
+        assert outcomes == [FixOpOutcome.APPLIED]
+        assert _table_at(text=text, path=["levels"]) == {"httpx": "verbose", "openai": "warning", "urllib3": "info"}
+
+    def test_a_wildcard_key_remap_that_matches_no_value_skips_without_touching_the_document(self) -> None:
+        text, outcomes = _apply(text=_DOC, ops=[RemapValueOp(table_path=["levels"], key="*", mapping={"nope": "other"})])
+        assert outcomes == [FixOpOutcome.SKIPPED]
+        assert text == _DOC
+
+    def test_a_wildcard_key_remap_skips_over_a_value_that_is_not_a_string(self) -> None:
+        """Only string values are remapped, whether the key is named or matched by the wildcard."""
+        text, outcomes = _apply(text=_DOC, ops=[RemapValueOp(table_path=["reporting"], key="*", mapping={"loud": "verbose"})])
+        assert outcomes == [FixOpOutcome.SKIPPED]
+        assert text == _DOC
+
+    def test_a_wildcard_key_remap_over_an_absent_table_skips(self) -> None:
+        text, outcomes = _apply(text=_DOC, ops=[RemapValueOp(table_path=["no_such_section"], key="*", mapping={"loud": "verbose"})])
+        assert outcomes == [FixOpOutcome.SKIPPED]
+        assert text == _DOC
 
     def test_wildcard_over_an_absent_node_skips(self) -> None:
         """Nothing matches, so nothing happens — and the document is untouched."""

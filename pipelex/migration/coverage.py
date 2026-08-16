@@ -46,7 +46,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pipelex.migration.fingerprint import PATH_SEPARATOR, TABLE_TYPE, SurfaceFingerprint, compute_fingerprint
 from pipelex.migration.goldens import defaults_golden_path, read_fingerprint_golden
 from pipelex.migration.ledger import MigrationEntry, MigrationLedger, MigrationSafety, load_ledger
-from pipelex.migration.narrowing import describe_narrowing, lost_enumerated_spellings
+from pipelex.migration.narrowing import describe_narrowing, is_remappable, lost_enumerated_spellings
 from pipelex.migration.surfaces import Surface, SurfaceRegistry
 from pipelex.migration.walk import EntryWalk, walk_entry
 from pipelex.suggested_fix import WILDCARD_SEGMENT
@@ -278,11 +278,13 @@ def _check_enum_accounting(
     Members are compared by *origin*: an enumerated path of the previous schema is looked up at
     the path the walk carried it to. A comparison over shared names would never look at a path
     the same entry renamed, and would let a lost member ride into the new schema unremapped.
+
+    An `unsafe` entry is allowed to leave a member unremapped — describing what no operation can
+    do is what `unsafe` is for — but it answers for that member by declaring the path, exactly as
+    it answers for a narrowing. The word alone accounts for nothing: the engine questions an
+    unsafe entry before reporting it, and a declaration is the only thing it can question a
+    document about when there is no operation to rehearse (R9).
     """
-    if entry.safety is MigrationSafety.UNSAFE:
-        # An unsafe entry is reported and never applied, so it is allowed to describe a change no
-        # operation can make. That is what `unsafe` is for.
-        return []
     remapped_by_origin: dict[str, set[str]] = {}
     for remap in walk.remaps:
         remapped_by_origin.setdefault(remap.origin_path, set()).update(remap.old_values)
@@ -298,15 +300,34 @@ def _check_enum_accounting(
             # check has already said so in terms the author can act on.
             continue
         removed_members = set(lost_enumerated_spellings(before=before_record, after=after_record))
-        unaccounted = sorted(removed_members - remapped_by_origin.get(origin, set()))
+        # A remap only reaches a path whose own value is a string. Where it cannot — an enumerated
+        # type inside a list — crediting one would be crediting an operation that skips on every
+        # run, and offering one as a remedy would send the author to write it and never see it fire.
+        reachable = is_remappable(record=before_record)
+        unaccounted = sorted(removed_members - remapped_by_origin.get(origin, set())) if reachable else sorted(removed_members)
         if unaccounted:
+            match entry.safety:
+                case MigrationSafety.UNSAFE:
+                    if final_path in entry.declared_narrowed_paths:
+                        continue
+                    remedy = (
+                        f"and the entry is unsafe, which is allowed — but `unsafe` is only ever *reported*, and the engine "
+                        f"reports it to a file that carries the material it names. Add '{final_path}' to "
+                        f"declared_narrowed_paths, or nobody hears about this"
+                    )
+                case MigrationSafety.SAFE:
+                    remedy = (
+                        "so the entry needs a remap_value for each, or must be marked unsafe"
+                        if reachable
+                        else "and no operation can rewrite a value inside a container, so the entry must be marked unsafe"
+                    )
             issues.append(
                 CoverageIssue(
                     surface_id=surface_id,
                     kind=CoverageIssueKind.ENUM_MEMBER_NOT_REMAPPED,
                     message=(
                         f"entry '{entry.id}': '{final_path}' no longer accepts {unaccounted} — a file carrying one of those "
-                        f"values no longer validates, so the entry needs a remap_value for each, or must be marked unsafe"
+                        f"values no longer validates, {remedy}"
                     ),
                 )
             )
@@ -321,7 +342,7 @@ def _check_narrowing_accounting(
     after: SurfaceFingerprint,
     walk: EntryWalk,
 ) -> list[CoverageIssue]:
-    """Every path whose value domain the entry narrows must carry a remap, or the entry must be unsafe.
+    """Every path whose value domain the entry narrows must carry a remap, or be declared unsafely.
 
     Paths are compared by *origin*, exactly as enumerated members are: a path the same entry
     renamed is looked up where the walk carried it, so a narrowing hidden behind a rename still
@@ -333,11 +354,13 @@ def _check_narrowing_accounting(
     Everywhere else, a tightened numeric bound above all, the entry has to say `unsafe`: the
     migration is then reported to the user and never applied, which is the honest answer when the
     tool cannot tell a stale value from a deliberate one.
+
+    **`unsafe` alone is not the accounting; the declaration is.** The engine questions an unsafe
+    entry before reporting it, and the only thing it can question a narrowing about is the path.
+    So an unsafe entry answers for a narrowing by naming that path in `declared_narrowed_paths` —
+    without which the gate would be satisfied by a word while the user whose value the new schema
+    refuses is never told anything (R9).
     """
-    if entry.safety is MigrationSafety.UNSAFE:
-        # An unsafe entry is reported and never applied, so it is allowed to describe a change no
-        # operation can make. That is what `unsafe` is for.
-        return []
     remapped_origins = {remap.origin_path for remap in walk.remaps}
 
     issues: list[CoverageIssue] = []
@@ -355,14 +378,33 @@ def _check_narrowing_accounting(
         reasons = describe_narrowing(before=before_record, after=after_record, remapped=origin in remapped_origins)
         if not reasons:
             continue
+        match entry.safety:
+            case MigrationSafety.UNSAFE:
+                if final_path in entry.declared_narrowed_paths:
+                    continue
+                remedy = (
+                    f"the entry is unsafe, which is the right answer, but `unsafe` is only ever *reported* — and the engine "
+                    f"reports it to a file that carries the material it names. Add '{final_path}' to declared_narrowed_paths, "
+                    f"or nobody hears about this"
+                )
+            case MigrationSafety.SAFE:
+                # Same gate `_check_enum_accounting` applies, for the same reason: a remap rewrites
+                # a *string* value, so on a path whose own value is a list it is a guarded skip on
+                # every run — and `make check-ledger` refuses one on a path that is not enumerated
+                # as illegal outright. Naming it here would send the author to write an operation
+                # one gate demands and the other rejects.
+                remedy = (
+                    "no structural operation can repair a value, so the entry needs a remap_value for that path, or must be marked unsafe"
+                    if is_remappable(record=before_record)
+                    else "and no operation can rewrite a value inside a container, so the entry must be marked unsafe"
+                )
         issues.append(
             CoverageIssue(
                 surface_id=surface_id,
                 kind=CoverageIssueKind.VALUE_DOMAIN_NARROWED,
                 message=(
                     f"entry '{entry.id}': '{final_path}' accepts fewer values than it did — {', '.join(reasons)}. A file "
-                    f"carrying one of the values it has stopped accepting no longer validates, and no structural operation "
-                    f"can repair a value, so the entry needs a remap_value for that path, or must be marked unsafe"
+                    f"carrying one of the values it has stopped accepting no longer validates, and {remedy}"
                 ),
             )
         )
@@ -567,7 +609,8 @@ def _check_head_link(*, surface_id: str, current_version: int, live: SurfaceFing
                 message=(
                     f"the models no longer have {diff.render_removals()}, which breaks every file that carries them. Bump "
                     f"current_schema_version to {current_version + 1}, add the entry '{surface_id}@{current_version + 1}' "
-                    f"accounting for each, then run `make umig`"
+                    f"accounting for each, then run `make umig` — or, if schema version {current_version} has not been "
+                    f"released and the golden merely predates a change to the fingerprint format, re-record it with `make umigf`"
                 ),
             )
         )
@@ -584,7 +627,9 @@ def _check_head_link(*, surface_id: str, current_version: int, live: SurfaceFing
                     f"{diff.render_narrowings()}. A file valid before this change is not valid after it, so this is a "
                     f"removal like any other. Bump current_schema_version to {current_version + 1}, add the entry "
                     f"'{surface_id}@{current_version + 1}' carrying a remap_value for each narrowed path — or marked "
-                    f"unsafe, where no remap can express it — then run `make umig`"
+                    f"unsafe, where no remap can express it — then run `make umig`. If schema version {current_version} "
+                    f"has not been released and the golden merely predates a change to the fingerprint format, re-record "
+                    f"it with `make umigf` instead"
                 ),
             )
         )

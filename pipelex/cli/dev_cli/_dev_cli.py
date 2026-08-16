@@ -332,10 +332,11 @@ def check_migration_schemas_command(
 @app.command(name="update-migration-schemas", help="Regenerate the migration fingerprint and defaults goldens")
 def update_migration_schemas_command(
     quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single status line")] = False,
+    force: Annotated[bool, typer.Option("--force", help="Overwrite a head golden that records material the models lost")] = False,
 ) -> None:
     """Regenerate the migration golden chain for every configuration surface."""
     try:
-        update_migration_schemas_cmd(quiet=quiet)
+        update_migration_schemas_cmd(quiet=quiet, force=force)
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise

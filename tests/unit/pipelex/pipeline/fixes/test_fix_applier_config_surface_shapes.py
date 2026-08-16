@@ -190,6 +190,85 @@ class TestFixApplierConfigSurfaceShapes:
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
         assert _dumps(toml_doc) == "[section]\nnested.renamed = 1\nother = 2\n"
 
+    def test_renaming_a_dotted_head_keeps_it_dotted_and_leaves_its_siblings_alone(self) -> None:
+        """Renaming ``k`` in ``k.x = 1`` gives ``kk.x = 1``, not a header that swallows what follows.
+
+        tomlkit stores a dotted assignment as a super-table under a key flagged *dotted*, and its
+        re-key primitive builds a fresh key that carries no such flag. The renderer then emits a
+        block header — and every scalar *after* it in the same table falls under that header, so
+        ``a.m`` silently became ``a.kk.m`` with an ``applied`` verdict. The reshape renames tables,
+        and dotted form is an ordinary way to write one, so this meets a real file on the first
+        machine.
+        """
+        toml_doc = tomlkit.parse("[a]\nk.x = 1\nm = 3\n")
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[RenameTableKeyOp(table_path=["a"], key="k", new_key="kk")])
+        assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
+        rendered = _dumps(toml_doc)
+        assert rendered == "[a]\nkk.x = 1\nm = 3\n"
+        assert tomlkit.parse(rendered).unwrap() == {"a": {"kk": {"x": 1}, "m": 3}}
+
+    def test_renaming_an_inner_segment_of_a_dotted_key_keeps_the_whole_chain_dotted(self) -> None:
+        """``k.x.y = 1`` renamed at ``x`` stays inside ``[a]`` instead of relocating to the root.
+
+        An inner segment is the worse half of the same defect: undotted, it makes tomlkit render
+        the chain as a *top-level* ``[k.xx]`` header, so the data leaves ``[a]`` altogether and
+        ``a`` is left an empty table.
+        """
+        toml_doc = tomlkit.parse("[a]\nk.x.y = 1\nm = 3\n")
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[RenameTableKeyOp(table_path=["a", "k"], key="x", new_key="xx")])
+        assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
+        rendered = _dumps(toml_doc)
+        assert rendered == "[a]\nk.xx.y = 1\nm = 3\n"
+        assert tomlkit.parse(rendered).unwrap() == {"a": {"k": {"xx": {"y": 1}}, "m": 3}}
+
+    def test_renaming_a_dotted_head_at_the_document_root_keeps_it_dotted(self) -> None:
+        """The root container is a ``Container`` rather than a ``Table``, and takes the same branch."""
+        toml_doc = tomlkit.parse("k.x = 1\nm = 3\n")
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[RenameTableKeyOp(table_path=[], key="k", new_key="kk")])
+        assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
+        rendered = _dumps(toml_doc)
+        assert rendered == "kk.x = 1\nm = 3\n"
+        assert tomlkit.parse(rendered).unwrap() == {"kk": {"x": 1}, "m": 3}
+
+    def test_renaming_a_dotted_head_is_replay_neutral_once_applied(self) -> None:
+        """Replayed over its own output the rename skips and changes no bytes, like every other one.
+
+        Worth its own case rather than trusting the general rename: the fix hands tomlkit a key it
+        would not have built itself, and a document that no longer round-trips would break the
+        engine's central guarantee precisely on the layout this fix exists for.
+        """
+        rename_op = RenameTableKeyOp(table_path=["a"], key="k", new_key="kk")
+        toml_doc = tomlkit.parse("[a]\nk.x = 1\nk.y = 2\nm = 3\n")
+        apply_fix_ops(toml_doc=toml_doc, ops=[rename_op])
+        once = _dumps(toml_doc)
+        assert once == "[a]\nkk.x = 1\nkk.y = 2\nm = 3\n"
+
+        replayed_doc = tomlkit.parse(once)
+        applications = apply_fix_ops(toml_doc=replayed_doc, ops=[rename_op])
+        assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED]
+        assert _dumps(replayed_doc) == once
+
+    def test_renaming_a_block_table_inserts_no_blank_line(self) -> None:
+        """A rename changes a name; it does not reflow the file around it.
+
+        tomlkit's re-key primitive appends a cosmetic newline to the table it replaces, which is
+        right for one it is about to re-home and wrong for one staying exactly where it is. On a
+        configuration surface the output is ``tomlkit.dumps`` and nothing else, so that newline was
+        a line of diff in a user's file for every rename an entry carries.
+        """
+        toml_doc = tomlkit.parse("[a]\nx = 1\n[b]\ny = 2\n")
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[RenameTableKeyOp(table_path=[], key="a", new_key="aa")])
+        assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
+        assert _dumps(toml_doc) == "[aa]\nx = 1\n[b]\ny = 2\n"
+
+    def test_renaming_a_dotted_head_onto_a_name_already_taken_is_a_conflict(self) -> None:
+        """Dotted form does not get its own collision rule: the same name in the same table refuses."""
+        toml_doc = tomlkit.parse("[a]\nk.x = 1\nkk.y = 2\n")
+        before = _dumps(toml_doc)
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[RenameTableKeyOp(table_path=["a"], key="k", new_key="kk")])
+        assert [application.outcome for application in applications] == [FixOpOutcome.CONFLICT]
+        assert _dumps(toml_doc) == before
+
     def test_quoted_key_containing_a_dot_is_one_path_segment(self) -> None:
         """A quoted key with a dot inside is a single segment, and stays quoted when renamed."""
         toml_doc = tomlkit.parse('["outer.inner"]\nvalue = 1\n')
