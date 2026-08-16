@@ -155,7 +155,9 @@ class TestTheRemedyIsNamedOnlyWhereItWouldWrite:
 
         assert exc.migration is not None
         assert exc.migration.would_write is True
-        assert f"Run `{MIGRATE_COMMAND}` to bring these files up to date." in exc.message
+        # The specimen is both old and wrong, so the command is named for what it carries forward
+        # and the unknown key is left where it belongs — with a person.
+        assert f"Run `{MIGRATE_COMMAND}` to carry forward what it can; the rest is yours to fix." in exc.message
 
     def test_a_file_with_nothing_to_apply_is_told_to_read_the_dry_run(self, global_dir: Path) -> None:
         """An unknown root key on a file that is otherwise current: a finding without a single step."""

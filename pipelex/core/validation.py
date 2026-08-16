@@ -155,7 +155,9 @@ def _migration_prose(*, block: MigrationErrorBlock) -> str:
     the command would change them. Telling a reader to run a migration over a file it would not
     touch is a sentence whose honest outcome is *nothing was written*, with their error still in
     front of them — so on that side the paragraph says so and points at the dry run, which is where
-    the diagnosis is.
+    the diagnosis is. And when the command would write but the paragraph has just listed what it
+    cannot do, the closing sentence says both, rather than promising a repair the list above has
+    already qualified.
     """
     files = ", ".join(f"'{plan.file_path}'" for plan in block.plans)
     carried = sorted({step.title for plan in block.plans for step in plan.steps})
@@ -168,7 +170,9 @@ def _migration_prose(*, block: MigrationErrorBlock) -> str:
     unresolved = _what_needs_a_person(plans=block.plans)
     if unresolved:
         sentences.append(f"What it cannot do for you: {'; '.join(unresolved)}.")
-    if block.would_write:
+    if block.would_write and unresolved:
+        sentences.append(f"Run `{block.remedy}` to carry forward what it can; the rest is yours to fix.")
+    elif block.would_write:
         sentences.append(f"Run `{block.remedy}` to bring these files up to date.")
     else:
         sentences.append(

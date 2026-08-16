@@ -276,6 +276,29 @@ class TestDoctorFixMode:
         assert "OPENAI_API_KEY=your_value_here" in output
         assert "export OPENAI_API_KEY=your_value_here" in output
 
+    def test_manual_fixes_print_a_bracketed_credential_name_on_every_platform(self, doctor_mocks: dict[str, Any]) -> None:
+        """A variable name is data from the user's `backends.toml`; each of the four platform lines must print it whole.
+
+        Rich reads `[TEST]` as markup and eats it, so a line that forgets to escape the name prints
+        `MY_API_KEY` — a value the user cannot set — or raises and takes the whole guidance down.
+        """
+        credentials_report = BackendCredentialsReport(
+            backend_name="my_backend",
+            required_vars=["MY[dev]_API_KEY"],
+            missing_vars=["MY[dev]_API_KEY"],
+            placeholder_vars=[],
+            all_credentials_valid=False,
+        )
+        doctor_mocks["backends"].return_value = (False, {"my_backend": credentials_report}, "1 backend(s) have missing or invalid credentials")
+
+        self._run_doctor_expecting_exit_one()
+
+        output = doctor_mocks["console"].export_text()
+        assert "MY[dev]_API_KEY=your_value_here" in output
+        assert "export MY[dev]_API_KEY=your_value_here" in output
+        assert '$env:MY[dev]_API_KEY="your_value_here"' in output
+        assert "set MY[dev]_API_KEY=your_value_here" in output
+
     def test_fix_mode_with_all_healthy_exits_zero(self, doctor_mocks: dict[str, Any]) -> None:
         """With everything healthy, fix mode exits 0 without prompting."""
         with pytest.raises(SystemExit) as exc_info:

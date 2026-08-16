@@ -403,3 +403,22 @@ class TestARemedyIsNamedOnlyWhereItWouldWrite:
         assert report.migration is not None
         assert report.migration.would_write, "the flat body is carried forward"
         assert report.migration.needs_attention, "and the unknown key beside it is nobody's but a person's"
+
+    def test_a_file_that_is_both_old_and_wrong_is_not_promised_a_full_repair(self, machine: Path) -> None:
+        """The mixed case: the command would write, and something would still be there afterwards.
+
+        `would_write` picks the opening and closing sentences, and this specimen is on its true side —
+        but the closing sentence used to promise that the run brings the files up to date, over a
+        file whose unknown key it will not touch. The paragraph has just listed what the command
+        cannot do; its last sentence must not take that back.
+        """
+        machine.joinpath("telemetry.toml").write_text(f"{_old_shape_telemetry_document()}\nnot_a_real_setting = true\n", encoding="utf-8")
+
+        report = report_validation_error(validation_error=_make_validation_error(), surface_id=TELEMETRY_CONFIG_SURFACE_ID)
+
+        assert report.migration is not None
+        assert report.migration.would_write is True
+        assert "'not_a_real_setting', which this build knows nothing about" in report.message
+        assert f"Run `{MIGRATE_COMMAND}` to bring these files up to date." not in report.message
+        assert f"Run `{MIGRATE_COMMAND}` to carry forward what it can" in report.message
+        assert "yours to fix" in report.message

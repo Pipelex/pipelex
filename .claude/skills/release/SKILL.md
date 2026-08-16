@@ -67,26 +67,31 @@ make check-migration-schemas
   Then re-run this step. Do not proceed on a red gate, and do not regenerate the
   goldens to make it quiet — a green gate over an unaccounted removal is exactly
   the failure the gate exists to prevent.
-- **If it passes**, check whether any schema version moved in this release:
+- **If it passes**, check whether any schema version moved in this release. Diff
+    the ledgers against the tag of the version read in step 1 — the previous
+    release, whichever branch the skill was invoked from (`origin/main` is not a
+    safe baseline: from `main` itself that diff is empty):
 
     ```bash
-    git diff origin/main -- pipelex/migration/ledgers/
+    git diff v<current version> -- pipelex/migration/ledgers/
     ```
 
-    For each entry that is new since `main` and carries `breaking = true`, confirm
+    For each entry that is new since that release and carries `breaking = true`, confirm
     the changelog carries a matching `**Migration:**` bullet naming the entry id and
     what a user has to do. The ledger and the changelog are deliberately separate
     artifacts saying the same thing to different readers, and this is the only place
     they are checked against each other — if the bullet is missing, write it now
     (house style: bold label, then two to four complete sentences).
 
-    Also confirm each such entry's `introduced_in` matches the version being cut.
+    **A breaking ledger entry makes this a minor release**, per the house
+    convention — if step 2 chose a patch bump and this step found one, go back and
+    settle the bump first, because the next check writes the new version into the
+    entry.
+
+    Then confirm each such entry's `introduced_in` matches the version being cut.
     It is written when the entry is authored, before the release number is known, so
     it is routinely one bump off. Nothing branches on it, but it is what a reader
     correlates the changelog against, so fix it here rather than leaving it wrong.
-
-**A breaking ledger entry makes this a minor release**, per the house convention —
-if step 2 chose a patch bump and this step found one, go back and say so.
 
 ### 4. Ensure we're on the right branch
 

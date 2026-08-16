@@ -1431,7 +1431,7 @@ def do_doctor_cmd(
                 # Windows PowerShell
                 console.print("[dim]# Windows PowerShell[/dim]")
                 for var_name in sorted(all_missing_vars):
-                    console.print(f'$env:{var_name}="[yellow]your_value_here[/yellow]"')
+                    console.print(f'$env:{escape(var_name)}="[yellow]your_value_here[/yellow]"')
                 console.print()
 
                 # Windows CMD

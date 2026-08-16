@@ -229,5 +229,8 @@ when there genuinely is no diff, and read
   either the change owes an entry or the check found a real defect. Editing the
   check is a separate decision with its own review.
 - **Never reuse a retired path or spelling** to make the reserved-path rule quiet.
-- **Never put a value into an operation.** If the repair needs one, the entry is
-  `unsafe` and a person makes the choice.
+- **Never invent a value.** A `remap_value` mapping carries the new spelling of an
+  old one — a translation the user's own file determines, which is why it can be
+  `safe`. What no operation may do is write a value the file does not already fix:
+  a default, or a replacement for a value a tightened bound now refuses. If the
+  repair needs one of those, the entry is `unsafe` and a person makes the choice.

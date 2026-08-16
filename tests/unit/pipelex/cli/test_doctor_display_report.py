@@ -66,6 +66,13 @@ def _healthy_report_kwargs() -> dict[str, Any]:
     }
 
 
+#: A directory name that is legal on every filesystem and is also Rich's opening delimiter.
+BRACKETED_DIR = "/work/[dev]/project/.pipelex"
+
+#: A closing tag: markup Rich cannot balance, which raises rather than swallowing.
+CLOSING_TAG = "unknown key '[/b]' in section"
+
+
 class TestDoctorDisplayReport:
     @pytest.fixture
     def console(self, mocker: MockerFixture) -> Console:
@@ -347,34 +354,19 @@ class TestDoctorDisplayReport:
         assert "✗ Unexpected error: totally unexpected" in output
         assert "https://go.pipelex.com/discord" in output
 
-
-class TestEveryDynamicFieldSurvivesRichMarkup:
-    """A bracket in a path or a message is data, and the report has to print it as data.
-
-    Rich reads `[...]` in a printed string as markup: a path segment like `[dev]` is silently
-    dropped from the output, and a `[/x]` sequence raises `MarkupError` and takes the whole report
-    down. Every row here interpolates something that comes from the user's filesystem, their
-    configuration, or an exception's text, so each one is a place that can happen — and the failure
-    is worst exactly when the report matters most, since the fields carrying brackets are the ones
-    quoting what went wrong.
-    """
-
-    #: A directory name that is legal on every filesystem and is also Rich's opening delimiter.
-    BRACKETED_DIR = "/work/[dev]/project/.pipelex"
-
-    #: A closing tag: markup Rich cannot balance, which raises rather than swallowing.
-    CLOSING_TAG = "unknown key '[/b]' in section"
-
-    @pytest.fixture
-    def console(self, mocker: MockerFixture) -> Console:
-        recorded_console = Console(width=200, record=True, color_system=None)
-        mocker.patch("pipelex.cli.commands.doctor_cmd.get_console", return_value=recorded_console)
-        return recorded_console
+    # --- Every dynamic field survives Rich markup ---
+    # A bracket in a path or a message is data, and the report has to print it as data. Rich reads
+    # `[...]` in a printed string as markup: a path segment like `[dev]` is silently dropped from
+    # the output, and a `[/x]` sequence raises `MarkupError` and takes the whole report down. Every
+    # row here interpolates something that comes from the user's filesystem, their configuration,
+    # or an exception's text, so each one is a place that can happen — and the failure is worst
+    # exactly when the report matters most, since the fields carrying brackets are the ones
+    # quoting what went wrong.
 
     def test_a_bracketed_config_directory_is_printed_whole(self, console: Console) -> None:
         kwargs = _healthy_report_kwargs()
         kwargs["config_location"] = ConfigLocationInfo(
-            config_dir=self.BRACKETED_DIR,
+            config_dir=BRACKETED_DIR,
             is_project_local=True,
             project_root="/work/[dev]/project",
             global_config_dir="/home/[user]/.pipelex",
@@ -383,7 +375,7 @@ class TestEveryDynamicFieldSurvivesRichMarkup:
         display_health_report(**kwargs)
 
         output = console.export_text()
-        assert self.BRACKETED_DIR in output
+        assert BRACKETED_DIR in output
         assert "Project root: /work/[dev]/project" in output
         assert "Global config: /home/[user]/.pipelex" in output
 
@@ -396,12 +388,12 @@ class TestEveryDynamicFieldSurvivesRichMarkup:
         embeds the pydantic analysis of the user's own configuration.
         """
         kwargs = _healthy_report_kwargs()
-        kwargs[field_name] = f"Configuration validation failed: {self.CLOSING_TAG}"
+        kwargs[field_name] = f"Configuration validation failed: {CLOSING_TAG}"
         kwargs[field_name.replace("_message", "_healthy")] = False
 
         display_health_report(**kwargs)
 
-        assert self.CLOSING_TAG in console.export_text()
+        assert CLOSING_TAG in console.export_text()
 
     def test_a_bracketed_backend_name_survives_the_credentials_detail(self, console: Console) -> None:
         """Backend names are table keys in the user's `backends.toml`, so they are user data too."""
@@ -411,8 +403,8 @@ class TestEveryDynamicFieldSurvivesRichMarkup:
         kwargs["backend_credential_reports"] = {
             "my[test]backend": BackendCredentialsReport(
                 backend_name="my[test]backend",
-                required_vars=["MY[TEST]_API_KEY"],
-                missing_vars=["MY[TEST]_API_KEY"],
+                required_vars=["MY[dev]_API_KEY"],
+                missing_vars=["MY[dev]_API_KEY"],
                 placeholder_vars=[],
                 all_credentials_valid=False,
             )
@@ -422,7 +414,7 @@ class TestEveryDynamicFieldSurvivesRichMarkup:
 
         output = console.export_text()
         assert "my[test]backend" in output
-        assert "MY[TEST]_API_KEY" in output
+        assert "MY[dev]_API_KEY" in output
 
     def test_a_bracketed_deck_filename_survives_the_per_file_detail(self, console: Console) -> None:
         kwargs = _healthy_report_kwargs()
@@ -448,11 +440,11 @@ class TestEveryDynamicFieldSurvivesRichMarkup:
                 backend_name="openai",
                 file_path="/work/[dev]/backends/openai.toml",
                 is_valid=False,
-                error_message=self.CLOSING_TAG,
+                error_message=CLOSING_TAG,
                 has_kit_template=False,
             )
         }
 
         display_health_report(**kwargs)
 
-        assert self.CLOSING_TAG in console.export_text()
+        assert CLOSING_TAG in console.export_text()

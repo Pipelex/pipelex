@@ -688,4 +688,4 @@ A release can never ship a moved schema without its entry: the release procedure
 ## Related
 
 - [Configuration Internals](contribute/configuration-defaults-and-overrides.md) — how the configuration layers merge, which this contract sits upstream of.
-- [Drift Contracts](contribute/drift-contracts.md) — why the checks here are derived checks rather than review obligations: anything mechanizable becomes a derived check, and coverage, convergence, transform goldens and reserved-path checking all are. The one part that is not mechanizable — [narrowing a validator expresses](#the-fingerprint) — is a review obligation instead, and the `config-docs` contract carries these ledgers in its review list for it.
+- [Drift Contracts](contribute/drift-contracts.md) — why the checks here are derived checks rather than review obligations: anything mechanizable becomes a derived check, and coverage, convergence, transform goldens and reserved-path checking all are. The one part that is not mechanizable — [domain narrowing expressed in a validator](#the-fingerprint) — is a review obligation instead, and the `config-docs` contract carries these ledgers in its review list for it.

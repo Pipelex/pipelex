@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:c695cff734d9c1699381a07f5392d5edbb6ad7e6655c116af927534d5d87125a"
+digest = "sha256:61a24bbc7b269beabac81b4d4b01d693e78c19acb26f1617b654d942eb98822f"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-16T22:56:54Z"
-rationale = "Second trigger on this branch, from the escaping pass over the doctor's health report: every dynamic value it interpolates now goes through rich.markup.escape, so a bracketed path or an error message quoting a closing tag prints as data instead of vanishing or raising. That is presentation only. No command, flag, output format, finding value, structured field or exit-code rule moved, and neither review target describes how a row is rendered, so both were read and neither is stale. The would_write change in the same commit is acked separately above; the docs it required were updated there."
+reviewed_at = "2026-08-16T23:26:20Z"
+rationale = "Third trigger on this branch, from the PR #1115 review: the PowerShell line of the doctor's manual-fix guidance was the one platform example still interpolating a credential variable name without rich.markup.escape, and now goes through it like its three siblings. Presentation only — no command, flag, output format, finding value or structured field moved, and neither review target mentions the platform examples, so both were read and neither is stale."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -82,7 +82,7 @@ rationale = "Second trigger on this branch, from the escaping pass over the doct
 "pipelex/cli/commands/codegen/inputs_cmd.py" = "blob:20738a9e42f0e5ef7ffc489093348af3cb4643a0"
 "pipelex/cli/commands/codegen/types_cmd.py" = "blob:b7c9c7a3664c9fbe66f9b4c3c5ebf9ea1322445c"
 "pipelex/cli/commands/crate_loading.py" = "blob:3d7d651931ecf1a15a3e2d72411b3212b55d74ef"
-"pipelex/cli/commands/doctor_cmd.py" = "blob:dcf25a627fcdd2d264c714b39b77155b9bd72d19"
+"pipelex/cli/commands/doctor_cmd.py" = "blob:0802df0148d1f880f3b244ebb339fd4419ec528d"
 "pipelex/cli/commands/fix/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/fix/_diff_sandbox.py" = "blob:2113f7e7ffd373177a3104ce5b5dfb7f657dd186"
 "pipelex/cli/commands/fix/_fix_core.py" = "blob:8f6a187a0fb42c498629b177753d81620800b0da"
