@@ -29,6 +29,17 @@ INITIAL_SCHEMA_VERSION = 1
 """Every surface starts here. There is no retroactive numbering of changes that predate the ledger."""
 
 
+def packaged_migration_dir() -> Path:
+    """The directory holding the checked-in ledgers and golden chains — this module's own.
+
+    It lives beside `load_ledger` rather than beside the surface registry because boot tolerance
+    needs a ledger and must not need a registry: the registry names the configuration models, and
+    pulling those into a loader that is itself part of the configuration package is how an import
+    cycle starts. A loader already knows which surface it is.
+    """
+    return Path(__file__).resolve().parent
+
+
 class MigrationSafety(StrEnum):
     """Whether the applier may act on an entry.
 

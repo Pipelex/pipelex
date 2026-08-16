@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:fcb2efa0f9d194a82f32e92d101ac203b57b110b8bc5a187007faac732718743"
+digest = "sha256:ec998d9b83b57e70f093e43090b7e193c1f58d87fd5d4310022ecd54ba93c8fa"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-16T15:02:05Z"
-rationale = "Two new user-facing commands, so the CLI docs gained a page rather than a note: docs/tools/cli/migrate.md covers what pipelex migrate walks, the backup it takes, why running it twice is running it once, and that it does not boot; the CLI Reference index and the mkdocs nav both list it. The agent-CLI contract doc gained a migrate row in its command table and a markdown-structure bullet, including the two things a machine consumer must know - writes only with --yes, and the verdict is the structured needs_attention rather than the exit code. run.md and the other command pages make no claim this change touches."
+reviewed_at = "2026-08-16T16:17:31Z"
+rationale = "The trigger is one line in plugins_cmd.py -- pipelex plugins list now loads its config through the tolerant loader -- and reviewing the CLI docs against boot tolerance found a real gap, though not in the page the trigger names. No command's surface changed: no flag, no output, no exit code, and plugins list behaves identically except that it now starts on a stale configuration instead of dying. What was missing is the other end: docs/tools/cli/migrate.md described a command users would have to know to look for, while the way they will actually meet it is a boot warning. Added a section naming that path, including the two things that surprise people -- nothing is written so the warning returns until the command is run, and a file the ledger cannot explain still fails the boot. Reviewed the agent-CLI contract doc and left it alone: the migrate row and its markdown-structure bullet are about the command's own surface, which this milestone did not touch, and boot tolerance emits a log warning rather than anything on the agent CLI's two output streams."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -106,7 +106,7 @@ rationale = "Two new user-facing commands, so the CLI docs gained a page rather 
 "pipelex/cli/commands/login/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/login/command.py" = "blob:ace1db9879626cc1722adaac12761aadaa6b24ed"
 "pipelex/cli/commands/migrate_cmd.py" = "blob:752ca2aab6ae6d7502d1e44cc1196416af4e6853"
-"pipelex/cli/commands/plugins_cmd.py" = "blob:2980268813f1acf67f0f2cc914ccaff6cae6889b"
+"pipelex/cli/commands/plugins_cmd.py" = "blob:190a58e16c9e28069fc162555ec0ab24ffd92e9d"
 "pipelex/cli/commands/resolve_cmd.py" = "blob:2928a0e26eab7983367a59a78533f6618817feba"
 "pipelex/cli/commands/run/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/run/_inputs_file_loader.py" = "blob:dde781f846968b667a0acfb4b3e3cea01cef7049"

@@ -15,8 +15,9 @@ import sys
 from rich.markup import escape
 
 from pipelex.migration.exceptions import MigrationError
+from pipelex.migration.ledger import packaged_migration_dir
 from pipelex.migration.ledger_check import LedgerIssue, check_ledgers
-from pipelex.migration.surfaces import build_config_surface_registry, packaged_migration_dir
+from pipelex.migration.surfaces import build_config_surface_registry
 from pipelex.runtime_hub import get_console
 
 

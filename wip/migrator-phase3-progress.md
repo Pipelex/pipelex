@@ -16,7 +16,7 @@ Record both numbers against S6.
 
 `make agent-check` and the full `make agent-test` are both green on the branch as pushed.
 
-⚠ **S6 is past half.** The pre-S7 bucket is closed (part 1, on `dev`), **the two `migrate` commands are built** (milestone 5) and **the downgrade diagnosis is built** (milestone 6), both on `feature/Migrator-3b`. What remains is the rest of the phase body — boot tolerance, `report_validation_error`, the telemetry-remedy retirement, `doctor`, the skills, the specs rows, and publishing the contract. See [What is actually left](#what-is-actually-left) at the bottom before planning a session.
+⚠ **S6 is past half.** The pre-S7 bucket is closed (part 1, on `dev`), and on `feature/Migrator-3b` the two `migrate` commands (milestone 5), the downgrade diagnosis (milestone 6) and boot tolerance (milestone 7) are all built. What remains is the rest of the phase body — `report_validation_error`, the telemetry-remedy retirement, `doctor`, the skills, the specs rows, and publishing the contract. See [What is actually left](#what-is-actually-left) at the bottom before planning a session.
 
 ## Build order chosen for this session
 
@@ -27,8 +27,9 @@ The charter lists a great many deliverables without an order. The order below wa
 3. **The applier's dotted-key rename policy, the backup/replace semantics pass, the `UNWRITABLE` wording** — done, see Milestone 3 below. That closes the "must be settled before S7" bucket.
 4. **The commands** — `pipelex migrate`, `pipelex-agent migrate`, the rendering-rule test — done, see Milestone 5 below. The **downgrade diagnosis** (`unexplained[]`) was deliberately carried out of this milestone and is where the next session starts.
 5. **The downgrade diagnosis** — done, see Milestone 6 below.
-6. **Boot tolerance, `report_validation_error` on the real plan, the telemetry remedies retired, the `doctor` row** — not started. **This is where the next session starts.**
-7. **The skills (`add-migration`, `/release` step 3b), the `config-docs` drift-contract review list, `command-surface-map.md` rows, publishing the contract in the nav** — not started.
+6. **Boot tolerance** — done, see Milestone 7 below.
+7. **`report_validation_error` on the real plan, the telemetry remedies retired, the `doctor` row** — not started. **This is where the next session starts.**
+8. **The skills (`add-migration`, `/release` step 3b), the `config-docs` drift-contract review list, `command-surface-map.md` rows, publishing the contract in the nav** — not started.
 
 ## Milestone 1 — the golden-format bucket (DONE)
 
@@ -335,27 +336,66 @@ tests/e2e/pipelex/cli/test_migrate_commands.py     the diagnosis through the rea
 
 Mutation-tested: dropping the reserved-meta strip, the open-node `*` fallback, the blocked-entry subtraction, the stop-at-an-unknown-table, the scalar-descend guard, the schema spelling, the remap exclusion, the forward trace, the `declared_removed_paths` source, and diagnosing the document as it was read each turn exactly the intended tests red.
 
+## Milestone 7 — boot tolerance (DONE, on `feature/Migrator-3b`)
+
+A stale configuration no longer stops the boot. Each surface's loader validates as it always did and, only when that fails, replays its ledger over the same files **in memory**, re-runs its own post-merge step, and validates again — booting with a warning that names the files and the `pipelex migrate` remedy. Nothing is written; a tolerated boot leaves the directory exactly as it found it, which is why the warning keeps coming back until the command is run.
+
+**The shared helper owns the failure path, not the load** — `replay_surface_files_in_memory` in `config_surface.py`, which was already the home of the reserved-`[meta]` strip. The three loaders differ between their merge and their validate (programmatic overrides / `${VAR}` substitution / nothing), so a helper owning the whole load would have to know about all three. It takes the surface id and the same ordered path list the loader merged, and hands back the migrated merge plus a `MigrationPlan` per file. The overrides in particular are re-applied by the caller, because they are a layer of the *load* while the replay only sees the *files*.
+
+### Three things the groundwork had wrong or had not seen
+
+**The engine cannot be imported at module level, and the mechanical guard would not have caught it.** `pipelex/migration/engine.py` imports `pipelex.pipeline.fixes.applier` — `pipeline` is an *interpreter* package, and the configuration loaders sit in `runtime_hub`'s closure, the kernel layer whose stated property is that importing it loads zero interpreter modules. The previous session's groundwork checked the reverse direction only (that the engine pulls in no configuration model, which is true) and concluded a module-level import was fine. It is not. And `make agent-check` would not have caught it: `check-hub-layering` does reachability to `interpreter_hub`, which `pipeline.fixes.applier` does not reach, so the lint stays green. Measured rather than assumed — a module-level import there was tried, and it turns **nine** entry points of `tests/unit/pipelex/test_kernel_layer_import_closure.py` red while every gate in `agent-check` passes. Only the full `make agent-test` sees it. So the engine import is deferred into the retry — which also makes "the healthy path is untouched" literal rather than approximate. `migration.plan` and `migration.ledger` are clean and are imported normally.
+
+**`PipelexConfig` does not raise `ValidationError`.** `ConfigRoot` gives itself a custom `__init__` that translates pydantic's error into `ConfigValidationError`, and pydantic v2 routes `model_validate` through a custom `__init__` — so the main configuration raises the translated one while a plain-model surface raises pydantic's. An `except ValidationError` would have switched boot tolerance off for the one surface everything depends on, silently and with every test passing. Both are caught, via `CONFIG_REFUSED` in `config_loader.py`.
+
+⚠ **The same fact makes an existing branch dead, and it belongs to item 3.** `runtime_boot.py`'s `except ValidationError as validation_error:` around `setup_config` — the one that calls `report_validation_error(category="config", ...)` and raises `PipelexConfigError` — can never fire, because what `setup_config` raises is `ConfigValidationError`. Pre-existing, unchanged by this milestone, and precisely item 3's business, since that dead branch is one of `report_validation_error`'s two config-side callers. Verified by hand, not inferred.
+
+**A failure *inside* the retry must never become the failure the user sees.** A missing ledger came back as `MigrationLedgerError` and replaced a legible "extra forbidden field: `not_a_real_setting`" with an internal path nobody can act on. The retry now declines on `MigrationLedgerError`; a broken packaged ledger stays loud where it should be loud (`make cl`, `pipelex migrate`). Same reasoning already applied to an unparseable file — and there the retry abandons *entirely* rather than skipping the file, because skipping drops a layer from the merge and a re-validation that then succeeded would boot on a configuration the user does not have.
+
+### Decisions recorded in the contract
+
+**Boot tolerance does not run the downgrade diagnosis.** On this path the model has already spoken, and pydantic's extra-field list is the same answer and a better one — it knows about validators, which a path walk does not. The diagnosis is for `pipelex migrate`, where nothing validates the file.
+
+**The re-validation is what decides, and that is stronger than a second gate.** The contract's "unsafe entries, conflicts and unexplained paths still fail the boot" reads as a *description of why the re-validation fails*, not as an extra refusal on top of it: material an `unsafe` entry is about is still in the file, so the model refuses it; and a `VALUE_DOMAIN_NARROWED` report the model accepts was never a reason to refuse a boot, since that report says *check this key* and the model has now checked it.
+
+### The two e2e tests changed premise, and a fourth finding came out of it
+
+`test_migrate_commands.py` opened both of its end-to-end tests by asserting **the machine does not boot** — that was the scenario. Boot tolerance makes it boot, so the full `make agent-test` caught them (nothing in `agent-check` did). They now assert the machine boots on *both* sides of every command, which is the tolerance property itself, and the migration is still measured on the files.
+
+⚠ **The agent CLI cannot see the warning, by contract.** The boot probe is `pipelex-agent models`, and `pipelex-agent` calls `silence_logging_for_agent_cli()` as its first act so nothing pollutes its two structured streams. So the e2e asserts the boot, not the warning — the warning is asserted per surface in `test_boot_tolerance.py`. The consequence is worth carrying into item 5: **a machine consumer never learns of a pending migration from a boot.** It has to ask — `pipelex-agent migrate --dry-run`, or the `doctor` pending-migrations row — which makes that row more load-bearing than it looked when it was listed.
+
+### Where it landed
+
+```
+pipelex/system/configuration/config_surface.py     the helper, the warning builder, the three surface-id constants
+pipelex/system/configuration/config_loader.py      config_file_paths extracted; load_config_validated; CONFIG_REFUSED
+pipelex/system/telemetry/telemetry_config.py       the retry, re-running the ${VAR} substitution
+pipelex/system/pipelex_service/pipelex_service_config.py  the retry, one file
+pipelex/runtime_hub.py                             setup_config goes through load_config_validated
+pipelex/cli/commands/plugins_cmd.py                same, for free
+pipelex/migration/ledger.py                        packaged_migration_dir moved here off the registry
+pipelex/migration/surfaces.py                      imports the surface-id constants instead of spelling them
+docs/migration-ledger.md                           "Boot tolerance" rewritten against what was built
+CHANGELOG.md                                       one Added bullet
+tests/unit/pipelex/system/configuration/test_boot_tolerance.py   NEW
+tests/e2e/pipelex/cli/test_migrate_commands.py     both e2e tests re-premised on a machine that boots
+docs/tools/cli/migrate.md                          the boot warning is how users will meet the command
+docs/contribute/hub-layering.md                    pipelex.migration accounted for (see the drift ack)
+```
+
+`packaged_migration_dir` moved off `surfaces.py` (the registry, which imports every configuration model) and onto `ledger.py`, so a loader can reach a ledger without reaching a registry. The surface ids are now constants in `config_surface.py` that the registry imports, so the loader and the registry cannot drift apart on a string literal.
+
+The stale documents in the tests are **real** where they can be: `telemetry-config@2` and its shipped `before@2.toml`. The other two surfaces have empty ledgers, so their tests plant a synthetic one in a temporary migration directory via `packaged_migration_dir` — the wiring is what is under test there.
+
+Mutation-tested: dropping the reserved-meta strip, skipping an unparseable file instead of abandoning the retry, abandoning on a missing file instead of skipping it, reporting a clean surface as stale, letting a ledger failure escape, merging the text as read instead of as replayed, dropping the programmatic overrides from the retry, catching only pydantic's `ValidationError`, re-raising from a failed retry instead of yielding, and building the warning from the file instead of from the ledger — each turned exactly the intended tests red.
+
+⚠ **A process note worth keeping.** During that mutation loop a `git checkout <file>` reverted an *unstaged* edit and silently undid part of the milestone; the next three test runs were measuring a tree that no longer had the code. Mutation loops over uncommitted work must back up with `cp` and restore with `cp` — never with git.
+
 ## Where this session paused
 
-**Paused right after milestone 6 was committed.** `feature/Migrator-3b` = *"Migrator Phase 3, milestone 6: name what the migration cannot explain"*, working tree clean, **still no upstream** — the first push is `git push -u origin feature/Migrator-3b`. `make agent-check`, `make cl`, `make cmig`, `make docs-check`, `make drift-check` (with the changes staged) and the **full `make agent-test`** were all green before the commit.
+**Paused right after milestone 7 was committed.** Working tree clean, **still no upstream** — the first push is `git push -u origin feature/Migrator-3b`. `make agent-check` (with everything staged, so `drift-check` is a real green), `make cmig`, `make docs-check` and the full `make agent-test` were all green before the commit.
 
-### Groundwork already done for boot tolerance (item 2), so the next session does not redo it
-
-**The import cycle everyone would fear is not there.** `pipelex.migration.engine` + `pipelex.migration.ledger` pull in only `pipelex.system.configuration.config_model` — not `configs`, not `config_loader`, not `telemetry_config`. What pulls the configuration models into the migration package is `migration/surfaces.py` (the **registry**), and boot tolerance does not need it: a loader already knows its own surface id and its own list of paths. So the helper may import the engine and the ledger at module level from `config_surface.py`.
-
-**"The healthy path never loads tomlkit" is about parsing, not importing.** `config_loader` already imports tomlkit through `tools/misc/toml_utils.py`. The property to keep is that a healthy boot never *re-reads* the files as a DOM and never reads a ledger.
-
-**The three loaders and their merge steps** (each calls `strip_reserved_meta` today, which is the seam the contract points at):
-
-| Surface | Loader | What sits between the merge and the validate |
-|---|---|---|
-| `pipelex-config` | `config_loader.py` `ConfigLoader.load_config` | `extra_overrides` deep-merged on top; a unit-testing layer below |
-| `telemetry-config` | `telemetry_config.py` (`load_telemetry_config`) | `${VAR}` substitution over every string |
-| `pipelex-service-config` | `pipelex_service_config.py` `load_pipelex_service_config_if_exists` | nothing |
-
-Because those steps differ, **the helper cannot own the whole load**. The shape that works is a helper owning the *failure path only* — given a surface id and the same ordered path list the loader merged, it reads each existing file, replays that surface's `safe` entries in memory, deep-merges the migrated documents in the same order, and hands back the merged dict plus the per-file `MigrationPlan`s — returning nothing when no operation applied, since then the failure is not staleness. The loader re-runs its own post-merge steps and re-validates.
-
-**Decision taken, and the reason worth keeping:** *boot tolerance does not run the downgrade diagnosis.* On the boot path the model has already spoken — pydantic's own extra-field list is the unexplained set, and it is more accurate than a path walk because it knows about validators. The diagnosis exists for the `migrate` command, where nothing validates the file. So the `migration` block on a configuration validation error carries the **plans**, and the "unexplained paths still fail the boot" clause of the contract is satisfied by the re-validation failing, not by a second diagnosis.
+Three drift contracts came open and were acked with the reviews written into the ack rationales: `hub-layering-convention` (which produced the real doc fix above), `cli-docs` (which produced the `migrate.md` section) and `config-docs` (reviewed, no page change — the loader gained no key, no layer and no precedence rule).
 
 ## What is actually left
 
@@ -372,7 +412,7 @@ Measured against the charter's own **Done when** list ([§ S6](../../wip/migrato
 The phase body the charter lists under **Do**, in the order the next session should take it:
 
 1. ~~**The downgrade diagnosis**~~ — done, see Milestone 6.
-2. **Boot tolerance** in one shared helper called by all three config-surface loaders. `pipelex/system/configuration/config_surface.py` is the home — it already owns the reserved-`[meta]` read side, and `declared_schema_version` landed there in Milestone 5.
+2. ~~**Boot tolerance**~~ — done, see Milestone 7.
 3. **`report_validation_error` on the real plan** — note `core/validation.py`'s current `migration_config` is the old *renaming* config, not the ledger plan. Consumer removed, `migration` field kept. This is also the **third channel of the rendering-rule test**, which is written and waiting for it (`TestNoValueFromAUsersFileIsEverRendered` names the gap in its docstring).
 4. **The two telemetry remedies retired** — `check_telemetry_config`'s old-shape sniff in `doctor_cmd.py` and `handle_telemetry_config_validation_error`'s banner in `error_handlers.py`. Both currently tell a user to re-initialize the file that Milestone 5 proved is migratable.
 5. **`doctor`: the pending-migrations row and `--fix`** delegating to the migrate command.
@@ -390,7 +430,7 @@ Then the PR to `dev` from `feature/Migrator-3b`.
 - **The rescue-copy race** (`pr-1113-review-notes.md` §3): a third run's prune can take the `.bak.` a rescue is about to rename. The commands now make concurrent runs producible, so this is decidable — revisit as an age-sparing prune, not a lock.
 - Deliberately past S7's freeze, with named triggers, in `pr-1113-review-notes.md` and `migrator-write-scope-and-rename-fidelity.md`: per-member bounds in the golden, the `safe`-entry sibling, the tomlkit raw-storage staleness pass, rename fidelity (§2), the taken-backup-name report, and the residual. §1 of the write-scope note is **closed** by Milestone 5.
 
-**The next session starts at boot tolerance.**
+**The next session starts at `report_validation_error` on the real plan** — and it inherits a finding from Milestone 7: the `except ValidationError` around `setup_config` in `runtime_boot.py`, one of that function's two config-side callers, is dead code, because `PipelexConfig` raises `ConfigValidationError`.
 
 ## Rulings this session took on its own authority
 

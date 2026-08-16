@@ -27,8 +27,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.migration.engine import replay_ledger_over_text
 from pipelex.migration.fingerprint import ENUM_TYPE
-from pipelex.migration.ledger import MigrationEntry, MigrationLedger, MigrationSafety, SurfaceBlock, load_ledger
-from pipelex.migration.surfaces import DefaultsLayerKind, Surface, build_config_surface_registry, packaged_migration_dir
+from pipelex.migration.ledger import MigrationEntry, MigrationLedger, MigrationSafety, SurfaceBlock, load_ledger, packaged_migration_dir
+from pipelex.migration.surfaces import DefaultsLayerKind, Surface, build_config_surface_registry
 from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, MigrationOp, MoveKeyOp, RemapValueOp, RenameTableKeyOp
 from tests.unit.pipelex.migration.document_strategies import (
     DocumentMutation,

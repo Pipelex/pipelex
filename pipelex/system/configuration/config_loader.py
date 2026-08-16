@@ -2,14 +2,29 @@ import shutil
 from pathlib import Path
 from typing import Any, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
-from pipelex.system.configuration.config_surface import strip_reserved_meta
+from pipelex import log
+from pipelex.system.configuration.config_surface import (
+    PIPELEX_CONFIG_SURFACE_ID,
+    replay_surface_files_in_memory,
+    stale_configuration_warning,
+    strip_reserved_meta,
+)
+from pipelex.system.exceptions import ConfigValidationError
 from pipelex.system.runtime import runtime_manager
 from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_utils import load_toml_from_path_and_merge_with_overrides
 
 _PluginConfigT = TypeVar("_PluginConfigT", bound=BaseModel)
+_ConfigT = TypeVar("_ConfigT", bound=BaseModel)
+
+# What a configuration model raises when it refuses a document, and there are two of them.
+# `ConfigRoot` gives itself a custom `__init__` that translates pydantic's error into ours, and
+# pydantic v2 routes `model_validate` through a custom `__init__` — so the main configuration
+# arrives as `ConfigValidationError` while a plain model surface arrives as pydantic's own.
+# Catching one of the pair would silently switch boot tolerance off for whichever model it missed.
+CONFIG_REFUSED = (ValidationError, ConfigValidationError)
 
 CONFIG_DIR_NAME = ".pipelex"
 CONFIG_NAME = "pipelex.toml"
@@ -311,6 +326,25 @@ class ConfigLoader:
         Returns:
             dict[str, Any]: The merged configuration dictionary
         """
+        if config_dir is None:
+            self.ensure_global_config_exists()
+        merged = load_toml_from_path_and_merge_with_overrides(paths=self.config_file_paths(config_dir=config_dir))
+        strip_reserved_meta(config_dict=merged)
+        if extra_overrides:
+            deep_update(merged, updates=extra_overrides)
+        return merged
+
+    def config_file_paths(self, *, config_dir: Path | None = None) -> list[Path]:
+        """The ordered layers ``load_config`` merges, later files winning on a collision.
+
+        Split out of ``load_config`` because boot tolerance has to replay the ledger over exactly
+        the files that were merged, in exactly that order — a second list assembled beside this one
+        would answer for a different machine the first time the layering changed. Pure: unlike
+        ``load_config`` it never creates the global directory, so asking which files *would* be
+        read does not bring one of them into existence.
+
+        Missing files stay in the list and are skipped by whoever reads them.
+        """
         is_unit_testing = runtime_manager.is_unit_testing
 
         list_of_configs: list[Path] = [self.pipelex_root_dir / CONFIG_NAME]
@@ -321,7 +355,6 @@ class ConfigLoader:
                 self._override_files_for_dir(config_dir, include_run_mode=not is_unit_testing),
             )
         else:
-            self.ensure_global_config_exists()
             project_dir = self.project_config_dir
 
             list_of_configs.append(self.global_config_dir / CONFIG_NAME)
@@ -338,11 +371,64 @@ class ConfigLoader:
         if is_unit_testing:
             list_of_configs.append(Path.cwd() / "tests" / f"pipelex_{runtime_manager.run_mode}.toml")
 
-        merged = load_toml_from_path_and_merge_with_overrides(paths=list_of_configs)
-        strip_reserved_meta(config_dict=merged)
+        return list_of_configs
+
+    def load_config_validated(
+        self,
+        *,
+        config_cls: type[_ConfigT],
+        extra_overrides: dict[str, Any] | None = None,
+        config_dir: Path | None = None,
+    ) -> _ConfigT:
+        """``load_config``, validated — and tolerant of a configuration the ledger can explain.
+
+        This is the boot's entry point, and the tolerance is the whole reason it exists. A file
+        left behind by a schema change should not stop the world: when validation fails, the
+        surface's ledger is replayed over the same files **in memory**, the result is validated
+        again, and a boot that succeeds says so in a warning naming the files and the
+        ``pipelex migrate`` remedy. Nothing is written — only the explicit command writes.
+
+        A configuration the ledger cannot explain raises exactly what it raised before: the retry
+        is the only new behaviour, and it either recovers or gets out of the way.
+        """
+        config_dict = self.load_config(extra_overrides=extra_overrides, config_dir=config_dir)
+        try:
+            return config_cls.model_validate(config_dict)
+        except CONFIG_REFUSED:
+            recovered = self._config_the_ledger_can_explain(config_cls=config_cls, extra_overrides=extra_overrides, config_dir=config_dir)
+            if recovered is None:
+                raise
+            return recovered
+
+    def _config_the_ledger_can_explain(
+        self,
+        *,
+        config_cls: type[_ConfigT],
+        extra_overrides: dict[str, Any] | None,
+        config_dir: Path | None,
+    ) -> _ConfigT | None:
+        """The same configuration with the ledger replayed over the user's files, or ``None``.
+
+        ``None`` covers both ways this can decline — the ledger had nothing to say about these
+        files, or it did and the result still does not validate. Neither is this method's to
+        report: the caller re-raises the error the configuration actually produced, which is a
+        truer account than "migration did not help" would be.
+
+        The programmatic overrides are re-applied on top, because they are a layer of the load
+        rather than a property of the files, and the replay only ever sees the files.
+        """
+        replayed = replay_surface_files_in_memory(surface_id=PIPELEX_CONFIG_SURFACE_ID, paths=self.config_file_paths(config_dir=config_dir))
+        if replayed is None:
+            return None
+        config_dict = replayed.config_dict
         if extra_overrides:
-            deep_update(merged, updates=extra_overrides)
-        return merged
+            deep_update(config_dict, updates=extra_overrides)
+        try:
+            config = config_cls.model_validate(config_dict)
+        except CONFIG_REFUSED:
+            return None
+        log.warning(stale_configuration_warning(plans=replayed.plans))
+        return config
 
 
 config_manager = ConfigLoader()

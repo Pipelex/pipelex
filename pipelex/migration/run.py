@@ -27,9 +27,10 @@ See `docs/migration-ledger.md` → "Surfaces" and "Applying".
 
 from pathlib import Path
 
+from pipelex.migration.ledger import packaged_migration_dir
 from pipelex.migration.plan import MigrationReport
 from pipelex.migration.runner import migrate_directories
-from pipelex.migration.surfaces import build_config_surface_registry, packaged_migration_dir
+from pipelex.migration.surfaces import build_config_surface_registry
 from pipelex.system.configuration.config_loader import config_manager
 
 

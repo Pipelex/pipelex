@@ -40,6 +40,12 @@ The command exits non-zero when it leaves something for you to look at.
 
 `pipelex migrate` does not boot Pipelex. That is the point: a configuration that cannot load is exactly when you need it, so it uses the migration history, the file editor and the filesystem, and nothing else. It works with no credentials, no model deck and no network.
 
+## The warning that sends you here
+
+You will usually meet this command through a warning rather than a crash. When a configuration file is out of date in a way the migration history explains, Pipelex boots anyway: it carries the file forward **in memory**, tells you which files it did that for, and points at this command. Nothing is written, so the same warning appears at the next boot, and the one after — running `pipelex migrate` is what makes the change to the file and stops it.
+
+A file the history cannot explain is a different case, and it still fails the boot with the configuration error itself: tolerance widens what starts, never what is accepted.
+
 ## For agents
 
 `pipelex-agent migrate` is the machine-facing counterpart. It writes only when passed `--yes`, since it cannot ask, and answers with a structured plan — `--format json` for the contract, `--format markdown` to read. Branch on the `needs_attention` field, never on the exit code.

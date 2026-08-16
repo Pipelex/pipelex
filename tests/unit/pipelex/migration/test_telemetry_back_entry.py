@@ -14,8 +14,7 @@ from typing import Any
 
 from pipelex.migration.engine import replay_ledger_over_text
 from pipelex.migration.goldens import pre_history_document_path
-from pipelex.migration.ledger import load_ledger
-from pipelex.migration.surfaces import packaged_migration_dir
+from pipelex.migration.ledger import load_ledger, packaged_migration_dir
 from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig
 from pipelex.tools.misc.toml_utils import load_toml_from_content
 

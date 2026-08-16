@@ -526,11 +526,11 @@ A stale configuration should warn, not stop the world — but only when the ledg
 
 ```
 load user files  →  deep-merge  →  validate (extra="forbid")
-    ok                              → boot; no ledger touched, no tomlkit loaded
+    ok                              → boot; no ledger read, no document re-parsed
     fails, surface S
-      → re-load S's user files with tomlkit
-      → replay S's `safe` entries in memory, per file (writes nothing)
-      → re-merge → re-validate
+      → re-read S's user files with tomlkit
+      → replay S's ledger in memory, per file (writes nothing; `unsafe` entries are rehearsed, never applied)
+      → re-merge → re-run the loader's own post-merge step → re-validate
            ok    → WARNING naming the file and the `pipelex migrate` remedy → boot
            fails → unsafe entries, CONFLICT, or unexplained paths → validation error
                    with error_domain "config" and the `migration` block
@@ -538,10 +538,17 @@ load user files  →  deep-merge  →  validate (extra="forbid")
 
 The rules this encodes:
 
-- **Boot never writes.** Nothing writes except the explicit `migrate` command; boot, `doctor` and validation detect and report.
-- **Boot tolerates only what the ledger explains.** `unsafe` entries, conflicts and unexplained paths still fail the boot. Tolerance widens what starts, never what is silently accepted.
-- **The healthy path is untouched.** The replay runs only on the failure path, so a current configuration never loads tomlkit and never reads a ledger. Replay neutrality is what makes the retry free when it does run.
+- **Boot never writes.** Nothing writes except the explicit `migrate` command; boot, `doctor` and validation detect and report. A tolerated boot leaves no backup either, which is why the warning keeps coming back until the user runs the command.
+- **Boot tolerates only what the ledger explains.** Tolerance widens what starts, never what is silently accepted. **The re-validation is what decides**, and that is stronger than a second gate on the report would be: material an `unsafe` entry is about is still in the file, so the model refuses it and the boot fails, and a `VALUE_DOMAIN_NARROWED` report the model accepts was never a reason to refuse a boot — that report says *check this key*, and the model has now checked it.
+- **The retry never becomes the failure.** Anything that goes wrong inside it — a ledger that will not load, a file that will not parse — makes it decline, and the error the *configuration* produced is what the user sees. Their error names the key to fix; ours would name our packaging. A file that cannot be re-read abandons the whole retry rather than being skipped, because skipping it would drop a layer from the merge and a re-validation that then succeeded would boot on a configuration the user does not have.
+- **The healthy path is untouched.** The replay runs only on the failure path, so a current configuration never reads a ledger, never re-parses a document, and never even imports the migration engine. (Not "never loads tomlkit": the ordinary configuration read has always imported it. What a healthy boot avoids is the second, DOM-level read.) Replay neutrality is what makes the retry free when it does run.
 - **One shared helper**, called by each configuration-surface loader — and that helper is also where `[meta] schema_version` is stripped. The strip belongs there and **not** in the generic TOML reader, which also reads `.mthds` files, backend definitions and the kit index, none of which reserve that key.
+
+**The helper owns the failure path, not the load.** The three loaders do different things between their merge and their validate — the main configuration deep-merges programmatic overrides, telemetry substitutes `${VAR}` placeholders, the service configuration does nothing — so a helper that owned the whole load would have to be told about all three. It is given the surface id and the same ordered path list the loader merged, and it hands back the migrated merge plus a `MigrationPlan` per file; each loader re-runs its own step over that and re-validates. The overrides in particular have to be re-applied by the caller: they are a layer of the *load*, and the replay only ever sees the *files*.
+
+> **The migration engine is imported inside the retry, not at the top of the module.** Its applier lives under `pipelex.pipeline` — an interpreter package — while the configuration loaders sit in `runtime_hub`'s import closure, and the kernel layer's property is that importing it loads zero interpreter modules (see [`hub-layering.md`](contribute/hub-layering.md)). A module-level import would break that silently: the layering guard mechanically checks reachability to `interpreter_hub`, which `pipelex.pipeline.fixes.applier` does not have, so nothing would have gone red. The deferred import is also what makes "the healthy path is untouched" literal rather than approximate.
+
+**Boot tolerance does not run the [downgrade diagnosis](#the-downgrade-direction).** On this path the model has already spoken, and pydantic's own extra-field list is both the same answer and a better one — it knows about validators, which a path walk does not. The diagnosis exists for `pipelex migrate`, where nothing validates the file at all. So "unexplained paths still fail the boot" is satisfied by the re-validation failing, and the `migration` block on the error carries the plans.
 
 ## Applying
 

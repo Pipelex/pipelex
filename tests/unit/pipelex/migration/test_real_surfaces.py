@@ -13,9 +13,9 @@ import tomlkit
 
 from pipelex.migration.coverage import check_registry
 from pipelex.migration.diagnosis import diagnose_unexplained_paths
-from pipelex.migration.ledger import INITIAL_SCHEMA_VERSION, load_ledger
+from pipelex.migration.ledger import INITIAL_SCHEMA_VERSION, load_ledger, packaged_migration_dir
 from pipelex.migration.ledger_check import check_ledgers
-from pipelex.migration.surfaces import build_config_surface_registry, packaged_migration_dir
+from pipelex.migration.surfaces import build_config_surface_registry
 from pipelex.migration.transform_check import check_transforms
 
 

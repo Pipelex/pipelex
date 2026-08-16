@@ -9,12 +9,21 @@ commands would then be proved against two subtly different ones.
 ``goldens/telemetry-config/before@2.toml``, the hand-authored flat document that entry
 ``telemetry-config@2`` exists to carry forward, read live rather than copied here. The ledger that
 migrates it is the one the package ships. Nothing about this test is synthetic except the machine
-it runs on, which is what makes the boot failure it starts from a real one: a flat
-``telemetry.toml`` fails ``TelemetryConfig``'s ``extra="forbid"`` today, in the field.
+it runs on, which is what makes the state it starts from a real one: a flat ``telemetry.toml``
+fails ``TelemetryConfig``'s ``extra="forbid"`` today, in the field.
+
+**Boot tolerance is why that machine boots at all.** Such a machine used to die at boot; it now
+starts, carries the file forward in memory, and warns a person that it did. So the boot probe here
+no longer measures "broken, then fixed" — it asserts the machine boots on *both* sides of every
+command, which is the tolerance property itself, while what the command changed is measured on the
+files. The warning is not asserted here and cannot be: this probe is the agent CLI, which silences
+logging process-wide by contract. It is asserted per surface in ``test_boot_tolerance.py``,
+alongside the other half — a configuration the ledger cannot explain still fails the boot.
 
 The boot probe is ``pipelex-agent models``: the cheapest command that performs a full Pipelex boot,
-including the telemetry load that the old shape breaks. ``pipelex show config`` is not a probe —
-it exits 0 on a machine whose telemetry configuration cannot load, because it never reads it.
+including the telemetry load the old shape sends down the tolerance path. ``pipelex show config``
+is not a probe — it exits 0 on a machine whose telemetry configuration cannot load, because it
+never reads it.
 """
 
 from __future__ import annotations
@@ -25,7 +34,7 @@ from typing import TYPE_CHECKING, Any
 
 from pipelex.migration.backup import existing_backups_of
 from pipelex.migration.goldens import pre_history_document_path
-from pipelex.migration.surfaces import packaged_migration_dir
+from pipelex.migration.ledger import packaged_migration_dir
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 from tests.e2e.agent_cli.conftest import REPO_ROOT
 
@@ -93,17 +102,32 @@ def _boot(*, env: dict[str, str], cwd: Path) -> subprocess.CompletedProcess[str]
     return _run(args=[str(PIPELEX_AGENT_BIN), "models", "--format", "json"], env=env, cwd=cwd)
 
 
+def _assert_boots(*, env: dict[str, str], cwd: Path) -> None:
+    """Boot tolerance, through the real binaries: a machine carrying the old shape starts anyway.
+
+    Asserted on both sides of every command here, which is deliberate — a before/after that only
+    checked *after* would pass just as well if the file had never been stale.
+
+    It does **not** assert the warning, and cannot: this probe is ``pipelex-agent``, which cuts
+    Python's logging off process-wide as its first act so that nothing pollutes its two structured
+    streams. That is the agent CLI's contract working, not a gap — the warning is where a person
+    reads it, and it is asserted per surface in ``test_boot_tolerance.py``. What it does mean is
+    that a *machine* consumer never learns of a pending migration from a boot, only by asking:
+    ``pipelex-agent migrate --dry-run``, or the `doctor` row.
+    """
+    booted = _boot(env=env, cwd=cwd)
+    assert booted.returncode == 0, booted.stderr
+
+
 class TestTheHumanMigrateCommand:
-    def test_stale_files_in_both_directories_are_migrated_and_the_boot_that_failed_succeeds(
+    def test_stale_files_in_both_directories_are_migrated_and_the_boot_stops_warning(
         self,
         hermetic_home: Path,
         offline_subprocess_env: dict[str, str],
     ) -> None:
         project_dir, global_file, project_file = _plant_a_stale_machine(hermetic_home=hermetic_home)
 
-        before = _boot(env=offline_subprocess_env, cwd=project_dir)
-        assert before.returncode != 0, "the scenario is worthless if this machine boots — the old shape must break it"
-        assert "TelemetryConfigValidationError" in before.stderr
+        _assert_boots(env=offline_subprocess_env, cwd=project_dir)
 
         migrated = _run(args=[str(PIPELEX_BIN), "--no-logo", "migrate", "--yes"], env=offline_subprocess_env, cwd=project_dir)
 
@@ -135,8 +159,7 @@ class TestTheHumanMigrateCommand:
             assert len(backups) == 1, f"expected exactly one backup of {path}, found {backups}"
             assert backups[0].read_text(encoding="utf-8") == original
 
-        after = _boot(env=offline_subprocess_env, cwd=project_dir)
-        assert after.returncode == 0, after.stderr
+        _assert_boots(env=offline_subprocess_env, cwd=project_dir)
 
     def test_a_dry_run_reports_the_same_work_and_writes_nothing(
         self,
@@ -169,15 +192,14 @@ class TestTheHumanMigrateCommand:
 
 
 class TestTheAgentMigrateLoop:
-    def test_plan_as_json_then_apply_and_the_boot_that_failed_succeeds(
+    def test_plan_as_json_then_apply_and_the_boot_stops_warning(
         self,
         hermetic_home: Path,
         offline_subprocess_env: dict[str, str],
     ) -> None:
         project_dir, global_file, project_file = _plant_a_stale_machine(hermetic_home=hermetic_home)
 
-        before = _boot(env=offline_subprocess_env, cwd=project_dir)
-        assert before.returncode != 0, "the scenario is worthless if this machine boots — the old shape must break it"
+        _assert_boots(env=offline_subprocess_env, cwd=project_dir)
 
         planned = _run(
             args=[str(PIPELEX_AGENT_BIN), "migrate", "--dry-run", "--format", "json"],
@@ -204,8 +226,7 @@ class TestTheAgentMigrateLoop:
         written = {plan_dict["file_path"] for plan_dict in outcome["plans"] if plan_dict["was_written"]}
         assert written == {str(global_file), str(project_file)}
 
-        after = _boot(env=offline_subprocess_env, cwd=project_dir)
-        assert after.returncode == 0, after.stderr
+        _assert_boots(env=offline_subprocess_env, cwd=project_dir)
 
     def test_a_second_run_finds_nothing_left_to_do(
         self,
