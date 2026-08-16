@@ -13,11 +13,11 @@ from pathlib import Path
 
 from pytest_mock import MockerFixture
 
-from pipelex.migration.backup import existing_backups_of, write_backup
+from pipelex.migration.backup import WrittenBackup, existing_backups_of, write_backup
 from pipelex.migration.plan import FileBlockedReason
 from pipelex.migration.runner import migrate_directories, migrate_file
 from pipelex.migration.surfaces import SurfaceRegistry
-from pipelex.pipeline.exceptions import FixTransactionError
+from pipelex.pipeline.exceptions import FixTransactionError, FixWriteConflictError
 from pipelex.pipeline.fixes.file_transaction import FileSnapshot, PendingFileUpdate, commit_file_updates
 from pipelex.suggested_fix import RenameTableKeyOp
 from tests.unit.pipelex.migration.conftest import EXAMPLE_SURFACE_ID, EntryBuilder, LedgerBuilder, SurfaceBuilder
@@ -273,7 +273,7 @@ class TestMigrationRunner:
         assert "output = " in first.read_text(encoding="utf-8")
         assert existing_backups_of(path=first) == [report.plans[0].backup_path]
 
-    def test_a_transaction_error_before_the_write_landed_blocks_the_file_and_spares_its_siblings(
+    def test_a_transaction_error_the_file_denies_reports_an_uncertain_state_and_spares_its_siblings(
         self,
         tmp_path: Path,
         mocker: MockerFixture,
@@ -303,15 +303,81 @@ class TestMigrationRunner:
         )
 
         assert [plan.was_written for plan in report.plans] == [False, True]
-        assert report.plans[0].blocked_reason is FileBlockedReason.UNWRITABLE
+        assert report.plans[0].blocked_reason is FileBlockedReason.STATE_UNCERTAIN
         assert first.read_text(encoding="utf-8") == OLD_SHAPE
         # The transaction could not vouch for the state it left, so the one certain copy of the
-        # original stays, and the report says where it is.
-        assert existing_backups_of(path=first) == [report.plans[0].backup_path]
+        # original stays — under a name outside the `.bak.` rotation, where the next successful
+        # run of this file cannot prune it away.
+        assert existing_backups_of(path=first) == []
         assert report.plans[0].backup_path is not None
+        assert report.plans[0].backup_path.name == "example.toml.rescue.20260815T120000Z"
         assert report.plans[0].backup_path.read_text(encoding="utf-8") == OLD_SHAPE
         assert str(report.plans[0].backup_path) in (report.plans[0].blocked_detail or "")
         assert "output = " in second.read_text(encoding="utf-8")
+
+    def test_an_uncertain_write_does_not_promise_to_keep_a_copy_another_run_made(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        build_entry: EntryBuilder,
+        build_ledger: LedgerBuilder,
+        build_surface: SurfaceBuilder,
+    ) -> None:
+        """A copy this run did not make stays that run's to move, so it also stays prunable.
+
+        The report may still name it — it does hold the original — but it must not tell the user
+        the copy will be waiting, because the next successful run of this file prunes exactly that
+        name. What the user needs to be told is to take it now.
+        """
+        target = tmp_path / "example.toml"
+        target.write_text(OLD_SHAPE, encoding="utf-8")
+        occupied = tmp_path / "example.toml.bak.20260815T120000Z"
+        occupied.write_text(OLD_SHAPE, encoding="utf-8")
+        ledger = build_ledger(
+            entries=[build_entry(to_schema_version=2, ops=[RenameTableKeyOp(table_path=["reporting"], key="output_config", new_key="output")])]
+        )
+        mocker.patch("pipelex.migration.runner.commit_file_updates", side_effect=FixTransactionError("commit failed and rollback was incomplete"))
+
+        plan = migrate_file(surface=build_surface(), ledger=ledger, file_path=target, dry_run=False, moment=MOMENT)
+
+        assert plan.blocked_reason is FileBlockedReason.STATE_UNCERTAIN
+        assert plan.backup_path == occupied
+        assert existing_backups_of(path=target) == [occupied], "still in the rotation, so a later run would prune it"
+        detail = plan.blocked_detail or ""
+        assert str(occupied) in detail
+        assert "is kept at" not in detail
+        assert "could not take it out of the way of pruning" in detail
+
+    def test_an_uncertain_write_does_not_promise_a_rescue_the_rename_refused(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        build_entry: EntryBuilder,
+        build_ledger: LedgerBuilder,
+        build_surface: SurfaceBuilder,
+    ) -> None:
+        """The same promise, broken the other way: the copy is this run's, and the rescue name is taken.
+
+        `keep_backup_for_rescue` leaves the copy where it is rather than losing it to a tidier
+        name, which is right — and leaves it inside the `.bak.` rotation, which the report must say.
+        """
+        target = tmp_path / "example.toml"
+        target.write_text(OLD_SHAPE, encoding="utf-8")
+        occupied_rescue = tmp_path / "example.toml.rescue.20260815T120000Z"
+        occupied_rescue.write_text("another run got here first\n", encoding="utf-8")
+        ledger = build_ledger(
+            entries=[build_entry(to_schema_version=2, ops=[RenameTableKeyOp(table_path=["reporting"], key="output_config", new_key="output")])]
+        )
+        mocker.patch("pipelex.migration.runner.commit_file_updates", side_effect=FixTransactionError("commit failed and rollback was incomplete"))
+
+        plan = migrate_file(surface=build_surface(), ledger=ledger, file_path=target, dry_run=False, moment=MOMENT)
+
+        assert plan.blocked_reason is FileBlockedReason.STATE_UNCERTAIN
+        assert plan.backup_path is not None
+        assert plan.backup_path.name == "example.toml.bak.20260815T120000Z"
+        assert plan.backup_path.read_text(encoding="utf-8") == OLD_SHAPE
+        assert occupied_rescue.read_text(encoding="utf-8") == "another run got here first\n", "never clobbered"
+        assert "could not take it out of the way of pruning" in (plan.blocked_detail or "")
 
     def test_a_file_edited_between_the_read_and_the_write_is_reported_as_changed_and_left_alone(
         self,
@@ -332,10 +398,10 @@ class TestMigrationRunner:
         edited_shape = OLD_SHAPE + "extra = 1\n"
         real_write_backup = write_backup
 
-        def edit_target_while_backing_up(*, snapshot: FileSnapshot, moment: datetime) -> Path:
-            backup_path = real_write_backup(snapshot=snapshot, moment=moment)
+        def edit_target_while_backing_up(*, snapshot: FileSnapshot, moment: datetime) -> WrittenBackup:
+            backup = real_write_backup(snapshot=snapshot, moment=moment)
             target.write_text(edited_shape, encoding="utf-8")
-            return backup_path
+            return backup
 
         mocker.patch("pipelex.migration.runner.write_backup", side_effect=edit_target_while_backing_up)
 
@@ -444,7 +510,7 @@ class TestMigrationRunner:
 
         plan = migrate_file(surface=build_surface(), ledger=ledger, file_path=target, dry_run=False, moment=MOMENT)
 
-        assert plan.blocked_reason is FileBlockedReason.UNWRITABLE
+        assert plan.blocked_reason is FileBlockedReason.UNREADABLE
         assert "could not be read" in (plan.blocked_detail or "")
         assert sorted(path.name for path in tmp_path.iterdir()) == ["example.toml"]
 
@@ -532,6 +598,130 @@ class TestMigrationRunner:
         assert healthy_plan.was_written
         assert "output = " in healthy.read_text(encoding="utf-8")
         assert ledger.surface.current_schema_version == 2
+
+    def test_a_symlinked_configuration_file_migrates_the_file_it_names_and_keeps_the_link(
+        self,
+        tmp_path: Path,
+        build_entry: EntryBuilder,
+        build_ledger: LedgerBuilder,
+        build_surface: SurfaceBuilder,
+    ) -> None:
+        """A dotfiles setup is a link, and the file the user means is at the end of it.
+
+        An atomic replace of the link path would put a regular file where the link was and leave
+        the real file behind, unmigrated — so the runner resolves first, exactly as the `.mthds`
+        fix loop already resolves its own targets. The copy lands beside the file it copies.
+        """
+        dotfiles = tmp_path / "dotfiles"
+        dotfiles.mkdir()
+        real = dotfiles / "example.toml"
+        real.write_text(OLD_SHAPE, encoding="utf-8")
+        config_dir = tmp_path / ".pipelex"
+        config_dir.mkdir()
+        link = config_dir / "example.toml"
+        link.symlink_to(real)
+        ledger = build_ledger(
+            entries=[build_entry(to_schema_version=2, ops=[RenameTableKeyOp(table_path=["reporting"], key="output_config", new_key="output")])]
+        )
+
+        plan = migrate_file(surface=build_surface(), ledger=ledger, file_path=link, dry_run=False, moment=MOMENT)
+
+        assert plan.was_written
+        assert link.is_symlink()
+        assert link.resolve() == real.resolve()
+        assert "output = " in real.read_text(encoding="utf-8")
+        # The plan names the path the walk found; the backup shows where the bytes actually went.
+        assert plan.file_path == link
+        assert plan.backup_path == dotfiles / "example.toml.bak.20260815T120000Z"
+        assert not list(existing_backups_of(path=link))
+
+    def test_a_backup_already_at_this_run_s_name_is_kept_rather_than_overwritten(
+        self,
+        tmp_path: Path,
+        build_entry: EntryBuilder,
+        build_ledger: LedgerBuilder,
+        build_surface: SurfaceBuilder,
+    ) -> None:
+        """Two runs inside one UTC second address the same name, and the older copy is the original.
+
+        The stamp resolves to the second, so a concurrent run of the same file can already have put
+        its copy there. Whatever is there is a copy of an *older* state than this run's, so taking
+        it away is the one loss backups exist to prevent.
+        """
+        target = tmp_path / "example.toml"
+        target.write_text(OLD_SHAPE, encoding="utf-8")
+        occupied = tmp_path / "example.toml.bak.20260815T120000Z"
+        occupied.write_text("the copy another run already made\n", encoding="utf-8")
+        ledger = build_ledger(
+            entries=[build_entry(to_schema_version=2, ops=[RenameTableKeyOp(table_path=["reporting"], key="output_config", new_key="output")])]
+        )
+
+        plan = migrate_file(surface=build_surface(), ledger=ledger, file_path=target, dry_run=False, moment=MOMENT)
+
+        assert plan.was_written
+        assert occupied.read_text(encoding="utf-8") == "the copy another run already made\n"
+        assert plan.backup_path == occupied
+
+    def test_a_refused_write_never_discards_a_backup_this_run_did_not_make(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        build_entry: EntryBuilder,
+        build_ledger: LedgerBuilder,
+        build_surface: SurfaceBuilder,
+    ) -> None:
+        """The narrow path the same-second collision actually damages, and the invariant that ends it.
+
+        A run whose commit is refused deletes the copy it made, because a write that did not happen
+        has nothing to back up. Deleting the copy it *found* is a different act entirely: that one
+        belongs to the run that is presently migrating the file.
+        """
+        target = tmp_path / "example.toml"
+        target.write_text(OLD_SHAPE, encoding="utf-8")
+        occupied = tmp_path / "example.toml.bak.20260815T120000Z"
+        occupied.write_text(OLD_SHAPE, encoding="utf-8")
+        ledger = build_ledger(
+            entries=[build_entry(to_schema_version=2, ops=[RenameTableKeyOp(table_path=["reporting"], key="output_config", new_key="output")])]
+        )
+        mocker.patch(
+            "pipelex.migration.runner.commit_file_updates",
+            side_effect=FixWriteConflictError("refusing to overwrite: the file changed while changes were being prepared"),
+        )
+
+        plan = migrate_file(surface=build_surface(), ledger=ledger, file_path=target, dry_run=False, moment=MOMENT)
+
+        assert plan.blocked_reason is FileBlockedReason.CHANGED_DURING_RUN
+        assert occupied.exists()
+        assert occupied.read_text(encoding="utf-8") == OLD_SHAPE
+
+    def test_a_rescue_copy_survives_the_next_successful_run_of_the_same_file(
+        self,
+        tmp_path: Path,
+        build_entry: EntryBuilder,
+        build_ledger: LedgerBuilder,
+        build_surface: SurfaceBuilder,
+    ) -> None:
+        """The copy a report told the user to go and get must still be there when they go.
+
+        Pruning keeps exactly one `.bak.<stamp>` per file, and a copy kept because a run could not
+        say what it had left is not one of those — it is outside the rotation by name, so nothing
+        collects it but the user.
+        """
+        target = tmp_path / "example.toml"
+        target.write_text(OLD_SHAPE, encoding="utf-8")
+        rescued = tmp_path / "example.toml.rescue.20260101T000000Z"
+        rescued.write_text("the original, from a run that could not vouch for its write\n", encoding="utf-8")
+        stale_backup = tmp_path / "example.toml.bak.20200101T000000Z"
+        stale_backup.write_text("from another era\n", encoding="utf-8")
+        ledger = build_ledger(
+            entries=[build_entry(to_schema_version=2, ops=[RenameTableKeyOp(table_path=["reporting"], key="output_config", new_key="output")])]
+        )
+
+        plan = migrate_file(surface=build_surface(), ledger=ledger, file_path=target, dry_run=False, moment=MOMENT)
+
+        assert plan.was_written
+        assert not stale_backup.exists()
+        assert rescued.read_text(encoding="utf-8") == "the original, from a run that could not vouch for its write\n"
 
     def test_a_missing_configuration_directory_is_skipped_rather_than_refused(
         self,

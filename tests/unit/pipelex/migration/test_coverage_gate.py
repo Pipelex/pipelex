@@ -64,6 +64,13 @@ class _SchemaTwoEnumMemberGone(BaseModel):
     tier: _TierWithoutBasic = _TierWithoutBasic.PREMIUM
 
 
+class _SchemaTwoRenamedWithMemberGone(BaseModel):
+    """`label` renamed *and* a spelling of `tier` retired — an entry that is about the rename only."""
+
+    title: str = "hello"
+    tier: _TierWithoutBasic = _TierWithoutBasic.PREMIUM
+
+
 class _SchemaTwoTierRenamedAndMemberGone(BaseModel):
     """`tier` renamed to `level` *and* `basic` dropped, in the same schema version."""
 
@@ -357,6 +364,7 @@ class TestEntryAccounting:
         assert "titel" in issues[0].message
 
     def test_a_removal_with_no_operation_accounting_for_it_is_caught(self, tmp_path: Path) -> None:
+        """An entry that is genuinely about something else still owes the version's removals."""
         entry = f"""
 [[migration]]
 id                = "{SURFACE_ID}@2"
@@ -366,6 +374,7 @@ breaking          = true
 safety            = "unsafe"
 title             = "Drop label"
 description       = "The key is gone, and this entry forgot to say so."
+declared_narrowed_paths = ["tier"]
 """
         _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=entry)
         _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
@@ -533,7 +542,7 @@ table_path = ["label"]
 
 
 class TestEnumAccounting:
-    def _entry_with_ops(self, *, safety: str, ops: str) -> str:
+    def _entry_with_ops(self, *, safety: str, ops: str, declared_narrowed_paths: str = "") -> str:
         return f"""
 [[migration]]
 id                = "{SURFACE_ID}@2"
@@ -543,6 +552,7 @@ breaking          = true
 safety            = "{safety}"
 title             = "Retire the basic tier"
 description       = "The spelling changed."
+{declared_narrowed_paths}
 {ops}
 """
 
@@ -618,12 +628,34 @@ mapping    = { basic = "standard" }
         _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoEnumMemberGone, schema_version=2)
         assert check_surface(surface=_surface(config_model=_SchemaTwoEnumMemberGone), migration_dir=tmp_path) == []
 
-    def test_an_unsafe_entry_may_leave_a_removed_member_unremapped(self, tmp_path: Path) -> None:
+    def test_an_unsafe_entry_that_declares_the_path_may_leave_a_removed_member_unremapped(self, tmp_path: Path) -> None:
         """`unsafe` means reported and never applied, so it is allowed to describe what no operation can do."""
-        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="unsafe", ops=""))
+        entry = self._entry_with_ops(safety="unsafe", ops="", declared_narrowed_paths='declared_narrowed_paths = ["tier"]')
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=entry)
         _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
         _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoEnumMemberGone, schema_version=2)
         assert check_surface(surface=_surface(config_model=_SchemaTwoEnumMemberGone), migration_dir=tmp_path) == []
+
+    def test_an_unsafe_entry_that_names_no_path_does_not_account_for_the_lost_member(self, tmp_path: Path) -> None:
+        """R9, on the enum half: the word `unsafe` satisfies a reader and reaches no user.
+
+        The entry has an operation, so it is not the op-free shape the parser refuses — and the
+        operation is about something else entirely, so rehearsing it says nothing to the user
+        whose `tier = "basic"` the new schema rejects.
+        """
+        ops = """
+[[migration.ops]]
+kind       = "rename_table_key"
+table_path = []
+key        = "label"
+new_key    = "title"
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="unsafe", ops=ops))
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoRenamedWithMemberGone, schema_version=2)
+        issues = check_surface(surface=_surface(config_model=_SchemaTwoRenamedWithMemberGone), migration_dir=tmp_path)
+        assert _kinds(issues) == [CoverageIssueKind.ENUM_MEMBER_NOT_REMAPPED]
+        assert "declared_narrowed_paths" in issues[0].message
 
     def test_a_member_lost_inside_a_list_cannot_be_remapped_and_the_gate_says_so(self, tmp_path: Path) -> None:
         """A remap rewrites a string value, and the value here is a list.
@@ -690,7 +722,7 @@ class TestValueDomainNarrowing:
     reject a file that was valid the day before with a green gate behind it.
     """
 
-    def _entry_with_ops(self, *, safety: str, ops: str) -> str:
+    def _entry_with_ops(self, *, safety: str, ops: str, declared_narrowed_paths: str = "") -> str:
         return f"""
 [[migration]]
 id                = "{SURFACE_ID}@2"
@@ -700,6 +732,7 @@ breaking          = true
 safety            = "{safety}"
 title             = "Narrow what a value may be"
 description       = "The domain shrank."
+{declared_narrowed_paths}
 {ops}
 """
 
@@ -807,14 +840,51 @@ mapping    = { auto = "unbounded" }
         assert _kinds(issues) == [CoverageIssueKind.VALUE_DOMAIN_NARROWED]
         assert "its type went from 'int | literal' to 'literal'" in issues[0].message
 
-    def test_an_unsafe_entry_may_leave_a_narrowing_unremapped(self, tmp_path: Path) -> None:
+    def test_an_unsafe_entry_that_declares_the_narrowing_leaves_it_unremapped(self, tmp_path: Path) -> None:
         """For a tightened numeric bound this is the only remedy there is: no mapping can enumerate
         the values a bound retires, so the migration is reported to the user and never applied.
         """
-        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="unsafe", ops=""))
+        entry = self._entry_with_ops(safety="unsafe", ops="", declared_narrowed_paths='declared_narrowed_paths = ["retries"]')
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=entry)
         _snapshot(migration_dir=tmp_path, config_model=_BoundedOne, schema_version=1)
         _snapshot(migration_dir=tmp_path, config_model=_BoundedTightened, schema_version=2)
         assert check_surface(surface=_surface(config_model=_BoundedTightened), migration_dir=tmp_path) == []
+
+    def test_an_unsafe_entry_that_declares_nothing_about_its_narrowing_is_refused(self, tmp_path: Path) -> None:
+        """R9 — `unsafe` on its own accounts for nothing, because the engine reports it to nobody.
+
+        The word satisfies a reader; the declaration is what the engine can question a user's file
+        about. An entry that says `unsafe` and names no path passes this gate while every user
+        whose value the new schema refuses is left with a failing boot and no message.
+        """
+        ops = """
+[[migration.ops]]
+kind       = "rename_table_key"
+table_path = []
+key        = "label"
+new_key    = "title"
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="unsafe", ops=ops))
+        _snapshot(migration_dir=tmp_path, config_model=_BoundedOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_BoundedTightenedAndRenamed, schema_version=2)
+        issues = check_surface(surface=_surface(config_model=_BoundedTightenedAndRenamed), migration_dir=tmp_path)
+        assert _kinds(issues) == [CoverageIssueKind.VALUE_DOMAIN_NARROWED]
+        assert "declared_narrowed_paths" in issues[0].message
+
+    def test_an_unsafe_entry_declaring_its_narrowing_beside_a_rename_is_green(self, tmp_path: Path) -> None:
+        """The same entry, with the one line that makes it reach the user it is written for."""
+        ops = """
+[[migration.ops]]
+kind       = "rename_table_key"
+table_path = []
+key        = "label"
+new_key    = "title"
+"""
+        entry = self._entry_with_ops(safety="unsafe", ops=ops, declared_narrowed_paths='declared_narrowed_paths = ["retries"]')
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=entry)
+        _snapshot(migration_dir=tmp_path, config_model=_BoundedOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_BoundedTightenedAndRenamed, schema_version=2)
+        assert check_surface(surface=_surface(config_model=_BoundedTightenedAndRenamed), migration_dir=tmp_path) == []
 
     def test_a_pre_history_entry_cannot_hide_a_narrowing_either(self, tmp_path: Path) -> None:
         """The flag exempts an entry from accounting, so it must not be a way past this one."""

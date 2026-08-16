@@ -132,6 +132,8 @@ description       = "One or two sentences a release note can quote."
 guidance          = """
 Agent-facing Markdown: what a user should understand or decide. Never the mechanism.
 """
+# unsafe entries only — the paths whose value domain this version narrowed:
+# declared_narrowed_paths = ["reporting.retries"]
 
 [[migration.ops]]                 # rename a nested table in place, inside its parent
 kind       = "rename_table_key"
@@ -155,7 +157,8 @@ The rules that govern the file:
 
 - **Entries are ordered by `to_schema_version` and replayed in that order.** Versions are contiguous and match their ids. A key renamed at version 2 and moved at version 4 lands correctly for a file coming from version 1, because the entries compose in sequence.
 - **`safety` and `guidance` are independent.** `safety` governs whether the applier may act: `safe` means mechanically complete and applied after one confirmation, `unsafe` means reported and never applied. `guidance` is prose any entry may carry, whatever its safety.
-- **`guidance` is the explanation, never the mechanism.** Anything expressible as operations must be operations. An entry may legitimately carry no operations at all with `safety = "unsafe"`, for a change only a human can make.
+- **`guidance` is the explanation, never the mechanism.** Anything expressible as operations must be operations. An entry may legitimately carry no operations at all with `safety = "unsafe"`, for a change only a human can make — and then it must say which paths it is about, in `declared_narrowed_paths`. See [What an `unsafe` entry promises](#what-an-unsafe-entry-promises).
+- **`declared_narrowed_paths` belongs to an `unsafe` entry and nowhere else.** A narrowing a `remap_value` can repair is accounted for by that remap; one it cannot repair is precisely what makes an entry `unsafe`, so the field on a `safe` entry is a contradiction and is refused when the file is parsed.
 - **Operations target the narrowest path that expresses the change.** A ledger entry is permanent data that outlives the current field census of its parent table, so deleting a parent because it happens to have one field today is wrong — unless the parent itself is what retires, in which case the entry deletes the parent and the parent's name becomes reserved.
 - **The parsed ledger is cached per process.** Replaying a surface over many files must not re-parse the TOML per file.
 
@@ -174,6 +177,41 @@ This exception is bounded to entries carrying the flag, and exists for the chang
 > **Every operation's source must be declared material, or lie beneath some.** The ordinary op-legality rule reads the reserved-path registry, which a pre-history entry feeds by declaration; the effect is the same rule and the same refusal. Beneath, because a declaration names the shape that retired and an operation may address one key inside it. The rule reads each source at its literal, pre-entry path — it does not follow the entry's own renames the way [sequential path state](#sequential-path-state) does — so an operation that would address a declared table under a name an earlier operation of the same entry gave it is refused; address the material first, then rename it.
 
 The `before` document lives beside the golden chain as `before@N.toml`, and it is the one file there that is neither snapshotted nor regenerated — a regenerated one would describe today's models, which is exactly what it is not about. Write it as a faithful representative of the old shape, carrying every path the entry's operations address, so that the transform check exercises each of them rather than taking them on the entry's word. The link then runs from that document instead of from `defaults@N-1`, and nothing else about the check changes: the same three claims verify it.
+
+## What an `unsafe` entry promises
+
+`safe` means the applier acts. `unsafe` means it does not — and everything an `unsafe` entry is worth rests on one sentence:
+
+> **An `unsafe` entry is reported on every run, to every file that still carries the material it is about — at whatever spelling that material has reached — and to no other file.**
+
+Both halves are load-bearing, and they pull against each other. Report too little and the entry is a note nobody reads; report too much and every user with a perfectly current file is warned, at every boot, forever, which teaches everyone to ignore the one warning that mattered. So the entry is **questioned** against each document before it is reported, and what makes that question answerable is what the entry declares.
+
+**The material an entry is about** is its operations' sources, plus its `declared_narrowed_paths`.
+
+- **Operations are questioned by rehearsing them** against the document and throwing the result away. This is value-sensitive by construction, which is the point: a `remap_value` is about a stale *spelling*, not about a path, so a user whose value was never stale hears nothing.
+- **Declared narrowed paths are questioned by looking them up.** No operation can express a value the new schema refuses, so there is nothing to rehearse. Presence is the whole predicate — the engine is model-free by design, and cannot tell a value the narrowed domain rejects from one it accepts. What it reports is therefore *check this key*, not *this value is wrong*.
+
+> **An entry with no operations must declare at least one narrowed path, and the ledger refuses one that does not.** That shape is the contract's own form for "a change only a human can make", and the [coverage table](#coverage-every-schema-change-is-accounted-for)'s only remedy for a tightened numeric bound — but with nothing to rehearse and nothing to look up, such an entry answers "nothing to say" for every file there will ever be. The accounting accepts it; the engine then guarantees it reaches nobody.
+
+> **`unsafe` on its own accounts for nothing.** The coverage gate lets an `unsafe` entry leave a narrowing unremapped and an enumerated spelling unmapped — that is what `unsafe` is for — but it demands the path be named in `declared_narrowed_paths`. Otherwise the word satisfies a reader while the user whose value the new schema refuses is left with a failing boot and no message.
+
+> **Declared paths are spelled as the fingerprint at the entry's own version records them**, `*` segments included, and [`make check-ledger`](#the-targets-and-where-the-data-lives) refuses one that version does not have. A narrowing keeps its path and shrinks what it accepts — that is exactly what separates it from a removal, which is accounted for by the operation that removes it. A path no version records is looked for in every file and found in none.
+
+**Whatever spelling the material has reached.** An `unsafe` entry is never applied, so a file it blocks keeps the old shape while later `safe` entries go on renaming the tables around it. Questioning only the entry's own spelling makes an entry that reported on the first run go silent on the second, with the file still broken:
+
+```
+unsafe@2 is about  [reporting] mode      safe@3 renames  reporting → output
+run 1: reports unsafe@2, then applies the rename → the file now says [output] mode
+run 2: no reporting.mode anywhere → silent, while the boot still fails on output.mode
+```
+
+So the material is traced through the ledger before the document is questioned: **back** through the entry's own operations, because the entry never applied them, and **forward** through every later `safe` entry, for a file that has been migrated past this one. A later `unsafe` entry moves nothing, since it is never applied either; material a later entry *deletes* stops being traced, because a file migrated that far no longer carries anything the entry is about. All of it is ledger arithmetic — an operation says which path it moves where — so the engine stays the model-free, filesystem-free function the gates replay.
+
+> **What gets reported is the spelling the file this run *wrote* uses.** Questioning happens where the replay reaches the entry; the later `safe` entries of the same run then rename the material before the file is written. So `narrowed_paths[]` names the end of that forward trace rather than the spelling that matched — otherwise a run that reports `reporting.retries` hands back a file that calls it `output.retries`, and sends the user looking for a key it no longer has.
+
+> **A rehearsal may guess; an application may not.** Forward tracing applies to `unsafe` entries only, because their operations are rehearsed against a copy and discarded: the worst a wrong guess costs is one report too many. A `safe` entry silenced the same way — by its own `CONFLICT`, after which a later entry renames the table around it — is left alone deliberately, because repairing it would mean *writing* at a spelling its author never wrote. That is a different promise and wants its own decision.
+
+> **Convergence exempts a reported narrowing, and nothing else.** The reference documents set the narrowed path exactly as every healthy file does, so an entry reported for that reason must not fail [convergence](#convergence-replay-is-neutral-on-the-witnesses) — otherwise the one remedy for a tightened bound could never be written. An `unsafe` entry whose *operations* fire on a witness is a different matter and still fails: that says the checked-in reference document carries retired material.
 
 ## The operation vocabulary
 
@@ -235,6 +273,7 @@ Enforced by [`make check-ledger`](#the-targets-and-where-the-data-lives), agains
 - **Every operation's source must be a path some schema version removed** — recorded as such in the reserved-path registry by the entry that removes it. An operation whose source is still a live path of the current schema would act on a valid file, and replay neutrality would be false. A `remap_value` is exempt by construction: what it retires is an enumerated *spelling*, not the path, which survives into the new schema — the remap legality rule is what governs it instead.
 - **No operation may address a concrete key beneath an open node.** Those keys are the user's, they are unbounded, and no schema change can remove one.
 - **A `*` segment is legal exactly at an open node**, and nowhere else.
+- **Every `declared_narrowed_path` must be a path the fingerprint at the entry's own version records.** The declaration is what the engine questions a document about, so one no version records reaches nobody — and a path that version has *lost* is a removal, which the operation that removes it accounts for. See [What an `unsafe` entry promises](#what-an-unsafe-entry-promises).
 
 ### Sequential path state
 
@@ -244,8 +283,8 @@ Legality is defined over an entry's **sequential path state**, not operation by 
 - **A `safe` rename or move must not land on a path the state already has.** The applier refuses to clobber an occupied destination, so a file carrying both keys — a perfectly valid file at the previous schema — would come back `CONFLICT` on every run. Such an entry is refused as **destination occupied**; it can be `unsafe`, or choose a destination the previous schema did not have.
 - **Every path surviving the walk must be a path of the new fingerprint.** A survivor that is not is either an unaccounted removal or a misspelled destination; the two are the same defect seen from either end, and one containment check catches both.
 - **Every path of the new fingerprint that the walk removed must be a genuine addition** — that is, absent from the previous fingerprint. One that was present is **over-deletion**: an entry that dropped a parent table where it meant to drop one child.
-- **Every enumerated spelling lost between the two fingerprints must be remapped, following the path through the entry's own renames.** Members are compared by origin — an enumerated path of the previous schema is looked up at the path the walk carried it to — so a member lost by a path the same entry renamed still demands its `remap_value`, and the remap that supplies it addresses the key by its new name.
-- **Every path whose value domain narrowed must carry a remap, or the entry must be `unsafe`.** Compared by origin like the spellings, and for the same reason: a narrowing hidden behind a rename would otherwise read as an unrelated addition and removal. The remedies are the two the [coverage table](#coverage-every-schema-change-is-accounted-for) names, and they are fewer than a removal has, because no structural operation can repair a value.
+- **Every enumerated spelling lost between the two fingerprints must be remapped, following the path through the entry's own renames.** Members are compared by origin — an enumerated path of the previous schema is looked up at the path the walk carried it to — so a member lost by a path the same entry renamed still demands its `remap_value`, and the remap that supplies it addresses the key by its new name. An `unsafe` entry may leave one unmapped and answers for it by naming the path in `declared_narrowed_paths`.
+- **Every path whose value domain narrowed must carry a remap, or be named in an `unsafe` entry's `declared_narrowed_paths`.** Compared by origin like the spellings, and for the same reason: a narrowing hidden behind a rename would otherwise read as an unrelated addition and removal. The remedies are the two the [coverage table](#coverage-every-schema-change-is-accounted-for) names, and they are fewer than a removal has, because no structural operation can repair a value. `unsafe` without the declaration is not one of them — see [what an `unsafe` entry promises](#what-an-unsafe-entry-promises).
 
 The end state is deliberately *not* compared as "the new fingerprint minus its additions". That formulation reads a rename's destination as an addition and its source as a removal, so it demands that the destination be absent from the end state — which is exactly where a correct rename puts it. Containment plus the over-deletion check is the same guarantee stated in a form renames satisfy.
 
@@ -320,8 +359,8 @@ The verdict turns on **direction**, not on whether something moved: a change tha
 |---|---|
 | Unchanged | Pass. |
 | Paths or enum members added, a default changed, or a type or bound **widened** | Regenerate the golden. No version bump and no entry are demanded, because additive changes are absorbed by the defaults layer and a widened domain still accepts every value a file already carries. Widening is defined so the fingerprint can decide it: a union whose members are a superset of the old ones, an enumerated type becoming `str`, and a bound dropped or relaxed. |
-| Any path or enum member removed or renamed | Require a schema version bump, an operation accounting for every removed path (wildcard paths included), and a remap or an `unsafe` entry for every removed enum member. Destinations are cross-checked against added paths. |
-| A type or bound **narrowed** — `int → str`, `str → SomeEnum`, `list[int] → list[str]`, `ge=1 → ge=5` | Require a schema version bump and an entry, exactly as a removal does. Every path survives and every spelling is still enumerated, and a file carrying an out-of-domain value stops validating all the same. No structural operation can repair a value, so the entry must carry a `remap_value` for each narrowed path — where the old spellings can be enumerated and [remap legality](#replay-neutrality) accepts it — or be marked `unsafe`, which is the only remedy a tightened numeric bound has. A remap answers only for the string values it rewrites — a lost `str`, enum or literal member — and for nothing else: an `int \| literal` field that loses its number, or that loses a spelling *and* raises its floor, still demands `unsafe`, because no mapping reaches a number. |
+| Any path or enum member removed or renamed | Require a schema version bump, an operation accounting for every removed path (wildcard paths included), and for every removed enum member either a remap or an `unsafe` entry **naming that path in `declared_narrowed_paths`**. Destinations are cross-checked against added paths. |
+| A type or bound **narrowed** — `int → str`, `str → SomeEnum`, `list[int] → list[str]`, `ge=1 → ge=5` | Require a schema version bump and an entry, exactly as a removal does. Every path survives and every spelling is still enumerated, and a file carrying an out-of-domain value stops validating all the same. No structural operation can repair a value, so the entry must carry a `remap_value` for each narrowed path — where the old spellings can be enumerated and [remap legality](#replay-neutrality) accepts it — or be marked `unsafe` **and name each narrowed path in `declared_narrowed_paths`**, which is the only remedy a tightened numeric bound has. A remap answers only for the string values it rewrites — a lost `str`, enum or literal member — and for nothing else: an `int \| literal` field that loses its number, or that loses a spelling *and* raises its floor, still demands `unsafe`, because no mapping reaches a number. |
 
 Alongside the diff, one standing invariant is checked on the new fingerprint itself, whether or not anything changed:
 
@@ -335,7 +374,7 @@ Stating it over every required path rather than only over newly added ones costs
 
 ### Convergence — replay is neutral on the witnesses
 
-A full replay of a surface's ledger over each of its reference documents produces zero applied operations, reports nothing about them, and returns the very bytes it was given. The same target checks what else is cheap and unambiguous: the ledger parses into the migration-operation subset, versions are contiguous and match ids, every operation is legal, every `safe` remap satisfies the legality rule, and no entry reintroduces a reserved path or a remapped-away spelling.
+A full replay of a surface's ledger over each of its reference documents produces zero applied operations, reports nothing about them beyond a [declared narrowing](#what-an-unsafe-entry-promises), and returns the very bytes it was given. The same target checks what else is cheap and unambiguous: the ledger parses into the migration-operation subset, versions are contiguous and match ids, every operation is legal, every `safe` remap satisfies the legality rule, and no entry reintroduces a reserved path or a remapped-away spelling.
 
 > **This target reads checked-in files and never fingerprints a live model** — the ledgers, the stored golden chain, the two reference documents (one of which, for a surface whose defaults come from its model, is rendered from that model's default values — rendered, not fingerprinted). That restraint is what earns it a place in `make agent-check`: every failure is a statement about a file the author wrote, and every remedy is to fix one. A check that read the models would go red on an ordinary configuration edit with *regenerate the golden* as its remedy, which is the fail-regenerate-fail cycle that keeps the coverage gate out of the loop agents run constantly. The cost is bounded and visible: between a version bump and the `make up-migration-schemas` that snapshots it, the new link does not exist, so the entry checks that need a fingerprint pair report the missing link by name instead of running.
 
@@ -415,19 +454,33 @@ MigrationReport
         blocked_reason, blocked_detail → set when the file itself could not be processed at all
         backup_path, was_written       → set when the run wrote the file
         steps[]        → entry_id, to_schema_version, title, description, breaking, safety, applied_ops[]
-        blocked[]      → entry_id, to_schema_version, reason, detail, guidance, applied_ops[]
+        blocked[]      → entry_id, to_schema_version, reason, detail, guidance, applied_ops[], narrowed_paths[]
         unexplained[]  → path, note
 ```
 
 There is no `from_version` and no trusted-version concept: nothing skips, so nothing needs one. Because a replay walks every entry while usually changing little, the report renders what actually changed — a step lists only the operations that fired, not the many that skipped.
 
-Two different things can be blocked, and the report keeps them apart. An **entry** is blocked when it cannot be applied — it is `unsafe`, or one of its operations came back `CONFLICT` — and it lands in `blocked[]` with the reason and its guidance, while the rest of the file's entries proceed. A **file** is blocked when it cannot be processed at all: it is unparseable, it is unwritable, or it changed on disk between the read and the write. That reason sits on the plan itself, and a blocked file never stops its siblings — every other file in the surface is migrated and reported normally.
+Two different things can be blocked, and the report keeps them apart. An **entry** is blocked when it cannot be applied — it is `unsafe`, or one of its operations came back `CONFLICT` — and it lands in `blocked[]` with the reason and its guidance, while the rest of the file's entries proceed. A **file** is blocked when it cannot be processed at all. That reason sits on the plan itself, and a blocked file never stops its siblings — every other file in the surface is migrated and reported normally.
+
+There is one file-blocked reason per **state the file is in**, rather than one per exception the run happened to catch, because the state is what decides what the user does next:
+
+| Reason | What it says about the file |
+|---|---|
+| `unreadable` | It is there and its bytes would not come. Nothing was written. |
+| `unparseable` | It was read and is not valid UTF-8, or not valid TOML. Nothing was written. |
+| `unwritable` | It needed a change and the run could not make it — the backup would not go down, or the replacement would not. The file is exactly as it was found. |
+| `changed_during_run` | It was removed or edited between the read and the write, so the run refused to write over work it had not seen. |
+| `state_uncertain` | The write could not be confirmed: the transaction could not describe what it left behind, and the file does not hold what the run wrote. |
+
+`state_uncertain` is the only one that cannot promise the file is as it was found, which is why it is not folded into `unwritable`: the next move is to compare the file against the rescue copy the plan names, not to fix a permission and run again. It is also, for the single-file commit a migration performs, the only transaction failure that reaches a plan at all — a replacement that fails re-raises its own error, because rolling back nothing is trivially complete.
 
 Two rules govern how an entry appears, and both exist so that a report is never more optimistic than the file:
 
 > **An entry is reported once.** An entry with a conflicting operation lands in `blocked[]` and not in `steps[]`, carrying in its own `applied_ops` whichever of its operations did land before the conflict was found. Operation-level atomicity is the applier's — a conflicting operation writes nothing — but an entry is not atomic, and saying it arrived whole when part of it could not would be a lie the next run has to correct.
 
-> **An `unsafe` entry is reported only when it would do something.** It is rehearsed against the document and the result discarded, so an entry with nothing to do on this file stays silent. Reporting every `unsafe` entry regardless would warn every user with a perfectly current file, at every boot, forever — and a warning nobody can act on is a warning everybody learns to ignore.
+> **An `unsafe` entry is reported only when the file still carries the material it is about.** Its operations are rehearsed against the document and the result discarded, and its declared narrowed paths are looked up — at every spelling later entries have given them. An entry with nothing to say about this file stays silent. Reporting every `unsafe` entry regardless would warn every user with a perfectly current file, at every boot, forever — and a warning nobody can act on is a warning everybody learns to ignore. The whole rule is [What an `unsafe` entry promises](#what-an-unsafe-entry-promises).
+
+> **A blocked entry's reason says which claim it is making.** `unsafe` means the file has the old *shape* and the applier will not change it. `conflict` means an operation's destination is already occupied. `value_domain_narrowed` is the weakest and the newest: the file *sets* a path whose accepted values the entry narrowed, and `narrowed_paths[]` lists those paths as the **ledger** spells them — `levels.*`, never the user's own `levels.my_package` — and at the spelling the file this run wrote carries, not the one that matched. It is a list of keys to check by hand rather than a list of errors, because telling one from the other needs the model and the engine has none by design.
 
 > **No value read from a user's file is ever rendered** — not in the command's output, not in the structured plan, not in an error. Paths, operation kinds and ledger-supplied values carry everything a plan needs to say.
 
@@ -470,6 +523,14 @@ The `.mthds` fix path follows its applier with a canonical reflow of the whole f
 
 Stated more strongly than the library can promise on its own: **a replay in which no operation applies returns the very text it was given** — not a re-serialization of it. Neutrality is therefore a property of the engine rather than of the TOML library it happens to use, and a round-trip can never contribute a change of its own to a file that needed nothing.
 
+### A rename changes a name, and nothing else about the line
+
+> **A key written as a dotted assignment stays a dotted assignment when it is renamed.**
+
+`package_log_levels.pipelex = "INFO"` and a `[pipelex.log_config.package_log_levels]` header say the same thing to a TOML parser and are two different things to a TOML *document*. Which one a key is is not a property of its name — it is a flag the parser sets and the renderer reads — and rebuilding the key from its name alone, which is what the library's own re-key primitive does, silently loses it. A renamed dotted key then came back out as a block header, and **a block header absorbs every scalar that follows it in the same table**: a neighbouring `m = 3` became a key of the renamed table, with an `applied` verdict and nothing said. Renamed at an inner segment the whole chain re-rendered at the document root, taking the subtree out of the table it lived in.
+
+Refusing the layout with a `CONFLICT` was the alternative and it is the wrong trade: a rename has exactly one correct answer on a dotted key, the layout is ordinary TOML that no formatter rewrites, and refusing would strand a reshape's table renames on any file that happens to be written that way. So the applier renames the document's body entries where they sit — every chunk of a key written on several dotted lines, carrying the flag forward — which also stops the library from injecting a cosmetic blank line after a table it renamed in place.
+
 ### The document is re-read between operations that applied
 
 > **Operations are applied one at a time, and the document is parsed afresh after each one that changed it.**
@@ -484,11 +545,23 @@ Always back up, before writing. Exactly one backup per file — a successful run
 
 The name is the source file's whole name, extension included, followed by `.bak.` and a compact UTC stamp: `pipelex.toml` backs up to `pipelex.toml.bak.20260815T120000Z`. Extension-included so a backup never shadows a real `.toml`, and separator-free so no filesystem objects to it. Pruning matches that whole shape, stamp included — a copy the user made by hand under a name that merely starts the same way (`pipelex.toml.bak.notes`) is theirs, and is never touched.
 
-The order of the three steps is itself a guarantee. The backup is written **first**, so there is never a moment with a rewritten file and no copy of the original; the older backups are pruned **last**, so there is never a moment with no backup at all; and a write that fails before touching the file takes its own fresh backup with it, so a failed run leaves the directory exactly as it found it. A write whose outcome the transaction cannot vouch for — a rollback it could not complete — is the one case that keeps its backup: the report names the copy, because that is precisely the state a backup exists for. Nothing that happens after the file is written can un-write it in the report: an older backup that will not prune, or a temp file the transaction could not remove, is a warning on a migrated file, never a blocked one.
+The order of the three steps is itself a guarantee. The backup is written **first**, so there is never a moment with a rewritten file and no copy of the original; the older backups are pruned **last**, so there is never a moment with no backup at all; and a write that fails before touching the file takes its own fresh backup with it, so a failed run leaves the directory exactly as it found it. Nothing that happens after the file is written can un-write it in the report: an older backup that will not prune, or a temp file the transaction could not remove, is a warning on a migrated file, never a blocked one.
+
+Three further rules make that safety net worth the name.
+
+> **A run never overwrites or removes a copy it did not make.** The stamp resolves to the second, so two runs of the same file can address the same name. The second reserves the name atomically, finds it taken, and leaves what is there — because what is there is a copy of an *older* state of the file, which is to say the original if anything is. The same rule governs the other direction: a run whose write is refused deletes the copy it made and never the copy it found.
+
+> **A copy the run cannot vouch for leaves the rotation.** When a write ends `state_uncertain`, the backup is renamed out of the `.bak.` family into `.rescue.` — `pipelex.toml.rescue.20260815T120000Z` — which pruning does not match. Otherwise the next successful run of that file would delete the very copy the report told the user to go and get. A rescue copy is never collected by anything but the user. When the copy cannot be moved — it is another run's, or the rescue name is taken, or the rename will not go — it stays where it is rather than being lost to a tidier name, and the report says the copy is still in the rotation and asks the user to take it now, instead of promising it will be waiting.
+
+> **The copy is durable before the file it copies changes.** Its bytes are `fsync`-ed by the staged write and its name by an `fsync` of the directory it lands in, so "back up first, replace second" survives a power loss and not only a process exit. The replacement of the target is deliberately *not* synced in turn: a migration lost to a crash is replayed by the next run, while a lost backup is lost.
+
+What a backup carries across is the file's **permission bits**, and that is the one deliberate exception to "no value read from a user's file is ever rendered" — a backup contains the user's values by definition, so a `0600` configuration must not acquire a world-readable copy beside it. Ownership, ACLs and extended attributes are **not** carried across the replace, on either the backup or the migrated file: an atomic same-directory replace cannot preserve what the running process has no right to set, and re-attaching an attribute blindly (a quarantine flag, a security label) is a worse guess than leaving it off. The security-relevant bit of a configuration file is its mode.
+
+A configuration file that is a **symlink** is followed: the file the user means is the one at the end of the link, so the run reads, backs up and replaces *that* file, and the link survives. Replacing the link path instead would put a regular file where the link was and leave the real file unmigrated. The plan keeps naming the path the directory walk found; the backup path shows where the bytes actually went. This is what the `.mthds` fix loop already does with its own targets. The two callers still differ on one half: the fix loop pairs its resolution with a write-scope check, so a link pointing outside the directories it was given is refused, and the migration runner has no equivalent — a configuration file symlinked outside every walked directory is migrated where it actually lives. Whether that should be guarded is open; see `wip/migrator-write-scope-and-rename-fidelity.md`.
 
 ### Per-file transactions
 
-Each file is written transactionally and independently: snapshot, stage, atomic replace, restore on failure. A file that is unparseable, unwritable or changed during the run is reported as blocked while its siblings proceed. No run leaves a partially rewritten file behind.
+Each file is written transactionally and independently: snapshot, stage, atomic replace, restore on failure. A file that cannot be processed is reported as blocked, with the reason naming the state it is in, while its siblings proceed. No run leaves a partially rewritten file behind.
 
 ## Limits you will meet
 
@@ -496,7 +569,7 @@ These are measured properties of the TOML library the engine uses, not aspiratio
 
 - **Arrays of tables are unaddressable, and reserved.** An `[[entry]]` node is a list, and no `table_path` segment syntax reaches it or anything under it; the `*` wildcard has no array form. One surface carries one today — the telemetry configuration's `otlp` list of exporters — and the fingerprint records it as a terminal `list[table]`: what happens *inside* an exporter entry (a renamed field, a tightened bound, a new required member) is invisible to the coverage gate, so a change there is the author's to account for by hand, exactly as validator-expressed narrowing is. Addressing what lies beneath one needs a new segment kind and a decision on the day — until then, an operation pointed at one resolves nothing and is reported as a guarded skip rather than raising.
 - **A moved table loses its introducing comment.** A comment block written above a table is stored as trailing trivia of the *previous* sibling, not as part of the table it appears to introduce, so it does not travel with a move. Comments *inside* a moved table travel intact, including trailing comments on individual keys. The consequence is real: a file seeded from a heavily-commented template and then migrated ends up with banner comments labelling sections that have moved away. Nothing in the engine may rely on comment fidelity across a move, and the package's own files are corrected by hand rather than by migration.
-- **A migration is not byte-minimal.** A rename adds a small amount of whitespace, and a renamed table that was written out of order across several chunks loses its own bare header while a plain table keeps it. Both forms are semantically identical, both are stable under replay, and neither accumulates — but a migration diff is not the minimal diff a human would have written.
+- **A migration is not byte-minimal.** A rename normalizes the spacing around its own `=`, and a renamed table that was written out of order across several chunks loses its own bare header while a plain table keeps it. Both forms are semantically identical, both are stable under replay, and neither accumulates — but a migration diff is not always the minimal diff a human would have written.
 - **A guarded skip is never an error.** Every operation whose target does not resolve reports itself skipped rather than raising. That guard is what makes always-replay possible, and it is why a misdirected operation is caught by the checks rather than by a crash on a user's machine.
 - **A renamed key cannot be addressed again in the same in-memory document.** The position-preserving rename updates the body the document renders from but leaves the node's raw `dict` storage stale, for any value that is not a table. Nothing the library renders or looks up is affected — which is why a single rename is correct, and why the `.mthds` fix path, whose renames target tables, never meets it. The engine [re-reads the document between operations that applied](#the-document-is-re-read-between-operations-that-applied), so nothing downstream has to know about this; it is recorded here because it explains a piece of the engine that would otherwise look like superstition.
 

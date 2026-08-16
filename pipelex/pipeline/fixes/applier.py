@@ -29,7 +29,7 @@ from pipelex_tools import format_mthds
 from pydantic import BaseModel, ConfigDict, Field
 from tomlkit import TOMLDocument
 from tomlkit.container import Container, OutOfOrderTableProxy
-from tomlkit.items import AbstractTable, AoT, Item, Table
+from tomlkit.items import AbstractTable, AoT, Item, Key, SingleKey, Table
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.suggested_fix import (
@@ -115,24 +115,24 @@ def _resolve_table(*, toml_doc: TOMLDocument, table_path: list[str]) -> dict[str
 def _rename_key_in_place(*, parent_table: dict[str, Any], key: str, new_key: str) -> None:
     """Rename ``key`` to ``new_key`` in a resolved table node, preserving position and comments.
 
-    tomlkit exposes no public position-preserving rename; ``Container._replace`` is its own
-    internal primitive (what ``__setitem__`` uses to re-home an existing key). It swaps the key in
-    ``_body`` in place and re-renders the table header, so the renamed table keeps its position
-    among siblings and its comments — a ``del`` + re-add would append it to the bottom of the
-    parent (the old fixer's reordering bug). The golden byte-compare tests are the CI tripwire if
-    a tomlkit bump ever changes this.
+    tomlkit exposes no public position-preserving rename, so ``_replace_key_in_container`` renames
+    the container's body entries in place: the key keeps its slot among its siblings and its
+    comments, where a ``del`` + re-add would append it to the bottom of the parent (the old
+    fixer's reordering bug). The golden byte-compare tests are the CI tripwire if a tomlkit bump
+    ever changes what that body looks like.
 
     ⚠ **A rename leaves the node's raw ``dict`` storage stale for a value that is not a Table.**
-    ``_replace_at`` leaves the old key in the dict and only writes the new one into it inside its
-    table branch, so everything tomlkit renders or looks up stays right (``dumps``, ``in``, ``[]``,
+    A ``Table`` and the ``Container`` inside it are two dict-like objects each holding their own
+    copy of the key set, and a rename reaching the container has no way to reach the parent
+    table's copy. So everything tomlkit renders or looks up stays right (``dumps``, ``in``, ``[]``,
     ``.get()`` all read the authoritative body) while ``dict.__delitem__`` — which
     ``Container.remove`` calls — cannot find the new key. Addressing a renamed **scalar or
     inline-table** key again in the same DOM therefore raises ``KeyError`` from inside the library.
     The ``.mthds`` fix path is unaffected because it renames ``[pipe.*]`` tables, which take the
-    branch tomlkit maintains; configuration migration re-reads the document between operations
-    that applied, for exactly this reason. Both facts are pinned by
+    branch tomlkit does keep in step; configuration migration re-reads the document between
+    operations that applied, for its own reasons, and is unaffected too. Both facts are pinned by
     ``tests/unit/pipelex/pipeline/fixes/test_fix_applier_rename_dom_consistency.py``, which is the
-    tripwire if a tomlkit bump ever changes it.
+    tripwire if this is ever repaired across every facade.
 
     ``_resolve_table`` hands back one of three dict-like shapes, each with its own route to the
     ``Container`` that owns the key:
@@ -170,9 +170,99 @@ def _rename_key_in_place(*, parent_table: dict[str, Any], key: str, new_key: str
 
 
 def _replace_key_in_container(*, container: Container, key: str, new_key: str) -> None:
-    item = cast("Item", container[key])
-    container._replace(key, new_key, item)  # pyright: ignore[reportPrivateUsage]
-    _refresh_table_headers(item=item)
+    """Rename one key of a container in place — every chunk of it, and nothing beyond the name.
+
+    A rename changes a name. tomlkit's own re-key primitive, ``Container._replace``, does three
+    further things on the way, and each of them is a defect on a **dotted** key — the ordinary way
+    to write a one-line entry of a section (``package_log_levels.pipelex = "INFO"``), and one no
+    formatter rewrites into anything else:
+
+    - **Dotted-ness is dropped.** It is not a property of the name but of how the line was
+      written: the key owns a super-table and carries a flag the parser sets, and the renderer
+      reads that flag to choose between a dotted assignment and a ``[a.k]`` header. Rebuilt as a
+      plain key, ``k.x = 1`` came back out as a header — and a header **absorbs every scalar that
+      follows it in the same table**, so a neighbouring ``m = 3`` silently became ``a.kk.m``, with
+      an ``applied`` verdict and nothing said. Renamed at an inner segment the chain re-rendered
+      at the document *root*, taking the whole subtree out of the table it lived in.
+    - **Chunks are collapsed.** A key written as several dotted lines (``k.x = 1`` then
+      ``k.y = 2``) is several body entries under one key, and the primitive keeps the first, nulls
+      the rest, and rebuilds one merged value from the container's dict facade — which for this
+      shape holds only the last chunk.
+    - **A blank line is injected.** The primitive appends a cosmetic newline to a replaced table.
+      That is right for a block table it is about to re-home, and wrong for an assignment.
+
+    Refusing the layout with a ``CONFLICT`` was the alternative the migration plan named, and it
+    is the wrong trade: a rename has exactly one correct answer on a dotted key (``kk.x = 1``),
+    and refusing would strand a configuration migration's table renames on any file that happens
+    to be written this way. This is a rendering defect with a root cause, like the stale
+    ``display_name`` on a table split across chunks, and it is fixed at the root for the same reason.
+
+    Renaming the body entries directly is also what keeps position and comments — the property
+    ``_replace`` was reached for in the first place — since nothing is removed or re-appended.
+    """
+    renamed_positions = [
+        (position, body_key) for position, (body_key, _) in enumerate(container.body) if body_key is not None and body_key.key == key
+    ]
+    if not renamed_positions:
+        # ``_rename_key_in_place`` checked membership through the dict facade; an empty body means
+        # the facade and the body disagree, which is a bug here rather than a document to migrate.
+        msg = f"key '{key}' is in the container's facade but in none of its body entries during rename — applier bug"
+        raise PipelexUnexpectedError(msg)
+
+    for position, body_key in renamed_positions:
+        _, body_item = container.body[position]
+        container.body[position] = (_renamed_key(previous=body_key, new_key=new_key), body_item)
+        _refresh_table_headers(item=body_item)
+
+    # The side indexes hold one entry per name, and tomlkit keeps the last chunk appended.
+    last_position, last_body_key = renamed_positions[-1]
+    _rehome_key_indexes(
+        container=container,
+        key=key,
+        renamed=_renamed_key(previous=last_body_key, new_key=new_key),
+        item=container.body[last_position][1],
+    )
+
+
+def _renamed_key(*, previous: Key, new_key: str) -> SingleKey:
+    """A fresh key under the new name, carrying forward the one property a rename must not lose.
+
+    Everything else — quoting, separator — is left to tomlkit's own construction, so renaming an
+    ordinary key yields exactly the key the library would have built for it.
+    """
+    renamed = SingleKey(new_key)
+    if previous.is_dotted():
+        # There is no public way to say "dotted": the flag is private, and tomlkit's own parser
+        # sets it exactly this way in ``Container._handle_dotted_key``.
+        renamed._dotted = True  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+    return renamed
+
+
+def _rehome_key_indexes(*, container: Container, key: str, renamed: SingleKey, item: Item) -> None:
+    """Move a renamed key in the two side indexes a ``Container`` carries beside its body.
+
+    The body is what tomlkit renders from; beside it sit a private map from key to body position,
+    which the public accessors read, and the raw ``dict`` storage a ``Container`` inherits, which
+    ``len()``, iteration and ``.get()`` read.
+
+    Both are updated exactly as ``Container._replace_at`` updates them, **including its asymmetry**
+    — the raw storage gets the new name back only for a ``Table``. That asymmetry is the known
+    staleness ``_rename_key_in_place`` documents and ``test_fix_applier_rename_dom_consistency.py``
+    pins, and it is deliberately not repaired here: the storage this function can reach is the
+    container's, while a nested rename's stale facade is the parent ``Table``'s own — a different
+    dict, holding items rather than values. Repairing one of the two would move the inconsistency
+    rather than end it, so the whole set of facades is one deliberate pass, not a rider on this one.
+    """
+    container._map[renamed] = container._map.pop(SingleKey(key))  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+    # ``dict`` explicitly on both lines — a ``Container`` is a ``MutableMapping`` *and* a ``dict``,
+    # so its own ``pop`` and ``[] =`` route through ``Container.__getitem__`` / ``__delitem__``,
+    # which read and rewrite the very body this function has just finished renaming. The stubs
+    # type the inherited members as ``dict[Unknown, Unknown]``, hence the narrow ignores.
+    dict.pop(container, key, None)  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+    if isinstance(item, Table):
+        # The raw storage holds one entry per name, and for a key written as several chunks
+        # tomlkit keeps the last one appended — which is the item this is handed.
+        dict.__setitem__(container, renamed.key, item.value)  # noqa: PLC2801 # pyright: ignore[reportUnknownMemberType]
 
 
 def _as_tomlkit_value(value: TomlValue | None) -> Any:

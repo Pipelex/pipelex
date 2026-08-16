@@ -18,7 +18,7 @@ from pathlib import Path
 from tomlkit.exceptions import TOMLKitError
 
 from pipelex import log
-from pipelex.migration.backup import prune_backups_except, write_backup
+from pipelex.migration.backup import RescuedBackup, WrittenBackup, keep_backup_for_rescue, prune_backups_except, write_backup
 from pipelex.migration.engine import replay_ledger_over_text
 from pipelex.migration.ledger import MigrationLedger, load_ledger_cached
 from pipelex.migration.plan import FileBlockedReason, MigrationPlan, MigrationReport
@@ -30,7 +30,12 @@ from pipelex.pipeline.fixes.file_transaction import FileSnapshot, PendingFileUpd
 def migrate_file(*, surface: Surface, ledger: MigrationLedger, file_path: Path, dry_run: bool, moment: datetime) -> MigrationPlan:
     """Replay one surface's ledger over one file, writing it only when something applied."""
     try:
-        snapshot = read_file_snapshot(file_path)
+        # Through a symlink to the file it names, the way the `.mthds` fix loop already resolves its
+        # own targets: a configuration file symlinked out of a dotfiles directory is that directory's
+        # file, and an atomic replace of the link path would delete the link and leave the real file
+        # unmigrated. The plan keeps naming the path the walk found; the backup lands beside the
+        # file that was actually rewritten, which is where a copy of it belongs.
+        snapshot = read_file_snapshot(file_path.resolve())
     except FileNotFoundError:
         return _blocked_plan(
             surface_id=surface.surface_id,
@@ -42,7 +47,7 @@ def migrate_file(*, surface: Surface, ledger: MigrationLedger, file_path: Path, 
         return _blocked_plan(
             surface_id=surface.surface_id,
             file_path=file_path,
-            reason=FileBlockedReason.UNWRITABLE,
+            reason=FileBlockedReason.UNREADABLE,
             detail=f"the file could not be read: {exc.strerror or exc}",
         )
 
@@ -95,7 +100,7 @@ def _write_migrated_file(*, plan: MigrationPlan, snapshot: FileSnapshot, new_con
     around it.
     """
     try:
-        backup_path = write_backup(snapshot=snapshot, moment=moment)
+        backup = write_backup(snapshot=snapshot, moment=moment)
     except OSError as exc:
         return plan.model_copy(
             update={
@@ -109,50 +114,89 @@ def _write_migrated_file(*, plan: MigrationPlan, snapshot: FileSnapshot, new_con
     except FixWriteConflictError as exc:
         # The primitive refused before touching the target, so the directory is as it was — minus
         # the copy this run just made, which has nothing to back up.
-        _discard_backup(backup_path=backup_path)
+        _discard_backup(backup=backup)
         return plan.model_copy(update={"blocked_reason": FileBlockedReason.CHANGED_DURING_RUN, "blocked_detail": str(exc)})
     except OSError as exc:
-        _discard_backup(backup_path=backup_path)
+        _discard_backup(backup=backup)
         return plan.model_copy(
             update={"blocked_reason": FileBlockedReason.UNWRITABLE, "blocked_detail": f"the file could not be written: {exc.strerror or exc}"}
         )
     except FixTransactionError as exc:
-        # The primitive raises this when it cannot vouch for the state it leaves behind — a rollback
-        # that did not complete, or a replacement that landed but whose temp files could not be
-        # removed. The exception cannot say which; the file can, so ask it. Whatever the answer,
-        # the backup stays: it is the one copy of the original whose provenance is certain, and a
-        # state the primitive cannot vouch for is exactly the state a backup exists for.
+        # For the single-file commit this runner performs, a replace that fails re-raises its own
+        # `OSError` or `FixWriteConflictError` — a rollback of nothing is trivially complete — so
+        # the only `FixTransactionError` that reaches here is the one raised *after* the target was
+        # replaced, when the temporary files could not be removed. The write landed; whether it is
+        # still what landed is the open question, and the file answers it.
         if not _carries(path=snapshot.path, content=new_content):
+            kept = _keep_the_original(backup=backup, path=snapshot.path, moment=moment)
             return plan.model_copy(
                 update={
-                    "blocked_reason": FileBlockedReason.UNWRITABLE,
-                    "blocked_detail": f"the file could not be written, and its state is uncertain — the original is kept at '{backup_path}': {exc}",
-                    "backup_path": backup_path,
+                    "blocked_reason": FileBlockedReason.STATE_UNCERTAIN,
+                    "blocked_detail": (
+                        f"the write could not be confirmed: the file does not hold what this run wrote, and the transaction could not "
+                        f"say what it left behind — {_whereabouts_of(kept=kept)}: {exc}"
+                    ),
+                    "backup_path": kept.path,
                 }
             )
         log.warning(f"'{snapshot.path}' was migrated, but the write left something behind: {exc}")
 
     try:
-        prune_backups_except(path=snapshot.path, keep=backup_path)
+        prune_backups_except(path=snapshot.path, keep=backup.path)
     except OSError as exc:
         # An older backup that would not go is a housekeeping failure on a file that is already
         # migrated and already backed up. Not the plan's to report as a failure of the file.
         log.warning(
-            f"'{snapshot.path}' was migrated and backed up to '{backup_path}', but an older backup could not be pruned: {exc.strerror or exc}"
+            f"'{snapshot.path}' was migrated and backed up to '{backup.path}', but an older backup could not be pruned: {exc.strerror or exc}"
         )
-    return plan.model_copy(update={"backup_path": backup_path, "was_written": True})
+    return plan.model_copy(update={"backup_path": backup.path, "was_written": True})
 
 
-def _discard_backup(*, backup_path: Path) -> None:
+def _keep_the_original(*, backup: WrittenBackup, path: Path, moment: datetime) -> RescuedBackup:
+    """Take this run's backup out of the rotation, so the next successful run cannot prune it.
+
+    Only a copy this run made: another run's backup of the same file is that run's to name and to
+    move, and renaming it here would make its report point at a file that no longer exists. That
+    copy holds the original all the same, so it is still what the report names — as a copy still in
+    the rotation, which is what `was_rescued` says.
+    """
+    if not backup.was_created:
+        return RescuedBackup(path=backup.path, was_rescued=False)
+    return keep_backup_for_rescue(path=path, backup_path=backup.path, moment=moment)
+
+
+def _whereabouts_of(*, kept: RescuedBackup) -> str:
+    """How to tell the user where the one certain copy of their file is, and how long it will be there.
+
+    A copy that left the `.bak.` rotation is safe until the user removes it, and the report says so.
+    One that could not be moved is a copy the next successful run of this file will prune, so the
+    report asks for the one thing that saves it — taking it now.
+    """
+    if kept.was_rescued:
+        return f"the copy taken before the migration is kept at '{kept.path}'"
+    return (
+        f"a copy of the file as it was is at '{kept.path}', and this run could not take it out of the way of pruning — "
+        f"copy it aside before the next successful run of this file"
+    )
+
+
+def _discard_backup(*, backup: WrittenBackup) -> None:
     """Remove the copy this run made of a file it then did not rewrite.
+
+    Only the copy this run made. A backup already sitting at that name belongs to a concurrent run
+    of the same file, and it is a copy of an older state — the original, if anything is; deleting
+    it here would destroy the one thing backups exist for on the way to reporting a write that
+    never happened.
 
     A copy that will not go is a stray file beside an untouched original — worth a warning, never
     worth an exception crossing the per-file boundary and aborting the siblings.
     """
+    if not backup.was_created:
+        return
     try:
-        backup_path.unlink(missing_ok=True)
+        backup.path.unlink(missing_ok=True)
     except OSError as exc:
-        log.warning(f"the backup '{backup_path}' was made for a write that did not happen and could not be removed: {exc.strerror or exc}")
+        log.warning(f"the backup '{backup.path}' was made for a write that did not happen and could not be removed: {exc.strerror or exc}")
 
 
 def _carries(*, path: Path, content: str) -> bool:

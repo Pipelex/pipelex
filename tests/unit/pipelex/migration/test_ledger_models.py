@@ -102,11 +102,31 @@ class TestEntryInvariants:
         with pytest.raises(ValidationError, match="cannot be 'safe'"):
             MigrationLedger.model_validate({"surface": surface, "migration": [_entry(ops=[])]})
 
-    def test_an_op_free_entry_is_legitimate_when_unsafe(self) -> None:
+    def test_an_op_free_entry_is_legitimate_when_unsafe_and_it_declares_what_it_is_about(self) -> None:
         """A change only a human can make is still a change the ledger should record."""
         surface = {**_SURFACE_BLOCK, "current_schema_version": 2}
-        ledger = MigrationLedger.model_validate({"surface": surface, "migration": [_entry(ops=[], safety="unsafe")]})
+        entry = _entry(ops=[], safety="unsafe", declared_narrowed_paths=["reporting.retries"])
+        ledger = MigrationLedger.model_validate({"surface": surface, "migration": [entry]})
         assert ledger.migration[0].ops == []
+        assert ledger.migration[0].declared_narrowed_paths == ["reporting.retries"]
+
+    def test_an_entry_with_neither_operations_nor_a_declaration_is_refused(self) -> None:
+        """R9: the engine questions an entry before reporting it, and this one answers nothing.
+
+        Operations are questioned by rehearsing them and a declaration by looking its paths up in
+        the document. An entry carrying neither says "nothing to say" for every file there will
+        ever be — the accounting accepts it and the user it exists for never hears of it.
+        """
+        surface = {**_SURFACE_BLOCK, "current_schema_version": 2}
+        with pytest.raises(ValidationError, match="reported to nobody, ever"):
+            MigrationLedger.model_validate({"surface": surface, "migration": [_entry(ops=[], safety="unsafe")]})
+
+    def test_a_safe_entry_may_not_declare_a_narrowing(self) -> None:
+        """A narrowing a remap can repair is that remap's business; one it cannot is what unsafe means."""
+        surface = {**_SURFACE_BLOCK, "current_schema_version": 2}
+        entry = _entry(declared_narrowed_paths=["reporting.retries"])
+        with pytest.raises(ValidationError, match="unsafe entries only"):
+            MigrationLedger.model_validate({"surface": surface, "migration": [entry]})
 
     def test_declared_removed_paths_belong_to_a_pre_history_entry(self) -> None:
         """An entry with an observable diff is accounted against that diff, never its own claim."""

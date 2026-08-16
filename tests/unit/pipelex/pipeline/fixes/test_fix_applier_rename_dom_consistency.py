@@ -1,22 +1,23 @@
 """Characterization of what a rename leaves behind in the tomlkit DOM.
 
-`_rename_key_in_place` renames through `Container._replace`, tomlkit's own position-preserving
-primitive — the only one there is, and the reason a renamed key keeps its place among its siblings
-instead of being appended at the bottom of its parent. What it does **not** do, for a value that
-is not a `Table`, is update the node's raw `dict` storage: the old key stays in the dict and the
-new one is only ever written into it inside the table branch of `_replace_at`.
+`_rename_key_in_place` renames a container's body entries where they sit, which is what keeps a
+renamed key in its place among its siblings instead of appended at the bottom of its parent. What
+that cannot reach, for a value that is not a `Table`, is the raw `dict` storage of the **parent
+node**: a `Table` and the `Container` inside it are two dict-like objects each holding their own
+copy of the key set, and only the container's copy is in reach.
 
 Everything tomlkit renders or looks up still works — `dumps`, `in`, `[]`, `.get()` all read the
 authoritative body — so a single rename followed by serialization is correct, which is why the
 `.mthds` fix path never met this: the keys it renames are `[pipe.*]` tables, and tables take the
-branch that keeps the dict in step.
+branch tomlkit does keep in step.
 
 A migration is the case that meets it, because always-replay runs many operations over one
 document. The consequence is pinned below: addressing a renamed non-table key again in the same
-DOM raises `KeyError` from inside the library. `pipelex.migration.engine` works around it by
-re-reading the document between operations that applied, and this module is the tripwire — **if
-these tests go red after a tomlkit bump, the workaround can be reconsidered**, and the engine's
-docstring says so.
+DOM raises `KeyError` from inside the library. `pipelex.migration.engine` re-reads the document
+between operations that applied, for reasons of its own, and so never sees it. Repairing the
+staleness means one deliberate pass over every facade kind — a `Container`, a `Table`, an
+out-of-order proxy — and this module is what tells whoever makes that pass, or a tomlkit bump,
+that the behaviour moved.
 """
 
 from typing import Any, cast
@@ -115,6 +116,29 @@ class TestRenameDomConsistency:
 
         with pytest.raises(KeyError):
             apply_fix_ops(toml_doc=toml_doc, ops=[DeleteKeyOp(table_path=table_path, key=new_key)])
+
+    def test_a_renamed_root_table_moves_in_the_documents_own_storage(self) -> None:
+        """The half of the bookkeeping the rename does get right, pinned so it cannot become a no-op.
+
+        A `Container` is a `MutableMapping` as well as a `dict`, so its own `pop` routes through the
+        accessors that read the body — which, once the body has been renamed, no longer knows the
+        old name and quietly reports nothing to remove. The rename calls `dict.pop` explicitly for
+        that reason, and this is what says so.
+        """
+        toml_doc = tomlkit.loads("[section]\nx = 1\n")
+
+        apply_fix_ops(toml_doc=toml_doc, ops=[RenameTableKeyOp(table_path=[], key="section", new_key="renamed")])
+
+        assert _raw_dict_keys(node=toml_doc) == {"renamed"}
+
+    def test_a_renamed_root_scalar_leaves_neither_name_in_the_documents_own_storage(self) -> None:
+        """The same staleness as above, measured at the root, where the container *is* the node."""
+        toml_doc = tomlkit.loads("retention = 30\n")
+
+        apply_fix_ops(toml_doc=toml_doc, ops=[RenameTableKeyOp(table_path=[], key="retention", new_key="keep_days")])
+
+        assert _raw_dict_keys(node=toml_doc) == set()
+        assert _dumped(toml_doc=toml_doc) == "keep_days = 30\n"
 
     def test_renaming_a_table_valued_key_keeps_the_dom_consistent(self) -> None:
         """The branch tomlkit does maintain — and the reason the `.mthds` fix path never met this."""

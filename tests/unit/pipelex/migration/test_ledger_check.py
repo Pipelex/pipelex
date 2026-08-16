@@ -185,7 +185,7 @@ def _snapshot(*, migration_dir: Path, config_model: type[BaseModel], schema_vers
     )
 
 
-def _entry(*, ops: str, to_schema_version: int = 2, safety: str = "safe", pre_history: str = "") -> str:
+def _entry(*, ops: str, to_schema_version: int = 2, safety: str = "safe", pre_history: str = "", declared_narrowed: str = "") -> str:
     return f"""
 [[migration]]
 id                = "{SURFACE_ID}@{to_schema_version}"
@@ -196,6 +196,7 @@ safety            = "{safety}"
 title             = "Reshape the synthetic surface"
 description       = "The surface changed shape."
 {pre_history}
+{declared_narrowed}
 {ops}
 """
 
@@ -206,6 +207,14 @@ kind       = "rename_table_key"
 table_path = []
 key        = "label"
 new_key    = "title"
+"""
+
+
+_DELETE_LABEL = """
+[[migration.ops]]
+kind       = "delete_key"
+table_path = []
+key        = "label"
 """
 
 
@@ -406,6 +415,46 @@ mapping    = { premium = "standard" }
         _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoEnumMemberGone, schema_version=2)
         issues = check_ledger(surface=_surface(config_model=_SchemaTwoEnumMemberGone), migration_dir=tmp_path)
         assert LedgerIssueKind.ILLEGAL_REMAP not in _kinds(issues)
+
+    def test_an_op_free_unsafe_entry_declaring_a_live_path_is_green(self, tmp_path: Path) -> None:
+        """R9's shape, end to end through the gate that decides whether a ledger may ship.
+
+        Nothing is removed and nothing is renamed — the schema tightened what a value may be, which
+        only a human can repair. The entry names the path, and the check is satisfied. The
+        convergence half is the interesting one: the reference documents *set* that path, exactly
+        as every healthy file does, and refusing the ledger for that would make the one remedy the
+        coverage gate offers for a tightened bound impossible to write.
+        """
+        entry = _entry(ops="", safety="unsafe", declared_narrowed='declared_narrowed_paths = ["settings.retries"]')
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=entry)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=2)
+        assert check_ledger(surface=_surface(config_model=_SchemaOne), migration_dir=tmp_path) == []
+
+    def test_a_declared_narrowed_path_the_entrys_own_version_does_not_have_is_refused(self, tmp_path: Path) -> None:
+        """A declaration nothing records is looked for in every file and found in none."""
+        entry = _entry(ops="", safety="unsafe", declared_narrowed='declared_narrowed_paths = ["settings.retriez"]')
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=entry)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=2)
+        issues = check_ledger(surface=_surface(config_model=_SchemaOne), migration_dir=tmp_path)
+        assert _kinds(issues) == [LedgerIssueKind.DECLARED_NARROWED_PATH_IS_ABSENT]
+        assert "settings.retriez" in issues[0].message
+
+    def test_a_declared_narrowed_path_that_is_really_a_removal_is_refused_as_absent(self, tmp_path: Path) -> None:
+        """The declaration is not a second way to account for a removal.
+
+        `label` is gone at version 2, so the fingerprint there does not record it — and a removal
+        is accounted for by the operation that removes it, which is a thing the applier can
+        actually do for the user.
+        """
+        entry = _entry(ops=_DELETE_LABEL, safety="unsafe", declared_narrowed='declared_narrowed_paths = ["label"]')
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=entry)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoLabelGone, schema_version=2)
+        assert LedgerIssueKind.DECLARED_NARROWED_PATH_IS_ABSENT in _kinds(
+            check_ledger(surface=_surface(config_model=_SchemaTwoLabelGone), migration_dir=tmp_path)
+        )
 
     def test_a_retired_name_that_comes_back_is_refused(self, tmp_path: Path) -> None:
         """And the reuse is not academic: the operation that retired the name starts firing again."""

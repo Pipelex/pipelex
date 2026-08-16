@@ -127,7 +127,7 @@ min_supported_schema_version = 0
     (directory / f"{SURFACE_ID}.toml").write_text(body, encoding="utf-8")
 
 
-def _entry(*, ops: str, to_schema_version: int = 2, safety: str = "safe") -> str:
+def _entry(*, ops: str, to_schema_version: int = 2, safety: str = "safe", declared: str = "") -> str:
     return f"""
 [[migration]]
 id                = "{SURFACE_ID}@{to_schema_version}"
@@ -137,6 +137,7 @@ breaking          = true
 safety            = "{safety}"
 title             = "Reshape the synthetic surface"
 description       = "The surface changed shape."
+{declared}
 {ops}
 """
 
@@ -389,7 +390,7 @@ mapping    = { basic = "standrad" }
         legal precisely when it is unsafe — so demanding its operations reach the new shape would
         contradict the one thing `unsafe` means.
         """
-        _write_ledger(migration_dir=tmp_path, entries=_entry(ops="", safety="unsafe"))
+        _write_ledger(migration_dir=tmp_path, entries=_entry(ops="", safety="unsafe", declared='declared_narrowed_paths = ["label"]'))
         _defaults(migration_dir=tmp_path, schema_version=1, document='label = "hello"\n')
         _defaults(migration_dir=tmp_path, schema_version=2, document='title = "hello"\n')
         assert check_transform_chain(surface=_surface(config_model=_Renamed), migration_dir=tmp_path) == []

@@ -37,6 +37,7 @@ def build_entry() -> EntryBuilder:
         breaking: bool = True,
         pre_history: bool = False,
         declared_removed_paths: list[str] | None = None,
+        declared_narrowed_paths: list[str] | None = None,
     ) -> MigrationEntry:
         return MigrationEntry(
             id=f"{surface_id}@{to_schema_version}",
@@ -49,6 +50,7 @@ def build_entry() -> EntryBuilder:
             guidance=guidance,
             pre_history=pre_history,
             declared_removed_paths=declared_removed_paths or [],
+            declared_narrowed_paths=declared_narrowed_paths or [],
             ops=ops,
         )
 

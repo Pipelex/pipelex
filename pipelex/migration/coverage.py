@@ -278,11 +278,13 @@ def _check_enum_accounting(
     Members are compared by *origin*: an enumerated path of the previous schema is looked up at
     the path the walk carried it to. A comparison over shared names would never look at a path
     the same entry renamed, and would let a lost member ride into the new schema unremapped.
+
+    An `unsafe` entry is allowed to leave a member unremapped — describing what no operation can
+    do is what `unsafe` is for — but it answers for that member by declaring the path, exactly as
+    it answers for a narrowing. The word alone accounts for nothing: the engine questions an
+    unsafe entry before reporting it, and a declaration is the only thing it can question a
+    document about when there is no operation to rehearse (R9).
     """
-    if entry.safety is MigrationSafety.UNSAFE:
-        # An unsafe entry is reported and never applied, so it is allowed to describe a change no
-        # operation can make. That is what `unsafe` is for.
-        return []
     remapped_by_origin: dict[str, set[str]] = {}
     for remap in walk.remaps:
         remapped_by_origin.setdefault(remap.origin_path, set()).update(remap.old_values)
@@ -304,11 +306,21 @@ def _check_enum_accounting(
         reachable = is_remappable(record=before_record)
         unaccounted = sorted(removed_members - remapped_by_origin.get(origin, set())) if reachable else sorted(removed_members)
         if unaccounted:
-            remedy = (
-                "so the entry needs a remap_value for each, or must be marked unsafe"
-                if reachable
-                else "and no operation can rewrite a value inside a container, so the entry must be marked unsafe"
-            )
+            match entry.safety:
+                case MigrationSafety.UNSAFE:
+                    if final_path in entry.declared_narrowed_paths:
+                        continue
+                    remedy = (
+                        f"and the entry is unsafe, which is allowed — but `unsafe` is only ever *reported*, and the engine "
+                        f"reports it to a file that carries the material it names. Add '{final_path}' to "
+                        f"declared_narrowed_paths, or nobody hears about this"
+                    )
+                case MigrationSafety.SAFE:
+                    remedy = (
+                        "so the entry needs a remap_value for each, or must be marked unsafe"
+                        if reachable
+                        else "and no operation can rewrite a value inside a container, so the entry must be marked unsafe"
+                    )
             issues.append(
                 CoverageIssue(
                     surface_id=surface_id,
@@ -330,7 +342,7 @@ def _check_narrowing_accounting(
     after: SurfaceFingerprint,
     walk: EntryWalk,
 ) -> list[CoverageIssue]:
-    """Every path whose value domain the entry narrows must carry a remap, or the entry must be unsafe.
+    """Every path whose value domain the entry narrows must carry a remap, or be declared unsafely.
 
     Paths are compared by *origin*, exactly as enumerated members are: a path the same entry
     renamed is looked up where the walk carried it, so a narrowing hidden behind a rename still
@@ -342,11 +354,13 @@ def _check_narrowing_accounting(
     Everywhere else, a tightened numeric bound above all, the entry has to say `unsafe`: the
     migration is then reported to the user and never applied, which is the honest answer when the
     tool cannot tell a stale value from a deliberate one.
+
+    **`unsafe` alone is not the accounting; the declaration is.** The engine questions an unsafe
+    entry before reporting it, and the only thing it can question a narrowing about is the path.
+    So an unsafe entry answers for a narrowing by naming that path in `declared_narrowed_paths` —
+    without which the gate would be satisfied by a word while the user whose value the new schema
+    refuses is never told anything (R9).
     """
-    if entry.safety is MigrationSafety.UNSAFE:
-        # An unsafe entry is reported and never applied, so it is allowed to describe a change no
-        # operation can make. That is what `unsafe` is for.
-        return []
     remapped_origins = {remap.origin_path for remap in walk.remaps}
 
     issues: list[CoverageIssue] = []
@@ -364,14 +378,24 @@ def _check_narrowing_accounting(
         reasons = describe_narrowing(before=before_record, after=after_record, remapped=origin in remapped_origins)
         if not reasons:
             continue
+        match entry.safety:
+            case MigrationSafety.UNSAFE:
+                if final_path in entry.declared_narrowed_paths:
+                    continue
+                remedy = (
+                    f"the entry is unsafe, which is the right answer, but `unsafe` is only ever *reported* — and the engine "
+                    f"reports it to a file that carries the material it names. Add '{final_path}' to declared_narrowed_paths, "
+                    f"or nobody hears about this"
+                )
+            case MigrationSafety.SAFE:
+                remedy = "no structural operation can repair a value, so the entry needs a remap_value for that path, or must be marked unsafe"
         issues.append(
             CoverageIssue(
                 surface_id=surface_id,
                 kind=CoverageIssueKind.VALUE_DOMAIN_NARROWED,
                 message=(
                     f"entry '{entry.id}': '{final_path}' accepts fewer values than it did — {', '.join(reasons)}. A file "
-                    f"carrying one of the values it has stopped accepting no longer validates, and no structural operation "
-                    f"can repair a value, so the entry needs a remap_value for that path, or must be marked unsafe"
+                    f"carrying one of the values it has stopped accepting no longer validates, and {remedy}"
                 ),
             )
         )
