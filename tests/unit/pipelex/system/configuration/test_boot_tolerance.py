@@ -210,13 +210,13 @@ class TestTheRetryHonoursTheSchemaVersionFloor:
     """
 
     OPS = (
-        '[[migration.ops]]\nkind = "rename_table_key"\ntable_path = ["pipelex", "log_config"]\n'
+        '[[migration.ops]]\nkind = "rename_table_key"\ntable_path = ["runtime", "log"]\n'
         'key = "old_default_log_level"\nnew_key = "default_log_level"\n'
     )
 
     def _stale_file(self, *, directory: Path, declared: int) -> Path:
         stale = directory / "pipelex.toml"
-        stale.write_text(f'[meta]\nschema_version = {declared}\n\n[pipelex.log_config]\nold_default_log_level = "DEBUG"\n', encoding="utf-8")
+        stale.write_text(f'[meta]\nschema_version = {declared}\n\n[runtime.log]\nold_default_log_level = "DEBUG"\n', encoding="utf-8")
         return stale
 
     def test_a_file_declaring_a_version_below_the_floor_declines_the_retry(self, tmp_path: Path, synthetic_migration_dir: Path) -> None:
@@ -245,7 +245,7 @@ class TestTheRetryHonoursTheSchemaVersionFloor:
         replayed = replay_surface_files_in_memory(surface_id=PIPELEX_CONFIG_SURFACE_ID, paths=[stale])
 
         assert replayed is not None
-        assert replayed.config_dict["pipelex"]["log_config"]["default_log_level"] == "DEBUG"
+        assert replayed.config_dict["runtime"]["log"]["default_log_level"] == "DEBUG"
 
     def test_the_loader_then_raises_the_users_own_error(self, fake_dirs: tuple[Path, Path], synthetic_migration_dir: Path) -> None:
         """Which names the stale key — and whose `migration` block is where the floor gets reported."""
@@ -388,16 +388,16 @@ class TestTheMainConfigurationLoader:
             migration_dir=synthetic_migration_dir,
             surface_id=PIPELEX_CONFIG_SURFACE_ID,
             base_file="pipelex.toml",
-            ops_body='[[migration.ops]]\nkind = "rename_table_key"\ntable_path = ["pipelex", "log_config"]\n'
+            ops_body='[[migration.ops]]\nkind = "rename_table_key"\ntable_path = ["runtime", "log"]\n'
             'key = "old_default_log_level"\nnew_key = "default_log_level"\n',
         )
-        (global_dir / "pipelex.toml").write_text('[pipelex.log_config]\nold_default_log_level = "DEBUG"\n', encoding="utf-8")
+        (global_dir / "pipelex.toml").write_text('[runtime.log]\nold_default_log_level = "DEBUG"\n', encoding="utf-8")
         mocker.patch.object(log, "log_dispatch", LogDispatch())
         loader = ConfigLoader()
 
         config = loader.load_config_validated(config_cls=PipelexConfig)
 
-        assert config.pipelex.log_config.default_log_level is LogLevel.DEBUG
+        assert config.runtime.log.default_log_level is LogLevel.DEBUG
         parked = loader.take_stale_configuration_warning()
         assert parked is not None
         assert "pipelex migrate" in parked
@@ -424,17 +424,17 @@ class TestTheMainConfigurationLoader:
             migration_dir=synthetic_migration_dir,
             surface_id=PIPELEX_CONFIG_SURFACE_ID,
             base_file="pipelex.toml",
-            ops_body='[[migration.ops]]\nkind = "rename_table_key"\ntable_path = ["pipelex", "log_config"]\n'
+            ops_body='[[migration.ops]]\nkind = "rename_table_key"\ntable_path = ["runtime", "log"]\n'
             'key = "old_default_log_level"\nnew_key = "default_log_level"\n',
         )
-        (global_dir / "pipelex.toml").write_text('[pipelex.log_config]\nold_default_log_level = "DEBUG"\n', encoding="utf-8")
+        (global_dir / "pipelex.toml").write_text('[runtime.log]\nold_default_log_level = "DEBUG"\n', encoding="utf-8")
 
         config = ConfigLoader().load_config_validated(
             config_cls=PipelexConfig,
-            extra_overrides={"pipelex": {"log_config": {"default_log_level": "WARNING"}}},
+            extra_overrides={"runtime": {"log": {"default_log_level": "WARNING"}}},
         )
 
-        assert config.pipelex.log_config.default_log_level is LogLevel.WARNING
+        assert config.runtime.log.default_log_level is LogLevel.WARNING
 
     @pytest.mark.usefixtures("fake_dirs", "synthetic_migration_dir")
     def test_a_configuration_the_ledger_cannot_explain_still_raises_the_users_own_error(self) -> None:

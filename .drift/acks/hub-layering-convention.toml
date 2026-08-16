@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:820a8c39f4defbb59e919745a9d040794d65ebe3566027ca1b8fadc9c8780953"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-16T16:17:00Z"
-rationale = "Boot tolerance put a kernel-layer module (system/configuration/config_surface.py) one deferred import away from pipelex.migration, whose engine imports pipeline.fixes.applier on purpose. Reviewing the page against that turned up a real staleness the change did not cause: pipelex.migration is a top-level package in NEITHER column of the accounting sentence, so it read as checked while being unpoliced -- the exact failure the same paragraph warns about. Added it, and explained rather than asserted its side, because it is the interesting case: it never reaches interpreter_hub, so declaring it kernel-layer would PASS the guard and be this page's own first known inversion all over again. Measured the rest instead of eyeballing it: a module-level engine import in config_surface keeps check-hub-layering green and turns nine closure-test entry points red, which is this page's lint-vs-property claim reproduced, so that claim needed no edit. The two hub partition tables are untouched by this milestone -- runtime_hub gained no symbol, only a rerouted call inside setup_config."
+digest = "sha256:c1c1ce14aca512a857eda9b83d88b9811c431c2dcb8bd04f503ef60bb0cce574"
+reviewed_by = "Claude (Opus 5)"
+reviewed_at = "2026-08-16T21:40:02Z"
+rationale = "Merging dev into the configuration-reshape branch, so the trigger diff on runtime_hub.py is two changes at once: the reshape's two new accessors (set_boot_orchestrator / get_boot_orchestrator) with the reset_config to reset_boot_state rename, and PR 1114's rerouting of setup_config through load_config_validated. Re-derived the runtime_hub partition table from the module instead of reading it: enumerated every public module-level function in pipelex/runtime_hub.py and checked each against the table, which is complete, boot-orchestrator row included. reset_boot_state is not an accessor and the page never named reset_config, so the rename reaches no sentence. Re-derived the 'every top-level package accounted for' claim the same way: enumerated every package under pipelex/ carrying an __init__.py and confirmed each is named either in the kernel-layer declaration and its follow-on paragraph, or in the 'Why the boundary exists' list of what runtime_hub may not name at module level. The pipelex.migration paragraph came through the merge intact and still describes the deferred engine import in system/configuration/config_surface.py, which the merge kept deferred. No doc change needed."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:2dbadcbab7d44364a7b5f1d16268b23b26700a00"
 "pipelex/interpreter_hub.py" = "blob:b8c35e37814f0e94c3bf1c364b06a98d0c22ee93"
-"pipelex/runtime_hub.py" = "blob:75e5f79bad4104617a32f2fe64d1493b0cfd4cb5"
+"pipelex/runtime_hub.py" = "blob:1d0ebc1a1b3f24ab0025e829c7145789e3bb512a"

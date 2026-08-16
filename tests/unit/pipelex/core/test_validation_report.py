@@ -151,7 +151,7 @@ class TestWhatTheScanFinds:
     def test_only_the_surface_that_refused_is_scanned(self, machine: Path) -> None:
         """A stale `telemetry.toml` is not an answer to a `pipelex.toml` that would not load."""
         machine.joinpath("telemetry.toml").write_text(_old_shape_telemetry_document(), encoding="utf-8")
-        machine.joinpath("pipelex.toml").write_text("[pipelex]\n", encoding="utf-8")
+        machine.joinpath("pipelex.toml").write_text("[runtime]\n", encoding="utf-8")
 
         report = report_validation_error(validation_error=_make_validation_error(), surface_id=PIPELEX_CONFIG_SURFACE_ID)
 

@@ -124,7 +124,7 @@ class TestDoctorConfigChecks:
         fake_home = tmp_path / "home"
         global_dir = fake_home / ".pipelex"
         global_dir.mkdir(parents=True)
-        (global_dir / "pipelex.toml").write_text("[pipelex]\n", encoding="utf-8")
+        (global_dir / "pipelex.toml").write_text("[runtime]\n", encoding="utf-8")
         project_root = tmp_path / "project"
         (project_root / ".git").mkdir(parents=True)
         (project_root / ".pipelex").mkdir()
