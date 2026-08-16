@@ -38,6 +38,9 @@ from pydantic.fields import FieldInfo
 from pipelex.suggested_fix import WILDCARD_SEGMENT
 
 PATH_SEPARATOR = "."
+UNION_SEPARATOR = " | "
+"""How a union renders in `value_type` — the one definition both the writer here and the parser in
+`narrowing.py` read, so the two cannot drift apart."""
 
 TABLE_TYPE = "table"
 """The rendering of a nested model. Class names are deliberately not recorded — see the module docstring."""
@@ -310,7 +313,7 @@ def _render_type(*, annotation: Any) -> str:
     if annotation is types.NoneType:
         return "none"
     if _is_union(annotation=annotation):
-        return " | ".join(_render_type(annotation=member) for member in get_args(annotation))
+        return UNION_SEPARATOR.join(_render_type(annotation=member) for member in get_args(annotation))
     if get_origin(annotation) is Literal:
         return LITERAL_TYPE
     origin = get_origin(annotation)

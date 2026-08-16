@@ -24,6 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.migration.goldens import read_fingerprint_golden
 from pipelex.migration.ledger import MigrationLedger
+from pipelex.migration.walk import op_source_path
 from pipelex.suggested_fix import RemapValueOp
 
 
@@ -68,8 +69,8 @@ def derive_reserved_registry(*, surface_id: str, ledger: MigrationLedger, migrat
         version = entry.to_schema_version
         if entry.pre_history:
             # No fingerprint pair describes a pre-history diff — that is what the flag means — so
-            # the entry's own declaration is the record, and `check-ledger` verifies it against a
-            # hand-authored `before` document.
+            # the entry's own declaration is the record: `check-ledger` verifies the operations stay
+            # inside it, and the transform check migrates the hand-authored `before` document.
             for path in entry.declared_removed_paths:
                 version_by_path.setdefault(path, version)
         else:
@@ -81,7 +82,7 @@ def derive_reserved_registry(*, surface_id: str, ledger: MigrationLedger, migrat
 
         for op in entry.ops:
             if isinstance(op, RemapValueOp):
-                path = ".".join([*op.table_path, op.key])
+                path = op_source_path(op=op)
                 for old_value in sorted(op.mapping):
                     version_by_value.setdefault(_value_key(path=path, value=old_value), version)
 

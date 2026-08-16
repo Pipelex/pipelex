@@ -27,7 +27,7 @@ import tomlkit
 from tomlkit import TOMLDocument
 
 from pipelex.pipeline.fixes.applier import FixOpOutcome, apply_fix_ops
-from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, EnsureTableOp, RenameTableKeyOp
+from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, EnsureTableOp, MoveKeyOp, RenameTableKeyOp
 
 # Every configuration file this repository owns and tracks. The packaged defaults are the complete
 # witness (every path present); the kit templates are the sparse shape real user files have — and
@@ -216,6 +216,61 @@ class TestFixApplierConfigSurfaceShapes:
         assert [line for line in rendered.splitlines() if line.startswith("[pipelex")] == []
         reparsed = tomlkit.parse(rendered)
         assert reparsed["interpreter"] == original["pipelex"]
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            pytest.param("[a.b]\nx = 1\n[a.c]\ny = 2\n[a.b.d]\nz = 3\n", id="grandchild continued after a sibling"),
+            pytest.param("[a]\n[a.b]\nx = 1\n[a.c]\ny = 2\n[a.b.d]\nz = 3\n", id="same, with an explicit header"),
+            pytest.param("[a.b.c]\nx = 1\n[a.b.e]\ny = 1\n[a.b.c.d]\nz = 1\n", id="split two levels down"),
+            pytest.param("[a]\nb.x = 1\nc = 2\nb.y = 3\n", id="dotted keys interleaved in one table"),
+            pytest.param("[a.b]\nx = 1\n[[a.b.l]]\nq = 1\n[a.c]\ny = 2\n[a.b.d]\nz = 3\n", id="array of tables between the chunks"),
+        ],
+    )
+    def test_a_table_whose_descendant_is_split_across_chunks_moves_and_renames_whole(self, text: str) -> None:
+        """A split *descendant* (a child declared, interrupted by a sibling, then continued) is several
+        tomlkit tables under one key, and the library's own header-cache invalidation visits only the
+        first of them — left alone, the rest would keep rendering under the old name. The applier
+        refreshes every chunk, so the rename or move comes out whole and re-parses to the same value
+        under the new path, in the original order.
+        """
+        original = tomlkit.parse(text).unwrap()["a"]
+        for op, expected in (
+            (RenameTableKeyOp(table_path=[], key="a", new_key="zz"), {"zz": original}),
+            (MoveKeyOp(table_path=[], key="a", new_table_path=["q"], new_key="a"), {"q": {"a": original}}),
+        ):
+            toml_doc = tomlkit.parse(text)
+            applications = apply_fix_ops(toml_doc=toml_doc, ops=[op])
+            assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
+            rendered = _dumps(toml_doc)
+            assert "[a" not in rendered
+            assert tomlkit.parse(rendered).unwrap() == expected
+
+    def test_a_split_descendant_beneath_a_root_proxy_still_renames_whole(self) -> None:
+        """The two shapes compose: a table interleaved at its own level *and* carrying a split child
+        goes through the proxy path, which renames in every chunk — every child lands under the new name.
+        """
+        text = "[a.b]\nx = 1\n[other]\nz = 1\n[a.c]\ny = 2\n[a.b.d]\nz = 3\n"
+        toml_doc = tomlkit.parse(text)
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[RenameTableKeyOp(table_path=[], key="a", new_key="zz")])
+        assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
+        reparsed = tomlkit.parse(_dumps(toml_doc)).unwrap()
+        assert "a" not in reparsed
+        assert reparsed["zz"] == {"b": {"x": 1, "d": {"z": 3}}, "c": {"y": 2}}
+
+    def test_a_split_descendant_beneath_a_nested_proxy_still_renames_whole(self) -> None:
+        """Same composition one level down: the renamed key lives inside an out-of-order table that is
+        itself nested, and one of its chunks carries a split child. The header refresh must reach
+        the chunks of a *nested* proxy too — the merged facade would show it one table per key.
+        """
+        text = "[p.a.b]\nx = 1\n[q]\nw = 0\n[p.a.c]\ny = 1\n[p.a.b.d]\nz = 1\n[p.a.e]\nv = 1\n[p.a.b.f]\nu = 1\n"
+        original = tomlkit.parse(text).unwrap()["p"]["a"]
+        toml_doc = tomlkit.parse(text)
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[RenameTableKeyOp(table_path=["p"], key="a", new_key="zz")])
+        assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
+        rendered = _dumps(toml_doc)
+        assert "[p.a" not in rendered
+        assert tomlkit.parse(rendered).unwrap()["p"] == {"zz": original}
 
     def test_rename_is_replay_neutral_once_applied(self) -> None:
         """Re-applying a rename over an already-migrated document skips and changes no bytes.

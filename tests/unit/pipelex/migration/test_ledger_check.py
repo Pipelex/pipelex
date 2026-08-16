@@ -94,6 +94,30 @@ class _SchemaTwoLabelGone(BaseModel):
     deck: dict[str, _DeckEntry] = Field(default_factory=dict[str, _DeckEntry])
 
 
+class _TierWithBasicBack(StrEnum):
+    BASIC = "basic"
+    PREMIUM = "premium"
+    STANDARD = "standard"
+
+
+class _SchemaThreeBasicBack(BaseModel):
+    """`basic` is a legal spelling of `tier` again — the reuse of a retired spelling — and `label` is renamed."""
+
+    title: str = "hello"
+    tier: _TierWithBasicBack = _TierWithBasicBack.STANDARD
+    settings: _Settings = Field(default_factory=_Settings)
+    deck: dict[str, _DeckEntry] = Field(default_factory=dict[str, _DeckEntry])
+
+
+class _SchemaThreeStaysRetired(BaseModel):
+    """Schema three keeps `basic` retired; only `label` is renamed."""
+
+    title: str = "hello"
+    tier: _TierWithoutBasic = _TierWithoutBasic.STANDARD
+    settings: _Settings = Field(default_factory=_Settings)
+    deck: dict[str, _DeckEntry] = Field(default_factory=dict[str, _DeckEntry])
+
+
 class _SchemaThreeLabelBack(BaseModel):
     """`label` is back — the reuse of a retired name — and `tier` is renamed to `level`."""
 
@@ -362,6 +386,42 @@ new_key    = "level"
         issues = check_ledger(surface=_surface(config_model=_SchemaThreeLabelBack), migration_dir=tmp_path)
         assert LedgerIssueKind.RESERVED_PATH_REUSED in _kinds(issues)
         assert LedgerIssueKind.CONVERGENCE_BROKEN in _kinds(issues)
+
+    def test_a_retired_spelling_that_comes_back_is_refused(self, tmp_path: Path) -> None:
+        """The value-side twin of the retired name: a remapped-away spelling accepted again would be
+        rewritten on every run of every file that still carries it.
+        """
+        remap_basic = """
+[[migration.ops]]
+kind       = "remap_value"
+table_path = []
+key        = "tier"
+mapping    = { basic = "standard" }
+"""
+        entries = _entry(ops=remap_basic, to_schema_version=2) + _entry(ops=_RENAME_LABEL_TO_TITLE, to_schema_version=3)
+        _write_ledger(migration_dir=tmp_path, current_schema_version=3, entries=entries)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoEnumMemberGone, schema_version=2)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaThreeBasicBack, schema_version=3)
+        issues = check_ledger(surface=_surface(config_model=_SchemaThreeBasicBack), migration_dir=tmp_path)
+        assert LedgerIssueKind.RESERVED_VALUE_REUSED in _kinds(issues)
+        assert "'basic'" in " ".join(issue.message for issue in issues)
+
+    def test_a_spelling_that_stays_retired_is_not_an_issue(self, tmp_path: Path) -> None:
+        remap_basic = """
+[[migration.ops]]
+kind       = "remap_value"
+table_path = []
+key        = "tier"
+mapping    = { basic = "standard" }
+"""
+        entries = _entry(ops=remap_basic, to_schema_version=2) + _entry(ops=_RENAME_LABEL_TO_TITLE, to_schema_version=3)
+        _write_ledger(migration_dir=tmp_path, current_schema_version=3, entries=entries)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoEnumMemberGone, schema_version=2)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaThreeStaysRetired, schema_version=3)
+        issues = check_ledger(surface=_surface(config_model=_SchemaThreeStaysRetired), migration_dir=tmp_path)
+        assert LedgerIssueKind.RESERVED_VALUE_REUSED not in _kinds(issues)
 
     def test_a_reference_document_the_ledger_still_changes_is_refused(self, tmp_path: Path) -> None:
         """A packaged document left behind by its own model would be migrated on every user's run."""

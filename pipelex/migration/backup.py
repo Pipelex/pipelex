@@ -53,8 +53,14 @@ def existing_backups_of(*, path: Path) -> list[Path]:
     copy the user made by hand under a name that merely starts the same way — and pruning must
     never take one of those.
     """
+    # Matched by string prefix rather than by glob, so a file name carrying a glob metacharacter
+    # (`telemetry_[eu].toml`, say) can never match a sibling's backups and have them pruned.
     prefix = f"{path.name}{BACKUP_INFIX}"
-    return sorted(candidate for candidate in path.parent.glob(f"{prefix}*") if _BACKUP_STAMP_PATTERN.fullmatch(candidate.name[len(prefix) :]))
+    return sorted(
+        candidate
+        for candidate in path.parent.iterdir()
+        if candidate.name.startswith(prefix) and _BACKUP_STAMP_PATTERN.fullmatch(candidate.name[len(prefix) :])
+    )
 
 
 def write_backup(*, snapshot: FileSnapshot, moment: datetime) -> Path:

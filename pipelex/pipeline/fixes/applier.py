@@ -29,7 +29,7 @@ from pipelex_tools import format_mthds
 from pydantic import BaseModel, ConfigDict, Field
 from tomlkit import TOMLDocument
 from tomlkit.container import Container, OutOfOrderTableProxy
-from tomlkit.items import AbstractTable, Item
+from tomlkit.items import AbstractTable, AoT, Item, Table
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.suggested_fix import (
@@ -170,7 +170,9 @@ def _rename_key_in_place(*, parent_table: dict[str, Any], key: str, new_key: str
 
 
 def _replace_key_in_container(*, container: Container, key: str, new_key: str) -> None:
-    container._replace(key, new_key, cast("Item", container[key]))  # pyright: ignore[reportPrivateUsage]
+    item = cast("Item", container[key])
+    container._replace(key, new_key, item)  # pyright: ignore[reportPrivateUsage]
+    _refresh_table_headers(item=item)
 
 
 def _as_tomlkit_value(value: TomlValue | None) -> Any:
@@ -394,6 +396,34 @@ def _apply_at_table_path(*, toml_doc: TOMLDocument, fix_op: FixOp, table_path: l
             return _OpResult(FixOpOutcome.APPLIED)
 
 
+def _refresh_table_headers(*, item: Any) -> None:
+    """Make every table beneath a renamed or moved ``item`` re-render its header under its new path.
+
+    tomlkit caches each table's rendered header in ``Table.display_name`` and, after a re-key,
+    invalidates that cache by walking ``Table.values()`` — the merged dict facade, which yields
+    one item per key. A table written in several chunks (``[a.b]`` … ``[a.c]`` … ``[a.b.d]``) is
+    several ``Table`` items under one key, so only the first chunk is visited and the others keep
+    rendering under the old name: the file comes out split between two tables with an
+    ``applied`` verdict. Walking the *body* instead reaches every chunk, so clearing the cache
+    here is what lets a rename or move come out whole for any layout the parser accepts.
+    """
+    if isinstance(item, OutOfOrderTableProxy):
+        for chunk in item._tables:  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+            _refresh_table_headers(item=chunk)
+        return
+    if isinstance(item, Table):
+        item.display_name = None
+        _refresh_table_headers(item=item.value)
+        return
+    if isinstance(item, AoT):
+        for element in item.body:
+            _refresh_table_headers(item=element)
+        return
+    if isinstance(item, Container):
+        for _, child in item.body:
+            _refresh_table_headers(item=child)
+
+
 def _apply_move_key(*, toml_doc: TOMLDocument, fix_op: MoveKeyOp, table_path: list[str]) -> _OpResult:
     """Relocate one key, creating whatever destination parents are missing.
 
@@ -420,6 +450,7 @@ def _apply_move_key(*, toml_doc: TOMLDocument, fix_op: MoveKeyOp, table_path: li
     del source_table[fix_op.key]
     destination_table = _create_block_table_path(toml_doc=toml_doc, table_path=fix_op.new_table_path)
     destination_table[fix_op.new_key] = moved_value
+    _refresh_table_headers(item=moved_value)
     return _OpResult(FixOpOutcome.APPLIED)
 
 

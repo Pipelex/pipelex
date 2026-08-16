@@ -7,7 +7,7 @@ would go red on an ordinary configuration edit with "regenerate the golden" as i
 fail-regenerate-fail cycle that keeps the coverage gate out of the loop agents run constantly.
 Here, every failure is a statement about files the author wrote, and every remedy is to fix one.
 
-Five questions, each with its own failure kind:
+The questions, each with its own failure kind:
 
 - **Op legality.** An operation's source must be material some schema version *removed*. One
   addressing a live path would fire on a perfectly valid current file, and replay neutrality —
@@ -24,7 +24,7 @@ Five questions, each with its own failure kind:
 - **Convergence.** Replaying the whole ledger over each reference document must apply nothing
   and return the very bytes it was given.
 
-Plus one refusal that outlives all four: a **reserved path** — anything a ledger entry ever
+Plus one refusal that outlives them all: a **reserved path** — anything a ledger entry ever
 removed — may not come back, because that would make removed material legal again.
 
 See `docs/migration-ledger.md` → "Legality rules" and "The checks".

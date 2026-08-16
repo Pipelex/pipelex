@@ -8,6 +8,7 @@ red on every legitimate configuration change and teach everyone to regenerate ra
 """
 
 from collections.abc import Mapping
+from decimal import Decimal
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
@@ -37,6 +38,7 @@ class _Synthetic(BaseModel):
     retries: int = Field(default=3, ge=0, le=10)
     lenient: str = Field(default="x", strict=False)
     item_bounded: list[Annotated[int, Field(ge=1)]] = Field(default_factory=list[int])
+    amount: Decimal = Field(default=Decimal(1), ge=Decimal(0))
 
 
 class _SelfReferential(BaseModel):
@@ -83,6 +85,7 @@ class TestFingerprintPaths:
             "retries",
             "lenient",
             "item_bounded",
+            "amount",
         }
 
     def test_paths_are_stably_ordered(self) -> None:
@@ -183,6 +186,10 @@ class TestFingerprintRecords:
     def test_a_bound_on_a_container_item_is_not_attributed_to_the_container(self) -> None:
         """`list[Annotated[int, Field(ge=1)]]` bounds the items, not the list."""
         assert _fingerprint().paths["item_bounded"].constraints is None
+
+    def test_a_bound_over_a_non_numeric_value_is_dropped(self) -> None:
+        """A `Decimal` (or a date) bound is outside the projection — the whitelist is over kinds *and* value types."""
+        assert _fingerprint().paths["amount"].constraints is None
 
     def test_a_path_with_no_bound_records_none(self) -> None:
         assert _fingerprint().paths["leaf.name"].constraints is None

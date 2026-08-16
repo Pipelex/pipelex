@@ -35,7 +35,7 @@ so it ships a hand-authored `before@N.toml` saying what the old shape was, and t
 there. Nothing else about the check changes — which is the point of that exception's shape. What
 the entry may declare and address is `check-ledger`'s half.
 
-Three departures from the contract's first wording, all recorded in `docs/migration-ledger.md`:
+What the comparator deliberately does not do, and why (each stated in `docs/migration-ledger.md` too):
 
 **`paths(defaults@N)` minus `added_at_N` is not the comparator.** A raw fingerprint difference counts a
 rename's *destination* as an addition, so subtracting it would demand the destination be absent
@@ -246,7 +246,7 @@ def _check_the_migrated_document_is_accepted(*, surface: Surface, entry: Migrati
                 surface=surface,
                 kind=TransformIssueKind.MIGRATED_DOCUMENT_REJECTED,
                 message=(
-                    f"entry '{entry.id}': the reference document of schema version {entry.to_schema_version - 1}, migrated by this "
+                    f"entry '{entry.id}': {_starting_document_label(entry=entry)}, migrated by this "
                     f"entry and read beneath the current defaults, is not accepted by {surface.config_model.__name__} — {exc}. "
                     f"An operation writes a value or a key the schema does not take, so every file it migrates fails to load"
                 ),

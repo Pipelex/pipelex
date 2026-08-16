@@ -115,7 +115,8 @@ class MigrationPlan(BaseModel):
     unexplained: list[UnexplainedPath] = Field(default_factory=list[UnexplainedPath])
 
     backup_path: Path | None = None
-    """Where the pre-migration copy of this file was written, when the run wrote the file."""
+    """Where the pre-migration copy of this file was written — when the run wrote the file, and also
+    when a write failed leaving the file's state uncertain, because then the copy is kept for the user."""
 
     was_written: bool = False
 

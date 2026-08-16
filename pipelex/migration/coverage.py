@@ -173,13 +173,16 @@ def check_entry_accounting(*, surface_id: str, entry: MigrationEntry, before: Su
             )
         )
 
-    for path in sorted((after_paths - end_paths) & before_paths):
+    for origin, landing in sorted(_over_deleted_landings(before_paths=before_paths, walk=walk).items()):
+        if landing not in after_paths or landing in end_paths:
+            continue
+        where = f"'{origin}'" if landing == origin else f"'{origin}' (which is '{landing}' at schema version {after.schema_version})"
         issues.append(
             CoverageIssue(
                 surface_id=surface_id,
                 kind=CoverageIssueKind.OVER_DELETION,
                 message=(
-                    f"entry '{entry.id}': its operations remove '{path}', but schema version {after.schema_version} still has it — "
+                    f"entry '{entry.id}': its operations remove {where}, but schema version {after.schema_version} still has it — "
                     f"an operation targets a parent where it meant to target one child"
                 ),
             )
@@ -188,6 +191,32 @@ def check_entry_accounting(*, surface_id: str, entry: MigrationEntry, before: Su
     issues.extend(_check_enum_accounting(surface_id=surface_id, entry=entry, before=before, after=after, walk=walk))
     issues.extend(_check_narrowing_accounting(surface_id=surface_id, entry=entry, before=before, after=after, walk=walk))
     return issues
+
+
+def _over_deleted_landings(*, before_paths: set[str], walk: EntryWalk) -> dict[str, str]:
+    """For every path the entry's operations remove, the path it *would* have had at the new schema.
+
+    Compared by origin, like every other accounting here: a child deleted beneath a table the same
+    entry renamed is spelled one way in the previous fingerprint and another in the next, and a
+    comparison by current spelling never lines the two up — the deletion of a path the new schema
+    still has would pass as the disappearance of one path and the appearance of an unrelated
+    other. So each removed origin is carried through its nearest surviving ancestor's rename, and
+    it is that landing the caller looks for in the new schema.
+    """
+    landings: dict[str, str] = {}
+    for origin in before_paths:
+        if walk.state.final_path_of_origin(origin=origin) is not None:
+            continue
+        segments = origin.split(PATH_SEPARATOR)
+        landing = origin
+        for depth in range(len(segments) - 1, 0, -1):
+            ancestor = PATH_SEPARATOR.join(segments[:depth])
+            ancestor_landing = walk.state.final_path_of_origin(origin=ancestor)
+            if ancestor_landing is not None:
+                landing = PATH_SEPARATOR.join([ancestor_landing, *segments[depth:]])
+                break
+        landings[origin] = landing
+    return landings
 
 
 def _check_the_pre_history_claim(
@@ -214,8 +243,9 @@ def _check_the_pre_history_claim(
     exempt it from the accounting that would have demanded a remap or an `unsafe` marking for it.
 
     What the declaration itself says, and whether the operations stay inside it, is `check-ledger`'s
-    to verify against the checked-in chain and the entry's hand-authored `before` document — no
-    live model is needed for either, and this gate exists to look at live models.
+    to verify against the checked-in chain; what the entry does to the hand-authored `before`
+    document is the transform check's, inside `check-migration-schemas`. Neither needs the diff
+    this function reads, and this function exists to look at that diff.
     """
     diff = diff_fingerprints(before=before, after=after)
     if not diff.has_removals and not diff.narrowed_paths:
@@ -312,15 +342,17 @@ def _check_narrowing_accounting(
 
     issues: list[CoverageIssue] = []
     for origin, before_record in before.paths.items():
-        if origin in remapped_origins:
-            continue
         final_path = walk.state.final_path_of_origin(origin=origin)
         after_record = after.paths.get(final_path) if final_path is not None else None
         if after_record is None:
             # The path does not survive into the new schema; the unaccounted-path or over-deletion
             # check has already said so in terms the author can act on.
             continue
-        reasons = describe_narrowing(before=before_record, after=after_record)
+        # A remap rewrites spellings, so it answers for a string-typed member the type stopped
+        # accepting — and for nothing else. A lost numeric member, or a bound tightened on the same
+        # path, is still a value no mapping can repair, and must not ride under the remap into a
+        # `safe` entry.
+        reasons = describe_narrowing(before=before_record, after=after_record, remapped=origin in remapped_origins)
         if not reasons:
             continue
         issues.append(

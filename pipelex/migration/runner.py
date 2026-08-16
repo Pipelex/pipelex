@@ -83,8 +83,10 @@ def _write_migrated_file(*, plan: MigrationPlan, snapshot: FileSnapshot, new_con
 
     The order is the point. Backing up first means there is never a moment with a rewritten file
     and no copy of the original; pruning last means there is never a moment with no backup at all.
-    A commit that fails takes its own fresh backup with it, so a failed run leaves the directory
-    exactly as it found it.
+    A commit that fails before touching the file takes its own fresh backup with it, so a failed run
+    leaves the directory exactly as it found it. The one exception is a commit whose outcome the
+    transaction cannot vouch for: then the backup is the only copy whose provenance is certain, and
+    it stays, named in the report.
 
     Nothing raised in here escapes to the caller: this is the per-file boundary, and an exception
     crossing it would abort every sibling file after this one — the one thing the per-file scope
@@ -105,20 +107,29 @@ def _write_migrated_file(*, plan: MigrationPlan, snapshot: FileSnapshot, new_con
     try:
         commit_file_updates([PendingFileUpdate(snapshot=snapshot, new_content=new_content)])
     except FixWriteConflictError as exc:
-        backup_path.unlink(missing_ok=True)
+        # The primitive refused before touching the target, so the directory is as it was — minus
+        # the copy this run just made, which has nothing to back up.
+        _discard_backup(backup_path=backup_path)
         return plan.model_copy(update={"blocked_reason": FileBlockedReason.CHANGED_DURING_RUN, "blocked_detail": str(exc)})
     except OSError as exc:
-        backup_path.unlink(missing_ok=True)
+        _discard_backup(backup_path=backup_path)
         return plan.model_copy(
             update={"blocked_reason": FileBlockedReason.UNWRITABLE, "blocked_detail": f"the file could not be written: {exc.strerror or exc}"}
         )
     except FixTransactionError as exc:
         # The primitive raises this when it cannot vouch for the state it leaves behind — a rollback
         # that did not complete, or a replacement that landed but whose temp files could not be
-        # removed. The exception cannot say which; the file can, so ask it.
+        # removed. The exception cannot say which; the file can, so ask it. Whatever the answer,
+        # the backup stays: it is the one copy of the original whose provenance is certain, and a
+        # state the primitive cannot vouch for is exactly the state a backup exists for.
         if not _carries(path=snapshot.path, content=new_content):
-            backup_path.unlink(missing_ok=True)
-            return plan.model_copy(update={"blocked_reason": FileBlockedReason.UNWRITABLE, "blocked_detail": f"the file could not be written: {exc}"})
+            return plan.model_copy(
+                update={
+                    "blocked_reason": FileBlockedReason.UNWRITABLE,
+                    "blocked_detail": f"the file could not be written, and its state is uncertain — the original is kept at '{backup_path}': {exc}",
+                    "backup_path": backup_path,
+                }
+            )
         log.warning(f"'{snapshot.path}' was migrated, but the write left something behind: {exc}")
 
     try:
@@ -130,6 +141,18 @@ def _write_migrated_file(*, plan: MigrationPlan, snapshot: FileSnapshot, new_con
             f"'{snapshot.path}' was migrated and backed up to '{backup_path}', but an older backup could not be pruned: {exc.strerror or exc}"
         )
     return plan.model_copy(update={"backup_path": backup_path, "was_written": True})
+
+
+def _discard_backup(*, backup_path: Path) -> None:
+    """Remove the copy this run made of a file it then did not rewrite.
+
+    A copy that will not go is a stray file beside an untouched original — worth a warning, never
+    worth an exception crossing the per-file boundary and aborting the siblings.
+    """
+    try:
+        backup_path.unlink(missing_ok=True)
+    except OSError as exc:
+        log.warning(f"the backup '{backup_path}' was made for a write that did not happen and could not be removed: {exc.strerror or exc}")
 
 
 def _carries(*, path: Path, content: str) -> bool:

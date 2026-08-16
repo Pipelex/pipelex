@@ -51,6 +51,21 @@ class TestTheNarrowingRelation:
         """Both widening shapes: a union that gains members, and an enumerated type relaxed into `str`."""
         assert describe_narrowing(before=_record(value_type=before_type), after=_record(value_type=after_type)) == []
 
+    @pytest.mark.parametrize(
+        ("before_type", "after_type", "expected"),
+        [
+            ("str", "enum", []),
+            ("enum | literal", "literal", []),
+            ("int | literal", "literal", ["its type went from 'int | literal' to 'literal'"]),
+            ("int | str", "enum", ["its type went from 'int | str' to 'enum'"]),
+        ],
+    )
+    def test_under_a_remap_only_the_string_typed_members_are_exempt(self, before_type: str, after_type: str, expected: list[str]) -> None:
+        """A remap rewrites string values, so it answers for a lost `str`, `enum` or `literal` member and
+        for nothing else: a number the old type accepted and the new one does not is still a narrowing.
+        """
+        assert describe_narrowing(before=_record(value_type=before_type), after=_record(value_type=after_type), remapped=True) == expected
+
     def test_a_union_inside_a_container_is_one_member_not_two(self) -> None:
         """Splitting a rendered type on `|` without respecting brackets would read this as a widening."""
         reasons = describe_narrowing(before=_record(value_type="list[int | str]"), after=_record(value_type="int"))

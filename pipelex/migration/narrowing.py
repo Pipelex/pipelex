@@ -26,24 +26,30 @@ string is read as the widening it is instead of as the loss of every member it h
 
 from fractions import Fraction
 
-from pipelex.migration.fingerprint import ENUM_TYPE, LITERAL_TYPE, STRING_TYPE, ConstraintKind, PathFingerprint
-
-_UNION_JOIN = " | "
+from pipelex.migration.fingerprint import ENUM_TYPE, LITERAL_TYPE, STRING_TYPE, UNION_SEPARATOR, ConstraintKind, PathFingerprint
 
 _LOWER_VALUE_BOUND_KINDS: tuple[tuple[ConstraintKind, bool], ...] = ((ConstraintKind.GT, True), (ConstraintKind.GE, False))
 _UPPER_VALUE_BOUND_KINDS: tuple[tuple[ConstraintKind, bool], ...] = ((ConstraintKind.LT, True), (ConstraintKind.LE, False))
 _LOWER_LENGTH_BOUND_KINDS: tuple[tuple[ConstraintKind, bool], ...] = ((ConstraintKind.MIN_LENGTH, False),)
 _UPPER_LENGTH_BOUND_KINDS: tuple[tuple[ConstraintKind, bool], ...] = ((ConstraintKind.MAX_LENGTH, False),)
+_STRING_TYPED_MEMBERS: frozenset[str] = frozenset({STRING_TYPE, ENUM_TYPE, LITERAL_TYPE})
 
 
-def describe_narrowing(*, before: PathFingerprint, after: PathFingerprint) -> list[str]:
+def describe_narrowing(*, before: PathFingerprint, after: PathFingerprint, remapped: bool = False) -> list[str]:
     """Why the values this path accepts are fewer than they were — empty when they are not.
 
     Every reason is phrased so that it can be read on its own in a gate's output, because that is
     where it lands: the author sees the path and needs to know which half of the record moved.
+
+    ``remapped`` is set when the entry carries a ``remap_value`` on this path. A remap rewrites
+    string values, so it answers for a lost string-typed member — ``str``, ``enum``, ``literal`` —
+    and for nothing else: a number the old type accepted and the new one does not (``int | literal``
+    becoming ``literal``) is a value no mapping reaches, and so is a tightened bound. Both must
+    still be reported, or they ride under the remap into a ``safe`` entry.
     """
     reasons: list[str] = []
-    if before.value_type != after.value_type and not _is_type_widening(before=before.value_type, after=after.value_type):
+    exempt = _STRING_TYPED_MEMBERS if remapped else frozenset[str]()
+    if before.value_type != after.value_type and not _is_type_widening(before=before.value_type, after=after.value_type, exempt=exempt):
         reasons.append(f"its type went from '{before.value_type}' to '{after.value_type}'")
     reasons.extend(_describe_tightenings(before=before.constraints or {}, after=after.constraints or {}))
     return reasons
@@ -68,17 +74,18 @@ def lost_enumerated_spellings(*, before: PathFingerprint, after: PathFingerprint
     return sorted(set(before.enum_members) - set(after.enum_members or []))
 
 
-def _is_type_widening(*, before: str, after: str) -> bool:
+def _is_type_widening(*, before: str, after: str, exempt: frozenset[str]) -> bool:
     """Whether every value the old type accepted the new one still accepts.
 
     Two shapes qualify, and nothing else does. A union that keeps its members and gains more is a
     widening, member by member — a comparison of the whole rendered string would call `int` to
     `int | str` a change and demand a bump for it. And an enumerated type becoming `str` is a
     widening, because the enumerated spellings are strings and `str` accepts them all; the reverse
-    is the narrowing this exists to catch.
+    is the narrowing this exists to catch. An ``exempt`` old member is one something else answers
+    for, and is not asked to be absorbed.
     """
     after_members = _union_members(rendered=after)
-    return all(_is_member_absorbed(member=member, after_members=after_members) for member in _union_members(rendered=before))
+    return all(_is_member_absorbed(member=member, after_members=after_members) for member in _union_members(rendered=before) - exempt)
 
 
 def _is_member_absorbed(*, member: str, after_members: set[str]) -> bool:
@@ -102,8 +109,8 @@ def _union_members(*, rendered: str) -> set[str]:
         elif character == "]":
             depth -= 1
         current += character
-        if depth == 0 and current.endswith(_UNION_JOIN):
-            members.add(current[: -len(_UNION_JOIN)])
+        if depth == 0 and current.endswith(UNION_SEPARATOR):
+            members.add(current[: -len(UNION_SEPARATOR)])
             current = ""
     members.add(current)
     return members
