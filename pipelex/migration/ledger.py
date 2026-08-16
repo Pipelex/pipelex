@@ -12,6 +12,7 @@ See `docs/migration-ledger.md` → "The ledger file".
 """
 
 from enum import StrEnum
+from functools import cache
 from pathlib import Path
 from typing import Any
 
@@ -107,6 +108,17 @@ class MigrationEntry(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def check_pre_history_declares_what_it_removed(self) -> Self:
+        if self.pre_history and not self.declared_removed_paths:
+            msg = (
+                f"entry '{self.id}': a pre-history entry declares the paths it removes — the flag exempts the entry from "
+                f"being accounted against a fingerprint diff, and the declaration is what replaces that diff, so an entry "
+                f"carrying the flag and declaring nothing is exempt from every accounting there is"
+            )
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
     def check_an_op_free_entry_is_unsafe(self) -> Self:
         if not self.ops and self.safety is MigrationSafety.SAFE:
             msg = f"entry '{self.id}': an entry with no operations cannot be 'safe' — there is nothing for the applier to do"
@@ -180,3 +192,19 @@ def load_ledger(*, migration_dir: Path, surface_id: str) -> MigrationLedger:
     except ValidationError as exc:
         msg = f"invalid ledger for surface '{surface_id}' at {path}: {exc}"
         raise MigrationLedgerError(msg) from exc
+
+
+@cache
+def load_ledger_cached(*, migration_dir: Path, surface_id: str) -> MigrationLedger:
+    """`load_ledger`, parsed once per process.
+
+    Replaying a surface over a directory of files must not re-parse the same TOML per file: the
+    ledger is checked-in package data that cannot change under a running process, and the parsed
+    model is frozen. Use this everywhere that reads a ledger during a run; `load_ledger` itself
+    stays uncached for the gates, which are told which directory to read and are asked to see
+    what is on disk right now.
+
+    A raise is not cached — `lru_cache` only records successful calls — so a ledger fixed on disk
+    between two calls is re-read rather than failing forever.
+    """
+    return load_ledger(migration_dir=migration_dir, surface_id=surface_id)

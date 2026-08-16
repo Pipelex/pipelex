@@ -5,6 +5,10 @@ One directory per surface, holding two files per schema version:
     pipelex/migration/goldens/<surface-id>/fingerprint@N.json
     pipelex/migration/goldens/<surface-id>/defaults@N.toml
 
+plus, for a pre-history entry only, the hand-authored document it migrates from:
+
+    pipelex/migration/goldens/<surface-id>/before@N.toml
+
 **The head link tracks; every link below it is frozen.** `update-migration-schemas` rewrites the
 snapshot for the surface's *current* version from live sources on every run, and a version bump
 simply leaves the previous version's files behind as history. Freezing the head instead would
@@ -27,6 +31,7 @@ from pipelex.migration.fingerprint import SurfaceFingerprint
 GOLDENS_DIR_NAME = "goldens"
 FINGERPRINT_STEM = "fingerprint"
 DEFAULTS_STEM = "defaults"
+PRE_HISTORY_STEM = "before"
 VERSION_MARKER = "@"
 
 
@@ -40,6 +45,18 @@ def fingerprint_golden_path(*, migration_dir: Path, surface_id: str, schema_vers
 
 def defaults_golden_path(*, migration_dir: Path, surface_id: str, schema_version: int) -> Path:
     return goldens_dir(migration_dir=migration_dir, surface_id=surface_id) / f"{DEFAULTS_STEM}{VERSION_MARKER}{schema_version}.toml"
+
+
+def pre_history_document_path(*, migration_dir: Path, surface_id: str, schema_version: int) -> Path:
+    """The hand-authored document a pre-history entry migrates *from*.
+
+    `before@N.toml` sits beside the chain and is the one file here that is neither snapshotted nor
+    regenerated: a change that predates the first fingerprint has no `defaults@N-1` to start from,
+    because there was no snapshot yet, so its author writes the old shape down instead. Nothing
+    regenerates it — a regenerated one would describe today's models, which is exactly what it is
+    not about.
+    """
+    return goldens_dir(migration_dir=migration_dir, surface_id=surface_id) / f"{PRE_HISTORY_STEM}{VERSION_MARKER}{schema_version}.toml"
 
 
 def read_fingerprint_golden(*, migration_dir: Path, surface_id: str, schema_version: int) -> SurfaceFingerprint | None:

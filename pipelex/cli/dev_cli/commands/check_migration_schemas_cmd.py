@@ -1,21 +1,26 @@
 """Command to verify that every configuration surface has accounted for its schema changes.
 
-This is the coverage half of the migration gate. It reads the checked-in ledgers and golden
-chains, recomputes each surface's fingerprint, and fails when a schema change would leave a user's
-file broken with nothing written down about how to repair it.
+This is the golden half of the migration gate, and it asks two questions of every surface. Coverage
+reads the checked-in ledgers and golden chains, recomputes each surface's fingerprint, and fails
+when a schema change would leave a user's file broken with nothing written down about how to repair
+it. The transform goldens then *do* the migration each entry describes, from one frozen reference
+document to the next, and fail when what the operations produce is not the shape the new version
+actually has.
 
-It lives in `make check` and deliberately **not** in `make agent-check`: it is a golden check, and
-in the loop agents run constantly a fail-regenerate-fail cycle with no single right answer is how
-a gate goes permanently green while catching nothing.
+Both live in `make check` and deliberately **not** in `make agent-check`: they are golden checks,
+and in the loop agents run constantly a fail-regenerate-fail cycle with no single right answer is
+how a gate goes permanently green while catching nothing.
 """
 
 import sys
+from collections.abc import Sequence
 
 from rich.markup import escape
 
 from pipelex.migration.coverage import CoverageIssue, check_registry
 from pipelex.migration.exceptions import MigrationError
 from pipelex.migration.surfaces import build_config_surface_registry, packaged_migration_dir
+from pipelex.migration.transform_check import TransformIssue, check_transforms
 from pipelex.runtime_hub import get_console
 
 
@@ -35,8 +40,11 @@ def check_migration_schemas_cmd(*, quiet: bool = False) -> None:
         console.print()
 
     registry = build_config_surface_registry()
+    migration_dir = packaged_migration_dir()
+    issues: list[CoverageIssue | TransformIssue] = []
     try:
-        issues = check_registry(registry=registry, migration_dir=packaged_migration_dir())
+        issues.extend(check_registry(registry=registry, migration_dir=migration_dir))
+        issues.extend(check_transforms(registry=registry, migration_dir=migration_dir))
     except MigrationError as exc:
         # An error is always loud — quiet only trims success output, never failures.
         console.print(f"[red]✗ Migration schema check: FAILED[/red] - {escape(str(exc))}")
@@ -51,7 +59,7 @@ def check_migration_schemas_cmd(*, quiet: bool = False) -> None:
     sys.exit(1)
 
 
-def _print_issues(*, issues: list[CoverageIssue]) -> None:
+def _print_issues(*, issues: Sequence[CoverageIssue | TransformIssue]) -> None:
     console = get_console()
     console.print(f"[red]✗ Migration schema check: FAILED[/red] - {len(issues)} issues")
     console.print()

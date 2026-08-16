@@ -4436,33 +4436,45 @@ rationale = "Verb-object: renders the diagnostic; single operand."
 param = "toml_doc"
 rationale = "Single-operand serialization of the TOML document."
 
+["pipelex/pipeline/fixes/file_transaction.py::_cleanup_staged_updates"]
+param = "staged_updates"
+rationale = "Verb-object: cleans up the staged updates; single operand."
+
+["pipelex/pipeline/fixes/file_transaction.py::_commit_staged_updates"]
+param = "staged_updates"
+rationale = "Verb-object: commits the staged updates; single operand."
+
+["pipelex/pipeline/fixes/file_transaction.py::_rollback_committed_updates"]
+param = "committed_updates"
+rationale = "Verb-object: rolls back the committed updates; single operand."
+
+["pipelex/pipeline/fixes/file_transaction.py::assert_snapshot_unchanged"]
+param = "snapshot"
+rationale = "Validator: the snapshot is the single operand checked."
+
+["pipelex/pipeline/fixes/file_transaction.py::commit_file_updates"]
+param = "updates"
+rationale = "Verb-object: commits the updates; single operand."
+
+["pipelex/pipeline/fixes/file_transaction.py::read_file_snapshot"]
+param = "path"
+rationale = "Factory from source: reads the snapshot of the file at path."
+
+["pipelex/pipeline/fixes/file_transaction.py::stage_file_update"]
+param = "update"
+rationale = "Verb-object: stages the update; single operand."
+
 ["pipelex/pipeline/fixes/fix_loop.py::_absolute_source_path"]
 param = "path"
 rationale = "Single-operand conversion of the path."
-
-["pipelex/pipeline/fixes/fix_loop.py::_assert_snapshot_unchanged"]
-param = "snapshot"
-rationale = "Validator: the snapshot is the single operand checked."
 
 ["pipelex/pipeline/fixes/fix_loop.py::_bind_fixes_to_snapshots"]
 param = "fixes"
 rationale = "Verb-object: binds the fixes; the rest is context."
 
-["pipelex/pipeline/fixes/fix_loop.py::_cleanup_staged_updates"]
-param = "staged_updates"
-rationale = "Verb-object: cleans up the staged updates; single operand."
-
 ["pipelex/pipeline/fixes/fix_loop.py::_colliding_op_name"]
 param = "fix_op"
 rationale = "Noun-named derivation from the fix op; scopes stay keyword."
-
-["pipelex/pipeline/fixes/fix_loop.py::_commit_file_updates"]
-param = "updates"
-rationale = "Verb-object: commits the updates; single operand."
-
-["pipelex/pipeline/fixes/fix_loop.py::_commit_staged_updates"]
-param = "staged_updates"
-rationale = "Verb-object: commits the staged updates; single operand."
 
 ["pipelex/pipeline/fixes/fix_loop.py::_fix_fingerprint"]
 param = "fix"
@@ -4480,14 +4492,6 @@ rationale = "Verb-object: partitions the fixes; scope params stay keyword."
 param = "validation_result"
 rationale = "Noun-named derivation from the validation result; single operand."
 
-["pipelex/pipeline/fixes/fix_loop.py::_read_file_snapshot"]
-param = "path"
-rationale = "Factory from source: reads the snapshot of the file at path."
-
-["pipelex/pipeline/fixes/fix_loop.py::_rollback_committed_updates"]
-param = "committed_updates"
-rationale = "Verb-object: rolls back the committed updates; single operand."
-
 ["pipelex/pipeline/fixes/fix_loop.py::_safe_fixes"]
 param = "items"
 rationale = "Noun-named derivation: filters the error items down to safe fixes; the rest is context."
@@ -4495,10 +4499,6 @@ rationale = "Noun-named derivation: filters the error items down to safe fixes; 
 ["pipelex/pipeline/fixes/fix_loop.py::_split_cross_file_collisions"]
 param = "fixes"
 rationale = "Verb-object: splits the fixes; codes_by_file is context."
-
-["pipelex/pipeline/fixes/fix_loop.py::_stage_file_update"]
-param = "update"
-rationale = "Verb-object: stages the update; single operand."
 
 ["pipelex/pipeline/fixes/fix_loop.py::_validation_error_items"]
 param = "exc"

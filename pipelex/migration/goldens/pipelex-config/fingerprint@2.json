@@ -131,7 +131,10 @@
       "value_type": "float",
       "required": true,
       "default": 2.5,
-      "open_node": false
+      "open_node": false,
+      "constraints": {
+        "gt": 0
+      }
     },
     "inference.img_gen.img_gen_param_defaults.is_moderated": {
       "value_type": "bool",
@@ -149,7 +152,10 @@
       "value_type": "int",
       "required": false,
       "default": 28,
-      "open_node": false
+      "open_node": false,
+      "constraints": {
+        "gt": 0
+      }
     },
     "inference.img_gen.img_gen_param_defaults.quality": {
       "value_type": "enum",
@@ -166,7 +172,11 @@
       "value_type": "int",
       "required": true,
       "default": 5,
-      "open_node": false
+      "open_node": false,
+      "constraints": {
+        "ge": 1,
+        "le": 6
+      }
     },
     "inference.img_gen.img_gen_param_defaults.seed": {
       "value_type": "int | literal",
@@ -427,7 +437,11 @@
       "value_type": "int",
       "required": true,
       "default": 3,
-      "open_node": false
+      "open_node": false,
+      "constraints": {
+        "ge": 1,
+        "le": 10
+      }
     },
     "inference.model_deck": {
       "value_type": "table",
@@ -488,7 +502,11 @@
       "value_type": "int",
       "required": true,
       "default": 2,
-      "open_node": false
+      "open_node": false,
+      "constraints": {
+        "ge": 0,
+        "le": 10
+      }
     },
     "interpreter": {
       "value_type": "table",
@@ -889,7 +907,10 @@
         "unbounded"
       ],
       "default": 8,
-      "open_node": false
+      "open_node": false,
+      "constraints": {
+        "ge": 1
+      }
     },
     "interpreter.scan": {
       "value_type": "table",
@@ -1239,7 +1260,10 @@
       "value_type": "float",
       "required": true,
       "default": 1.0,
-      "open_node": false
+      "open_node": false,
+      "constraints": {
+        "gt": 0
+      }
     },
     "runtime.reporting.is_generate_cost_report_file_enabled": {
       "value_type": "bool",

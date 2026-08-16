@@ -19,6 +19,9 @@ classifiers = [
 
 dependencies = [
   "aiofiles>=23.2.1",
+  # The migration fingerprint reads constraint objects from it by type. A zero-dependency
+  # interchange vocabulary, declared directly rather than borrowed from pydantic's own tree.
+  "annotated-types>=0.7.0",
   "datamodel-code-generator>=0.55.0",
   "filetype>=1.2.0",
   "httpx>=0.23.0,<1.0.0",
@@ -110,6 +113,7 @@ docs = [
 dev = [
   "boto3-stubs>=1.35.24",
   "cryptography>=46.0.7",
+  "hypothesis>=6.140.3",
   "jsonschema>=4.20.0",
   "moto[dynamodb,s3]>=5.0.0",
   "mypy==1.19.1",

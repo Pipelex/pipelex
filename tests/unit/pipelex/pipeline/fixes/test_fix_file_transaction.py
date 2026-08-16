@@ -6,13 +6,15 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.pipeline.exceptions import FixTransactionError, FixWriteConflictError
+from pipelex.pipeline.fixes.file_transaction import (
+    FileSnapshot,
+    PendingFileUpdate,
+    assert_snapshot_unchanged,
+    commit_file_updates,
+    read_file_snapshot,
+)
 from pipelex.pipeline.fixes.fix_loop import (
-    _assert_snapshot_unchanged,  # pyright: ignore[reportPrivateUsage]  # noqa: PLC2701
     _bind_fixes_to_snapshots,  # pyright: ignore[reportPrivateUsage]  # noqa: PLC2701
-    _commit_file_updates,  # pyright: ignore[reportPrivateUsage]  # noqa: PLC2701
-    _FileSnapshot,  # pyright: ignore[reportPrivateUsage]
-    _PendingFileUpdate,  # pyright: ignore[reportPrivateUsage]  # noqa: PLC2701
-    _read_file_snapshot,  # pyright: ignore[reportPrivateUsage]  # noqa: PLC2701
     _snapshot_loaded_sources,  # pyright: ignore[reportPrivateUsage]  # noqa: PLC2701
 )
 from pipelex.suggested_fix import FixSafety, SuggestedFix
@@ -37,11 +39,11 @@ class TestFixFileTransaction:
     def test_concurrent_edit_is_not_overwritten(self, tmp_path: Path) -> None:
         target = tmp_path / "bundle.mthds"
         target.write_text("original\n", encoding="utf-8")
-        snapshot = _read_file_snapshot(target)
+        snapshot = read_file_snapshot(target)
         target.write_text("user edit\n", encoding="utf-8")
 
         with pytest.raises(FixWriteConflictError, match="file changed"):
-            _commit_file_updates([_PendingFileUpdate(snapshot=snapshot, new_content="fixed\n")])
+            commit_file_updates([PendingFileUpdate(snapshot=snapshot, new_content="fixed\n")])
 
         assert target.read_text(encoding="utf-8") == "user edit\n"
         assert list(tmp_path.glob(".*.pipelex-fix-*.tmp")) == []
@@ -49,11 +51,11 @@ class TestFixFileTransaction:
     def test_failed_atomic_replace_preserves_original(self, tmp_path: Path, mocker: MockerFixture) -> None:
         target = tmp_path / "bundle.mthds"
         target.write_text("original\n", encoding="utf-8")
-        snapshot = _read_file_snapshot(target)
+        snapshot = read_file_snapshot(target)
         mocker.patch.object(Path, "replace", side_effect=OSError("replace failed"))
 
         with pytest.raises(OSError, match="replace failed"):
-            _commit_file_updates([_PendingFileUpdate(snapshot=snapshot, new_content="fixed\n")])
+            commit_file_updates([PendingFileUpdate(snapshot=snapshot, new_content="fixed\n")])
 
         assert target.read_text(encoding="utf-8") == "original\n"
         assert list(tmp_path.glob(".*.pipelex-fix-*.tmp")) == []
@@ -66,9 +68,9 @@ class TestFixFileTransaction:
         second_path.write_text("second original\n", encoding="utf-8")
         third_path.write_text("third original\n", encoding="utf-8")
         updates = [
-            _PendingFileUpdate(snapshot=_read_file_snapshot(first_path), new_content="first fixed\n"),
-            _PendingFileUpdate(snapshot=_read_file_snapshot(second_path), new_content="second fixed\n"),
-            _PendingFileUpdate(snapshot=_read_file_snapshot(third_path), new_content="third fixed\n"),
+            PendingFileUpdate(snapshot=read_file_snapshot(first_path), new_content="first fixed\n"),
+            PendingFileUpdate(snapshot=read_file_snapshot(second_path), new_content="second fixed\n"),
+            PendingFileUpdate(snapshot=read_file_snapshot(third_path), new_content="third fixed\n"),
         ]
         original_replace = Path.replace
         replacement_count = 0
@@ -88,7 +90,7 @@ class TestFixFileTransaction:
         mocker.patch.object(Path, "replace", new=fail_third_replacement)
 
         with pytest.raises(OSError, match="third replace failed"):
-            _commit_file_updates(updates)
+            commit_file_updates(updates)
 
         assert first_path.read_text(encoding="utf-8") == "first original\n"
         assert second_path.read_text(encoding="utf-8") == "second original\n"
@@ -104,25 +106,25 @@ class TestFixFileTransaction:
         second_path.write_text("second original\n", encoding="utf-8")
         third_path.write_text("third original\n", encoding="utf-8")
         updates = [
-            _PendingFileUpdate(snapshot=_read_file_snapshot(first_path), new_content="first fixed\n"),
-            _PendingFileUpdate(snapshot=_read_file_snapshot(second_path), new_content="second fixed\n"),
-            _PendingFileUpdate(snapshot=_read_file_snapshot(third_path), new_content="third fixed\n"),
+            PendingFileUpdate(snapshot=read_file_snapshot(first_path), new_content="first fixed\n"),
+            PendingFileUpdate(snapshot=read_file_snapshot(second_path), new_content="second fixed\n"),
+            PendingFileUpdate(snapshot=read_file_snapshot(third_path), new_content="third fixed\n"),
         ]
         assertion_count = 0
 
-        def inject_edit_before_third_commit(snapshot: _FileSnapshot) -> None:
+        def inject_edit_before_third_commit(snapshot: FileSnapshot) -> None:
             nonlocal assertion_count
             assertion_count += 1
             if assertion_count == 3:
                 second_path.write_text("concurrent user edit\n", encoding="utf-8")
                 msg = "injected third-file conflict"
                 raise FixWriteConflictError(msg)
-            _assert_snapshot_unchanged(snapshot)
+            assert_snapshot_unchanged(snapshot)
 
-        mocker.patch("pipelex.pipeline.fixes.fix_loop._assert_snapshot_unchanged", new=inject_edit_before_third_commit)
+        mocker.patch("pipelex.pipeline.fixes.file_transaction.assert_snapshot_unchanged", new=inject_edit_before_third_commit)
 
         with pytest.raises(FixTransactionError, match="rollback was incomplete") as exc_info:
-            _commit_file_updates(updates)
+            commit_file_updates(updates)
 
         assert first_path.read_text(encoding="utf-8") == "first original\n"
         assert second_path.read_text(encoding="utf-8") == "concurrent user edit\n"
@@ -134,7 +136,7 @@ class TestFixFileTransaction:
     def test_cleanup_failure_reports_committed_outcome(self, tmp_path: Path, mocker: MockerFixture) -> None:
         target = tmp_path / "bundle.mthds"
         target.write_text("original\n", encoding="utf-8")
-        snapshot = _read_file_snapshot(target)
+        snapshot = read_file_snapshot(target)
         original_unlink = Path.unlink
 
         def fail_temp_cleanup(path: Path, *, missing_ok: bool = False) -> None:
@@ -146,20 +148,20 @@ class TestFixFileTransaction:
         mocker.patch.object(Path, "unlink", new=fail_temp_cleanup)
 
         with pytest.raises(FixTransactionError, match=r"target changes were committed.*cleanup failed"):
-            _commit_file_updates([_PendingFileUpdate(snapshot=snapshot, new_content="fixed\n")])
+            commit_file_updates([PendingFileUpdate(snapshot=snapshot, new_content="fixed\n")])
 
         assert target.read_text(encoding="utf-8") == "fixed\n"
 
     def test_cleanup_failure_does_not_mask_commit_failure(self, tmp_path: Path, mocker: MockerFixture) -> None:
         target = tmp_path / "bundle.mthds"
         target.write_text("original\n", encoding="utf-8")
-        snapshot = _read_file_snapshot(target)
+        snapshot = read_file_snapshot(target)
 
         mocker.patch.object(Path, "replace", side_effect=OSError("primary replace failure"))
         mocker.patch.object(Path, "unlink", side_effect=OSError("secondary cleanup failure"))
 
         with pytest.raises(OSError, match="primary replace failure") as exc_info:
-            _commit_file_updates([_PendingFileUpdate(snapshot=snapshot, new_content="fixed\n")])
+            commit_file_updates([PendingFileUpdate(snapshot=snapshot, new_content="fixed\n")])
 
         assert target.read_text(encoding="utf-8") == "original\n"
         assert len(exc_info.value.__notes__) == 1
