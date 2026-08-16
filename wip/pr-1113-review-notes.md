@@ -39,11 +39,11 @@ Nothing is lost that was not already going to be pruned, and the run in question
 
 ---
 
-## Where this pauses — the thread replies are still owed
+## What each thread was answered with
 
-The code, tests, docs and notes are committed (`Answer the PR #1113 review: …`) with `make agent-check`, `make cl`, `make cmig`, `make docs-check` and the full `make agent-test` all green, and **no golden moved**. The commit is **not pushed**.
+The code, tests, docs and notes are committed (`Answer the PR #1113 review: …`) with `make agent-check`, `make cl`, `make cmig`, `make docs-check` and the full `make agent-test` all green, and **no golden moved**. The commits are **not pushed**.
 
-What remains is mechanical: reply on each of the twenty-three threads and resolve the eighteen that are closed. Reply with `addPullRequestReviewThreadReply(pullRequestReviewThreadId: "<id>", body: "…")` and resolve with `resolveReviewThread(threadId: "<id>")`. **Leave the five `defer` rows open.**
+Every thread has been replied to on the PR. The threads whose finding was closed are resolved; the five `defer` rows are deliberately left open, so the questions they carry stay visible on the PR rather than only in this file. The table below is the record of who was told what.
 
 | Thread id | Where | Disposition |
 |---|---|---|
