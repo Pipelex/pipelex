@@ -5,7 +5,7 @@ Lives below both ``graph`` and ``tracing`` because it rides in every job's
 TOML nests it under ``[...graph.data_inclusion]``, which is where an
 operator expects to tune it. Keeping the class here is what lets
 :mod:`pipelex.system.trace_context` stay independent of the graph rendering
-configs (``mermaid`` / ``reactflow``) that ``GraphConfig`` pulls in.
+config modules (``mermaid_config`` / ``reactflow_config``) that ``GraphConfig`` imports.
 """
 
 from pipelex.system.configuration.config_model import ConfigModel

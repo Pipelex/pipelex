@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:6ed1f6961113515fa3e40df06dfc2a7a7534cd2e499bc6a0488b152d68240886"
+digest = "sha256:b9ad2e4ec9403dead4351219b821a741e88752d5774fbf1673522f1e89ec8a20"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-15T16:16:33Z"
-rationale = "Re-ack after one further trigger edit: AGENT_CLI_CONFIG_OVERRIDES in agent_cli_factory.py is a dict-shaped config tree, so the reshape moves its keys from {'pipelex': {'log_config': ...}} to {'runtime': {'log': ...}}. Like the check_rules_sync_cmd raw-dict read, this is a site no type checker can reach — it is a plain mapping handed to Pipelex.make — which is why both are named rather than folded into 'mechanical read-site sweep'. The values inside it, AGENT_CLI_STDERR_LOG_FIELDS, are unchanged, so the agent CLI's output discipline is byte-for-byte what it was. Reviewed docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md again: neither names AGENT_CLI_CONFIG_OVERRIDES, neither spells a config address, and the two-stream format contract they do specify is untouched. Everything in the previous ack still holds. No doc change needed."
+reviewed_at = "2026-08-16T05:52:03Z"
+rationale = "Review follow-up: the only trigger edit is a comment reword in the plain CLI doctor_cmd.py. The comment said report_validation_error emits a migration-aware report; that function lost its MigrationConfig half and its category parameter in this PR, so the comment now describes the analyzed user-facing report it actually produces. No flag, no output stream, no exit code and no behaviour changed. Reviewed both targets: docs/tools/cli/ has no doctor page at all (update.md mentions only the Model Deck section, which this does not touch), and pipelex/cli/agent_cli/CLAUDE.md documents the agent CLI doctor, a different module, and specifies its two-stream format contract, which is untouched. Neither target names report_validation_error or claims the doctor report is migration-aware. No doc change needed."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -81,7 +81,7 @@ rationale = "Re-ack after one further trigger edit: AGENT_CLI_CONFIG_OVERRIDES i
 "pipelex/cli/commands/codegen/inputs_cmd.py" = "blob:20738a9e42f0e5ef7ffc489093348af3cb4643a0"
 "pipelex/cli/commands/codegen/types_cmd.py" = "blob:b7c9c7a3664c9fbe66f9b4c3c5ebf9ea1322445c"
 "pipelex/cli/commands/crate_loading.py" = "blob:3d7d651931ecf1a15a3e2d72411b3212b55d74ef"
-"pipelex/cli/commands/doctor_cmd.py" = "blob:b7f73043ff210747449d2b96e03e79eced016806"
+"pipelex/cli/commands/doctor_cmd.py" = "blob:7a79c723c232bddf1bca7f82d4f4aa2e567b1785"
 "pipelex/cli/commands/fix/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/fix/_diff_sandbox.py" = "blob:5ce264f5b0ab4ff4172f4d8789450916947f5c0e"
 "pipelex/cli/commands/fix/_fix_core.py" = "blob:8f6a187a0fb42c498629b177753d81620800b0da"

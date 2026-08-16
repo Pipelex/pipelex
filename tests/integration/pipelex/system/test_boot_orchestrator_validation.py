@@ -16,6 +16,7 @@ import pytest
 
 from pipelex.pipelex import Pipelex
 from pipelex.plugins.exceptions import UnknownBootOrchestratorError
+from pipelex.runtime_hub import get_boot_orchestrator
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 
 
@@ -44,3 +45,10 @@ class TestBootOrchestratorValidation:
         # so booting under it is the in-process default — and must not be rejected.
         Pipelex.make(integration_mode=_test_integration_mode(), needs_inference=False, boot_orchestrator="direct")
         assert Pipelex.is_fully_booted()
+        # The accepted name must also reach the hub. `boot_orchestrator` stopped being a config
+        # field and became boot-scoped hub state, so `get_boot_orchestrator()` is the only way
+        # run-time code (our Temporal plugin asking whether it owns the process) can read it back.
+        # Nothing in this repo reads it yet, which is exactly why the write needs pinning here:
+        # without this assertion, deleting the `set_boot_orchestrator` call in `RuntimeBoot.setup`
+        # leaves the whole suite green and hands every downstream reader a silent ``None``.
+        assert get_boot_orchestrator() == "direct"

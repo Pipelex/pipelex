@@ -142,7 +142,7 @@ def check_config_files(*, config_dir: Path | None = None) -> tuple[bool, int, st
             return False, 0, msg
         except ConfigValidationError as exc:
             # ConfigRoot.__init__ wraps pydantic.ValidationError into ConfigValidationError;
-            # recover the original via __cause__ so we still emit the migration-aware report.
+            # recover the original via __cause__ so we still emit the analyzed, user-facing report.
             underlying = exc.__cause__
             if isinstance(underlying, ValidationError):
                 validation_error_msg = report_validation_error(validation_error=underlying)

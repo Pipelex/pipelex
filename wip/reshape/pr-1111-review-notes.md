@@ -51,4 +51,56 @@ Every one of these is invisible to pyright, mypy, ruff and the whole test suite,
 
 **Open question:** is that worth building? Points in favour: the ledger makes it nearly free to keep correct, it is exactly the kind of gate the repo already likes (`check-keyword-only`, `check-migration-schemas`, the drift contracts), and this class will recur on every future config reshape. Points against: it needs a real allowlist for the legitimate collisions — module filenames (`log_config.py`, `aws_config.py`, the per-provider `*_config.py`), genuine attributes (`deck.model_deck_config.is_model_fallback_enabled`), local variables that share the name (`storage_config = get_config().runtime.storage`), the migrator's own fixtures and goldens, and intentional historical prose in the changelog and the `# was [cogt]` markers. Get that allowlist wrong and the gate is noise.
 
+**A fourth review round supplied the first measured false positive of the manual sweep, which is direct evidence for the allowlist half of that question.** The sweep had rewritten a sentence in `pipelex/system/data_inclusion_config.py` that names the graph rendering *module* names `mermaid_config` / `reactflow_config` — modules `pipelex/graph/graph_config.py` still imports and that the reshape never touched — into the field names `mermaid` / `reactflow`. The tell was that the identical sentence in `docs/contribute/hub-layering.md` had been swept correctly, so source and docs had silently diverged. Reverted in that round. A mechanical gate would have flagged the same sentence, so the module-filename allowlist entry is not hypothetical: it is required on day one, and it has to cover a module name appearing in prose, not just an import statement.
+
 Designing it is a decision, not a review fix, so it is recorded here rather than attempted.
+
+## 4. Our Temporal plugin reads `boot_orchestrator` from a field that no longer exists
+
+**Reporter:** found by the fourth review round while checking what depends on the demoted field.
+**File:** `pipelex-server/temporal/pipelex_temporal/temporal_activation.py:19` (sibling repo, not this one).
+
+`boot_orchestrator` stopped being a config field and became a boot argument plus boot-scoped hub state. That site still reads `get_config().plugins.boot_orchestrator`.
+
+**This is the one downstream site in the whole cross-repo sweep whose fix is not a path rename**, and it is worth calling out because a mechanical `plugins.` → `runtime.plugins.` pass produces the wrong answer here. The field was deleted, not moved; the correct fix is `from pipelex.runtime_hub import get_boot_orchestrator` and calling it. Every other downstream hit found so far — `content_generator_in_workflow.py`, `act_pipe_func.py`, the tracing tests, the `pipelex-api` / cookbook / cocode TOMLs, `pipelex-mistral-workflows` — is a straight rename.
+
+The one piece of good news is that it fails loudly rather than silently: `plugins` is not a root field on `PipelexConfig` any more, so the read raises `AttributeError` at import-activation time instead of quietly returning a default.
+
+**Action:** this belongs in the release-gated cross-repo sweep, flagged as manual. There is now an in-repo test pinning the write end of that seam (`tests/integration/pipelex/system/test_boot_orchestrator_validation.py` asserts `get_boot_orchestrator()` returns the accepted name), so the reader has something to trust.
+
+## 5. A backend TOML matches the `pipelex-config` tier glob and is claimed by nothing
+
+**Reporter:** found by the fourth review round while checking surface claiming.
+**File:** `.pipelex/inference/backends/pipelex_gateway.toml`.
+
+It matches the `pipelex-config` surface's tier glob `pipelex_*.toml`, but it is a backend definition, not a config root. `pipelex_service.toml` is safe from the same glob for a reason that does not apply here — filenames claim before globs, and it is a `base_file` for its own surface — whereas nothing claims this one first.
+
+Nothing on this branch is affected: `files_by_surface_in_directory` does not exist here, so no directory walk consults the glob yet.
+
+**Action:** this is a concrete, named specimen for S6's `pipelex migrate` directory walk. Whatever S6 builds for the walk should be tested against this exact file rather than a synthetic one.
+
+## 6. `introduced_in` is a forward-written version with no validator behind it
+
+**Reporter:** found by the fourth review round.
+**File:** `pipelex/migration/ledgers/pipelex-config.toml`.
+
+The `pipelex-config@2` entry declares `introduced_in = "0.46.0"` while `pyproject.toml` is on `0.45.0`. That is deliberate — the entry ships in a future release — and it is consistent with the changelog's forward-written `pipelex migrate` line, which Louis already ruled to keep.
+
+The point worth recording is that **nothing checks it**. `ledger.py:79` types `introduced_in` as a bare `str`, so any value parses, and no gate compares it to the package version at any point.
+
+**Action:** re-check this at release time. If the release lands on a number other than `0.46.0`, the field is silently wrong. A cheap release-time assertion (the head entry's `introduced_in` must equal the version being cut, or be unreleased) would close it permanently, but that is a decision for the release session, not this PR.
+
+## 7. The committed error pages under `docs/errors/` are gated by nothing
+
+**Reporter:** found by the fourth review round — `docs/errors/core-unconditional-plugin-disabled-error.md` had shipped stale.
+
+The commit "Review follow-up: the rest of the retired config roots, in strings and prose" added double-backticks to the `CoreUnconditionalPluginDisabledError` docstring. The generated page kept the un-backticked sentence, through three review rounds and a green full suite.
+
+Nothing catches it, and the two halves of the generated-error-docs system are gated asymmetrically:
+
+- the identity snapshot (`tests/data/errors/error_identity.txt`, `make gei`) has a real gate — `tests/unit/pipelex/errors/test_error_identity_snapshot.py` compares the committed file to a fresh generation and fails on drift;
+- the pages (`docs/errors/`, `make gep`) have none. Every test in `tests/unit/pipelex/errors/test_error_pages_generator.py` writes to `tmp_path`, and `make docs-check` *runs* the generator as a build dependency — so it rewrites the pages in the working tree, builds green, and never compares them against what is committed.
+
+The consequence is broader than a forgotten new class: **editing the docstring of an existing error class silently leaves its committed page stale**, and no gate anywhere — lint, full test suite, or CI — will say so. The page was regenerated in the fourth round, but the gap remains.
+
+**Open question:** add a snapshot-style test for the pages, mirroring the identity snapshot (generate to a temp dir, compare against `docs/errors/`, fail on drift)? The complication is the `<!-- pipelex:authored -->` marker: pages a maintainer has claimed are preserved across runs, so the comparison has to skip them, and the test would need to encode that rule rather than compare the directory wholesale.
