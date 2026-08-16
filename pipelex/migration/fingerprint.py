@@ -238,7 +238,10 @@ def _record_field(
     collected[dotted] = PathFingerprint(
         value_type=_render_type(annotation=resolved),
         required=required,
-        enum_members=_collect_enum_members(annotation=resolved),
+        # The members of an open node's value schema belong on the `*` child recorded below, whose
+        # own value is the enumerated one — the only place an operation can address them. Every
+        # other container keeps its members here, because it gets no child record at all.
+        enum_members=None if open_value_type is not None else _collect_enum_members(annotation=resolved),
         default=_json_safe(value=defaults_value),
         open_node=open_value_type is not None,
         constraints=_collect_constraints(annotation=annotation, field_metadata=field_metadata),
@@ -435,7 +438,16 @@ def _fold_bound(*, collected: dict[ConstraintKind, int | float], other: dict[Con
     overclaim — a union member with no bound of that kind is unbounded in it, so the honest union
     would drop the kind entirely — and the overclaim is what keeps a tightening visible on the
     common `Annotated[int, Field(ge=1)] | Literal["auto"]` shape, where the literal member can
-    carry no numeric bound at all. Symmetric on both fingerprints, so it cannot invent a narrowing.
+    carry no numeric bound at all.
+
+    It is symmetric, so it costs nothing while a union's member set holds still. Where that set
+    *moves* between two versions, the per-kind aggregate loses which member each bound came from
+    and can travel in a direction the accepted values did not — a union of two separately bounded
+    members can report a tightening that widened, and hide one that really narrowed. Reading it
+    correctly means recording bounds per member in the golden; no surface has a union with two
+    bound-carrying members today, and the alternative that needs no format change — dropping a kind
+    absent from some pool — cannot tell `gt` from `ge` here and would trade this over-report for a
+    silent under-report, which is the worse of the two. See `wip/pr-1113-review-notes.md`.
     """
     for kind, value in other.items():
         existing = collected.get(kind)
@@ -460,18 +472,15 @@ def _collect_enum_members(*, annotation: Any) -> list[str] | None:
 
 def _gather_enum_members(*, annotation: Any, members: set[str]) -> None:
     if isinstance(annotation, type) and issubclass(annotation, Enum):
-        members.update(str(member.value) for member in annotation)
+        # Only the string-valued members, exactly as a `Literal` is read below and for the same
+        # reason: a `remap_value` rewrites a *string*, so recording `1` as a spelling would let the
+        # accounting credit a remap the applier skips on every run, leaving a green gate over a file
+        # the new schema rejects. An enum over non-strings records nothing, which is the honest
+        # answer — and the same blind spot `Literal[1, 2]` already declares.
+        members.update(member.value for member in annotation if isinstance(member.value, str))
         return
     if get_origin(annotation) is Literal:
         members.update(str(arg) for arg in get_args(annotation) if isinstance(arg, str))
-        return
-    if _as_open_mapping_value(annotation=annotation) is not None:
-        # The value schema of an open mapping gets its own record beneath the `*` segment, and its
-        # members belong there. Recording them on the container as well made the coverage gate
-        # demand a `remap_value` at a path whose value is a table — an operation that can never
-        # fire, so the demand had no answer an author could give. Descending into every *other*
-        # container stays right: a `list[enum]` gets no child record, so a member lost inside one
-        # would otherwise be invisible.
         return
     for arg in get_args(annotation):
         _gather_enum_members(annotation=arg, members=members)

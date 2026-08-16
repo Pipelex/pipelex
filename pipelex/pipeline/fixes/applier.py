@@ -505,12 +505,19 @@ def _remap_every_value(*, target_table: dict[str, Any], mapping: dict[str, str],
     no conflict rule: any rewrite makes the operation applied, none makes it skipped.
     """
     remapped = 0
+    # Only the string values are ones a mapping could have named, so they are what the report
+    # counts against: a table also holding sub-tables or numbers would otherwise read as though the
+    # operation had left values behind that it was never able to address.
+    reachable = 0
     for key in list(target_table):
+        if not isinstance(target_table[key], str):
+            continue
+        reachable += 1
         if _remap_one_value(target_table=target_table, key=key, mapping=mapping, table_path_str=table_path_str).outcome.did_apply:
             remapped += 1
     if not remapped:
         return _OpResult(FixOpOutcome.SKIPPED, f"no value in '{table_path_str}' is one this operation's mapping names")
-    return _OpResult(FixOpOutcome.APPLIED, f"remapped {remapped} of {len(target_table)} values in '{table_path_str}'")
+    return _OpResult(FixOpOutcome.APPLIED, f"remapped {remapped} of {reachable} values in '{table_path_str}'")
 
 
 def _refresh_table_headers(*, item: Any) -> None:

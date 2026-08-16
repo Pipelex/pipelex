@@ -152,10 +152,16 @@ def keep_backup_for_rescue(*, path: Path, backup_path: Path, moment: datetime) -
     successful run of the same file must not prune it away, which is exactly what it would do to
     anything still named `.bak.<stamp>`.
 
-    Returns the path the copy is actually at, so the report always names a file that exists: a
-    rename that will not go, or a rescue name another run has already taken, leaves the copy where
-    it is rather than losing it to a tidier name. It leaves it inside the rotation too, and
-    `was_rescued` is how the report knows to tell the user to take it now rather than later.
+    Returns the path the copy is actually at, rather than the one it was headed for: a rename that
+    will not go, or a rescue name another run has already taken, leaves the copy where it is rather
+    than losing it to a tidier name. It leaves it inside the rotation too, and `was_rescued` is how
+    the report knows to tell the user to take it now rather than later.
+
+    "Where it is" is answered as of this call. The stamp resolves to the second and nothing here
+    locks, so a third run of the same file that commits in between can prune the copy out from
+    under an unrescued name — the one case in which the returned path names a file that has since
+    gone. Closing it means coordinating pruning across processes, which is more machinery than a
+    module with no command driving it yet has earned.
     """
     rescue_path = rescue_path_for(path=path, moment=moment)
     try:

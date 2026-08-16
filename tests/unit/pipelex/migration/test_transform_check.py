@@ -390,7 +390,11 @@ mapping    = { basic = "standrad" }
         legal precisely when it is unsafe — so demanding its operations reach the new shape would
         contradict the one thing `unsafe` means.
         """
-        _write_ledger(migration_dir=tmp_path, entries=_entry(ops="", safety="unsafe", declared='declared_narrowed_paths = ["label"]'))
+        # `title`, not `label`: an entry declares a path its *own* version records, and `label` is
+        # the one this bump removes. Declaring a removed path is the shape `make check-ledger`
+        # refuses as DECLARED_NARROWED_PATH_IS_ABSENT — a fixture that only escapes it by calling a
+        # different gate would put an illegal ledger in front of the next reader as an example.
+        _write_ledger(migration_dir=tmp_path, entries=_entry(ops="", safety="unsafe", declared='declared_narrowed_paths = ["title"]'))
         _defaults(migration_dir=tmp_path, schema_version=1, document='label = "hello"\n')
         _defaults(migration_dir=tmp_path, schema_version=2, document='title = "hello"\n')
         assert check_transform_chain(surface=_surface(config_model=_Renamed), migration_dir=tmp_path) == []

@@ -116,6 +116,16 @@ class TestTheNarrowingRelation:
             ("int", {ConstraintKind.GE: 1}, {ConstraintKind.GT: 0}),
             ("int", {ConstraintKind.LT: 10}, {ConstraintKind.LE: 9}),
             ("int | literal", {ConstraintKind.GT: 0}, {ConstraintKind.GE: 1}),
+            # A fractional threshold names no integer of its own, so it is the same bound as the
+            # whole number it rounds to — in both directions, and inclusive as well as exclusive.
+            ("int", {ConstraintKind.GT: 1.5}, {ConstraintKind.GE: 2}),
+            ("int", {ConstraintKind.GE: 2}, {ConstraintKind.GT: 1.5}),
+            ("int", {ConstraintKind.GT: 0.5}, {ConstraintKind.GT: 0.9}),
+            ("int", {ConstraintKind.GE: 0.5}, {ConstraintKind.GE: 1}),
+            ("int", {ConstraintKind.LE: 10}, {ConstraintKind.LT: 10.5}),
+            ("int", {ConstraintKind.LT: 10.5}, {ConstraintKind.LT: 10.1}),
+            ("int", {ConstraintKind.LE: 9.5}, {ConstraintKind.LE: 9}),
+            ("int", {ConstraintKind.GE: 0}, {ConstraintKind.GT: -0.5}),
         ],
     )
     def test_two_spellings_of_one_integer_bound_are_the_same_bound(
@@ -217,6 +227,36 @@ class TestTheNarrowingRelation:
             after=_record(value_type="str"),
         )
         assert lost == []
+
+    def test_an_enumerated_container_relaxed_into_free_strings_loses_no_spelling(self) -> None:
+        """The same relaxation one container down, which the type half already reads structurally.
+
+        `list[enum]` to `list[str]` is the widening `test_a_container_or_scalar_that_only_gained_room_is_not_a_narrowing`
+        asserts it is. Reading the exemption only at the top level made this half disagree with that
+        one: no narrowing, and every spelling lost — a bump and an `unsafe` entry demanded, then
+        reported to every user forever, for a change no file notices.
+        """
+        lost = lost_enumerated_spellings(
+            before=_record(value_type="list[enum]", enum_members=["basic", "premium"]),
+            after=_record(value_type="list[str]"),
+        )
+        assert lost == []
+
+    def test_an_enumerated_container_relaxed_into_something_else_still_loses_its_spellings(self) -> None:
+        """The exemption travels into the container, and so does its limit: `list[int]` accepts no spelling."""
+        lost = lost_enumerated_spellings(
+            before=_record(value_type="list[enum]", enum_members=["basic", "premium"]),
+            after=_record(value_type="list[int]"),
+        )
+        assert lost == ["basic", "premium"]
+
+    def test_an_enumerated_container_flattened_to_a_bare_string_still_loses_its_spellings(self) -> None:
+        """A `list[enum]` is not absorbed by `str`: a file carrying a list stops validating outright."""
+        lost = lost_enumerated_spellings(
+            before=_record(value_type="list[enum]", enum_members=["basic", "premium"]),
+            after=_record(value_type="str"),
+        )
+        assert lost == ["basic", "premium"]
 
     def test_an_enum_that_became_something_else_entirely_still_loses_its_spellings(self) -> None:
         """The exemption is for widening only — `int` accepts none of the spellings `str` did."""

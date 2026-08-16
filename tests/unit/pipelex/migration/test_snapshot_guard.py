@@ -139,6 +139,25 @@ class TestTheSnapshotGuard:
 
         assert "--force" in str(caught.value)
 
+    def test_the_refusal_names_the_remedy_a_narrowing_actually_has(self, tmp_path: Path) -> None:
+        """A tightened bound is not repaired by a bump alone, and the message must not imply it is.
+
+        The guard refuses on a narrowing as well as on a removal, but named only the removal's
+        remedy — "add the entry accounting for it" — which for a bound an author has just tightened
+        reads as though bumping the version were the whole of it. No structural operation can
+        repair a value, so the entry has to carry a remap or say `unsafe` and name the path.
+        """
+        _write_ledger(migration_dir=tmp_path)
+        snapshot_surface(surface=_surface(config_model=_SchemaOne), migration_dir=tmp_path)
+
+        with pytest.raises(MigrationSnapshotRefusedError) as caught:
+            snapshot_surface(surface=_surface(config_model=_BoundTightened), migration_dir=tmp_path)
+
+        message = str(caught.value)
+        assert "accepts fewer values at" in message
+        assert "declared_narrowed_paths" in message
+        assert "remap_value" in message
+
     def test_force_re_records_the_head_over_lost_material(self, tmp_path: Path) -> None:
         """The escape a fingerprint *format* change needs, over a schema version nobody has released."""
         _write_ledger(migration_dir=tmp_path)

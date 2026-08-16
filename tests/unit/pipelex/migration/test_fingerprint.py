@@ -9,7 +9,7 @@ red on every legitimate configuration change and teach everyone to regenerate ra
 
 from collections.abc import Mapping
 from decimal import Decimal
-from enum import StrEnum
+from enum import Enum, StrEnum
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
@@ -20,6 +20,13 @@ from pipelex.migration.fingerprint import ENUM_TYPE, TABLE_TYPE, ConstraintKind,
 class _Mode(StrEnum):
     FAST = "fast"
     SLOW = "slow"
+
+
+class _Level(int, Enum):
+    """Deliberately not a `StrEnum`: the projection has to say so rather than stringify it."""
+
+    LOW = 1
+    HIGH = 2
 
 
 class _Leaf(BaseModel):
@@ -35,6 +42,8 @@ class _Synthetic(BaseModel):
     labels: dict[str, str]
     modes: dict[str, _Mode]
     mode_list: list[_Mode]
+    mode_maps: list[dict[str, _Mode]]
+    level: _Level = _Level.LOW
     tags: list[str]
     bounded: Annotated[int, Field(ge=1)] | Literal["unbounded"] = 1
     # A field-level bound binds the whole field, whatever a union member declares for itself —
@@ -89,6 +98,8 @@ class TestFingerprintPaths:
             "modes",
             "modes.*",
             "mode_list",
+            "mode_maps",
+            "level",
             "tags",
             "bounded",
             "capped",
@@ -180,6 +191,28 @@ class TestFingerprintRecords:
         the remedy for one is an `unsafe` entry, which the coverage gate asks for by name.
         """
         assert _fingerprint().paths["mode_list"].enum_members == ["fast", "slow"]
+
+    def test_the_members_of_a_mapping_nested_in_a_list_are_recorded_on_the_list_itself(self) -> None:
+        """The suppression belongs to the field's own open node, not to every mapping anywhere inside it.
+
+        A `list[dict[str, enum]]` has no `*` child — the field's open node is the list, and a list
+        gets no child record — so suppressing the mapping's members here dropped them entirely, and
+        retiring one moved nothing in the fingerprint at all. The gate would have passed a change
+        that breaks every file carrying the spelling.
+        """
+        fingerprint = _fingerprint()
+        assert fingerprint.paths["mode_maps"].enum_members == ["fast", "slow"]
+        assert "mode_maps.*" not in fingerprint.path_names()
+
+    def test_an_enum_over_non_string_values_records_no_spelling(self) -> None:
+        """The same rule a `Literal` over non-strings already follows, for the same reason.
+
+        A remap rewrites a *string* value, so recording `1` and `2` as spellings would let the
+        accounting credit a `remap_value` the applier skips on every run — a green gate over a file
+        the new schema rejects. Recording nothing makes the projection's blind spot visible as a
+        blind spot, which is what the `Literal` rule already does.
+        """
+        assert _fingerprint().paths["level"].enum_members is None
 
     def test_a_string_literal_counts_as_an_enumerated_spelling(self) -> None:
         """A `Literal` and an `Enum` are the same thing to a TOML file: a closed set of spellings."""

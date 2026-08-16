@@ -42,6 +42,8 @@ The scenarios where it is *not* correct both require a file to be sitting at `<f
 
 What *was* wrong on this path — the `state_uncertain` report promising to keep a copy it had not moved out of the pruning rotation — is fixed: `keep_backup_for_rescue` now returns `RescuedBackup(path, was_rescued)` and the report tells the user to take the copy now when it could not be secured.
 
+A second thing was wrong on it and is now fixed too, found by the PR #1113 bot review: the *creator* of a shared name could delete a copy the adopting run was already relying on. Run A writes `bak.T`; run B finds the name taken, adopts it as its restore point, commits and prunes; A's commit is then refused *because B's landed*, and `_discard_backup` unlinked `bak.T` on the reasoning that a write that did not happen has nothing to back up. That reasoning is about A's own actions, and it left the migrated file with no copy of the original anywhere. `_discard_backup` now asks the file what it holds: a refused write discards its copy unless the file already carries the text this run was going to write, which only the other run can have put there. A user's own edit is unaffected — the file then holds the user's text, and the copy goes as it always did.
+
 **Residual worth knowing.** If this ever needs revisiting, the honest lever is not a content check but the plan's vocabulary: `MigrationPlan.backup_path` currently means "where a copy of the pre-migration file is", not "where this run wrote one", and nothing in the report distinguishes the two.
 
 ## Residual, unrelated to the three above

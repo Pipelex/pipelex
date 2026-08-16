@@ -3,7 +3,8 @@
 Writes each surface's fingerprint and complete reference document for the schema version its
 ledger currently declares. Older versions are never rewritten — a bump leaves the previous
 version's snapshot behind as the frozen history the chain is made of — and the head version is
-only rewritten when doing so erases nothing (see `pipelex/migration/snapshot.py`).
+rewritten only when doing so erases nothing (see `pipelex/migration/snapshot.py`). `--force` is the
+one exception, for a golden that predates a change to the fingerprint format itself.
 
 The regeneration diff is the point. A fingerprint golden is checked in so that a reviewer sees,
 line by line, which paths a change added, removed or renamed; running this command without reading

@@ -112,12 +112,13 @@ def _write_migrated_file(*, plan: MigrationPlan, snapshot: FileSnapshot, new_con
     try:
         commit_file_updates([PendingFileUpdate(snapshot=snapshot, new_content=new_content)])
     except FixWriteConflictError as exc:
-        # The primitive refused before touching the target, so the directory is as it was — minus
-        # the copy this run just made, which has nothing to back up.
-        _discard_backup(backup=backup)
+        # The primitive refused before touching the target, so everything this run did is undone by
+        # taking back the copy it just made, which has nothing to back up. What the primitive
+        # refused *over* is somebody else's write, and `_discard_backup` is what asks whose.
+        _discard_backup(backup=backup, snapshot=snapshot, new_content=new_content)
         return plan.model_copy(update={"blocked_reason": FileBlockedReason.CHANGED_DURING_RUN, "blocked_detail": str(exc)})
     except OSError as exc:
-        _discard_backup(backup=backup)
+        _discard_backup(backup=backup, snapshot=snapshot, new_content=new_content)
         return plan.model_copy(
             update={"blocked_reason": FileBlockedReason.UNWRITABLE, "blocked_detail": f"the file could not be written: {exc.strerror or exc}"}
         )
@@ -180,7 +181,7 @@ def _whereabouts_of(*, kept: RescuedBackup) -> str:
     )
 
 
-def _discard_backup(*, backup: WrittenBackup) -> None:
+def _discard_backup(*, backup: WrittenBackup, snapshot: FileSnapshot, new_content: str) -> None:
     """Remove the copy this run made of a file it then did not rewrite.
 
     Only the copy this run made. A backup already sitting at that name belongs to a concurrent run
@@ -188,10 +189,21 @@ def _discard_backup(*, backup: WrittenBackup) -> None:
     it here would destroy the one thing backups exist for on the way to reporting a write that
     never happened.
 
+    And only while nobody else has done this run's work. The stamp resolves to the second, so a
+    concurrent run of the same file that found this name taken adopted it as *its* restore point
+    without writing anything there. If that run has since committed, the file already holds the
+    text this run was going to write — and the copy under this name is the last of the original,
+    named by a report that is already out. So the file is asked what it holds rather than assumed
+    to be as it was: only this run's own text acquits the other run of having got there first.
+
+    A user's edit is the other reason a write is refused, and it is not this: the file then holds
+    the user's text, the copy goes as it always did, and nothing is left beside a file they did not
+    ask to have backed up.
+
     A copy that will not go is a stray file beside an untouched original — worth a warning, never
     worth an exception crossing the per-file boundary and aborting the siblings.
     """
-    if not backup.was_created:
+    if not backup.was_created or _carries(path=snapshot.path, content=new_content):
         return
     try:
         backup.path.unlink(missing_ok=True)

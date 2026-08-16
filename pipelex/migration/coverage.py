@@ -388,7 +388,16 @@ def _check_narrowing_accounting(
                     f"or nobody hears about this"
                 )
             case MigrationSafety.SAFE:
-                remedy = "no structural operation can repair a value, so the entry needs a remap_value for that path, or must be marked unsafe"
+                # Same gate `_check_enum_accounting` applies, for the same reason: a remap rewrites
+                # a *string* value, so on a path whose own value is a list it is a guarded skip on
+                # every run — and `make check-ledger` refuses one on a path that is not enumerated
+                # as illegal outright. Naming it here would send the author to write an operation
+                # one gate demands and the other rejects.
+                remedy = (
+                    "no structural operation can repair a value, so the entry needs a remap_value for that path, or must be marked unsafe"
+                    if is_remappable(record=before_record)
+                    else "and no operation can rewrite a value inside a container, so the entry must be marked unsafe"
+                )
         issues.append(
             CoverageIssue(
                 surface_id=surface_id,

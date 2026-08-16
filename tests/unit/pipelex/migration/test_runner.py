@@ -694,6 +694,42 @@ class TestMigrationRunner:
         assert occupied.exists()
         assert occupied.read_text(encoding="utf-8") == OLD_SHAPE
 
+    def test_a_refused_write_keeps_its_copy_when_the_original_is_no_longer_on_disk(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        build_entry: EntryBuilder,
+        build_ledger: LedgerBuilder,
+        build_surface: SurfaceBuilder,
+    ) -> None:
+        """The other half of the same-second collision: the copy this run made is the one another run named.
+
+        A run whose write is refused deletes the copy it made, on the reasoning that the directory
+        is as it was and a write that did not happen has nothing to back up. That reasoning is about
+        this run's own actions, and the write is refused precisely because somebody else's landed —
+        the concurrent run that found this name taken, adopted it as its restore point, and has
+        already replaced the file. Deleting it here leaves the migrated file with no copy of the
+        original anywhere, and the other run's report naming a path that is gone.
+        """
+        target = tmp_path / "example.toml"
+        target.write_text(OLD_SHAPE, encoding="utf-8")
+        ledger = build_ledger(
+            entries=[build_entry(to_schema_version=2, ops=[RenameTableKeyOp(table_path=["reporting"], key="output_config", new_key="output")])]
+        )
+
+        def _the_other_run_got_there_first(_updates: list[PendingFileUpdate]) -> None:
+            target.write_text('[reporting]\noutput = { directory = "out" }\n', encoding="utf-8")
+            msg = "refusing to overwrite: the file changed while changes were being prepared"
+            raise FixWriteConflictError(msg)
+
+        mocker.patch("pipelex.migration.runner.commit_file_updates", side_effect=_the_other_run_got_there_first)
+
+        plan = migrate_file(surface=build_surface(), ledger=ledger, file_path=target, dry_run=False, moment=MOMENT)
+
+        assert plan.blocked_reason is FileBlockedReason.CHANGED_DURING_RUN
+        backups = existing_backups_of(path=target)
+        assert [backup.read_text(encoding="utf-8") for backup in backups] == [OLD_SHAPE]
+
     def test_a_rescue_copy_survives_the_next_successful_run_of_the_same_file(
         self,
         tmp_path: Path,

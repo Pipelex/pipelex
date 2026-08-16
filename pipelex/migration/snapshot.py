@@ -103,9 +103,11 @@ def _refuse_a_destructive_head_overwrite(
     msg = (
         f"surface '{surface.surface_id}': refusing to overwrite the golden for schema version {schema_version}, because "
         f"{' and '.join(lost)}. Rewriting the head link here would erase exactly what the coverage gate exists to catch, "
-        f"leaving it green over a change that breaks every file carrying that material. If this is a real removal, bump "
+        f"leaving it green over a change that breaks every file carrying that material. If this is a real change, bump "
         f"current_schema_version to {schema_version + 1} and add the entry '{surface.surface_id}@{schema_version + 1}' "
-        f"accounting for it. If schema version {schema_version} has not been released and the golden merely predates a "
+        f"accounting for it — a removal by the operation that removes it, and a narrowing by a remap_value on the path, "
+        f"or by marking the entry unsafe and naming the path in declared_narrowed_paths, since no structural operation "
+        f"can repair a value. If schema version {schema_version} has not been released and the golden merely predates a "
         f"change to the fingerprint format itself, re-record it with `--force`"
     )
     raise MigrationSnapshotRefusedError(msg)

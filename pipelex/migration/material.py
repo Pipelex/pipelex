@@ -33,7 +33,7 @@ from collections.abc import Sequence
 
 from pipelex.migration.fingerprint import PATH_SEPARATOR
 from pipelex.migration.ledger import MigrationEntry, MigrationLedger, MigrationSafety
-from pipelex.migration.walk import op_source_path
+from pipelex.migration.walk import joined, op_source_path
 from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, MigrationOp, MoveKeyOp, RemapValueOp, RenameTableKeyOp
 
 
@@ -167,9 +167,9 @@ def _path_through_op(*, path: str, op: MigrationOp) -> str | None:
         case DeleteKeyOp() | DeleteTableOp():
             return None if _is_at_or_under(path=path, ancestor=op_source_path(op=op)) else path
         case RenameTableKeyOp():
-            return _respelled(path=path, source=op_source_path(op=op), destination=_joined(segments=[*op.table_path, op.new_key]))
+            return _respelled(path=path, source=op_source_path(op=op), destination=joined(segments=[*op.table_path, op.new_key]))
         case MoveKeyOp():
-            return _respelled(path=path, source=op_source_path(op=op), destination=_joined(segments=[*op.new_table_path, op.new_key]))
+            return _respelled(path=path, source=op_source_path(op=op), destination=joined(segments=[*op.new_table_path, op.new_key]))
 
 
 def _path_before_op(*, path: str, op: MigrationOp) -> str:
@@ -182,9 +182,9 @@ def _path_before_op(*, path: str, op: MigrationOp) -> str:
         case RemapValueOp() | DeleteKeyOp() | DeleteTableOp():
             return path
         case RenameTableKeyOp():
-            return _respelled(path=path, source=_joined(segments=[*op.table_path, op.new_key]), destination=op_source_path(op=op))
+            return _respelled(path=path, source=joined(segments=[*op.table_path, op.new_key]), destination=op_source_path(op=op))
         case MoveKeyOp():
-            return _respelled(path=path, source=_joined(segments=[*op.new_table_path, op.new_key]), destination=op_source_path(op=op))
+            return _respelled(path=path, source=joined(segments=[*op.new_table_path, op.new_key]), destination=op_source_path(op=op))
 
 
 def _with_source_path(*, op: MigrationOp, source_path: str) -> MigrationOp:
@@ -213,7 +213,3 @@ def _respelled(*, path: str, source: str, destination: str) -> str:
 
 def _is_at_or_under(*, path: str, ancestor: str) -> bool:
     return path == ancestor or path.startswith(ancestor + PATH_SEPARATOR)
-
-
-def _joined(*, segments: Sequence[str]) -> str:
-    return PATH_SEPARATOR.join(segments)

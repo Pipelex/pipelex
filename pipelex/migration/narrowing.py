@@ -80,15 +80,59 @@ def lost_enumerated_spellings(*, before: PathFingerprint, after: PathFingerprint
     of them still validates. That change is a widening and must ask for nothing — a bump demanded
     there is a gate crying wolf on a change no user's file notices.
 
-    The exemption is exactly that case — the new type admits `str` — and not "the type did not
-    narrow": `Literal['a']` to `Literal[1]` renders the same type on both sides and records no
-    members after, and every file carrying `'a'` stops validating.
+    The exemption is exactly that case — every enumerated part of the old type absorbed by a new
+    one that enumerates nothing — and not "the type did not narrow": `Literal['a']` to `Literal[1]`
+    renders the same type on both sides and records no members after, and every file carrying `'a'`
+    stops validating.
+
+    It is read structurally, at whatever depth the spellings sit, because that is where the type
+    half of this relation reads it: `list[enum]` to `list[str]` is the same benign loosening one
+    container down, and answering it differently here would have the two halves contradict each
+    other on one change. The depth cuts both ways — a `list[enum]` flattened to a bare `str` is no
+    widening at all, and every spelling it had is lost with it.
     """
     if not before.enum_members:
         return []
-    if not after.enum_members and STRING_TYPE in _union_members(rendered=after.value_type):
+    if not after.enum_members and _is_relaxed_into_free_strings(before=before.value_type, after=after.value_type):
         return []
     return sorted(set(before.enum_members) - set(after.enum_members or []))
+
+
+def _is_relaxed_into_free_strings(*, before: str, after: str) -> bool:
+    """Whether the new type still accepts every enumerated spelling the old one carried.
+
+    Two conditions, and the first is what keeps this from reading as "the type did not narrow": the
+    new type must enumerate nothing anywhere, so that a record with no members means "free" rather
+    than "enumerated over values the fingerprint cannot spell". Then every old member that carried
+    spellings must be absorbed — by `str`, or by the same member one container down.
+
+    Members that carry no spellings are not asked to be absorbed. `enum | int` becoming `str` loses
+    the numbers, and that is a narrowing of the *type*, reported by `describe_narrowing`; this half
+    answers only for the spellings.
+    """
+    if _records_enumerated_members(rendered=after):
+        return False
+    after_members = _union_members(rendered=after)
+    return all(
+        _is_member_absorbed(member=member, after_members=after_members)
+        for member in _union_members(rendered=before)
+        if _records_enumerated_members(rendered=member)
+    )
+
+
+def _records_enumerated_members(*, rendered: str) -> bool:
+    """Whether a rendered type spells out a closed set of values anywhere inside it.
+
+    `enum` and `literal` do, at any depth: the members of a `list[enum]` are recorded on the list's
+    own path, since a container argument gets no record of its own.
+    """
+    for member in _union_members(rendered=rendered):
+        if member in _ENUMERATED_MEMBERS:
+            return True
+        _, arguments = _split_container(rendered=member)
+        if any(_records_enumerated_members(rendered=argument) for argument in arguments):
+            return True
+    return False
 
 
 def is_remappable(*, record: PathFingerprint) -> bool:
@@ -248,20 +292,37 @@ def _strictest_bound(
     makes `max` mean "strictest" in both. Exclusivity breaks the tie, since `gt=0` admits one fewer
     value than `ge=0` at the same threshold.
 
-    Over the integers exclusivity is not a tie-break but a step: `gt=0` *is* `ge=1`, so the
-    exclusive form is folded into the inclusive one before comparing, and the two spellings of one
-    bound stop reading as a tightening of each other.
+    Over the integers a bound is met at the first whole number past its threshold, so every
+    spelling of one bound folds onto that number before anything is compared: `gt=t` binds at
+    `floor(t) + 1` and `ge=t` at `ceil(t)`. For a whole threshold — which is what `gt=0` *is*
+    `ge=1` says, and the only kind pydantic will build on an integer field — both are identities
+    beyond turning the exclusive form inclusive. For a fractional one they are what stops `gt=0.5`
+    and `gt=0.9`, which admit exactly the same integers, from reading as a tightening.
     """
     keys: list[tuple[float, bool]] = []
     for kind, exclusive in kinds:
         if kind not in constraints:
             continue
         threshold = sign * constraints[kind]
-        if integral and exclusive:
-            keys.append((threshold + 1.0, False))
+        if integral:
+            keys.append((_first_integer_meeting(threshold=threshold, exclusive=exclusive), False))
             continue
         keys.append((threshold, exclusive))
     return max(keys) if keys else None
+
+
+def _first_integer_meeting(*, threshold: float, exclusive: bool) -> float:
+    """The smallest whole number that satisfies this bound, in the signed comparison domain.
+
+    Read exactly rather than in binary floating point — `Fraction` for the same reason
+    `_is_multiple` uses it, so a threshold a user wrote as a decimal is not floored one short of
+    itself by a representation error.
+    """
+    exact = Fraction(str(threshold))
+    floored = exact.numerator // exact.denominator
+    if exclusive:
+        return float(floored + 1)
+    return float(floored if exact.denominator == 1 else floored + 1)
 
 
 def _render_bounds(*, constraints: dict[ConstraintKind, int | float], kinds: tuple[tuple[ConstraintKind, bool], ...]) -> str:
