@@ -2,7 +2,8 @@
 
 Writes each surface's fingerprint and complete reference document for the schema version its
 ledger currently declares. Older versions are never rewritten — a bump leaves the previous
-version's snapshot behind as the frozen history the chain is made of.
+version's snapshot behind as the frozen history the chain is made of — and the head version is
+only rewritten when doing so erases nothing (see `pipelex/migration/snapshot.py`).
 
 The regeneration diff is the point. A fingerprint golden is checked in so that a reviewer sees,
 line by line, which paths a change added, removed or renamed; running this command without reading
@@ -19,11 +20,14 @@ from pipelex.migration.surfaces import build_config_surface_registry, packaged_m
 from pipelex.runtime_hub import get_console
 
 
-def update_migration_schemas_cmd(*, quiet: bool = False) -> None:
+def update_migration_schemas_cmd(*, quiet: bool = False, force: bool = False) -> None:
     """Regenerate the fingerprint and defaults goldens for every configuration surface.
 
     Args:
         quiet: If True, output only a single status line (for use in Make targets).
+        force: If True, overwrite a head golden even when the models have lost material it
+            records. Reserved for a change to the fingerprint *format* over an unreleased schema
+            version; a real removal wants a bump and an entry instead.
     """
     console = get_console()
 
@@ -34,7 +38,7 @@ def update_migration_schemas_cmd(*, quiet: bool = False) -> None:
 
     registry = build_config_surface_registry()
     try:
-        snapshots = snapshot_registry(registry=registry, migration_dir=packaged_migration_dir())
+        snapshots = snapshot_registry(registry=registry, migration_dir=packaged_migration_dir(), force=force)
     except MigrationError as exc:
         console.print(f"[red]✗ Migration schema update: FAILED[/red] - {escape(str(exc))}")
         sys.exit(1)

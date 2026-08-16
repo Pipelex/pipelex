@@ -46,7 +46,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pipelex.migration.fingerprint import PATH_SEPARATOR, TABLE_TYPE, SurfaceFingerprint, compute_fingerprint
 from pipelex.migration.goldens import defaults_golden_path, read_fingerprint_golden
 from pipelex.migration.ledger import MigrationEntry, MigrationLedger, MigrationSafety, load_ledger
-from pipelex.migration.narrowing import describe_narrowing, lost_enumerated_spellings
+from pipelex.migration.narrowing import describe_narrowing, is_remappable, lost_enumerated_spellings
 from pipelex.migration.surfaces import Surface, SurfaceRegistry
 from pipelex.migration.walk import EntryWalk, walk_entry
 from pipelex.suggested_fix import WILDCARD_SEGMENT
@@ -298,15 +298,24 @@ def _check_enum_accounting(
             # check has already said so in terms the author can act on.
             continue
         removed_members = set(lost_enumerated_spellings(before=before_record, after=after_record))
-        unaccounted = sorted(removed_members - remapped_by_origin.get(origin, set()))
+        # A remap only reaches a path whose own value is a string. Where it cannot — an enumerated
+        # type inside a list — crediting one would be crediting an operation that skips on every
+        # run, and offering one as a remedy would send the author to write it and never see it fire.
+        reachable = is_remappable(record=before_record)
+        unaccounted = sorted(removed_members - remapped_by_origin.get(origin, set())) if reachable else sorted(removed_members)
         if unaccounted:
+            remedy = (
+                "so the entry needs a remap_value for each, or must be marked unsafe"
+                if reachable
+                else "and no operation can rewrite a value inside a container, so the entry must be marked unsafe"
+            )
             issues.append(
                 CoverageIssue(
                     surface_id=surface_id,
                     kind=CoverageIssueKind.ENUM_MEMBER_NOT_REMAPPED,
                     message=(
                         f"entry '{entry.id}': '{final_path}' no longer accepts {unaccounted} — a file carrying one of those "
-                        f"values no longer validates, so the entry needs a remap_value for each, or must be marked unsafe"
+                        f"values no longer validates, {remedy}"
                     ),
                 )
             )
@@ -567,7 +576,8 @@ def _check_head_link(*, surface_id: str, current_version: int, live: SurfaceFing
                 message=(
                     f"the models no longer have {diff.render_removals()}, which breaks every file that carries them. Bump "
                     f"current_schema_version to {current_version + 1}, add the entry '{surface_id}@{current_version + 1}' "
-                    f"accounting for each, then run `make umig`"
+                    f"accounting for each, then run `make umig` — or, if schema version {current_version} has not been "
+                    f"released and the golden merely predates a change to the fingerprint format, re-record it with `make umigf`"
                 ),
             )
         )
@@ -584,7 +594,9 @@ def _check_head_link(*, surface_id: str, current_version: int, live: SurfaceFing
                     f"{diff.render_narrowings()}. A file valid before this change is not valid after it, so this is a "
                     f"removal like any other. Bump current_schema_version to {current_version + 1}, add the entry "
                     f"'{surface_id}@{current_version + 1}' carrying a remap_value for each narrowed path — or marked "
-                    f"unsafe, where no remap can express it — then run `make umig`"
+                    f"unsafe, where no remap can express it — then run `make umig`. If schema version {current_version} "
+                    f"has not been released and the golden merely predates a change to the fingerprint format, re-record "
+                    f"it with `make umigf` instead"
                 ),
             )
         )

@@ -692,16 +692,6 @@
     "pipelex.log_config.package_log_levels": {
       "value_type": "dict[str, enum]",
       "required": true,
-      "enum_members": [
-        "CRITICAL",
-        "DEBUG",
-        "DEV",
-        "ERROR",
-        "INFO",
-        "OFF",
-        "VERBOSE",
-        "WARNING"
-      ],
       "default": {
         "anthropic": "INFO",
         "asyncio": "INFO",

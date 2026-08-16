@@ -33,8 +33,14 @@ class _Synthetic(BaseModel):
     optional_leaf: _Leaf | None = None
     deck: dict[str, _Leaf]
     labels: dict[str, str]
+    modes: dict[str, _Mode]
+    mode_list: list[_Mode]
     tags: list[str]
     bounded: Annotated[int, Field(ge=1)] | Literal["unbounded"] = 1
+    # A field-level bound binds the whole field, whatever a union member declares for itself —
+    # pydantic applies it on top of the member's own. The field is never validated here; the
+    # fingerprint reads the annotation and the metadata, and this is the shape that separates them.
+    capped: Annotated[int, Field(le=100)] | Literal["auto"] = Field(default="auto", le=6)
     retries: int = Field(default=3, ge=0, le=10)
     lenient: str = Field(default="x", strict=False)
     item_bounded: list[Annotated[int, Field(ge=1)]] = Field(default_factory=list[int])
@@ -80,8 +86,12 @@ class TestFingerprintPaths:
             "deck.*.count",
             "labels",
             "labels.*",
+            "modes",
+            "modes.*",
+            "mode_list",
             "tags",
             "bounded",
+            "capped",
             "retries",
             "lenient",
             "item_bounded",
@@ -152,6 +162,25 @@ class TestFingerprintRecords:
         assert record.value_type == ENUM_TYPE
         assert record.enum_members == ["fast", "slow"]
 
+    def test_the_members_beneath_an_open_mapping_are_recorded_on_the_wildcard_and_not_on_the_table(self) -> None:
+        """The container's own value is a table, not an enumerated spelling.
+
+        Recording the members twice made the coverage gate demand a `remap_value` at the container
+        path as well as at the wildcard one — and a remap of a table value can never fire, so the
+        demand had no legal answer. The wildcard record is the one an operation can address.
+        """
+        fingerprint = _fingerprint()
+        assert fingerprint.paths["modes"].enum_members is None
+        assert fingerprint.paths["modes.*"].enum_members == ["fast", "slow"]
+
+    def test_the_members_inside_a_list_are_recorded_on_the_list_itself(self) -> None:
+        """A list gets no child record, so the list's own path is the only place they can live.
+
+        Dropping them there would make a member removed from a `list[enum]` invisible to the gate;
+        the remedy for one is an `unsafe` entry, which the coverage gate asks for by name.
+        """
+        assert _fingerprint().paths["mode_list"].enum_members == ["fast", "slow"]
+
     def test_a_string_literal_counts_as_an_enumerated_spelling(self) -> None:
         """A `Literal` and an `Enum` are the same thing to a TOML file: a closed set of spellings."""
         assert _fingerprint().paths["bounded"].enum_members == ["unbounded"]
@@ -169,6 +198,15 @@ class TestFingerprintRecords:
         so a walk reading the annotation alone would be blind to every bound declared the usual way.
         """
         assert ConstraintKind.GE in (_fingerprint().paths["retries"].constraints or {})
+
+    def test_a_field_level_bound_binds_the_whole_field_and_a_member_may_not_loosen_it(self) -> None:
+        """`Field(le=6)` on the field is applied on top of whatever a union member declares.
+
+        Merging the two sources by "widest wins" would record `le=100` and read a later tightening
+        of the field-level bound as a change to an already-looser one — the gate going quiet on
+        exactly the values that stop validating.
+        """
+        assert _fingerprint().paths["capped"].constraints == {ConstraintKind.LE: 6}
 
     def test_a_bound_nested_inside_a_union_member_is_found_too(self) -> None:
         """The shape `Annotated[int, Field(ge=1)] | Literal["unbounded"]`, which the type rendering strips."""

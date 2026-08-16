@@ -77,6 +77,16 @@ class _SchemaTwoDeckFieldRenamed(BaseModel):
     deck: dict[str, _DeckEntryRenamed] = Field(default_factory=dict[str, _DeckEntryRenamed])
 
 
+class _SchemaOneWithLevels(BaseModel):
+    """A mapping from the user's own keys to an enumerated value — where `key = "*"` is the only reach."""
+
+    levels: dict[str, _Tier] = Field(default_factory=dict[str, _Tier])
+
+
+class _SchemaTwoLevelMemberGone(BaseModel):
+    levels: dict[str, _TierWithoutBasic] = Field(default_factory=dict[str, _TierWithoutBasic])
+
+
 class _SchemaTwoEnumMemberGone(BaseModel):
     """`basic` is no longer a legal spelling of `tier`."""
 
@@ -292,6 +302,40 @@ new_key    = "new_name"
         _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
         _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoDeckFieldRenamed, schema_version=2)
         assert check_ledger(surface=_surface(config_model=_SchemaTwoDeckFieldRenamed), migration_dir=tmp_path) == []
+
+    def test_a_wildcard_key_remap_beneath_an_open_node_is_legal_and_checked_like_any_other(self, tmp_path: Path) -> None:
+        """`key = "*"` addresses the wildcard record, so the remap legality rule reads its member set.
+
+        The keys under `levels` are the user's, so no fixed key reaches the values; the wildcard
+        record is where the enumerated members live, and it is exactly what the rule is checked
+        against — the operation is neither exempt nor unreachable.
+        """
+        ops = """
+[[migration.ops]]
+kind       = "remap_value"
+table_path = ["levels"]
+key        = "*"
+mapping    = { basic = "standard" }
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=_entry(ops=ops))
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOneWithLevels, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoLevelMemberGone, schema_version=2)
+        assert check_ledger(surface=_surface(config_model=_SchemaTwoLevelMemberGone), migration_dir=tmp_path) == []
+
+    def test_a_wildcard_key_remap_that_would_rewrite_a_still_legal_value_is_refused(self, tmp_path: Path) -> None:
+        """Wildcard or not, a `safe` remap must be provably unable to fire on a current file."""
+        ops = """
+[[migration.ops]]
+kind       = "remap_value"
+table_path = ["levels"]
+key        = "*"
+mapping    = { premium = "standard" }
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=_entry(ops=ops))
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOneWithLevels, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoLevelMemberGone, schema_version=2)
+        issues = check_ledger(surface=_surface(config_model=_SchemaTwoLevelMemberGone), migration_dir=tmp_path)
+        assert LedgerIssueKind.ILLEGAL_REMAP in _kinds(issues)
 
     def test_a_safe_remap_of_a_value_that_is_still_legal_is_refused(self, tmp_path: Path) -> None:
         """The remap legality rule, and the reason replay neutrality holds.

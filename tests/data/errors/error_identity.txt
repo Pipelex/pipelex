@@ -157,6 +157,7 @@ MigrationError | Migration error | https://docs.pipelex.com/latest/errors/migrat
 MigrationGoldenError | Migration golden error | https://docs.pipelex.com/latest/errors/migration-golden-error/
 MigrationLedgerError | Migration ledger error | https://docs.pipelex.com/latest/errors/migration-ledger-error/
 MigrationRegistryError | Migration registry error | https://docs.pipelex.com/latest/errors/migration-registry-error/
+MigrationSnapshotRefusedError | Migration snapshot refused | https://docs.pipelex.com/latest/errors/migration-snapshot-refused-error/
 MissingBundleValidatorError | Missing bundle validator | https://docs.pipelex.com/latest/errors/missing-bundle-validator-error/
 MissingDependencyError | Missing dependency | https://docs.pipelex.com/latest/errors/missing-dependency-error/
 MissingOrchestratorError | Missing orchestrator | https://docs.pipelex.com/latest/errors/missing-orchestrator-error/

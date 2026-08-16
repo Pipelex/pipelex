@@ -625,6 +625,62 @@ mapping    = { basic = "standard" }
         _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoEnumMemberGone, schema_version=2)
         assert check_surface(surface=_surface(config_model=_SchemaTwoEnumMemberGone), migration_dir=tmp_path) == []
 
+    def test_a_member_lost_inside_a_list_cannot_be_remapped_and_the_gate_says_so(self, tmp_path: Path) -> None:
+        """A remap rewrites a string value, and the value here is a list.
+
+        Crediting the remap would leave a green gate over a file that stops validating: the
+        operation is a guarded skip on every run. `unsafe` is the only remedy, and the message
+        has to say that rather than offer a remap the author would write and never see fire.
+        """
+        ops = """
+[[migration.ops]]
+kind       = "remap_value"
+table_path = []
+key        = "tiers"
+mapping    = { basic = "standard" }
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="safe", ops=ops))
+        _snapshot(migration_dir=tmp_path, config_model=_ListOfTiers, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_ListOfTiersMemberGone, schema_version=2)
+        issues = check_surface(surface=_surface(config_model=_ListOfTiersMemberGone), migration_dir=tmp_path)
+        assert _kinds(issues) == [CoverageIssueKind.ENUM_MEMBER_NOT_REMAPPED]
+        assert "must be marked unsafe" in issues[0].message
+        assert "remap_value" not in issues[0].message
+
+    def test_a_member_lost_beneath_an_open_mapping_is_remapped_through_the_wildcard_key(self, tmp_path: Path) -> None:
+        """The keys are the user's, so `key = "*"` is the only operation that reaches the values."""
+        ops = """
+[[migration.ops]]
+kind       = "remap_value"
+table_path = ["levels"]
+key        = "*"
+mapping    = { basic = "standard" }
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="safe", ops=ops))
+        _snapshot(migration_dir=tmp_path, config_model=_MappingOfTiers, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_MappingOfTiersMemberGone, schema_version=2)
+        assert check_surface(surface=_surface(config_model=_MappingOfTiersMemberGone), migration_dir=tmp_path) == []
+
+
+class _ListOfTiers(BaseModel):
+    """An enumerated type inside a list: the members live on the list's own path, with no child record."""
+
+    tiers: list[_Tier] = Field(default_factory=lambda: [_Tier.BASIC])
+
+
+class _ListOfTiersMemberGone(BaseModel):
+    tiers: list[_TierWithoutBasic] = Field(default_factory=lambda: [_TierWithoutBasic.STANDARD])
+
+
+class _MappingOfTiers(BaseModel):
+    """An enumerated type beneath an open mapping: the members live on the `*` record."""
+
+    levels: dict[str, _Tier] = Field(default_factory=lambda: {"one": _Tier.BASIC})
+
+
+class _MappingOfTiersMemberGone(BaseModel):
+    levels: dict[str, _TierWithoutBasic] = Field(default_factory=lambda: {"one": _TierWithoutBasic.STANDARD})
+
 
 class TestValueDomainNarrowing:
     """The change that keeps every path and every spelling, and still breaks a user's file.

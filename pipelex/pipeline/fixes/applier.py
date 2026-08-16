@@ -382,18 +382,45 @@ def _apply_at_table_path(*, toml_doc: TOMLDocument, fix_op: FixOp, table_path: l
             return _apply_move_key(toml_doc=toml_doc, fix_op=fix_op, table_path=table_path)
         case RemapValueOp():
             target_table = _resolve_table(toml_doc=toml_doc, table_path=table_path)
-            if target_table is None or fix_op.key not in target_table:
+            if target_table is None:
+                return _OpResult(FixOpOutcome.SKIPPED, f"table '{table_path_str}' not found in document")
+            if fix_op.key == WILDCARD_SEGMENT:
+                return _remap_every_value(target_table=target_table, mapping=fix_op.mapping, table_path_str=table_path_str)
+            if fix_op.key not in target_table:
                 return _OpResult(FixOpOutcome.SKIPPED, f"key '{fix_op.key}' not found in table '{table_path_str}'")
-            current_value = target_table[fix_op.key]
-            if not isinstance(current_value, str):
-                return _OpResult(FixOpOutcome.SKIPPED, f"value of '{table_path_str}.{fix_op.key}' is not a string")
-            new_value = fix_op.mapping.get(str(current_value))
-            if new_value is None:
-                # The current value is deliberately not named: a report must never echo a value
-                # read from a user's file (docs/migration-ledger.md, "What the engine reports").
-                return _OpResult(FixOpOutcome.SKIPPED, f"value of '{table_path_str}.{fix_op.key}' is not in this operation's mapping")
-            target_table[fix_op.key] = new_value
-            return _OpResult(FixOpOutcome.APPLIED)
+            return _remap_one_value(target_table=target_table, key=fix_op.key, mapping=fix_op.mapping, table_path_str=table_path_str)
+
+
+def _remap_one_value(*, target_table: dict[str, Any], key: str, mapping: dict[str, str], table_path_str: str) -> _OpResult:
+    """Rewrite one key's value through the mapping, skipping anything the mapping does not name."""
+    current_value = target_table[key]
+    if not isinstance(current_value, str):
+        return _OpResult(FixOpOutcome.SKIPPED, f"value of '{table_path_str}.{key}' is not a string")
+    new_value = mapping.get(str(current_value))
+    if new_value is None:
+        # The current value is deliberately not named: a report must never echo a value
+        # read from a user's file (docs/migration-ledger.md, "What the engine reports").
+        return _OpResult(FixOpOutcome.SKIPPED, f"value of '{table_path_str}.{key}' is not in this operation's mapping")
+    target_table[key] = new_value
+    return _OpResult(FixOpOutcome.APPLIED)
+
+
+def _remap_every_value(*, target_table: dict[str, Any], mapping: dict[str, str], table_path_str: str) -> _OpResult:
+    """Rewrite every value of the addressed table through the mapping — the ``*`` key.
+
+    This is the "each of these" reading the wildcard already has in a ``table_path``, applied to
+    keys instead of to tables, and it is what a mapping from the user's own keys to an enumerated
+    value needs: the keys are the user's, so only the document can enumerate them, and no fixed
+    ``key`` reaches them. A remap never collides, so folding many entries into one outcome needs
+    no conflict rule: any rewrite makes the operation applied, none makes it skipped.
+    """
+    remapped = 0
+    for key in list(target_table):
+        if _remap_one_value(target_table=target_table, key=key, mapping=mapping, table_path_str=table_path_str).outcome.did_apply:
+            remapped += 1
+    if not remapped:
+        return _OpResult(FixOpOutcome.SKIPPED, f"no value in '{table_path_str}' is one this operation's mapping names")
+    return _OpResult(FixOpOutcome.APPLIED, f"remapped {remapped} of {len(target_table)} values in '{table_path_str}'")
 
 
 def _refresh_table_headers(*, item: Any) -> None:
