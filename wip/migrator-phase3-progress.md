@@ -17,7 +17,7 @@ Record all three numbers against S6.
 
 `make agent-check` and the full `make agent-test` are both green on the branch as pushed.
 
-◐ **S6 part 3 is in progress on `feature/Migrator-3c`, uncommitted.** Items 6–9 of [What is actually left](#what-is-actually-left) are all built (Milestones 11–14); the §2 wording ruling is **taken and written down but deliberately not built** (see [The §2 ruling](#the-2-ruling--taken-not-built)). What remains: implement §2 across its four surfaces with tests, §4 if there is room, then the part-3 PR and ⏸ C. One of the four items lands in a **different repo** — Milestone 13 is uncommitted in `/Users/lchoquel/repos/Pipelex/` on `feature/Migrator`.
+✅ **S6 part 3 is complete and up for review — PR [#1115](https://github.com/Pipelex/pipelex/pull/1115), `feature/Migrator-3c` → `dev`, pushed at `fdbd99b7c`.** Items 6–9 of [What is actually left](#what-is-actually-left) are Milestones 11–14; the two parked #1114 review items that were routed to part 3 are Milestones 15 (§2, *a remedy is named only where it would write*) and 16 (§4, the doctor's unescaped Rich fields). `agent-check`, `agent-test`, `cmig`, `docs-check` and `check-spec-links` all green. One companion change lands in a **different repo** — Milestone 13 is pushed on `feature/Migrator` in `/Users/lchoquel/repos/Pipelex/` (commit `1db9326`), with no PR of its own. **⏸ C is not reached**: it waits on #1115 being merged, since its cold-start checks read the files off `dev`.
 
 ⚠ **S6 is well past half.** The pre-S7 bucket is closed (part 1, on `dev`), and on `feature/Migrator-3b` the two `migrate` commands (milestone 5), the downgrade diagnosis (milestone 6), boot tolerance (milestone 7), the validation-error report (milestone 8), the telemetry-remedy retirement (milestone 9) and the `doctor` pending-migrations row with `--fix` (milestone 10) are all built. What remains is the rest of the phase body — the drift-contract review list, the skills, the specs rows, and publishing the contract — as **part 3**, on a fresh branch after #1114 merges. See [What is actually left](#what-is-actually-left) at the bottom before planning a session.
 
@@ -629,7 +629,7 @@ The phase body the charter lists under **Do**, in the order the next session sho
 8. ~~**`docs/specs/command-surface-map.md` rows**~~ — done, see Milestone 13 (workspace-root repo, uncommitted there).
 9. ~~**Publish the contract**~~ — done, see Milestone 14.
 
-Then the part-3 PR to `dev` from `feature/Migrator-3c`, and Checkpoint C.
+~~Then the part-3 PR to `dev` from `feature/Migrator-3c`~~ — opened as [#1115](https://github.com/Pipelex/pipelex/pull/1115). Checkpoint C follows its merge.
 
 ### Part 3 — Milestones 11 to 14 (uncommitted on `feature/Migrator-3c`)
 
@@ -678,7 +678,7 @@ The items the review-bot pass on PR #1114 raised and this branch parked rather t
 - **The rescue-copy race** (`pr-1113-review-notes.md` §3): a third run's prune can take the `.bak.` a rescue is about to rename. The commands now make concurrent runs producible, so this is decidable — revisit as an age-sparing prune, not a lock.
 - Deliberately past S7's freeze, with named triggers, in `pr-1113-review-notes.md` and `migrator-write-scope-and-rename-fidelity.md`: per-member bounds in the golden, the `safe`-entry sibling, the tomlkit raw-storage staleness pass, rename fidelity (§2), the taken-backup-name report, and the residual. §1 of the write-scope note is **closed** by Milestone 5.
 
-✅ **Part 3, session 1 — items 6 through 9 are all built**, on `feature/Migrator-3c`, in one uncommitted change set. They are Milestones 11–14 below. What is left on this branch is the §2 wording ruling (taken, not built — see below), §4 if there is room, then the PR and ⏸ C.
+✅ **Part 3 is done, over two sessions.** Session 1 built items 6 through 9 (Milestones 11–14), committed as *"the review obligation, the two skills, and publishing the contract"*. Session 2 built the two parked #1114 review items routed here — Milestone 15 (§2) and Milestone 16 (§4) — committed as *"a remedy is named only where it would write, and the doctor stops eating brackets"*. Both are pushed and up for review as [#1115](https://github.com/Pipelex/pipelex/pull/1115). Nothing is left on this branch; ⏸ C waits on the merge.
 
 Milestone 7's inherited finding — the dead `except ValidationError` around `setup_config` — **is fixed**, at both of that function's config-side callers, and the same defect turned out to exist in the doctor.
 
