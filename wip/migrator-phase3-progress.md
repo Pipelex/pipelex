@@ -2,9 +2,16 @@
 
 The charter is [`wip/migrator-3/sequencing.md` § S6](../../wip/migrator-3/sequencing.md) at the **workspace root** (from this repo: `../wip/migrator-3/sequencing.md`), with the phase content in `plan.md § Phase 3`. This file is the session-crossing record of what S6 has built, what it decided, and what is still open. Open the charter first, then this.
 
-**Venue.** `_migrator/`, branch `feature/Migrator-3`, cut from `origin/dev` (the Phase 2 squash merge). Nothing pushed yet, no PR open yet.
+**Venue.** `_migrator/`, branch `feature/Migrator-3`, cut from `origin/dev` (the Phase 2 squash merge). **Pushed to origin, PR open against `dev`** carrying the pre-S7 bucket. S6 therefore lands as **two** PRs rather than the one the charter assumes: this one, and a second for the phase body on a fresh branch once `feature/Migrator-3` is squash-merged and deleted. Record both numbers against S6.
 
-⚠ **Cold-start state.** Milestone 1 is the branch's only commit (*"Migrator Phase 3, milestone 1: settle the golden format before S7 freezes it"*). **Milestones 2 and 3 are green but uncommitted** — staged working-tree state on top of it, across 22 files. Do not `git checkout`/`git stash` anything before reading the two milestone sections below; commit them first if you want a clean tree.
+✅ **Cold-start state.** Two commits, both pushed, working tree clean:
+
+1. *"Migrator Phase 3, milestone 1: settle the golden format before S7 freezes it"*
+2. *"Migrator Phase 3, milestones 2-3: what an unsafe entry promises, and catching a narrowing"* — milestones 2 and 3 together, plus the fixes from a `/code-review high` pass over them.
+
+`make agent-check` and the full `make agent-test` are both green on the branch as pushed.
+
+⚠ **S6 is about a third done.** The charter's "must be settled before S7" bucket is closed; the phase's own body — the two `migrate` commands and everything downstream of them — is **not started**. See [What is actually left](#what-is-actually-left) at the bottom before planning a session.
 
 ## Build order chosen for this session
 
@@ -91,7 +98,7 @@ added.
 
 `make agent-check` green. `make cl` green, `make cmig` green. `make umig` is a no-op on the tree as committed. Full `make agent-test` green — every test passed, working tree clean.
 
-## Milestone 2 — what an `unsafe` entry promises (DONE, uncommitted at the pause)
+## Milestone 2 — what an `unsafe` entry promises (DONE, committed and pushed)
 
 R9 (ruled option 2 on 2026-08-16) and the round-2 sibling — an `unsafe` entry silenced by a later `safe` rename of its target — were built as the single pass the charter asked for. The promise is now written once, in `docs/migration-ledger.md` § "What an `unsafe` entry promises":
 
@@ -133,9 +140,9 @@ The new tests were mutation-tested against the pre-fix engine: five of them go r
 
 ### Verified at the pause
 
-`make agent-check` green, `make cl` green, `make cmig` green, and the full `make agent-test` green — every test passed. Nothing committed yet: milestone 2 is uncommitted working-tree state on top of `9eea2219f`.
+`make agent-check` green, `make cl` green, `make cmig` green, and the full `make agent-test` green — every test passed.
 
-## Milestone 3 — the write path: dotted keys, backups, and what a blocked file means (DONE, uncommitted)
+## Milestone 3 — the write path: dotted keys, backups, and what a blocked file means (DONE, committed and pushed)
 
 The last of the "must be settled before S7" bucket. Three things the charter listed separately turned out to be one pass over the code that actually touches a user's file.
 
@@ -181,7 +188,7 @@ Every new runner test was mutation-tested: dropping the resolve, clobbering the 
 
 ### Verified at the pause
 
-`make agent-check` green, `make cl` green, `make cmig` green, `make docs-check` green, `make drift-check` green **with the changes staged**. Full `make agent-test` green. Milestones 2 and 3 are both uncommitted working-tree state on top of `9eea2219f`.
+`make agent-check` green, `make cl` green, `make cmig` green, `make docs-check` green, `make drift-check` green **with the changes staged**. Full `make agent-test` green.
 
 ## Already true before this session started (do not rebuild)
 
@@ -199,6 +206,34 @@ Everything in [§ S6](../../wip/migrator-3/sequencing.md#s6--migrator-phase-3) n
 **The "must be settled before S7" bucket is closed.** Two named follow-ups came out of it, neither blocking: the tomlkit raw-storage staleness wants one pass over every facade kind (`Container`, `Table`, `OutOfOrderTableProxy`) rather than the half-repair a rename can reach; and the `safe`-entry sibling above.
 
 Then the phase's own body: the two commands, boot tolerance, `report_validation_error`, the downgrade diagnosis, the telemetry-remedy retirement, `doctor`, the drift-contract review list (plus the four validator sites R8 names), the `add-migration` skill, `/release` step 3b, the `command-surface-map.md` rows, and publishing the contract in the nav.
+
+## Milestone 4 — the review pass over milestones 2-3 (DONE, in the same commit)
+
+A `/code-review high` over the staged changes produced five findings. Two were fixed, three were deferred with their options written down in [`wip/migrator-write-scope-and-rename-fidelity.md`](./migrator-write-scope-and-rename-fidelity.md).
+
+**Fixed.** The `value_domain_narrowed` report named the spelling the document carried *when the replay reached the entry*, and the later `safe` entries of the same run then renamed the material before the file was written — so a run reporting `reporting.retries` handed back a file calling it `output.retries`. `material.py` gained `spelling_after_replay`, and the report now names the end of that forward trace. Separately, the `state_uncertain` detail promised the pre-migration copy was "kept" on paths where it had not been moved out of the pruning rotation at all — another run's copy, a taken rescue name, or a rename that would not go. `keep_backup_for_rescue` now returns `RescuedBackup(path, was_rescued)` and the report asks the user to take the copy now when it could not be secured.
+
+**Deferred, with the decision spelled out for each.** The migration runner resolves symlinks without the write-scope guard its `.mthds` sibling pairs with `.resolve()`, so a configuration file symlinked outside every walked directory is migrated where it actually lives — keep it and say so, or guard it like the fix loop. A rename still renormalises the assignment's separator and drops a deliberate quoting, which is not a regression but sits against two claims made elsewhere in the same changeset. And a backup name already taken is reported as this run's copy — the documented policy working as designed, whose only misleading cases need a same-UTC-second collision from a non-run source.
+
+The contract's symlink paragraph was trimmed in the same change: it claimed "the two callers of the shared transaction primitive now agree", which on the write-scope half they do not.
+
+## What is actually left
+
+Measured against the charter's own **Done when** list ([§ S6](../../wip/migrator-3/sequencing.md#s6--migrator-phase-3)), verified against the tree rather than against this file:
+
+| Done when | State |
+|---|---|
+| The golden format is final for S7 (format bucket, dotted-key rename, `umig`, backup/replace in the contract) | ✅ Milestones 1 and 3 |
+| R9 is built | ✅ Milestone 2 |
+| The walk stops by name on a file two surfaces' globs both claim | ⚠️ Behaviour and test landed in Phase 2. The #1111 note-5 half is **owed**: re-aim it at the real specimen `.pipelex/inference/backends/pipelex_gateway.toml` and pin that the walk is non-recursive. A test, not a behaviour change. |
+| `pipelex migrate --help` / `pipelex-agent migrate --help`, the bootstrap test, both end-to-end tests | ❌ Not started. No `migrate` command exists in `pipelex/cli/commands/`. |
+| `release/SKILL.md` step 3b; `.claude/skills/add-migration/` | ❌ Neither exists. |
+
+And the phase body the charter lists under **Do**, none of it started: boot tolerance in the shared config-surface helper (all three loaders); `report_validation_error` on the real plan — note `core/validation.py`'s current `migration_config` is the old *renaming* config, not the ledger plan; the downgrade diagnosis; the two telemetry remedies retired; the `doctor` row and `--fix`; the `config-docs` drift-contract review list plus the four validator sites R8 names; the `command-surface-map.md` rows; publishing the contract in the nav. Then the PR to `dev`.
+
+Three "fits here" items are still literally unread by anything, which is the cheapest way to see the commands are missing: `min_supported_schema_version` has no reader beyond its own validator, and `MigrationReport.written_plans` / `blocked_plans` / `MigrationLedger.entry_for_version` have no caller. `pipelex migrate` is the intended reader of all four.
+
+**The next session starts at the two commands.**
 
 ## Rulings this session took on its own authority
 
