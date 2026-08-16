@@ -10,6 +10,8 @@ from rich.console import Console
 from pipelex.cli.commands.doctor_cmd import (
     BackendFileReport,
     ConfigLocationInfo,
+    TelemetryConfigCheck,
+    TelemetryConfigFinding,
     display_health_report,
     doctor_cmd,
 )
@@ -41,8 +43,7 @@ def _healthy_report_kwargs() -> dict[str, Any]:
         "config_healthy": True,
         "config_message": "All configuration files present and valid",
         "config_missing_count": 0,
-        "telemetry_healthy": True,
-        "telemetry_message": "Telemetry configured (mode: off)",
+        "telemetry_check": TelemetryConfigCheck(finding=TelemetryConfigFinding.HEALTHY, message="Telemetry configured (mode: off)"),
         "backends_healthy": True,
         "backends_message": "All 1 enabled backend(s) have valid credentials",
         "backend_credential_reports": {},

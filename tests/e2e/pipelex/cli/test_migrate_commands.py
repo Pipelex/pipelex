@@ -372,8 +372,9 @@ class TestNoValueFromAUsersFileIsEverRendered:
     quietly dropped would be no rule at all.
 
     Two of the three channels are covered here: the command's own output and the structured plan.
-    The third, the `migration` block on a configuration validation error, joins them when
-    `report_validation_error` starts reporting the real plan.
+    The third — the `migration` block on a configuration validation error — is
+    `TestABootFailureCarriesThePendingMigration` below, which needs a different specimen: boot
+    tolerance means a file the ledger *can* explain never reaches an error surface at all.
     """
 
     PLANTED_SECRET = "phc_L1VE_s3cret_project_key_that_must_never_be_rendered"
@@ -506,3 +507,77 @@ class TestABootFailureCarriesThePendingMigration:
 
         assert boot.returncode == 0, boot.stderr
         assert "migration" not in boot.stderr
+
+
+class TestAStaleTelemetryFileIsMigratedNotReset:
+    """Every surface that reports a stale `telemetry.toml` names the migration, not a fresh file.
+
+    Until now each of them held its own hardcoded remedy — *config format has changed, run
+    `pipelex init telemetry`* — written for exactly the shape the shipped ledger entry exists to
+    carry forward. That command writes a new file: the PostHog key, the Langfuse credentials and
+    the OTLP exporters a real machine has would all be gone.
+
+    Two different machines are needed here, and the difference is boot tolerance. The `doctor`
+    row is a filesystem probe, so it reports a file the ledger *can* explain — that machine boots
+    fine, and the doctor is what says the change is not permanent yet. The error envelope needs a
+    file that is old *and* wrong, because anything the ledger fully explains never reaches an
+    error at all.
+    """
+
+    def test_the_agent_doctor_reports_the_finding_and_the_migrate_remedy(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        project_dir, _, _ = _plant_a_stale_machine(hermetic_home=hermetic_home)
+
+        checked = _run(args=[str(PIPELEX_AGENT_BIN), "doctor", "--format", "json"], env=offline_subprocess_env, cwd=project_dir)
+
+        report: dict[str, Any] = json.loads(checked.stdout)
+        telemetry: dict[str, Any] = report["checks"]["telemetry"]
+        assert telemetry["healthy"] is False
+        assert telemetry["finding"] == "out_of_date"
+        actions: list[str] = report["recommended_actions"]
+        assert any("pipelex migrate" in action for action in actions)
+        assert not any("init telemetry" in action for action in actions), "this file is old, not broken"
+
+    def test_a_telemetry_boot_failure_carries_the_block_in_one_envelope(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """The other configuration surface that raises its own error type, on the same contract.
+
+        Boot tolerance means a telemetry file has to be old *and* wrong to get here — flat, and
+        carrying a key no telemetry schema ever had — which is exactly the machine the old
+        remedy was worst for: it is migratable, and `pipelex init telemetry` would have answered
+        it by writing a fresh file over the settings the migration keeps.
+        """
+        _, global_file, _ = _plant_a_stale_machine(hermetic_home=hermetic_home)
+        global_file.write_text(f"{_old_shape_telemetry_document()}\nnot_a_telemetry_setting = true\n", encoding="utf-8")
+
+        boot = _boot(env=offline_subprocess_env, cwd=hermetic_home)
+
+        assert boot.returncode != 0, "a file the ledger cannot fully explain still fails the boot"
+        assert boot.stderr.count('"error": true') == 1, boot.stderr
+        envelope: dict[str, Any] = json.loads(boot.stderr)
+        assert envelope["error_type"] == "TelemetryConfigValidationError"
+        assert envelope["error_domain"] == "config", "it comes from the class now, not the lookup table"
+        assert envelope["migration"]["remedy"] == "pipelex migrate"
+        assert "init telemetry" not in envelope["hint"]
+
+    def test_the_human_doctor_says_migrate_and_never_offers_to_start_the_file_over(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        project_dir, _, _ = _plant_a_stale_machine(hermetic_home=hermetic_home)
+
+        checked = _run(args=[str(PIPELEX_BIN), "--no-logo", "doctor"], env=offline_subprocess_env, cwd=project_dir)
+
+        # Both streams: the human doctor renders through a Rich console whose target the user's
+        # own log configuration decides, so which one it lands on is not this test's business.
+        printed = checked.stdout + checked.stderr
+        assert "out of date" in printed, printed
+        assert "pipelex migrate" in printed
+        assert "pipelex init telemetry" not in printed

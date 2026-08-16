@@ -46,6 +46,8 @@ You will usually meet this command through a warning rather than a crash. When a
 
 A file the history cannot explain is a different case, and it still fails the boot with the configuration error itself: tolerance widens what starts, never what is accepted. That error names this command too, though — beside the key it could not accept, it tells you which of your files a migration would touch, what it would carry forward, and what only you can decide.
 
+`pipelex doctor` is the third way here, and the one to reach for when nothing has gone wrong yet: it reports each configuration file as healthy, missing, out of date, or invalid, and only the out-of-date ones are this command's business. Nothing that Pipelex tells you about an out-of-date file will ever suggest deleting it and starting over — that is what this command exists to make unnecessary.
+
 ## For agents
 
 `pipelex-agent migrate` is the machine-facing counterpart. It writes only when passed `--yes`, since it cannot ask, and answers with a structured plan — `--format json` for the contract, `--format markdown` to read. Branch on the `needs_attention` field, never on the exit code.

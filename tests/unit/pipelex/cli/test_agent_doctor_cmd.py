@@ -14,7 +14,9 @@ if TYPE_CHECKING:
 from pipelex.cli.agent_cli.commands.agent_cli_factory import AGENT_CLI_STDERR_LOG_FIELDS
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.doctor_cmd import agent_doctor_cmd
+from pipelex.cli.commands.doctor_cmd import TelemetryConfigCheck, TelemetryConfigFinding
 from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport
+from pipelex.core.validation import MIGRATE_COMMAND
 from pipelex.system.console_target import ConsoleTarget
 
 
@@ -46,7 +48,7 @@ class TestAgentDoctorCmd:
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
-            return_value=(True, "Telemetry configured"),
+            return_value=TelemetryConfigCheck(finding=TelemetryConfigFinding.HEALTHY, message="Telemetry configured"),
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",
@@ -64,15 +66,34 @@ class TestAgentDoctorCmd:
         assert parsed["all_healthy"] is True
         assert "recommended_actions" not in parsed
 
-    def test_unhealthy_includes_recommended_actions(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
-        """Unhealthy telemetry should produce recommended_actions in the JSON output."""
+    @pytest.mark.parametrize(
+        ("finding", "expected_action"),
+        [
+            (TelemetryConfigFinding.NOT_FOUND, "pipelex init telemetry"),
+            (TelemetryConfigFinding.OUT_OF_DATE, MIGRATE_COMMAND),
+            (TelemetryConfigFinding.INVALID, "Fix"),
+            (TelemetryConfigFinding.UNPARSEABLE, "Fix"),
+        ],
+    )
+    def test_each_telemetry_finding_gets_its_own_recommended_action(
+        self,
+        finding: TelemetryConfigFinding,
+        expected_action: str,
+        mocker: MockerFixture,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """One remedy per finding, and the finding itself rides the envelope for an agent to branch on.
+
+        All four used to be answered with `pipelex init telemetry`, which on the out-of-date one
+        writes a fresh file over the settings a migration would have kept.
+        """
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_config_files",
             return_value=(True, 0, "All config files present"),
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
-            return_value=(False, "Config format has changed - run 'pipelex init telemetry' to update"),
+            return_value=TelemetryConfigCheck(finding=finding, message="something is up with telemetry"),
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",
@@ -88,10 +109,39 @@ class TestAgentDoctorCmd:
         parsed = json.loads(capsys.readouterr().out)
         assert parsed["all_healthy"] is False
         assert parsed["checks"]["telemetry"]["healthy"] is False
-        assert "recommended_actions" in parsed
-        assert any("pipelex init telemetry" in action for action in parsed["recommended_actions"])
+        assert parsed["checks"]["telemetry"]["finding"] == finding
+        actions = parsed["recommended_actions"]
+        assert any(expected_action in action for action in actions)
         # Rich markup should be stripped from the message
         assert "[cyan]" not in parsed["checks"]["telemetry"]["message"]
+
+    def test_an_out_of_date_telemetry_file_is_never_told_to_start_over(
+        self,
+        mocker: MockerFixture,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """The destructive half of the old remedy, pinned absent on the finding it was worst for."""
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_config_files",
+            return_value=(True, 0, "All config files present"),
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
+            return_value=TelemetryConfigCheck(finding=TelemetryConfigFinding.OUT_OF_DATE, message="out of date"),
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",
+            return_value=(True, {}, "All backends healthy"),
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_models",
+            return_value=(True, "Models valid", {}),
+        )
+
+        agent_doctor_cmd(output_format=CliOutputFormat.JSON)
+
+        parsed = json.loads(capsys.readouterr().out)
+        assert not any("init telemetry" in action for action in parsed["recommended_actions"])
 
     def test_backend_details_in_output(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """Backend credential reports should appear as structured data in the JSON output."""
@@ -110,7 +160,7 @@ class TestAgentDoctorCmd:
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
-            return_value=(True, "OK"),
+            return_value=TelemetryConfigCheck(finding=TelemetryConfigFinding.HEALTHY, message="OK"),
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",
@@ -167,7 +217,7 @@ class TestAgentDoctorCmd:
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
-            return_value=(True, "OK"),
+            return_value=TelemetryConfigCheck(finding=TelemetryConfigFinding.HEALTHY, message="OK"),
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",
@@ -218,7 +268,7 @@ class TestAgentDoctorCmd:
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
-            return_value=(True, "Telemetry configured"),
+            return_value=TelemetryConfigCheck(finding=TelemetryConfigFinding.HEALTHY, message="Telemetry configured"),
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",
@@ -263,7 +313,7 @@ class TestAgentDoctorCmd:
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
-            return_value=(True, "OK"),
+            return_value=TelemetryConfigCheck(finding=TelemetryConfigFinding.HEALTHY, message="OK"),
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",
@@ -314,7 +364,7 @@ class TestAgentDoctorCmd:
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
-            return_value=(True, "OK"),
+            return_value=TelemetryConfigCheck(finding=TelemetryConfigFinding.HEALTHY, message="OK"),
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",

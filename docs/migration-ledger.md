@@ -572,6 +572,19 @@ The agent loop this opens is the one the commands were built for: a command fail
 
 **A failure inside the scan is never the failure the user sees**, for the same reason the boot retry declines quietly: they have an error in front of them that names what to fix, and replacing it with a packaging problem of ours would cost them the only message that helps. A ledger that will not load stays loud where it should be — `make check-ledger`, and `pipelex migrate` itself. The catch is narrow rather than blanket, so a bug in our own applier still surfaces as the bug it is.
 
+### Every surface reports it the same way, and none of them says "start over"
+
+A configuration error reaches a user through several surfaces at once — the human CLI's panel, the agent CLI's JSON envelope, the `doctor` row — and before the ledger each of those carried its own hardcoded remedy. The telemetry ones are the case worth naming, because they were written for a real event and then aged into the wrong advice: *the telemetry.toml format has changed, run `pipelex init telemetry`*, shown for the very flat file that entry `telemetry-config@2` exists to carry forward. That command writes a fresh file. It would have taken the PostHog key, the Langfuse credentials and the OTLP exporters with it.
+
+So no surface holds its own answer any more:
+
+- Every configuration surface's loader raises through `report_validation_error`, so the `migration` block reaches the error wherever it is caught. `TelemetryConfigError` is a `PipelexConfigError` for this reason — it carries `error_domain = CONFIG` from the class rather than from the agent CLI's lookup table, and it can carry a block.
+- The **human handler** prints the fields the model refused and then names `pipelex migrate` when the block is there, or an edit when it is not.
+- The **agent envelope** carries `migration` as a field and its hint says which of the two readings applies; an agent branches on the field, never on the sentence.
+- The **`doctor` row** carries a *finding* — `healthy`, `not_found`, `unparseable`, `out_of_date`, `invalid` — and every caller reads that instead of the row's wording. This one is a correctness fix and not only a tidy-up: `--fix` used to decide what it could repair by searching the message for `"format has changed"`, so rewording the row would have switched the whole repair path off in silence.
+
+> **Writing a fresh file repairs exactly one finding: a missing one.** There is nothing in a file that is not there to lose. Every other unhealthy state has the user's own settings in it, so an out-of-date file is offered `pipelex migrate` and a broken one is left to a person. Regeneration is still reachable, and it is described as what it is — a way to start over that discards the file.
+
 ## Applying
 
 > **Operations apply to the user's file, and a template is never the remedy.** "Delete your configuration and re-initialize it" is the failure this project exists to remove, not a fallback it may reach for: re-initializing throws away every choice the user made, and it is exactly what a structural change should not cost them.

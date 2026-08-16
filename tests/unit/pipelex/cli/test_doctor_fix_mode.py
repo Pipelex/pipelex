@@ -7,10 +7,11 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from rich.console import Console
 
-from pipelex.cli.commands.doctor_cmd import BackendFileReport, do_doctor_cmd
+from pipelex.cli.commands.doctor_cmd import BackendFileReport, TelemetryConfigCheck, TelemetryConfigFinding, do_doctor_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport
 from pipelex.cogt.models.deck_manifest import DeckFileStatus, DeckSyncReport
+from pipelex.core.validation import MIGRATE_COMMAND
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -18,6 +19,7 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 CLEAN_DECK = DeckSyncReport(kit_version="1.2.0", installed_kit_version="1.2.0", manifest_present=True, files={})
+HEALTHY_TELEMETRY = TelemetryConfigCheck(finding=TelemetryConfigFinding.HEALTHY, message="OK")
 
 
 class TestDoctorFixMode:
@@ -27,7 +29,7 @@ class TestDoctorFixMode:
         mocks: dict[str, Any] = {
             "setup": mocker.patch("pipelex.cli.commands.doctor_cmd.setup_doctor_runtime"),
             "config": mocker.patch("pipelex.cli.commands.doctor_cmd.check_config_files", return_value=(True, 0, "OK")),
-            "telemetry": mocker.patch("pipelex.cli.commands.doctor_cmd.check_telemetry_config", return_value=(True, "OK")),
+            "telemetry": mocker.patch("pipelex.cli.commands.doctor_cmd.check_telemetry_config", return_value=HEALTHY_TELEMETRY),
             "backends": mocker.patch("pipelex.cli.commands.doctor_cmd.check_backend_credentials", return_value=(True, {}, "OK")),
             "models": mocker.patch("pipelex.cli.commands.doctor_cmd.check_models", return_value=(True, "OK", {})),
             "deck": mocker.patch("pipelex.cli.commands.doctor_cmd.check_deck_sync", return_value=(True, CLEAN_DECK, "OK")),
@@ -58,14 +60,52 @@ class TestDoctorFixMode:
         assert "Interactive Fix Mode" in output
         assert "Configuration files installed" in output
 
-    def test_fix_telemetry_format_change_runs_init_telemetry(self, doctor_mocks: dict[str, Any]) -> None:
-        """Accepting the telemetry fix runs init focused on telemetry."""
-        doctor_mocks["telemetry"].return_value = (False, "Config format has changed - run 'pipelex init telemetry' to update")
+    def test_fix_missing_telemetry_runs_init_telemetry(self, doctor_mocks: dict[str, Any]) -> None:
+        """A telemetry file that is not there is written, and it is the only finding that is."""
+        doctor_mocks["telemetry"].return_value = TelemetryConfigCheck(
+            finding=TelemetryConfigFinding.NOT_FOUND,
+            message="Telemetry configuration file not found",
+        )
 
         self._run_doctor_expecting_exit_one()
 
         doctor_mocks["init_cmd"].assert_called_once_with(focus=InitFocus.TELEMETRY, skip_confirmation=True)
         assert "Telemetry configured" in doctor_mocks["console"].export_text()
+
+    def test_fix_never_offers_to_reset_an_out_of_date_telemetry_file(self, doctor_mocks: dict[str, Any]) -> None:
+        """The defect this milestone retired, pinned as behaviour.
+
+        `--fix` used to read the row's *message* for "format has changed" and, on a match, offer
+        to write a fresh telemetry.toml — discarding the PostHog key, the Langfuse credentials
+        and the exporters that the migration it should have named would have carried forward.
+        """
+        doctor_mocks["telemetry"].return_value = TelemetryConfigCheck(
+            finding=TelemetryConfigFinding.OUT_OF_DATE,
+            message=f"Configuration is out of date — run '{MIGRATE_COMMAND}' to bring it up to date",
+        )
+
+        self._run_doctor_expecting_exit_one()
+
+        doctor_mocks["init_cmd"].assert_not_called()
+
+    def test_fix_never_offers_to_reset_an_invalid_telemetry_file(self, doctor_mocks: dict[str, Any]) -> None:
+        """A file that is wrong is a person's to edit; a reset is offered as a way to start over.
+
+        The distinction matters on the same file the previous test is about: the old sniff also
+        matched "invalid configuration", so a single mistyped enum value was answered by
+        rewriting the whole file.
+        """
+        doctor_mocks["telemetry"].return_value = TelemetryConfigCheck(
+            finding=TelemetryConfigFinding.INVALID,
+            message="Invalid configuration:\nValidation error(s):",
+        )
+
+        self._run_doctor_expecting_exit_one()
+
+        doctor_mocks["init_cmd"].assert_not_called()
+        output = doctor_mocks["console"].export_text()
+        assert "Telemetry validation error" in output
+        assert "discarding what is in it" in output
 
     def test_fix_outdated_deck_runs_update(self, doctor_mocks: dict[str, Any]) -> None:
         """Accepting the deck fix runs `pipelex update --yes`."""

@@ -42,9 +42,10 @@ from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.exceptions import ConfigValidationError
 from pipelex.system.pipelex_service.exceptions import PipelexServiceConfigValidationError
 from pipelex.system.pipelex_service.pipelex_service_config import load_pipelex_service_config_if_exists
-from pipelex.system.telemetry import telemetry_config as telemetry_config_module
+from pipelex.system.telemetry import telemetry_loader as telemetry_loader_module
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
-from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig, load_telemetry_config
+from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig
+from pipelex.system.telemetry.telemetry_loader import load_telemetry_config
 from pipelex.tools.log.log_levels import LogLevel
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
@@ -238,7 +239,7 @@ class TestTheTelemetryLoader:
         stale = global_dir / "telemetry.toml"
         stale.write_text(old_shape_telemetry_document(), encoding="utf-8")
         before = stale.read_bytes()
-        warning = mocker.patch.object(telemetry_config_module.log, "warning")
+        warning = mocker.patch.object(telemetry_loader_module.log, "warning")
 
         config = load_telemetry_config(secrets_provider=secrets_provider)
 
@@ -297,7 +298,7 @@ class TestTheTelemetryLoader:
         mocker: MockerFixture,
     ) -> None:
         """The replay runs on the failure path only, so a current machine pays nothing for it."""
-        retry = mocker.spy(telemetry_config_module, "replay_surface_files_in_memory")
+        retry = mocker.spy(telemetry_loader_module, "replay_surface_files_in_memory")
 
         load_telemetry_config(secrets_provider=secrets_provider)
 

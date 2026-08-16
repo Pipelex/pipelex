@@ -14,6 +14,8 @@ from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_e
 from pipelex.cli.commands.doctor_cmd import (
     BackendFileReport,
     ConfigLocationInfo,
+    TelemetryConfigCheck,
+    TelemetryConfigFinding,
     check_backend_credentials,
     check_config_files,
     check_models,
@@ -21,12 +23,32 @@ from pipelex.cli.commands.doctor_cmd import (
     gather_config_location,
     setup_doctor_runtime,
 )
+from pipelex.core.validation import MIGRATE_COMMAND
 from pipelex.system.configuration.config_loader import config_manager
 
 
 def _status_icon(*, healthy: bool) -> str:
     """Return a status emoji: checkmark for healthy, warning for unhealthy."""
     return "\u2705" if healthy else "\u26a0\ufe0f"
+
+
+def _telemetry_action(*, check: TelemetryConfigCheck, config_location: ConfigLocationInfo) -> str | None:
+    """What to tell an agent to do about the telemetry finding, or nothing when it is healthy.
+
+    One remedy per finding, because they are genuinely different moves: a missing file is written,
+    an out-of-date one is migrated with every setting kept, and a file this build cannot read is
+    a person's to edit. The single `pipelex init telemetry` this replaced said the same thing to
+    all four, and on the out-of-date one it was destructive advice.
+    """
+    match check.finding:
+        case TelemetryConfigFinding.HEALTHY:
+            return None
+        case TelemetryConfigFinding.NOT_FOUND:
+            return "Run 'pipelex init telemetry' to write a telemetry configuration"
+        case TelemetryConfigFinding.OUT_OF_DATE:
+            return f"Run '{MIGRATE_COMMAND}' to bring telemetry.toml up to date (it keeps the settings in it)"
+        case TelemetryConfigFinding.UNPARSEABLE | TelemetryConfigFinding.INVALID:
+            return f"Fix {config_location.config_dir}/telemetry.toml: {check.message}"
 
 
 def _format_doctor_markdown(result: dict[str, Any]) -> str:
@@ -153,7 +175,7 @@ def agent_doctor_cmd(
         # a silent installer on a fresh machine. (The --global path skips materialization
         # — see load_config.)
         config_healthy, config_missing_count, config_message = check_config_files(config_dir=config_dir)
-        telemetry_healthy, telemetry_message = check_telemetry_config(config_dir=config_dir)
+        telemetry_check = check_telemetry_config(config_dir=config_dir)
         backends_healthy, backend_credential_reports, backends_message = check_backend_credentials(config_dir=config_dir)
 
         # check_models requires the hub + log.configure produced by setup_doctor_runtime.
@@ -200,7 +222,7 @@ def agent_doctor_cmd(
     # installed a hub or configured log — the helper guards both internally).
     apply_agent_cli_output_discipline()
 
-    all_healthy = config_healthy and telemetry_healthy and backends_healthy and models_healthy
+    all_healthy = config_healthy and telemetry_check.is_healthy and backends_healthy and models_healthy
 
     # Build backend credential details
     backends_list: list[dict[str, Any]] = []
@@ -235,8 +257,9 @@ def agent_doctor_cmd(
         recommended_actions.append("Run 'pipelex init config' to install missing configuration files")
     if not config_healthy and config_missing_count == 0:
         recommended_actions.append(f"Fix validation errors in {config_location.config_dir}/pipelex.toml or run 'pipelex init config'")
-    if not telemetry_healthy:
-        recommended_actions.append(f"Run 'pipelex init telemetry' to fix telemetry: {telemetry_message}")
+    recommended_telemetry_action = _telemetry_action(check=telemetry_check, config_location=config_location)
+    if recommended_telemetry_action is not None:
+        recommended_actions.append(recommended_telemetry_action)
     if not backends_healthy:
         for report in backend_credential_reports.values():
             if report.missing_vars:
@@ -265,8 +288,9 @@ def agent_doctor_cmd(
                 "missing_count": config_missing_count,
             },
             "telemetry": {
-                "healthy": telemetry_healthy,
-                "message": telemetry_message,
+                "healthy": telemetry_check.is_healthy,
+                "finding": str(telemetry_check.finding),
+                "message": telemetry_check.message,
             },
             "backend_credentials": {
                 "healthy": backends_healthy,

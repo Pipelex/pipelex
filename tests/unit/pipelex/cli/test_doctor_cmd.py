@@ -12,6 +12,8 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 from pipelex.cli.commands.doctor_cmd import (
+    TelemetryConfigCheck,
+    TelemetryConfigFinding,
     check_backend_credentials,
     check_telemetry_config,
     do_doctor_cmd,
@@ -48,7 +50,7 @@ class TestDoctorLayeredResolution:
         )
         mock_check_telemetry = mocker.patch(
             "pipelex.cli.commands.doctor_cmd.check_telemetry_config",
-            return_value=(True, "OK"),
+            return_value=TelemetryConfigCheck(finding=TelemetryConfigFinding.HEALTHY, message="OK"),
         )
         mock_check_backends = mocker.patch(
             "pipelex.cli.commands.doctor_cmd.check_backend_credentials",
@@ -105,7 +107,7 @@ class TestDoctorLayeredResolution:
         )
         mocker.patch(
             "pipelex.cli.commands.doctor_cmd.check_telemetry_config",
-            return_value=(True, "OK"),
+            return_value=TelemetryConfigCheck(finding=TelemetryConfigFinding.HEALTHY, message="OK"),
         )
         mocker.patch(
             "pipelex.cli.commands.doctor_cmd.check_backend_credentials",
@@ -138,7 +140,7 @@ class TestDoctorLayeredResolution:
         assert "translated validation message" in kwargs["models_message"]
         # All other partial check tuples survived intact.
         assert kwargs["config_healthy"] is True
-        assert kwargs["telemetry_healthy"] is True
+        assert kwargs["telemetry_check"].is_healthy is True
         assert kwargs["backends_healthy"] is True
 
     def test_telemetry_check_falls_back_to_global(self, mocker: MockerFixture, tmp_path: Path) -> None:
@@ -154,9 +156,9 @@ class TestDoctorLayeredResolution:
         mocker.patch.object(ConfigLoader, "global_config_dir", new_callable=mocker.PropertyMock, return_value=global_dir)
 
         # No config_dir override → layered resolution should find it in global
-        healthy, message = check_telemetry_config()
-        assert healthy is True
-        assert "off" in message
+        check = check_telemetry_config()
+        assert check.is_healthy is True
+        assert "off" in check.message
 
     def test_telemetry_check_uses_project_override(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """When project .pipelex/ has telemetry.toml, it should be used instead of global."""
@@ -170,9 +172,9 @@ class TestDoctorLayeredResolution:
         mocker.patch.object(ConfigLoader, "project_config_dir", new_callable=mocker.PropertyMock, return_value=project_dir)
         mocker.patch.object(ConfigLoader, "global_config_dir", new_callable=mocker.PropertyMock, return_value=global_dir)
 
-        healthy, message = check_telemetry_config()
-        assert healthy is True
-        assert "anonymous" in message
+        check = check_telemetry_config()
+        assert check.is_healthy is True
+        assert "anonymous" in check.message
 
     def test_telemetry_check_with_explicit_config_dir_skips_layering(self, tmp_path: Path) -> None:
         """When config_dir is explicitly provided (e.g. --global), use it directly without layering."""
@@ -180,8 +182,7 @@ class TestDoctorLayeredResolution:
         explicit_dir.mkdir()
         (explicit_dir / TELEMETRY_CONFIG_FILE_NAME).write_text(TELEMETRY_OFF, encoding="utf-8")
 
-        healthy, _message = check_telemetry_config(config_dir=explicit_dir)
-        assert healthy is True
+        assert check_telemetry_config(config_dir=explicit_dir).is_healthy is True
 
     def test_backend_credentials_falls_back_to_global(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """When project .pipelex/ exists but has no backends.toml, fall back to global."""

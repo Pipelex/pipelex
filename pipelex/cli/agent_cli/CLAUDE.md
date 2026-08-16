@@ -97,7 +97,7 @@ commands/
 | `models` | Lists available model presets, aliases, and waterfalls. `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value) |
 | `check-model` | Validates a model reference and suggests alternatives if invalid. `--type`/`-t` for model category, `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value) |
 | `migrate` | Migrates this machine's configuration files (global `~/.pipelex/` and project `.pipelex/`, non-recursively) to the current schema by replaying each surface's ledger. Does **not** boot — it is the command for a configuration that cannot load. Writes only with `--yes`; `--dry-run` plans and is the default; the two together are refused with exit 2. `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json`. The verdict is the structured `needs_attention`, not the exit code. |
-| `doctor` | Checks config, credentials, models health. `--global`/`-g` for global dir. `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value) |
+| `doctor` | Checks config, credentials, models health. `--global`/`-g` for global dir. `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value). The telemetry check carries a `finding` (`healthy`/`not_found`/`unparseable`/`out_of_date`/`invalid`) beside its `healthy` and `message`; branch on that, and note `out_of_date` is `pipelex migrate`'s and never `pipelex init telemetry`'s — a reset would discard the settings the migration keeps. |
 
 ## Key Patterns
 

@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:118723c9f4a8b205094d8762d8e27c8c53ba63e363b84a3ca7577d4e6e0f9eeb"
+digest = "sha256:212388c1577a5b03a20746c38d638f473f0ecd03c1653a30dcdf384885aa4df6"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-16T17:06:18Z"
-rationale = "Retiring the renaming-maps consumer is what the previous ack parked for this milestone, and index.md line 57 was the line it named: '[migration] - Migration helpers for renamed settings' described a mechanism that now has no reader at all. Rewrote it to say the section is retired and to point users at pipelex migrate, which is the remedy that replaced it, and to say why the table itself is still there - removing a table the model requires is a schema change of its own. Swept the rest of docs/configuration/ for the same mechanism and found nothing else: it was one line. The other trigger, config_loader.py, gained pydantic_error_behind, an internal helper that reaches through a translated refusal for the pydantic error underneath it - no key, no file, no layer and no precedence rule changed, so the override and merge-order pages are untouched and correct as written."
+reviewed_at = "2026-08-16T18:05:41Z"
+rationale = "The trigger is telemetry_config.py, and the change behind it is the one that matters to a user: a telemetry.toml that will not load now says whether it is out of date or wrong, and the out-of-date answer is pipelex migrate rather than pipelex init telemetry. That distinction was missing from docs/configuration/config-practical/telemetry-config.md entirely, and the page's only advice for a file in trouble was a Resetting Configuration section that deletes it. Added a When telemetry.toml will not load section naming the two situations and what each costs, and reframed the reset section as what it is - a way to start over that discards every setting. Swept the rest of docs/configuration/: index.md and inference-backend-config.md mention telemetry only as a file that exists and as the Gateway's separate telemetry, neither of which moved. The module split itself - models staying in telemetry_config.py, the loader moving to telemetry_loader.py - is invisible to these pages, which name files and keys and never modules."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:ee1ee2d0c1474dcef5e07690268de37ae3ff0987"
@@ -16,6 +16,6 @@ rationale = "Retiring the renaming-maps consumer is what the previous ack parked
 "pipelex/system/configuration/config_surface.py" = "blob:e9cecb2b6f1307f1b1ac3375cf9c6e56b021cb4b"
 "pipelex/system/configuration/configs.py" = "blob:d53cdf2dd2f78efd53b51f1f6c89605f9dd4e5d8"
 "pipelex/system/configuration/pipe_func_config.py" = "blob:df1cbd3698d51c96d8fa8a8c6fdf1c6be57e5771"
-"pipelex/system/telemetry/telemetry_config.py" = "blob:a9ff15349d68d077a751cb9aaabb374c434b83d6"
+"pipelex/system/telemetry/telemetry_config.py" = "blob:7070951a6d3e4c10cb7d59822ce168c6590c53be"
 "pipelex/tools/aws/aws_config.py" = "blob:c1aeafeae08d3921464db33795f11a29ff3892ba"
 "pipelex/tools/log/log_config.py" = "blob:7b6d032ffea29d6ce60e8af7106f2d935bc18348"

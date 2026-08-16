@@ -119,7 +119,14 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     # Interpreter errors
     "MthdsParserError": "Check MTHDS file TOML syntax and ensure all referenced concepts and pipes are defined",
     # Configuration/initialization errors
-    "TelemetryConfigValidationError": "Run 'pipelex init telemetry' to create a valid telemetry configuration",
+    # Two readings, and the `migration` field on this same payload is what separates them: present
+    # means the file is out of date, absent means it is wrong. Never `pipelex init telemetry` on
+    # the first — that writes a fresh file over settings a migration would have kept.
+    "TelemetryConfigValidationError": (
+        "If this payload carries a 'migration' field, the configuration is out of date: run "
+        "'pipelex-agent migrate --dry-run --format json', then 'pipelex-agent migrate --yes'. "
+        "Otherwise correct the telemetry.toml settings named in the message."
+    ),
     "GatewayTermsNotAcceptedError": "Run 'pipelex init config' to accept gateway terms, or disable pipelex_gateway in backends.toml",
     "GatewayApiKeyMissingError": "Set the PIPELEX_GATEWAY_API_KEY environment variable, or disable pipelex_gateway in backends.toml",
     "GatewayDoNotTrackConflictError": "Unset the DO_NOT_TRACK environment variable, or disable pipelex_gateway in backends.toml",
@@ -188,7 +195,6 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "PipeOperatorModelChoiceError": "config",
     "PipeOperatorModelAvailabilityError": "config",
     "ModelDeckPresetValidatonError": "config",
-    "TelemetryConfigValidationError": "config",
     "BinaryNotFoundError": "config",
     "GatewayUnknownModelError": "config",
     "InitConfigError": "config",

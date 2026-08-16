@@ -66,7 +66,7 @@ def migrate_config_directories(*, config_dirs: list[Path], dry_run: bool) -> Mig
     )
 
 
-def scan_config_surface(*, surface_id: str) -> MigrationReport:
+def scan_config_surface(*, surface_id: str, config_dirs: list[Path] | None = None) -> MigrationReport:
     """What a `pipelex migrate` would find for one surface, without writing anything.
 
     The read-only half of the run, and the one a *diagnosis* wants: a configuration validation
@@ -83,11 +83,19 @@ def scan_config_surface(*, surface_id: str) -> MigrationReport:
     owns which file — see `migrate_directories`. Handing it a one-surface registry instead looks
     equivalent and is not: `pipelex_service.toml` is another surface's base file *and* a match for
     `pipelex-config`'s `pipelex_*.toml`, and with that other surface absent the glob wins.
+
+    Args:
+        surface_id: The surface to answer for.
+        config_dirs: The directories to look in. The default — the ones a real migration walks —
+            is what a boot failure wants, since it has no directory of its own to speak of. A
+            caller that was pointed at one directory and is reporting on *that* passes it here
+            rather than inheriting the walk: `pipelex doctor --global` inspects a file in
+            `~/.pipelex/` and must not answer with a finding about the project directory beside it.
     """
     return migrate_directories(
         registry=build_config_surface_registry(),
         migration_dir=packaged_migration_dir(),
-        config_dirs=config_directories_to_migrate(),
+        config_dirs=config_dirs if config_dirs is not None else config_directories_to_migrate(),
         dry_run=True,
         only_surface_id=surface_id,
     )

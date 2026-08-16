@@ -5,10 +5,11 @@ from __future__ import annotations
 import contextlib
 import io
 import sys
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError
 from rich.panel import Panel
 from rich.prompt import Confirm
 from rich.text import Text
@@ -37,11 +38,13 @@ from pipelex.cogt.model_backends.gateway_config import GatewayConfig
 from pipelex.cogt.models.deck_manifest import DeckFileStatus, DeckSyncReport, compute_deck_sync_report, status_rich_label
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.config import get_config
-from pipelex.core.validation import raise_config_setup_error, report_validation_error
+from pipelex.core.validation import MIGRATE_COMMAND, raise_config_setup_error, report_validation_error
 from pipelex.kit.paths import get_kit_configs_dir
+from pipelex.migration.exceptions import MigrationError
+from pipelex.migration.run import scan_config_surface
 from pipelex.runtime_hub import RuntimeHub, get_console, set_runtime_hub
 from pipelex.system.configuration.config_loader import CONFIG_REFUSED, config_manager, pydantic_error_behind
-from pipelex.system.configuration.config_surface import PIPELEX_CONFIG_SURFACE_ID
+from pipelex.system.configuration.config_surface import PIPELEX_CONFIG_SURFACE_ID, TELEMETRY_CONFIG_SURFACE_ID, strip_reserved_meta
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.environment import get_optional_env
 from pipelex.system.pipelex_service.exceptions import (
@@ -155,33 +158,119 @@ def check_config_files(*, config_dir: Path | None = None) -> tuple[bool, int, st
     return False, missing_count, f"{missing_count} configuration file(s) missing"
 
 
-def check_telemetry_config(*, config_dir: Path | None = None) -> tuple[bool, str]:
-    """Check if telemetry configuration is valid.
+class TelemetryConfigFinding(StrEnum):
+    """What the telemetry probe found — the thing every caller branches on.
+
+    A verdict rather than a sentence, and the reason is a bug this replaced: the fix machinery
+    used to decide what it could repair by searching the *message* for `"format has changed"`,
+    so rewording the row would have switched the whole `--fix` path off in silence.
+    """
+
+    HEALTHY = "healthy"
+    NOT_FOUND = "not_found"
+    UNPARSEABLE = "unparseable"
+    OUT_OF_DATE = "out_of_date"
+    INVALID = "invalid"
+
+    @property
+    def is_healthy(self) -> bool:
+        return self is TelemetryConfigFinding.HEALTHY
+
+    @property
+    def is_out_of_date(self) -> bool:
+        """Whether `pipelex migrate` is the remedy — the ledger explains this file."""
+        return self is TelemetryConfigFinding.OUT_OF_DATE
+
+    @property
+    def is_repaired_by_initializing(self) -> bool:
+        """Whether writing a fresh file is a repair here rather than a loss.
+
+        True for exactly one finding. There is nothing in a file that is not there to preserve,
+        while every other unhealthy state has the user's own settings in it — which is why an
+        out-of-date file gets `pipelex migrate` and a broken one gets a person, not a reset.
+        """
+        return self is TelemetryConfigFinding.NOT_FOUND
+
+
+class TelemetryConfigCheck(BaseModel):
+    """The telemetry row of the health report: what was found, and how to say it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    finding: TelemetryConfigFinding
+    message: str
+
+    @property
+    def is_healthy(self) -> bool:
+        return self.finding.is_healthy
+
+
+def check_telemetry_config(*, config_dir: Path | None = None) -> TelemetryConfigCheck:
+    """Check if telemetry configuration is valid, and if not, whether it is out of date or wrong.
+
+    The second half is what keeps the remedy honest. A telemetry file the ledger can carry
+    forward is migrated by `pipelex migrate`, which keeps every setting in it; telling that user
+    to re-initialize would throw away their PostHog keys and their exporters to fix a file that
+    was never broken.
 
     Args:
         config_dir: Explicit config directory override (e.g. for --global).
             If None, uses layered resolution (project .pipelex/ → global ~/.pipelex/).
 
     Returns:
-        Tuple of (is_healthy, message)
+        The finding and the message describing it.
     """
     telemetry_config_path = config_manager.resolve_config_file(TELEMETRY_CONFIG_FILE_NAME, config_dir=config_dir)
 
     try:
         toml_doc = load_toml_from_path(telemetry_config_path)
     except FileNotFoundError:
-        return False, "Telemetry configuration file not found"
+        return TelemetryConfigCheck(finding=TelemetryConfigFinding.NOT_FOUND, message="Telemetry configuration file not found")
     except TomlError as exc:
-        return False, f"TOML syntax error: {exc}"
+        return TelemetryConfigCheck(finding=TelemetryConfigFinding.UNPARSEABLE, message=f"TOML syntax error: {exc}")
+
+    # Exactly as the loader reads it: `[meta]` is reserved for the migration machinery and is
+    # stripped before validation, so a file carrying one must not be reported as invalid here
+    # while booting perfectly well.
+    strip_reserved_meta(config_dict=toml_doc)
 
     try:
         telemetry_config = TelemetryConfig.model_validate(toml_doc)
-        return True, f"Telemetry configured (mode: {telemetry_config.custom_posthog.mode})"
-    except ValidationError:
-        # Check if this looks like the old config format (has telemetry_mode at root level)
-        if "custom_posthog" not in toml_doc and ("telemetry_mode" in toml_doc or "project_api_key" in toml_doc):
-            return False, "Config format has changed - run 'pipelex init telemetry' to update"
-        return False, "Invalid configuration - run 'pipelex init telemetry' to fix"
+    except ValidationError as exc:
+        return _telemetry_is_out_of_date_or_wrong(validation_error=exc, config_dir=telemetry_config_path.parent)
+    return TelemetryConfigCheck(
+        finding=TelemetryConfigFinding.HEALTHY,
+        message=f"Telemetry configured (mode: {telemetry_config.custom_posthog.mode})",
+    )
+
+
+def _telemetry_is_out_of_date_or_wrong(*, validation_error: ValidationError, config_dir: Path) -> TelemetryConfigCheck:
+    """Ask the ledger which of the two this is, and say so.
+
+    The scan is aimed at the directory the probe actually read, not at the directories a real
+    migration walks: this row reports on one file, and answering it with a finding about the
+    other tier would name a file the reader is not looking at.
+
+    **A failure inside the scan never takes the health report down with it.** The same rule the
+    boot retry and `report_validation_error` follow, and it costs more here than anywhere else: an
+    exception escaping this probe reaches the doctor's own outer handler, which prints one line
+    and exits — so a packaging problem of ours would replace every row the user came for. Falling
+    back to `INVALID` under-reports at worst, and the field-level analysis it carries is what the
+    reader needs either way. The catch stays narrow, so a bug in our applier surfaces as itself.
+    """
+    try:
+        report = scan_config_surface(surface_id=TELEMETRY_CONFIG_SURFACE_ID, config_dirs=[config_dir])
+    except (MigrationError, OSError):
+        report = None
+    if report is not None and not report.is_clean:
+        return TelemetryConfigCheck(
+            finding=TelemetryConfigFinding.OUT_OF_DATE,
+            message=f"Configuration is out of date — run '{MIGRATE_COMMAND}' to bring it up to date",
+        )
+    return TelemetryConfigCheck(
+        finding=TelemetryConfigFinding.INVALID,
+        message=f"Invalid configuration:\n{report_validation_error(validation_error=validation_error).message}",
+    )
 
 
 def check_backend_credentials(*, config_dir: Path | None = None) -> tuple[bool, dict[str, BackendCredentialsReport], str]:
@@ -436,8 +525,7 @@ def display_health_report(
     config_healthy: bool,
     config_message: str,
     config_missing_count: int,
-    telemetry_healthy: bool,
-    telemetry_message: str,
+    telemetry_check: TelemetryConfigCheck,
     backends_healthy: bool,
     backends_message: str,
     backend_credential_reports: dict[str, BackendCredentialsReport],
@@ -457,8 +545,7 @@ def display_health_report(
         config_healthy: Whether config files check passed
         config_message: Message about config files status
         config_missing_count: Number of missing config files
-        telemetry_healthy: Whether telemetry check passed
-        telemetry_message: Message about telemetry status
+        telemetry_check: What the telemetry probe found, and the sentence for it
         backends_healthy: Whether backends check passed
         backends_message: Message about backends status
         backend_credential_reports: Dict of backend credential reports
@@ -474,7 +561,7 @@ def display_health_report(
             the Models row as a yellow advisory and suppress its standalone Solutions entry,
             since the Config Files row already steers the user.
     """
-    all_healthy = config_healthy and telemetry_healthy and backends_healthy and models_healthy and deck_healthy
+    all_healthy = config_healthy and telemetry_check.is_healthy and backends_healthy and models_healthy and deck_healthy
 
     # Overall status panel
     if all_healthy:
@@ -514,10 +601,10 @@ def display_health_report(
 
     # Telemetry Configuration section
     console.print("[bold]Telemetry Configuration[/bold]")
-    if telemetry_healthy:
-        console.print(f"  [green]✓[/green] {telemetry_message}")
+    if telemetry_check.is_healthy:
+        console.print(f"  [green]✓[/green] {telemetry_check.message}")
     else:
-        console.print(f"  [red]✗[/red] {telemetry_message}")
+        console.print(f"  [red]✗[/red] {telemetry_check.message}")
     console.print()
 
     # Backend Credentials section
@@ -597,12 +684,9 @@ def display_health_report(
     if not all_healthy:
         # Check what can be auto-fixed
         can_auto_fix_config = not config_healthy and config_missing_count > 0
-        can_auto_fix_telemetry = not telemetry_healthy and (
-            "not found" in telemetry_message.lower()
-            or "format has changed" in telemetry_message.lower()
-            or "invalid configuration" in telemetry_message.lower()
-        )
-        has_telemetry_validation_error = not telemetry_healthy and not can_auto_fix_telemetry
+        can_auto_fix_telemetry = telemetry_check.finding.is_repaired_by_initializing
+        telemetry_is_out_of_date = telemetry_check.finding.is_out_of_date
+        has_telemetry_validation_error = not telemetry_check.is_healthy and not can_auto_fix_telemetry and not telemetry_is_out_of_date
 
         # Check for backend file issues
         has_backend_file_issues = False
@@ -622,6 +706,7 @@ def display_health_report(
         has_recommendations = (
             can_auto_fix_config
             or can_auto_fix_telemetry
+            or telemetry_is_out_of_date
             or has_telemetry_validation_error
             or (not backends_healthy and backend_credential_reports)
             or has_backend_file_issues
@@ -637,9 +722,13 @@ def display_health_report(
             if can_auto_fix_telemetry:
                 console.print("  • Run [cyan]pipelex init telemetry[/cyan] to configure telemetry preferences")
 
-            if has_telemetry_validation_error and "pipelex init telemetry" not in telemetry_message:
+            if telemetry_is_out_of_date:
+                # Never `init telemetry` here: this file is not broken, it is old, and the
+                # migration carries every setting in it forward where a reset would drop them.
+                console.print(f"  • Run [cyan]{MIGRATE_COMMAND}[/cyan] to bring telemetry.toml up to date")
+
+            if has_telemetry_validation_error:
                 console.print(f"  • Fix validation errors in [cyan]{config_location.config_dir}/telemetry.toml[/cyan]")
-                console.print("    or run [cyan]pipelex init telemetry[/cyan] to regenerate")
 
             if has_deck_drift:
                 console.print("  • Run [cyan]pipelex update[/cyan] to refresh the model deck from the current kit")
@@ -923,7 +1012,7 @@ def do_doctor_cmd(
     # side effect. Running it first would turn check_config_files into a silent installer
     # on a fresh machine. (The --global path skips materialization — see load_config.)
     config_healthy, config_missing_count, config_message = check_config_files()
-    telemetry_healthy, telemetry_message = check_telemetry_config()
+    telemetry_check = check_telemetry_config()
     backends_healthy, backend_credential_reports, backends_message = check_backend_credentials()
 
     # check_models requires the hub + log.configure produced by setup_doctor_runtime.
@@ -959,8 +1048,7 @@ def do_doctor_cmd(
         config_healthy=config_healthy,
         config_message=config_message,
         config_missing_count=config_missing_count,
-        telemetry_healthy=telemetry_healthy,
-        telemetry_message=telemetry_message,
+        telemetry_check=telemetry_check,
         backends_healthy=backends_healthy,
         backends_message=backends_message,
         backend_credential_reports=backend_credential_reports,
@@ -975,7 +1063,7 @@ def do_doctor_cmd(
         fix_mode=fix,
     )
 
-    all_healthy = config_healthy and telemetry_healthy and backends_healthy and models_healthy and deck_healthy
+    all_healthy = config_healthy and telemetry_check.is_healthy and backends_healthy and models_healthy and deck_healthy
 
     # Exit code: 0 if healthy, 1 if issues found
     if all_healthy:
@@ -983,12 +1071,9 @@ def do_doctor_cmd(
 
     # Determine what can be auto-fixed
     can_fix_config = not config_healthy and config_missing_count > 0
-    # Telemetry can be fixed if not found, format changed, OR invalid configuration
-    can_fix_telemetry = not telemetry_healthy and (
-        "not found" in telemetry_message.lower()
-        or "format has changed" in telemetry_message.lower()
-        or "invalid configuration" in telemetry_message.lower()
-    )
+    # Writing a fresh telemetry.toml repairs exactly one finding — a missing file. An out-of-date
+    # one is `pipelex migrate`'s (named in the report above), and a broken one is a person's.
+    can_fix_telemetry = telemetry_check.finding.is_repaired_by_initializing
 
     # Check for backend file issues that can be auto-fixed
     can_fix_backends = False
@@ -1004,8 +1089,8 @@ def do_doctor_cmd(
 
     # Determine what requires manual fixes (excludes auto-fixable issues)
     has_config_validation_error = not config_healthy and config_missing_count == 0
-    # Telemetry validation error only if it's not auto-fixable (not "not found" and not "format has changed")
-    has_telemetry_validation_error = not telemetry_healthy and not can_fix_telemetry
+    # A telemetry finding a person has to resolve: neither a fresh file nor a migration gets there.
+    has_telemetry_validation_error = not telemetry_check.is_healthy and not can_fix_telemetry and not telemetry_check.finding.is_out_of_date
     has_backend_credential_issues = not backends_healthy and backend_credential_reports
 
     # If --fix flag is provided, offer to fix auto-fixable issues
@@ -1026,17 +1111,9 @@ def do_doctor_cmd(
                     console.print(f"[red]Failed to install configuration files: {exc!s}[/red]")
                 console.print()
 
-        # Fix missing or outdated telemetry config
+        # Fix a missing telemetry config
         if can_fix_telemetry:
-            is_format_change = "format has changed" in telemetry_message.lower()
-            is_invalid_config = "invalid configuration" in telemetry_message.lower()
-            if is_format_change:
-                prompt_msg = "[bold]Reset telemetry configuration using the new format?[/bold]"
-            elif is_invalid_config:
-                prompt_msg = "[bold]Reset telemetry configuration to fix validation errors?[/bold]"
-            else:
-                prompt_msg = "[bold]Configure telemetry preferences?[/bold]"
-            if Confirm.ask(prompt_msg, default=True):
+            if Confirm.ask("[bold]Configure telemetry preferences?[/bold]", default=True):
                 try:
                     console.print()
                     init_cmd(focus=InitFocus.TELEMETRY, skip_confirmation=True)
@@ -1103,13 +1180,15 @@ def do_doctor_cmd(
             console.print("or run [cyan]pipelex init config[/cyan] to regenerate from template.")
             console.print()
 
-        # Telemetry validation errors (skip if message already contains the fix command)
-        if has_telemetry_validation_error and "pipelex init telemetry" not in telemetry_message:
+        # Telemetry validation errors. Regeneration is offered as what it is — a way to start
+        # over that discards the file — and only here, where nothing else gets there. An
+        # out-of-date file never reaches this branch: it has a migration that keeps its settings.
+        if has_telemetry_validation_error:
             console.print("[bold]Telemetry validation error:[/bold]")
-            console.print(f"  {telemetry_message}")
+            console.print(f"  {telemetry_check.message}")
             console.print()
             console.print(f"You can fix this manually by editing [cyan]{config_location.config_dir}/telemetry.toml[/cyan]")
-            console.print("or run [cyan]pipelex init telemetry[/cyan] to regenerate from template.")
+            console.print("or run [cyan]pipelex init telemetry[/cyan] to start the file over, discarding what is in it.")
             console.print()
 
         # Backend credentials

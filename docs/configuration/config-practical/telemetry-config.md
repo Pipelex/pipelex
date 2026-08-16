@@ -251,9 +251,23 @@ When set, this disables:
 
 ---
 
+## When telemetry.toml will not load
+
+Pipelex tells you which of the two situations you are in, because the fix is different.
+
+**Your file is out of date.** The settings are fine, the shape they are written in has moved on. Pipelex boots anyway — it carries the file forward in memory and warns you — and `pipelex doctor` reports the telemetry row as out of date. Make it permanent with:
+
+```bash
+pipelex migrate
+```
+
+That rewrites the file into the current shape and **keeps everything in it** — your PostHog key, your Langfuse credentials, your OTLP exporters. It backs the file up first. See [the migration ledger](../../migration-ledger.md) for what it does and does not touch.
+
+**Your file is wrong.** A setting that is not a setting, a value outside what it accepts, or TOML that does not parse. The error names the fields; correct them in `telemetry.toml`. No command fixes this one, because nothing but you knows what you meant.
+
 ## Resetting Configuration
 
-To reset your telemetry configuration to defaults:
+To start over — **discarding every setting in the file**, which is why it is not the answer to either situation above:
 
 ```bash
 rm .pipelex/telemetry.toml

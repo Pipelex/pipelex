@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
+import pytest
 from pydantic import BaseModel, ValidationError
 
 from pipelex.cli.commands.doctor_cmd import (
+    TelemetryConfigFinding,
     check_config_files,
     check_telemetry_config,
     gather_config_location,
 )
 from pipelex.cli.exceptions import PipelexCLIError
+from pipelex.core.validation import MIGRATE_COMMAND
+from pipelex.migration.exceptions import MigrationLedgerError
 from pipelex.system.configuration.config_loader import ConfigLoader, config_manager
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.exceptions import ConfigValidationError
@@ -19,8 +24,6 @@ from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 from pipelex.tools.misc.exceptions import TomlError
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from pytest_mock import MockerFixture
 
 
@@ -164,35 +167,106 @@ class TestDoctorConfigChecks:
         assert "Error loading pipelex.toml: permission denied" in message
 
     def test_check_telemetry_config_file_not_found(self, tmp_path: Path) -> None:
-        """A missing telemetry.toml is unhealthy with a clear message."""
-        healthy, message = check_telemetry_config(config_dir=tmp_path)
+        """A missing telemetry.toml is unhealthy, and is the one finding a fresh file repairs."""
+        check = check_telemetry_config(config_dir=tmp_path)
 
-        assert healthy is False
-        assert message == "Telemetry configuration file not found"
+        assert check.finding is TelemetryConfigFinding.NOT_FOUND
+        assert check.finding.is_repaired_by_initializing is True
+        assert check.message == "Telemetry configuration file not found"
 
     def test_check_telemetry_config_toml_syntax_error(self, tmp_path: Path) -> None:
-        """Invalid TOML in telemetry.toml is reported as a syntax error."""
+        """Invalid TOML in telemetry.toml is reported as a syntax error a person resolves."""
         (tmp_path / TELEMETRY_CONFIG_FILE_NAME).write_text("not [ valid toml", encoding="utf-8")
 
-        healthy, message = check_telemetry_config(config_dir=tmp_path)
+        check = check_telemetry_config(config_dir=tmp_path)
 
-        assert healthy is False
-        assert message.startswith("TOML syntax error:")
+        assert check.finding is TelemetryConfigFinding.UNPARSEABLE
+        assert check.finding.is_repaired_by_initializing is False
+        assert check.message.startswith("TOML syntax error:")
 
-    def test_check_telemetry_config_old_format_detected(self, tmp_path: Path) -> None:
-        """The legacy flat format gets the dedicated migration message."""
+    def test_check_telemetry_config_old_format_is_out_of_date_not_broken(self, tmp_path: Path) -> None:
+        """The legacy flat format is what the shipped ledger entry is about, so it is migratable.
+
+        This used to be answered with `pipelex init telemetry`, which writes a fresh file over
+        the very settings — the PostHog key here — that the migration carries forward.
+        """
         (tmp_path / TELEMETRY_CONFIG_FILE_NAME).write_text('telemetry_mode = "off"\nproject_api_key = "key"\n', encoding="utf-8")
 
-        healthy, message = check_telemetry_config(config_dir=tmp_path)
+        check = check_telemetry_config(config_dir=tmp_path)
 
-        assert healthy is False
-        assert message == "Config format has changed - run 'pipelex init telemetry' to update"
+        assert check.finding is TelemetryConfigFinding.OUT_OF_DATE
+        assert check.finding.is_repaired_by_initializing is False
+        assert MIGRATE_COMMAND in check.message
+        assert "init telemetry" not in check.message
 
-    def test_check_telemetry_config_invalid_new_format(self, tmp_path: Path) -> None:
-        """A new-format file that fails validation gets the generic fix message."""
+    def test_check_telemetry_config_invalid_new_format_names_the_field(self, tmp_path: Path) -> None:
+        """A current-shape file that fails validation is wrong rather than old, and says which field."""
         (tmp_path / TELEMETRY_CONFIG_FILE_NAME).write_text('[custom_posthog]\nmode = "no-such-mode"\n', encoding="utf-8")
 
-        healthy, message = check_telemetry_config(config_dir=tmp_path)
+        check = check_telemetry_config(config_dir=tmp_path)
 
-        assert healthy is False
-        assert message == "Invalid configuration - run 'pipelex init telemetry' to fix"
+        assert check.finding is TelemetryConfigFinding.INVALID
+        assert "custom_posthog.mode" in check.message
+        assert MIGRATE_COMMAND not in check.message
+
+    def test_check_telemetry_config_strips_the_reserved_meta_table(self, tmp_path: Path) -> None:
+        """`[meta]` belongs to the migration machinery and boot strips it before validating.
+
+        A probe stricter than the loader it reports on would call a perfectly bootable file
+        invalid, which is worse than saying nothing.
+        """
+        (tmp_path / TELEMETRY_CONFIG_FILE_NAME).write_text('[meta]\nschema_version = 2\n\n[custom_posthog]\nmode = "off"\n', encoding="utf-8")
+
+        check = check_telemetry_config(config_dir=tmp_path)
+
+        assert check.finding is TelemetryConfigFinding.HEALTHY
+
+    def test_check_telemetry_config_survives_a_failure_inside_the_scan(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """A packaging problem of ours must not replace every row the user came for.
+
+        An exception escaping this probe reaches the doctor's outer handler, which prints one
+        line and exits — so the whole health report would be lost to a broken ledger. The
+        fallback under-reports at worst, and still names the fields the model refused.
+        """
+        (tmp_path / TELEMETRY_CONFIG_FILE_NAME).write_text('[custom_posthog]\nmode = "no-such-mode"\n', encoding="utf-8")
+        mocker.patch(
+            "pipelex.cli.commands.doctor_cmd.scan_config_surface",
+            side_effect=MigrationLedgerError("the packaged ledger will not load"),
+        )
+
+        check = check_telemetry_config(config_dir=tmp_path)
+
+        assert check.finding is TelemetryConfigFinding.INVALID
+        assert "custom_posthog.mode" in check.message
+
+    def test_check_telemetry_config_lets_an_unexpected_scan_bug_surface(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """The catch is narrow on purpose: an applier bug is not a field condition."""
+        (tmp_path / TELEMETRY_CONFIG_FILE_NAME).write_text('[custom_posthog]\nmode = "no-such-mode"\n', encoding="utf-8")
+        mocker.patch(
+            "pipelex.cli.commands.doctor_cmd.scan_config_surface",
+            side_effect=RuntimeError("an applier bug"),
+        )
+
+        with pytest.raises(RuntimeError, match="an applier bug"):
+            check_telemetry_config(config_dir=tmp_path)
+
+    def test_check_telemetry_config_scans_only_the_directory_it_read(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """The finding answers for the file on the row, not for the other tier beside it.
+
+        A stale file in the global directory and a wrong one in the directory under inspection:
+        reporting the first would send a `--global` reader to a migration that does nothing for
+        the file they are looking at.
+        """
+        fake_home = tmp_path / "home"
+        global_dir = fake_home / ".pipelex"
+        global_dir.mkdir(parents=True)
+        (global_dir / TELEMETRY_CONFIG_FILE_NAME).write_text('telemetry_mode = "off"\n', encoding="utf-8")
+        mocker.patch.object(Path, "home", return_value=fake_home)
+
+        inspected = tmp_path / "inspected"
+        inspected.mkdir()
+        (inspected / TELEMETRY_CONFIG_FILE_NAME).write_text('[custom_posthog]\nmode = "no-such-mode"\n', encoding="utf-8")
+
+        check = check_telemetry_config(config_dir=inspected)
+
+        assert check.finding is TelemetryConfigFinding.INVALID

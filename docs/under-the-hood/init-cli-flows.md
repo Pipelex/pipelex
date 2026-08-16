@@ -34,7 +34,7 @@ These two categories are managed by separate steps. `init_config()` copies only 
 | `pipelex init agreement` | `agreement` | Gateway terms acceptance (no reset) |
 | `pipelex init credentials` | `credentials` | Credential setup for enabled backends |
 
-All commands except `agreement` and `credentials` perform a **full reset** (overwrite existing files). Config updates are not yet supported.
+All commands except `agreement` and `credentials` perform a **full reset** (overwrite existing files) — every setting in the file is replaced by the template's. That is why init is not the answer to a configuration file that has fallen behind the current schema: [`pipelex migrate`](../tools/cli/migrate.md) rewrites such a file in place and keeps what is in it.
 
 ### Inputs
 
