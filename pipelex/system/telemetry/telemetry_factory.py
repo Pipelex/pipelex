@@ -9,7 +9,8 @@ from pipelex.system.pipelex_service.pipelex_details import PipelexDetails
 from pipelex.system.pipelex_service.remote_config import RemoteConfig
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.otel_constants import OTelConstants
-from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig, load_telemetry_config
+from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig
+from pipelex.system.telemetry.telemetry_loader import load_telemetry_config
 from pipelex.system.telemetry.telemetry_manager_abstract import (
     TelemetryManagerAbstract,
     TelemetryManagerNoOp,

@@ -153,8 +153,11 @@ class RuntimeHub:
                 overrides *are* overrides of). Used by the doctor ``--global`` path
                 so the hub reflects exactly the directory being reported on.
         """
-        config_dict = config_manager.load_config(extra_overrides=config_overrides, config_dir=config_dir)
-        self.set_config(config=config_cls.model_validate(config_dict))
+        # ``load_config_validated`` rather than a load followed by a validate here, and the
+        # difference is boot tolerance: a configuration a schema change left behind is replayed
+        # through its ledger in memory and re-validated before this raises, so a stale file warns
+        # instead of stopping the boot. See ``docs/migration-ledger.md`` → "Boot tolerance".
+        self.set_config(config=config_manager.load_config_validated(config_cls=config_cls, extra_overrides=config_overrides, config_dir=config_dir))
 
     def set_config(self, config: ConfigRoot):
         if self._config is not None:

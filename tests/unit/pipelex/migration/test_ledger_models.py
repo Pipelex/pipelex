@@ -12,7 +12,8 @@ import pytest
 from pydantic import ValidationError
 
 from pipelex.migration.exceptions import MigrationLedgerError
-from pipelex.migration.ledger import MigrationLedger, MigrationSafety, ledgers_dir, load_ledger
+from pipelex.migration.ledger import MigrationLedger, ledgers_dir, load_ledger
+from pipelex.migration.safety import MigrationSafety
 from pipelex.suggested_fix import DeleteKeyOp
 
 _SURFACE_BLOCK = {

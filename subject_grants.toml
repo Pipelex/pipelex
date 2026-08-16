@@ -244,6 +244,10 @@ rationale = "Parses the config_arg; single operand."
 param = "result"
 rationale = "Verb-object: emits the result; format options stay keyword."
 
+["pipelex/cli/agent_cli/commands/migrate_cmd.py::_render_markdown"]
+param = "result"
+rationale = "Positional-Callable protocol: passed as markdown_renderer, invoked renderer(result)."
+
 ["pipelex/cli/agent_cli/commands/pipe_cmd.py::_pipe_spec_to_toml"]
 param = "pipe_spec"
 rationale = "Serializes the pipe_spec to TOML; single operand."
@@ -5451,14 +5455,6 @@ rationale = "Verb-object: transforms the input dict; enum class stays keyword."
 ["pipelex/system/configuration/config_model.py::ConfigModel.transform_list_of_str_to_enum"]
 param = "input_list"
 rationale = "Verb-object: transforms the input list; enum class stays keyword."
-
-["pipelex/system/configuration/configs.py::MigrationConfig.text_in_renaming_keys"]
-param = "text"
-rationale = "Predicate on the text; single operand."
-
-["pipelex/system/configuration/configs.py::MigrationConfig.text_in_renaming_values"]
-param = "text"
-rationale = "Predicate on the text; single operand."
 
 ["pipelex/system/environment.py::all_env_vars_are_set"]
 param = "keys"

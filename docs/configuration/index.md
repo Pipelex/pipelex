@@ -54,7 +54,7 @@ The configuration is organized into four main sections:
 1. `[pipelex]` - Core Pipelex settings
 2. `[cogt]` - Cognitive tools and LLM settings
 3. `[plugins]` - Plugin-specific configurations
-4. `[migration]` - Migration helpers for renamed settings
+4. `[migration]` - Retired, and empty of meaning: the rename tables it holds are no longer read by anything. Keeping an out-of-date configuration working is now the job of [`pipelex migrate`](../tools/cli/migrate.md), which repairs your files instead of guessing at an error message. The section stays in place for now because removing a table the configuration model still requires is itself a change your files would have to be migrated through.
 
 Each section contains multiple subsections for specific features and functionalities.
 

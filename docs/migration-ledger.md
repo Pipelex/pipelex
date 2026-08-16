@@ -24,7 +24,7 @@ A **surface** is one artifact family with one schema version and one ledger. The
 | `telemetry-config` | `telemetry.toml` | `telemetry_*.toml` | `TelemetryConfig` | Model defaults |
 | `pipelex-service-config` | `pipelex_service.toml` | — | `PipelexServiceConfig` | Model defaults |
 
-File names are relative to a configuration directory, and every surface spans exactly two of them: the global `~/.pipelex/` and the project's `.pipelex/`. `pipelex migrate` walks both, and only those. Two paths that look like configuration are outside the walk by design: the unit-testing tier `./tests/pipelex_{run_mode}.toml`, and any file reached through an explicit `load_config(config_dir=…)`, which is a repository-internal mechanism rather than a user's configuration.
+File names are relative to a configuration directory, and every surface spans exactly two of them: the global `~/.pipelex/` and the project's `.pipelex/`. `pipelex migrate` walks both, and only those. Two paths that look like configuration are outside the walk by design: the unit-testing tier `./tests/pipelex_{run_mode}.toml`, and a directory an embedder hands `Pipelex.make(config_dir=…)` that is neither of the two. Boot tolerance and the error-path diagnosis still read such a directory (see [Boot tolerance](#boot-tolerance)), but its files are the embedder's to bring up to date: `pipelex migrate` has no way to be pointed at them, and does not pretend otherwise.
 
 The tier set is **open**. Environment and run-mode names are dynamic, so the tier filenames of `pipelex-config` cannot be enumerated in advance — `pipelex_local.toml`, `pipelex_{environment}.toml`, `pipelex_{run_mode}.toml`, `pipelex_override.toml` and `pipelex_temporary_override.toml` are a description of today, not a closed list. That is why the registry matches tiers with a glob, and the glob is what makes the resolution rule necessary:
 
@@ -65,7 +65,7 @@ The reasoning is worth keeping. Any side record of "what has already been applie
 Two reservations exist so that later projects stay free:
 
 - **`[meta] schema_version`** is a reserved optional in-file key. Every configuration-surface reader tolerates it and strips it before validation; **nothing writes it**. The reason not to write it is not release compatibility, which our principles disclaim, but team skew on tracked files: base configuration files under a project's `.pipelex/` are shared through git right now, so one developer on a newer pipelex writing the key would break a teammate on last week's build the same afternoon.
-- **`min_supported_schema_version`** on the surface block, held at zero until a ledger squash ever moves it. Without the floor, a squash silently under-migrates the oldest files in the field, because the applier skips absent targets and reports success. With it, the loader fails loudly instead.
+- **`min_supported_schema_version`** on the surface block, held at zero until a ledger squash ever moves it. Without the floor, a squash silently under-migrates the oldest files in the field, because the applier skips absent targets and reports success. With it, a file that *declares* where it stands is refused by name — `unsupported_schema_version`, nothing written — instead of being run over and reported clean. The two reservations are one mechanism: a document's declaration is the only evidence a floor can act on, which is why the migration reads the reserved key exactly as tolerantly as the loader strips it. A file declaring nothing, which is every file in the field, is migrated as always.
 
 ### The downgrade direction
 
@@ -75,7 +75,14 @@ Under the no-backward-compatibility principle this is not repaired, but it must 
 
 > When validation fails on an unknown path that no ledger entry removes, the report says so: the path is either a typo or was written by a newer pipelex than this one, and the message asks whether the user is on an older branch or build.
 
-That diagnosis is computable from the ledger alone and needs no stamp.
+That diagnosis needs no stamp, and every run produces it — it lands in a plan's `unexplained[]`. Four rules make its answer worth reading:
+
+- **It is the one part of a migration that needs the model.** Whether the current schema knows a path cannot be answered from a ledger, so the question goes to the surface's [fingerprint](#the-fingerprint) — the same projection the coverage gate diffs. The engine stays model-free, and the diagnosis sits beside the runner, which has a surface.
+- **The document diagnosed is the one the run leaves behind.** Everything the ledger explains has been carried forward by then, so what is left over is genuinely left over. On a dry run that document exists only in memory, which is why the diagnosis belongs to the run and not to a later pass over the file.
+- **A blocked entry answers for its own material.** An `unsafe` entry is never applied, so the old shape it is about is still in the file — already reported, by name, with the entry's guidance. Saying the same key is an unexplained typo would contradict that. The subtraction deliberately over-covers: every path it removes is one the same report names in `blocked[]`.
+- **A key the user chose is reported as the schema spells it.** Beneath an open mapping the schema says `levels.*` where the file says `levels.my_package`, and a typo *inside* such an entry is reported at `queues.*.retries` — the same rule that governs a blocked entry's `narrowed_paths[]`. Only the segment the schema does not know is named, because naming it is the whole point.
+
+Two things are deliberately not reported. An unknown *table* is named once instead of once per key inside it, since the shallowest name is the one to fix. And a document that nests below a path the schema says is a scalar is left alone: that is a type error, which the model reports far better, and descending would invent unknown paths beneath a path the schema knows perfectly well.
 
 ## Replay neutrality
 
@@ -468,6 +475,7 @@ There is one file-blocked reason per **state the file is in**, rather than one p
 |---|---|
 | `unreadable` | It is there and its bytes would not come. Nothing was written. |
 | `unparseable` | It was read and is not valid UTF-8, or not valid TOML. Nothing was written. |
+| `unsupported_schema_version` | It declares a `[meta] schema_version` below its ledger's floor, so the entries that would carry it forward are no longer there. Nothing was written. |
 | `unwritable` | It needed a change and the run could not make it — the backup would not go down, or the replacement would not. The file is exactly as it was found. |
 | `changed_during_run` | It was removed or edited between the read and the write, so the run refused to write over work it had not seen. |
 | `state_uncertain` | The write could not be confirmed: the transaction could not describe what it left behind, and the file does not hold what the run wrote. |
@@ -482,11 +490,35 @@ Two rules govern how an entry appears, and both exist so that a report is never 
 
 > **A blocked entry's reason says which claim it is making.** `unsafe` means the file has the old *shape* and the applier will not change it. `conflict` means an operation's destination is already occupied. `value_domain_narrowed` is the weakest and the newest: the file *sets* a path whose accepted values the entry narrowed, and `narrowed_paths[]` lists those paths as the **ledger** spells them — `levels.*`, never the user's own `levels.my_package` — and at the spelling the file this run wrote carries, not the one that matched. It is a list of keys to check by hand rather than a list of errors, because telling one from the other needs the model and the engine has none by design.
 
+> **An unexplained path is what neither the schema nor the ledger accounts for.** `unexplained[]` carries the paths of the migrated document that the current schema does not know and no entry — applied or blocked — explains, each with the two readings the tool cannot tell apart: a typo, or a file written by a newer pipelex. The whole rule is [the downgrade direction](#the-downgrade-direction).
+
 > **No value read from a user's file is ever rendered** — not in the command's output, not in the structured plan, not in an error. Paths, operation kinds and ledger-supplied values carry everything a plan needs to say.
 
 That is a mechanical rule rather than a list of credential-shaped key names, because such a list is a guess that eventually misses one. The single deliberate exception is the backup file, which contains the user's values by definition and is protected by inheriting the source file's mode rather than the process umask.
 
 When migration is reported through a validation error, the error keeps `error_domain: "config"` and gains a structured `migration` block carrying the plan, the remedy and the diagnosis. Consumers branch on the presence of that block, never on wording. Following the workspace convention: the structured fields are the contract, and Markdown, exit codes and HTTP statuses are presentation.
+
+## The commands
+
+Two commands run a migration, and they are the same run with two audiences.
+
+| | `pipelex migrate` | `pipelex-agent migrate` |
+|---|---|---|
+| Reader | a person | a program |
+| Default | plan, show it, ask | plan, and write nothing |
+| Writes when | the question is answered, or `--yes` | `--yes` |
+| `--dry-run` | plan and stop | plan and stop (the default, said explicitly) |
+| Answer | Rich output | JSON, or Markdown with `--format markdown` |
+
+**Both walk the global `~/.pipelex/` and the project `.pipelex/`, and nothing else.** An embedder's `config_dir=` outside those two and this repository's own `tests/pipelex_{run_mode}.toml` are outside the walk: the first is the embedder's to update, the second is not a user's configuration at all, and migrating a directory nobody asked about is how a tool earns a reputation for touching things. A directory that does not exist is skipped, and a project rooted at the home directory is walked once rather than twice.
+
+**The walk is not recursive.** A surface's tier files sit beside its base file; a subdirectory holds a different kind of thing. The specimen is real: `.pipelex/inference/backends/pipelex_gateway.toml` matches the `pipelex-config` tier glob `pipelex_*.toml` exactly and is an inference backend definition, so a recursive walk would replay the main configuration's ledger over it.
+
+> **`--dry-run` and `--yes` together are refused, not resolved.** One asks for no write and the other authorizes one; picking a winner would hide the bug that produced both.
+
+**Neither command boots.** A broken configuration is the reason to reach for `migrate`, so needing a working one would make it useless in exactly the case it exists for. What a migration may use is the ledger, the applier and the filesystem: no configuration load, no model deck, no credentials, no network. That is a property under test rather than an accident, and the test is what keeps a future import from creeping into the list.
+
+**The structured fields are the contract.** `needs_attention` is the verdict — *this run left something a person has to decide* — and it is deliberately not "did anything get written": a run that migrated every file it found has succeeded, and so has a dry run that found nothing blocked. The exit code (`1` when `needs_attention`, `2` on a contradictory pair of flags) and the rendering are presentation, and follow the workspace convention rather than carrying the verdict.
 
 ## Boot tolerance
 
@@ -494,11 +526,11 @@ A stale configuration should warn, not stop the world — but only when the ledg
 
 ```
 load user files  →  deep-merge  →  validate (extra="forbid")
-    ok                              → boot; no ledger touched, no tomlkit loaded
+    ok                              → boot; no ledger read, no document re-parsed
     fails, surface S
-      → re-load S's user files with tomlkit
-      → replay S's `safe` entries in memory, per file (writes nothing)
-      → re-merge → re-validate
+      → re-read S's user files with tomlkit
+      → replay S's ledger in memory, per file (writes nothing; `unsafe` entries are rehearsed, never applied)
+      → re-merge → re-run the loader's own post-merge step → re-validate
            ok    → WARNING naming the file and the `pipelex migrate` remedy → boot
            fails → unsafe entries, CONFLICT, or unexplained paths → validation error
                    with error_domain "config" and the `migration` block
@@ -506,10 +538,79 @@ load user files  →  deep-merge  →  validate (extra="forbid")
 
 The rules this encodes:
 
-- **Boot never writes.** Nothing writes except the explicit `migrate` command; boot, `doctor` and validation detect and report.
-- **Boot tolerates only what the ledger explains.** `unsafe` entries, conflicts and unexplained paths still fail the boot. Tolerance widens what starts, never what is silently accepted.
-- **The healthy path is untouched.** The replay runs only on the failure path, so a current configuration never loads tomlkit and never reads a ledger. Replay neutrality is what makes the retry free when it does run.
+- **Boot never writes.** Nothing writes except the explicit `migrate` command; boot, `doctor` and validation detect and report. A tolerated boot leaves no backup either, which is why the warning keeps coming back until the user runs the command.
+- **Boot tolerates only what the ledger explains.** Tolerance widens what starts, never what is silently accepted. **The re-validation is what decides**, and that is stronger than a second gate on the report would be: material an `unsafe` entry is about is still in the file, so the model refuses it and the boot fails, and a `VALUE_DOMAIN_NARROWED` report the model accepts was never a reason to refuse a boot — that report says *check this key*, and the model has now checked it.
+- **The retry honours the [schema-version floor](#schema-versions-and-why-every-run-replays-everything).** A file that declares a version below `min_supported_schema_version` is one `pipelex migrate` refuses; the retry declines it through the same predicate rather than carrying it forward under-migrated, and the user's own error — with the `migration` block naming the floor — is what they see.
+- **The retry never becomes the failure.** Anything that goes wrong inside it — a ledger that will not load, a file that will not parse — makes it decline, and the error the *configuration* produced is what the user sees. Their error names the key to fix; ours would name our packaging. A file that cannot be re-read abandons the whole retry rather than being skipped, because skipping it would drop a layer from the merge and a re-validation that then succeeded would boot on a configuration the user does not have.
+- **The main configuration's warning waits for the logger.** That configuration is what configures logging, so when its retry succeeds there is no logger yet — the loader parks the warning (`config_manager.take_stale_configuration_warning()`) and the boot emits it right after `log.configure`. The telemetry and service loaders run after that point and warn directly. The warning is the same either way; only *when* it is said moves.
+- **The healthy path is untouched.** The replay runs only on the failure path, so a current configuration never reads a ledger, never re-parses a document, and never even imports the migration engine. (Not "never loads tomlkit": the ordinary configuration read has always imported it. What a healthy boot avoids is the second, DOM-level read.) Replay neutrality is what makes the retry free when it does run.
 - **One shared helper**, called by each configuration-surface loader — and that helper is also where `[meta] schema_version` is stripped. The strip belongs there and **not** in the generic TOML reader, which also reads `.mthds` files, backend definitions and the kit index, none of which reserve that key.
+
+**The helper owns the failure path, not the load.** The three loaders do different things between their merge and their validate — the main configuration deep-merges programmatic overrides, telemetry substitutes `${VAR}` placeholders, the service configuration does nothing — so a helper that owned the whole load would have to be told about all three. It is given the surface id and the same ordered path list the loader merged, and it hands back the migrated merge plus a `MigrationPlan` per file; each loader re-runs its own step over that and re-validates. The overrides in particular have to be re-applied by the caller: they are a layer of the *load*, and the replay only ever sees the *files*.
+
+> **The migration engine is imported inside the retry, not at the top of the module.** Its applier lives under `pipelex.pipeline` — an interpreter package — while the configuration loaders sit in `runtime_hub`'s import closure, and the kernel layer's property is that importing it loads zero interpreter modules (see [`hub-layering.md`](contribute/hub-layering.md)). A module-level import would break that silently: the layering guard mechanically checks reachability to `interpreter_hub`, which `pipelex.pipeline.fixes.applier` does not have, so nothing would have gone red. The deferred import is also what makes "the healthy path is untouched" literal rather than approximate.
+
+**Boot tolerance does not run the [downgrade diagnosis](#the-downgrade-direction).** On this path the model has already spoken, and pydantic's own extra-field list is both the same answer and a better one — it knows about validators, which a path walk does not. The diagnosis exists for `pipelex migrate`, where nothing validates the file at all. So "unexplained paths still fail the boot" is satisfied by the re-validation failing, and the `migration` block on the error carries the plans.
+
+## Reporting a stale configuration on a validation error
+
+When the boot's retry declines and the model's refusal stands, the error the user gets says one more thing than pydantic can: whether their configuration is *wrong* or merely *old*.
+
+A validation error cannot answer that by itself. It is raised against the merged configuration and carries no provenance — it names a key, not which of the files that were merged put it there, and certainly not whether that key was correct last month. So `report_validation_error` asks the files instead: a **dry-run scan** of the surface that refused, over the same directories a `pipelex migrate` would walk — or, when the caller loaded one explicit directory (`doctor --global`, an embedder's `config_dir=`), over that directory alone, so the block never names a file the reader did not load.
+
+**The scan is named, not guessed.** The caller passes the surface whose model refused; a caller validating something that is not a configuration surface — a `.mthds` bundle, an inference backend file, a model deck — passes nothing and gets the translation alone. None of those has a ledger, and offering them a `pipelex migrate` remedy would send a user to a command with nothing to do. That is also why the scan does not run at all when no surface is named: it is a directory walk and a ledger replay, and a bundle-validation failure has no business paying for one.
+
+> **Scoping narrows the answer, never the registry.** Which surface owns a file is decided across *all* of them, because an exact base file claims before any glob. A registry built to hold only the surface being asked about removes the other claimants from that arbitration, and `pipelex_service.toml` — another surface's base file, and a match for `pipelex-config`'s `pipelex_*.toml` — is then replayed under the wrong ledger and diagnosed against the wrong model, so its ordinary settings come back reported as paths this build knows nothing about.
+
+The answer rides the error twice, and the two halves are not interchangeable:
+
+- **`error_domain` stays `"config"`.** It does not become a domain of its own. `ErrorDomain` is a closed cross-repo enum and the agent-hook specification routes any domain it does not know to BLOCK, so a stale configuration reported under a new domain would stop an agent rather than tell it what to run.
+- **The structured `migration` block is the contract, and consumers branch on its presence.** Absent means the failure is not staleness. Present, it carries `remedy` (the command), `needs_attention` (whether anything here is a person's rather than the tool's), and `plans` — the same `MigrationPlan` shape `pipelex-agent migrate --dry-run --format json` emits under its own `plans` key, so an agent that parses one has already parsed the other. Only the files the scan found something in are listed: unlike the commands' report, which answers *what did the walk visit*, the block answers *what is wrong with this machine*.
+- **The message is presentation.** It carries the pydantic analysis followed by a paragraph naming the files, what the command would carry forward, and what it cannot do for anyone. Nothing branches on its wording.
+
+The agent loop this opens is the one the commands were built for: a command fails, the block is present, the agent runs `pipelex-agent migrate --dry-run --format json`, shows the user what would change, and runs `--yes` on confirmation. It never hand-edits a configuration file.
+
+> **No value read from a user's file appears in the block either.** This is the third of the three channels that rule covers, beside the command's own output and its structured plan. The block reports paths, operation kinds and ledger-supplied values — a key holding a live credential is named by its *path* and never by what it holds.
+
+**A failure inside the scan is never the failure the user sees**, for the same reason the boot retry declines quietly: they have an error in front of them that names what to fix, and replacing it with a packaging problem of ours would cost them the only message that helps. A ledger that will not load stays loud where it should be — `make check-ledger`, and `pipelex migrate` itself. The catch is narrow rather than blanket, so a bug in our own applier still surfaces as the bug it is.
+
+### Every surface reports it the same way, and none of them says "start over"
+
+A configuration error reaches a user through several surfaces at once — the human CLI's panel, the agent CLI's JSON envelope, the `doctor` row — and before the ledger each of those carried its own hardcoded remedy. The telemetry ones are the case worth naming, because they were written for a real event and then aged into the wrong advice: *the telemetry.toml format has changed, run `pipelex init telemetry`*, shown for the very flat file that entry `telemetry-config@2` exists to carry forward. That command writes a fresh file. It would have taken the PostHog key, the Langfuse credentials and the OTLP exporters with it.
+
+So no surface holds its own answer any more:
+
+- Every configuration surface's loader raises through `report_validation_error`, so the `migration` block reaches the error wherever it is caught. `TelemetryConfigError` is a `PipelexConfigError` for this reason — it carries `error_domain = CONFIG` from the class rather than from the agent CLI's lookup table, and it can carry a block.
+- The **human handler** prints the fields the model refused and then names `pipelex migrate` when the block is there, or an edit when it is not.
+- The **agent envelope** carries `migration` as a field and its hint says which of the two readings applies; an agent branches on the field, never on the sentence.
+- The **`doctor` row** carries a *finding* — `healthy`, `not_found`, `unparseable`, `out_of_date`, `invalid` — and every caller reads that instead of the row's wording. This one is a correctness fix and not only a tidy-up: `--fix` used to decide what it could repair by searching the message for `"format has changed"`, so rewording the row would have switched the whole repair path off in silence. The finding answers for the one file the row is about: the scan behind `out_of_date` runs over the directory that file lives in — which also holds the `telemetry_*.toml` tier — and the verdict is read off that file's own plan, so a stale tier file beside a wrong base file leaves the base file `invalid`, and the fields the model refused stay on the row.
+
+> **Writing a fresh file repairs exactly one finding: a missing one.** There is nothing in a file that is not there to lose. Every other unhealthy state has the user's own settings in it, so an out-of-date file is offered `pipelex migrate` and a broken one is left to a person. Regeneration is still reachable, and it is described as what it is — a way to start over that discards the file.
+
+## The health report
+
+The boot warns, and the validation error explains — but both of them need something to have gone wrong first, and one of them cannot reach a machine at all. `pipelex-agent` cuts Python's logging off process-wide as its first act, so an agent never sees a boot warning; for a program, **asking is the only channel**, and `pipelex doctor` is the asking.
+
+The doctor's configuration-migration row is a **dry run of `pipelex migrate`** — the command's own run with the writing switched off, not an approximation of it. It reports one of four findings:
+
+| Finding | What it means | What comes next |
+|---|---|---|
+| `up_to_date` | every file the walk claims is at the current schema | nothing |
+| `pending` | at least one file would be rewritten | `pipelex migrate` (and `--fix` offers to run it) |
+| `needs_attention` | something is there the command will not do on its own | `pipelex migrate --dry-run`, then a person |
+| `unavailable` | the scan itself could not run | check by hand; this is our problem, not the machine's |
+
+Two of those distinctions carry weight. `unavailable` is separate from the rest because **a packaging problem of ours must not be reported as a finding about the user's files** — and, more sharply, must not be reported as health: not knowing is not the same as being up to date. And `pending` is separate from `needs_attention` because only one of them has a command behind it; offering to run a migration over a file it would not change is a prompt whose honest outcome is *nothing was written*.
+
+A run is often both at once, which is the ordinary shape on a machine that has drifted, so the row lists **both sets of files** and names both moves. A reader — or an agent — that heard only the first would stop with a broken file still in place.
+
+> **The row takes no directory, and that is a decision.** Every other check in the doctor reports on a *file* and is scoped to the directory the doctor was pointed at, `--global` included. This one reports on a *command*, and `pipelex migrate` has no `--global`: it walks the global `~/.pipelex/` and the project `.pipelex/` both. A row scoped narrower would name a command that then rewrites a file the row never mentioned — and a tool that writes to a user's files must not spring that. Over-reporting is legible instead: every file is named with its full path, so a reader sees which directory each one is in.
+
+**`--fix` runs the same write pass the command runs.** The row above it *was* the dry run — the same two-pass shape `pipelex migrate` has, with the doctor asking the question in the middle — and fix mode reaches the command's own write half rather than a second implementation that could drift from it. What it does not do is call the command itself: that ends the process when something is left for a person, and the doctor still has rows to render and an exit code of its own to set.
+
+**Nothing inside a file is rendered here either.** The row reports paths and counts. It is the fourth channel the rendering rule covers, beside the command's output, its structured plan, and the block on a validation error.
+
+**A failure inside the scan costs more here than anywhere else**, which is why it is caught rather than raised: an exception escaping this probe reaches the doctor's own outer handler, which prints one line and exits — so a broken packaged ledger would replace *every row the user came for* with "Unexpected error". The catch stays narrow (`MigrationError`, `OSError`), so a bug in our applier still surfaces as itself.
 
 ## Applying
 
@@ -557,7 +658,7 @@ Three further rules make that safety net worth the name.
 
 What a backup carries across is the file's **permission bits**, and that is the one deliberate exception to "no value read from a user's file is ever rendered" — a backup contains the user's values by definition, so a `0600` configuration must not acquire a world-readable copy beside it. Ownership, ACLs and extended attributes are **not** carried across the replace, on either the backup or the migrated file: an atomic same-directory replace cannot preserve what the running process has no right to set, and re-attaching an attribute blindly (a quarantine flag, a security label) is a worse guess than leaving it off. The security-relevant bit of a configuration file is its mode.
 
-A configuration file that is a **symlink** is followed: the file the user means is the one at the end of the link, so the run reads, backs up and replaces *that* file, and the link survives. Replacing the link path instead would put a regular file where the link was and leave the real file unmigrated. The plan keeps naming the path the directory walk found; the backup path shows where the bytes actually went. This is what the `.mthds` fix loop already does with its own targets. The two callers still differ on one half: the fix loop pairs its resolution with a write-scope check, so a link pointing outside the directories it was given is refused, and the migration runner has no equivalent — a configuration file symlinked outside every walked directory is migrated where it actually lives. Whether that should be guarded is open; see `wip/migrator-write-scope-and-rename-fidelity.md`.
+A configuration file that is a **symlink** is followed: the file the user means is the one at the end of the link, so the run reads, backs up and replaces *that* file, and the link survives. Replacing the link path instead would put a regular file where the link was and leave the real file unmigrated. The plan keeps naming the path the directory walk found; the backup path shows where the bytes actually went. This is what the `.mthds` fix loop already does with its own targets. The two callers differ on one half, and the difference is deliberate: **a migration's write scope is the resolved target of any file the walk claims**, not the walked directories themselves. The `.mthds` fix loop pairs its resolution with a write-scope check because it is handed a bundle directory and must not write outside it; a configuration directory is a place a user keeps links to files they own, and a dotfiles repository is the ordinary reason one is there. Refusing it would mean the tool declines to migrate exactly the machines whose owner was most deliberate about their configuration. The plan names the walked path and the backup names the resolved one, so a run that followed a link out of the directory says so. The reasoning behind both readings is in `wip/migrator-write-scope-and-rename-fidelity.md`.
 
 ### Per-file transactions
 

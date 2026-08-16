@@ -8,9 +8,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from pipelex.migration.ledger import MigrationEntry, MigrationLedger, MigrationSafety, SurfaceBlock
+from pipelex.migration.ledger import MigrationEntry, MigrationLedger, SurfaceBlock
+from pipelex.migration.safety import MigrationSafety
 from pipelex.migration.surfaces import DefaultsLayerKind, Surface, SurfaceRegistry
 from pipelex.suggested_fix import MigrationOp
 
@@ -65,6 +66,7 @@ def build_ledger() -> LedgerBuilder:
         surface_id: str = EXAMPLE_SURFACE_ID,
         base_file: str = EXAMPLE_BASE_FILE,
         tier_glob: str | None = EXAMPLE_TIER_GLOB,
+        min_supported_schema_version: int = 0,
     ) -> MigrationLedger:
         return MigrationLedger(
             surface=SurfaceBlock(
@@ -73,7 +75,7 @@ def build_ledger() -> LedgerBuilder:
                 base_file=base_file,
                 tier_glob=tier_glob,
                 current_schema_version=1 + len(entries),
-                min_supported_schema_version=0,
+                min_supported_schema_version=min_supported_schema_version,
             ),
             migration=entries,
         )
@@ -81,10 +83,26 @@ def build_ledger() -> LedgerBuilder:
     return _build_ledger
 
 
+class ExampleOutput(BaseModel):
+    directory: str = "out"
+
+
+class ExampleReporting(BaseModel):
+    output: ExampleOutput = Field(default_factory=ExampleOutput)
+    destination: str | None = None
+
+
 class ExampleConfig(BaseModel):
-    """A stand-in configuration model for surfaces the tests invent."""
+    """A stand-in configuration model for surfaces the tests invent.
+
+    It has to name the paths the fixtures' *migrated* documents carry, and not only the ones a test
+    happens to assert on. A migration run diagnoses what it leaves behind against this model, so a
+    path missing here is reported as unexplained — which is the diagnosis working, and noise in
+    every test that was about something else.
+    """
 
     label: str = "hello"
+    reporting: ExampleReporting = Field(default_factory=ExampleReporting)
 
 
 @pytest.fixture

@@ -20,7 +20,7 @@ def plugins_list_command() -> None:
     would be wired in (and what the ``plugins.disabled`` denylist turns off).
     """
     console = get_console()
-    config = PipelexConfig.model_validate(config_manager.load_config())
+    config = config_manager.load_config_validated(config_cls=PipelexConfig)
     registrar = build_registrar(
         config=config,
         builtin_plugins=BUILTIN_PLUGINS,

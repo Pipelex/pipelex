@@ -19,7 +19,8 @@ from rich.markup import escape
 
 from pipelex.migration.coverage import CoverageIssue, check_registry
 from pipelex.migration.exceptions import MigrationError
-from pipelex.migration.surfaces import build_config_surface_registry, packaged_migration_dir
+from pipelex.migration.ledger import packaged_migration_dir
+from pipelex.migration.surfaces import build_config_surface_registry
 from pipelex.migration.transform_check import TransformIssue, check_transforms
 from pipelex.runtime_hub import get_console
 

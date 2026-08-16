@@ -3,10 +3,16 @@ from typing import Any, cast
 
 from pydantic import Field, ValidationError
 
+from pipelex import log
 from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_model import ConfigModel
-from pipelex.system.configuration.config_surface import strip_reserved_meta
+from pipelex.system.configuration.config_surface import (
+    PIPELEX_SERVICE_CONFIG_SURFACE_ID,
+    replay_surface_files_in_memory,
+    stale_configuration_warning,
+    strip_reserved_meta,
+)
 from pipelex.system.pipelex_service.exceptions import PipelexServiceConfigValidationError
 from pipelex.system.pipelex_service.pipelex_service_agreement import (
     PIPELEX_SERVICE_CONFIG_FILE_NAME,
@@ -42,9 +48,31 @@ def load_pipelex_service_config_if_exists(config_dir: Path) -> PipelexServiceCon
     except FileNotFoundError:
         return None
     except ValidationError as exc:
+        recovered = _service_config_the_ledger_can_explain(config_path=config_path)
+        if recovered is not None:
+            return recovered
         validation_error_msg = format_pydantic_validation_error(exc)
         msg = f"Invalid Pipelex service configuration: {validation_error_msg}"
         raise PipelexServiceConfigValidationError(msg) from exc
+
+
+def _service_config_the_ledger_can_explain(*, config_path: Path) -> PipelexServiceConfig | None:
+    """The same service configuration with the ledger replayed over the user's file, or `None`.
+
+    Boot tolerance for the one surface with no tiers: a single file, so the "merge" the shared
+    helper performs is a merge of one. The ledger for this surface is empty today, which makes
+    this the branch that costs nothing until the first entry lands — exactly the point of wiring
+    every surface at once rather than only the one that currently needs it.
+    """
+    replayed = replay_surface_files_in_memory(surface_id=PIPELEX_SERVICE_CONFIG_SURFACE_ID, paths=[config_path])
+    if replayed is None:
+        return None
+    try:
+        service_config = PipelexServiceConfig.model_validate(replayed.config_dict)
+    except ValidationError:
+        return None
+    log.warning(stale_configuration_warning(plans=replayed.plans))
+    return service_config
 
 
 def is_pipelex_gateway_enabled(backends_file_path: Path | None = None) -> bool:

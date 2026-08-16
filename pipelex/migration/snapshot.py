@@ -26,7 +26,7 @@ from pydantic import BaseModel, ConfigDict
 
 from pipelex.migration.coverage import diff_fingerprints
 from pipelex.migration.exceptions import MigrationSnapshotRefusedError
-from pipelex.migration.fingerprint import SurfaceFingerprint, compute_fingerprint
+from pipelex.migration.fingerprint import SurfaceFingerprint
 from pipelex.migration.goldens import read_fingerprint_golden, write_defaults_golden, write_fingerprint_golden
 from pipelex.migration.ledger import load_ledger
 from pipelex.migration.surfaces import Surface, SurfaceRegistry
@@ -47,7 +47,7 @@ class SurfaceSnapshot(BaseModel):
 def snapshot_surface(*, surface: Surface, migration_dir: Path, force: bool = False) -> SurfaceSnapshot:
     ledger = load_ledger(migration_dir=migration_dir, surface_id=surface.surface_id)
     schema_version = ledger.surface.current_schema_version
-    fingerprint = compute_surface_fingerprint(surface=surface, schema_version=schema_version)
+    fingerprint = surface.fingerprint_at(schema_version=schema_version)
     if not force:
         _refuse_a_destructive_head_overwrite(surface=surface, fingerprint=fingerprint, schema_version=schema_version, migration_dir=migration_dir)
     fingerprint_path = write_fingerprint_golden(migration_dir=migration_dir, fingerprint=fingerprint)
@@ -63,15 +63,6 @@ def snapshot_surface(*, surface: Surface, migration_dir: Path, force: bool = Fal
         fingerprint_path=fingerprint_path,
         defaults_path=defaults_path,
         path_count=len(fingerprint.paths),
-    )
-
-
-def compute_surface_fingerprint(*, surface: Surface, schema_version: int) -> SurfaceFingerprint:
-    return compute_fingerprint(
-        surface_id=surface.surface_id,
-        schema_version=schema_version,
-        config_model=surface.config_model,
-        defaults_document=surface.read_defaults_document(),
     )
 
 

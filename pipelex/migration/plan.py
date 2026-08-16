@@ -16,6 +16,12 @@ and the write — and that reason sits on the plan itself, where it never stops 
 > rather than a list of credential-shaped key names, because such a list is a guess that
 > eventually misses one.
 
+This module is deliberately low-level — stdlib, pydantic, and the two sibling modules that are
+themselves low-level (`safety`, `suggested_fix`) — so that `pipelex.base_exceptions` can import it
+without creating a cycle. That is what lets a configuration validation error carry a real
+`MigrationPlan` rather than a second projection of one that would drift from this one. Nothing
+here may reach `migration.exceptions`, `migration.ledger` or anything that imports them.
+
 See `docs/migration-ledger.md` → "What the engine reports".
 """
 
@@ -24,7 +30,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex.migration.ledger import MigrationSafety
+from pipelex.migration.safety import MigrationSafety
 from pipelex.suggested_fix import MigrationOp
 
 
@@ -105,6 +111,15 @@ class FileBlockedReason(StrEnum):
     UNPARSEABLE = "unparseable"
     """The file was read and is not valid UTF-8, or not valid TOML. Nothing was written."""
 
+    UNSUPPORTED_SCHEMA_VERSION = "unsupported_schema_version"
+    """The file declares a `[meta] schema_version` below its ledger's floor, so the entries that
+    would carry it forward are no longer in the ledger. Nothing was written.
+
+    This is the one state a replay cannot detect for itself, and the reason the floor exists: the
+    applier skips an operation whose target is absent, so a squashed ledger run over a file older
+    than the squash would report success over a file it under-migrated. Refusing by name is the
+    alternative to that silence."""
+
     UNWRITABLE = "unwritable"
     """The file needed a change and the run could not make it — the backup would not go down, or
     the replacement would not. The file is exactly as it was found."""
@@ -122,6 +137,16 @@ class FileBlockedReason(StrEnum):
     For the single-file commit the runner performs it is also the *only* transaction failure that
     reaches the plan at all: a replacement that fails re-raises its own `OSError`, because rolling
     back nothing is trivially complete."""
+
+    @property
+    def leaves_the_write_unconfirmed(self) -> bool:
+        """Whether this reason means the file may hold something other than what it was found with.
+
+        Every other reason confirms this migration did not write — including `CHANGED_DURING_RUN`,
+        under which somebody else did; a summary that says "nothing was written" is true of them
+        and false of this one.
+        """
+        return self is FileBlockedReason.STATE_UNCERTAIN
 
 
 class UnexplainedPath(BaseModel):
@@ -165,6 +190,18 @@ class MigrationPlan(BaseModel):
         """Whether the file needs nothing: nothing applied, nothing blocked, nothing unexplained."""
         return not (self.steps or self.blocked or self.unexplained or self.blocked_reason)
 
+    @property
+    def did_change(self) -> bool:
+        """Whether anything applied to this file — a whole entry, or the part of a conflicting one
+        that landed before the conflict was found.
+
+        The plan-level twin of `DocumentReplay.did_change_document`, which is what the runner writes
+        on; the two must agree or a dry run stops predicting the write. A file can therefore be both
+        changed and blocked: the entry that conflicted is reported once, under `blocked`, carrying
+        the operations of it that did apply.
+        """
+        return bool(self.steps) or any(entry.applied_ops for entry in self.blocked)
+
 
 class MigrationReport(BaseModel):
     """Every file one run visited."""
@@ -175,11 +212,38 @@ class MigrationReport(BaseModel):
 
     @property
     def written_plans(self) -> list[MigrationPlan]:
+        """The files this run rewrote. Always empty on a dry run, which writes nothing."""
         return [plan for plan in self.plans if plan.was_written]
 
     @property
+    def changed_plans(self) -> list[MigrationPlan]:
+        """The files something applied to — whether or not this run was allowed to write them.
+
+        The difference from `written_plans` is exactly what a dry run is for: these are the files
+        a write pass would rewrite — including a file whose only change is the part of a
+        conflicting entry that applied before the conflict.
+        """
+        return [plan for plan in self.plans if plan.did_change]
+
+    @property
     def blocked_plans(self) -> list[MigrationPlan]:
+        """The files carrying something this run would not do — a blocked file, or a blocked entry."""
         return [plan for plan in self.plans if plan.blocked_reason is not None or plan.blocked]
+
+    @property
+    def unexplained_plans(self) -> list[MigrationPlan]:
+        """The files carrying a path the current schema does not know and no entry removes."""
+        return [plan for plan in self.plans if plan.unexplained]
+
+    @property
+    def needs_attention(self) -> bool:
+        """Whether anything here is a human's to resolve rather than the tool's.
+
+        This is the verdict a machine consumer branches on. It is deliberately *not* "did this run
+        write anything": a run that migrated every file it found and left nothing blocked has
+        succeeded, and a dry run that found nothing blocked has too.
+        """
+        return bool(self.blocked_plans or self.unexplained_plans)
 
     @property
     def is_clean(self) -> bool:

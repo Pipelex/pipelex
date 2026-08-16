@@ -20,6 +20,7 @@ from pipelex.cli.agent_cli.commands.fmt_cmd import fmt_cmd
 from pipelex.cli.agent_cli.commands.init_cmd import agent_init_cmd
 from pipelex.cli.agent_cli.commands.inputs.app import inputs_app
 from pipelex.cli.agent_cli.commands.lint_cmd import lint_cmd
+from pipelex.cli.agent_cli.commands.migrate_cmd import agent_migrate_cmd
 from pipelex.cli.agent_cli.commands.models_cmd import agent_models_cmd
 from pipelex.cli.agent_cli.commands.pipe_cmd import pipe_cmd
 from pipelex.cli.agent_cli.commands.run.app import run_app
@@ -47,6 +48,7 @@ class PipelexAgentCLI(TyperGroup):
             "models",
             "check-model",
             "accept-gateway-terms",
+            "migrate",
             "doctor",
         ]
 
@@ -147,4 +149,5 @@ app.command(name="pipe", help="Structure a pipe from JSON spec and output TOML")
 app.command(name="models", help="List available model presets, aliases, and waterfalls")(agent_models_cmd)
 app.command(name="check-model", help="Check if a model reference is valid and suggest alternatives")(agent_check_model_cmd)
 app.command(name="accept-gateway-terms", help="Accept Pipelex Gateway terms and mark inference setup complete")(agent_accept_gateway_terms_cmd)
+app.command(name="migrate", help="Migrate this machine's Pipelex configuration files to the current schema")(agent_migrate_cmd)
 app.command(name="doctor", help="Check Pipelex configuration health and auto-fix issues")(agent_doctor_cmd)
