@@ -36,3 +36,42 @@ Nothing is lost that was not already going to be pruned, and the run in question
 **Why it is not fixed here.** Closing it means coordinating pruning with rescue across processes — a lock file — and pruning is deliberately name-shaped rather than ownership-aware. That is real machinery for a module that no command drives yet (`pipelex migrate` does not exist). The docstring was corrected in this pass to state the window rather than deny it.
 
 **The decision to take.** Revisit when `pipelex migrate` lands and concurrent runs become something a user can actually produce. The honest lever then is probably not a lock but pruning that spares backups younger than some age, which fixes this and nothing else has to change.
+
+---
+
+## Where this pauses — the thread replies are still owed
+
+The code, tests, docs and notes are committed (`Answer the PR #1113 review: …`) with `make agent-check`, `make cl`, `make cmig`, `make docs-check` and the full `make agent-test` all green, and **no golden moved**. The commit is **not pushed**.
+
+What remains is mechanical: reply on each of the twenty-three threads and resolve the eighteen that are closed. Reply with `addPullRequestReviewThreadReply(pullRequestReviewThreadId: "<id>", body: "…")` and resolve with `resolveReviewThread(threadId: "<id>")`. **Leave the five `defer` rows open.**
+
+| Thread id | Where | Disposition |
+|---|---|---|
+| `PRRT_kwDOOwmMFc6Zmxk2` | `narrowing.py:143` (codex) | ✅ fixed — exemption now read structurally |
+| `PRRT_kwDOOwmMFc6Zm0kG` | `test_narrowing.py:79` | ✅ fixed — same root cause; companion assertions added |
+| `PRRT_kwDOOwmMFc6Zmxk4` | `narrowing.py:261` (codex) | ✅ fixed — exclusive *and* inclusive normalization |
+| `PRRT_kwDOOwmMFc6Zm0kD` | `narrowing.py:261` | ✅ fixed — same; their `floor(t)+1` missed the inclusive half |
+| `PRRT_kwDOOwmMFc6ZmxyX` | `runner.py:144-152` (greptile) | ✅ fixed — `_discard_backup` asks the file what it holds |
+| `PRRT_kwDOOwmMFc6Zm0j4` | `runner.py:197` | ✅ fixed — same bug from the deleting side |
+| `PRRT_kwDOOwmMFc6Zm0j-` | `backup.py:167` | 📝 **defer** — docstring corrected, race in this note §3 |
+| `PRRT_kwDOOwmMFc6Zm0kB` | `backup.py:134` | 📝 **defer** — already recorded, `migrator-write-scope-and-rename-fidelity.md` §3 |
+| `PRRT_kwDOOwmMFc6Zm0jz` | `coverage.py:306` | ✅ fixed — non-string enums record no members |
+| `PRRT_kwDOOwmMFc6Zm0j5` | `fingerprint.py:468` | ✅ fixed — suppression moved to the call site |
+| `PRRT_kwDOOwmMFc6Zm0j7` | `narrowing.py:105` | 📝 **defer** — this note §1 |
+| `PRRT_kwDOOwmMFc6Zm0kF` | `coverage.py:391` | ✅ fixed — gated on `is_remappable` |
+| `PRRT_kwDOOwmMFc6Zm0kA` | `applier.py:508` | ➖ false positive — `engine.py:96-102` re-reads between ops; nothing outside a ledger builds a `RemapValueOp` |
+| `PRRT_kwDOOwmMFc6Zm0kR` | `applier.py:513` | ✅ fixed — denominator counts string values |
+| `PRRT_kwDOOwmMFc6Zm0kC` | `fingerprint.py:379` | 📝 **defer** — docstring corrected, aggregation in this note §2 |
+| `PRRT_kwDOOwmMFc6Zm0kI` | `update_migration_schemas_cmd.py:6` | ✅ fixed |
+| `PRRT_kwDOOwmMFc6Zm0kJ` | `test_transform_check.py:393` | ✅ fixed — declares `title` |
+| `PRRT_kwDOOwmMFc6Zm0kK` | `Makefile:111` | ➖ no change — the target name is itself 31 chars, the dash column is 31, so the padding asked for cannot exist; four entries already overflow the same way |
+| `PRRT_kwDOOwmMFc6Zm0kL` | `material.py:218` | ✅ fixed — uses `walk.joined` |
+| `PRRT_kwDOOwmMFc6Zm0kM` | `docs/migration-ledger.md:194` | ✅ fixed — both shapes named |
+| `PRRT_kwDOOwmMFc6Zm0kO` | `wip/migrator-phase3-progress.md:195` | ✅ fixed — the two claims separated |
+| `PRRT_kwDOOwmMFc6Zm0kU` | `snapshot.py:103` | ✅ fixed — names the narrowing remedy |
+| `PRRT_kwDOOwmMFc6Zm0kV` | `material.py:106` | 📝 **defer** — already recorded, `migrator-write-scope-and-rename-fidelity.md` § "Residual" |
+
+Two things worth carrying forward that the bots did not report:
+
+- A `list[enum]` flattened to a bare `str` was silently losing every spelling — the opposite direction of the container-widening bug, found by writing the third test case rather than by any reviewer. It is fixed and pinned.
+- `is_remappable` still has **no direct unit test**, only the indirect coverage-gate one, and it now gates two accountings. Worth closing whichever way §1 is decided.
