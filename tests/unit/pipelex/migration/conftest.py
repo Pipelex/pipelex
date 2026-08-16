@@ -65,6 +65,7 @@ def build_ledger() -> LedgerBuilder:
         surface_id: str = EXAMPLE_SURFACE_ID,
         base_file: str = EXAMPLE_BASE_FILE,
         tier_glob: str | None = EXAMPLE_TIER_GLOB,
+        min_supported_schema_version: int = 0,
     ) -> MigrationLedger:
         return MigrationLedger(
             surface=SurfaceBlock(
@@ -73,7 +74,7 @@ def build_ledger() -> LedgerBuilder:
                 base_file=base_file,
                 tier_glob=tier_glob,
                 current_schema_version=1 + len(entries),
-                min_supported_schema_version=0,
+                min_supported_schema_version=min_supported_schema_version,
             ),
             migration=entries,
         )

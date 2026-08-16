@@ -105,6 +105,15 @@ class FileBlockedReason(StrEnum):
     UNPARSEABLE = "unparseable"
     """The file was read and is not valid UTF-8, or not valid TOML. Nothing was written."""
 
+    UNSUPPORTED_SCHEMA_VERSION = "unsupported_schema_version"
+    """The file declares a `[meta] schema_version` below its ledger's floor, so the entries that
+    would carry it forward are no longer in the ledger. Nothing was written.
+
+    This is the one state a replay cannot detect for itself, and the reason the floor exists: the
+    applier skips an operation whose target is absent, so a squashed ledger run over a file older
+    than the squash would report success over a file it under-migrated. Refusing by name is the
+    alternative to that silence."""
+
     UNWRITABLE = "unwritable"
     """The file needed a change and the run could not make it — the backup would not go down, or
     the replacement would not. The file is exactly as it was found."""
@@ -175,11 +184,37 @@ class MigrationReport(BaseModel):
 
     @property
     def written_plans(self) -> list[MigrationPlan]:
+        """The files this run rewrote. Always empty on a dry run, which writes nothing."""
         return [plan for plan in self.plans if plan.was_written]
 
     @property
+    def changed_plans(self) -> list[MigrationPlan]:
+        """The files something applied to — whether or not this run was allowed to write them.
+
+        The difference from `written_plans` is exactly what a dry run is for: these are the files
+        a write pass would rewrite.
+        """
+        return [plan for plan in self.plans if plan.steps]
+
+    @property
     def blocked_plans(self) -> list[MigrationPlan]:
+        """The files carrying something this run would not do — a blocked file, or a blocked entry."""
         return [plan for plan in self.plans if plan.blocked_reason is not None or plan.blocked]
+
+    @property
+    def unexplained_plans(self) -> list[MigrationPlan]:
+        """The files carrying a path the current schema does not know and no entry removes."""
+        return [plan for plan in self.plans if plan.unexplained]
+
+    @property
+    def needs_attention(self) -> bool:
+        """Whether anything here is a human's to resolve rather than the tool's.
+
+        This is the verdict a machine consumer branches on. It is deliberately *not* "did this run
+        write anything": a run that migrated every file it found and left nothing blocked has
+        succeeded, and a dry run that found nothing blocked has too.
+        """
+        return bool(self.blocked_plans or self.unexplained_plans)
 
     @property
     def is_clean(self) -> bool:

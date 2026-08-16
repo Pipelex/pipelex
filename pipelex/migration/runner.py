@@ -15,6 +15,8 @@ See `docs/migration-ledger.md` → "Applying" and "Per-file transactions".
 from datetime import UTC, datetime
 from pathlib import Path
 
+import tomlkit
+from tomlkit import TOMLDocument
 from tomlkit.exceptions import TOMLKitError
 
 from pipelex import log
@@ -25,6 +27,7 @@ from pipelex.migration.plan import FileBlockedReason, MigrationPlan, MigrationRe
 from pipelex.migration.surfaces import Surface, SurfaceRegistry
 from pipelex.pipeline.exceptions import FixTransactionError, FixWriteConflictError
 from pipelex.pipeline.fixes.file_transaction import FileSnapshot, PendingFileUpdate, commit_file_updates, read_file_snapshot
+from pipelex.system.configuration.config_surface import declared_schema_version
 
 
 def migrate_file(*, surface: Surface, ledger: MigrationLedger, file_path: Path, dry_run: bool, moment: datetime) -> MigrationPlan:
@@ -62,7 +65,7 @@ def migrate_file(*, surface: Surface, ledger: MigrationLedger, file_path: Path, 
         )
 
     try:
-        replay = replay_ledger_over_text(ledger=ledger, text=text)
+        document = tomlkit.loads(text)
     except TOMLKitError as exc:
         return _blocked_plan(
             surface_id=surface.surface_id,
@@ -70,6 +73,24 @@ def migrate_file(*, surface: Surface, ledger: MigrationLedger, file_path: Path, 
             reason=FileBlockedReason.UNPARSEABLE,
             # A parse error names a position and a syntax expectation, never a value.
             detail=f"the file is not valid TOML: {exc}",
+        )
+
+    below_the_floor = _refuse_a_file_below_the_floor(surface=surface, ledger=ledger, file_path=file_path, document=document)
+    if below_the_floor is not None:
+        return below_the_floor
+
+    try:
+        replay = replay_ledger_over_text(ledger=ledger, text=text)
+    except TOMLKitError as exc:
+        # The text parsed a moment ago, so this is an operation failing on a document that is
+        # valid TOML — an applier bug rather than a bad file. It is reported loudly against the
+        # one file it happened on rather than allowed to abort the walk, which is the per-file
+        # scope doing its job on a case nobody planned for.
+        return _blocked_plan(
+            surface_id=surface.surface_id,
+            file_path=file_path,
+            reason=FileBlockedReason.UNPARSEABLE,
+            detail=f"an operation could not be applied to this file: {exc}",
         )
 
     plan = MigrationPlan(
@@ -81,6 +102,34 @@ def migrate_file(*, surface: Surface, ledger: MigrationLedger, file_path: Path, 
     if not replay.did_change_document or dry_run:
         return plan
     return _write_migrated_file(plan=plan, snapshot=snapshot, new_content=replay.text, moment=moment)
+
+
+def _refuse_a_file_below_the_floor(*, surface: Surface, ledger: MigrationLedger, file_path: Path, document: TOMLDocument) -> MigrationPlan | None:
+    """Refuse a file that declares a schema version this ledger can no longer migrate from.
+
+    The floor is the one thing a replay cannot work out for itself. The applier skips an operation
+    whose target is absent and reports success, so a ledger whose oldest entries were squashed
+    away would run over a file older than the squash, change nothing, and say it was fine. A
+    document that *declares* where it stands is the only evidence available, which is why the
+    reserved `[meta] schema_version` is read here and nowhere else in a migration.
+
+    Almost every file declares nothing and this returns `None` — the floor is zero on every
+    surface today, and nothing writes the key. It earns its place the day a squash moves the floor.
+    """
+    declared = declared_schema_version(config_dict=document.unwrap())
+    floor = ledger.surface.min_supported_schema_version
+    if declared is None or declared >= floor:
+        return None
+    return _blocked_plan(
+        surface_id=surface.surface_id,
+        file_path=file_path,
+        reason=FileBlockedReason.UNSUPPORTED_SCHEMA_VERSION,
+        detail=(
+            f"this file declares schema version {declared} and the '{surface.surface_id}' ledger only migrates from "
+            f"version {floor} onwards, so the entries that would bring it forward are no longer there — migrate it "
+            f"with a pipelex release that still carries them, or re-create the file"
+        ),
+    )
 
 
 def _write_migrated_file(*, plan: MigrationPlan, snapshot: FileSnapshot, new_content: str, moment: datetime) -> MigrationPlan:

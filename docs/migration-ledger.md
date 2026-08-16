@@ -65,7 +65,7 @@ The reasoning is worth keeping. Any side record of "what has already been applie
 Two reservations exist so that later projects stay free:
 
 - **`[meta] schema_version`** is a reserved optional in-file key. Every configuration-surface reader tolerates it and strips it before validation; **nothing writes it**. The reason not to write it is not release compatibility, which our principles disclaim, but team skew on tracked files: base configuration files under a project's `.pipelex/` are shared through git right now, so one developer on a newer pipelex writing the key would break a teammate on last week's build the same afternoon.
-- **`min_supported_schema_version`** on the surface block, held at zero until a ledger squash ever moves it. Without the floor, a squash silently under-migrates the oldest files in the field, because the applier skips absent targets and reports success. With it, the loader fails loudly instead.
+- **`min_supported_schema_version`** on the surface block, held at zero until a ledger squash ever moves it. Without the floor, a squash silently under-migrates the oldest files in the field, because the applier skips absent targets and reports success. With it, a file that *declares* where it stands is refused by name — `unsupported_schema_version`, nothing written — instead of being run over and reported clean. The two reservations are one mechanism: a document's declaration is the only evidence a floor can act on, which is why the migration reads the reserved key exactly as tolerantly as the loader strips it. A file declaring nothing, which is every file in the field, is migrated as always.
 
 ### The downgrade direction
 
@@ -468,6 +468,7 @@ There is one file-blocked reason per **state the file is in**, rather than one p
 |---|---|
 | `unreadable` | It is there and its bytes would not come. Nothing was written. |
 | `unparseable` | It was read and is not valid UTF-8, or not valid TOML. Nothing was written. |
+| `unsupported_schema_version` | It declares a `[meta] schema_version` below its ledger's floor, so the entries that would carry it forward are no longer there. Nothing was written. |
 | `unwritable` | It needed a change and the run could not make it — the backup would not go down, or the replacement would not. The file is exactly as it was found. |
 | `changed_during_run` | It was removed or edited between the read and the write, so the run refused to write over work it had not seen. |
 | `state_uncertain` | The write could not be confirmed: the transaction could not describe what it left behind, and the file does not hold what the run wrote. |
@@ -487,6 +488,28 @@ Two rules govern how an entry appears, and both exist so that a report is never 
 That is a mechanical rule rather than a list of credential-shaped key names, because such a list is a guess that eventually misses one. The single deliberate exception is the backup file, which contains the user's values by definition and is protected by inheriting the source file's mode rather than the process umask.
 
 When migration is reported through a validation error, the error keeps `error_domain: "config"` and gains a structured `migration` block carrying the plan, the remedy and the diagnosis. Consumers branch on the presence of that block, never on wording. Following the workspace convention: the structured fields are the contract, and Markdown, exit codes and HTTP statuses are presentation.
+
+## The commands
+
+Two commands run a migration, and they are the same run with two audiences.
+
+| | `pipelex migrate` | `pipelex-agent migrate` |
+|---|---|---|
+| Reader | a person | a program |
+| Default | plan, show it, ask | plan, and write nothing |
+| Writes when | the question is answered, or `--yes` | `--yes` |
+| `--dry-run` | plan and stop | plan and stop (the default, said explicitly) |
+| Answer | Rich output | JSON, or Markdown with `--format markdown` |
+
+**Both walk the global `~/.pipelex/` and the project `.pipelex/`, and nothing else.** A `config_dir=` load and this repository's own `tests/pipelex_{run_mode}.toml` are outside the walk: neither is a user's configuration, and migrating a directory nobody asked about is how a tool earns a reputation for touching things. A directory that does not exist is skipped, and a project rooted at the home directory is walked once rather than twice.
+
+**The walk is not recursive.** A surface's tier files sit beside its base file; a subdirectory holds a different kind of thing. The specimen is real: `.pipelex/inference/backends/pipelex_gateway.toml` matches the `pipelex-config` tier glob `pipelex_*.toml` exactly and is an inference backend definition, so a recursive walk would replay the main configuration's ledger over it.
+
+> **`--dry-run` and `--yes` together are refused, not resolved.** One asks for no write and the other authorizes one; picking a winner would hide the bug that produced both.
+
+**Neither command boots.** A broken configuration is the reason to reach for `migrate`, so needing a working one would make it useless in exactly the case it exists for. What a migration may use is the ledger, the applier and the filesystem: no configuration load, no model deck, no credentials, no network. That is a property under test rather than an accident, and the test is what keeps a future import from creeping into the list.
+
+**The structured fields are the contract.** `needs_attention` is the verdict — *this run left something a person has to decide* — and it is deliberately not "did anything get written": a run that migrated every file it found has succeeded, and so has a dry run that found nothing blocked. The exit code (`1` when `needs_attention`, `2` on a contradictory pair of flags) and the rendering are presentation, and follow the workspace convention rather than carrying the verdict.
 
 ## Boot tolerance
 
@@ -557,7 +580,7 @@ Three further rules make that safety net worth the name.
 
 What a backup carries across is the file's **permission bits**, and that is the one deliberate exception to "no value read from a user's file is ever rendered" — a backup contains the user's values by definition, so a `0600` configuration must not acquire a world-readable copy beside it. Ownership, ACLs and extended attributes are **not** carried across the replace, on either the backup or the migrated file: an atomic same-directory replace cannot preserve what the running process has no right to set, and re-attaching an attribute blindly (a quarantine flag, a security label) is a worse guess than leaving it off. The security-relevant bit of a configuration file is its mode.
 
-A configuration file that is a **symlink** is followed: the file the user means is the one at the end of the link, so the run reads, backs up and replaces *that* file, and the link survives. Replacing the link path instead would put a regular file where the link was and leave the real file unmigrated. The plan keeps naming the path the directory walk found; the backup path shows where the bytes actually went. This is what the `.mthds` fix loop already does with its own targets. The two callers still differ on one half: the fix loop pairs its resolution with a write-scope check, so a link pointing outside the directories it was given is refused, and the migration runner has no equivalent — a configuration file symlinked outside every walked directory is migrated where it actually lives. Whether that should be guarded is open; see `wip/migrator-write-scope-and-rename-fidelity.md`.
+A configuration file that is a **symlink** is followed: the file the user means is the one at the end of the link, so the run reads, backs up and replaces *that* file, and the link survives. Replacing the link path instead would put a regular file where the link was and leave the real file unmigrated. The plan keeps naming the path the directory walk found; the backup path shows where the bytes actually went. This is what the `.mthds` fix loop already does with its own targets. The two callers differ on one half, and the difference is deliberate: **a migration's write scope is the resolved target of any file the walk claims**, not the walked directories themselves. The `.mthds` fix loop pairs its resolution with a write-scope check because it is handed a bundle directory and must not write outside it; a configuration directory is a place a user keeps links to files they own, and a dotfiles repository is the ordinary reason one is there. Refusing it would mean the tool declines to migrate exactly the machines whose owner was most deliberate about their configuration. The plan names the walked path and the backup names the resolved one, so a run that followed a link out of the directory says so. The reasoning behind both readings is in `wip/migrator-write-scope-and-rename-fidelity.md`.
 
 ### Per-file transactions
 

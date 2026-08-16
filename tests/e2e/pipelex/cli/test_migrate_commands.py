@@ -1,0 +1,356 @@
+"""End-to-end tests for ``pipelex migrate`` and ``pipelex-agent migrate``, via subprocess.
+
+Both binaries live in one module because the *scenario* is one: a machine whose configuration
+files predate the installed pipelex, a boot that fails because of it, and a command that repairs
+it. Splitting the module would duplicate the only hard part — planting that machine — and the two
+commands would then be proved against two subtly different ones.
+
+**The old shape is real, and so is the migration.** The fixture is the package's own
+``goldens/telemetry-config/before@2.toml``, the hand-authored flat document that entry
+``telemetry-config@2`` exists to carry forward, read live rather than copied here. The ledger that
+migrates it is the one the package ships. Nothing about this test is synthetic except the machine
+it runs on, which is what makes the boot failure it starts from a real one: a flat
+``telemetry.toml`` fails ``TelemetryConfig``'s ``extra="forbid"`` today, in the field.
+
+The boot probe is ``pipelex-agent models``: the cheapest command that performs a full Pipelex boot,
+including the telemetry load that the old shape breaks. ``pipelex show config`` is not a probe —
+it exits 0 on a machine whose telemetry configuration cannot load, because it never reads it.
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess  # noqa: S404 - invokes the real pipelex binaries for E2E coverage
+from typing import TYPE_CHECKING, Any
+
+from pipelex.migration.backup import existing_backups_of
+from pipelex.migration.goldens import pre_history_document_path
+from pipelex.migration.surfaces import packaged_migration_dir
+from pipelex.tools.misc.toml_utils import load_toml_from_path
+from tests.e2e.agent_cli.conftest import REPO_ROOT
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+PIPELEX_BIN = REPO_ROOT / ".venv" / "bin" / "pipelex"
+PIPELEX_AGENT_BIN = REPO_ROOT / ".venv" / "bin" / "pipelex-agent"
+
+TELEMETRY_SURFACE_ID = "telemetry-config"
+
+# A tier file of the flat era, as a user would have written one: a couple of overrides on top of
+# the global file, not the whole census the golden carries.
+OLD_SHAPE_PROJECT_OVERRIDE = """\
+# My project keeps telemetry quiet.
+telemetry_mode = "off"
+host = "https://project.example.invalid"
+"""
+
+
+def _old_shape_telemetry_document() -> str:
+    """The flat pre-history document the shipped entry is about, read from the package."""
+    path = pre_history_document_path(migration_dir=packaged_migration_dir(), surface_id=TELEMETRY_SURFACE_ID, schema_version=2)
+    return path.read_text(encoding="utf-8")
+
+
+def _plant_a_stale_machine(*, hermetic_home: Path) -> tuple[Path, Path, Path]:
+    """A machine with an old-shape file in the global directory and another in a project.
+
+    Both directories are walked and both files are claimed — the global ``telemetry.toml`` by the
+    surface's base file and the project ``telemetry_override.toml`` by its tier glob — so the run
+    has to reach two directories and two tiers to be complete. The project override is also the
+    tier the telemetry loader actually merges, which is what keeps the boot failure honest.
+
+    Returns the project directory, the global file and the project file.
+    """
+    global_file = hermetic_home / ".pipelex" / "telemetry.toml"
+    global_file.write_text(_old_shape_telemetry_document(), encoding="utf-8")
+
+    project_dir = hermetic_home / "workspace"
+    project_config_dir = project_dir / ".pipelex"
+    project_config_dir.mkdir(parents=True)
+    project_file = project_config_dir / "telemetry_override.toml"
+    project_file.write_text(OLD_SHAPE_PROJECT_OVERRIDE, encoding="utf-8")
+    return project_dir, global_file, project_file
+
+
+def _run(*, args: list[str], env: dict[str, str], cwd: Path) -> subprocess.CompletedProcess[str]:
+    # A wide terminal, because the human CLI renders through Rich and Rich wraps at the console
+    # width. A temp-directory path is long enough to be broken across two lines at the default 80,
+    # which would make these assertions fail for a reason that has nothing to do with migration.
+    return subprocess.run(  # noqa: S603
+        args,
+        env={**env, "COLUMNS": "400"},
+        cwd=str(cwd),
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=180,
+    )
+
+
+def _boot(*, env: dict[str, str], cwd: Path) -> subprocess.CompletedProcess[str]:
+    """Run a command that performs a full Pipelex boot, telemetry load included."""
+    return _run(args=[str(PIPELEX_AGENT_BIN), "models", "--format", "json"], env=env, cwd=cwd)
+
+
+class TestTheHumanMigrateCommand:
+    def test_stale_files_in_both_directories_are_migrated_and_the_boot_that_failed_succeeds(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        project_dir, global_file, project_file = _plant_a_stale_machine(hermetic_home=hermetic_home)
+
+        before = _boot(env=offline_subprocess_env, cwd=project_dir)
+        assert before.returncode != 0, "the scenario is worthless if this machine boots — the old shape must break it"
+        assert "TelemetryConfigValidationError" in before.stderr
+
+        migrated = _run(args=[str(PIPELEX_BIN), "--no-logo", "migrate", "--yes"], env=offline_subprocess_env, cwd=project_dir)
+
+        assert migrated.returncode == 0, migrated.stdout + migrated.stderr
+        # The human CLI's console writes to stderr when no runtime hub owns one, which is the case
+        # for a command that deliberately does not boot. Read both, and assert on the union.
+        report = migrated.stdout + migrated.stderr
+        assert str(global_file) in report
+        assert str(project_file) in report
+
+        assert load_toml_from_path(path=global_file) == {
+            "custom_posthog": {
+                "mode": "anonymous",
+                "endpoint": "https://eu.i.posthog.com",
+                "api_key": "phc_example_project_api_key",
+                "user_id": "",
+                "geoip": True,
+                "debug": False,
+                "redact_properties": ["prompt", "system_prompt", "response", "file_path", "url"],
+            }
+        }
+        assert load_toml_from_path(path=project_file) == {"custom_posthog": {"mode": "off", "endpoint": "https://project.example.invalid"}}
+
+        # One copy per file, holding what that file used to say. Exactly one: a run that backed a
+        # file up twice, or left an older copy beside the new one, would be leaving the user to
+        # work out which is the original.
+        for original, path in ((_old_shape_telemetry_document(), global_file), (OLD_SHAPE_PROJECT_OVERRIDE, project_file)):
+            backups = existing_backups_of(path=path)
+            assert len(backups) == 1, f"expected exactly one backup of {path}, found {backups}"
+            assert backups[0].read_text(encoding="utf-8") == original
+
+        after = _boot(env=offline_subprocess_env, cwd=project_dir)
+        assert after.returncode == 0, after.stderr
+
+    def test_a_dry_run_reports_the_same_work_and_writes_nothing(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        project_dir, global_file, _ = _plant_a_stale_machine(hermetic_home=hermetic_home)
+        original = global_file.read_text(encoding="utf-8")
+
+        planned = _run(args=[str(PIPELEX_BIN), "--no-logo", "migrate", "--dry-run"], env=offline_subprocess_env, cwd=project_dir)
+
+        assert planned.returncode == 0, planned.stdout + planned.stderr
+        assert "telemetry-config@2" in planned.stdout + planned.stderr or "Nest the flat telemetry" in planned.stdout + planned.stderr
+        assert global_file.read_text(encoding="utf-8") == original
+        assert existing_backups_of(path=global_file) == []
+
+    def test_the_two_write_flags_contradict_each_other_and_are_refused(
+        self,
+        hermetic_home: Path,  # noqa: ARG002 - the fixture is what makes HOME hermetic for the subprocess
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        refused = _run(
+            args=[str(PIPELEX_BIN), "--no-logo", "migrate", "--dry-run", "--yes"],
+            env=offline_subprocess_env,
+            cwd=REPO_ROOT,
+        )
+
+        assert refused.returncode == 2
+        assert "contradict" in refused.stdout + refused.stderr
+
+
+class TestTheAgentMigrateLoop:
+    def test_plan_as_json_then_apply_and_the_boot_that_failed_succeeds(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        project_dir, global_file, project_file = _plant_a_stale_machine(hermetic_home=hermetic_home)
+
+        before = _boot(env=offline_subprocess_env, cwd=project_dir)
+        assert before.returncode != 0, "the scenario is worthless if this machine boots — the old shape must break it"
+
+        planned = _run(
+            args=[str(PIPELEX_AGENT_BIN), "migrate", "--dry-run", "--format", "json"],
+            env=offline_subprocess_env,
+            cwd=project_dir,
+        )
+        assert planned.returncode == 0, planned.stderr
+        plan: dict[str, Any] = json.loads(planned.stdout)
+
+        assert plan["applied"] is False
+        assert plan["needs_attention"] is False
+        assert plan["is_clean"] is False
+        assert plan["summary"]["files_changed"] == 2
+        assert plan["summary"]["files_written"] == 0
+        assert existing_backups_of(path=global_file) == [], "a plan is not a write"
+        assert {str(hermetic_home / ".pipelex"), str(project_dir / ".pipelex")} == set(plan["config_dirs"])
+
+        applied = _run(args=[str(PIPELEX_AGENT_BIN), "migrate", "--yes", "--format", "json"], env=offline_subprocess_env, cwd=project_dir)
+        assert applied.returncode == 0, applied.stderr
+        outcome: dict[str, Any] = json.loads(applied.stdout)
+
+        assert outcome["applied"] is True
+        assert outcome["summary"]["files_written"] == 2
+        written = {plan_dict["file_path"] for plan_dict in outcome["plans"] if plan_dict["was_written"]}
+        assert written == {str(global_file), str(project_file)}
+
+        after = _boot(env=offline_subprocess_env, cwd=project_dir)
+        assert after.returncode == 0, after.stderr
+
+    def test_a_second_run_finds_nothing_left_to_do(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """Replay neutrality, at the command's own level: migrating twice is migrating once."""
+        project_dir, _, _ = _plant_a_stale_machine(hermetic_home=hermetic_home)
+
+        first = _run(args=[str(PIPELEX_AGENT_BIN), "migrate", "--yes", "--format", "json"], env=offline_subprocess_env, cwd=project_dir)
+        assert first.returncode == 0, first.stderr
+
+        second = _run(args=[str(PIPELEX_AGENT_BIN), "migrate", "--yes", "--format", "json"], env=offline_subprocess_env, cwd=project_dir)
+        assert second.returncode == 0, second.stderr
+        outcome: dict[str, Any] = json.loads(second.stdout)
+        assert outcome["is_clean"] is True
+        assert outcome["summary"]["files_written"] == 0
+
+    def test_the_two_write_flags_contradict_each_other_and_are_refused(
+        self,
+        hermetic_home: Path,  # noqa: ARG002 - the fixture is what makes HOME hermetic for the subprocess
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        refused = _run(
+            args=[str(PIPELEX_AGENT_BIN), "migrate", "--dry-run", "--yes", "--format", "json"],
+            env=offline_subprocess_env,
+            cwd=REPO_ROOT,
+        )
+
+        assert refused.returncode == 2
+        assert json.loads(refused.stderr)["error_type"] == "ArgumentError"
+
+
+class TestTheBootstrapPath:
+    """The property that makes this command reachable at all: it runs when nothing else does.
+
+    A broken configuration is the reason to reach for `migrate`, so needing a working one would
+    make it useless in exactly the case it exists for. What it may use is the migration ledger, the
+    applier and the filesystem — and this test is what keeps a future import of the config, the
+    model deck or the network from creeping into that list unnoticed.
+    """
+
+    def _break_the_configuration(self, *, hermetic_home: Path) -> None:
+        config_file = hermetic_home / ".pipelex" / "pipelex.toml"
+        # At the top of the document, so the key lands at the root rather than in whichever table
+        # happens to be last — a root key no model knows, which no ledger entry removes either.
+        config_file.write_text(f"not_a_real_setting = true\n{config_file.read_text(encoding='utf-8')}", encoding="utf-8")
+
+    def test_both_commands_run_against_a_configuration_that_cannot_load(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        self._break_the_configuration(hermetic_home=hermetic_home)
+
+        boot = _boot(env=offline_subprocess_env, cwd=hermetic_home)
+        assert boot.returncode != 0, "the scenario is worthless if this machine boots"
+        assert "ConfigValidationError" in boot.stderr
+
+        human = _run(args=[str(PIPELEX_BIN), "--no-logo", "migrate", "--dry-run"], env=offline_subprocess_env, cwd=hermetic_home)
+        assert human.returncode == 0, human.stdout + human.stderr
+
+        agent = _run(
+            args=[str(PIPELEX_AGENT_BIN), "migrate", "--dry-run", "--format", "json"],
+            env=offline_subprocess_env,
+            cwd=hermetic_home,
+        )
+        assert agent.returncode == 0, agent.stderr
+        assert json.loads(agent.stdout)["summary"]["files_walked"] > 0
+
+    def test_the_ledger_still_migrates_a_stale_file_beside_a_configuration_that_cannot_load(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """The bootstrap path is not merely "does not crash" — it still does the work.
+
+        A command that ran but declined to touch anything while the configuration was broken would
+        pass the test above and be useless.
+        """
+        self._break_the_configuration(hermetic_home=hermetic_home)
+        _, global_file, _ = _plant_a_stale_machine(hermetic_home=hermetic_home)
+
+        applied = _run(
+            args=[str(PIPELEX_AGENT_BIN), "migrate", "--yes", "--format", "json"],
+            env=offline_subprocess_env,
+            cwd=hermetic_home,
+        )
+
+        assert applied.returncode == 0, applied.stderr
+        assert json.loads(applied.stdout)["summary"]["files_written"] == 1
+        assert "custom_posthog" in global_file.read_text(encoding="utf-8")
+
+
+class TestNoValueFromAUsersFileIsEverRendered:
+    """The contract's mechanical rule, asserted on the channels that exist today.
+
+    > No value read from a user's file is ever rendered — not in the command's output, not in the
+    > structured plan, not in an error.
+
+    Mechanical rather than a list of credential-shaped key names, because such a list is a guess
+    that eventually misses one. The planted value is carried by a `move_key` the shipped ledger
+    performs, so the run demonstrably *handled* it — a rule that held only because the value was
+    quietly dropped would be no rule at all.
+
+    Two of the three channels are covered here: the command's own output and the structured plan.
+    The third, the `migration` block on a configuration validation error, joins them when
+    `report_validation_error` starts reporting the real plan.
+    """
+
+    PLANTED_SECRET = "phc_L1VE_s3cret_project_key_that_must_never_be_rendered"
+
+    def _plant_the_secret(self, *, hermetic_home: Path) -> tuple[Path, Path]:
+        document = _old_shape_telemetry_document().replace("phc_example_project_api_key", self.PLANTED_SECRET)
+        assert self.PLANTED_SECRET in document, "the golden no longer carries the api key this test substitutes into"
+        project_dir, global_file, _ = _plant_a_stale_machine(hermetic_home=hermetic_home)
+        global_file.write_text(document, encoding="utf-8")
+        return project_dir, global_file
+
+    def test_neither_command_renders_a_planted_secret_while_migrating_it(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        project_dir, global_file = self._plant_the_secret(hermetic_home=hermetic_home)
+
+        channels = [
+            _run(args=[str(PIPELEX_BIN), "--no-logo", "migrate", "--dry-run"], env=offline_subprocess_env, cwd=project_dir),
+            _run(
+                args=[str(PIPELEX_AGENT_BIN), "migrate", "--dry-run", "--format", "json"],
+                env=offline_subprocess_env,
+                cwd=project_dir,
+            ),
+            _run(
+                args=[str(PIPELEX_AGENT_BIN), "migrate", "--dry-run", "--format", "markdown"],
+                env=offline_subprocess_env,
+                cwd=project_dir,
+            ),
+            _run(args=[str(PIPELEX_BIN), "--no-logo", "migrate", "--yes"], env=offline_subprocess_env, cwd=project_dir),
+        ]
+        for channel in channels:
+            assert self.PLANTED_SECRET not in channel.stdout
+            assert self.PLANTED_SECRET not in channel.stderr
+
+        # And it was moved rather than dropped, which is what makes the assertions above mean
+        # something: the run read this value, wrote it under its new key, and never said it.
+        assert self.PLANTED_SECRET in global_file.read_text(encoding="utf-8")
+        assert load_toml_from_path(path=global_file)["custom_posthog"]["api_key"] == self.PLANTED_SECRET

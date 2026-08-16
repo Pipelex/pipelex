@@ -13,6 +13,7 @@ from pipelex.cli.commands.graph_cmd import graph_app
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cli.commands.login.command import login_cmd
+from pipelex.cli.commands.migrate_cmd import migrate_cmd
 from pipelex.cli.commands.plugins_cmd import plugins_app
 from pipelex.cli.commands.resolve_cmd import resolve_cmd
 from pipelex.cli.commands.run.app import run_app
@@ -32,6 +33,7 @@ _CORE_COMMAND_ORDER: list[str] = [
     "init",
     "doctor",
     "update",
+    "migrate",
     "build",
     "validate",
     "fix",
@@ -150,7 +152,7 @@ def app_callback(
 """
         )
     # Skip checks if no command is being run (e.g., just --help) or if running setup/diagnostic commands
-    if ctx.invoked_subcommand is None or ctx.invoked_subcommand in {"login", "init", "doctor", "update", "which"}:
+    if ctx.invoked_subcommand is None or ctx.invoked_subcommand in {"login", "init", "doctor", "update", "migrate", "which"}:
         return
 
     # Check system readiness (dependencies and venv for dev installs)
@@ -223,6 +225,19 @@ def update_command(
 ) -> None:
     """Refresh the installed deck to match the kit shipped with the running pipelex version."""
     update_cmd(local=local, yes=yes, dry_run=dry_run, no_backup=no_backup)
+
+
+@app.command(name="migrate", help="Migrate this machine's Pipelex configuration files to the current schema")
+def migrate_command(
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Report what would change and write nothing")] = False,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Apply without the interactive confirmation")] = False,
+) -> None:
+    """Bring the configuration files in ~/.pipelex/ and the project .pipelex/ up to the current schema.
+
+    Runs on a configuration that cannot load — it needs the migration ledger, the applier and the
+    filesystem, and nothing else. Every file it rewrites is backed up beside itself first.
+    """
+    migrate_cmd(dry_run=dry_run, yes=yes)
 
 
 app.add_typer(

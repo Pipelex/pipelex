@@ -2,16 +2,21 @@
 
 The charter is [`wip/migrator-3/sequencing.md` § S6](../../wip/migrator-3/sequencing.md) at the **workspace root** (from this repo: `../wip/migrator-3/sequencing.md`), with the phase content in `plan.md § Phase 3`. This file is the session-crossing record of what S6 has built, what it decided, and what is still open. Open the charter first, then this.
 
-**Venue.** `_migrator/`, branch `feature/Migrator-3`, cut from `origin/dev` (the Phase 2 squash merge). **Pushed to origin, PR open against `dev`** carrying the pre-S7 bucket. S6 therefore lands as **two** PRs rather than the one the charter assumes: this one, and a second for the phase body on a fresh branch once `feature/Migrator-3` is squash-merged and deleted. Record both numbers against S6.
+**Venue.** S6 lands as **two** PRs, not the one the charter assumes.
 
-✅ **Cold-start state.** Two commits, both pushed, working tree clean:
+- **Part 1 — `feature/Migrator-3`: MERGED.** PR [#1113](https://github.com/Pipelex/pipelex/pull/1113), `dev` = `490d189df`. Milestones 1–4 below. The branch is deleted local and remote.
+- **Part 2 — `feature/Migrator-3b`**, cut from `dev` = `490d189df`, **no upstream set** (first push is `git push -u origin feature/Migrator-3b`). This is the branch a new session works on. Milestone 5 onwards.
+
+Record both numbers against S6.
+
+✅ **Cold-start state (part 1, on `dev`).** Two commits, both pushed, working tree clean:
 
 1. *"Migrator Phase 3, milestone 1: settle the golden format before S7 freezes it"*
 2. *"Migrator Phase 3, milestones 2-3: what an unsafe entry promises, and catching a narrowing"* — milestones 2 and 3 together, plus the fixes from a `/code-review high` pass over them.
 
 `make agent-check` and the full `make agent-test` are both green on the branch as pushed.
 
-⚠ **S6 is about a third done.** The charter's "must be settled before S7" bucket is closed; the phase's own body — the two `migrate` commands and everything downstream of them — is **not started**. See [What is actually left](#what-is-actually-left) at the bottom before planning a session.
+⚠ **S6 is roughly half done.** The pre-S7 bucket is closed (part 1, on `dev`) and **the two `migrate` commands are built** (milestone 5, on `feature/Migrator-3b`). What remains is the rest of the phase body — boot tolerance, `report_validation_error`, the downgrade diagnosis, the telemetry-remedy retirement, `doctor`, the skills, the specs rows, and publishing the contract. See [What is actually left](#what-is-actually-left) at the bottom before planning a session.
 
 ## Build order chosen for this session
 
@@ -20,8 +25,8 @@ The charter lists a great many deliverables without an order. The order below wa
 1. **The golden-format bucket + the narrowing relation** — done, see below.
 2. **R9 + the "what does `unsafe` promise" pass** — done, see Milestone 2 below.
 3. **The applier's dotted-key rename policy, the backup/replace semantics pass, the `UNWRITABLE` wording** — done, see Milestone 3 below. That closes the "must be settled before S7" bucket.
-4. **The commands** — `pipelex migrate`, `pipelex-agent migrate`, the downgrade diagnosis, the rendering-rule test — not started. **This is where the next session starts.**
-5. **Boot tolerance, `report_validation_error` on the real plan, the telemetry remedies retired, the `doctor` row** — not started.
+4. **The commands** — `pipelex migrate`, `pipelex-agent migrate`, the rendering-rule test — done, see Milestone 5 below. The **downgrade diagnosis** (`unexplained[]`) was deliberately carried out of this milestone and is where the next session starts.
+5. **The downgrade diagnosis, boot tolerance, `report_validation_error` on the real plan, the telemetry remedies retired, the `doctor` row** — not started. **This is where the next session starts.**
 6. **The skills (`add-migration`, `/release` step 3b), the `config-docs` drift-contract review list, `command-surface-map.md` rows, publishing the contract in the nav** — not started.
 
 ## Milestone 1 — the golden-format bucket (DONE)
@@ -202,6 +207,8 @@ Everything in [§ S6](../../wip/migrator-3/sequencing.md#s6--migrator-phase-3) n
 - ~~**The backup and replace semantics pass**~~ — done, see Milestone 3(b).
 - ~~**The `UNWRITABLE` wording and the reason enum**~~ — done, see Milestone 3(c).
 - ~~**R9**~~ — done, see Milestone 2. What it left open: **a `safe` entry silenced by its own `CONFLICT` plus a later rename** has the same mechanism and was deliberately not fixed, because repairing it means writing at a guessed spelling.
+- ~~**The #1111 note-5 half** (the walk is non-recursive, pinned with the real specimen)~~ — done, see Milestone 5.
+- ~~**The symlink write scope**~~ — decided in Milestone 5 and written into the contract: the write scope is the resolved target of any file the walk claims.
 
 **The "must be settled before S7" bucket is closed.** Two named follow-ups came out of it, neither blocking: the tomlkit raw-storage staleness wants one pass over every facade kind (`Container`, `Table`, `OutOfOrderTableProxy`) rather than the half-repair a rename can reach; and the `safe`-entry sibling above.
 
@@ -217,6 +224,67 @@ A `/code-review high` over the staged changes produced five findings. Two were f
 
 The contract's symlink paragraph was trimmed in the same change: it claimed "the two callers of the shared transaction primitive now agree", which on the write-scope half they do not.
 
+## Milestone 5 — the two `migrate` commands (DONE, on `feature/Migrator-3b`)
+
+The first milestone of part 2, and the one the reshape is gated on: until `pipelex migrate` exists, merging the reshape strands every existing `pipelex.toml` in the field.
+
+### What was built
+
+**`pipelex/migration/run.py` — the aiming.** `runner.py` answers *how* a file is migrated and takes everything as a parameter, which is what lets the gates replay it over documents nobody writes. The new module answers *what a real run is aimed at*: the package's own registry, the ledgers shipped beside it, and `config_directories_to_migrate()` — the global `~/.pipelex/` then the project `.pipelex/`, each only if it exists, and a project rooted at the home directory walked once rather than twice. Both commands and (later) `report_validation_error` must aim at the same files, or a user is told one thing by their boot and another by their tool.
+
+**`pipelex migrate`** (`pipelex/cli/commands/migrate_cmd.py`) plans, shows the plan, and asks; `--yes` skips the question, `--dry-run` stops after the plan. Two passes deliberately: the rehearsal is what the user is shown and asked about, the second is the one that writes, and where they disagree the transaction refuses rather than writing over work it never saw. Registered in `_CORE_COMMAND_ORDER` and added to the app callback's skip set, so no readiness check or deck notice runs ahead of a command whose whole point is a broken machine.
+
+**`pipelex-agent migrate`** (`pipelex/cli/agent_cli/commands/migrate_cmd.py`) is the same run for a machine. **It writes only with `--yes`** — it cannot ask, so the default is the safe half of the question — and `--dry-run` is the explicit spelling of that default, which is the loop the charter names. The two together are **refused, exit 2**, rather than resolved: an agent that asks for both has a bug a silent winner would hide. `needs_attention` is the verdict and is deliberately not "did anything get written"; the exit code and the rendering are presentation.
+
+`describe_op` is shared between them, and renders an operation from ledger-supplied material only.
+
+### The end-to-end tests use the real shipped migration
+
+The one thing that made an honest E2E possible today: **`telemetry-config@2` is a real entry about a real file**. A flat first-generation `telemetry.toml` fails `TelemetryConfig`'s `extra="forbid"` and breaks the boot right now, so the charter's "failing boot → migrate → boot succeeds" runs against the package's own `goldens/telemetry-config/before@2.toml` and the ledger the package ships — no fixture invented, no monkeypatching. `tests/e2e/pipelex/cli/test_migrate_commands.py` plants that file in a hermetic HOME **and** a flat `telemetry_override.toml` in a temp project (the tier the telemetry loader actually merges, which is what keeps the boot failure honest), then proves: the boot fails, both files are migrated, exactly one backup each holding what that file used to say, the report names both, and the boot succeeds. The agent loop (`--dry-run --format json` → `--yes`) is the same scenario read as JSON.
+
+**The boot probe is `pipelex-agent models`** — the cheapest command that performs a full boot including the telemetry load. `pipelex show config` is *not* a probe: it exits 0 on a machine whose telemetry cannot load, because it never reads it. Worth knowing before inventing a lighter one.
+
+**The bootstrap proof** plants a root key no model knows at the top of `pipelex.toml`, confirms a booting command exits 1 on it, and shows both `migrate` commands still run. A second test in the same class is the one that matters more: with that same broken `pipelex.toml` in place, a stale `telemetry.toml` beside it is **still migrated**. A command that ran but declined to do anything would pass the first test and be useless.
+
+**The rendering rule**, on the two channels that exist: a realistic secret is planted as the old `project_api_key`, which the shipped entry *moves*, and asserted absent from stdout and stderr of four invocations (human dry-run, human apply, agent JSON, agent Markdown) while the migrated file demonstrably carries it. The third channel — the `migration` block on a configuration validation error — joins when `report_validation_error` lands, and the test's docstring says so.
+
+### `min_supported_schema_version` now has a reader
+
+The charter's "the command reads them or they go", settled for the floor by **giving it a reader** rather than softening the sentence. `declared_schema_version` (in `config_surface.py`, beside the strip that already lived there) reads the reserved `[meta] schema_version` **exactly as tolerantly as boot strips it** — a string, a float, a `bool`, a non-table `[meta]` are all "no declaration", because a malformed declaration boots fine and migration must not be stricter than the reader the key exists for. `migrate_file` refuses a file below its ledger's floor with a new `FileBlockedReason.UNSUPPORTED_SCHEMA_VERSION`, writing nothing. Dormant today (every floor is 0, and nothing writes the key) and pinned with a synthetic ledger; it earns its place the day a squash moves a floor.
+
+Note what this uncovered: **a squash cannot actually be expressed today** — `check_entries_are_contiguous_and_named_for_their_version` requires entries to start at 2 and be contiguous — so the floor is a *declaration* the reader now enforces, not something derivable from the entries. That is worth knowing before anyone tries to squash a ledger.
+
+`MigrationReport` gained `changed_plans`, `unexplained_plans` and `needs_attention`; `written_plans` and `blocked_plans` finally have readers. **`MigrationLedger.entry_for_version` still has none** — see below.
+
+### Decisions taken in this milestone
+
+- **The symlink write scope is settled and written into the contract**, closing §1 of `migrator-write-scope-and-rename-fidelity.md` in favour of keeping the current behaviour and saying so: *a migration's write scope is the resolved target of any file the walk claims*. The `.mthds` fix loop guards its scope because it is handed a bundle directory; a configuration directory is a place a user keeps links to files they own, and a dotfiles repository is the ordinary reason one is there. Refusing it would decline to migrate exactly the machines whose owner was most deliberate.
+- **The walk is not recursive, and that is now pinned with the real specimen** (#1111 note 5): `.pipelex/inference/backends/pipelex_gateway.toml` matches the `pipelex-config` tier glob exactly. Both halves are tested — it is not claimed where it lives, *and* the same name at the top level is claimed — because without the second half the first would still pass if the glob stopped matching, and would be proving nothing about recursion.
+- **The replay-time `TOMLKitError` catch got an honest message.** The parse now happens up front (for the floor read), so a `TOMLKitError` from the replay is an operation failing on a document that is valid TOML — an applier bug, not a bad file. It is still caught at the per-file boundary rather than aborting the walk, and the detail now says what it is.
+
+### Files touched in milestone 5
+
+```
+pipelex/migration/run.py                          NEW — which directories, which registry, which ledgers
+pipelex/migration/runner.py                       up-front parse; the floor refusal; the honest replay-error detail
+pipelex/migration/plan.py                         UNSUPPORTED_SCHEMA_VERSION; changed_plans/unexplained_plans/needs_attention
+pipelex/system/configuration/config_surface.py    declared_schema_version
+pipelex/cli/commands/migrate_cmd.py               NEW — the human command + describe_op
+pipelex/cli/agent_cli/commands/migrate_cmd.py     NEW — the machine command
+pipelex/cli/_cli.py, pipelex/cli/agent_cli/_agent_cli.py   registration, ordering, the no-boot skip set
+subject_grants.toml                               _render_markdown (positional-Callable protocol)
+docs/migration-ledger.md                          NEW § "The commands"; the floor bullet; the blocked-reason row; the symlink decision
+docs/tools/cli/migrate.md                         NEW user-facing page (+ index row, + mkdocs nav)
+pipelex/cli/agent_cli/CLAUDE.md                   the migrate row and its markdown structure
+CHANGELOG.md                                      two Added bullets
+tests/e2e/pipelex/cli/test_migrate_commands.py    NEW — both commands, the bootstrap, the rendering rule
+tests/unit/pipelex/migration/test_migration_run.py NEW — directories, walk depth, the floor, the reserved-key read
+tests/unit/pipelex/migration/conftest.py          build_ledger gained min_supported_schema_version
+.drift/acks/{cli-docs,config-docs}.toml           both contracts reviewed and acked
+```
+
+Mutation-tested: dropping the project directory from the walk, making `--yes` not write, removing the floor refusal, and making the walk recursive each turn exactly the intended tests red.
+
 ## What is actually left
 
 Measured against the charter's own **Done when** list ([§ S6](../../wip/migrator-3/sequencing.md#s6--migrator-phase-3)), verified against the tree rather than against this file:
@@ -225,20 +293,39 @@ Measured against the charter's own **Done when** list ([§ S6](../../wip/migrato
 |---|---|
 | The golden format is final for S7 (format bucket, dotted-key rename, `umig`, backup/replace in the contract) | ✅ Milestones 1 and 3 |
 | R9 is built | ✅ Milestone 2 |
-| The walk stops by name on a file two surfaces' globs both claim | ⚠️ Behaviour and test landed in Phase 2. The #1111 note-5 half is **owed**: re-aim it at the real specimen `.pipelex/inference/backends/pipelex_gateway.toml` and pin that the walk is non-recursive. A test, not a behaviour change. |
-| `pipelex migrate --help` / `pipelex-agent migrate --help`, the bootstrap test, both end-to-end tests | ❌ Not started. No `migrate` command exists in `pipelex/cli/commands/`. |
-| `release/SKILL.md` step 3b; `.claude/skills/add-migration/` | ❌ Neither exists. |
+| The walk stops by name on a file two surfaces' globs both claim | ✅ Behaviour and test landed in Phase 2; the #1111 note-5 half landed in Milestone 5 (`TestTheWalkIsNotRecursive`, both halves, real specimen) |
+| `pipelex migrate --help` / `pipelex-agent migrate --help`, the bootstrap test, both end-to-end tests | ✅ Milestone 5 — and the end-to-end pair runs against the **real** `telemetry-config@2` entry rather than current-shape fixtures, which is stronger than the charter asked for |
+| `release/SKILL.md` step 3b; `.claude/skills/add-migration/` | ❌ Neither exists |
 
-And the phase body the charter lists under **Do**, none of it started: boot tolerance in the shared config-surface helper (all three loaders); `report_validation_error` on the real plan — note `core/validation.py`'s current `migration_config` is the old *renaming* config, not the ledger plan; the downgrade diagnosis; the two telemetry remedies retired; the `doctor` row and `--fix`; the `config-docs` drift-contract review list plus the four validator sites R8 names; the `command-surface-map.md` rows; publishing the contract in the nav. Then the PR to `dev`.
+The phase body the charter lists under **Do**, in the order the next session should take it:
 
-Three "fits here" items are still literally unread by anything, which is the cheapest way to see the commands are missing: `min_supported_schema_version` has no reader beyond its own validator, and `MigrationReport.written_plans` / `blocked_plans` / `MigrationLedger.entry_for_version` have no caller. `pipelex migrate` is the intended reader of all four.
+1. **The downgrade diagnosis** — `unexplained[]` is still never populated. A path the current schema does not know and no ledger entry removes should land there with the typo-or-newer-pipelex wording. Both commands already render `unexplained[]`, so this is engine work only, no rework. The materials are in place: `fingerprint.path_names()` gives the schema's paths with `*` segments and `documents.document_paths()` gives the document's, and `document_carries_path` is the one-directional matcher — the diagnosis needs its reverse (*does any schema pattern match this document path*). Watch the two traps: a path a **blocked** entry would have removed is explained by that entry, not unexplained; and the fingerprint is model-derived, so the diagnosis is the first thing in the migration package that needs a model. **Decide where it runs** — it cannot live in the model-free engine, so it belongs either in `run.py` (which already knows the registry) or on the plan as a post-pass.
+2. **Boot tolerance** in one shared helper called by all three config-surface loaders. `pipelex/system/configuration/config_surface.py` is the home — it already owns the reserved-`[meta]` read side, and `declared_schema_version` landed there in Milestone 5.
+3. **`report_validation_error` on the real plan** — note `core/validation.py`'s current `migration_config` is the old *renaming* config, not the ledger plan. Consumer removed, `migration` field kept. This is also the **third channel of the rendering-rule test**, which is written and waiting for it (`TestNoValueFromAUsersFileIsEverRendered` names the gap in its docstring).
+4. **The two telemetry remedies retired** — `check_telemetry_config`'s old-shape sniff in `doctor_cmd.py` and `handle_telemetry_config_validation_error`'s banner in `error_handlers.py`. Both currently tell a user to re-initialize the file that Milestone 5 proved is migratable.
+5. **`doctor`: the pending-migrations row and `--fix`** delegating to the migrate command.
+6. **The `config-docs` drift contract's `review` list** plus the four validator sites R8 names (`KitConfig._validate_targets`, `DryRunConfig.validate_image_urls`, `ImgGenConfig.validate_quality_mapping`, `LLMConfig.validate_effort_to_budget_mapping`).
+7. **The skills**: `.claude/skills/add-migration/`, and `/release` step 3b.
+8. **`docs/specs/command-surface-map.md` rows** — that file is in the **workspace-root** repo, not this one.
+9. **Publish the contract**: delete `docs/migration-ledger.md`'s Status banner, remove its `not_in_nav` entry and comment, add a Migration Ledger row to the nav's Project section.
 
-**The next session starts at the two commands.**
+Then the PR to `dev` from `feature/Migrator-3b`.
+
+### Small items still owed, folded in from the #1113 review
+
+- **`MigrationLedger.entry_for_version` still has no caller.** Milestone 5 gave the other three "fits here" items readers; this one found none — `pipelex migrate` never needs to look an entry up by version, because always-replay walks them all. **Decide: remove it, or the first real caller keeps it.** Nothing else is waiting on the answer.
+- **`is_remappable` has no direct unit test** and gates two accountings; and §1 of `pr-1113-review-notes.md` (credit a union by its string branches alone and say so, or ask the non-string branches — about four lines on `_records_enumerated_members`) is still undecided. Cheap, and it belongs with whoever next touches `coverage.py`.
+- **The rescue-copy race** (`pr-1113-review-notes.md` §3): a third run's prune can take the `.bak.` a rescue is about to rename. The commands now make concurrent runs producible, so this is decidable — revisit as an age-sparing prune, not a lock.
+- Deliberately past S7's freeze, with named triggers, in `pr-1113-review-notes.md` and `migrator-write-scope-and-rename-fidelity.md`: per-member bounds in the golden, the `safe`-entry sibling, the tomlkit raw-storage staleness pass, rename fidelity (§2), the taken-backup-name report, and the residual. §1 of the write-scope note is **closed** by Milestone 5.
+
+**The next session starts at the downgrade diagnosis.**
 
 ## Rulings this session took on its own authority
 
 The charter says the format bucket is to be "decided and recorded here" — it does not route it to Louis, unlike R1–R9. The three decisions above were taken on that basis, each with its reasoning written into `docs/migration-ledger.md` rather than only here. **R9 itself is already ruled** (option 2, 2026-08-16) and is a build task, not a decision.
 
 Milestone 3 took the policy calls the charter routed here by name — preserve dotted-ness rather than refuse it; follow a symlink rather than refuse or clobber it; never overwrite or remove a copy this run did not make; take a copy the run cannot vouch for out of the pruning rotation by name; carry the mode and not the ownership or the extended attributes; `fsync` the directory once, after the backup and before the replace. Each is written into `docs/migration-ledger.md` rather than only here.
+
+Milestone 5 took two on the same basis, both written into `docs/migration-ledger.md`: **a migration's write scope is the resolved target of any file the walk claims** (the `.mthds` fix loop's scope guard is not copied, because a configuration directory is where a user keeps links to files they own); and **`min_supported_schema_version` gets a reader rather than a softened sentence** — a file declaring a version below its ledger's floor is refused by name, reading the reserved key exactly as tolerantly as boot strips it.
 
 Milestone 2 took three further rulings on that same basis, each written into `docs/migration-ledger.md` rather than only here: the coverage gate now demands a declaration from an `unsafe` entry rather than accepting the word (without it R9 is half-built); convergence exempts a `VALUE_DOMAIN_NARROWED` report and nothing else (without it R9's ruled shape cannot be written at all); and forward tracing stops at `unsafe` entries (a rehearsal may guess, an application may not). The third is the one that leaves a named open question, listed above.

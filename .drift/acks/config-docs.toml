@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:71968ad3e732b8e92611a165463e2a9c293772fd07ed2d994a26c6f02548ef1f"
+digest = "sha256:5caf99e16619f07a968180d67172c1b1898ab2e846b81864261edf17d557f870"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-15T12:10:14Z"
-rationale = "Reviewed docs/configuration/ against the config-surface read helper, the loader and telemetry wiring, and the PipelexServiceConfig.agreement default. Nothing there went stale: no page documents a reader's tolerance rules, the service-agreement file's location is unchanged, and the telemetry page documents settings rather than the load path. The new reserved meta schema_version key is deliberately NOT added to these pages — nothing writes it, and documenting it where users are told what to put in their files would invite the team-skew breakage the migration contract forbids; it is specified in docs/migration-ledger.md, which is published at Phase 3."
+reviewed_at = "2026-08-16T15:02:30Z"
+rationale = "config_surface.py gained declared_schema_version, a READER of the reserved meta schema_version key beside the strip that already lived there, used by pipelex migrate to refuse a file below its ledger floor. Reviewed docs/configuration/: no page mentions the reserved key, and the previous ack's reasoning holds unchanged and now more strongly - nothing writes it, so documenting it where users are told what to put in their files would invite the team-skew breakage the migration contract forbids. Its specification stays in docs/migration-ledger.md, which now also records what the floor refuses and why. No page documents a reader's tolerance rules, so nothing there went stale."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:ee1ee2d0c1474dcef5e07690268de37ae3ff0987"
@@ -13,7 +13,7 @@ rationale = "Reviewed docs/configuration/ against the config-surface read helper
 "pipelex/system/configuration/config_loader.py" = "blob:76f9a66ae1ac28df45b9742677218bee63a37121"
 "pipelex/system/configuration/config_model.py" = "blob:83b29dc6e93393c9b98c4353636caf0135c80339"
 "pipelex/system/configuration/config_root.py" = "blob:c7d43851270912d17413cfc6a511247d3c7cc160"
-"pipelex/system/configuration/config_surface.py" = "blob:18dc1521de776dbffaa27630896c0700c9edf100"
+"pipelex/system/configuration/config_surface.py" = "blob:78647c61aeec621794bba3a732dc81d4bac8ef51"
 "pipelex/system/configuration/configs.py" = "blob:90b3186c53b431e0c50b73a533685be92ccd94b0"
 "pipelex/system/configuration/pipe_func_config.py" = "blob:df1cbd3698d51c96d8fa8a8c6fdf1c6be57e5771"
 "pipelex/system/telemetry/telemetry_config.py" = "blob:db0457ba4214d5b0ecb18db75e1b164054181fed"

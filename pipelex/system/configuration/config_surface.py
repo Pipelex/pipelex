@@ -39,3 +39,24 @@ def strip_reserved_meta(*, config_dict: dict[str, Any]) -> None:
     del typed_meta_table[RESERVED_SCHEMA_VERSION_KEY]
     if not typed_meta_table:
         del config_dict[RESERVED_META_TABLE]
+
+
+def declared_schema_version(*, config_dict: dict[str, Any]) -> int | None:
+    """The schema version a configuration document declares, or `None` when it declares none.
+
+    Almost every document returns `None`: **nothing writes the key**, so one carrying it was
+    hand-written or came from a tool that is not this one. That is exactly why the read is
+    tolerant rather than strict — a value that is not a plain integer is a malformed declaration,
+    and the same document boots fine because `strip_reserved_meta` removes the key whatever it
+    holds. Reading it as "no declaration" keeps the two halves of the reserved key consistent:
+    what boot ignores, migration does not act on either.
+
+    `bool` is excluded on purpose. It is an `int` to Python and never a schema version.
+    """
+    meta_table = config_dict.get(RESERVED_META_TABLE)
+    if not isinstance(meta_table, dict):
+        return None
+    declared = cast("dict[str, Any]", meta_table).get(RESERVED_SCHEMA_VERSION_KEY)
+    if isinstance(declared, bool) or not isinstance(declared, int):
+        return None
+    return declared
