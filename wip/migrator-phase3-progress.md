@@ -16,7 +16,7 @@ Record both numbers against S6.
 
 `make agent-check` and the full `make agent-test` are both green on the branch as pushed.
 
-⚠ **S6 is well past half.** The pre-S7 bucket is closed (part 1, on `dev`), and on `feature/Migrator-3b` the two `migrate` commands (milestone 5), the downgrade diagnosis (milestone 6), boot tolerance (milestone 7), the validation-error report (milestone 8) and the telemetry-remedy retirement (milestone 9) are all built. What remains is the rest of the phase body — the `doctor` pending-migrations row and `--fix`, the drift-contract review list, the skills, the specs rows, and publishing the contract. See [What is actually left](#what-is-actually-left) at the bottom before planning a session.
+⚠ **S6 is well past half.** The pre-S7 bucket is closed (part 1, on `dev`), and on `feature/Migrator-3b` the two `migrate` commands (milestone 5), the downgrade diagnosis (milestone 6), boot tolerance (milestone 7), the validation-error report (milestone 8), the telemetry-remedy retirement (milestone 9) and the `doctor` pending-migrations row with `--fix` (milestone 10) are all built. What remains is the rest of the phase body — the drift-contract review list, the skills, the specs rows, and publishing the contract. See [What is actually left](#what-is-actually-left) at the bottom before planning a session.
 
 ## Build order chosen for this session
 
@@ -30,8 +30,8 @@ The charter lists a great many deliverables without an order. The order below wa
 6. **Boot tolerance** — done, see Milestone 7 below.
 7. **`report_validation_error` on the real plan** — done, see Milestone 8 below.
 8. **The telemetry remedies retired** — done, see Milestone 9 below.
-9. **The `doctor` pending-migrations row and `--fix` delegating to the migrate command** — not started. **This is where the next session starts.**
-10. **The skills (`add-migration`, `/release` step 3b), the `config-docs` drift-contract review list, `command-surface-map.md` rows, publishing the contract in the nav** — not started.
+9. **The `doctor` pending-migrations row and `--fix` delegating to the migrate command** — done, see Milestone 10 below.
+10. **The skills (`add-migration`, `/release` step 3b), the `config-docs` drift-contract review list, `command-surface-map.md` rows, publishing the contract in the nav** — not started. **This is where the next session starts.**
 
 ## Milestone 1 — the golden-format bucket (DONE)
 
@@ -536,11 +536,63 @@ Mutation-tested: dropping the block from the raise, un-parenting the error class
 
 Also corrected in passing: `TestNoValueFromAUsersFileIsEverRendered`'s docstring still said the third rendering channel would arrive "when `report_validation_error` starts reporting the real plan". Milestone 8 landed it, as its own class, for the reason that class's docstring gives.
 
+## Milestone 10 — the `doctor` pending-migrations row and `--fix` (DONE, on `feature/Migrator-3b`)
+
+The last item of the phase body's first half, and the one Milestone 7 made load-bearing: **a machine consumer never learns of a pending migration from a boot.** A configuration the ledger can explain boots with a warning, and `pipelex-agent` cuts logging off process-wide as its first act, so no warning reaches it. Asking was the only channel left, and until now there was nothing to ask.
+
+### What was built
+
+**`check_pending_migrations()` in `doctor_cmd.py`** — a `PendingMigrationsCheck(finding, message, migratable_files, attention_files)` over a new `PendingMigrationsFinding`: `UP_TO_DATE`, `PENDING`, `NEEDS_ATTENTION`, `UNAVAILABLE`. It is **`pipelex migrate`'s own dry run**, not an approximation of it — `migrate_config_directories(config_dirs=config_directories_to_migrate(), dry_run=True)`, the same call the command makes.
+
+Both renderers carry it: a **Configuration Migrations** section in the human report (placed beside Configuration Files, since it is about the same files), and `checks.pending_migrations` on the agent envelope with the finding and the two file lists. `--fix` offers to run the migration.
+
+### The four decisions, each recorded in the contract
+
+- **The row takes no directory.** Every other check reports on a *file* and is scoped to the directory the doctor was pointed at, `--global` included. This one reports on a *command*, and `pipelex migrate` has no `--global`. A row scoped narrower would name a command that then rewrites a file the row never mentioned — the one surprise a tool that writes to a user's files must not spring. Over-reporting is legible instead: every file is named with its full path. Pinned twice, at unit level (`assert_called_once_with()`, no arguments) and against `--global` on the agent doctor.
+- **`UNAVAILABLE` is its own member, and it is not healthy.** A packaging problem of ours must not be reported as a finding about the user's files, and *not knowing* is not the same as *being up to date*.
+- **`PENDING` and `NEEDS_ATTENTION` are separate because only one has a command behind it.** Offering to migrate a file the run would not change is a prompt whose honest outcome is "nothing was written" — the same shape as the reset `--fix` used to offer for an out-of-date `telemetry.toml`. So `is_repaired_by_migrating` is true for `PENDING` alone, and that is what gates fix mode.
+- **A run is usually both at once**, so the row reports **both file lists** and both channels name both moves. The first draft keyed the second move off the *finding* and therefore said nothing about the attention files whenever anything was also pending; found by running the real binary against a planted machine, not by a test.
+
+### `--fix` reaches the command's write pass, and deliberately not the command
+
+`migrate_cmd.py` grew `apply_pending_migrations(config_dirs=...)` — the second of the command's two passes, with no exit code attached. Both callers use it. Calling `migrate_cmd(yes=True)` from the doctor was the obvious move and is wrong: it exits the process when the run leaves something for a person, which would cut off the doctor's remaining fixes, its remaining rows and its own exit code. The doctor's row *is* the dry run, so the two-pass shape is preserved — dry run, ask, write — with the doctor asking the question in the middle.
+
+A `[dim]Re-run pipelex doctor[/dim]` line follows a successful migration, because every row below it was measured before the migration ran.
+
+### One redundancy retired in the same pass
+
+With a machine-wide row in place, the telemetry row's own `pipelex migrate` advice became the same instruction twice at two scopes. It is suppressed when the machine-wide row is reporting a pending run — **and only then**, which is not decoration: a telemetry file whose only pending work is *blocked* leaves the surface-scoped probe saying `out_of_date` while the machine-wide row has nothing to write, and there the telemetry bullet is the only thing that speaks. Both halves are tested.
+
+### Files touched in milestone 10
+
+```
+pipelex/cli/commands/migrate_cmd.py               apply_pending_migrations — the write pass, without the exit
+pipelex/cli/commands/doctor_cmd.py                PendingMigrationsFinding / PendingMigrationsCheck; the row; the fix
+pipelex/cli/agent_cli/commands/doctor_cmd.py      checks.pending_migrations; _pending_migrations_actions; the markdown section
+docs/migration-ledger.md                          NEW § "The health report"
+docs/tools/cli/migrate.md                         the doctor row as the third way here
+docs/tools/cli/agent-cli.md                       the row is the only channel a machine has
+pipelex/cli/agent_cli/CLAUDE.md                   the doctor row names checks.pending_migrations
+CHANGELOG.md                                      one Added bullet
+tests/unit/pipelex/cli/test_doctor_pending_migrations.py   NEW
+tests/unit/pipelex/cli/{test_doctor_cmd,test_doctor_display_report,test_doctor_fix_mode,test_agent_doctor_cmd,test_format_doctor_markdown}.py
+tests/e2e/pipelex/cli/test_migrate_commands.py    NEW class: the row and `--fix`, through the real binaries
+.drift/acks/cli-docs.toml                         reviewed and acked
+```
+
+⚠ **Every doctor test that runs a whole doctor now has to stub this check**, and the reason is worth carrying: unlike every other check it takes no directory, so it walks the *developer's* `~/.pipelex/` and the repo's own `.pipelex/`. Four existing test modules gained the stub. A test that forgets it does not fail — it silently depends on whose laptop the suite is running on.
+
+⚠ **And the agent envelope's shape has a fixture nobody thinks of.** `test_format_doctor_markdown.py` builds the whole result dict by hand, so a new `checks` key makes its renderer raise `KeyError` — nine tests, in a module no part of `agent-check` runs and that a targeted per-area run does not obviously reach. Only the full `make agent-test` caught it. Adding a key to that envelope means editing two `ClassVar` dicts there.
+
+Mutation-tested: scoping the row to one directory, reporting a scan failure as up to date, widening that catch to a blanket `except`, making the row write, dropping the migration from what `--fix` can do, offering it for a file it would not repair, dropping the attention files when something is also pending, repeating the telemetry remedy under the machine-wide row, leaving the row out of either verdict, and making the shared write pass a dry run — each turned exactly the intended tests red.
+
 ## Where this session paused
 
-**Paused right after milestone 9 was committed.** Working tree clean. The **branch** has an upstream — `origin/feature/Migrator-3b`, whose head is milestone 8 — so **only milestone 9 is unpushed**: the branch is one commit ahead of its remote. (Milestone 8 was pushed between sessions; the note that said otherwise was written before that happened.) `make agent-check` with everything staged (so `drift-check` is a real green), `make docs-check`, and the full `make agent-test` were all green on the exact tree that was committed.
+**Paused right after milestone 10 was committed.** Working tree clean. The branch is **two commits ahead** of `origin/feature/Migrator-3b` (whose head is milestone 8): milestones 9 and 10 are both unpushed, and no PR is open. `make agent-check` with everything staged (so `drift-check` is a real green), `make docs-check`, and the full `make agent-test` were all green on the exact tree that was committed.
 
-Both drift contracts came open again at milestone 9 and were acked with the reviews written into the ack rationales: `config-docs` (which produced the telemetry page's new "When telemetry.toml will not load" section) and `cli-docs` (which produced the finding on the agent doctor's documented envelope, the `agent-cli.md` note that the telemetry error carries the block too, and the honest `init.md` warning that init replaces a file wholesale).
+Only `cli-docs` came open at milestone 10 — no configuration model moved, so `config-docs` stayed shut. Its ack rationale records what was reviewed and what was deliberately left alone (`docs/features/cli.md`, `agent-cli.md`'s command table, `update.md`'s deck claim, and `index.md`, which has no doctor entry at all).
+
+Both drift contracts came open at milestone 9 and were acked with the reviews written into the ack rationales: `config-docs` (which produced the telemetry page's new "When telemetry.toml will not load" section) and `cli-docs` (which produced the finding on the agent doctor's documented envelope, the `agent-cli.md` note that the telemetry error carries the block too, and the honest `init.md` warning that init replaces a file wholesale).
 
 At milestone 8 the same two were acked: `config-docs` produced the `docs/configuration/index.md` fix the *previous* ack had explicitly parked for that milestone, and `cli-docs` produced the agent-CLI error-envelope documentation and the `migrate.md` agent paragraph.
 
@@ -566,7 +618,7 @@ The phase body the charter lists under **Do**, in the order the next session sho
 2. ~~**Boot tolerance**~~ — done, see Milestone 7.
 3. ~~**`report_validation_error` on the real plan**~~ — done, see Milestone 8. The third channel of the rendering-rule test landed with it, as a new e2e class (`TestABootFailureCarriesThePendingMigration`) rather than inside `TestNoValueFromAUsersFileIsEverRendered`, because the reachable specimen is different: boot tolerance means a file the ledger *can* explain never reaches the error surface at all, so the channel is exercised by a key no entry explains, whose value is the planted secret.
 4. ~~**The two telemetry remedies retired**~~ — done, see Milestone 9. There were four, and the worst of them was `doctor --fix`'s offer to reset a migratable file. The third surface, `pipelex_service_config.py`, was deliberately left alone — it has no wrong remedy to retire, and closing its gap costs the same models/loader split.
-5. **`doctor`: the pending-migrations row and `--fix`** delegating to the migrate command. Milestone 9 built the telemetry *finding* and left `--fix` silent on `OUT_OF_DATE` on purpose, so this item now has two halves: the row that reports pending migrations across **every** surface, and fix mode actually running the command. Milestone 7's note that a machine consumer never learns of a pending migration from a boot is what makes the row load-bearing.
+5. ~~**`doctor`: the pending-migrations row and `--fix`**~~ — done, see Milestone 10. Both halves: a row that is `pipelex migrate`'s own dry run across every surface, and fix mode reaching the command's write pass (not the command, which exits). The row deliberately takes no directory — it answers for a command that has no `--global`.
 6. **The `config-docs` drift contract's `review` list** plus the four validator sites R8 names (`KitConfig._validate_targets`, `DryRunConfig.validate_image_urls`, `ImgGenConfig.validate_quality_mapping`, `LLMConfig.validate_effort_to_budget_mapping`).
 7. **The skills**: `.claude/skills/add-migration/`, and `/release` step 3b.
 8. **`docs/specs/command-surface-map.md` rows** — that file is in the **workspace-root** repo, not this one.
@@ -581,7 +633,9 @@ Then the PR to `dev` from `feature/Migrator-3b`.
 - **The rescue-copy race** (`pr-1113-review-notes.md` §3): a third run's prune can take the `.bak.` a rescue is about to rename. The commands now make concurrent runs producible, so this is decidable — revisit as an age-sparing prune, not a lock.
 - Deliberately past S7's freeze, with named triggers, in `pr-1113-review-notes.md` and `migrator-write-scope-and-rename-fidelity.md`: per-member bounds in the golden, the `safe`-entry sibling, the tomlkit raw-storage staleness pass, rename fidelity (§2), the taken-backup-name report, and the residual. §1 of the write-scope note is **closed** by Milestone 5.
 
-**The next session starts at item 5, the `doctor` pending-migrations row and `--fix`.** Milestone 9 built the telemetry half of it — `check_telemetry_config` now answers with a `TelemetryConfigFinding` and the report names `pipelex migrate` for an out-of-date file — and stopped there on purpose, because a row that covers *every* surface would supersede a telemetry-only `--fix`. What is owed: a health row that runs `scan_config_surface` (or the whole-walk `migrate_config_directories` dry run) across all three surfaces and reports what is pending, and fix mode offering to run the migration rather than nothing. `TelemetryConfigCheck`'s shape is the precedent to follow — a finding a caller branches on, never a sentence it greps, which is the defect Milestone 9 fixed inside the doctor itself.
+**The next session starts at item 6, the `config-docs` drift contract's `review` list.** Everything that touches *code* in the phase body is now built — items 1 through 5 — and what is left is four items of a different kind: a contract's review list (item 6), two skills (item 7), a spec file in the **workspace-root** repo (item 8), and publishing the ledger contract in the nav (item 9). None of them depends on another, so they can be taken in any order; item 6 is the cheapest and item 9 is the one that closes the phase.
+
+Item 6 concretely: extend `drift.toml`'s `config-docs` contract so its `review` list also covers the ledger files (`pipelex/migration/goldens/`, the ledgers themselves) and the four validator sites R8 names — `KitConfig._validate_targets`, `DryRunConfig.validate_image_urls`, `ImgGenConfig.validate_quality_mapping`, `LLMConfig.validate_effort_to_budget_mapping`. R8's point is that a validator is a schema change the fingerprint cannot see, so a change to one is a review obligation the same way a model field is.
 
 Milestone 7's inherited finding — the dead `except ValidationError` around `setup_config` — **is fixed**, at both of that function's config-side callers, and the same defect turned out to exist in the doctor.
 
@@ -596,5 +650,7 @@ Milestone 5 took two on the same basis, both written into `docs/migration-ledger
 Milestone 2 took three further rulings on that same basis, each written into `docs/migration-ledger.md` rather than only here: the coverage gate now demands a declaration from an `unsafe` entry rather than accepting the word (without it R9 is half-built); convergence exempts a `VALUE_DOMAIN_NARROWED` report and nothing else (without it R9's ruled shape cannot be written at all); and forward tracing stops at `unsafe` entries (a rehearsal may guess, an application may not). The third is the one that leaves a named open question, listed above.
 
 Milestone 9 took three on that basis, all written into `docs/migration-ledger.md`: **writing a fresh file repairs exactly one finding, a missing one** — every other unhealthy state holds the user's own settings, so an out-of-date file gets the migration and a broken one gets a person; **a probe's verdict is a field its callers branch on, never a sentence they search** — the doctor's own `--fix` had made the opposite choice and would have lost its repair path to a reword; and **a loader must be able to reach the migration package without reaching the registry**, which is what put the telemetry models and the telemetry loader in two modules. The scope call — leaving `pipelex_service_config.py` alone — is recorded in Milestone 9 above rather than in the contract, because it is a decision about this branch rather than about the ledger.
+
+Milestone 10 took four on that basis, all written into `docs/migration-ledger.md`'s new § "The health report": **a row that reports on a command is scoped by that command, not by the flag the report was invoked with** — `pipelex migrate` has no `--global`, so a narrower row would name a command that rewrites a file it never mentioned; **not knowing is a finding of its own and is never health** — `UNAVAILABLE` sits beside the three verdicts rather than folding into `UP_TO_DATE`; **a fix is offered only where a command would actually write** — a prompt whose honest outcome is "nothing was written" is the same defect as Milestone 9's reset, one step along; and **a caller that has already asked its own question reaches the write pass, never the command** — a command owns the process's exit code, and a caller with rows still to render cannot let it.
 
 Milestone 8 took four, each written into `docs/migration-ledger.md` rather than only here: **the scan is scoped by the surface the caller names**, so a `.mthds` bundle or a backend file pays for no walk and is offered no remedy it has none for; **the block carries `MigrationPlan` itself** rather than a projection of it, which is what forced `MigrationSafety` out of `ledger.py` into `safety.py` — a second shape would have drifted from the commands' own; **scoping narrows the answer and never the registry**, because ownership is decided across all surfaces and a one-surface registry hands `pipelex_service.toml` to the wrong ledger; and **a failure inside the scan declines quietly, but only on `(MigrationError, OSError)`** — an applier bug is not a field condition and must keep surfacing.

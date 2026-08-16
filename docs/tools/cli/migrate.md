@@ -46,7 +46,11 @@ You will usually meet this command through a warning rather than a crash. When a
 
 A file the history cannot explain is a different case, and it still fails the boot with the configuration error itself: tolerance widens what starts, never what is accepted. That error names this command too, though — beside the key it could not accept, it tells you which of your files a migration would touch, what it would carry forward, and what only you can decide.
 
-`pipelex doctor` is the third way here, and the one to reach for when nothing has gone wrong yet: it reports each configuration file as healthy, missing, out of date, or invalid, and only the out-of-date ones are this command's business. Nothing that Pipelex tells you about an out-of-date file will ever suggest deleting it and starting over — that is what this command exists to make unnecessary.
+`pipelex doctor` is the third way here, and the one to reach for when nothing has gone wrong yet. It has a **Configuration Migrations** row that is this command's own dry run: it names every file a migration would rewrite, with its full path, and separately any file carrying something the command will not do on its own. `pipelex doctor --fix` then offers to run the migration for you — the same run, after showing you what it is about to do.
+
+That row answers for both configuration directories, the global one and the project one, even when the rest of the report is about a single directory. It is describing a command, and the command walks both — a row that named fewer files than the command touches would be the one surprise worth avoiding here.
+
+Nothing that Pipelex tells you about an out-of-date file will ever suggest deleting it and starting over — that is what this command exists to make unnecessary.
 
 ## For agents
 

@@ -193,6 +193,8 @@ Exactly one such object is written to stderr per failure, so the stream parses a
 
     `TelemetryConfigValidationError` carries it too, on the same terms: present means the `telemetry.toml` is old, absent means it is wrong and the fields the message names are what to correct.
 
+    **A failure is not the only way to learn this, and for an agent it is not even the reliable one.** A configuration the migration history explains boots with a warning rather than an error — and `pipelex-agent` silences logging process-wide before anything can emit one, so no error arrives and the machine is still stale. `pipelex-agent doctor` is the channel that always answers: its `checks.pending_migrations` row carries a `finding` (`up_to_date`, `pending`, `needs_attention`, `unavailable`), the `migratable_files` a migration would rewrite, and the `attention_files` it will not repair on its own. Branch on `finding`; `unavailable` means the check could not run and is not a claim that the machine is current. The row answers for both configuration directories even under `--global`, because it describes `pipelex migrate`, which has no such flag.
+
 `fmt` and `lint` are raw passthroughs to the `plxt` binary and bypass the JSON output contract, producing native `plxt` output instead.
 
 ## Graph Visualization

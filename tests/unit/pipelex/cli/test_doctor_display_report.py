@@ -10,6 +10,8 @@ from rich.console import Console
 from pipelex.cli.commands.doctor_cmd import (
     BackendFileReport,
     ConfigLocationInfo,
+    PendingMigrationsCheck,
+    PendingMigrationsFinding,
     TelemetryConfigCheck,
     TelemetryConfigFinding,
     display_health_report,
@@ -17,11 +19,17 @@ from pipelex.cli.commands.doctor_cmd import (
 )
 from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport
 from pipelex.cogt.models.deck_manifest import DeckFileStatus, DeckSyncReport
+from pipelex.core.validation import MIGRATE_COMMAND
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 CLEAN_DECK = DeckSyncReport(kit_version="1.2.0", installed_kit_version="1.2.0", manifest_present=True, files={})
+
+NO_PENDING_MIGRATIONS = PendingMigrationsCheck(
+    finding=PendingMigrationsFinding.UP_TO_DATE,
+    message="Every configuration file is at the current schema",
+)
 
 PROJECT_LOCATION = ConfigLocationInfo(
     config_dir="/work/project/.pipelex",
@@ -43,6 +51,7 @@ def _healthy_report_kwargs() -> dict[str, Any]:
         "config_healthy": True,
         "config_message": "All configuration files present and valid",
         "config_missing_count": 0,
+        "pending_migrations_check": NO_PENDING_MIGRATIONS,
         "telemetry_check": TelemetryConfigCheck(finding=TelemetryConfigFinding.HEALTHY, message="Telemetry configured (mode: off)"),
         "backends_healthy": True,
         "backends_message": "All 1 enabled backend(s) have valid credentials",
@@ -229,6 +238,80 @@ class TestDoctorDisplayReport:
         output = console.export_text()
         assert "Interactive fixes for outdated backend configurations will be offered below" in output
         assert "Run pipelex doctor --fix" not in output
+
+    def test_pending_migrations_row_names_every_file_and_the_command(self, console: Console) -> None:
+        """The row a machine that has drifted actually shows: what runs, and what is still owed."""
+        kwargs = _healthy_report_kwargs()
+        kwargs["pending_migrations_check"] = PendingMigrationsCheck(
+            finding=PendingMigrationsFinding.PENDING,
+            message="1 configuration file(s) can be brought up to date by 'pipelex migrate'",
+            migratable_files=["/home/user/.pipelex/telemetry.toml"],
+            attention_files=["/work/project/.pipelex/pipelex.toml"],
+        )
+
+        display_health_report(**kwargs)
+
+        output = console.export_text()
+        assert "Configuration Migrations" in output
+        assert "/home/user/.pipelex/telemetry.toml" in output, "the row is where a reader learns which directory is touched"
+        assert "/work/project/.pipelex/pipelex.toml" in output
+        assert f"Run {MIGRATE_COMMAND} to bring 1 configuration file(s) up to date" in output
+        assert f"Run {MIGRATE_COMMAND} --dry-run" in output, "a file the command will not repair is still owed a look"
+
+    def test_a_row_that_could_not_be_checked_is_not_reported_as_healthy(self, console: Console) -> None:
+        """Not knowing is not the same as being up to date, and it names a way to find out."""
+        kwargs = _healthy_report_kwargs()
+        kwargs["pending_migrations_check"] = PendingMigrationsCheck(
+            finding=PendingMigrationsFinding.UNAVAILABLE,
+            message="Could not check for pending migrations: the packaged ledger will not load",
+        )
+
+        display_health_report(**kwargs)
+
+        output = console.export_text()
+        assert "Issues Found" in output
+        assert "the packaged ledger will not load" in output
+        assert f"Run {MIGRATE_COMMAND} --dry-run to check for pending migrations" in output
+
+    def test_an_out_of_date_telemetry_file_is_not_sent_to_the_same_command_twice(self, console: Console) -> None:
+        """The machine-wide row already names `pipelex migrate` and already lists this file."""
+        kwargs = _healthy_report_kwargs()
+        kwargs["telemetry_check"] = TelemetryConfigCheck(
+            finding=TelemetryConfigFinding.OUT_OF_DATE,
+            message="Configuration is out of date",
+        )
+        kwargs["pending_migrations_check"] = PendingMigrationsCheck(
+            finding=PendingMigrationsFinding.PENDING,
+            message="1 configuration file(s) can be brought up to date",
+            migratable_files=["/home/user/.pipelex/telemetry.toml"],
+        )
+
+        display_health_report(**kwargs)
+
+        solutions = console.export_text().split("Possible Solutions", 1)[1]
+        assert "telemetry.toml up to date" not in solutions
+        assert solutions.count(f"Run {MIGRATE_COMMAND} to bring") == 1
+
+    def test_a_telemetry_file_the_migration_will_not_repair_keeps_its_own_bullet(self, console: Console) -> None:
+        """The suppression is scoped, not blanket: with no pending run, the row speaks for itself.
+
+        Reachable when the telemetry file's only pending work is blocked — the surface-scoped
+        probe still calls it out of date while the machine-wide row has nothing to write.
+        """
+        kwargs = _healthy_report_kwargs()
+        kwargs["telemetry_check"] = TelemetryConfigCheck(
+            finding=TelemetryConfigFinding.OUT_OF_DATE,
+            message="Configuration is out of date",
+        )
+        kwargs["pending_migrations_check"] = PendingMigrationsCheck(
+            finding=PendingMigrationsFinding.NEEDS_ATTENTION,
+            message="1 configuration file(s) need a look",
+            attention_files=["/home/user/.pipelex/telemetry.toml"],
+        )
+
+        display_health_report(**kwargs)
+
+        assert "telemetry.toml up to date" in console.export_text()
 
     def test_doctor_cmd_catches_unexpected_errors(self, console: Console, mocker: MockerFixture) -> None:
         """The doctor entry point converts unexpected errors into a friendly exit 1."""

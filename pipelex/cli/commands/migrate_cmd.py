@@ -33,6 +33,8 @@ from pipelex.runtime_hub import get_console
 from pipelex.suggested_fix import WILDCARD_SEGMENT, DeleteKeyOp, DeleteTableOp, MoveKeyOp, RemapValueOp, RenameTableKeyOp
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from pipelex.migration.plan import BlockedEntry, MigrationReport, UnexplainedPath
     from pipelex.suggested_fix import MigrationOp
 
@@ -90,8 +92,7 @@ def migrate_cmd(*, dry_run: bool = False, yes: bool = False) -> None:
         console.print()
         return
 
-    applied = migrate_config_directories(config_dirs=config_dirs, dry_run=False)
-    _print_written(report=applied)
+    applied = apply_pending_migrations(config_dirs=config_dirs)
     written = len(applied.written_plans)
     if written:
         console.print(_panel(message=f"Migrated {written} file(s); a copy of each original is beside it.", style="green"))
@@ -99,6 +100,21 @@ def migrate_cmd(*, dry_run: bool = False, yes: bool = False) -> None:
         console.print(_panel(message="Nothing was written.", style="yellow"))
     console.print()
     _exit_on_attention(report=applied)
+
+
+def apply_pending_migrations(*, config_dirs: list[Path]) -> MigrationReport:
+    """Write what a migration would write, render what it did, and hand the report back.
+
+    The second of this command's two passes on its own, with no exit code attached to it. A
+    caller that has already shown the user a dry run and asked its own question reaches the same
+    code rather than reimplementing it — `pipelex doctor --fix` is that caller, and its
+    pending-migrations row *is* the dry run. Calling `migrate_cmd` there instead would end the
+    doctor's own run: the command exits the process when something is left for a person, and the
+    doctor still has rows to render and an exit code of its own to set.
+    """
+    applied = migrate_config_directories(config_dirs=config_dirs, dry_run=False)
+    _print_written(report=applied)
+    return applied
 
 
 def _exit_on_attention(*, report: MigrationReport) -> None:

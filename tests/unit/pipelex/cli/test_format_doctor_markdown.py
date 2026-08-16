@@ -23,6 +23,13 @@ class TestFormatDoctorMarkdown:
         },
         "checks": {
             "config_files": {"healthy": True, "message": "All config files present", "missing_count": 0},
+            "pending_migrations": {
+                "healthy": True,
+                "finding": "up_to_date",
+                "message": "Every configuration file is at the current schema",
+                "migratable_files": [],
+                "attention_files": [],
+            },
             "telemetry": {"healthy": True, "message": "Telemetry configured"},
             "backend_credentials": {"healthy": True, "message": "All backends healthy", "backends": []},
             "models": {"healthy": True, "message": "Models valid", "backend_files": []},
@@ -40,6 +47,13 @@ class TestFormatDoctorMarkdown:
         },
         "checks": {
             "config_files": {"healthy": True, "message": "OK", "missing_count": 0},
+            "pending_migrations": {
+                "healthy": False,
+                "finding": "pending",
+                "message": "1 configuration file(s) can be brought up to date by 'pipelex migrate'",
+                "migratable_files": ["/home/user/.pipelex/telemetry.toml"],
+                "attention_files": [],
+            },
             "telemetry": {"healthy": False, "message": "Config format outdated"},
             "backend_credentials": {
                 "healthy": False,
@@ -76,6 +90,14 @@ class TestFormatDoctorMarkdown:
         """Healthy result should not include a Recommended Actions section."""
         output = _format_doctor_markdown(self._HEALTHY_RESULT)
         assert "Recommended Actions" not in output
+
+    def test_pending_migrations_section_lists_the_files_a_migration_would_touch(self) -> None:
+        """The row an agent reads when nothing has failed yet — a boot would never have said it."""
+        rendered = _format_doctor_markdown(self._UNHEALTHY_RESULT)
+
+        assert "## Configuration Migrations" in rendered
+        assert "1 configuration file(s) can be brought up to date" in rendered
+        assert "`/home/user/.pipelex/telemetry.toml`: out of date" in rendered
 
     def test_unhealthy_output_shows_warning_status(self) -> None:
         """Unhealthy result should show 'Issues found' with warning emoji."""

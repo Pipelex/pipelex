@@ -14,11 +14,14 @@ from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_e
 from pipelex.cli.commands.doctor_cmd import (
     BackendFileReport,
     ConfigLocationInfo,
+    PendingMigrationsCheck,
+    PendingMigrationsFinding,
     TelemetryConfigCheck,
     TelemetryConfigFinding,
     check_backend_credentials,
     check_config_files,
     check_models,
+    check_pending_migrations,
     check_telemetry_config,
     gather_config_location,
     setup_doctor_runtime,
@@ -32,13 +35,47 @@ def _status_icon(*, healthy: bool) -> str:
     return "\u2705" if healthy else "\u26a0\ufe0f"
 
 
-def _telemetry_action(*, check: TelemetryConfigCheck, config_location: ConfigLocationInfo) -> str | None:
+def _pending_migrations_actions(*, check: PendingMigrationsCheck) -> list[str]:
+    """What to tell an agent about the pending-migrations row — none, one move, or two.
+
+    A machine consumer never learns of a pending migration from a boot: a stale configuration the
+    ledger can explain boots with a warning, and the agent CLI silences its own logging before one
+    can be emitted. So for an agent this row is not a convenience, it is the only channel.
+
+    Two actions rather than one when a run both migrates some files and leaves others behind,
+    which is the ordinary shape on a machine that has drifted: the command is worth running *and*
+    something is still owed afterwards, and an agent that only heard the first would stop early.
+    """
+    actions: list[str] = []
+    match check.finding:
+        case PendingMigrationsFinding.UP_TO_DATE:
+            return actions
+        case PendingMigrationsFinding.PENDING:
+            migratable = ", ".join(check.migratable_files)
+            actions.append(f"Run '{MIGRATE_COMMAND}' to bring these configuration files up to date (it keeps the settings in them): {migratable}")
+        case PendingMigrationsFinding.NEEDS_ATTENTION:
+            pass
+        case PendingMigrationsFinding.UNAVAILABLE:
+            actions.append(f"{check.message}. Run '{MIGRATE_COMMAND} --dry-run' to check by hand.")
+    if check.attention_files:
+        attention = ", ".join(check.attention_files)
+        actions.append(
+            f"Run '{MIGRATE_COMMAND} --dry-run' to see what these configuration files carry that the migration will not do on its own: {attention}"
+        )
+    return actions
+
+
+def _telemetry_action(*, check: TelemetryConfigCheck, config_location: ConfigLocationInfo, migration_already_recommended: bool) -> str | None:
     """What to tell an agent to do about the telemetry finding, or nothing when it is healthy.
 
     One remedy per finding, because they are genuinely different moves: a missing file is written,
     an out-of-date one is migrated with every setting kept, and a file this build cannot read is
     a person's to edit. The single `pipelex init telemetry` this replaced said the same thing to
     all four, and on the out-of-date one it was destructive advice.
+
+    `migration_already_recommended` is the one case where a finding produces no action: the
+    pending-migrations row names the same command and lists this file among the ones it covers, so
+    repeating it here would be the same instruction twice at two different scopes.
     """
     match check.finding:
         case TelemetryConfigFinding.HEALTHY:
@@ -46,6 +83,8 @@ def _telemetry_action(*, check: TelemetryConfigCheck, config_location: ConfigLoc
         case TelemetryConfigFinding.NOT_FOUND:
             return "Run 'pipelex init telemetry' to write a telemetry configuration"
         case TelemetryConfigFinding.OUT_OF_DATE:
+            if migration_already_recommended:
+                return None
             return f"Run '{MIGRATE_COMMAND}' to bring telemetry.toml up to date (it keeps the settings in it)"
         case TelemetryConfigFinding.UNPARSEABLE | TelemetryConfigFinding.INVALID:
             return f"Fix {config_location.config_dir}/telemetry.toml: {check.message}"
@@ -71,6 +110,15 @@ def _format_doctor_markdown(result: dict[str, Any]) -> str:
     config_check = checks["config_files"]
     lines.append(f"\n## Config Files \u2014 {_status_icon(healthy=config_check['healthy'])}\n")
     lines.append(config_check["message"])
+
+    # Configuration Migrations
+    migrations_check = checks["pending_migrations"]
+    lines.append(f"\n## Configuration Migrations \u2014 {_status_icon(healthy=migrations_check['healthy'])}\n")
+    lines.append(migrations_check["message"])
+    for file_path in migrations_check["migratable_files"]:
+        lines.append(f"- `{file_path}`: out of date")
+    for file_path in migrations_check["attention_files"]:
+        lines.append(f"- `{file_path}`: needs a look")
 
     # Telemetry
     telemetry_check = checks["telemetry"]
@@ -175,6 +223,9 @@ def agent_doctor_cmd(
         # a silent installer on a fresh machine. (The --global path skips materialization
         # — see load_config.)
         config_healthy, config_missing_count, config_message = check_config_files(config_dir=config_dir)
+        # No config_dir: this row reports on `pipelex migrate`, which has no --global and walks
+        # both configuration directories. See `check_pending_migrations`.
+        pending_migrations_check = check_pending_migrations()
         telemetry_check = check_telemetry_config(config_dir=config_dir)
         backends_healthy, backend_credential_reports, backends_message = check_backend_credentials(config_dir=config_dir)
 
@@ -222,7 +273,7 @@ def agent_doctor_cmd(
     # installed a hub or configured log — the helper guards both internally).
     apply_agent_cli_output_discipline()
 
-    all_healthy = config_healthy and telemetry_check.is_healthy and backends_healthy and models_healthy
+    all_healthy = config_healthy and pending_migrations_check.is_healthy and telemetry_check.is_healthy and backends_healthy and models_healthy
 
     # Build backend credential details
     backends_list: list[dict[str, Any]] = []
@@ -257,7 +308,12 @@ def agent_doctor_cmd(
         recommended_actions.append("Run 'pipelex init config' to install missing configuration files")
     if not config_healthy and config_missing_count == 0:
         recommended_actions.append(f"Fix validation errors in {config_location.config_dir}/pipelex.toml or run 'pipelex init config'")
-    recommended_telemetry_action = _telemetry_action(check=telemetry_check, config_location=config_location)
+    recommended_actions.extend(_pending_migrations_actions(check=pending_migrations_check))
+    recommended_telemetry_action = _telemetry_action(
+        check=telemetry_check,
+        config_location=config_location,
+        migration_already_recommended=pending_migrations_check.finding.is_repaired_by_migrating,
+    )
     if recommended_telemetry_action is not None:
         recommended_actions.append(recommended_telemetry_action)
     if not backends_healthy:
@@ -286,6 +342,13 @@ def agent_doctor_cmd(
                 "healthy": config_healthy,
                 "message": config_message,
                 "missing_count": config_missing_count,
+            },
+            "pending_migrations": {
+                "healthy": pending_migrations_check.is_healthy,
+                "finding": str(pending_migrations_check.finding),
+                "message": pending_migrations_check.message,
+                "migratable_files": pending_migrations_check.migratable_files,
+                "attention_files": pending_migrations_check.attention_files,
             },
             "telemetry": {
                 "healthy": telemetry_check.is_healthy,

@@ -82,14 +82,19 @@ def _plant_a_stale_machine(*, hermetic_home: Path) -> tuple[Path, Path, Path]:
     return project_dir, global_file, project_file
 
 
-def _run(*, args: list[str], env: dict[str, str], cwd: Path) -> subprocess.CompletedProcess[str]:
+def _run(*, args: list[str], env: dict[str, str], cwd: Path, answers: str | None = None) -> subprocess.CompletedProcess[str]:
     # A wide terminal, because the human CLI renders through Rich and Rich wraps at the console
     # width. A temp-directory path is long enough to be broken across two lines at the default 80,
     # which would make these assertions fail for a reason that has nothing to do with migration.
+    #
+    # `answers` feeds an interactive command's prompts. Every confirmation the doctor asks defaults
+    # to yes, so a run of bare newlines accepts each one in turn without this having to know how
+    # many there will be or what order they come in.
     return subprocess.run(  # noqa: S603
         args,
         env={**env, "COLUMNS": "400"},
         cwd=str(cwd),
+        input=answers,
         capture_output=True,
         text=True,
         check=False,
@@ -581,3 +586,63 @@ class TestAStaleTelemetryFileIsMigratedNotReset:
         assert "out of date" in printed, printed
         assert "pipelex migrate" in printed
         assert "pipelex init telemetry" not in printed
+
+
+class TestTheDoctorReportsAndRepairsAStaleMachine:
+    """The row that tells a machine a migration is pending, and the fix mode that runs it.
+
+    A boot never says this: a stale configuration the ledger can explain boots with a warning, and
+    `pipelex-agent` cuts logging off process-wide as its first act so nothing can emit one. Asking
+    is the only channel a machine has, which is what makes this row load-bearing rather than
+    convenient.
+    """
+
+    def test_the_agent_doctor_names_every_file_a_migration_would_touch_and_writes_nothing(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """Both directories, because both are what the command it names would rewrite.
+
+        The row is scoped to no directory at all, unlike every other check here — `pipelex migrate`
+        has no `--global`. And it is a report: the files it names are exactly as it found them.
+        """
+        project_dir, global_file, project_file = _plant_a_stale_machine(hermetic_home=hermetic_home)
+        before = {path: path.read_text(encoding="utf-8") for path in (global_file, project_file)}
+
+        checked = _run(args=[str(PIPELEX_AGENT_BIN), "doctor", "--format", "json"], env=offline_subprocess_env, cwd=project_dir)
+
+        report: dict[str, Any] = json.loads(checked.stdout)
+        row: dict[str, Any] = report["checks"]["pending_migrations"]
+        assert row["healthy"] is False
+        assert row["finding"] == "pending"
+        assert sorted(row["migratable_files"]) == sorted([str(global_file), str(project_file)])
+        assert any("pipelex migrate" in action for action in report["recommended_actions"])
+        for path, text in before.items():
+            assert path.read_text(encoding="utf-8") == text, "a health report writes nothing"
+            assert existing_backups_of(path=path) == []
+
+    def test_fix_mode_runs_the_migration_and_keeps_what_was_in_the_files(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """`--fix` offers the command rather than merely naming it, and it is the same command.
+
+        Every confirmation the doctor asks defaults to yes, so bare newlines accept whatever it
+        offers — which is deliberate here: the assertion is about the files, and it holds however
+        many other fixes this machine happens to be offered alongside the migration.
+        """
+        project_dir, global_file, project_file = _plant_a_stale_machine(hermetic_home=hermetic_home)
+
+        _run(args=[str(PIPELEX_BIN), "--no-logo", "doctor", "--fix"], env=offline_subprocess_env, cwd=project_dir, answers="\n" * 8)
+
+        for path in (global_file, project_file):
+            migrated = load_toml_from_path(path)
+            assert "custom_posthog" in migrated, f"{path} was not migrated"
+            assert len(existing_backups_of(path=path)) == 1, "the original is kept beside it"
+        # The settings the old destructive remedy would have discarded are still there.
+        assert load_toml_from_path(project_file)["custom_posthog"]["endpoint"] == "https://project.example.invalid"
+
+        checked = _run(args=[str(PIPELEX_AGENT_BIN), "doctor", "--format", "json"], env=offline_subprocess_env, cwd=project_dir)
+        assert json.loads(checked.stdout)["checks"]["pending_migrations"]["finding"] == "up_to_date"

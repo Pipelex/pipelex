@@ -585,6 +585,31 @@ So no surface holds its own answer any more:
 
 > **Writing a fresh file repairs exactly one finding: a missing one.** There is nothing in a file that is not there to lose. Every other unhealthy state has the user's own settings in it, so an out-of-date file is offered `pipelex migrate` and a broken one is left to a person. Regeneration is still reachable, and it is described as what it is — a way to start over that discards the file.
 
+## The health report
+
+The boot warns, and the validation error explains — but both of them need something to have gone wrong first, and one of them cannot reach a machine at all. `pipelex-agent` cuts Python's logging off process-wide as its first act, so an agent never sees a boot warning; for a program, **asking is the only channel**, and `pipelex doctor` is the asking.
+
+The doctor's configuration-migration row is a **dry run of `pipelex migrate`** — the command's own run with the writing switched off, not an approximation of it. It reports one of four findings:
+
+| Finding | What it means | What comes next |
+|---|---|---|
+| `up_to_date` | every file the walk claims is at the current schema | nothing |
+| `pending` | at least one file would be rewritten | `pipelex migrate` (and `--fix` offers to run it) |
+| `needs_attention` | something is there the command will not do on its own | `pipelex migrate --dry-run`, then a person |
+| `unavailable` | the scan itself could not run | check by hand; this is our problem, not the machine's |
+
+Two of those distinctions carry weight. `unavailable` is separate from the rest because **a packaging problem of ours must not be reported as a finding about the user's files** — and, more sharply, must not be reported as health: not knowing is not the same as being up to date. And `pending` is separate from `needs_attention` because only one of them has a command behind it; offering to run a migration over a file it would not change is a prompt whose honest outcome is *nothing was written*.
+
+A run is often both at once, which is the ordinary shape on a machine that has drifted, so the row lists **both sets of files** and names both moves. A reader — or an agent — that heard only the first would stop with a broken file still in place.
+
+> **The row takes no directory, and that is a decision.** Every other check in the doctor reports on a *file* and is scoped to the directory the doctor was pointed at, `--global` included. This one reports on a *command*, and `pipelex migrate` has no `--global`: it walks the global `~/.pipelex/` and the project `.pipelex/` both. A row scoped narrower would name a command that then rewrites a file the row never mentioned — and a tool that writes to a user's files must not spring that. Over-reporting is legible instead: every file is named with its full path, so a reader sees which directory each one is in.
+
+**`--fix` runs the same write pass the command runs.** The row above it *was* the dry run — the same two-pass shape `pipelex migrate` has, with the doctor asking the question in the middle — and fix mode reaches the command's own write half rather than a second implementation that could drift from it. What it does not do is call the command itself: that ends the process when something is left for a person, and the doctor still has rows to render and an exit code of its own to set.
+
+**Nothing inside a file is rendered here either.** The row reports paths and counts. It is the fourth channel the rendering rule covers, beside the command's output, its structured plan, and the block on a validation error.
+
+**A failure inside the scan costs more here than anywhere else**, which is why it is caught rather than raised: an exception escaping this probe reaches the doctor's own outer handler, which prints one line and exits — so a broken packaged ledger would replace *every row the user came for* with "Unexpected error". The catch stays narrow (`MigrationError`, `OSError`), so a bug in our applier still surfaces as itself.
+
 ## Applying
 
 > **Operations apply to the user's file, and a template is never the remedy.** "Delete your configuration and re-initialize it" is the failure this project exists to remove, not a fallback it may reach for: re-initializing throws away every choice the user made, and it is exactly what a structural change should not cost them.

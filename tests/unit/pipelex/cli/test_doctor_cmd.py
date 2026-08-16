@@ -12,6 +12,8 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 from pipelex.cli.commands.doctor_cmd import (
+    PendingMigrationsCheck,
+    PendingMigrationsFinding,
     TelemetryConfigCheck,
     TelemetryConfigFinding,
     check_backend_credentials,
@@ -25,6 +27,13 @@ from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 # Minimal valid telemetry TOML — only [custom_posthog].mode is needed, rest defaults
 TELEMETRY_OFF = '[custom_posthog]\nmode = "off"\n'
 TELEMETRY_ANONYMOUS = '[custom_posthog]\nmode = "anonymous"\n'
+
+# The migration row walks this machine's real configuration directories, so every test that runs
+# the whole doctor stubs it — otherwise the result would depend on whose laptop the suite is on.
+NO_PENDING_MIGRATIONS = PendingMigrationsCheck(
+    finding=PendingMigrationsFinding.UP_TO_DATE,
+    message="Every configuration file is at the current schema",
+)
 
 
 class TestDoctorLayeredResolution:
@@ -68,6 +77,10 @@ class TestDoctorLayeredResolution:
                 "OK",
             ),
         )
+        mock_check_migrations = mocker.patch(
+            "pipelex.cli.commands.doctor_cmd.check_pending_migrations",
+            return_value=NO_PENDING_MIGRATIONS,
+        )
         mocker.patch("pipelex.cli.commands.doctor_cmd.display_health_report")
 
         with pytest.raises(SystemExit) as exc_info:
@@ -82,6 +95,9 @@ class TestDoctorLayeredResolution:
         mock_check_backends.assert_called_once_with()
         mock_check_models.assert_called_once_with()
         mock_check_deck.assert_called_once_with()
+        # The migration row takes no directory at all — it answers for `pipelex migrate`, which
+        # walks both configuration directories and has no way to be pointed at one.
+        mock_check_migrations.assert_called_once_with()
 
     def test_pipelex_config_error_from_bootstrap_preserves_partial_report(self, mocker: MockerFixture) -> None:
         """Regression: a config that passes check_config_files's shape check but fails full
@@ -120,6 +136,10 @@ class TestDoctorLayeredResolution:
                 DeckSyncReport(kit_version="1.0.0", installed_kit_version="1.0.0", manifest_present=True, files={}),
                 "OK",
             ),
+        )
+        mocker.patch(
+            "pipelex.cli.commands.doctor_cmd.check_pending_migrations",
+            return_value=NO_PENDING_MIGRATIONS,
         )
         mock_display = mocker.patch("pipelex.cli.commands.doctor_cmd.display_health_report")
 

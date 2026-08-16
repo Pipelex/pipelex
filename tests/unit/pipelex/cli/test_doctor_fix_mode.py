@@ -2,16 +2,25 @@
 
 from __future__ import annotations
 
+from pathlib import Path as PurePath
 from typing import TYPE_CHECKING, Any
 
 import pytest
 from rich.console import Console
 
-from pipelex.cli.commands.doctor_cmd import BackendFileReport, TelemetryConfigCheck, TelemetryConfigFinding, do_doctor_cmd
+from pipelex.cli.commands.doctor_cmd import (
+    BackendFileReport,
+    PendingMigrationsCheck,
+    PendingMigrationsFinding,
+    TelemetryConfigCheck,
+    TelemetryConfigFinding,
+    do_doctor_cmd,
+)
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport
 from pipelex.cogt.models.deck_manifest import DeckFileStatus, DeckSyncReport
 from pipelex.core.validation import MIGRATE_COMMAND
+from pipelex.migration.plan import MigrationPlan, MigrationReport
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -20,6 +29,17 @@ if TYPE_CHECKING:
 
 CLEAN_DECK = DeckSyncReport(kit_version="1.2.0", installed_kit_version="1.2.0", manifest_present=True, files={})
 HEALTHY_TELEMETRY = TelemetryConfigCheck(finding=TelemetryConfigFinding.HEALTHY, message="OK")
+NO_PENDING_MIGRATIONS = PendingMigrationsCheck(
+    finding=PendingMigrationsFinding.UP_TO_DATE,
+    message="Every configuration file is at the current schema",
+)
+STALE_TELEMETRY_FILE = "/home/user/.pipelex/telemetry.toml"
+ONE_MIGRATION_PENDING = PendingMigrationsCheck(
+    finding=PendingMigrationsFinding.PENDING,
+    message="1 configuration file(s) can be brought up to date",
+    migratable_files=[STALE_TELEMETRY_FILE],
+)
+ONE_FILE_MIGRATED = MigrationReport(plans=[MigrationPlan(surface_id="telemetry-config", file_path=PurePath(STALE_TELEMETRY_FILE), was_written=True)])
 
 
 class TestDoctorFixMode:
@@ -30,6 +50,10 @@ class TestDoctorFixMode:
             "setup": mocker.patch("pipelex.cli.commands.doctor_cmd.setup_doctor_runtime"),
             "config": mocker.patch("pipelex.cli.commands.doctor_cmd.check_config_files", return_value=(True, 0, "OK")),
             "telemetry": mocker.patch("pipelex.cli.commands.doctor_cmd.check_telemetry_config", return_value=HEALTHY_TELEMETRY),
+            # Stubbed for every test, not only the ones about it: the real check walks this
+            # machine's own configuration directories, and no unit test should depend on those.
+            "migrations": mocker.patch("pipelex.cli.commands.doctor_cmd.check_pending_migrations", return_value=NO_PENDING_MIGRATIONS),
+            "migrate": mocker.patch("pipelex.cli.commands.doctor_cmd.apply_pending_migrations"),
             "backends": mocker.patch("pipelex.cli.commands.doctor_cmd.check_backend_credentials", return_value=(True, {}, "OK")),
             "models": mocker.patch("pipelex.cli.commands.doctor_cmd.check_models", return_value=(True, "OK", {})),
             "deck": mocker.patch("pipelex.cli.commands.doctor_cmd.check_deck_sync", return_value=(True, CLEAN_DECK, "OK")),
@@ -106,6 +130,65 @@ class TestDoctorFixMode:
         output = doctor_mocks["console"].export_text()
         assert "Telemetry validation error" in output
         assert "discarding what is in it" in output
+
+    def test_fix_migrates_the_files_the_ledger_can_carry_forward(self, doctor_mocks: dict[str, Any]) -> None:
+        """The half of this item that `--fix` owed: the command is offered, not merely named.
+
+        It runs the same write pass `pipelex migrate` runs — the row above it was that command's
+        own dry run — rather than a second implementation that could drift from it.
+        """
+        doctor_mocks["migrations"].return_value = ONE_MIGRATION_PENDING
+        doctor_mocks["migrate"].return_value = ONE_FILE_MIGRATED
+
+        self._run_doctor_expecting_exit_one()
+
+        doctor_mocks["migrate"].assert_called_once()
+        prompts = [call.args[0] for call in doctor_mocks["confirm"].call_args_list]
+        assert any("Migrate 1 configuration file(s)" in prompt for prompt in prompts)
+        output = doctor_mocks["console"].export_text()
+        assert "Migrated 1 configuration file(s)" in output
+        assert "Re-run" in output, "the rows below were measured before the migration ran"
+
+    def test_declining_the_migration_writes_nothing(self, doctor_mocks: dict[str, Any]) -> None:
+        """The prompt is a real question — a no leaves the machine exactly as it was."""
+        doctor_mocks["migrations"].return_value = ONE_MIGRATION_PENDING
+        doctor_mocks["confirm"].return_value = False
+
+        self._run_doctor_expecting_exit_one()
+
+        doctor_mocks["migrate"].assert_not_called()
+
+    def test_fix_offers_nothing_for_files_the_migration_would_not_repair(self, doctor_mocks: dict[str, Any]) -> None:
+        """A file carrying a key no ledger explains is a person's, and the command would do nothing.
+
+        Offering to run it would be a prompt whose honest outcome is "nothing was written" — the
+        same shape as the reset `--fix` used to offer for an out-of-date telemetry file.
+        """
+        doctor_mocks["migrations"].return_value = PendingMigrationsCheck(
+            finding=PendingMigrationsFinding.NEEDS_ATTENTION,
+            message="1 configuration file(s) need a look",
+            attention_files=["/work/project/.pipelex/pipelex.toml"],
+        )
+
+        self._run_doctor_expecting_exit_one()
+
+        doctor_mocks["migrate"].assert_not_called()
+
+    def test_a_failed_migration_is_reported_and_the_doctor_carries_on(self, doctor_mocks: dict[str, Any]) -> None:
+        """One fix failing must not take the rest of fix mode down with it."""
+        doctor_mocks["migrations"].return_value = ONE_MIGRATION_PENDING
+        doctor_mocks["migrate"].side_effect = OSError("the directory is read-only")
+        doctor_mocks["deck"].return_value = (
+            False,
+            DeckSyncReport(kit_version="1.3.0", installed_kit_version="1.2.0", manifest_present=True, files={}),
+            "Deck is behind",
+        )
+
+        self._run_doctor_expecting_exit_one()
+
+        assert "Failed to migrate configuration files" in doctor_mocks["console"].export_text()
+        # The deck fix sits below the migration in fix mode, and it still ran.
+        doctor_mocks["update_cmd"].assert_called_once_with(yes=True)
 
     def test_fix_outdated_deck_runs_update(self, doctor_mocks: dict[str, Any]) -> None:
         """Accepting the deck fix runs `pipelex update --yes`."""

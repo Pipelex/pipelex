@@ -9,7 +9,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from rich.markup import escape
 from rich.panel import Panel
 from rich.prompt import Confirm
 from rich.text import Text
@@ -19,6 +20,7 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.ui.types import InitFocus
+from pipelex.cli.commands.migrate_cmd import apply_pending_migrations
 from pipelex.cli.commands.update_cmd import update_cmd
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.exceptions import (
@@ -41,7 +43,7 @@ from pipelex.config import get_config
 from pipelex.core.validation import MIGRATE_COMMAND, raise_config_setup_error, report_validation_error
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.migration.exceptions import MigrationError
-from pipelex.migration.run import scan_config_surface
+from pipelex.migration.run import config_directories_to_migrate, migrate_config_directories, scan_config_surface
 from pipelex.runtime_hub import RuntimeHub, get_console, set_runtime_hub
 from pipelex.system.configuration.config_loader import CONFIG_REFUSED, config_manager, pydantic_error_behind
 from pipelex.system.configuration.config_surface import PIPELEX_CONFIG_SURFACE_ID, TELEMETRY_CONFIG_SURFACE_ID, strip_reserved_meta
@@ -270,6 +272,114 @@ def _telemetry_is_out_of_date_or_wrong(*, validation_error: ValidationError, con
     return TelemetryConfigCheck(
         finding=TelemetryConfigFinding.INVALID,
         message=f"Invalid configuration:\n{report_validation_error(validation_error=validation_error).message}",
+    )
+
+
+class PendingMigrationsFinding(StrEnum):
+    """What a dry run of `pipelex migrate` found on this machine.
+
+    One member per *next move*, which is the only thing they disagree about: nothing to do, run the
+    command, read the notes, or we could not look. The last one is deliberately not folded into the
+    others — a packaging problem of ours must not be reported as a finding about the user's files.
+    """
+
+    UP_TO_DATE = "up_to_date"
+    PENDING = "pending"
+    NEEDS_ATTENTION = "needs_attention"
+    UNAVAILABLE = "unavailable"
+
+    @property
+    def is_healthy(self) -> bool:
+        return self is PendingMigrationsFinding.UP_TO_DATE
+
+    @property
+    def is_repaired_by_migrating(self) -> bool:
+        """Whether `pipelex migrate` has something to write here.
+
+        True for `PENDING` alone, and it stays true when that same run also leaves something for a
+        person: the command migrates the files it can either way, and the notes are read after.
+        """
+        return self is PendingMigrationsFinding.PENDING
+
+    @property
+    def is_uncheckable(self) -> bool:
+        """Whether the question went unanswered, which is neither a yes nor a no."""
+        return self is PendingMigrationsFinding.UNAVAILABLE
+
+
+class PendingMigrationsCheck(BaseModel):
+    """The configuration-migration row: what a dry run found, and which files it was about."""
+
+    model_config = ConfigDict(frozen=True)
+
+    finding: PendingMigrationsFinding
+    message: str
+
+    migratable_files: list[str] = Field(default_factory=list[str])
+    """The files `pipelex migrate` would rewrite, each backed up first."""
+
+    attention_files: list[str] = Field(default_factory=list[str])
+    """The files carrying something the command will not do on its own."""
+
+    @property
+    def is_healthy(self) -> bool:
+        return self.finding.is_healthy
+
+
+def check_pending_migrations() -> PendingMigrationsCheck:
+    """Whether `pipelex migrate` has anything to do on this machine, and to which files.
+
+    A boot does not tell anyone this. A stale configuration the ledger can explain boots with a
+    warning, and the agent CLI silences its own logging before anything can emit one — so asking
+    is the only way a machine consumer ever learns that a migration is pending. This row is the
+    asking.
+
+    **It takes no directory, and that is the decision rather than an omission.** Every other check
+    reports on a *file* and is scoped to the directory the doctor was pointed at, `--global`
+    included. This one reports on a *command*, and `pipelex migrate` has no `--global`: it walks
+    the global `~/.pipelex/` and the project `.pipelex/` both. A row scoped narrower would name a
+    command that then rewrites a file the row never mentioned, which is the one surprise a tool
+    that writes to a user's files must not spring. Over-reporting is legible instead — every file
+    is named with its full path, so a reader sees which directory each one is in.
+
+    The dry run is the command's own, so this is not an approximation of what `pipelex migrate`
+    would do. It is that run, with the writing switched off.
+
+    **A failure inside the scan is reported as a failure to check**, never as a finding about the
+    user's files and never as an exception — an exception here reaches `doctor_cmd`'s outer
+    handler, which prints one line and exits, so a broken packaged ledger would replace every row
+    the user came for. The catch stays narrow, so a bug in our applier still surfaces as itself.
+    """
+    try:
+        report = migrate_config_directories(config_dirs=config_directories_to_migrate(), dry_run=True)
+    except (MigrationError, OSError) as exc:
+        return PendingMigrationsCheck(
+            finding=PendingMigrationsFinding.UNAVAILABLE,
+            message=f"Could not check for pending migrations: {exc}",
+        )
+
+    if report.is_clean:
+        return PendingMigrationsCheck(
+            finding=PendingMigrationsFinding.UP_TO_DATE,
+            message="Every configuration file is at the current schema",
+        )
+
+    migratable_files = [str(plan.file_path) for plan in report.changed_plans]
+    # In the order the run visited them, and deduplicated: one file can be both blocked and
+    # carrying a path the schema cannot explain.
+    attention_paths = {plan.file_path for plan in report.blocked_plans} | {plan.file_path for plan in report.unexplained_plans}
+    attention_files = [str(plan.file_path) for plan in report.plans if plan.file_path in attention_paths]
+
+    sentences: list[str] = []
+    if migratable_files:
+        sentences.append(f"{len(migratable_files)} configuration file(s) can be brought up to date by '{MIGRATE_COMMAND}'")
+    if attention_files:
+        sentences.append(f"{len(attention_files)} configuration file(s) need a look — run '{MIGRATE_COMMAND} --dry-run' for the detail")
+    return PendingMigrationsCheck(
+        finding=PendingMigrationsFinding.PENDING if migratable_files else PendingMigrationsFinding.NEEDS_ATTENTION,
+        message="; ".join(sentences),
+        migratable_files=migratable_files,
+        attention_files=attention_files,
     )
 
 
@@ -525,6 +635,7 @@ def display_health_report(
     config_healthy: bool,
     config_message: str,
     config_missing_count: int,
+    pending_migrations_check: PendingMigrationsCheck,
     telemetry_check: TelemetryConfigCheck,
     backends_healthy: bool,
     backends_message: str,
@@ -545,6 +656,7 @@ def display_health_report(
         config_healthy: Whether config files check passed
         config_message: Message about config files status
         config_missing_count: Number of missing config files
+        pending_migrations_check: What a dry run of `pipelex migrate` found, across every surface
         telemetry_check: What the telemetry probe found, and the sentence for it
         backends_healthy: Whether backends check passed
         backends_message: Message about backends status
@@ -561,7 +673,9 @@ def display_health_report(
             the Models row as a yellow advisory and suppress its standalone Solutions entry,
             since the Config Files row already steers the user.
     """
-    all_healthy = config_healthy and telemetry_check.is_healthy and backends_healthy and models_healthy and deck_healthy
+    all_healthy = (
+        config_healthy and pending_migrations_check.is_healthy and telemetry_check.is_healthy and backends_healthy and models_healthy and deck_healthy
+    )
 
     # Overall status panel
     if all_healthy:
@@ -597,6 +711,12 @@ def display_health_report(
         console.print(f"  [green]✓[/green] {config_message}")
     else:
         console.print(f"  [red]✗[/red] {config_message}")
+    console.print()
+
+    # Configuration Migrations section. It sits next to Configuration Files because it is about
+    # the same files — what the installed pipelex would change in them, rather than what it can read.
+    console.print("[bold]Configuration Migrations[/bold]")
+    _print_pending_migrations(check=pending_migrations_check)
     console.print()
 
     # Telemetry Configuration section
@@ -685,7 +805,15 @@ def display_health_report(
         # Check what can be auto-fixed
         can_auto_fix_config = not config_healthy and config_missing_count > 0
         can_auto_fix_telemetry = telemetry_check.finding.is_repaired_by_initializing
+        can_migrate = pending_migrations_check.finding.is_repaired_by_migrating
         telemetry_is_out_of_date = telemetry_check.finding.is_out_of_date
+        # The migration row names the same command and covers every surface, so the telemetry-only
+        # bullet under it would be the same advice twice. It still appears on its own — a telemetry
+        # file whose only pending work is blocked leaves that row out of date and this one silent.
+        show_telemetry_migrate_bullet = telemetry_is_out_of_date and not can_migrate
+        # Read off the list rather than off the finding: a run can both migrate some files and
+        # leave others for a person, and that combination is the ordinary one on a stale machine.
+        migrations_need_a_look = bool(pending_migrations_check.attention_files)
         has_telemetry_validation_error = not telemetry_check.is_healthy and not can_auto_fix_telemetry and not telemetry_is_out_of_date
 
         # Check for backend file issues
@@ -706,6 +834,9 @@ def display_health_report(
         has_recommendations = (
             can_auto_fix_config
             or can_auto_fix_telemetry
+            or can_migrate
+            or migrations_need_a_look
+            or pending_migrations_check.finding.is_uncheckable
             or telemetry_is_out_of_date
             or has_telemetry_validation_error
             or (not backends_healthy and backend_credential_reports)
@@ -722,7 +853,22 @@ def display_health_report(
             if can_auto_fix_telemetry:
                 console.print("  • Run [cyan]pipelex init telemetry[/cyan] to configure telemetry preferences")
 
-            if telemetry_is_out_of_date:
+            if can_migrate:
+                console.print(
+                    f"  • Run [cyan]{MIGRATE_COMMAND}[/cyan] to bring "
+                    f"{len(pending_migrations_check.migratable_files)} configuration file(s) up to date"
+                )
+
+            if migrations_need_a_look:
+                console.print(
+                    f"  • Run [cyan]{MIGRATE_COMMAND} --dry-run[/cyan] to see what "
+                    f"{len(pending_migrations_check.attention_files)} configuration file(s) carry that the migration will not do on its own"
+                )
+
+            if pending_migrations_check.finding.is_uncheckable:
+                console.print(f"  • Run [cyan]{MIGRATE_COMMAND} --dry-run[/cyan] to check for pending migrations — this report could not")
+
+            if show_telemetry_migrate_bullet:
                 # Never `init telemetry` here: this file is not broken, it is old, and the
                 # migration carries every setting in it forward where a reset would drop them.
                 console.print(f"  • Run [cyan]{MIGRATE_COMMAND}[/cyan] to bring telemetry.toml up to date")
@@ -774,7 +920,7 @@ def display_health_report(
             console.print()
 
             # Only suggest --fix if there are auto-fixable issues AND we're not already in fix mode
-            if not fix_mode and (can_auto_fix_config or can_auto_fix_telemetry or can_auto_fix_backends):
+            if not fix_mode and (can_auto_fix_config or can_auto_fix_telemetry or can_migrate or can_auto_fix_backends):
                 console.print("[dim]Run[/dim] [cyan]pipelex doctor --fix[/cyan] [dim]to interactively fix auto-fixable issues.[/dim]")
                 console.print()
 
@@ -786,6 +932,27 @@ def display_health_report(
             console.print("  [cyan]https://docs.pipelex.com[/cyan] - Documentation")
             console.print("  [cyan]https://go.pipelex.com/discord[/cyan] - Discord Community")
             console.print()
+
+
+def _print_pending_migrations(*, check: PendingMigrationsCheck) -> None:
+    """Render the configuration-migration row: the verdict, then the files it is about.
+
+    Every file is named with its full path — this row is the one place a reader learns that
+    `pipelex migrate` would touch a file in a directory they were not asking about. Nothing read
+    *inside* a file is rendered, here or anywhere else that reports a migration.
+    """
+    console = get_console()
+    match check.finding:
+        case PendingMigrationsFinding.UP_TO_DATE:
+            console.print(f"  [green]✓[/green] {check.message}")
+        case PendingMigrationsFinding.PENDING | PendingMigrationsFinding.NEEDS_ATTENTION:
+            console.print(f"  [yellow]⚠[/yellow]  {check.message}")
+            for file_path in check.migratable_files:
+                console.print(f"    [dim]{escape(file_path)}[/dim] — out of date")
+            for file_path in check.attention_files:
+                console.print(f"    [dim]{escape(file_path)}[/dim] — needs a look")
+        case PendingMigrationsFinding.UNAVAILABLE:
+            console.print(f"  [red]✗[/red] {check.message}")
 
 
 def check_deck_sync(*, config_dir: Path | None = None) -> tuple[bool, DeckSyncReport, str]:
@@ -1012,6 +1179,9 @@ def do_doctor_cmd(
     # side effect. Running it first would turn check_config_files into a silent installer
     # on a fresh machine. (The --global path skips materialization — see load_config.)
     config_healthy, config_missing_count, config_message = check_config_files()
+    # Runs whether or not the config loads, and that is the point: a configuration that will not
+    # load is exactly the machine most likely to be stale, and this row is what names the remedy.
+    pending_migrations_check = check_pending_migrations()
     telemetry_check = check_telemetry_config()
     backends_healthy, backend_credential_reports, backends_message = check_backend_credentials()
 
@@ -1048,6 +1218,7 @@ def do_doctor_cmd(
         config_healthy=config_healthy,
         config_message=config_message,
         config_missing_count=config_missing_count,
+        pending_migrations_check=pending_migrations_check,
         telemetry_check=telemetry_check,
         backends_healthy=backends_healthy,
         backends_message=backends_message,
@@ -1063,7 +1234,9 @@ def do_doctor_cmd(
         fix_mode=fix,
     )
 
-    all_healthy = config_healthy and telemetry_check.is_healthy and backends_healthy and models_healthy and deck_healthy
+    all_healthy = (
+        config_healthy and pending_migrations_check.is_healthy and telemetry_check.is_healthy and backends_healthy and models_healthy and deck_healthy
+    )
 
     # Exit code: 0 if healthy, 1 if issues found
     if all_healthy:
@@ -1074,6 +1247,7 @@ def do_doctor_cmd(
     # Writing a fresh telemetry.toml repairs exactly one finding — a missing file. An out-of-date
     # one is `pipelex migrate`'s (named in the report above), and a broken one is a person's.
     can_fix_telemetry = telemetry_check.finding.is_repaired_by_initializing
+    can_fix_migrations = pending_migrations_check.finding.is_repaired_by_migrating
 
     # Check for backend file issues that can be auto-fixed
     can_fix_backends = False
@@ -1085,7 +1259,7 @@ def do_doctor_cmd(
 
     can_fix_deck = not deck_healthy and deck_report.kit_version != ""
 
-    has_auto_fixable_issues = can_fix_config or can_fix_telemetry or can_fix_backends or can_fix_deck
+    has_auto_fixable_issues = can_fix_config or can_fix_migrations or can_fix_telemetry or can_fix_backends or can_fix_deck
 
     # Determine what requires manual fixes (excludes auto-fixable issues)
     has_config_validation_error = not config_healthy and config_missing_count == 0
@@ -1109,6 +1283,25 @@ def do_doctor_cmd(
                 except Exception as exc:  # noqa: BLE001
                     # Doctor --fix handler: wraps the whole init_cmd sub-command; a fix failure is reported and the doctor run continues.
                     console.print(f"[red]Failed to install configuration files: {exc!s}[/red]")
+                console.print()
+
+        # Migrate the configuration files the ledger can carry forward. This runs the same write
+        # pass `pipelex migrate` runs — the row above was its dry run — rather than a second
+        # implementation of it, and it is offered before the rows that report on file *contents*
+        # because migrating can be what resolves them.
+        if can_fix_migrations:
+            migratable_count = len(pending_migrations_check.migratable_files)
+            if Confirm.ask(f"[bold]Migrate {migratable_count} configuration file(s) to the current schema?[/bold]", default=True):
+                try:
+                    console.print()
+                    applied = apply_pending_migrations(config_dirs=config_directories_to_migrate())
+                    console.print(f"[green]✓[/green] Migrated {len(applied.written_plans)} configuration file(s)")
+                    # The rows below were measured before this ran, so a file this just repaired can
+                    # still be reported as broken further down.
+                    console.print("[dim]Re-run[/dim] [cyan]pipelex doctor[/cyan] [dim]for an updated report.[/dim]")
+                except Exception as exc:  # noqa: BLE001
+                    # Doctor --fix handler: wraps the whole migration pass; a fix failure is reported and the doctor run continues.
+                    console.print(f"[red]Failed to migrate configuration files: {exc!s}[/red]")
                 console.print()
 
         # Fix a missing telemetry config
