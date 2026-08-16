@@ -12,6 +12,7 @@ configuration models".
 """
 
 from enum import StrEnum
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any, cast
 
@@ -30,6 +31,7 @@ PIPELEX_CONFIG_FILE_NAME = "pipelex.toml"
 
 # The package directory, `pipelex/` — this module sits one level under it.
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent
+_KIT_CONFIGS_DIR = _PACKAGE_ROOT / "kit" / "configs"
 
 
 def packaged_migration_dir() -> Path:
@@ -64,6 +66,15 @@ class Surface(BaseModel):
     defaults_layer_kind: DefaultsLayerKind
     packaged_document_path: Path | None = None
 
+    kit_template_path: Path | None = None
+    """The sparse starter file `pipelex init` copies into a configuration directory.
+
+    A **convergence and neutrality witness only**, never a snapshot: it is read live, so there is
+    no fixture to maintain and no golden to go stale. It earns its place beside the complete
+    reference document because the two are different shapes — the complete document has every key
+    set, the template has almost none — and an operation that misbehaves on an absent key would
+    pass over one and fail over the other."""
+
     @model_validator(mode="after")
     def check_defaults_layer_is_reachable(self) -> Self:
         has_packaged_path = self.packaged_document_path is not None
@@ -93,6 +104,18 @@ class Surface(BaseModel):
             case DefaultsLayerKind.MODEL_DEFAULTS:
                 document: str = tomlkit.dumps(self.read_defaults_document())  # pyright: ignore[reportUnknownMemberType]
                 return document
+
+    def reference_documents(self) -> list[tuple[str, str]]:
+        """Every document a replay must be neutral over, as `(label, text)` pairs.
+
+        Both are at the current schema by construction — one is the packaged defaults layer or the
+        document the model's own defaults synthesize, the other is the starter template the kit
+        ships — so neither is a fixture anyone has to keep up to date.
+        """
+        documents = [("reference document", self.render_reference_document())]
+        if self.kit_template_path is not None:
+            documents.append(("kit template", self.kit_template_path.read_text(encoding="utf-8")))
+        return documents
 
     def read_defaults_document(self) -> dict[str, Any]:
         """The surface's complete reference document, as a plain mapping.
@@ -178,6 +201,52 @@ class SurfaceRegistry(BaseModel):
         msg = f"no surface '{surface_id}' in this registry"
         raise MigrationRegistryError(msg)
 
+    def surface_for_file_name(self, *, file_name: str) -> Surface | None:
+        """Which surface owns a file, by its name alone, or `None` when no surface claims it.
+
+        > **Exact filenames claim before globs, across all surfaces.** A file matched by any
+        > surface's exact pattern belongs to that surface and is excluded from every surface's
+        > glob.
+
+        Without the rule, `pipelex_service.toml` is both the base file of one surface and a match
+        for another's `pipelex_*.toml`, and which ledger runs over it becomes an accident of
+        iteration order.
+
+        Raises:
+            MigrationRegistryError: two surfaces' globs both claim this file. That the registry
+                itself cannot decide — whether two glob languages overlap is not decidable
+                cheaply, and the registry has no files to look at. Here there is one, so the
+                contract's *a file claimed by two globs is a registry error* becomes enforceable,
+                by name, on the file that proves it.
+        """
+        for surface in self.surfaces:
+            if surface.base_file == file_name:
+                return surface
+        claimants = [surface for surface in self.surfaces if surface.tier_glob is not None and fnmatch(file_name, surface.tier_glob)]
+        if len(claimants) > 1:
+            named = ", ".join(f"'{surface.surface_id}' ({surface.tier_glob})" for surface in claimants)
+            msg = f"registry error: '{file_name}' is claimed by the tier globs of {named} — a file belongs to exactly one surface"
+            raise MigrationRegistryError(msg)
+        return claimants[0] if claimants else None
+
+    def files_by_surface_in_directory(self, *, directory: Path) -> list[tuple[Surface, Path]]:
+        """Every file in one configuration directory that a surface claims, with its surface.
+
+        A directory that does not exist is skipped rather than refused: the global `~/.pipelex/`
+        and a project's `.pipelex/` are both optional, and a machine that has only one of them is
+        an ordinary machine, not a broken one.
+        """
+        if not directory.is_dir():
+            return []
+        claimed: list[tuple[Surface, Path]] = []
+        for path in sorted(directory.iterdir()):
+            if not path.is_file():
+                continue
+            surface = self.surface_for_file_name(file_name=path.name)
+            if surface is not None:
+                claimed.append((surface, path))
+        return claimed
+
 
 def _reject_duplicates(*, values: list[str], label: str) -> None:
     seen: set[str] = set()
@@ -205,6 +274,7 @@ def build_config_surface_registry() -> SurfaceRegistry:
                 config_model=PipelexConfig,
                 defaults_layer_kind=DefaultsLayerKind.PACKAGED_DOCUMENT,
                 packaged_document_path=_PACKAGE_ROOT / PIPELEX_CONFIG_FILE_NAME,
+                kit_template_path=_KIT_CONFIGS_DIR / PIPELEX_CONFIG_FILE_NAME,
             ),
             Surface(
                 surface_id="telemetry-config",
@@ -213,6 +283,7 @@ def build_config_surface_registry() -> SurfaceRegistry:
                 tier_glob="telemetry_*.toml",
                 config_model=TelemetryConfig,
                 defaults_layer_kind=DefaultsLayerKind.MODEL_DEFAULTS,
+                kit_template_path=_KIT_CONFIGS_DIR / TELEMETRY_CONFIG_FILE_NAME,
             ),
             Surface(
                 surface_id="pipelex-service-config",
@@ -220,6 +291,7 @@ def build_config_surface_registry() -> SurfaceRegistry:
                 base_file=PIPELEX_SERVICE_CONFIG_FILE_NAME,
                 config_model=PipelexServiceConfig,
                 defaults_layer_kind=DefaultsLayerKind.MODEL_DEFAULTS,
+                kit_template_path=_KIT_CONFIGS_DIR / PIPELEX_SERVICE_CONFIG_FILE_NAME,
             ),
         ]
     )

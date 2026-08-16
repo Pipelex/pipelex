@@ -7,5 +7,117 @@ id = "telemetry-config"
 title = "Telemetry destinations and capture settings"
 base_file = "telemetry.toml"
 tier_glob = "telemetry_*.toml"
-current_schema_version = 1
+current_schema_version = 2
 min_supported_schema_version = 0
+
+[[migration]]
+id = "telemetry-config@2"
+to_schema_version = 2
+introduced_in = "0.46.0"
+breaking = true
+safety = "safe"
+pre_history = true
+title = "Nest the flat telemetry settings under [custom_posthog]"
+description = """
+The first telemetry configuration was a flat file: `telemetry_mode`, `host` and `project_api_key` \
+sat at the document root, because PostHog was the only destination there was. Adding Langfuse and \
+OTLP made a section per destination necessary, and the PostHog settings moved into \
+`[custom_posthog]` — named for *your* PostHog, to distinguish it from the Gateway's. This entry \
+carries a file written before that move onto the current shape.
+"""
+guidance = """
+Four settings of the flat format have no counterpart today and are dropped rather than moved:
+
+- `respect_dnt` — `DO_NOT_TRACK=1` is now honoured unconditionally, so there is nothing to opt out of.
+- `dry_mode_enabled` and `verbose_enabled` — replaced by `debug`, which travels.
+- `settings_customized` — a marker the first-run prompt wrote; there is no first-run telemetry prompt any more.
+
+If you had turned `respect_dnt` off, nothing restores that behaviour: honouring `DO_NOT_TRACK` is
+not configurable.
+"""
+
+# Declared rather than derived: this change predates the first fingerprint, so no snapshot shows
+# these paths going away and there is no diff to account the entry against. The hand-authored
+# document the operations below are verified against is goldens/telemetry-config/before@2.toml.
+declared_removed_paths = [
+  "telemetry_mode",
+  "host",
+  "project_api_key",
+  "user_id",
+  "geoip_enabled",
+  "debug",
+  "redact",
+  "settings_customized",
+  "respect_dnt",
+  "dry_mode_enabled",
+  "verbose_enabled",
+]
+
+[[migration.ops]] # the destination table does not exist in a flat file: this first move creates it
+kind = "move_key"
+table_path = []
+key = "telemetry_mode"
+new_table_path = ["custom_posthog"]
+new_key = "mode"
+
+[[migration.ops]]
+kind = "move_key"
+table_path = []
+key = "host"
+new_table_path = ["custom_posthog"]
+new_key = "endpoint"
+
+[[migration.ops]]
+kind = "move_key"
+table_path = []
+key = "project_api_key"
+new_table_path = ["custom_posthog"]
+new_key = "api_key"
+
+[[migration.ops]]
+kind = "move_key"
+table_path = []
+key = "user_id"
+new_table_path = ["custom_posthog"]
+new_key = "user_id"
+
+[[migration.ops]]
+kind = "move_key"
+table_path = []
+key = "geoip_enabled"
+new_table_path = ["custom_posthog"]
+new_key = "geoip"
+
+[[migration.ops]]
+kind = "move_key"
+table_path = []
+key = "debug"
+new_table_path = ["custom_posthog"]
+new_key = "debug"
+
+[[migration.ops]]
+kind = "move_key"
+table_path = []
+key = "redact"
+new_table_path = ["custom_posthog"]
+new_key = "redact_properties"
+
+[[migration.ops]] # the four settings the current shape has no home for
+kind = "delete_key"
+table_path = []
+key = "settings_customized"
+
+[[migration.ops]]
+kind = "delete_key"
+table_path = []
+key = "respect_dnt"
+
+[[migration.ops]]
+kind = "delete_key"
+table_path = []
+key = "dry_mode_enabled"
+
+[[migration.ops]]
+kind = "delete_key"
+table_path = []
+key = "verbose_enabled"

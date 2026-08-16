@@ -4,7 +4,7 @@ Pipelex configuration files live on users' machines and in users' repositories, 
 
 This page is the contract: what a ledger may contain, what the engine may do with it, and what is guaranteed to a user whose files are migrated. It is normative. Everything asserted here has, or will have, a test behind it, and where a rule exists to prevent a specific failure the failure is named — a rule whose reason is forgotten is a rule that gets relaxed.
 
-> **Status.** This specification was written before its implementation, deliberately: the guarantees below are what the engine is built against. The data format, the operation vocabulary and the checks land first; `pipelex migrate` and boot tolerance land last. Of the checks, the coverage gate (`make check-migration-schemas`) and its regenerator (`make up-migration-schemas`) exist today; `make check-ledger`, the transform-golden verifier and pre-history entries arrive with the engine. Until the commands exist, this page is built but kept out of the documentation navigation.
+> **Status.** This specification was written before its implementation, deliberately: the guarantees below are what the engine is built against. The data format, the operation vocabulary and the checks land first; `pipelex migrate` and boot tolerance land last. Every check described here exists today: the coverage gate (`make check-migration-schemas`), its regenerator (`make up-migration-schemas`), the ledger check (`make check-ledger`), the transform-golden verifier inside the coverage gate, the neutrality property suite, and the verification of a [pre-history entry](#pre-history-entries). The ledgers themselves are nearly empty — `telemetry-config` carries the one entry the package ships, and the other two surfaces sit at schema version 1 — so over those two the neutrality property still exercises its sampler rather than the theorem. Until the commands exist, this page is built but kept out of the documentation navigation.
 
 ## What migrates, and what does not
 
@@ -28,9 +28,11 @@ File names are relative to a configuration directory, and every surface spans ex
 
 The tier set is **open**. Environment and run-mode names are dynamic, so the tier filenames of `pipelex-config` cannot be enumerated in advance — `pipelex_local.toml`, `pipelex_{environment}.toml`, `pipelex_{run_mode}.toml`, `pipelex_override.toml` and `pipelex_temporary_override.toml` are a description of today, not a closed list. That is why the registry matches tiers with a glob, and the glob is what makes the resolution rule necessary:
 
-> **Exact filenames claim before globs, across all surfaces.** A file matched by any surface's exact pattern belongs to that surface and is excluded from every surface's glob. A file claimed by two globs, or by two exact names, is a registry error and is rejected when the registry loads.
+> **Exact filenames claim before globs, across all surfaces.** A file matched by any surface's exact pattern belongs to that surface and is excluded from every surface's glob. A file claimed by two globs, or by two exact names, is a registry error.
 
 Without the rule, `pipelex_service.toml` is both the base file of one surface and a match for another's `pipelex_*.toml`, and which ledger runs over it becomes an accident of iteration order.
+
+The registry error is raised at the two moments it is decidable, and no earlier. Two surfaces sharing an id, a base file or a *literal* glob string are refused when the registry loads. Two surfaces whose globs merely *could* overlap are not: whether two glob languages intersect is not cheaply decidable, and a registry has no files to look at. That one is refused the moment a real file proves it — resolution stops by name, on the file, rather than picking whichever surface came first.
 
 Each surface also declares its **defaults-layer kind**, because the checks need to know where a current-schema default value comes from: a packaged TOML document merged beneath the user's files, or model-level field defaults. The distinction matters twice — for synthesizing the complete reference document of a surface that has no packaged file, and for refusing an added path that has no default anywhere. A model-defaults surface whose model cannot be built with nothing set has no defaults layer at all, and says so when its reference document is asked for rather than surfacing later as a missing value.
 
@@ -94,9 +96,13 @@ With both premises every operation in a full replay over a current-valid file sk
 The theorem is checked anyway, twice, because proofs rot where code does not:
 
 - **The convergence witness.** A full replay over each of a surface's reference documents — the complete defaults document and the sparse kit template — must produce zero applied operations. Both are at the current schema by construction, so there is no fixture to maintain. Cheap and exact; it runs in `agent-check`.
-- **The neutrality property test.** Generated documents that are valid at the current schema — mutations of the packaged defaults within the schema: other enum members, deleted optional keys, altered scalars, tier-shaped sparse subsets — must replay to byte-identical output. This is the executable form of the theorem over the domain the theorem actually claims. It carries a **vacuity meta-test**: every generated document must validate against its surface's model, or the property is passing on garbage.
+- **The neutrality property test.** Generated documents that are valid at the current schema must replay to byte-identical output. This is the executable form of the theorem over the domain the theorem actually claims, and the sampler is what makes it worth anything.
 
-Two further properties hold and are tested with it: replay is **idempotent** (applying a ledger twice equals applying it once) and **prefix-coherent** (a file that has already absorbed some entries lands where a replay from zero lands).
+The sampler mutates the surface's defaults three ways — dropping a path, swapping an enumerated spelling for another member of its recorded set, flipping a boolean — and **proposes each mutation from the fingerprint while letting the models decide whether it lands**: a proposal the models reject is simply not made and the document keeps the value it had. That division is forced, because [schema membership is decided by validators the fingerprint cannot see](#the-fingerprint). A sampler that consults only the projection can do nothing but drop keys — sound over every surface, since the defaults layer restores whatever a file omits, but never able to reach a different *value*, which is the whole reason a property beats a witness. A sampler that mutates whatever the annotation allows and checks nothing is red only when it happens to pick the wrong path, and the remedy everyone learns for that is to grow an exclusion list. Numbers and free strings are not perturbed at all, and that costs the property nothing: no operation's precondition mentions either, so perturbing one cannot separate a neutral replay from a non-neutral one.
+
+It carries a **vacuity meta-test**: every generated document must validate against its surface's model, or the property is passing on garbage. Under a propose-and-decide sampler that assertion guards what the per-mutation decisions do not — the assembly around them, and any later model change that breaks it — and it is made against the emitted text, which is the artifact the property is quantified over. The other direction needs guarding too, because a sampler that quietly re-emitted the reference document every time would satisfy every property on this page: each mutation kind must be shown to be reachable.
+
+Two further properties hold and are tested with it: replay is **idempotent** (applying a ledger twice equals applying it once) and **prefix-coherent** (a file that has already absorbed some entries lands where a replay from zero lands). Both are claims about files that still have something to migrate, so they are quantified over a second generator — within-schema documents with retired material put back — which needs a vacuity check of its own: a ledger that acts on nothing satisfies both.
 
 ## The ledger file
 
@@ -157,7 +163,17 @@ The rules that govern the file:
 
 A removal that predates the first fingerprint has no observed diff and no snapshot to compare against. Such an entry may carry `pre_history = true`, in which case it **declares its own removed paths** — the reserved-path registry records them from the declaration rather than from a fingerprint diff — and ships a hand-authored `before` document so the transform check has a pair to verify. Convergence and neutrality then verify it exactly like any other entry.
 
-This exception is bounded to entries carrying the flag, and exists for the changes that shipped before the ledger did. It is not a way to avoid a fingerprint diff for a change that has one.
+This exception is bounded to entries carrying the flag, and exists for the changes that shipped before the ledger did. It is not a way to avoid a fingerprint diff for a change that has one — and because that is the whole risk of the flag, it is what the four rules below check rather than trust. A pre-history entry buys an exemption from one accounting and pays for it with another.
+
+> **The declaration is not optional.** An entry carrying the flag and declaring nothing is refused when the ledger is parsed: the declaration is what stands in for the diff, so without one the flag exempts the entry from every accounting there is.
+
+> **No declared path may appear in a fingerprint at or below the entry's own version.** A path some snapshot records is material whose removal *is* observable, so it is accounted against that snapshot like any other change. (A *later* version bringing a declared path back is a different failure with a different remedy, and [the reserved-path rule](#reserved-paths-and-names) reports it in those terms.)
+
+> **The fingerprint pair the entry sits between must show no removal and no narrowing.** Stated from the other side by the coverage gate, which is the gate the flag exempts: if something did go away between those two snapshots — a path, a spelling, or the values a path accepts — the entry is not pre-history and the flag would be exempting a real change from the accounting it needs.
+
+> **Every operation's source must be declared material, or lie beneath some.** The ordinary op-legality rule reads the reserved-path registry, which a pre-history entry feeds by declaration; the effect is the same rule and the same refusal. Beneath, because a declaration names the shape that retired and an operation may address one key inside it. The rule reads each source at its literal, pre-entry path — it does not follow the entry's own renames the way [sequential path state](#sequential-path-state) does — so an operation that would address a declared table under a name an earlier operation of the same entry gave it is refused; address the material first, then rename it.
+
+The `before` document lives beside the golden chain as `before@N.toml`, and it is the one file there that is neither snapshotted nor regenerated — a regenerated one would describe today's models, which is exactly what it is not about. Write it as a faithful representative of the old shape, carrying every path the entry's operations address, so that the transform check exercises each of them rather than taking them on the entry's word. The link then runs from that document instead of from `defaults@N-1`, and nothing else about the check changes: the same three claims verify it.
 
 ## The operation vocabulary
 
@@ -188,6 +204,8 @@ Both halves are deliberate and neither is wrong, but they differ, and a reviewer
 
 Some configuration nodes are **open dictionaries** — fields typed as a mapping from arbitrary keys to a value schema, where any key is legal, no fingerprint can enumerate the keys, and `extra="forbid"` says nothing. The keys under such a node belong to the user; the value schema belongs to us. So the fingerprint records value-schema paths beneath a `*` segment, and an operation may use `*` **exactly at an open node**, where the applier expands it over the keys the file actually contains. A field renamed inside every entry of an open mapping, or an enum member remapped across every value of one, is then an ordinary `safe` operation rather than an impossibility.
 
+> **`move_key` takes no wildcard on either side.** A wildcard destination names no target: "move each entry's key into *some* entry" has no rule for which entry receives it. A wildcard *source* with the fixed destination that leaves it is many-to-one: on any file where two matched entries carry the key, the second lands on the destination the first just occupied and the whole operation conflicts. Both are refused when the ledger is parsed. The other kinds act on each matched entry in place, which is what makes a wildcard mean something for them.
+
 ### Outcomes
 
 The applier reports one outcome per operation:
@@ -208,7 +226,9 @@ The guarantees above hold only if entries cannot say certain things. These rules
 
 ### Op legality
 
-- **Every operation's source must be a path some schema version removed** — recorded as such in the reserved-path registry by the entry that removes it. An operation whose source is still a live path of the current schema would act on a valid file, and replay neutrality would be false.
+Enforced by [`make check-ledger`](#the-targets-and-where-the-data-lives), against the entry's [sequential path state](#sequential-path-state) rather than against the literal path an operation spells — an operation acting inside a table an earlier operation of the same entry renamed is judged on the node it really addresses.
+
+- **Every operation's source must be a path some schema version removed** — recorded as such in the reserved-path registry by the entry that removes it. An operation whose source is still a live path of the current schema would act on a valid file, and replay neutrality would be false. A `remap_value` is exempt by construction: what it retires is an enumerated *spelling*, not the path, which survives into the new schema — the remap legality rule is what governs it instead.
 - **No operation may address a concrete key beneath an open node.** Those keys are the user's, they are unbounded, and no schema change can remove one.
 - **A `*` segment is legal exactly at an open node**, and nowhere else.
 
@@ -221,6 +241,7 @@ Legality is defined over an entry's **sequential path state**, not operation by 
 - **Every path surviving the walk must be a path of the new fingerprint.** A survivor that is not is either an unaccounted removal or a misspelled destination; the two are the same defect seen from either end, and one containment check catches both.
 - **Every path of the new fingerprint that the walk removed must be a genuine addition** — that is, absent from the previous fingerprint. One that was present is **over-deletion**: an entry that dropped a parent table where it meant to drop one child.
 - **Every enumerated spelling lost between the two fingerprints must be remapped, following the path through the entry's own renames.** Members are compared by origin — an enumerated path of the previous schema is looked up at the path the walk carried it to — so a member lost by a path the same entry renamed still demands its `remap_value`, and the remap that supplies it addresses the key by its new name.
+- **Every path whose value domain narrowed must carry a remap, or the entry must be `unsafe`.** Compared by origin like the spellings, and for the same reason: a narrowing hidden behind a rename would otherwise read as an unrelated addition and removal. The remedies are the two the [coverage table](#coverage-every-schema-change-is-accounted-for) names, and they are fewer than a removal has, because no structural operation can repair a value.
 
 The end state is deliberately *not* compared as "the new fingerprint minus its additions". That formulation reads a rename's destination as an addition and its source as a removal, so it demands that the destination be absent from the end state — which is exactly where a correct rename puts it. Containment plus the over-deletion check is the same guarantee stated in a form renames satisfy.
 
@@ -248,15 +269,28 @@ The fingerprint is a normalized projection of a surface's model tree, checked in
 - whether the path is required;
 - the enum member set, where the type is enumerated;
 - the value in the surface's defaults layer, where one exists;
-- an open-node marker, with the value-schema paths beneath it recorded under a `*` segment.
+- an open-node marker, with the value-schema paths beneath it recorded under a `*` segment;
+- the numeric and length bounds on the value, where there are any.
 
 It is serialized in a stable order and is **deliberately not raw `model_json_schema()` output**, which moves for reasons that have nothing to do with our schema — reference layout, titles, ordering, the validation library's own version. A gate that cries wolf gets regenerated reflexively, and that is how a gate dies.
 
-The same reasoning drives two normalizations that look like information loss and are not. A nested model records its type as `table` and an enumerated one as `enum`, with no class name anywhere: renaming a *Python class* changes nothing in anybody's file and must move nothing, while renaming a *field* or an enum *member* — the things a file actually contains — moves the fingerprint and is caught. Constraint metadata is stripped for the same reason, at every level of an annotation rather than only the outermost one, so a validation-library upgrade that reshapes a constraint object cannot move a golden.
+The same reasoning drives two normalizations that look like information loss and are not. A nested model records its type as `table` and an enumerated one as `enum`, with no class name anywhere: renaming a *Python class* changes nothing in anybody's file and must move nothing, while renaming a *field* or an enum *member* — the things a file actually contains — moves the fingerprint and is caught. Constraint objects are stripped out of the recorded *type* for the same reason, at every level of an annotation rather than only the outermost one, so a validation-library upgrade that reshapes one cannot move a rendered type.
 
-An enumerated member set is collected from both sources that produce one: an enum class and a string literal type. To a TOML file they are the same thing — a closed set of legal spellings — and either can lose one.
+The bounds are recorded beside the type instead, and the same principle decides what a bound may be: the projection is a **closed whitelist** over `gt`, `ge`, `lt`, `le`, `min_length`, `max_length` and `multiple_of`, read from `annotated_types` — a zero-dependency interchange vocabulary rather than validation-library internals — and **anything unrecognized is dropped rather than serialized**. A strictness flag, a before-validator, a pattern object, a bound expressed over dates, a constraint kind a future release invents: none of them reach the golden. What lands there is a function of our schema, not of the library's representation of it, which is the property the strip above defends.
 
-Two shapes are recorded as terminal rather than descended into, because no operation can address what lies beneath them: an array of tables, which has no path segment syntax and no wildcard form, and a model reachable from itself, which has no finite path set at all.
+> **`pattern` is excluded, permanently.** Regex containment is not decidable for real expressions, so a gate that compared patterns would read every pattern edit as a tightening, produce false positives on changes that break nobody, and be waved through until it caught nothing. There are no `pattern` constraints on any surface today, so saying so costs nothing.
+
+A bound is read from two places, because a bound written the ordinary way appears in neither the other: pydantic folds a top-level `Field(ge=1)` into the field's *metadata*, leaving the annotation bare, while a bound inside a union member (`Annotated[int, Field(ge=1)] | Literal["unbounded"]`) stays in the annotation. A generic container's arguments are deliberately not descended into — a bound inside `list[Annotated[int, Field(ge=1)]]` binds the items, not the list. Across union members the widest bound wins, since a union's value domain is the union of its members' and a bound on one never binds the others.
+
+An enumerated member set is collected from both sources that produce one: an enum class and a string literal type. To a TOML file they are the same thing — a closed set of legal spellings — and either can lose one. A member is only *lost*, though, when the new shape stops accepting it — that is, when the new type does not admit `str`: an enumerated type relaxed into a free string records no members afterwards, and reading that raw set difference as the loss of every spelling would demand a bump and a remap for the most benign loosening a configuration model can undergo. The exemption is exactly that shape and not "the type did not change": `Literal['a']` becoming `Literal[1]` renders the same type on both sides and records no members after, and it loses `'a'`. A literal over non-string values records no members at all — its domain is one more thing the projection does not see.
+
+Two shapes are recorded as terminal rather than descended into, because no operation can address what lies beneath them: an array of tables, which has no path segment syntax and no wildcard form, and a model reachable from itself, which has no finite path set at all. Terminal means blind: a change to the model beneath an array of tables leaves the fingerprint unchanged, and the telemetry surface's `otlp` exporters are that shape today (see [Limits you will meet](#limits-you-will-meet)).
+
+**What the fingerprint records is what the types say, and a validator can say something else.** Every recorded field is read from an annotation or from the metadata beside it, so a constraint expressed as a validator instead is invisible here — and that is not a corner case, it reaches the enum member set and the open-node marker alike. A telemetry mode is a member of the recorded set and is still rejected unless the document also carries the user id that mode requires. Several nodes typed `dict[str, X]` on the main configuration surface reject any key outside a fixed set, so the open-node marker claims a key space that is not the user's after all. A pair of validators demands every member of an enum as a key of every entry of an open mapping, which makes *adding* an enum member break a user's file — additively, as far as any projection can tell. Nothing here can be made to see any of it.
+
+> **The gate does not claim what it cannot see.** Domain narrowing expressed in a validator — a non-empty check, a cross-field invariant, a completeness rule over user-supplied keys — is not visible from the schema and stays the author's responsibility. The [coverage gate](#coverage-every-schema-change-is-accounted-for) catches the mechanical subset: types and the whitelisted bounds. It does not catch the rest, and the coverage table would overclaim without this sentence.
+
+The consequence for the gates is mild where they compare a fingerprint against a fingerprint, because a blind spot on both sides cancels. The consequence for anything that tries to *decide schema membership* from a fingerprint is total, and it is why [the neutrality property test](#replay-neutrality) asks the models rather than the projection.
 
 What each recorded field is for: requiredness and enum members are load-bearing for coverage and for remap legality; defaults are recorded so that a flipped default is *visible in the regeneration diff*, but a default value **never gates on its own** — it changes no shape and no operation can address it. The one place a default is decisive is [a required path that has none](#coverage-every-schema-change-is-accounted-for).
 
@@ -268,11 +302,14 @@ Checks with distinct failure meanings, so that a red gate says which guarantee b
 
 Recompute the fingerprint and diff it against the golden for the surface's current schema version:
 
+The verdict turns on **direction**, not on whether something moved: a change that leaves a user's file valid asks for a regeneration, and one that does not asks for a bump. That distinction is what the last row exists for — a narrowing removes no path and no spelling, so read as a raw diff it looks exactly like an addition.
+
 | Diff | Verdict |
 |---|---|
 | Unchanged | Pass. |
-| Paths or enum members added, or a type or default changed | Regenerate the golden. No version bump and no entry are demanded, because additive changes are absorbed by the defaults layer. |
+| Paths or enum members added, a default changed, or a type or bound **widened** | Regenerate the golden. No version bump and no entry are demanded, because additive changes are absorbed by the defaults layer and a widened domain still accepts every value a file already carries. Widening is defined so the fingerprint can decide it: a union whose members are a superset of the old ones, an enumerated type becoming `str`, and a bound dropped or relaxed. |
 | Any path or enum member removed or renamed | Require a schema version bump, an operation accounting for every removed path (wildcard paths included), and a remap or an `unsafe` entry for every removed enum member. Destinations are cross-checked against added paths. |
+| A type or bound **narrowed** — `int → str`, `str → SomeEnum`, `list[int] → list[str]`, `ge=1 → ge=5` | Require a schema version bump and an entry, exactly as a removal does. Every path survives and every spelling is still enumerated, and a file carrying an out-of-domain value stops validating all the same. No structural operation can repair a value, so the entry must carry a `remap_value` for each narrowed path — where the old spellings can be enumerated and [remap legality](#replay-neutrality) accepts it — or be marked `unsafe`, which is the only remedy a tightened numeric bound has. A remap answers only for the string values it rewrites — a lost `str`, enum or literal member — and for nothing else: an `int \| literal` field that loses its number, or that loses a spelling *and* raises its floor, still demands `unsafe`, because no mapping reaches a number. |
 
 Alongside the diff, one standing invariant is checked on the new fingerprint itself, whether or not anything changed:
 
@@ -286,7 +323,9 @@ Stating it over every required path rather than only over newly added ones costs
 
 ### Convergence — replay is neutral on the witnesses
 
-A full replay of a surface's ledger over each of its reference documents produces zero applied operations. The same target checks what else is cheap and unambiguous: the ledger parses into the migration-operation subset, versions are contiguous and match ids, every `safe` remap satisfies the legality rule, and no entry reintroduces a reserved path.
+A full replay of a surface's ledger over each of its reference documents produces zero applied operations, reports nothing about them, and returns the very bytes it was given. The same target checks what else is cheap and unambiguous: the ledger parses into the migration-operation subset, versions are contiguous and match ids, every operation is legal, every `safe` remap satisfies the legality rule, and no entry reintroduces a reserved path or a remapped-away spelling.
+
+> **This target reads checked-in files and never fingerprints a live model** — the ledgers, the stored golden chain, the two reference documents (one of which, for a surface whose defaults come from its model, is rendered from that model's default values — rendered, not fingerprinted). That restraint is what earns it a place in `make agent-check`: every failure is a statement about a file the author wrote, and every remedy is to fix one. A check that read the models would go red on an ordinary configuration edit with *regenerate the golden* as its remedy, which is the fail-regenerate-fail cycle that keeps the coverage gate out of the loop agents run constantly. The cost is bounded and visible: between a version bump and the `make up-migration-schemas` that snapshots it, the new link does not exist, so the entry checks that need a fingerprint pair report the missing link by name instead of running.
 
 ### Transform goldens — the operations say what the schema change did
 
@@ -298,15 +337,27 @@ The regenerator writes, for each surface, the snapshot of its **current** schema
 
 Freezing the head instead would rot. An additive change is absorbed by the defaults layer and needs no bump, so a head frozen at the last bump would drift from the live model and eventually stop validating against it — while the whole point of the last link is that it is what the current model reads. Only the sparse kit template is not snapshotted at all: it is a convergence and neutrality witness, and both read it live, so a snapshot of it would have no reader.
 
-The check then asserts, pairwise over the complete-defaults family:
+The check then applies entry N to `defaults@N−1` and asserts three things about what comes out, pairwise over the complete-defaults family:
 
-> `paths(apply(entry N, defaults@N−1)) == paths(defaults@N) − added_at_N`, where `added_at_N` is `fingerprint@N` minus `fingerprint@N−1`; plus value equality on every path an operation wrote; plus validation of the last link against the current model.
+> **Every path the migration creates, schema version N has** — in `defaults@N` or in `fingerprint@N`; **every path `defaults@N−1` and `defaults@N` share survives the migration**; and **the last link's migrated document is accepted by the current model**, read the way a user's file is read — beneath the current defaults layer, not alone.
 
-The comparator is **not byte-exact and not a subset test**, and both exclusions are deliberate. Byte-exactness fails on any honest version bump, because the same commit adds keys, edits comments and flips unrelated defaults. A subset test is blind to over-deletion — deleting a parent table where the entry meant to delete one child would pass. What survives is a comparator that tolerates additions, comment edits and default flips, and is red on wrong destinations, wrong remap targets, wrong order and over-deletion.
+Each claim is one-directional on purpose, and together they are red on wrong destinations, wrong remap targets, wrong order and over-deletion. The first catches a destination that is misspelled or lands where the new shape carries nothing, which is the defect the whole check exists for: coverage accounts for the removed path and convergence skips the absent source, so without this the typo migrates every user file to a key `extra="forbid"` rejects, with the tool reporting success. The second catches an entry that dropped a parent table where it meant to drop one child. The third catches what moves no path at all — a value the schema does not accept, or a key it does not know.
+
+One exemption belongs to the first claim: a created path whose **container** is absent from `defaults@N` is not compared. When a whole entry of an open mapping is dropped from a packaged document between versions, what an operation did inside it says nothing about the operation.
+
+The comparator is **not byte-exact, not a subset test, and not an equality**. Byte-exactness fails on any honest version bump, because the same commit adds keys, edits comments and flips unrelated defaults. A subset test is blind to over-deletion. An equality is blind in the other direction: it would refuse every addition the same commit made. What survives tolerates additions, comment edits and default flips, because nothing asserts them.
+
+> **What the comparator is not: `paths(defaults@N) − added_at_N`.** A raw fingerprint difference counts a rename's *destination* as an addition, so subtracting it would demand the destination be absent from the expected shape — exactly where a correct rename puts it. This is the same defect the [symbolic end-state walk](#sequential-path-state) met and answered with containment, and the answer here is the same one expressed over documents. Subtraction would also be blind by construction to everything a fingerprint cannot see: a model added to a packaged deck lives beneath an open node, where the fingerprint records a value schema and never a key, so that addition would be asserted rather than tolerated and the check would go red on ordinary content.
+
+> **What the first claim reads: `defaults@N` *or* `fingerprint@N`, never the document alone.** An optional key whose default is `None` has no value in any reference document — TOML has no null, and the synthesized document drops the key — while being a perfectly ordinary destination for a migration to move a user's value onto. Against the document alone, the check would refuse the destination the schema most obviously has. A misspelled destination is in neither the document nor the fingerprint, so nothing the claim was protecting is given up, and the fingerprint is checked-in data like everything else the check reads. The fingerprint is read *with its wildcards*: a document names the user's own key where the fingerprint names `*`, so `deck.claude.new_name` is recorded as `deck.*.new_name`, and a rename beneath an open mapping whose destination the reference document happens not to carry under that entry is a correct rename, not a misspelled one.
+
+> **What the comparator does not assert: value equality against `defaults@N`.** A default flipped in the same commit as a rename makes such a check red with no remedy available to anyone — the older link is frozen, the head link tracks, and a migrated file legitimately carries the user's old value where the new reference document carries the new default. What that assertion was for, *the operations produce values the new schema accepts*, is checked where it can be checked soundly: by the last link's validation above, and by [the remap legality rule](#replay-neutrality), which refuses a remap whose target spelling the new schema does not accept.
+
+One kind of entry has no link to check: an **unsafe** entry is reported and never applied, so no document ever makes that transition mechanically, and the vocabulary explicitly grants such an entry the right to be incomplete — an entry with no operations at all is legal precisely when it is unsafe. A **pre-history** entry does have a link, and this is where it is verified: it has no snapshot on the far side of it, which is what the flag means, so the link starts from its hand-authored [`before@N.toml`](#pre-history-entries) and answers the same three claims. An entry marked pre-history with no such document is refused by name.
 
 The sparse kit template is **not** in the chain: starter-template edits between bumps would go red under equality, and it exercises no operation the complete document does not. It remains a convergence and neutrality witness.
 
-Pairwise checks compose by induction into the full chain — a replay from any historical snapshot lands on the current shape, because prefix entries skip on any snapshot at or past their version, their sources being permanently removed material.
+Pairwise checks compose by induction into the full chain — a replay from any historical snapshot lands on the current shape, because prefix entries skip on any snapshot at or past their version, their sources being permanently removed material. That induction is also why only the last link is validated against a model: it is the only link whose model we still have, and every earlier one was the last link when it was authored.
 
 ### Testing the gates without coupling them to the configuration models
 
@@ -314,11 +365,13 @@ The surface registry is an **injected parameter, never a module constant**. The 
 
 Without this, every legitimate configuration change turns the gate's own suite red alongside the gate, and the fix everyone learns is "regenerate the goldens" — which is how a gate goes permanently green while catching nothing.
 
+[The neutrality property](#replay-neutrality) is the deliberate exception: it is quantified over the real surfaces, because the domain it claims is the one real files live in. What keeps that from costing what the rule warns about is the propose-and-decide sampler — a model that grows a new validator makes a proposed mutation stop landing, rather than making the suite red. Everything the property needs a ledger with entries in it for runs against a synthetic surface, as the rule says.
+
 ### The targets, and where the data lives
 
 | Target | Alias | Aggregates | What it does |
 |---|---|---|---|
-| `make check-ledger` | `cl` | `check`, `agent-check` | The ledger parses into migration operations, versions are contiguous and match ids, legality and remap legality hold, no entry reintroduces a reserved path, and replay over both reference documents applies nothing. Reads checked-in data and regenerates nothing. |
+| `make check-ledger` | `cl` | `check`, `agent-check` | The ledger parses into migration operations, versions are contiguous and match ids, legality and remap legality hold, no entry reintroduces a reserved path, and replay over both reference documents applies nothing. Reads checked-in data only — no live model is fingerprinted and nothing is regenerated. |
 | `make check-migration-schemas` | `cmig` | `check` | Fingerprints every surface, diffs against the goldens, demands a bump and full accounting for every removal, cross-checks destinations, and verifies the pairwise transform-golden chain. |
 | `make up-migration-schemas` | `umig` | `up` | Regenerates the fingerprint goldens, and snapshots the reference documents into the transform-golden chain when a schema version bumped. |
 
@@ -331,9 +384,10 @@ pipelex/migration/ledgers/<surface-id>.toml            the ledgers
 pipelex/migration/goldens/<surface-id>/
     fingerprint@N.json                                 the fingerprint at schema version N
     defaults@N.toml                                    the complete reference document at schema version N
+    before@N.toml                                      a pre-history entry's hand-authored starting document
 ```
 
-Two files per version and nothing else. The fingerprint the coverage check diffs against is the chain's head link, `fingerprint@<current>`, rather than a separate always-current copy — one file with one writer cannot disagree with itself. The reserved-path registry is [derived from the chain](#reserved-paths-and-names), and the sparse kit template is read live rather than snapshotted.
+Two files per version, and a third only where a [pre-history entry](#pre-history-entries) needs one. The fingerprint the coverage check diffs against is the chain's head link, `fingerprint@<current>`, rather than a separate always-current copy — one file with one writer cannot disagree with itself. The reserved-path registry is [derived from the chain](#reserved-paths-and-names), and the sparse kit template is read live rather than snapshotted.
 
 ## What the engine reports
 
@@ -342,16 +396,23 @@ Every surface produces the same plan model:
 ```
 MigrationReport
   └── MigrationPlan (per file)
-        surface, file_path
-        blocked_reason → set when the file itself could not be processed at all
-        steps[]        → id, to_schema_version, title, breaking, safety, ops[], changelog
-        blocked[]      → id, reason, guidance
+        surface_id, file_path
+        blocked_reason, blocked_detail → set when the file itself could not be processed at all
+        backup_path, was_written       → set when the run wrote the file
+        steps[]        → entry_id, to_schema_version, title, description, breaking, safety, applied_ops[]
+        blocked[]      → entry_id, to_schema_version, reason, detail, guidance, applied_ops[]
         unexplained[]  → path, note
 ```
 
-There is no `from_version` and no trusted-version concept: nothing skips, so nothing needs one. Because a replay walks every entry while usually changing little, the report renders what actually changed — it filters on `APPLIED`, routes `CONFLICT` into `blocked`, and carries the downgrade diagnosis in `unexplained`.
+There is no `from_version` and no trusted-version concept: nothing skips, so nothing needs one. Because a replay walks every entry while usually changing little, the report renders what actually changed — a step lists only the operations that fired, not the many that skipped.
 
 Two different things can be blocked, and the report keeps them apart. An **entry** is blocked when it cannot be applied — it is `unsafe`, or one of its operations came back `CONFLICT` — and it lands in `blocked[]` with the reason and its guidance, while the rest of the file's entries proceed. A **file** is blocked when it cannot be processed at all: it is unparseable, it is unwritable, or it changed on disk between the read and the write. That reason sits on the plan itself, and a blocked file never stops its siblings — every other file in the surface is migrated and reported normally.
+
+Two rules govern how an entry appears, and both exist so that a report is never more optimistic than the file:
+
+> **An entry is reported once.** An entry with a conflicting operation lands in `blocked[]` and not in `steps[]`, carrying in its own `applied_ops` whichever of its operations did land before the conflict was found. Operation-level atomicity is the applier's — a conflicting operation writes nothing — but an entry is not atomic, and saying it arrived whole when part of it could not would be a lie the next run has to correct.
+
+> **An `unsafe` entry is reported only when it would do something.** It is rehearsed against the document and the result discarded, so an entry with nothing to do on this file stays silent. Reporting every `unsafe` entry regardless would warn every user with a perfectly current file, at every boot, forever — and a warning nobody can act on is a warning everybody learns to ignore.
 
 > **No value read from a user's file is ever rendered** — not in the command's output, not in the structured plan, not in an error. Paths, operation kinds and ledger-supplied values carry everything a plan needs to say.
 
@@ -392,9 +453,23 @@ The rules this encodes:
 
 The `.mthds` fix path follows its applier with a canonical reflow of the whole file. That is right for `.mthds` files, which are canonically formatted by CI, and wrong for a user-owned configuration, where a one-key rename must not also rewrite the user's spacing and layout. It is also load-bearing for the guarantees: byte-level replay neutrality only holds if serialization contributes no changes of its own.
 
+Stated more strongly than the library can promise on its own: **a replay in which no operation applies returns the very text it was given** — not a re-serialization of it. Neutrality is therefore a property of the engine rather than of the TOML library it happens to use, and a round-trip can never contribute a change of its own to a file that needed nothing.
+
+### The document is re-read between operations that applied
+
+> **Operations are applied one at a time, and the document is parsed afresh after each one that changed it.**
+
+This is a measured requirement, not caution. The position-preserving rename the applier depends on leaves the node's raw `dict` storage out of step with the body it renders from, for any value that is not a table: everything the library renders or looks up still works, but *addressing that key again in the same in-memory document* raises from inside the library. Always-replay runs many operations over one document, so migration is the caller that meets it — the `.mthds` fix path renames tables, which take the branch the library keeps consistent.
+
+Re-reading is exact, because serialization is byte-faithful, and it costs one parse per **applied** operation — which under always-replay is almost never, since the common case is a current file where everything skips. The behaviour is pinned by a characterization test so that a library upgrade which fixes it makes the workaround removable rather than invisible.
+
 ### Backups
 
 Always back up, before writing. Exactly one backup per file — a successful run replaces the previous one — named with a UTC timestamp, inheriting the source file's mode rather than the default umask, and with its path printed in the report. For files tracked in git, git remains the durable history; the backup covers the untracked ones and the moment between two commits.
+
+The name is the source file's whole name, extension included, followed by `.bak.` and a compact UTC stamp: `pipelex.toml` backs up to `pipelex.toml.bak.20260815T120000Z`. Extension-included so a backup never shadows a real `.toml`, and separator-free so no filesystem objects to it. Pruning matches that whole shape, stamp included — a copy the user made by hand under a name that merely starts the same way (`pipelex.toml.bak.notes`) is theirs, and is never touched.
+
+The order of the three steps is itself a guarantee. The backup is written **first**, so there is never a moment with a rewritten file and no copy of the original; the older backups are pruned **last**, so there is never a moment with no backup at all; and a write that fails before touching the file takes its own fresh backup with it, so a failed run leaves the directory exactly as it found it. A write whose outcome the transaction cannot vouch for — a rollback it could not complete — is the one case that keeps its backup: the report names the copy, because that is precisely the state a backup exists for. Nothing that happens after the file is written can un-write it in the report: an older backup that will not prune, or a temp file the transaction could not remove, is a warning on a migrated file, never a blocked one.
 
 ### Per-file transactions
 
@@ -404,17 +479,18 @@ Each file is written transactionally and independently: snapshot, stage, atomic 
 
 These are measured properties of the TOML library the engine uses, not aspirations. They are stated here because a user or an author will run into them, and being surprised by them is worse than being told.
 
-- **Arrays of tables are unaddressable, and reserved.** An `[[entry]]` node is a list, and no `table_path` segment syntax reaches it or anything under it; the `*` wildcard has no array form. No configuration surface contains one today. If one ever appears, addressing it needs a new segment kind and a decision on the day — until then, an operation pointed at one resolves nothing and is reported as a guarded skip rather than raising.
+- **Arrays of tables are unaddressable, and reserved.** An `[[entry]]` node is a list, and no `table_path` segment syntax reaches it or anything under it; the `*` wildcard has no array form. One surface carries one today — the telemetry configuration's `otlp` list of exporters — and the fingerprint records it as a terminal `list[table]`: what happens *inside* an exporter entry (a renamed field, a tightened bound, a new required member) is invisible to the coverage gate, so a change there is the author's to account for by hand, exactly as validator-expressed narrowing is. Addressing what lies beneath one needs a new segment kind and a decision on the day — until then, an operation pointed at one resolves nothing and is reported as a guarded skip rather than raising.
 - **A moved table loses its introducing comment.** A comment block written above a table is stored as trailing trivia of the *previous* sibling, not as part of the table it appears to introduce, so it does not travel with a move. Comments *inside* a moved table travel intact, including trailing comments on individual keys. The consequence is real: a file seeded from a heavily-commented template and then migrated ends up with banner comments labelling sections that have moved away. Nothing in the engine may rely on comment fidelity across a move, and the package's own files are corrected by hand rather than by migration.
 - **A migration is not byte-minimal.** A rename adds a small amount of whitespace, and a renamed table that was written out of order across several chunks loses its own bare header while a plain table keeps it. Both forms are semantically identical, both are stable under replay, and neither accumulates — but a migration diff is not the minimal diff a human would have written.
 - **A guarded skip is never an error.** Every operation whose target does not resolve reports itself skipped rather than raising. That guard is what makes always-replay possible, and it is why a misdirected operation is caught by the checks rather than by a crash on a user's machine.
+- **A renamed key cannot be addressed again in the same in-memory document.** The position-preserving rename updates the body the document renders from but leaves the node's raw `dict` storage stale, for any value that is not a table. Nothing the library renders or looks up is affected — which is why a single rename is correct, and why the `.mthds` fix path, whose renames target tables, never meets it. The engine [re-reads the document between operations that applied](#the-document-is-re-read-between-operations-that-applied), so nothing downstream has to know about this; it is recorded here because it explains a piece of the engine that would otherwise look like superstition.
 
 ## Authoring an entry
 
 The gate says what is missing; you should not be composing entries by hand from a diff. The intended loop:
 
 1. Make the schema change.
-2. Run the coverage check. It refuses the change and names every removed path and enum member that lacks accounting, every destination that does not match an added path, and every added path that has no default.
+2. Run the coverage check. It refuses the change and names every removed path and enum member that lacks accounting, every path whose value domain narrowed, every destination that does not match an added path, and every added path that has no default.
 3. Write the entry — or have the migration-authoring skill derive it from the fingerprint diff, bump the surface's schema version, regenerate the fingerprint golden and snapshot the transform goldens.
 4. Add the changelog entry. The changelog and the ledger are deliberately separate artifacts saying the same thing to different readers; the release process is where they are checked against each other.
 

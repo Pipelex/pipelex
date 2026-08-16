@@ -115,6 +115,13 @@ class TestEntryInvariants:
         with pytest.raises(ValidationError, match="pre-history entries only"):
             MigrationLedger.model_validate({"surface": surface, "migration": [entry]})
 
+    def test_a_pre_history_entry_declaring_nothing_is_refused(self) -> None:
+        """The declaration is what replaces the diff; without one the flag exempts an entry from everything."""
+        surface = {**_SURFACE_BLOCK, "current_schema_version": 2}
+        entry = _entry(pre_history=True)
+        with pytest.raises(ValidationError, match="declares the paths it removes"):
+            MigrationLedger.model_validate({"surface": surface, "migration": [entry]})
+
     def test_nothing_migrates_to_schema_version_one(self) -> None:
         """Version 1 is the shape a surface starts at; there is no earlier shape to come from."""
         surface = {**_SURFACE_BLOCK, "current_schema_version": 1}

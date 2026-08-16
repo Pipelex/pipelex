@@ -1,0 +1,264 @@
+{
+  "surface_id": "telemetry-config",
+  "schema_version": 2,
+  "paths": {
+    "custom_portkey": {
+      "value_type": "table",
+      "required": false,
+      "open_node": false
+    },
+    "custom_portkey.force_debug_enabled": {
+      "value_type": "bool",
+      "required": false,
+      "default": false,
+      "open_node": false
+    },
+    "custom_portkey.force_tracing_enabled": {
+      "value_type": "bool",
+      "required": false,
+      "default": false,
+      "open_node": false
+    },
+    "custom_posthog": {
+      "value_type": "table",
+      "required": false,
+      "open_node": false
+    },
+    "custom_posthog.api_key": {
+      "value_type": "str",
+      "required": false,
+      "open_node": false
+    },
+    "custom_posthog.debug": {
+      "value_type": "bool",
+      "required": false,
+      "default": false,
+      "open_node": false
+    },
+    "custom_posthog.endpoint": {
+      "value_type": "str",
+      "required": false,
+      "default": "https://us.i.posthog.com",
+      "open_node": false
+    },
+    "custom_posthog.geoip": {
+      "value_type": "bool",
+      "required": false,
+      "default": true,
+      "open_node": false
+    },
+    "custom_posthog.mode": {
+      "value_type": "enum",
+      "required": false,
+      "enum_members": [
+        "anonymous",
+        "identified",
+        "off"
+      ],
+      "default": "off",
+      "open_node": false
+    },
+    "custom_posthog.redact_properties": {
+      "value_type": "list[str]",
+      "required": false,
+      "default": [],
+      "open_node": false
+    },
+    "custom_posthog.tracing": {
+      "value_type": "table",
+      "required": false,
+      "open_node": false
+    },
+    "custom_posthog.tracing.capture": {
+      "value_type": "table",
+      "required": false,
+      "open_node": false
+    },
+    "custom_posthog.tracing.capture.content": {
+      "value_type": "bool",
+      "required": false,
+      "default": false,
+      "open_node": false
+    },
+    "custom_posthog.tracing.capture.content_max_length": {
+      "value_type": "int",
+      "required": false,
+      "open_node": false
+    },
+    "custom_posthog.tracing.capture.output_class_names": {
+      "value_type": "bool",
+      "required": false,
+      "default": false,
+      "open_node": false
+    },
+    "custom_posthog.tracing.capture.pipe_codes": {
+      "value_type": "bool",
+      "required": false,
+      "default": false,
+      "open_node": false
+    },
+    "custom_posthog.tracing.enabled": {
+      "value_type": "bool",
+      "required": false,
+      "default": false,
+      "open_node": false
+    },
+    "custom_posthog.user_id": {
+      "value_type": "str",
+      "required": false,
+      "open_node": false
+    },
+    "langfuse": {
+      "value_type": "table",
+      "required": false,
+      "open_node": false
+    },
+    "langfuse.enabled": {
+      "value_type": "bool",
+      "required": false,
+      "default": false,
+      "open_node": false
+    },
+    "langfuse.endpoint": {
+      "value_type": "str",
+      "required": false,
+      "open_node": false
+    },
+    "langfuse.public_key": {
+      "value_type": "str",
+      "required": false,
+      "open_node": false
+    },
+    "langfuse.secret_key": {
+      "value_type": "str",
+      "required": false,
+      "open_node": false
+    },
+    "otlp": {
+      "value_type": "list[table]",
+      "required": false,
+      "default": [],
+      "open_node": false
+    },
+    "pipelex_gateway": {
+      "value_type": "table",
+      "required": false,
+      "open_node": false
+    },
+    "pipelex_gateway.portkey": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "pipelex_gateway.portkey.force_debug_enabled": {
+      "value_type": "bool",
+      "required": false,
+      "open_node": false
+    },
+    "pipelex_gateway.portkey.force_tracing_enabled": {
+      "value_type": "bool",
+      "required": false,
+      "open_node": false
+    },
+    "pipelex_gateway.posthog": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "pipelex_gateway.posthog.api_key": {
+      "value_type": "str",
+      "required": false,
+      "open_node": false
+    },
+    "pipelex_gateway.posthog.debug": {
+      "value_type": "bool",
+      "required": false,
+      "open_node": false
+    },
+    "pipelex_gateway.posthog.endpoint": {
+      "value_type": "str",
+      "required": false,
+      "open_node": false
+    },
+    "pipelex_gateway.posthog.geoip": {
+      "value_type": "bool",
+      "required": false,
+      "open_node": false
+    },
+    "pipelex_gateway.posthog.mode": {
+      "value_type": "enum",
+      "required": false,
+      "enum_members": [
+        "anonymous",
+        "identified",
+        "off"
+      ],
+      "open_node": false
+    },
+    "pipelex_gateway.posthog.redact_properties": {
+      "value_type": "list[str]",
+      "required": false,
+      "open_node": false
+    },
+    "pipelex_gateway.posthog.tracing": {
+      "value_type": "table",
+      "required": false,
+      "open_node": false
+    },
+    "pipelex_gateway.posthog.tracing.capture": {
+      "value_type": "table",
+      "required": false,
+      "open_node": false
+    },
+    "pipelex_gateway.posthog.tracing.capture.content": {
+      "value_type": "bool",
+      "required": false,
+      "open_node": false
+    },
+    "pipelex_gateway.posthog.tracing.capture.content_max_length": {
+      "value_type": "int",
+      "required": false,
+      "open_node": false
+    },
+    "pipelex_gateway.posthog.tracing.capture.output_class_names": {
+      "value_type": "bool",
+      "required": false,
+      "open_node": false
+    },
+    "pipelex_gateway.posthog.tracing.capture.pipe_codes": {
+      "value_type": "bool",
+      "required": false,
+      "open_node": false
+    },
+    "pipelex_gateway.posthog.tracing.enabled": {
+      "value_type": "bool",
+      "required": false,
+      "open_node": false
+    },
+    "pipelex_gateway.posthog.user_id": {
+      "value_type": "str",
+      "required": false,
+      "open_node": false
+    },
+    "telemetry_allowed_modes": {
+      "value_type": "dict[str, bool]",
+      "required": false,
+      "default": {
+        "ci": false,
+        "cli": true,
+        "docker": true,
+        "fastapi": true,
+        "mcp": true,
+        "n8n": true,
+        "pytest": false,
+        "python": false
+      },
+      "open_node": true
+    },
+    "telemetry_allowed_modes.*": {
+      "value_type": "bool",
+      "required": true,
+      "open_node": false
+    }
+  }
+}

@@ -118,12 +118,17 @@ class TestFixOpUnion:
                 {"op": {"kind": "move_key", "table_path": ["deck", "*"], "key": "k", "new_table_path": ["deck", "*"], "new_key": "k"}}
             )
 
-    def test_a_wildcard_source_is_accepted(self) -> None:
-        """The source side is the whole point of the segment, and stays legal."""
-        op = _FixOpHolder.model_validate(
-            {"op": {"kind": "move_key", "table_path": ["deck", "*"], "key": "k", "new_table_path": ["storage"], "new_key": "k"}}
-        ).op
-        assert isinstance(op, MoveKeyOp)
+    def test_a_wildcard_source_move_is_refused(self) -> None:
+        """A move's destination is one fixed key, so every matched entry would move onto the same one and the second conflicts."""
+        with pytest.raises(ValidationError, match="wildcard"):
+            _FixOpHolder.model_validate(
+                {"op": {"kind": "move_key", "table_path": ["deck", "*"], "key": "k", "new_table_path": ["storage"], "new_key": "k"}}
+            )
+
+    def test_a_wildcard_source_is_accepted_where_it_acts_in_place(self) -> None:
+        """The source side is the whole point of the segment: each matched entry is acted on in place."""
+        op = _FixOpHolder.model_validate({"op": {"kind": "rename_table_key", "table_path": ["deck", "*"], "key": "k", "new_key": "n"}}).op
+        assert isinstance(op, RenameTableKeyOp)
         assert op.table_path == ["deck", "*"]
 
     def test_a_remap_needs_a_non_empty_mapping(self) -> None:

@@ -11,7 +11,9 @@ that is not about configuration, which teaches the reflex the whole design exist
 
 from pipelex.migration.coverage import check_registry
 from pipelex.migration.ledger import INITIAL_SCHEMA_VERSION, load_ledger
+from pipelex.migration.ledger_check import check_ledgers
 from pipelex.migration.surfaces import build_config_surface_registry, packaged_migration_dir
+from pipelex.migration.transform_check import check_transforms
 
 
 class TestTheRealRegistry:
@@ -46,3 +48,23 @@ class TestTheCheckedInGoldens:
         """
         issues = check_registry(registry=build_config_surface_registry(), migration_dir=packaged_migration_dir())
         assert issues == [], "\n".join(f"{issue.surface_id}: {issue.message}" for issue in issues)
+
+    def test_the_real_ledgers_pass_the_ledger_check(self) -> None:
+        """The checked-in ledgers say only legal things, and replay over our own documents does nothing.
+
+        The convergence half of this is the one assertion here that is not about the goldens at
+        all: it replays every ledger over the packaged configuration and the kit template, which
+        is exactly what a user's machine will do to their own file.
+        """
+        ledger_issues = check_ledgers(registry=build_config_surface_registry(), migration_dir=packaged_migration_dir())
+        assert ledger_issues == [], "\n".join(f"{issue.surface_id}: {issue.message}" for issue in ledger_issues)
+
+    def test_the_real_transform_chains_hold(self) -> None:
+        """Every entry, applied to the document of the version before it, lands on the next one.
+
+        No longer vacuous: `telemetry-config@2` is a pre-history entry, so this walks its
+        hand-authored `before@2.toml` through its operations and holds the result against today's
+        shape and today's model.
+        """
+        transform_issues = check_transforms(registry=build_config_surface_registry(), migration_dir=packaged_migration_dir())
+        assert transform_issues == [], "\n".join(f"{issue.surface_id}: {issue.message}" for issue in transform_issues)

@@ -14,8 +14,9 @@ the golden the gate will compare against, hand it a ledger entry, and assert whi
 
 from enum import StrEnum
 from pathlib import Path
+from typing import Annotated, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from pipelex.migration.coverage import CoverageIssue, CoverageIssueKind, check_surface, diff_fingerprints
 from pipelex.migration.fingerprint import compute_fingerprint
@@ -68,6 +69,86 @@ class _SchemaTwoTierRenamedAndMemberGone(BaseModel):
 
     label: str = "hello"
     level: _TierWithoutBasic = _TierWithoutBasic.PREMIUM
+
+
+class _Section(BaseModel):
+    """A table with two keys, one of them optional with no value in any reference document."""
+
+    limit: int | None = None
+    name: str = "x"
+
+
+class _SchemaOneWithSection(BaseModel):
+    label: str = "hello"
+    section: _Section = Field(default_factory=_Section)
+
+
+class _SchemaTwoSectionRenamed(BaseModel):
+    """`section` renamed to `area`, both children kept."""
+
+    label: str = "hello"
+    area: _Section = Field(default_factory=_Section)
+
+
+class _BoundedOne(BaseModel):
+    """A shape with a bounded number beside an ordinary key — the starting point for narrowings."""
+
+    label: str = "hello"
+    retries: int = Field(default=3, ge=1)
+
+
+class _BoundedTightened(BaseModel):
+    """The bound moved up. Every path survives; a file saying `retries = 2` stops validating."""
+
+    label: str = "hello"
+    retries: int = Field(default=3, ge=2)
+
+
+class _BoundedRelaxed(BaseModel):
+    """The bound is gone. Every file that validated before still does."""
+
+    label: str = "hello"
+    retries: int = 3
+
+
+class _BoundedTightenedAndRenamed(BaseModel):
+    """A tightened bound riding along with a rename, the way a real schema version mixes changes."""
+
+    title: str = "hello"
+    retries: int = Field(default=3, ge=2)
+
+
+class _BoundedOrAuto(BaseModel):
+    """A bounded number that may also be spelled `auto` — the `int | literal` shape real surfaces carry."""
+
+    label: str = "hello"
+    retries: Annotated[int, Field(ge=1)] | Literal["auto", "unbounded"] = 3
+
+
+class _BoundedTightenedOrUnbounded(BaseModel):
+    """`auto` is gone *and* the bound moved up: a remap answers for the first, nothing but `unsafe` for the second."""
+
+    label: str = "hello"
+    retries: Annotated[int, Field(ge=8)] | Literal["unbounded"] = 8
+
+
+class _SpelledOnly(BaseModel):
+    """The number is gone altogether: only one spelling survives, and `retries = 4` is out of domain."""
+
+    label: str = "hello"
+    retries: Literal["unbounded"] = "unbounded"
+
+
+class _FreeStringTier(BaseModel):
+    """`tier` accepts any string."""
+
+    tier: str = "basic"
+
+
+class _EnumeratedTier(BaseModel):
+    """`tier` accepts two spellings and nothing else."""
+
+    tier: _Tier = _Tier.BASIC
 
 
 class _SchemaOneWithBothNames(BaseModel):
@@ -141,6 +222,27 @@ new_key    = "{new_key}"
 """
 
 
+def _pre_history_entry() -> str:
+    """An entry about `legacy_mode`, a key no fingerprint in this chain has ever recorded."""
+    return f"""
+[[migration]]
+id                     = "{SURFACE_ID}@2"
+to_schema_version      = 2
+introduced_in          = "0.46.0"
+breaking               = true
+safety                 = "safe"
+title                  = "Drop a key that predates the chain"
+description            = "It was gone before anything was snapshotted."
+pre_history            = true
+declared_removed_paths = ["legacy_mode"]
+
+[[migration.ops]]
+kind       = "delete_key"
+table_path = []
+key        = "legacy_mode"
+"""
+
+
 class TestTheSteadyState:
     def test_a_surface_whose_golden_matches_its_models_passes(self, tmp_path: Path) -> None:
         """The overwhelmingly common state: nothing changed, so nothing is owed."""
@@ -211,6 +313,31 @@ class TestTheHeadLink:
         assert "schema version 1" in issues[0].message
 
 
+class TestThePreHistoryClaim:
+    def test_a_pre_history_entry_over_an_unmoved_pair_is_green(self, tmp_path: Path) -> None:
+        """The whole point of the flag: the change it describes happened before any of this was snapshotted."""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=_pre_history_entry())
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=2)
+        assert check_surface(surface=_surface(config_model=_SchemaOne), migration_dir=tmp_path) == []
+
+    def test_a_pre_history_entry_hiding_a_real_removal_is_refused(self, tmp_path: Path) -> None:
+        """The flag exempts an entry from accounting, so a change with an observable diff must not carry it."""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=_pre_history_entry())
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoRemoved, schema_version=2)
+        issues = check_surface(surface=_surface(config_model=_SchemaTwoRemoved), migration_dir=tmp_path)
+        assert CoverageIssueKind.PRE_HISTORY_HAS_A_DIFF in _kinds(issues)
+        assert "label" in "".join(issue.message for issue in issues)
+
+    def test_a_pre_history_entry_beside_an_addition_stays_green(self, tmp_path: Path) -> None:
+        """Additions are absorbed by the defaults layer, so they are nobody's accounting — the flag's included."""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=_pre_history_entry())
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOneWithBothNames, schema_version=2)
+        assert check_surface(surface=_surface(config_model=_SchemaOneWithBothNames), migration_dir=tmp_path) == []
+
+
 class TestEntryAccounting:
     def test_a_correct_rename_entry_is_green(self, tmp_path: Path) -> None:
         _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=_rename_entry())
@@ -275,6 +402,63 @@ key        = "tier"
         issues = check_surface(surface=_surface(config_model=_SchemaTwoRemoved), migration_dir=tmp_path)
         assert _kinds(issues) == [CoverageIssueKind.OVER_DELETION]
         assert "tier" in issues[0].message
+
+    def test_an_over_deletion_beneath_a_renamed_table_is_caught(self, tmp_path: Path) -> None:
+        """The deleted child is `section.limit` in the old spelling and `area.limit` in the new, so a
+        comparison by current spelling never lines the two up. Compared by origin, the entry removes a
+        path the new schema still has — and the convergence witness cannot see it either, because
+        the child is optional and no reference document carries it.
+        """
+        entry = f"""
+[[migration]]
+id                = "{SURFACE_ID}@2"
+to_schema_version = 2
+introduced_in     = "0.46.0"
+breaking          = true
+safety            = "safe"
+title             = "Rename the section, and drop too much beneath it"
+description       = "Deletes area.limit as well, which schema 2 still has."
+
+[[migration.ops]]
+kind       = "rename_table_key"
+table_path = []
+key        = "section"
+new_key    = "area"
+
+[[migration.ops]]
+kind       = "delete_key"
+table_path = ["area"]
+key        = "limit"
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=entry)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOneWithSection, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoSectionRenamed, schema_version=2)
+        issues = check_surface(surface=_surface(config_model=_SchemaTwoSectionRenamed), migration_dir=tmp_path)
+        assert _kinds(issues) == [CoverageIssueKind.OVER_DELETION]
+        assert "'section.limit'" in issues[0].message
+        assert "'area.limit'" in issues[0].message
+
+    def test_a_rename_that_keeps_every_child_is_green(self, tmp_path: Path) -> None:
+        entry = f"""
+[[migration]]
+id                = "{SURFACE_ID}@2"
+to_schema_version = 2
+introduced_in     = "0.46.0"
+breaking          = true
+safety            = "safe"
+title             = "Rename the section"
+description       = "Nothing beneath it changes."
+
+[[migration.ops]]
+kind       = "rename_table_key"
+table_path = []
+key        = "section"
+new_key    = "area"
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=entry)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOneWithSection, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoSectionRenamed, schema_version=2)
+        assert check_surface(surface=_surface(config_model=_SchemaTwoSectionRenamed), migration_dir=tmp_path) == []
 
     def test_an_operation_whose_source_never_existed_is_caught(self, tmp_path: Path) -> None:
         """A dead operation is silent forever: it skips on every file and reports success."""
@@ -441,60 +625,149 @@ mapping    = { basic = "standard" }
         _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoEnumMemberGone, schema_version=2)
         assert check_surface(surface=_surface(config_model=_SchemaTwoEnumMemberGone), migration_dir=tmp_path) == []
 
-    def test_a_safe_remap_of_a_value_that_is_still_legal_is_refused(self, tmp_path: Path) -> None:
-        """The remap legality rule, and the reason replay neutrality holds.
 
-        `premium` is still a legal tier at schema 2, so a user who chose it deliberately would
-        have it rewritten on every run — and replay over a current-valid file would not be a no-op.
-        """
-        ops = """
-[[migration.ops]]
-kind       = "remap_value"
-table_path = []
-key        = "tier"
-mapping    = { basic = "standard", premium = "standard" }
+class TestValueDomainNarrowing:
+    """The change that keeps every path and every spelling, and still breaks a user's file.
+
+    Without the direction split these all read as additive — nothing was removed — so the gate
+    would answer "regenerate the golden", demand no bump and no entry, and the next boot would
+    reject a file that was valid the day before with a green gate behind it.
+    """
+
+    def _entry_with_ops(self, *, safety: str, ops: str) -> str:
+        return f"""
+[[migration]]
+id                = "{SURFACE_ID}@2"
+to_schema_version = 2
+introduced_in     = "0.46.0"
+breaking          = true
+safety            = "{safety}"
+title             = "Narrow what a value may be"
+description       = "The domain shrank."
+{ops}
 """
-        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="safe", ops=ops))
-        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
-        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoEnumMemberGone, schema_version=2)
-        issues = check_surface(surface=_surface(config_model=_SchemaTwoEnumMemberGone), migration_dir=tmp_path)
-        assert CoverageIssueKind.ILLEGAL_REMAP in _kinds(issues)
-        assert "premium" in " ".join(issue.message for issue in issues)
 
-    def test_a_remap_to_a_spelling_the_new_schema_rejects_is_refused(self, tmp_path: Path) -> None:
-        """The value-side twin of the misspelled rename destination.
+    def test_a_tightened_bound_without_a_bump_is_refused(self, tmp_path: Path) -> None:
+        _write_ledger(migration_dir=tmp_path, current_schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_BoundedOne, schema_version=1)
+        issues = check_surface(surface=_surface(config_model=_BoundedTightened), migration_dir=tmp_path)
+        assert _kinds(issues) == [CoverageIssueKind.REMOVAL_NEEDS_A_BUMP]
+        assert "lower bound tightened from ge=1 to ge=2" in issues[0].message
 
-        Rewriting to a spelling the new schema does not accept migrates every file to something
-        the model rejects, with the tool reporting success.
+    def test_a_free_string_becoming_enumerated_without_a_bump_is_refused(self, tmp_path: Path) -> None:
+        """Every spelling the file could carry is now checked against a closed set it may fail."""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_FreeStringTier, schema_version=1)
+        issues = check_surface(surface=_surface(config_model=_EnumeratedTier), migration_dir=tmp_path)
+        assert _kinds(issues) == [CoverageIssueKind.REMOVAL_NEEDS_A_BUMP]
+        assert "its type went from 'str' to 'enum'" in issues[0].message
+
+    def test_a_relaxed_bound_asks_only_for_a_regeneration(self, tmp_path: Path) -> None:
+        """The other direction has to stay cheap, or the gate is one an author learns to fight."""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_BoundedOne, schema_version=1)
+        issues = check_surface(surface=_surface(config_model=_BoundedRelaxed), migration_dir=tmp_path)
+        assert _kinds(issues) == [CoverageIssueKind.FINGERPRINT_DRIFTED]
+
+    def test_an_enumerated_path_relaxed_into_a_free_string_asks_only_for_a_regeneration(self, tmp_path: Path) -> None:
+        """The member set empties, and a raw set difference would call that the loss of every spelling.
+
+        This is the widening most likely to be attempted in practice, and demanding a bump and a
+        remap for each spelling would be the gate at its most obviously wrong.
         """
-        ops = """
-[[migration.ops]]
-kind       = "remap_value"
-table_path = []
-key        = "tier"
-mapping    = { basic = "standrad" }
-"""
-        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="safe", ops=ops))
-        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
-        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoEnumMemberGone, schema_version=2)
-        issues = check_surface(surface=_surface(config_model=_SchemaTwoEnumMemberGone), migration_dir=tmp_path)
-        assert CoverageIssueKind.ILLEGAL_REMAP in _kinds(issues)
-        assert "standrad" in " ".join(issue.message for issue in issues)
+        _write_ledger(migration_dir=tmp_path, current_schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_EnumeratedTier, schema_version=1)
+        issues = check_surface(surface=_surface(config_model=_FreeStringTier), migration_dir=tmp_path)
+        assert _kinds(issues) == [CoverageIssueKind.FINGERPRINT_DRIFTED]
 
-    def test_a_safe_remap_of_a_free_string_is_refused(self, tmp_path: Path) -> None:
-        """Where the schema does not enumerate, staleness cannot be proven and the entry must be unsafe."""
+    def test_a_bumped_entry_that_does_not_account_for_the_narrowing_is_refused(self, tmp_path: Path) -> None:
+        """The entry explains the rename it made and says nothing about the bound it moved."""
         ops = """
 [[migration.ops]]
-kind       = "remap_value"
+kind       = "rename_table_key"
 table_path = []
 key        = "label"
-mapping    = { hello = "hi" }
+new_key    = "title"
 """
         _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="safe", ops=ops))
-        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
-        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=2)
-        issues = check_surface(surface=_surface(config_model=_SchemaOne), migration_dir=tmp_path)
-        assert CoverageIssueKind.ILLEGAL_REMAP in _kinds(issues)
+        _snapshot(migration_dir=tmp_path, config_model=_BoundedOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_BoundedTightenedAndRenamed, schema_version=2)
+        issues = check_surface(surface=_surface(config_model=_BoundedTightenedAndRenamed), migration_dir=tmp_path)
+        assert _kinds(issues) == [CoverageIssueKind.VALUE_DOMAIN_NARROWED]
+        assert "'retries'" in issues[0].message
+
+    def test_a_remap_on_the_narrowed_path_accounts_for_it(self, tmp_path: Path) -> None:
+        """The remedy that repairs the file rather than only warning about it, where it applies."""
+        ops = """
+[[migration.ops]]
+kind       = "remap_value"
+table_path = []
+key        = "tier"
+mapping    = { entry = "basic" }
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="safe", ops=ops))
+        _snapshot(migration_dir=tmp_path, config_model=_FreeStringTier, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_EnumeratedTier, schema_version=2)
+        assert check_surface(surface=_surface(config_model=_EnumeratedTier), migration_dir=tmp_path) == []
+
+    def test_a_remap_on_a_path_does_not_answer_for_a_bound_tightened_on_that_same_path(self, tmp_path: Path) -> None:
+        """A remap rewrites spellings; the number `retries = 4` is not a spelling and no mapping reaches it.
+
+        Without this the remap that retires `auto` would carry the tightened bound into a `safe`
+        entry, and a file saying `retries = 4` would fail at boot behind a green gate.
+        """
+        ops = """
+[[migration.ops]]
+kind       = "remap_value"
+table_path = []
+key        = "retries"
+mapping    = { auto = "unbounded" }
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="safe", ops=ops))
+        _snapshot(migration_dir=tmp_path, config_model=_BoundedOrAuto, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_BoundedTightenedOrUnbounded, schema_version=2)
+        issues = check_surface(surface=_surface(config_model=_BoundedTightenedOrUnbounded), migration_dir=tmp_path)
+        assert _kinds(issues) == [CoverageIssueKind.VALUE_DOMAIN_NARROWED]
+        assert "lower bound tightened from ge=1 to ge=8" in issues[0].message
+        assert "its type went from" not in issues[0].message
+
+    def test_a_remap_on_a_path_does_not_answer_for_a_non_string_member_that_path_lost(self, tmp_path: Path) -> None:
+        """The other way a remap falls short: `int | literal` becomes `literal`. The remap rewrites the
+        spelling it names and never touches the number, so `retries = 4` fails at boot — the type
+        half of narrowing must still run for a remapped origin, exempting only what a remap can
+        rewrite.
+        """
+        ops = """
+[[migration.ops]]
+kind       = "remap_value"
+table_path = []
+key        = "retries"
+mapping    = { auto = "unbounded" }
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="safe", ops=ops))
+        _snapshot(migration_dir=tmp_path, config_model=_BoundedOrAuto, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SpelledOnly, schema_version=2)
+        issues = check_surface(surface=_surface(config_model=_SpelledOnly), migration_dir=tmp_path)
+        assert _kinds(issues) == [CoverageIssueKind.VALUE_DOMAIN_NARROWED]
+        assert "its type went from 'int | literal' to 'literal'" in issues[0].message
+
+    def test_an_unsafe_entry_may_leave_a_narrowing_unremapped(self, tmp_path: Path) -> None:
+        """For a tightened numeric bound this is the only remedy there is: no mapping can enumerate
+        the values a bound retires, so the migration is reported to the user and never applied.
+        """
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=self._entry_with_ops(safety="unsafe", ops=""))
+        _snapshot(migration_dir=tmp_path, config_model=_BoundedOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_BoundedTightened, schema_version=2)
+        assert check_surface(surface=_surface(config_model=_BoundedTightened), migration_dir=tmp_path) == []
+
+    def test_a_pre_history_entry_cannot_hide_a_narrowing_either(self, tmp_path: Path) -> None:
+        """The flag exempts an entry from accounting, so it must not be a way past this one."""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=_pre_history_entry())
+        _snapshot(migration_dir=tmp_path, config_model=_BoundedOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_BoundedTightened, schema_version=2)
+        issues = check_surface(surface=_surface(config_model=_BoundedTightened), migration_dir=tmp_path)
+        assert _kinds(issues) == [CoverageIssueKind.PRE_HISTORY_HAS_A_DIFF]
+        assert "'retries'" in issues[0].message
 
 
 class TestTheDefaultsLayerRule:

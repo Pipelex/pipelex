@@ -29,7 +29,7 @@ from pipelex_tools import format_mthds
 from pydantic import BaseModel, ConfigDict, Field
 from tomlkit import TOMLDocument
 from tomlkit.container import Container, OutOfOrderTableProxy
-from tomlkit.items import AbstractTable, Item
+from tomlkit.items import AbstractTable, AoT, Item, Table
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.suggested_fix import (
@@ -73,6 +73,19 @@ class FixOpOutcome(StrEnum):
             case FixOpOutcome.SKIPPED | FixOpOutcome.CONFLICT:
                 return False
 
+    @property
+    def is_conflict(self) -> bool:
+        """Whether the change could not be made without choosing on the user's behalf.
+
+        A separate question from ``did_apply``: both a skip and a conflict left the document
+        untouched, but only one of them is something a caller has to act on.
+        """
+        match self:
+            case FixOpOutcome.CONFLICT:
+                return True
+            case FixOpOutcome.APPLIED | FixOpOutcome.SKIPPED:
+                return False
+
 
 class FixOpApplication(BaseModel):
     """Per-op application report: the op, whether it applied, and why not when skipped."""
@@ -108,6 +121,18 @@ def _rename_key_in_place(*, parent_table: dict[str, Any], key: str, new_key: str
     among siblings and its comments — a ``del`` + re-add would append it to the bottom of the
     parent (the old fixer's reordering bug). The golden byte-compare tests are the CI tripwire if
     a tomlkit bump ever changes this.
+
+    ⚠ **A rename leaves the node's raw ``dict`` storage stale for a value that is not a Table.**
+    ``_replace_at`` leaves the old key in the dict and only writes the new one into it inside its
+    table branch, so everything tomlkit renders or looks up stays right (``dumps``, ``in``, ``[]``,
+    ``.get()`` all read the authoritative body) while ``dict.__delitem__`` — which
+    ``Container.remove`` calls — cannot find the new key. Addressing a renamed **scalar or
+    inline-table** key again in the same DOM therefore raises ``KeyError`` from inside the library.
+    The ``.mthds`` fix path is unaffected because it renames ``[pipe.*]`` tables, which take the
+    branch tomlkit maintains; configuration migration re-reads the document between operations
+    that applied, for exactly this reason. Both facts are pinned by
+    ``tests/unit/pipelex/pipeline/fixes/test_fix_applier_rename_dom_consistency.py``, which is the
+    tripwire if a tomlkit bump ever changes it.
 
     ``_resolve_table`` hands back one of three dict-like shapes, each with its own route to the
     ``Container`` that owns the key:
@@ -145,7 +170,9 @@ def _rename_key_in_place(*, parent_table: dict[str, Any], key: str, new_key: str
 
 
 def _replace_key_in_container(*, container: Container, key: str, new_key: str) -> None:
-    container._replace(key, new_key, cast("Item", container[key]))  # pyright: ignore[reportPrivateUsage]
+    item = cast("Item", container[key])
+    container._replace(key, new_key, item)  # pyright: ignore[reportPrivateUsage]
+    _refresh_table_headers(item=item)
 
 
 def _as_tomlkit_value(value: TomlValue | None) -> Any:
@@ -369,6 +396,34 @@ def _apply_at_table_path(*, toml_doc: TOMLDocument, fix_op: FixOp, table_path: l
             return _OpResult(FixOpOutcome.APPLIED)
 
 
+def _refresh_table_headers(*, item: Any) -> None:
+    """Make every table beneath a renamed or moved ``item`` re-render its header under its new path.
+
+    tomlkit caches each table's rendered header in ``Table.display_name`` and, after a re-key,
+    invalidates that cache by walking ``Table.values()`` — the merged dict facade, which yields
+    one item per key. A table written in several chunks (``[a.b]`` … ``[a.c]`` … ``[a.b.d]``) is
+    several ``Table`` items under one key, so only the first chunk is visited and the others keep
+    rendering under the old name: the file comes out split between two tables with an
+    ``applied`` verdict. Walking the *body* instead reaches every chunk, so clearing the cache
+    here is what lets a rename or move come out whole for any layout the parser accepts.
+    """
+    if isinstance(item, OutOfOrderTableProxy):
+        for chunk in item._tables:  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+            _refresh_table_headers(item=chunk)
+        return
+    if isinstance(item, Table):
+        item.display_name = None
+        _refresh_table_headers(item=item.value)
+        return
+    if isinstance(item, AoT):
+        for element in item.body:
+            _refresh_table_headers(item=element)
+        return
+    if isinstance(item, Container):
+        for _, child in item.body:
+            _refresh_table_headers(item=child)
+
+
 def _apply_move_key(*, toml_doc: TOMLDocument, fix_op: MoveKeyOp, table_path: list[str]) -> _OpResult:
     """Relocate one key, creating whatever destination parents are missing.
 
@@ -395,6 +450,7 @@ def _apply_move_key(*, toml_doc: TOMLDocument, fix_op: MoveKeyOp, table_path: li
     del source_table[fix_op.key]
     destination_table = _create_block_table_path(toml_doc=toml_doc, table_path=fix_op.new_table_path)
     destination_table[fix_op.new_key] = moved_value
+    _refresh_table_headers(item=moved_value)
     return _OpResult(FixOpOutcome.APPLIED)
 
 
