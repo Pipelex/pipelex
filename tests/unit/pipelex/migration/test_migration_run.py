@@ -200,3 +200,60 @@ class TestReadingTheDeclaredSchemaVersion:
         `True` is the trap: it is an `int` to Python and never a schema version.
         """
         assert declared_schema_version(config_dict=config_dict) is None
+
+
+class TestTheDocumentTheDiagnosisReadsIsTheOneTheRunLeaves:
+    """A run diagnoses what it is about to leave behind, not what it found.
+
+    The distinction is invisible on a file that needed nothing and is the whole answer on a file
+    that did: every stale key the ledger repairs would be reported as unexplained if the diagnosis
+    read the document as it arrived.
+    """
+
+    def _ledger(self, *, build_entry: EntryBuilder, build_ledger: LedgerBuilder) -> MigrationLedger:
+        return build_ledger(
+            entries=[build_entry(to_schema_version=2, ops=[RenameTableKeyOp(table_path=["reporting"], key="output_config", new_key="output")])]
+        )
+
+    def test_a_key_the_ledger_renames_is_not_reported_as_unexplained(
+        self,
+        tmp_path: Path,
+        build_entry: EntryBuilder,
+        build_ledger: LedgerBuilder,
+        build_surface: SurfaceBuilder,
+    ) -> None:
+        target = tmp_path / "example.toml"
+        target.write_text('[reporting]\noutput_config = { directory = "out" }\n', encoding="utf-8")
+
+        plan = migrate_file(
+            surface=build_surface(),
+            ledger=self._ledger(build_entry=build_entry, build_ledger=build_ledger),
+            file_path=target,
+            dry_run=False,
+            moment=MOMENT,
+        )
+
+        assert plan.steps, "the scenario is worthless unless the rename actually fired"
+        assert plan.unexplained == []
+
+    def test_a_dry_run_diagnoses_the_document_it_would_have_written(
+        self,
+        tmp_path: Path,
+        build_entry: EntryBuilder,
+        build_ledger: LedgerBuilder,
+        build_surface: SurfaceBuilder,
+    ) -> None:
+        """The document only exists in memory here, which is why the diagnosis belongs to the run."""
+        target = tmp_path / "example.toml"
+        target.write_text('[reporting]\noutput_config = { directory = "out" }\nretires = 3\n', encoding="utf-8")
+
+        plan = migrate_file(
+            surface=build_surface(),
+            ledger=self._ledger(build_entry=build_entry, build_ledger=build_ledger),
+            file_path=target,
+            dry_run=True,
+            moment=MOMENT,
+        )
+
+        assert not plan.was_written
+        assert [unexplained.path for unexplained in plan.unexplained] == ["reporting.retires"]

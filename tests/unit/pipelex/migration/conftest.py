@@ -8,7 +8,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from pipelex.migration.ledger import MigrationEntry, MigrationLedger, MigrationSafety, SurfaceBlock
 from pipelex.migration.surfaces import DefaultsLayerKind, Surface, SurfaceRegistry
@@ -82,10 +82,26 @@ def build_ledger() -> LedgerBuilder:
     return _build_ledger
 
 
+class ExampleOutput(BaseModel):
+    directory: str = "out"
+
+
+class ExampleReporting(BaseModel):
+    output: ExampleOutput = Field(default_factory=ExampleOutput)
+    destination: str | None = None
+
+
 class ExampleConfig(BaseModel):
-    """A stand-in configuration model for surfaces the tests invent."""
+    """A stand-in configuration model for surfaces the tests invent.
+
+    It has to name the paths the fixtures' *migrated* documents carry, and not only the ones a test
+    happens to assert on. A migration run diagnoses what it leaves behind against this model, so a
+    path missing here is reported as unexplained — which is the diagnosis working, and noise in
+    every test that was about something else.
+    """
 
     label: str = "hello"
+    reporting: ExampleReporting = Field(default_factory=ExampleReporting)
 
 
 @pytest.fixture

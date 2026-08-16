@@ -16,7 +16,7 @@ Record both numbers against S6.
 
 `make agent-check` and the full `make agent-test` are both green on the branch as pushed.
 
-⚠ **S6 is roughly half done.** The pre-S7 bucket is closed (part 1, on `dev`) and **the two `migrate` commands are built** (milestone 5, on `feature/Migrator-3b`). What remains is the rest of the phase body — boot tolerance, `report_validation_error`, the downgrade diagnosis, the telemetry-remedy retirement, `doctor`, the skills, the specs rows, and publishing the contract. See [What is actually left](#what-is-actually-left) at the bottom before planning a session.
+⚠ **S6 is past half.** The pre-S7 bucket is closed (part 1, on `dev`), **the two `migrate` commands are built** (milestone 5) and **the downgrade diagnosis is built** (milestone 6), both on `feature/Migrator-3b`. What remains is the rest of the phase body — boot tolerance, `report_validation_error`, the telemetry-remedy retirement, `doctor`, the skills, the specs rows, and publishing the contract. See [What is actually left](#what-is-actually-left) at the bottom before planning a session.
 
 ## Build order chosen for this session
 
@@ -26,8 +26,9 @@ The charter lists a great many deliverables without an order. The order below wa
 2. **R9 + the "what does `unsafe` promise" pass** — done, see Milestone 2 below.
 3. **The applier's dotted-key rename policy, the backup/replace semantics pass, the `UNWRITABLE` wording** — done, see Milestone 3 below. That closes the "must be settled before S7" bucket.
 4. **The commands** — `pipelex migrate`, `pipelex-agent migrate`, the rendering-rule test — done, see Milestone 5 below. The **downgrade diagnosis** (`unexplained[]`) was deliberately carried out of this milestone and is where the next session starts.
-5. **The downgrade diagnosis, boot tolerance, `report_validation_error` on the real plan, the telemetry remedies retired, the `doctor` row** — not started. **This is where the next session starts.**
-6. **The skills (`add-migration`, `/release` step 3b), the `config-docs` drift-contract review list, `command-surface-map.md` rows, publishing the contract in the nav** — not started.
+5. **The downgrade diagnosis** — done, see Milestone 6 below.
+6. **Boot tolerance, `report_validation_error` on the real plan, the telemetry remedies retired, the `doctor` row** — not started. **This is where the next session starts.**
+7. **The skills (`add-migration`, `/release` step 3b), the `config-docs` drift-contract review list, `command-surface-map.md` rows, publishing the contract in the nav** — not started.
 
 ## Milestone 1 — the golden-format bucket (DONE)
 
@@ -285,6 +286,55 @@ tests/unit/pipelex/migration/conftest.py          build_ledger gained min_suppor
 
 Mutation-tested: dropping the project directory from the walk, making `--yes` not write, removing the floor refusal, and making the walk recursive each turn exactly the intended tests red.
 
+## Milestone 6 — the downgrade diagnosis (DONE, on `feature/Migrator-3b`)
+
+`unexplained[]` had renderers on both commands and nothing ever put anything in it. It does now, and the charter's sentence about the downgrade direction — *"that diagnosis is computable from the ledger alone"* — turned out to be wrong and was corrected in the contract in the same change.
+
+### Where it runs, and why there
+
+**In the runner, on the document the run leaves behind.** `run.py` was the other candidate and cannot do it: on a dry run the migrated document exists only in memory, and re-reading the file afterwards would diagnose the *pre*-migration shape — reporting every stale key the ledger is about to repair. So `migrate_file` diagnoses `replay.text`, which is the only place that document is.
+
+**It is the first thing in the migration package that needs a model, and the engine stayed model-free.** The question goes to the surface's *fingerprint*, not to the model directly, which is what keeps the new module (`diagnosis.py`) as pure as `material.py`: a fingerprint, a document, a ledger and the blocked entries in, a list of `UnexplainedPath` out. `compute_surface_fingerprint` moved off `snapshot.py` (the *regenerator*) and onto `Surface.fingerprint_at()`, where both readers can have it without the runner importing the golden-writing machinery. It costs about 2 ms per file and reads nothing but the package's own files, so the bootstrap property is untouched.
+
+### The four rules that make the answer worth reading
+
+- **A tree walk, not a diff of two flat path sets.** That is what buys the two properties a set diff cannot have: an unknown *table* is named once instead of once per key inside it, and the schema spelling of every ancestor is known by the time a child is reported.
+- **A blocked entry answers for its own material.** An `unsafe` entry is never applied, so the old shape it is about is still in the file — already reported, by name, with the entry's guidance. Calling the same key an unexplained typo would contradict the report two lines above it. The subtraction **deliberately over-covers** (op sources plus `declared_removed_paths`, each also traced forward through later `safe` entries), because every path it removes is one the same report names in `blocked[]`. A `remap_value` contributes nothing: it moves a value and leaves the path where it was, so subtracting it would silence a real typo sitting at a remapped key. This is `MigrationLedger.entry_for_version`'s **first caller** — the #1113 review's open "remove it or keep it" question is answered by keeping it.
+- **A key the user chose is never rendered.** Beneath an open mapping the schema says `levels.*` where the file says `levels.my_package`, and a typo *inside* such an entry is reported at `queues.*.retreis`. Same rule as `narrowed_paths[]`, and the walk gets it for free by carrying the schema spelling alongside the document path.
+- **A document nesting below a path the schema says is a scalar is left alone.** That is a type error, which the model reports far better, and descending would invent unknown paths beneath a path the schema knows perfectly well. Together with the reserved-`[meta]` strip — performed exactly as boot performs it — that is what keeps the diagnosis silent on files it has nothing to say about.
+
+### What the note says
+
+One note for every finding, and deliberately so: *the current schema has no setting there, and no ledger entry retires it — either the name is a typo, or this file was written by a newer pipelex than the one running, so check whether you are on an older branch or an older build.* The two readings are indistinguishable to a schema that knows neither name, and guessing would send half the users to the wrong fix.
+
+**A reserved-path cross-reference was considered and rejected.** `derive_reserved_registry` could say "this path was retired at version N and is still here" — but a reserved path surviving a replay means a *blocked* entry, which the subtraction above already accounts for, so the branch would never fire.
+
+### The witnesses
+
+- **Every real surface's reference document and kit template diagnose clean** (`test_real_surfaces.py`). Both are at the current schema by construction, so a finding in either is the diagnosis being wrong about our own schema rather than a stale document. It was green on the first run, which is what made the design trustworthy before any of the unit tests existed.
+- **The e2e bootstrap fixture was already the specimen.** `_break_the_configuration` plants `not_a_real_setting = true` at the top of `pipelex.toml` — a root key no model knows and no entry removes — so the diagnosis is now asserted against the very file that breaks the boot, through the real binary. Both bootstrap tests changed exit expectation from 0 to **1**: `needs_attention` is now true on that machine, which is correct, and the second one is the better test for it — a broken `pipelex.toml` needing a human does not stop the stale `telemetry.toml` beside it from being migrated.
+
+### Files touched in milestone 6
+
+```
+pipelex/migration/diagnosis.py         NEW — the walk, the blocked-entry subtraction, the note
+pipelex/migration/documents.py         path_matches_pattern / path_is_at_or_under_pattern extracted; one definition of `*`
+pipelex/migration/runner.py            _diagnose, on the migrated document
+pipelex/migration/surfaces.py          Surface.fingerprint_at()
+pipelex/migration/snapshot.py          compute_surface_fingerprint removed, calls the method
+docs/migration-ledger.md               "The downgrade direction" rewritten; the unexplained rule in "What the engine reports"
+CHANGELOG.md                           one Added bullet
+tests/unit/pipelex/migration/test_diagnosis.py     NEW
+tests/unit/pipelex/migration/test_real_surfaces.py the clean-witness over our own documents
+tests/unit/pipelex/migration/test_migration_run.py the migrated-document-not-the-read-one pair
+tests/unit/pipelex/migration/conftest.py           ExampleConfig grew the paths its fixtures' migrated documents carry
+tests/e2e/pipelex/cli/test_migrate_commands.py     the diagnosis through the real binary; two bootstrap exit codes
+```
+
+`ExampleConfig` growing a `reporting` block is worth noticing rather than skipping: the synthetic surface's model now has to name the paths the synthetic *migrated* documents carry, or the diagnosis reports them and every runner test gains noise about something it was not testing.
+
+Mutation-tested: dropping the reserved-meta strip, the open-node `*` fallback, the blocked-entry subtraction, the stop-at-an-unknown-table, the scalar-descend guard, the schema spelling, the remap exclusion, the forward trace, the `declared_removed_paths` source, and diagnosing the document as it was read each turn exactly the intended tests red.
+
 ## What is actually left
 
 Measured against the charter's own **Done when** list ([§ S6](../../wip/migrator-3/sequencing.md#s6--migrator-phase-3)), verified against the tree rather than against this file:
@@ -299,7 +349,7 @@ Measured against the charter's own **Done when** list ([§ S6](../../wip/migrato
 
 The phase body the charter lists under **Do**, in the order the next session should take it:
 
-1. **The downgrade diagnosis** — `unexplained[]` is still never populated. A path the current schema does not know and no ledger entry removes should land there with the typo-or-newer-pipelex wording. Both commands already render `unexplained[]`, so this is engine work only, no rework. The materials are in place: `fingerprint.path_names()` gives the schema's paths with `*` segments and `documents.document_paths()` gives the document's, and `document_carries_path` is the one-directional matcher — the diagnosis needs its reverse (*does any schema pattern match this document path*). Watch the two traps: a path a **blocked** entry would have removed is explained by that entry, not unexplained; and the fingerprint is model-derived, so the diagnosis is the first thing in the migration package that needs a model. **Decide where it runs** — it cannot live in the model-free engine, so it belongs either in `run.py` (which already knows the registry) or on the plan as a post-pass.
+1. ~~**The downgrade diagnosis**~~ — done, see Milestone 6.
 2. **Boot tolerance** in one shared helper called by all three config-surface loaders. `pipelex/system/configuration/config_surface.py` is the home — it already owns the reserved-`[meta]` read side, and `declared_schema_version` landed there in Milestone 5.
 3. **`report_validation_error` on the real plan** — note `core/validation.py`'s current `migration_config` is the old *renaming* config, not the ledger plan. Consumer removed, `migration` field kept. This is also the **third channel of the rendering-rule test**, which is written and waiting for it (`TestNoValueFromAUsersFileIsEverRendered` names the gap in its docstring).
 4. **The two telemetry remedies retired** — `check_telemetry_config`'s old-shape sniff in `doctor_cmd.py` and `handle_telemetry_config_validation_error`'s banner in `error_handlers.py`. Both currently tell a user to re-initialize the file that Milestone 5 proved is migratable.
@@ -313,12 +363,12 @@ Then the PR to `dev` from `feature/Migrator-3b`.
 
 ### Small items still owed, folded in from the #1113 review
 
-- **`MigrationLedger.entry_for_version` still has no caller.** Milestone 5 gave the other three "fits here" items readers; this one found none — `pipelex migrate` never needs to look an entry up by version, because always-replay walks them all. **Decide: remove it, or the first real caller keeps it.** Nothing else is waiting on the answer.
+- ~~**`MigrationLedger.entry_for_version` still has no caller.**~~ Answered by Milestone 6: the downgrade diagnosis looks a blocked entry's own operations up from the `to_schema_version` its `BlockedEntry` carries, which is the first real caller. It stays.
 - **`is_remappable` has no direct unit test** and gates two accountings; and §1 of `pr-1113-review-notes.md` (credit a union by its string branches alone and say so, or ask the non-string branches — about four lines on `_records_enumerated_members`) is still undecided. Cheap, and it belongs with whoever next touches `coverage.py`.
 - **The rescue-copy race** (`pr-1113-review-notes.md` §3): a third run's prune can take the `.bak.` a rescue is about to rename. The commands now make concurrent runs producible, so this is decidable — revisit as an age-sparing prune, not a lock.
 - Deliberately past S7's freeze, with named triggers, in `pr-1113-review-notes.md` and `migrator-write-scope-and-rename-fidelity.md`: per-member bounds in the golden, the `safe`-entry sibling, the tomlkit raw-storage staleness pass, rename fidelity (§2), the taken-backup-name report, and the residual. §1 of the write-scope note is **closed** by Milestone 5.
 
-**The next session starts at the downgrade diagnosis.**
+**The next session starts at boot tolerance.**
 
 ## Rulings this session took on its own authority
 

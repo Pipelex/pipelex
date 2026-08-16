@@ -21,9 +21,10 @@ from tomlkit.exceptions import TOMLKitError
 
 from pipelex import log
 from pipelex.migration.backup import RescuedBackup, WrittenBackup, keep_backup_for_rescue, prune_backups_except, write_backup
-from pipelex.migration.engine import replay_ledger_over_text
+from pipelex.migration.diagnosis import diagnose_unexplained_paths
+from pipelex.migration.engine import DocumentReplay, replay_ledger_over_text
 from pipelex.migration.ledger import MigrationLedger, load_ledger_cached
-from pipelex.migration.plan import FileBlockedReason, MigrationPlan, MigrationReport
+from pipelex.migration.plan import FileBlockedReason, MigrationPlan, MigrationReport, UnexplainedPath
 from pipelex.migration.surfaces import Surface, SurfaceRegistry
 from pipelex.pipeline.exceptions import FixTransactionError, FixWriteConflictError
 from pipelex.pipeline.fixes.file_transaction import FileSnapshot, PendingFileUpdate, commit_file_updates, read_file_snapshot
@@ -98,10 +99,29 @@ def migrate_file(*, surface: Surface, ledger: MigrationLedger, file_path: Path, 
         file_path=file_path,
         steps=replay.steps,
         blocked=replay.blocked,
+        unexplained=_diagnose(surface=surface, ledger=ledger, document=document, replay=replay, text=text),
     )
     if not replay.did_change_document or dry_run:
         return plan
     return _write_migrated_file(plan=plan, snapshot=snapshot, new_content=replay.text, moment=moment)
+
+
+def _diagnose(*, surface: Surface, ledger: MigrationLedger, document: TOMLDocument, replay: DocumentReplay, text: str) -> list[UnexplainedPath]:
+    """Ask what the migration could not explain about the document it is about to leave behind.
+
+    **The document diagnosed is the migrated one**, not the one that was read: everything the
+    ledger explains has been carried forward by the time the replay ends, so what is left over is
+    genuinely left over. On a dry run that document exists only here, in memory, which is why the
+    diagnosis belongs to the run rather than to a later pass over the written file.
+
+    This is where a migration meets the model. The fingerprint is the surface's own projection —
+    the same one the coverage gate diffs — and computing it neither loads the user's configuration
+    nor touches the network, which is what keeps the command runnable on a machine that cannot
+    boot. It costs a walk of the model tree per file, on the order of a couple of milliseconds.
+    """
+    fingerprint = surface.fingerprint_at(schema_version=ledger.surface.current_schema_version)
+    migrated = document if replay.text == text else tomlkit.loads(replay.text)
+    return diagnose_unexplained_paths(fingerprint=fingerprint, document=migrated.unwrap(), ledger=ledger, blocked=replay.blocked)
 
 
 def _refuse_a_file_below_the_floor(*, surface: Surface, ledger: MigrationLedger, file_path: Path, document: TOMLDocument) -> MigrationPlan | None:

@@ -51,16 +51,40 @@ def document_carries_path(*, paths: set[str], pattern: str) -> bool:
 
     A schema path is not a document path: beneath an open mapping the schema says `levels.*` while
     the document says `levels.my_package`, and a literal lookup would answer "no" for every file
-    that has ever set one. Each `*` matches exactly one segment, which is what it means in the
-    fingerprint and in an operation alike — never a whole subtree.
+    that has ever set one.
     """
     if WILDCARD_SEGMENT not in pattern:
         return pattern in paths
+    return any(path_matches_pattern(path=path, pattern=pattern) for path in paths)
+
+
+def path_matches_pattern(*, path: str, pattern: str) -> bool:
+    """Whether one document path is the one a schema path names.
+
+    Each `*` matches exactly one segment, which is what it means in the fingerprint and in an
+    operation alike — never a whole subtree. This is the single definition of that rule; everything
+    that compares a document against a schema path or an operation's target reads it, so the two
+    directions of the question cannot come to different answers.
+    """
     expected = pattern.split(PATH_SEPARATOR)
-    for path in paths:
-        segments = path.split(PATH_SEPARATOR)
-        if len(segments) != len(expected):
-            continue
-        if all(wanted in {WILDCARD_SEGMENT, found} for wanted, found in zip(expected, segments, strict=True)):
-            return True
-    return False
+    segments = path.split(PATH_SEPARATOR)
+    if len(segments) != len(expected):
+        return False
+    return _segments_match(segments=segments, expected=expected)
+
+
+def path_is_at_or_under_pattern(*, path: str, pattern: str) -> bool:
+    """Whether a document path is the one a pattern names, or sits inside it.
+
+    An operation that deletes or renames a table takes the whole subtree with it, so a pattern
+    naming that table answers for every path beneath it too.
+    """
+    expected = pattern.split(PATH_SEPARATOR)
+    segments = path.split(PATH_SEPARATOR)
+    if len(segments) < len(expected):
+        return False
+    return _segments_match(segments=segments[: len(expected)], expected=expected)
+
+
+def _segments_match(*, segments: list[str], expected: list[str]) -> bool:
+    return all(wanted in {WILDCARD_SEGMENT, found} for wanted, found in zip(expected, segments, strict=True))

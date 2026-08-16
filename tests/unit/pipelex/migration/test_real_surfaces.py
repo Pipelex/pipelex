@@ -9,7 +9,10 @@ specific key, a particular default — and every legitimate configuration change
 that is not about configuration, which teaches the reflex the whole design exists to prevent.
 """
 
+import tomlkit
+
 from pipelex.migration.coverage import check_registry
+from pipelex.migration.diagnosis import diagnose_unexplained_paths
 from pipelex.migration.ledger import INITIAL_SCHEMA_VERSION, load_ledger
 from pipelex.migration.ledger_check import check_ledgers
 from pipelex.migration.surfaces import build_config_surface_registry, packaged_migration_dir
@@ -29,6 +32,26 @@ class TestTheRealRegistry:
         """The premise the whole vocabulary rests on: without it, an added key breaks every file."""
         for surface in build_config_surface_registry().surfaces:
             assert surface.read_defaults_document(), f"surface '{surface.surface_id}' supplies no defaults"
+
+    def test_no_surfaces_own_documents_carry_anything_the_diagnosis_cannot_explain(self) -> None:
+        """The downgrade diagnosis, over the two documents it must always be silent about.
+
+        Both are at the current schema by construction — one is the defaults layer, the other the
+        starter file `pipelex init` copies — so a path it cannot account for in either is the
+        diagnosis being wrong about our own schema, not the document being stale.
+        """
+        migration_dir = packaged_migration_dir()
+        for surface in build_config_surface_registry().surfaces:
+            ledger = load_ledger(migration_dir=migration_dir, surface_id=surface.surface_id)
+            fingerprint = surface.fingerprint_at(schema_version=ledger.surface.current_schema_version)
+            for label, text in surface.reference_documents():
+                unexplained = diagnose_unexplained_paths(
+                    fingerprint=fingerprint,
+                    document=tomlkit.loads(text).unwrap(),
+                    ledger=ledger,
+                    blocked=[],
+                )
+                assert unexplained == [], f"{surface.surface_id} ({label}): {[found.path for found in unexplained]}"
 
     def test_every_surface_has_a_ledger(self) -> None:
         migration_dir = packaged_migration_dir()

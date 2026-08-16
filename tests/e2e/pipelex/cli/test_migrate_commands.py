@@ -265,16 +265,47 @@ class TestTheBootstrapPath:
         assert boot.returncode != 0, "the scenario is worthless if this machine boots"
         assert "ConfigValidationError" in boot.stderr
 
+        # Both commands answer with a *report* rather than a crash, and that — not the exit code —
+        # is what "it runs" means here. Each leaves a 1 behind, because the key planted above is
+        # one the downgrade diagnosis has something to say about; the test below is what says so.
         human = _run(args=[str(PIPELEX_BIN), "--no-logo", "migrate", "--dry-run"], env=offline_subprocess_env, cwd=hermetic_home)
-        assert human.returncode == 0, human.stdout + human.stderr
+        assert human.returncode == 1, human.stdout + human.stderr
+        assert str(hermetic_home / ".pipelex") in human.stdout + human.stderr
 
         agent = _run(
             args=[str(PIPELEX_AGENT_BIN), "migrate", "--dry-run", "--format", "json"],
             env=offline_subprocess_env,
             cwd=hermetic_home,
         )
-        assert agent.returncode == 0, agent.stderr
+        assert agent.returncode == 1, agent.stderr
         assert json.loads(agent.stdout)["summary"]["files_walked"] > 0
+
+    def test_the_root_key_no_ledger_removes_is_named_rather_than_passed_over(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """The downgrade diagnosis, against the very file that broke the boot.
+
+        A replay finds nothing to do here — no operation's source is present — so without the
+        diagnosis the command would report this machine clean beside a boot that will not start,
+        which is the exact failure the migration project exists to remove.
+        """
+        self._break_the_configuration(hermetic_home=hermetic_home)
+
+        planned = _run(
+            args=[str(PIPELEX_AGENT_BIN), "migrate", "--dry-run", "--format", "json"],
+            env=offline_subprocess_env,
+            cwd=hermetic_home,
+        )
+
+        assert planned.returncode == 1, "an unexplained path is a person's to resolve, so the run needs attention"
+        report: dict[str, Any] = json.loads(planned.stdout)
+        assert report["needs_attention"] is True
+        assert report["summary"]["unexplained_paths"] == 1
+        unexplained = [found for plan in report["plans"] if plan["file_path"].endswith("pipelex.toml") for found in plan["unexplained"]]
+        assert [found["path"] for found in unexplained] == ["not_a_real_setting"]
+        assert "newer pipelex" in unexplained[0]["note"]
 
     def test_the_ledger_still_migrates_a_stale_file_beside_a_configuration_that_cannot_load(
         self,
@@ -295,8 +326,13 @@ class TestTheBootstrapPath:
             cwd=hermetic_home,
         )
 
-        assert applied.returncode == 0, applied.stderr
-        assert json.loads(applied.stdout)["summary"]["files_written"] == 1
+        # A 1, and the work still done: the broken `pipelex.toml` beside it is a file the diagnosis
+        # has something to say about, and one file needing a human never stops another being
+        # migrated. That is the per-file scope, read at the level of the whole command.
+        assert applied.returncode == 1, applied.stderr
+        outcome: dict[str, Any] = json.loads(applied.stdout)
+        assert outcome["summary"]["files_written"] == 1
+        assert outcome["summary"]["unexplained_paths"] == 1
         assert "custom_posthog" in global_file.read_text(encoding="utf-8")
 
 

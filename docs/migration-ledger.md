@@ -75,7 +75,14 @@ Under the no-backward-compatibility principle this is not repaired, but it must 
 
 > When validation fails on an unknown path that no ledger entry removes, the report says so: the path is either a typo or was written by a newer pipelex than this one, and the message asks whether the user is on an older branch or build.
 
-That diagnosis is computable from the ledger alone and needs no stamp.
+That diagnosis needs no stamp, and every run produces it — it lands in a plan's `unexplained[]`. Four rules make its answer worth reading:
+
+- **It is the one part of a migration that needs the model.** Whether the current schema knows a path cannot be answered from a ledger, so the question goes to the surface's [fingerprint](#the-fingerprint) — the same projection the coverage gate diffs. The engine stays model-free, and the diagnosis sits beside the runner, which has a surface.
+- **The document diagnosed is the one the run leaves behind.** Everything the ledger explains has been carried forward by then, so what is left over is genuinely left over. On a dry run that document exists only in memory, which is why the diagnosis belongs to the run and not to a later pass over the file.
+- **A blocked entry answers for its own material.** An `unsafe` entry is never applied, so the old shape it is about is still in the file — already reported, by name, with the entry's guidance. Saying the same key is an unexplained typo would contradict that. The subtraction deliberately over-covers: every path it removes is one the same report names in `blocked[]`.
+- **A key the user chose is reported as the schema spells it.** Beneath an open mapping the schema says `levels.*` where the file says `levels.my_package`, and a typo *inside* such an entry is reported at `queues.*.retries` — the same rule that governs a blocked entry's `narrowed_paths[]`. Only the segment the schema does not know is named, because naming it is the whole point.
+
+Two things are deliberately not reported. An unknown *table* is named once instead of once per key inside it, since the shallowest name is the one to fix. And a document that nests below a path the schema says is a scalar is left alone: that is a type error, which the model reports far better, and descending would invent unknown paths beneath a path the schema knows perfectly well.
 
 ## Replay neutrality
 
@@ -482,6 +489,8 @@ Two rules govern how an entry appears, and both exist so that a report is never 
 > **An `unsafe` entry is reported only when the file still carries the material it is about.** Its operations are rehearsed against the document and the result discarded, and its declared narrowed paths are looked up — at every spelling later entries have given them. An entry with nothing to say about this file stays silent. Reporting every `unsafe` entry regardless would warn every user with a perfectly current file, at every boot, forever — and a warning nobody can act on is a warning everybody learns to ignore. The whole rule is [What an `unsafe` entry promises](#what-an-unsafe-entry-promises).
 
 > **A blocked entry's reason says which claim it is making.** `unsafe` means the file has the old *shape* and the applier will not change it. `conflict` means an operation's destination is already occupied. `value_domain_narrowed` is the weakest and the newest: the file *sets* a path whose accepted values the entry narrowed, and `narrowed_paths[]` lists those paths as the **ledger** spells them — `levels.*`, never the user's own `levels.my_package` — and at the spelling the file this run wrote carries, not the one that matched. It is a list of keys to check by hand rather than a list of errors, because telling one from the other needs the model and the engine has none by design.
+
+> **An unexplained path is what neither the schema nor the ledger accounts for.** `unexplained[]` carries the paths of the migrated document that the current schema does not know and no entry — applied or blocked — explains, each with the two readings the tool cannot tell apart: a typo, or a file written by a newer pipelex. The whole rule is [the downgrade direction](#the-downgrade-direction).
 
 > **No value read from a user's file is ever rendered** — not in the command's output, not in the structured plan, not in an error. Paths, operation kinds and ledger-supplied values carry everything a plan needs to say.
 

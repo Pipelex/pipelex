@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from typing_extensions import Self
 
 from pipelex.migration.exceptions import MigrationRegistryError
+from pipelex.migration.fingerprint import SurfaceFingerprint, compute_fingerprint
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.pipelex_service.pipelex_service_agreement import PIPELEX_SERVICE_CONFIG_FILE_NAME
 from pipelex.system.pipelex_service.pipelex_service_config import PipelexServiceConfig
@@ -87,6 +88,21 @@ class Surface(BaseModel):
             )
             raise ValueError(msg)
         return self
+
+    def fingerprint_at(self, *, schema_version: int) -> SurfaceFingerprint:
+        """This surface's live models, projected and labelled with the schema version they are at.
+
+        It lives on the surface because the surface is what holds both halves the projection needs
+        — the model tree and the defaults layer it is read against. Both readers want the same
+        answer for different reasons: the regenerator writes it into the golden chain, and a
+        migration run asks it which paths the current schema knows.
+        """
+        return compute_fingerprint(
+            surface_id=self.surface_id,
+            schema_version=schema_version,
+            config_model=self.config_model,
+            defaults_document=self.read_defaults_document(),
+        )
 
     def render_reference_document(self) -> str:
         """The surface's complete reference document as TOML text, ready to check in.
