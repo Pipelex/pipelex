@@ -119,13 +119,17 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     # Interpreter errors
     "MthdsParserError": "Check MTHDS file TOML syntax and ensure all referenced concepts and pipes are defined",
     # Configuration/initialization errors
-    # Two readings, and the `migration` field on this same payload is what separates them: present
-    # means the file is out of date, absent means it is wrong. Never `pipelex init telemetry` on
-    # the first — that writes a fresh file over settings a migration would have kept.
+    # Three readings, and two fields on this same payload separate them: an absent `migration`
+    # means the file is wrong, and a present one means the migration history has something to say
+    # about it — `migration.would_write` then says whether a command repairs it or whether the
+    # plans are a diagnosis to act on by hand. Never `pipelex init telemetry` on either of the
+    # last two: that writes a fresh file over settings a migration would have kept.
     "TelemetryConfigValidationError": (
-        "If this payload carries a 'migration' field, the configuration is out of date: run "
-        "'pipelex-agent migrate --dry-run --format json', then 'pipelex-agent migrate --yes'. "
-        "Otherwise correct the telemetry.toml settings named in the message."
+        "If this payload carries a 'migration' field, read its 'would_write': true means the "
+        "configuration is out of date and 'pipelex-agent migrate --yes' repairs it — run "
+        "'pipelex-agent migrate --dry-run --format json' first to show the user what would change. "
+        "False means the migration would write nothing and its 'plans' name what to correct by hand. "
+        "Without a 'migration' field, correct the telemetry.toml settings named in the message."
     ),
     "GatewayTermsNotAcceptedError": "Run 'pipelex init config' to accept gateway terms, or disable pipelex_gateway in backends.toml",
     "GatewayApiKeyMissingError": "Set the PIPELEX_GATEWAY_API_KEY environment variable, or disable pipelex_gateway in backends.toml",

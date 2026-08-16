@@ -312,3 +312,33 @@ class TestDoctorConfigChecks:
         assert check.finding is TelemetryConfigFinding.INVALID
         assert "custom_posthog.mode" in check.message
         assert MIGRATE_COMMAND not in check.message
+
+
+class TestTheTelemetryRowNamesMigrateOnlyWhereItWouldWrite:
+    """`out_of_date` is a promise that a command repairs this file, so it has to be one.
+
+    The probe used to read *not clean* as *out of date*, which made a file whose only finding is a
+    key no build knows about `out_of_date` — and the row then offered `pipelex migrate`, a run that
+    visits the file, writes nothing, and leaves the same refusal behind. That file is not old; it is
+    wrong in a way the ledger happens to have something to say about, and `invalid` is where it
+    belongs, because that is the finding that routes to a person.
+    """
+
+    def test_a_file_with_nothing_to_apply_is_invalid_rather_than_out_of_date(self, tmp_path: Path) -> None:
+        (tmp_path / TELEMETRY_CONFIG_FILE_NAME).write_text('[custom_posthog]\nmode = "off"\nnot_a_telemetry_setting = true\n', encoding="utf-8")
+
+        check = check_telemetry_config(config_dir=tmp_path)
+
+        assert check.finding is TelemetryConfigFinding.INVALID
+        assert check.finding.is_repaired_by_initializing is False
+        assert f"{MIGRATE_COMMAND} --dry-run" in check.message, "the diagnosis the scan found must not be lost with the finding"
+        assert f"run '{MIGRATE_COMMAND}'" not in check.message
+
+    def test_a_file_the_ledger_carries_forward_is_still_out_of_date(self, tmp_path: Path) -> None:
+        """The other side of the same branch, so a fix that simply stopped reporting staleness is red."""
+        (tmp_path / TELEMETRY_CONFIG_FILE_NAME).write_text('telemetry_mode = "off"\nproject_api_key = "key"\n', encoding="utf-8")
+
+        check = check_telemetry_config(config_dir=tmp_path)
+
+        assert check.finding is TelemetryConfigFinding.OUT_OF_DATE
+        assert MIGRATE_COMMAND in check.message

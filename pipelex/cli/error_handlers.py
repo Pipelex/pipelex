@@ -427,9 +427,15 @@ def handle_telemetry_config_validation_error(exc: TelemetryConfigValidationError
     console.print(escape(exc.message))
     console.print()
 
-    if exc.migration is not None:
+    if exc.migration is not None and exc.migration.would_write:
         console.print(f"[bold green]💡 To fix:[/bold green] Run [cyan]{exc.migration.remedy}[/cyan] to bring your configuration up to date\n")
         console.print("[dim]The migration keeps every setting in the file — it does not start it over.[/dim]")
+    elif exc.migration is not None:
+        # A block whose `would_write` is False is a diagnosis, not a repair: the command would visit
+        # this file, write nothing, and leave the same refusal standing. What the reader needs is the
+        # dry run's detail and their own editor.
+        console.print("[bold green]💡 To fix:[/bold green] Correct the settings named above in [cyan]telemetry.toml[/cyan]\n")
+        console.print(f"[dim]Run [cyan]{exc.migration.remedy} --dry-run[/cyan] for what the migration found — it would rewrite nothing here.[/dim]")
     else:
         console.print("[bold green]💡 To fix:[/bold green] Correct the settings named above in [cyan]telemetry.toml[/cyan]\n")
         console.print("[dim]Or run [cyan]pipelex init telemetry[/cyan] to start the file over — this discards what is in it.[/dim]")
