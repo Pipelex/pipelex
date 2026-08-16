@@ -44,11 +44,13 @@ The command exits non-zero when it leaves something for you to look at.
 
 You will usually meet this command through a warning rather than a crash. When a configuration file is out of date in a way the migration history explains, Pipelex boots anyway: it carries the file forward **in memory**, tells you which files it did that for, and points at this command. Nothing is written, so the same warning appears at the next boot, and the one after — running `pipelex migrate` is what makes the change to the file and stops it.
 
-A file the history cannot explain is a different case, and it still fails the boot with the configuration error itself: tolerance widens what starts, never what is accepted.
+A file the history cannot explain is a different case, and it still fails the boot with the configuration error itself: tolerance widens what starts, never what is accepted. That error names this command too, though — beside the key it could not accept, it tells you which of your files a migration would touch, what it would carry forward, and what only you can decide.
 
 ## For agents
 
 `pipelex-agent migrate` is the machine-facing counterpart. It writes only when passed `--yes`, since it cannot ask, and answers with a structured plan — `--format json` for the contract, `--format markdown` to read. Branch on the `needs_attention` field, never on the exit code.
+
+An agent usually meets this command through a failure rather than by choosing it. A configuration error carries a `migration` field when — and only when — a scan of the machine found something; its presence is the signal that the configuration is *old* rather than *wrong*. The loop from there is `pipelex-agent migrate --dry-run --format json`, show the user what would change, then `--yes` on confirmation. Never hand-edit a configuration file.
 
 ## See also
 

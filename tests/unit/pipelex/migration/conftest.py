@@ -10,7 +10,8 @@ from pathlib import Path
 import pytest
 from pydantic import BaseModel, Field
 
-from pipelex.migration.ledger import MigrationEntry, MigrationLedger, MigrationSafety, SurfaceBlock
+from pipelex.migration.ledger import MigrationEntry, MigrationLedger, SurfaceBlock
+from pipelex.migration.safety import MigrationSafety
 from pipelex.migration.surfaces import DefaultsLayerKind, Surface, SurfaceRegistry
 from pipelex.suggested_fix import MigrationOp
 

@@ -16,7 +16,7 @@ Record both numbers against S6.
 
 `make agent-check` and the full `make agent-test` are both green on the branch as pushed.
 
-⚠ **S6 is past half.** The pre-S7 bucket is closed (part 1, on `dev`), and on `feature/Migrator-3b` the two `migrate` commands (milestone 5), the downgrade diagnosis (milestone 6) and boot tolerance (milestone 7) are all built. What remains is the rest of the phase body — `report_validation_error`, the telemetry-remedy retirement, `doctor`, the skills, the specs rows, and publishing the contract. See [What is actually left](#what-is-actually-left) at the bottom before planning a session.
+⚠ **S6 is past half.** The pre-S7 bucket is closed (part 1, on `dev`), and on `feature/Migrator-3b` the two `migrate` commands (milestone 5), the downgrade diagnosis (milestone 6) and boot tolerance (milestone 7) and the validation-error report (milestone 8) are all built. What remains is the rest of the phase body — the telemetry-remedy retirement, `doctor`, the skills, the specs rows, and publishing the contract. See [What is actually left](#what-is-actually-left) at the bottom before planning a session.
 
 ## Build order chosen for this session
 
@@ -28,8 +28,9 @@ The charter lists a great many deliverables without an order. The order below wa
 4. **The commands** — `pipelex migrate`, `pipelex-agent migrate`, the rendering-rule test — done, see Milestone 5 below. The **downgrade diagnosis** (`unexplained[]`) was deliberately carried out of this milestone and is where the next session starts.
 5. **The downgrade diagnosis** — done, see Milestone 6 below.
 6. **Boot tolerance** — done, see Milestone 7 below.
-7. **`report_validation_error` on the real plan, the telemetry remedies retired, the `doctor` row** — not started. **This is where the next session starts.**
-8. **The skills (`add-migration`, `/release` step 3b), the `config-docs` drift-contract review list, `command-surface-map.md` rows, publishing the contract in the nav** — not started.
+7. **`report_validation_error` on the real plan** — done, see Milestone 8 below.
+8. **The telemetry remedies retired, the `doctor` row** — not started. **This is where the next session starts.**
+9. **The skills (`add-migration`, `/release` step 3b), the `config-docs` drift-contract review list, `command-surface-map.md` rows, publishing the contract in the nav** — not started.
 
 ## Milestone 1 — the golden-format bucket (DONE)
 
@@ -391,11 +392,84 @@ Mutation-tested: dropping the reserved-meta strip, skipping an unparseable file 
 
 ⚠ **A process note worth keeping.** During that mutation loop a `git checkout <file>` reverted an *unstaged* edit and silently undid part of the milestone; the next three test runs were measuring a tree that no longer had the code. Mutation loops over uncommitted work must back up with `cp` and restore with `cp` — never with git.
 
+## Milestone 8 — `report_validation_error` on the real plan (DONE, on `feature/Migrator-3b`)
+
+The old `MigrationConfig` / `migration_maps` consumer is gone and a **dry-run scan of the surface that refused** has taken its place, riding the error twice: as a paragraph in the message and as the structured `migration` block a machine consumer branches on. `error_domain` stays `"config"`.
+
+### The signature changed, and `category` did not survive it
+
+`report_validation_error(*, category, validation_error) -> str` became `report_validation_error(*, validation_error, surface_id=None) -> ValidationErrorReport`. `category` selected a renaming map and had no other reader, so with the maps retired it named nothing; `surface_id` expresses the one asymmetry left — **naming a surface is what turns the scan on**. The two `.mthds` callers (`validate_bundle.py`, `library_manager.py`) and `runtime_boot`'s backend/deck helper name none, deliberately: none of those has a ledger, and a `pipelex migrate` remedy for a `.mthds` bundle sends a user to a command with nothing to do. That is pinned twice — no block, *and* the walk never happens.
+
+`MigrationConfig` keeps `migration_maps` and loses both methods, with the reason in its docstring: the field is dead but the `[migration]` table ships and `extra="forbid"` would refuse every user file still carrying one, so the reshape entry is what removes both halves — sequencing rule 3. Two now-dead subject grants came out of `subject_grants.toml` with the methods.
+
+### The block had to live in `base_exceptions.py`, and that cost a module move
+
+`ErrorReport` references the block as a typed field, and `base_exceptions` cannot import the migration package: `plan.py` → `ledger.py` → `migration.exceptions` → `base_exceptions`. The precedent is `ValidationErrorItem`, which lives there for exactly this reason.
+
+Rather than declare a second projection of `MigrationPlan` that would drift from the first, the cycle was **broken**: `MigrationSafety` moved out of `ledger.py` into a new `pipelex/migration/safety.py`, which leaves `plan.py` depending only on stdlib, pydantic, `safety` and `suggested_fix` — all already in `base_exceptions`' closure. `plan.py`'s docstring now states that constraint the way `suggested_fix.py` states its own. So `MigrationErrorBlock.plans` is `list[MigrationPlan]`: **the same shape `pipelex-agent migrate --dry-run --format json` emits under its own `plans` key**, and an agent that parses one has already parsed the other.
+
+`migration` is deliberately **not** in `_STRICT_KEPT_FIELDS`, and the contrast with `validation_errors` is written beside it: validation errors describe the caller's own submitted bundle, a pending migration describes the *host's* configuration directories.
+
+### Three defects found, all real, all fixed
+
+**(a) Scoping the scan by building a one-surface registry silently corrupted the answer.** `SurfaceRegistry.surface_for_file_name` resolves ownership by *"an exact base file claims before any glob, **across all surfaces**"* — and its docstring names `pipelex_service.toml` as the very case it exists for, since that file is one surface's base file and a match for `pipelex-config`'s `pipelex_*.toml`. Handing `migrate_directories` a registry holding only `pipelex-config` removed the other claimant from that arbitration, so the glob won: the file was replayed under the wrong ledger and diagnosed against the wrong model, and its perfectly ordinary `agreement` and `onboarding` settings came back reported as *paths this build knows nothing about*. **Measured in a real run's stderr, not reasoned about.** The fix is `migrate_directories(only_surface_id=...)`: arbitration first with the full registry, filter second. Mutation-tested — reverting it turns the regression test red on exactly `pipelex_service.toml`.
+
+**(b) The boot's `except ValidationError` around `setup_config` was dead**, as Milestone 7 predicted, and so was the doctor's. `PipelexConfig` is a `ConfigRoot`, whose custom `__init__` translates pydantic's error into `ConfigValidationError`, so neither arm ever fired for the one configuration everything depends on — a bad `pipelex.toml` produced a bare traceback rather than the field-level translation the arm existed to produce. Both now catch `CONFIG_REFUSED` and go through one shared `raise_config_setup_error`, with `pydantic_error_behind` (new, beside `CONFIG_REFUSED` in `config_loader.py`) reaching through either shape. A refusal carrying no pydantic error is re-raised as itself.
+
+**(c) The agent CLI printed two error envelopes on one stream.** `agent_error` leaves through `typer.Exit`, which is a `RuntimeError` and **not** a `SystemExit`, so `models_cmd`'s `except SystemExit: raise` never caught it and the broad `except Exception` below reported it a second time. Two JSON documents on stderr is not JSON — `json.loads` gives *"Extra data"*. Pre-existing, and found because the new e2e is the first test to parse that stream instead of substring-matching it. Fixed at both sites (`models_cmd`, `check_model_cmd`) and pinned by an explicit single-envelope assertion.
+
+**(d) And one trap this milestone introduced and closed in the same pass.** `MigrationPlan` carries real `Path` values, so `ErrorReport.to_dict()` — the documented serialization surface, handed straight to `json.dumps` by the webhook delivery path — could no longer be serialized once a block rode on it. Not reachable from a pipeline run today, since nothing raises a `PipelexConfigError` inside one, but leaving it would be a trap for whoever wires the next consumer. `to_dict` now dumps that one field in JSON mode; dumping the whole report in JSON mode would have re-serialized every other field and every round-trip with it. `from_dict` still round-trips, because pydantic accepts a string for a `Path`.
+
+### Decisions taken in this milestone
+
+- **The scan runs only on the failure path and only when a surface is named**, so it is a filesystem walk and a ledger replay that a healthy boot never pays for — and the migration import is deferred inside the function, for the kernel-layer reason Milestone 7 established (`core/validation.py` is in `runtime_boot`'s closure; `make agent-check` would not catch a module-level import, only the full `make agent-test`).
+- **A failure inside the scan never becomes the failure the user sees**, same rule as the boot retry — but the catch is `(MigrationError, OSError)` rather than blanket, so an applier bug still surfaces as the bug it is. Both halves are tested.
+- **The block is present iff the scan found something**, and only non-clean plans are listed. Absence is the verdict "this is not staleness", which is what "consumers branch on the block's presence" requires to mean anything.
+- **The message is presentation** and carries the pydantic analysis plus a paragraph in the same order as `stale_configuration_warning`, because the two are read in the same places.
+
+### Files touched in milestone 8
+
+```
+pipelex/migration/safety.py                       NEW — MigrationSafety, moved out of ledger.py to break the cycle
+pipelex/migration/plan.py                         the low-level constraint stated; imports safety
+pipelex/migration/ledger.py + 5 siblings + 7 test modules   re-pointed at migration.safety
+pipelex/migration/runner.py                       migrate_directories(only_surface_id=...)
+pipelex/migration/run.py                          scan_config_surface — the dry run, aimed at one surface
+pipelex/base_exceptions.py                        MigrationErrorBlock; ErrorReport.migration; PipelexConfigError carries it
+pipelex/core/validation.py                        REWRITTEN — the scan, the block, the prose, raise_config_setup_error
+pipelex/system/configuration/config_loader.py     pydantic_error_behind, beside CONFIG_REFUSED
+pipelex/system/configuration/configs.py           MigrationConfig: methods retired, field and reason kept
+pipelex/runtime_boot.py, pipelex/cli/commands/doctor_cmd.py   the dead arms fixed, one shared helper
+pipelex/cli/agent_cli/commands/agent_output.py    the migration block on the error payload
+pipelex/cli/agent_cli/commands/{models,check_model}_cmd.py    the double-envelope fix
+pipelex/pipeline/validate_bundle.py, pipelex/libraries/library_manager.py   .message, no surface
+subject_grants.toml                               two dead grants removed
+docs/migration-ledger.md                          NEW § "Reporting a stale configuration on a validation error"
+docs/tools/cli/agent-cli.md                       the error envelope: one document, and the `migration` field
+docs/tools/cli/migrate.md                         the boot-failure path names the command; the agent loop
+docs/configuration/index.md                       the `[migration]` line, which the previous config-docs ack parked for here
+pipelex/cli/agent_cli/CLAUDE.md                   the migration-field bullet
+CHANGELOG.md                                      one Added bullet, two Fixed
+tests/unit/pipelex/core/test_validation_report.py RE-AIMED — was about hub state, is now about the scan
+tests/e2e/pipelex/cli/test_migrate_commands.py    NEW class: the third channel, through the real binary
+.drift/acks/{config-docs,cli-docs}.toml           both reviewed and acked
+```
+
+Mutation-tested: building the scan's registry from one surface, dropping the JSON-mode dump of the `migration` field, widening the scan's catch to a blanket `except Exception`, and returning a block when the scan found nothing — each turned exactly the intended tests red.
+
+The re-aiming of `test_validation_report.py` is worth noticing rather than skipping: its two tests existed because the helper *read the hub* and crashed when there was not one. It no longer touches the hub at all, so that concern moved — the bootstrap property is now that the **scan** runs on a machine with no hub and no configuration, which is where it is asserted.
+
+⚠ **The e2e's boot assertion changed, and it is a contract change.** `TestTheBootstrapPath` asserted `"ConfigValidationError" in boot.stderr`; a boot failure now reports `PipelexConfigError`, which is the class that carries `error_domain: "config"` and the block. Anything downstream matching on that error type sees a different name.
+
 ## Where this session paused
 
-**Paused right after milestone 7 was committed.** Working tree clean, **still no upstream** — the first push is `git push -u origin feature/Migrator-3b`. `make agent-check` (with everything staged, so `drift-check` is a real green), `make cmig`, `make docs-check` and the full `make agent-test` were all green before the commit.
+**Paused right after milestone 8 was committed.** Working tree clean. The **branch** has an upstream — `origin/feature/Migrator-3b`, which happened after the milestone-7 note was written and that note said otherwise — but **the milestone-8 commit itself is not pushed**: the branch is one commit ahead of its remote. `make agent-check` with everything staged (so `drift-check` is a real green), `make docs-check`, and the full `make agent-test` were all green on the exact tree that was committed.
 
-Three drift contracts came open and were acked with the reviews written into the ack rationales: `hub-layering-convention` (which produced the real doc fix above), `cli-docs` (which produced the `migrate.md` section) and `config-docs` (reviewed, no page change — the loader gained no key, no layer and no precedence rule).
+Two drift contracts came open and were acked with the reviews written into the ack rationales: `config-docs` (which produced the `docs/configuration/index.md` fix the *previous* ack had explicitly parked for this milestone) and `cli-docs` (which produced the agent-CLI error-envelope documentation and the `migrate.md` agent paragraph).
+
+### Milestone 7's own ack record, kept
+
+Three contracts were acked at milestone 7: `hub-layering-convention`, `cli-docs` and `config-docs`.
 
 ## What is actually left
 
@@ -413,7 +487,7 @@ The phase body the charter lists under **Do**, in the order the next session sho
 
 1. ~~**The downgrade diagnosis**~~ — done, see Milestone 6.
 2. ~~**Boot tolerance**~~ — done, see Milestone 7.
-3. **`report_validation_error` on the real plan** — note `core/validation.py`'s current `migration_config` is the old *renaming* config, not the ledger plan. Consumer removed, `migration` field kept. This is also the **third channel of the rendering-rule test**, which is written and waiting for it (`TestNoValueFromAUsersFileIsEverRendered` names the gap in its docstring).
+3. ~~**`report_validation_error` on the real plan**~~ — done, see Milestone 8. The third channel of the rendering-rule test landed with it, as a new e2e class (`TestABootFailureCarriesThePendingMigration`) rather than inside `TestNoValueFromAUsersFileIsEverRendered`, because the reachable specimen is different: boot tolerance means a file the ledger *can* explain never reaches the error surface at all, so the channel is exercised by a key no entry explains, whose value is the planted secret.
 4. **The two telemetry remedies retired** — `check_telemetry_config`'s old-shape sniff in `doctor_cmd.py` and `handle_telemetry_config_validation_error`'s banner in `error_handlers.py`. Both currently tell a user to re-initialize the file that Milestone 5 proved is migratable.
 5. **`doctor`: the pending-migrations row and `--fix`** delegating to the migrate command.
 6. **The `config-docs` drift contract's `review` list** plus the four validator sites R8 names (`KitConfig._validate_targets`, `DryRunConfig.validate_image_urls`, `ImgGenConfig.validate_quality_mapping`, `LLMConfig.validate_effort_to_budget_mapping`).
@@ -430,7 +504,9 @@ Then the PR to `dev` from `feature/Migrator-3b`.
 - **The rescue-copy race** (`pr-1113-review-notes.md` §3): a third run's prune can take the `.bak.` a rescue is about to rename. The commands now make concurrent runs producible, so this is decidable — revisit as an age-sparing prune, not a lock.
 - Deliberately past S7's freeze, with named triggers, in `pr-1113-review-notes.md` and `migrator-write-scope-and-rename-fidelity.md`: per-member bounds in the golden, the `safe`-entry sibling, the tomlkit raw-storage staleness pass, rename fidelity (§2), the taken-backup-name report, and the residual. §1 of the write-scope note is **closed** by Milestone 5.
 
-**The next session starts at `report_validation_error` on the real plan** — and it inherits a finding from Milestone 7: the `except ValidationError` around `setup_config` in `runtime_boot.py`, one of that function's two config-side callers, is dead code, because `PipelexConfig` raises `ConfigValidationError`.
+**The next session starts at item 4, the two telemetry remedies.** Both currently tell a user to re-initialize a file Milestone 5 proved is migratable, and Milestone 8 has now put the remedy on the error surface for the *main* configuration — so what these two need is the same treatment on the telemetry path: `check_telemetry_config`'s old-shape sniff in `doctor_cmd.py` and `handle_telemetry_config_validation_error`'s banner in `error_handlers.py`. Note that `report_validation_error` is ready for them as it stands — pass `surface_id=TELEMETRY_CONFIG_SURFACE_ID` and the scan aims at the telemetry surface — and that boot tolerance means the telemetry error path is now reached only when the ledger *cannot* explain the file, which is exactly the case those two hardcoded remedies were written for and get wrong.
+
+Milestone 7's inherited finding — the dead `except ValidationError` around `setup_config` — **is fixed**, at both of that function's config-side callers, and the same defect turned out to exist in the doctor.
 
 ## Rulings this session took on its own authority
 
@@ -441,3 +517,5 @@ Milestone 3 took the policy calls the charter routed here by name — preserve d
 Milestone 5 took two on the same basis, both written into `docs/migration-ledger.md`: **a migration's write scope is the resolved target of any file the walk claims** (the `.mthds` fix loop's scope guard is not copied, because a configuration directory is where a user keeps links to files they own); and **`min_supported_schema_version` gets a reader rather than a softened sentence** — a file declaring a version below its ledger's floor is refused by name, reading the reserved key exactly as tolerantly as boot strips it.
 
 Milestone 2 took three further rulings on that same basis, each written into `docs/migration-ledger.md` rather than only here: the coverage gate now demands a declaration from an `unsafe` entry rather than accepting the word (without it R9 is half-built); convergence exempts a `VALUE_DOMAIN_NARROWED` report and nothing else (without it R9's ruled shape cannot be written at all); and forward tracing stops at `unsafe` entries (a rehearsal may guess, an application may not). The third is the one that leaves a named open question, listed above.
+
+Milestone 8 took four, each written into `docs/migration-ledger.md` rather than only here: **the scan is scoped by the surface the caller names**, so a `.mthds` bundle or a backend file pays for no walk and is offered no remedy it has none for; **the block carries `MigrationPlan` itself** rather than a projection of it, which is what forced `MigrationSafety` out of `ledger.py` into `safety.py` — a second shape would have drifted from the commands' own; **scoping narrows the answer and never the registry**, because ownership is decided across all surfaces and a one-surface registry hands `pipelex_service.toml` to the wrong ledger; and **a failure inside the scan declines quietly, but only on `(MigrationError, OSError)`** — an applier bug is not a field condition and must keep surfacing.

@@ -773,7 +773,7 @@ class LibraryManager(LibraryManagerAbstract):
         try:
             return self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
         except ValidationError as validation_error:
-            validation_error_msg = report_validation_error(category="mthds", validation_error=validation_error)
+            validation_error_msg = report_validation_error(validation_error=validation_error).message
             msg = f"Could not load blueprints from {[str(pth) for pth in valid_mthds_paths]} because of: {validation_error_msg}"
             raise LibraryError(
                 message=msg,

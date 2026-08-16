@@ -298,17 +298,27 @@ def migrate_directories(
     migration_dir: Path,
     config_dirs: list[Path],
     dry_run: bool,
+    only_surface_id: str | None = None,
     moment: datetime | None = None,
 ) -> MigrationReport:
     """Migrate every claimed file in every given configuration directory.
 
     The walk is over the directories a caller names — in practice the global `~/.pipelex/` and the
     project's `.pipelex/`, and only those. A directory that does not exist is skipped.
+
+    `only_surface_id` narrows the answer to one surface, for a caller that is diagnosing a
+    particular model's refusal rather than migrating the machine. **It narrows the result, not the
+    registry, and that distinction is the whole point**: which surface owns a file is decided
+    across *all* of them — an exact base file claims before any glob — so a registry holding one
+    surface would hand `pipelex_service.toml` to `pipelex-config`'s `pipelex_*.toml` and replay
+    the wrong ledger over it. Arbitration first, then the filter.
     """
     stamp = moment if moment is not None else datetime.now(UTC)
     plans: list[MigrationPlan] = []
     for directory in config_dirs:
         for surface, file_path in registry.files_by_surface_in_directory(directory=directory):
+            if only_surface_id is not None and surface.surface_id != only_surface_id:
+                continue
             ledger = load_ledger_cached(migration_dir=migration_dir, surface_id=surface.surface_id)
             plans.append(migrate_file(surface=surface, ledger=ledger, file_path=file_path, dry_run=dry_run, moment=stamp))
     return MigrationReport(plans=plans)

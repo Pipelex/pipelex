@@ -106,7 +106,9 @@ def agent_check_model_cmd(
                 agent_success(result)
             case CliOutputFormat.MARKDOWN:
                 print(_format_check_markdown(result))
-    except SystemExit:
+    except (SystemExit, typer.Exit):
+        # `typer.Exit` is a `RuntimeError`, not a `SystemExit`: without it here, an error
+        # `agent_error` has already reported is caught again below and reported twice.
         raise
     except ModelReferenceParseError as exc:
         agent_error(f"Invalid model reference: {exc}", error_type="ArgumentError", cause=exc)

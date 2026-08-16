@@ -187,6 +187,10 @@ Do not confuse this setup-warning shape with the `warnings` array on the `valida
 }
 ```
 
+Exactly one such object is written to stderr per failure, so the stream parses as a single JSON document.
+
+**`migration`** — a configuration error (`"error_domain": "config"`) carries an extra `migration` object when, and only when, a scan of this machine's configuration directories found something. Its presence is the whole signal: the configuration is *out of date* rather than wrong. It holds `remedy` (the command that fixes what can be fixed), `needs_attention` (whether something there is a person's decision rather than the tool's), and `plans` — one per file, in the same shape [`pipelex-agent migrate`](migrate.md) emits under its own `plans` key. The loop from there is `pipelex-agent migrate --dry-run --format json`, show the user what would change, then `--yes`. Never hand-edit a configuration file.
+
 `fmt` and `lint` are raw passthroughs to the `plxt` binary and bypass the JSON output contract, producing native `plxt` output instead.
 
 ## Graph Visualization

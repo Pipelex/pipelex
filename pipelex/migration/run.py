@@ -64,3 +64,30 @@ def migrate_config_directories(*, config_dirs: list[Path], dry_run: bool) -> Mig
         config_dirs=config_dirs,
         dry_run=dry_run,
     )
+
+
+def scan_config_surface(*, surface_id: str) -> MigrationReport:
+    """What a `pipelex migrate` would find for one surface, without writing anything.
+
+    The read-only half of the run, and the one a *diagnosis* wants: a configuration validation
+    error is raised against the merged configuration and carries no provenance — it says a key is
+    wrong, not which of the files that were merged put it there — so the way to answer "is this
+    machine's configuration simply stale?" is to look at the files themselves.
+
+    Scoped to the surface whose model refused, and to the same directories a real migration walks.
+    Both halves matter: reporting a pending `telemetry.toml` migration underneath a
+    `pipelex.toml` error would answer a question nobody asked, and scanning a directory the
+    `migrate` command would not touch would offer a remedy that then does nothing.
+
+    The scoping is a filter on the *answer*, and the full registry still decides which surface
+    owns which file — see `migrate_directories`. Handing it a one-surface registry instead looks
+    equivalent and is not: `pipelex_service.toml` is another surface's base file *and* a match for
+    `pipelex-config`'s `pipelex_*.toml`, and with that other surface absent the glob wins.
+    """
+    return migrate_directories(
+        registry=build_config_surface_registry(),
+        migration_dir=packaged_migration_dir(),
+        config_dirs=config_directories_to_migrate(),
+        dry_run=True,
+        only_surface_id=surface_id,
+    )

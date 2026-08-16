@@ -550,6 +550,28 @@ The rules this encodes:
 
 **Boot tolerance does not run the [downgrade diagnosis](#the-downgrade-direction).** On this path the model has already spoken, and pydantic's own extra-field list is both the same answer and a better one — it knows about validators, which a path walk does not. The diagnosis exists for `pipelex migrate`, where nothing validates the file at all. So "unexplained paths still fail the boot" is satisfied by the re-validation failing, and the `migration` block on the error carries the plans.
 
+## Reporting a stale configuration on a validation error
+
+When the boot's retry declines and the model's refusal stands, the error the user gets says one more thing than pydantic can: whether their configuration is *wrong* or merely *old*.
+
+A validation error cannot answer that by itself. It is raised against the merged configuration and carries no provenance — it names a key, not which of the files that were merged put it there, and certainly not whether that key was correct last month. So `report_validation_error` asks the files instead: a **dry-run scan** of the surface that refused, over the same directories a `pipelex migrate` would walk.
+
+**The scan is named, not guessed.** The caller passes the surface whose model refused; a caller validating something that is not a configuration surface — a `.mthds` bundle, an inference backend file, a model deck — passes nothing and gets the translation alone. None of those has a ledger, and offering them a `pipelex migrate` remedy would send a user to a command with nothing to do. That is also why the scan does not run at all when no surface is named: it is a directory walk and a ledger replay, and a bundle-validation failure has no business paying for one.
+
+> **Scoping narrows the answer, never the registry.** Which surface owns a file is decided across *all* of them, because an exact base file claims before any glob. A registry built to hold only the surface being asked about removes the other claimants from that arbitration, and `pipelex_service.toml` — another surface's base file, and a match for `pipelex-config`'s `pipelex_*.toml` — is then replayed under the wrong ledger and diagnosed against the wrong model, so its ordinary settings come back reported as paths this build knows nothing about.
+
+The answer rides the error twice, and the two halves are not interchangeable:
+
+- **`error_domain` stays `"config"`.** It does not become a domain of its own. `ErrorDomain` is a closed cross-repo enum and the agent-hook specification routes any domain it does not know to BLOCK, so a stale configuration reported under a new domain would stop an agent rather than tell it what to run.
+- **The structured `migration` block is the contract, and consumers branch on its presence.** Absent means the failure is not staleness. Present, it carries `remedy` (the command), `needs_attention` (whether anything here is a person's rather than the tool's), and `plans` — the same `MigrationPlan` shape `pipelex-agent migrate --dry-run --format json` emits under its own `plans` key, so an agent that parses one has already parsed the other. Only the files the scan found something in are listed: unlike the commands' report, which answers *what did the walk visit*, the block answers *what is wrong with this machine*.
+- **The message is presentation.** It carries the pydantic analysis followed by a paragraph naming the files, what the command would carry forward, and what it cannot do for anyone. Nothing branches on its wording.
+
+The agent loop this opens is the one the commands were built for: a command fails, the block is present, the agent runs `pipelex-agent migrate --dry-run --format json`, shows the user what would change, and runs `--yes` on confirmation. It never hand-edits a configuration file.
+
+> **No value read from a user's file appears in the block either.** This is the third of the three channels that rule covers, beside the command's own output and its structured plan. The block reports paths, operation kinds and ledger-supplied values — a key holding a live credential is named by its *path* and never by what it holds.
+
+**A failure inside the scan is never the failure the user sees**, for the same reason the boot retry declines quietly: they have an error in front of them that names what to fix, and replacing it with a packaging problem of ours would cost them the only message that helps. A ledger that will not load stays loud where it should be — `make check-ledger`, and `pipelex migrate` itself. The catch is narrow rather than blanket, so a bug in our own applier still surfaces as the bug it is.
+
 ## Applying
 
 > **Operations apply to the user's file, and a template is never the remedy.** "Delete your configuration and re-initialize it" is the failure this project exists to remove, not a fallback it may reach for: re-initializing throws away every choice the user made, and it is exactly what a structural change should not cost them.

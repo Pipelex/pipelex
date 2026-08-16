@@ -5456,14 +5456,6 @@ rationale = "Verb-object: transforms the input dict; enum class stays keyword."
 param = "input_list"
 rationale = "Verb-object: transforms the input list; enum class stays keyword."
 
-["pipelex/system/configuration/configs.py::MigrationConfig.text_in_renaming_keys"]
-param = "text"
-rationale = "Predicate on the text; single operand."
-
-["pipelex/system/configuration/configs.py::MigrationConfig.text_in_renaming_values"]
-param = "text"
-rationale = "Predicate on the text; single operand."
-
 ["pipelex/system/environment.py::all_env_vars_are_set"]
 param = "keys"
 rationale = "Predicate on the given env-var keys; single operand."

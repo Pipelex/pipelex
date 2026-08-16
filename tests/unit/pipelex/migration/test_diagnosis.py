@@ -13,8 +13,9 @@ from pydantic import BaseModel, Field
 
 from pipelex.migration.diagnosis import diagnose_unexplained_paths
 from pipelex.migration.fingerprint import SurfaceFingerprint, compute_fingerprint
-from pipelex.migration.ledger import MigrationLedger, MigrationSafety
+from pipelex.migration.ledger import MigrationLedger
 from pipelex.migration.plan import BlockedEntry, BlockedEntryReason
+from pipelex.migration.safety import MigrationSafety
 from pipelex.suggested_fix import DeleteKeyOp, MigrationOp, RemapValueOp, RenameTableKeyOp
 from tests.unit.pipelex.migration.conftest import EXAMPLE_SURFACE_ID, EntryBuilder, LedgerBuilder
 

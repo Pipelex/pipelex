@@ -10,8 +10,8 @@ from typing import Any, cast
 import tomlkit
 
 from pipelex.migration.engine import replay_ledger_over_text
-from pipelex.migration.ledger import MigrationSafety
 from pipelex.migration.plan import BlockedEntryReason
+from pipelex.migration.safety import MigrationSafety
 from pipelex.suggested_fix import DeleteKeyOp, MoveKeyOp, RenameTableKeyOp
 from tests.unit.pipelex.migration.conftest import EntryBuilder, LedgerBuilder
 

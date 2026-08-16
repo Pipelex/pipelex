@@ -37,13 +37,13 @@ from pipelex.cogt.model_backends.gateway_config import GatewayConfig
 from pipelex.cogt.models.deck_manifest import DeckFileStatus, DeckSyncReport, compute_deck_sync_report, status_rich_label
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.config import get_config
-from pipelex.core.validation import report_validation_error
+from pipelex.core.validation import raise_config_setup_error, report_validation_error
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.runtime_hub import RuntimeHub, get_console, set_runtime_hub
-from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.configuration.config_loader import CONFIG_REFUSED, config_manager, pydantic_error_behind
+from pipelex.system.configuration.config_surface import PIPELEX_CONFIG_SURFACE_ID
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.environment import get_optional_env
-from pipelex.system.exceptions import ConfigValidationError
 from pipelex.system.pipelex_service.exceptions import (
     RemoteConfigUnavailableError,
     RemoteConfigValidationError,
@@ -136,20 +136,16 @@ def check_config_files(*, config_dir: Path | None = None) -> tuple[bool, int, st
             with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
                 config = config_manager.load_config(config_dir=config_dir)
                 PipelexConfig.model_validate(config)
-        except ValidationError as validation_error:
-            validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
-            msg = f"Configuration validation failed:\n{validation_error_msg}"
-            return False, 0, msg
-        except ConfigValidationError as exc:
-            # ConfigRoot.__init__ wraps pydantic.ValidationError into ConfigValidationError;
-            # recover the original via __cause__ so we still emit the migration-aware report.
-            underlying = exc.__cause__
-            if isinstance(underlying, ValidationError):
-                validation_error_msg = report_validation_error(category="config", validation_error=underlying)
-                msg = f"Configuration validation failed:\n{validation_error_msg}"
-            else:
-                msg = f"Configuration validation failed: {exc.message}"
-            return False, 0, msg
+        except CONFIG_REFUSED as config_error:
+            # Both shapes a refusal takes: `ConfigRoot.__init__` translates pydantic's error into
+            # `ConfigValidationError`, and `pydantic_error_behind` reaches back through it for the
+            # field-level analysis. A refusal carrying no pydantic error at all keeps its own
+            # message, which is then the whole account.
+            validation_error = pydantic_error_behind(config_error=config_error)
+            if validation_error is None:
+                return False, 0, f"Configuration validation failed: {config_error}"
+            report = report_validation_error(validation_error=validation_error, surface_id=PIPELEX_CONFIG_SURFACE_ID)
+            return False, 0, f"Configuration validation failed:\n{report.message}"
         except (TomlError, OSError) as exc:
             return False, 0, f"Error loading pipelex.toml: {exc}"
 
@@ -775,10 +771,8 @@ def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = Non
     set_runtime_hub(runtime_hub)
     try:
         runtime_hub.setup_config(config_cls=PipelexConfig, config_dir=config_dir)
-    except ValidationError as validation_error:
-        validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
-        msg = f"Could not setup config because of: {validation_error_msg}"
-        raise PipelexConfigError(msg) from validation_error
+    except CONFIG_REFUSED as config_error:
+        raise_config_setup_error(config_error=config_error, surface_id=PIPELEX_CONFIG_SURFACE_ID)
 
     log_config = get_config().pipelex.log_config
     if log_config_overrides is not None:

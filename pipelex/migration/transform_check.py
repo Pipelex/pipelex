@@ -75,7 +75,8 @@ from pipelex.migration.engine import apply_ops_over_text
 from pipelex.migration.exceptions import MigrationGoldenError
 from pipelex.migration.fingerprint import PATH_SEPARATOR, SurfaceFingerprint
 from pipelex.migration.goldens import defaults_golden_path, pre_history_document_path, read_fingerprint_golden
-from pipelex.migration.ledger import MigrationEntry, MigrationLedger, MigrationSafety, load_ledger
+from pipelex.migration.ledger import MigrationEntry, MigrationLedger, load_ledger
+from pipelex.migration.safety import MigrationSafety
 from pipelex.migration.surfaces import Surface, SurfaceRegistry
 from pipelex.suggested_fix import WILDCARD_SEGMENT
 from pipelex.system.configuration.config_surface import strip_reserved_meta

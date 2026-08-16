@@ -26,6 +26,24 @@ _ConfigT = TypeVar("_ConfigT", bound=BaseModel)
 # Catching one of the pair would silently switch boot tolerance off for whichever model it missed.
 CONFIG_REFUSED = (ValidationError, ConfigValidationError)
 
+
+def pydantic_error_behind(*, config_error: Exception) -> ValidationError | None:
+    """The pydantic error a refused configuration actually carries, whichever half of `CONFIG_REFUSED` arrived.
+
+    The companion of the tuple above, and it exists for the same reason: a caller that wants the
+    field-level analysis has to reach through `ConfigValidationError` to the `__cause__` the
+    translation kept, and doing that by hand at each site is how one of them comes to catch only
+    pydantic's and quietly stop reporting anything for the main configuration.
+
+    `None` when the refusal carries no pydantic error at all — a `ConfigValidationError` raised for
+    a reason of its own — in which case its own message is the whole account.
+    """
+    if isinstance(config_error, ValidationError):
+        return config_error
+    cause = config_error.__cause__
+    return cause if isinstance(cause, ValidationError) else None
+
+
 CONFIG_DIR_NAME = ".pipelex"
 CONFIG_NAME = "pipelex.toml"
 

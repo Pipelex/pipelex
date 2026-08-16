@@ -16,6 +16,12 @@ and the write — and that reason sits on the plan itself, where it never stops 
 > rather than a list of credential-shaped key names, because such a list is a guess that
 > eventually misses one.
 
+This module is deliberately low-level — stdlib, pydantic, and the two sibling modules that are
+themselves low-level (`safety`, `suggested_fix`) — so that `pipelex.base_exceptions` can import it
+without creating a cycle. That is what lets a configuration validation error carry a real
+`MigrationPlan` rather than a second projection of one that would drift from this one. Nothing
+here may reach `migration.exceptions`, `migration.ledger` or anything that imports them.
+
 See `docs/migration-ledger.md` → "What the engine reports".
 """
 
@@ -24,7 +30,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex.migration.ledger import MigrationSafety
+from pipelex.migration.safety import MigrationSafety
 from pipelex.suggested_fix import MigrationOp
 
 

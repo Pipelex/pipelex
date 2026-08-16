@@ -284,7 +284,10 @@ class TestTheBootstrapPath:
 
         boot = _boot(env=offline_subprocess_env, cwd=hermetic_home)
         assert boot.returncode != 0, "the scenario is worthless if this machine boots"
-        assert "ConfigValidationError" in boot.stderr
+        # `PipelexConfigError` rather than the raw `ConfigValidationError` this used to report:
+        # the boot's own arm now catches both shapes a refusal takes and translates. The class is
+        # what carries `error_domain: "config"` and the `migration` block to a machine consumer.
+        assert "PipelexConfigError" in boot.stderr
 
         # Both commands answer with a *report* rather than a crash, and that — not the exit code —
         # is what "it runs" means here. Each leaves a 1 behind, because the key planted above is
@@ -411,3 +414,95 @@ class TestNoValueFromAUsersFileIsEverRendered:
         # something: the run read this value, wrote it under its new key, and never said it.
         assert self.PLANTED_SECRET in global_file.read_text(encoding="utf-8")
         assert load_toml_from_path(path=global_file)["custom_posthog"]["api_key"] == self.PLANTED_SECRET
+
+
+class TestABootFailureCarriesThePendingMigration:
+    """The third channel: a configuration that will not load says *why*, in fields and in prose.
+
+    Boot tolerance already handles the case the ledger can explain — that machine boots, with a
+    warning. What is left is the machine the ledger cannot explain, and until now all it got was
+    pydantic's account of a key it had never heard of. It now also gets the scan: which of its
+    files the walk would touch, what a `pipelex migrate` would carry forward, and what nobody but
+    a person can resolve.
+
+    **The structured block is the contract; the prose is presentation.** A machine consumer
+    branches on `migration` being present, never on the wording — which is why both are asserted
+    here, on the same run, through the real binary.
+    """
+
+    PLANTED_SECRET = "phc_L1VE_boot_error_key_that_must_never_be_rendered"
+
+    def _break_the_configuration_with_a_secret(self, *, hermetic_home: Path) -> Path:
+        """A root key no model knows, holding a value that looks exactly like a live credential.
+
+        The unknown key is what breaks the boot *and* what the downgrade diagnosis reports; its
+        value is what must never appear. Both halves in one key is deliberate — it means the
+        diagnosis demonstrably read the value it declines to render.
+        """
+        config_file = hermetic_home / ".pipelex" / "pipelex.toml"
+        planted = f'posthog_project_key = "{self.PLANTED_SECRET}"\n'
+        config_file.write_text(planted + config_file.read_text(encoding="utf-8"), encoding="utf-8")
+        return config_file
+
+    def test_the_agent_boot_error_carries_the_config_domain_and_the_block(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        self._break_the_configuration_with_a_secret(hermetic_home=hermetic_home)
+
+        boot = _boot(env=offline_subprocess_env, cwd=hermetic_home)
+
+        assert boot.returncode != 0, "the scenario is worthless if this machine boots"
+        # One envelope, and it has to be said out loud: `agent_error` leaves through `typer.Exit`,
+        # which is a `RuntimeError` rather than a `SystemExit`, so a command boundary re-raising
+        # only `SystemExit` caught it again and printed a second document after the first. Two
+        # JSON documents on one stream is not JSON, and the block below would be unreadable.
+        assert boot.stderr.count('"error": true') == 1, boot.stderr
+        envelope: dict[str, Any] = json.loads(boot.stderr)
+        assert envelope["error_type"] == "PipelexConfigError"
+        assert envelope["error_domain"] == "config", "a new domain would route the agent hooks to BLOCK"
+
+        block: dict[str, Any] = envelope["migration"]
+        assert block["remedy"] == "pipelex migrate"
+        assert block["needs_attention"] is True, "a key no entry explains is a person's to resolve"
+        unexplained = [found for plan in block["plans"] for found in plan["unexplained"]]
+        assert [found["path"] for found in unexplained] == ["posthog_project_key"]
+        assert [plan["file_path"] for plan in block["plans"]] == [str(hermetic_home / ".pipelex" / "pipelex.toml")]
+
+    def test_no_value_from_the_users_file_reaches_either_stream(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """The contract's mechanical rule, on the channel that was waiting for this milestone.
+
+        The diagnosis walked this document and reached the very key whose value is planted here —
+        it names the key in the block above — so a rule that held only because nothing had read
+        the value would be no rule at all.
+        """
+        config_file = self._break_the_configuration_with_a_secret(hermetic_home=hermetic_home)
+
+        boot = _boot(env=offline_subprocess_env, cwd=hermetic_home)
+
+        assert self.PLANTED_SECRET not in boot.stdout
+        assert self.PLANTED_SECRET not in boot.stderr
+        assert self.PLANTED_SECRET in config_file.read_text(encoding="utf-8"), "nothing was written, so the value is still there"
+
+    def test_a_machine_the_ledger_can_explain_boots_instead_of_reporting(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """The block's absence is a verdict too, and boot tolerance is why it is reachable.
+
+        A stale file the ledger carries forward never reaches this error surface at all — it warns
+        and boots. Without this test the block would look like the answer to staleness, when it is
+        actually the answer to staleness the ledger *cannot* resolve.
+        """
+        project_dir, _, _ = _plant_a_stale_machine(hermetic_home=hermetic_home)
+
+        boot = _boot(env=offline_subprocess_env, cwd=project_dir)
+
+        assert boot.returncode == 0, boot.stderr
+        assert "migration" not in boot.stderr

@@ -213,19 +213,20 @@ class Pipelex(ConfigModel):
 
 
 class MigrationConfig(ConfigModel):
+    """Dead, and deliberately still here.
+
+    The hand-maintained rename tables that once let a validation error guess "you probably mean
+    the new name for this". The migration ledger answers that question properly now — from the
+    entries that actually performed the renames, per file rather than per word — so nothing reads
+    these any more.
+
+    The field stays because deleting it is a schema change: `pipelex.toml` ships a `[migration]`
+    table and `extra="forbid"` would refuse every user file still carrying one. The configuration
+    reshape's ledger entry is what removes both halves at once, which is what keeps the reshape a
+    single schema bump rather than two.
+    """
+
     migration_maps: dict[str, dict[str, str]]
-
-    def text_in_renaming_keys(self, text: str, *, category: str) -> list[tuple[str, str]]:
-        renaming_map = self.migration_maps.get(category)
-        if not renaming_map:
-            return []
-        return [(key, value) for key, value in renaming_map.items() if text in key]
-
-    def text_in_renaming_values(self, text: str, *, category: str) -> list[tuple[str, str]]:
-        renaming_map = self.migration_maps.get(category)
-        if not renaming_map:
-            return []
-        return [(key, value) for key, value in renaming_map.items() if text in value]
 
 
 class PluginsConfig(ConfigModel):

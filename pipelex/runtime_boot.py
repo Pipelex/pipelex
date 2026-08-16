@@ -46,7 +46,7 @@ from kajson.kajson_manager import KajsonManager
 from pydantic import ValidationError
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexConfigError, PipelexSetupError
+from pipelex.base_exceptions import PipelexSetupError
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
@@ -71,7 +71,7 @@ from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
 from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.stuffs.stuff_template_set import STUFF_TEMPLATE_SET
-from pipelex.core.validation import report_validation_error
+from pipelex.core.validation import raise_config_setup_error, report_validation_error
 from pipelex.graph.mermaidflow.template_set import MERMAID_TEMPLATE_SET
 from pipelex.graph.reactflow.template_set import REACTFLOW_TEMPLATE_SET
 from pipelex.observer.multi_observer import MultiObserver
@@ -90,8 +90,9 @@ from pipelex.providers.builtins import KERNEL_BUILTIN_PLUGINS, KERNEL_CORE_UNCON
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.runtime_hub import RuntimeHub, set_runtime_hub
-from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.configuration.config_loader import CONFIG_REFUSED, config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
+from pipelex.system.configuration.config_surface import PIPELEX_CONFIG_SURFACE_ID
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.pipelex_service.exceptions import (
     GatewayTermsNotAcceptedError,
@@ -191,10 +192,12 @@ class RuntimeBoot(metaclass=MetaSingleton):
                 config_overrides=config_overrides,
                 config_dir=config_dir,
             )
-        except ValidationError as validation_error:
-            validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
-            msg = f"Could not setup config because of: {validation_error_msg}"
-            raise PipelexConfigError(msg) from validation_error
+        except CONFIG_REFUSED as config_error:
+            # Both halves of the pair, and the reason is that this arm used to catch only
+            # pydantic's: `PipelexConfig` is a `ConfigRoot`, whose custom `__init__` translates
+            # into `ConfigValidationError`, so the arm never fired for the one configuration
+            # everything depends on and every boot failure arrived as a bare traceback instead.
+            raise_config_setup_error(config_error=config_error, surface_id=PIPELEX_CONFIG_SURFACE_ID)
 
         log_config = get_config().pipelex.log_config
         self.runtime_hub.set_console_print_target(target=log_config.console_print_target)
@@ -232,7 +235,11 @@ class RuntimeBoot(metaclass=MetaSingleton):
         if not isinstance(cause_exc, ValidationError):
             msg += f"\nUnexpexted cause:{cause_exc}"
             raise PipelexSetupError(msg) from cause_exc
-        report = report_validation_error(category="config", validation_error=cause_exc)
+        # No surface is named on purpose: the inference backend library and the model deck are not
+        # configuration surfaces — they have no ledger and the `migrate` walk does not claim their
+        # files — so offering a migration remedy for them would send the user to a command with
+        # nothing to do.
+        report = report_validation_error(validation_error=cause_exc).message
         return f"""{msg}
 {report}
 
