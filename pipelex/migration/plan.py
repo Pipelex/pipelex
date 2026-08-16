@@ -142,8 +142,9 @@ class FileBlockedReason(StrEnum):
     def leaves_the_write_unconfirmed(self) -> bool:
         """Whether this reason means the file may hold something other than what it was found with.
 
-        Every other reason leaves the file exactly as it was; a summary that says "nothing was
-        written" is true of them and false of this one.
+        Every other reason confirms this migration did not write — including `CHANGED_DURING_RUN`,
+        under which somebody else did; a summary that says "nothing was written" is true of them
+        and false of this one.
         """
         return self is FileBlockedReason.STATE_UNCERTAIN
 

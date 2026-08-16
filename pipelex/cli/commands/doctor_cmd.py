@@ -243,19 +243,21 @@ def check_telemetry_config(*, config_dir: Path | None = None) -> TelemetryConfig
     try:
         telemetry_config = TelemetryConfig.model_validate(toml_doc)
     except ValidationError as exc:
-        return _telemetry_is_out_of_date_or_wrong(validation_error=exc, config_dir=telemetry_config_path.parent)
+        return _telemetry_is_out_of_date_or_wrong(validation_error=exc, config_path=telemetry_config_path)
     return TelemetryConfigCheck(
         finding=TelemetryConfigFinding.HEALTHY,
         message=f"Telemetry configured (mode: {telemetry_config.custom_posthog.mode})",
     )
 
 
-def _telemetry_is_out_of_date_or_wrong(*, validation_error: ValidationError, config_dir: Path) -> TelemetryConfigCheck:
+def _telemetry_is_out_of_date_or_wrong(*, validation_error: ValidationError, config_path: Path) -> TelemetryConfigCheck:
     """Ask the ledger which of the two this is, and say so.
 
     The scan is aimed at the directory the probe actually read, not at the directories a real
-    migration walks: this row reports on one file, and answering it with a finding about the
-    other tier would name a file the reader is not looking at.
+    migration walks, and the answer is read off the plan for the file the probe read: this row
+    reports on one file, and answering it with a finding about the other tier — or about the
+    `telemetry_*.toml` tier file beside it in the same directory — would name a file the reader
+    is not looking at, and send them to a migration that leaves the error on this one behind.
 
     **A failure inside the scan never takes the health report down with it.** The same rule the
     boot retry and `report_validation_error` follow, and it costs more here than anywhere else: an
@@ -265,10 +267,11 @@ def _telemetry_is_out_of_date_or_wrong(*, validation_error: ValidationError, con
     reader needs either way. The catch stays narrow, so a bug in our applier surfaces as itself.
     """
     try:
-        report = scan_config_surface(surface_id=TELEMETRY_CONFIG_SURFACE_ID, config_dirs=[config_dir])
+        report = scan_config_surface(surface_id=TELEMETRY_CONFIG_SURFACE_ID, config_dirs=[config_path.parent])
     except (MigrationError, OSError):
         report = None
-    if report is not None and not report.is_clean:
+    own_plan = next((plan for plan in report.plans if plan.file_path == config_path), None) if report is not None else None
+    if own_plan is not None and not own_plan.is_clean:
         return TelemetryConfigCheck(
             finding=TelemetryConfigFinding.OUT_OF_DATE,
             message=f"Configuration is out of date — run '{MIGRATE_COMMAND}' to bring it up to date",

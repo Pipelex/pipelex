@@ -20,7 +20,7 @@ from pipelex.migration.exceptions import MigrationLedgerError
 from pipelex.system.configuration.config_loader import ConfigLoader, config_manager
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.exceptions import ConfigValidationError
-from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
+from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TELEMETRY_CONFIG_OVERRIDE_FILE_NAME
 from pipelex.tools.misc.exceptions import TomlError
 
 if TYPE_CHECKING:
@@ -296,3 +296,19 @@ class TestDoctorConfigChecks:
         check = check_telemetry_config(config_dir=inspected)
 
         assert check.finding is TelemetryConfigFinding.INVALID
+
+    def test_check_telemetry_config_answers_for_its_own_file_not_the_tier_beside_it(self, tmp_path: Path) -> None:
+        """A stale tier file in the same directory does not make the base file old.
+
+        The probe validates one file; the scan walks the directory it lives in, which also holds
+        the `telemetry_*.toml` tier. A wrong `telemetry.toml` beside a stale
+        `telemetry_override.toml` is wrong, and saying "run migrate" would leave the error behind.
+        """
+        (tmp_path / TELEMETRY_CONFIG_FILE_NAME).write_text('[custom_posthog]\nmode = "no-such-mode"\n', encoding="utf-8")
+        (tmp_path / TELEMETRY_CONFIG_OVERRIDE_FILE_NAME).write_text('telemetry_mode = "off"\n', encoding="utf-8")
+
+        check = check_telemetry_config(config_dir=tmp_path)
+
+        assert check.finding is TelemetryConfigFinding.INVALID
+        assert "custom_posthog.mode" in check.message
+        assert MIGRATE_COMMAND not in check.message

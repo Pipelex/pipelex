@@ -90,14 +90,19 @@ def migrate_cmd(*, dry_run: bool = False, yes: bool = False) -> None:
     if not yes and not Confirm.ask(f"[bold]Migrate {len(rehearsal.changed_plans)} file(s)?[/bold]", default=True):
         console.print("[yellow]Migration cancelled — nothing was written.[/yellow]")
         console.print()
+        # The "no" answered "shall I write?"; what the rehearsal left for a person is still there.
+        _exit_on_attention(report=rehearsal)
         return
 
     applied = apply_pending_migrations(config_dirs=config_dirs)
     written = len(applied.written_plans)
-    if written:
+    unconfirmed = any(plan.blocked_reason is not None and plan.blocked_reason.leaves_the_write_unconfirmed for plan in applied.plans)
+    if unconfirmed:
+        # Tested first: a file in an unknown state is the verdict of the run, however many others landed.
+        lead = f"Migrated {written} file(s), but no write could be confirmed for every file" if written else "No write could be confirmed"
+        console.print(_panel(message=f"{lead} — compare each file marked above against the rescue copy named there.", style="red"))
+    elif written:
         console.print(_panel(message=f"Migrated {written} file(s); a copy of each original is beside it.", style="green"))
-    elif any(plan.blocked_reason is not None and plan.blocked_reason.leaves_the_write_unconfirmed for plan in applied.plans):
-        console.print(_panel(message="No write could be confirmed — compare each file against the rescue copy named above.", style="red"))
     else:
         console.print(_panel(message="Nothing was written.", style="yellow"))
     console.print()
