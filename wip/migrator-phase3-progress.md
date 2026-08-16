@@ -335,6 +335,28 @@ tests/e2e/pipelex/cli/test_migrate_commands.py     the diagnosis through the rea
 
 Mutation-tested: dropping the reserved-meta strip, the open-node `*` fallback, the blocked-entry subtraction, the stop-at-an-unknown-table, the scalar-descend guard, the schema spelling, the remap exclusion, the forward trace, the `declared_removed_paths` source, and diagnosing the document as it was read each turn exactly the intended tests red.
 
+## Where this session paused
+
+**Paused right after milestone 6 was committed.** `feature/Migrator-3b` = *"Migrator Phase 3, milestone 6: name what the migration cannot explain"*, working tree clean, **still no upstream** — the first push is `git push -u origin feature/Migrator-3b`. `make agent-check`, `make cl`, `make cmig`, `make docs-check`, `make drift-check` (with the changes staged) and the **full `make agent-test`** were all green before the commit.
+
+### Groundwork already done for boot tolerance (item 2), so the next session does not redo it
+
+**The import cycle everyone would fear is not there.** `pipelex.migration.engine` + `pipelex.migration.ledger` pull in only `pipelex.system.configuration.config_model` — not `configs`, not `config_loader`, not `telemetry_config`. What pulls the configuration models into the migration package is `migration/surfaces.py` (the **registry**), and boot tolerance does not need it: a loader already knows its own surface id and its own list of paths. So the helper may import the engine and the ledger at module level from `config_surface.py`.
+
+**"The healthy path never loads tomlkit" is about parsing, not importing.** `config_loader` already imports tomlkit through `tools/misc/toml_utils.py`. The property to keep is that a healthy boot never *re-reads* the files as a DOM and never reads a ledger.
+
+**The three loaders and their merge steps** (each calls `strip_reserved_meta` today, which is the seam the contract points at):
+
+| Surface | Loader | What sits between the merge and the validate |
+|---|---|---|
+| `pipelex-config` | `config_loader.py` `ConfigLoader.load_config` | `extra_overrides` deep-merged on top; a unit-testing layer below |
+| `telemetry-config` | `telemetry_config.py` (`load_telemetry_config`) | `${VAR}` substitution over every string |
+| `pipelex-service-config` | `pipelex_service_config.py` `load_pipelex_service_config_if_exists` | nothing |
+
+Because those steps differ, **the helper cannot own the whole load**. The shape that works is a helper owning the *failure path only* — given a surface id and the same ordered path list the loader merged, it reads each existing file, replays that surface's `safe` entries in memory, deep-merges the migrated documents in the same order, and hands back the merged dict plus the per-file `MigrationPlan`s — returning nothing when no operation applied, since then the failure is not staleness. The loader re-runs its own post-merge steps and re-validates.
+
+**Decision taken, and the reason worth keeping:** *boot tolerance does not run the downgrade diagnosis.* On the boot path the model has already spoken — pydantic's own extra-field list is the unexplained set, and it is more accurate than a path walk because it knows about validators. The diagnosis exists for the `migrate` command, where nothing validates the file. So the `migration` block on a configuration validation error carries the **plans**, and the "unexplained paths still fail the boot" clause of the contract is satisfied by the re-validation failing, not by a second diagnosis.
+
 ## What is actually left
 
 Measured against the charter's own **Done when** list ([§ S6](../../wip/migrator-3/sequencing.md#s6--migrator-phase-3)), verified against the tree rather than against this file:
