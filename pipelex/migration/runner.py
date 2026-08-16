@@ -17,12 +17,13 @@ from pathlib import Path
 
 from tomlkit.exceptions import TOMLKitError
 
+from pipelex import log
 from pipelex.migration.backup import prune_backups_except, write_backup
 from pipelex.migration.engine import replay_ledger_over_text
 from pipelex.migration.ledger import MigrationLedger, load_ledger_cached
 from pipelex.migration.plan import FileBlockedReason, MigrationPlan, MigrationReport
 from pipelex.migration.surfaces import Surface, SurfaceRegistry
-from pipelex.pipeline.exceptions import FixWriteConflictError
+from pipelex.pipeline.exceptions import FixTransactionError, FixWriteConflictError
 from pipelex.pipeline.fixes.file_transaction import FileSnapshot, PendingFileUpdate, commit_file_updates, read_file_snapshot
 
 
@@ -84,6 +85,12 @@ def _write_migrated_file(*, plan: MigrationPlan, snapshot: FileSnapshot, new_con
     and no copy of the original; pruning last means there is never a moment with no backup at all.
     A commit that fails takes its own fresh backup with it, so a failed run leaves the directory
     exactly as it found it.
+
+    Nothing raised in here escapes to the caller: this is the per-file boundary, and an exception
+    crossing it would abort every sibling file after this one — the one thing the per-file scope
+    exists to rule out. Whatever goes wrong lands on this file's plan, or, once the file is
+    written, in a warning, because a written file is written whatever happens to the housekeeping
+    around it.
     """
     try:
         backup_path = write_backup(snapshot=snapshot, moment=moment)
@@ -105,9 +112,32 @@ def _write_migrated_file(*, plan: MigrationPlan, snapshot: FileSnapshot, new_con
         return plan.model_copy(
             update={"blocked_reason": FileBlockedReason.UNWRITABLE, "blocked_detail": f"the file could not be written: {exc.strerror or exc}"}
         )
+    except FixTransactionError as exc:
+        # The primitive raises this when it cannot vouch for the state it leaves behind — a rollback
+        # that did not complete, or a replacement that landed but whose temp files could not be
+        # removed. The exception cannot say which; the file can, so ask it.
+        if not _carries(path=snapshot.path, content=new_content):
+            backup_path.unlink(missing_ok=True)
+            return plan.model_copy(update={"blocked_reason": FileBlockedReason.UNWRITABLE, "blocked_detail": f"the file could not be written: {exc}"})
+        log.warning(f"'{snapshot.path}' was migrated, but the write left something behind: {exc}")
 
-    prune_backups_except(path=snapshot.path, keep=backup_path)
+    try:
+        prune_backups_except(path=snapshot.path, keep=backup_path)
+    except OSError as exc:
+        # An older backup that would not go is a housekeeping failure on a file that is already
+        # migrated and already backed up. Not the plan's to report as a failure of the file.
+        log.warning(
+            f"'{snapshot.path}' was migrated and backed up to '{backup_path}', but an older backup could not be pruned: {exc.strerror or exc}"
+        )
     return plan.model_copy(update={"backup_path": backup_path, "was_written": True})
+
+
+def _carries(*, path: Path, content: str) -> bool:
+    """Whether the file on disk holds exactly this text — the one question a failed commit leaves open."""
+    try:
+        return path.read_bytes() == content.encode("utf-8")
+    except OSError:
+        return False
 
 
 def _blocked_plan(*, surface_id: str, file_path: Path, reason: FileBlockedReason, detail: str) -> MigrationPlan:

@@ -37,8 +37,20 @@ class TestTheTelemetryBackEntry:
 
         migrated: dict[str, Any] = load_toml_from_content(replay.text)
         assert TelemetryConfig.model_validate(migrated).custom_posthog.mode is PostHogMode.ANONYMOUS
-        assert migrated["custom_posthog"]["api_key"] == "phc_example_project_api_key"
-        assert "telemetry_mode" not in migrated
+        # Every value the flat era set is carried, under the key the current shape gives it, and
+        # nothing else is left at the root — data fidelity is what this entry is for, so it is
+        # asserted rather than left to `extra="forbid"`.
+        assert migrated == {
+            "custom_posthog": {
+                "mode": "anonymous",
+                "endpoint": "https://eu.i.posthog.com",
+                "api_key": "phc_example_project_api_key",
+                "user_id": "",
+                "geoip": True,
+                "debug": False,
+                "redact_properties": ["prompt", "system_prompt", "response", "file_path", "url"],
+            }
+        }
 
     def test_replaying_it_again_changes_nothing(self) -> None:
         """The migrated file is a current file, and a current file is what replay must not touch."""

@@ -15,10 +15,12 @@ expressed by a model at all.
 from enum import StrEnum
 from pathlib import Path
 
+import pytest
 from pydantic import BaseModel, ConfigDict, Field
 
+from pipelex.migration.exceptions import MigrationGoldenError
 from pipelex.migration.fingerprint import compute_fingerprint
-from pipelex.migration.goldens import pre_history_document_path, write_defaults_golden, write_fingerprint_golden
+from pipelex.migration.goldens import defaults_golden_path, pre_history_document_path, write_defaults_golden, write_fingerprint_golden
 from pipelex.migration.ledger import ledgers_dir
 from pipelex.migration.surfaces import DefaultsLayerKind, Surface
 from pipelex.migration.transform_check import TransformIssue, TransformIssueKind, check_transform_chain
@@ -345,6 +347,28 @@ mapping    = { basic = "standrad" }
         _defaults(migration_dir=tmp_path, schema_version=1, document='[deck.claude]\nold_name = "b"\n')
         _defaults(migration_dir=tmp_path, schema_version=2, document='[deck.claude]\nnew_name = "b"\n\n[deck.gpt6]\nnew_name = "c"\n')
         assert check_transform_chain(surface=_surface(config_model=_Deck), migration_dir=tmp_path) == []
+
+    def test_a_destination_beneath_an_open_mapping_that_the_new_document_omits_is_tolerated(self, tmp_path: Path) -> None:
+        """The fingerprint records `deck.*.new_name`; the document carries `deck.claude.new_name`, or not.
+
+        A packaged deck entry can drop a key in the same commit that renames it, because the new
+        default is what it wanted anyway. The destination is then absent from the reference
+        document and present in the fingerprint only under the wildcard — a literal comparison
+        would call the correct rename a misspelled destination.
+        """
+        _write_ledger(migration_dir=tmp_path, entries=_entry(ops=_rename(key="old_name", new_key="new_name", table_path='["deck", "*"]')))
+        _defaults(migration_dir=tmp_path, schema_version=1, document='[deck.claude]\nold_name = "b"\n')
+        _defaults(migration_dir=tmp_path, schema_version=2, document="[deck.claude]\n")
+        _fingerprint(migration_dir=tmp_path, config_model=_Deck, schema_version=2)
+        assert check_transform_chain(surface=_surface(config_model=_Deck), migration_dir=tmp_path) == []
+
+    def test_a_reference_document_that_cannot_be_read_is_refused_by_name(self, tmp_path: Path) -> None:
+        """A golden that exists but cannot be read is a broken golden, not a crash: the gate names it."""
+        _write_ledger(migration_dir=tmp_path, entries=_entry(ops=_rename(key="label", new_key="title")))
+        _defaults(migration_dir=tmp_path, schema_version=2, document='title = "hello"\n')
+        defaults_golden_path(migration_dir=tmp_path, surface_id=SURFACE_ID, schema_version=1).write_bytes(b"\xff\xfe not utf-8")
+        with pytest.raises(MigrationGoldenError, match=r"defaults@1\.toml"):
+            check_transform_chain(surface=_surface(config_model=_Renamed), migration_dir=tmp_path)
 
     def test_an_entry_dropped_from_an_open_mapping_does_not_blame_the_operation(self, tmp_path: Path) -> None:
         """When a whole container is gone from the new document, what happened inside it says nothing.

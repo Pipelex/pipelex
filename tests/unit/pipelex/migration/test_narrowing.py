@@ -136,3 +136,25 @@ class TestTheNarrowingRelation:
             after=_record(value_type="int"),
         )
         assert lost == ["basic", "premium"]
+
+    def test_a_literal_whose_spellings_became_non_strings_still_loses_them(self) -> None:
+        """`Literal['a']` to `Literal[1]` renders the same type on both sides and records no members
+        after — the one shape where the type comparison alone would wave a lost spelling through.
+        """
+        lost = lost_enumerated_spellings(
+            before=_record(value_type="literal", enum_members=["a"]),
+            after=_record(value_type="literal"),
+        )
+        assert lost == ["a"]
+
+    @pytest.mark.parametrize(
+        ("before_step", "after_step"),
+        [(0.3, 0.1), (1.0, 0.5), (0.6, 0.2)],
+    )
+    def test_a_relaxed_float_step_is_read_exactly_rather_than_in_binary(self, before_step: float, after_step: float) -> None:
+        """`0.3 % 0.1` is not zero in binary floating point; a widening must not read as a tightening for it."""
+        reasons = describe_narrowing(
+            before=_record(constraints={ConstraintKind.MULTIPLE_OF: before_step}),
+            after=_record(constraints={ConstraintKind.MULTIPLE_OF: after_step}),
+        )
+        assert reasons == []

@@ -164,6 +164,21 @@ class MoveKeyOp(FixOpBase):
             raise ValueError(msg)
         return new_table_path
 
+    @field_validator("table_path")
+    @classmethod
+    def refuse_wildcard_source(cls, table_path: list[str]) -> list[str]:
+        """A move cannot start from a wildcard either, and for the same reason read the other way.
+
+        With the destination pinned to one fixed key, "move each entry's key" is many-to-one: on
+        any file where two matched entries carry the key, the second lands on a destination the
+        first just occupied and the whole operation conflicts. The other kinds act on each matched
+        entry in place, which is what makes a wildcard mean something for them.
+        """
+        if WILDCARD_SEGMENT in table_path:
+            msg = f"a move_key source may not contain the wildcard segment '{WILDCARD_SEGMENT}': every matched entry would move onto one destination"
+            raise ValueError(msg)
+        return table_path
+
 
 class RemapValueOp(FixOpBase):
     """Rewrite ``key``'s value through ``mapping``, doing nothing when it is not a mapped value.

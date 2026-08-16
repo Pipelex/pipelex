@@ -265,5 +265,7 @@ api_key = "sk-live-DO-NOT-RENDER-THIS"
 
         replay = replay_ledger_over_text(ledger=ledger, text=secret_bearing)
 
+        # The entry must actually be reported — a report of nothing renders no value trivially.
+        assert [blocked.entry_id for blocked in replay.blocked] == ["example-config@2"]
         rendered = replay.model_dump_json(exclude={"text"})
         assert "DO-NOT-RENDER-THIS" not in rendered

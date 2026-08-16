@@ -24,6 +24,8 @@ which of the old spellings really stopped being accepted, so that an enum relaxe
 string is read as the widening it is instead of as the loss of every member it had.
 """
 
+from fractions import Fraction
+
 from pipelex.migration.fingerprint import ENUM_TYPE, LITERAL_TYPE, STRING_TYPE, ConstraintKind, PathFingerprint
 
 _UNION_JOIN = " | "
@@ -54,10 +56,14 @@ def lost_enumerated_spellings(*, before: PathFingerprint, after: PathFingerprint
     records no members afterwards, so every spelling it had reads as lost, while in truth every one
     of them still validates. That change is a widening and must ask for nothing — a bump demanded
     there is a gate crying wolf on a change no user's file notices.
+
+    The exemption is exactly that case — the new type admits `str` — and not "the type did not
+    narrow": `Literal['a']` to `Literal[1]` renders the same type on both sides and records no
+    members after, and every file carrying `'a'` stops validating.
     """
     if not before.enum_members:
         return []
-    if not after.enum_members and _is_type_widening(before=before.value_type, after=after.value_type):
+    if not after.enum_members and STRING_TYPE in _union_members(rendered=after.value_type):
         return []
     return sorted(set(before.enum_members) - set(after.enum_members or []))
 
@@ -162,6 +168,8 @@ def _describe_multiple_of(*, before: dict[ConstraintKind, int | float], after: d
     after_step = after.get(ConstraintKind.MULTIPLE_OF)
     if after_step is None or after_step == 0:
         return []
-    if before_step is not None and before_step % after_step == 0:
+    # Divisibility is decided over exact rationals: `0.3 % 0.1` is not zero in binary floating
+    # point, and a relaxed step must not read as a tightened one.
+    if before_step is not None and Fraction(str(before_step)) % Fraction(str(after_step)) == 0:
         return []
     return [f"its step tightened from {'unbounded' if before_step is None else f'multiple_of={before_step}'} to multiple_of={after_step}"]

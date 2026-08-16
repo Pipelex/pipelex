@@ -123,10 +123,10 @@ def _rename_key_in_place(*, parent_table: dict[str, Any], key: str, new_key: str
     a tomlkit bump ever changes this.
 
     ⚠ **A rename leaves the node's raw ``dict`` storage stale for a value that is not a Table.**
-    ``_replace_at`` deletes the old key from the dict and only writes the new one back inside its
+    ``_replace_at`` leaves the old key in the dict and only writes the new one into it inside its
     table branch, so everything tomlkit renders or looks up stays right (``dumps``, ``in``, ``[]``,
     ``.get()`` all read the authoritative body) while ``dict.__delitem__`` — which
-    ``Container.remove`` calls — can no longer find the key. Addressing a renamed **scalar or
+    ``Container.remove`` calls — cannot find the new key. Addressing a renamed **scalar or
     inline-table** key again in the same DOM therefore raises ``KeyError`` from inside the library.
     The ``.mthds`` fix path is unaffected because it renames ``[pipe.*]`` tables, which take the
     branch tomlkit maintains; configuration migration re-reads the document between operations

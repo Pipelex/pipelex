@@ -3,8 +3,8 @@
 `_rename_key_in_place` renames through `Container._replace`, tomlkit's own position-preserving
 primitive — the only one there is, and the reason a renamed key keeps its place among its siblings
 instead of being appended at the bottom of its parent. What it does **not** do, for a value that
-is not a `Table`, is update the node's raw `dict` storage: the key is deleted from the dict and the
-new one is only ever written back inside the table branch of `_replace_at`.
+is not a `Table`, is update the node's raw `dict` storage: the old key stays in the dict and the
+new one is only ever written into it inside the table branch of `_replace_at`.
 
 Everything tomlkit renders or looks up still works — `dumps`, `in`, `[]`, `.get()` all read the
 authoritative body — so a single rename followed by serialization is correct, which is why the

@@ -72,10 +72,12 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from pipelex.migration.documents import document_paths
 from pipelex.migration.engine import apply_ops_over_text
+from pipelex.migration.exceptions import MigrationGoldenError
 from pipelex.migration.fingerprint import PATH_SEPARATOR, SurfaceFingerprint
 from pipelex.migration.goldens import defaults_golden_path, pre_history_document_path, read_fingerprint_golden
 from pipelex.migration.ledger import MigrationEntry, MigrationLedger, MigrationSafety, load_ledger
 from pipelex.migration.surfaces import Surface, SurfaceRegistry
+from pipelex.suggested_fix import WILDCARD_SEGMENT
 from pipelex.system.configuration.config_surface import strip_reserved_meta
 from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_utils import load_toml_from_content
@@ -189,7 +191,7 @@ def _check_paths(
     migrated_paths = _paths_of(text=migrated_text)
     recorded_paths = after_fingerprint.path_names() if after_fingerprint is not None else set[str]()
 
-    created = migrated_paths - before_paths - recorded_paths
+    created = {path for path in migrated_paths - before_paths if not _is_recorded(path=path, recorded_paths=recorded_paths)}
     unexpected = {path for path in created - after_paths if _ancestors_are_in(path=path, paths=after_paths)}
     removed = (before_paths & after_paths) - migrated_paths
 
@@ -254,8 +256,24 @@ def _check_the_migrated_document_is_accepted(*, surface: Surface, entry: Migrati
 
 
 def _read_defaults_golden(*, migration_dir: Path, surface_id: str, schema_version: int) -> str | None:
-    path = defaults_golden_path(migration_dir=migration_dir, surface_id=surface_id, schema_version=schema_version)
-    return path.read_text(encoding="utf-8") if path.exists() else None
+    return _read_golden_text(path=defaults_golden_path(migration_dir=migration_dir, surface_id=surface_id, schema_version=schema_version))
+
+
+def _read_golden_text(*, path: Path) -> str | None:
+    """A golden's text, `None` when it does not exist — and a named refusal when it exists but cannot be read.
+
+    Raises:
+        MigrationGoldenError: the file is there and is not readable UTF-8 text. A gate has to say
+            which file, the same way `read_fingerprint_golden` does; a raw traceback from deep in a
+            comparison names nothing an author can act on.
+    """
+    if not path.exists():
+        return None
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, ValueError) as exc:
+        msg = f"unreadable golden at {path}: {exc}"
+        raise MigrationGoldenError(msg) from exc
 
 
 def _read_document_the_entry_migrates_from(*, surface: Surface, entry: MigrationEntry, migration_dir: Path) -> str | None:
@@ -268,8 +286,7 @@ def _read_document_the_entry_migrates_from(*, surface: Surface, entry: Migration
     verifies a pre-history entry, and they are the same three claims every other entry answers.
     """
     if entry.pre_history:
-        path = _pre_history_document_path(surface=surface, entry=entry, migration_dir=migration_dir)
-        return path.read_text(encoding="utf-8") if path.exists() else None
+        return _read_golden_text(path=_pre_history_document_path(surface=surface, entry=entry, migration_dir=migration_dir))
     return _read_defaults_golden(migration_dir=migration_dir, surface_id=surface.surface_id, schema_version=entry.to_schema_version - 1)
 
 
@@ -300,6 +317,33 @@ def _starting_document_missing(*, surface: Surface, entry: MigrationEntry, migra
 
 def _paths_of(*, text: str) -> set[str]:
     return document_paths(document=load_toml_from_content(text))
+
+
+def _is_recorded(*, path: str, recorded_paths: set[str]) -> bool:
+    """Whether a concrete document path is one the fingerprint records, wildcard included.
+
+    A document names the user's own key where the fingerprint names `*`, so `deck.claude.new_name`
+    is recorded as `deck.*.new_name`. Comparing the two literally would let a rename beneath an
+    open mapping read as a misspelled destination whenever the reference document happens not to
+    carry that key under that entry.
+    """
+    if path in recorded_paths:
+        return True
+    segments = path.split(PATH_SEPARATOR)
+    for recorded in recorded_paths:
+        recorded_segments = recorded.split(PATH_SEPARATOR)
+        if len(recorded_segments) != len(segments):
+            continue
+        if all(
+            _segment_matches(recorded=recorded_segment, concrete=segment)
+            for recorded_segment, segment in zip(recorded_segments, segments, strict=True)
+        ):
+            return True
+    return False
+
+
+def _segment_matches(*, recorded: str, concrete: str) -> bool:
+    return recorded in {WILDCARD_SEGMENT, concrete}
 
 
 def _ancestors_are_in(*, path: str, paths: set[str]) -> bool:

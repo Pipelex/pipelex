@@ -5,17 +5,22 @@ processed is reported as blocked while every sibling is migrated normally — un
 fix loop, whose files only make sense together and which commits a round all-or-nothing.
 """
 
+import errno
 import stat
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
+from pytest_mock import MockerFixture
+
 from pipelex.migration.backup import existing_backups_of
-from pipelex.migration.ledger import ledgers_dir
 from pipelex.migration.plan import FileBlockedReason
 from pipelex.migration.runner import migrate_directories, migrate_file
 from pipelex.migration.surfaces import SurfaceRegistry
+from pipelex.pipeline.exceptions import FixTransactionError
+from pipelex.pipeline.fixes.file_transaction import PendingFileUpdate, commit_file_updates
 from pipelex.suggested_fix import RenameTableKeyOp
-from tests.unit.pipelex.migration.conftest import EntryBuilder, LedgerBuilder, SurfaceBuilder
+from tests.unit.pipelex.migration.conftest import EXAMPLE_SURFACE_ID, EntryBuilder, LedgerBuilder, SurfaceBuilder
 
 MOMENT = datetime(2026, 8, 15, 12, 0, 0, tzinfo=UTC)
 
@@ -159,12 +164,156 @@ class TestMigrationRunner:
         assert target.read_text(encoding="utf-8") == current
         assert not existing_backups_of(path=target)
 
+    def test_a_users_own_backup_like_file_survives_the_pruning(
+        self,
+        tmp_path: Path,
+        build_entry: EntryBuilder,
+        build_ledger: LedgerBuilder,
+        build_surface: SurfaceBuilder,
+    ) -> None:
+        """Only names carrying the stamp we write are ours to prune; anything else beside the file is the user's."""
+        target = tmp_path / "example.toml"
+        target.write_text(OLD_SHAPE, encoding="utf-8")
+        users_own = tmp_path / "example.toml.bak.notes"
+        users_own.write_text("my own copy\n", encoding="utf-8")
+        stale_backup = tmp_path / "example.toml.bak.20200101T000000Z"
+        stale_backup.write_text("from another era\n", encoding="utf-8")
+        ledger = build_ledger(
+            entries=[build_entry(to_schema_version=2, ops=[RenameTableKeyOp(table_path=["reporting"], key="output_config", new_key="output")])]
+        )
+
+        plan = migrate_file(surface=build_surface(), ledger=ledger, file_path=target, dry_run=False, moment=MOMENT)
+
+        assert plan.was_written
+        assert users_own.read_text(encoding="utf-8") == "my own copy\n"
+        assert not stale_backup.exists()
+        assert existing_backups_of(path=target) == [plan.backup_path]
+
+    def test_a_backup_that_cannot_be_placed_leaves_no_staged_copy_behind(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        build_entry: EntryBuilder,
+        build_ledger: LedgerBuilder,
+        build_surface: SurfaceBuilder,
+    ) -> None:
+        target = tmp_path / "example.toml"
+        target.write_text(OLD_SHAPE, encoding="utf-8")
+        ledger = build_ledger(
+            entries=[build_entry(to_schema_version=2, ops=[RenameTableKeyOp(table_path=["reporting"], key="output_config", new_key="output")])]
+        )
+        mocker.patch.object(Path, "replace", side_effect=OSError(errno.EACCES, "Permission denied"))
+
+        plan = migrate_file(surface=build_surface(), ledger=ledger, file_path=target, dry_run=False, moment=MOMENT)
+
+        assert plan.blocked_reason is FileBlockedReason.UNWRITABLE
+        assert not plan.was_written
+        assert target.read_text(encoding="utf-8") == OLD_SHAPE
+        assert sorted(path.name for path in tmp_path.iterdir()) == ["example.toml"]
+
+    def test_a_transaction_error_after_the_write_landed_reports_the_file_as_written(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        build_surface: SurfaceBuilder,
+        write_ledger_file: Callable[..., Path],
+    ) -> None:
+        """The primitive can raise after the target was replaced (its own temp cleanup failed). The plan must say what happened
+        to the file, not what happened to the temp files — and the sibling must still be migrated.
+        """
+        config_dir = tmp_path / ".pipelex"
+        config_dir.mkdir()
+        first = config_dir / "example.toml"
+        first.write_text(OLD_SHAPE, encoding="utf-8")
+        second = config_dir / "example_local.toml"
+        second.write_text(OLD_SHAPE, encoding="utf-8")
+        migration_dir = tmp_path / "migration"
+        write_ledger_file(migration_dir=migration_dir, surface_id=EXAMPLE_SURFACE_ID, body=_LEDGER_TOML)
+        real_commit = commit_file_updates
+
+        def commit_then_fail_cleanup(updates: list[PendingFileUpdate]) -> None:
+            real_commit(updates)
+            if updates[0].snapshot.path == first:
+                msg = "target changes were committed, but temporary-file cleanup failed"
+                raise FixTransactionError(msg)
+
+        mocker.patch("pipelex.migration.runner.commit_file_updates", side_effect=commit_then_fail_cleanup)
+
+        report = migrate_directories(
+            registry=SurfaceRegistry(surfaces=[build_surface()]), migration_dir=migration_dir, config_dirs=[config_dir], dry_run=False, moment=MOMENT
+        )
+
+        assert [plan.was_written for plan in report.plans] == [True, True]
+        assert all(plan.blocked_reason is None for plan in report.plans)
+        assert "output = " in first.read_text(encoding="utf-8")
+        assert existing_backups_of(path=first) == [report.plans[0].backup_path]
+
+    def test_a_transaction_error_before_the_write_landed_blocks_the_file_and_spares_its_siblings(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        build_surface: SurfaceBuilder,
+        write_ledger_file: Callable[..., Path],
+    ) -> None:
+        config_dir = tmp_path / ".pipelex"
+        config_dir.mkdir()
+        first = config_dir / "example.toml"
+        first.write_text(OLD_SHAPE, encoding="utf-8")
+        second = config_dir / "example_local.toml"
+        second.write_text(OLD_SHAPE, encoding="utf-8")
+        migration_dir = tmp_path / "migration"
+        write_ledger_file(migration_dir=migration_dir, surface_id=EXAMPLE_SURFACE_ID, body=_LEDGER_TOML)
+        real_commit = commit_file_updates
+
+        def fail_first_commit(updates: list[PendingFileUpdate]) -> None:
+            if updates[0].snapshot.path == first:
+                msg = "commit failed and rollback was incomplete"
+                raise FixTransactionError(msg)
+            real_commit(updates)
+
+        mocker.patch("pipelex.migration.runner.commit_file_updates", side_effect=fail_first_commit)
+
+        report = migrate_directories(
+            registry=SurfaceRegistry(surfaces=[build_surface()]), migration_dir=migration_dir, config_dirs=[config_dir], dry_run=False, moment=MOMENT
+        )
+
+        assert [plan.was_written for plan in report.plans] == [False, True]
+        assert report.plans[0].blocked_reason is FileBlockedReason.UNWRITABLE
+        assert first.read_text(encoding="utf-8") == OLD_SHAPE
+        assert not existing_backups_of(path=first)
+        assert "output = " in second.read_text(encoding="utf-8")
+
+    def test_a_pruning_failure_never_turns_a_written_file_into_a_blocked_one(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        build_entry: EntryBuilder,
+        build_ledger: LedgerBuilder,
+        build_surface: SurfaceBuilder,
+    ) -> None:
+        target = tmp_path / "example.toml"
+        target.write_text(OLD_SHAPE, encoding="utf-8")
+        stale_backup = tmp_path / "example.toml.bak.20200101T000000Z"
+        stale_backup.write_text("from another era\n", encoding="utf-8")
+        ledger = build_ledger(
+            entries=[build_entry(to_schema_version=2, ops=[RenameTableKeyOp(table_path=["reporting"], key="output_config", new_key="output")])]
+        )
+        mocker.patch("pipelex.migration.runner.prune_backups_except", side_effect=OSError(errno.EACCES, "Permission denied"))
+
+        plan = migrate_file(surface=build_surface(), ledger=ledger, file_path=target, dry_run=False, moment=MOMENT)
+
+        assert plan.was_written
+        assert plan.blocked_reason is None
+        assert "output = " in target.read_text(encoding="utf-8")
+        assert stale_backup.exists()
+
     def test_an_unparseable_file_is_blocked_and_its_siblings_are_still_migrated(
         self,
         tmp_path: Path,
         build_entry: EntryBuilder,
         build_ledger: LedgerBuilder,
         build_surface: SurfaceBuilder,
+        write_ledger_file: Callable[..., Path],
     ) -> None:
         migration_dir = tmp_path / "migration"
         surface = build_surface()
@@ -176,7 +325,7 @@ class TestMigrationRunner:
                 )
             ]
         )
-        _write_ledger(migration_dir=migration_dir, ledger_toml=_LEDGER_TOML)
+        write_ledger_file(migration_dir=migration_dir, surface_id=EXAMPLE_SURFACE_ID, body=_LEDGER_TOML)
 
         config_dir = tmp_path / ".pipelex"
         config_dir.mkdir()
@@ -206,9 +355,10 @@ class TestMigrationRunner:
         self,
         tmp_path: Path,
         build_surface: SurfaceBuilder,
+        write_ledger_file: Callable[..., Path],
     ) -> None:
         migration_dir = tmp_path / "migration"
-        _write_ledger(migration_dir=migration_dir, ledger_toml=_LEDGER_TOML)
+        write_ledger_file(migration_dir=migration_dir, surface_id=EXAMPLE_SURFACE_ID, body=_LEDGER_TOML)
 
         report = migrate_directories(
             registry=SurfaceRegistry(surfaces=[build_surface()]),
@@ -245,11 +395,3 @@ table_path = ["reporting"]
 key = "output_config"
 new_key = "output"
 """
-
-
-def _write_ledger(*, migration_dir: Path, ledger_toml: str) -> Path:
-    directory = ledgers_dir(migration_dir=migration_dir)
-    directory.mkdir(parents=True, exist_ok=True)
-    path = directory / "example-config.toml"
-    path.write_text(ledger_toml, encoding="utf-8")
-    return path

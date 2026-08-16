@@ -159,12 +159,19 @@ def _documents_at_an_older_shape(  # kw-only: ignore — Hypothesis passes `draw
     Idempotence and prefix coherence are claims about files that still have something to migrate,
     so they need documents the ledger will actually act on — the neutrality domain is exactly the
     set where it does not.
+
+    Putting a retired key back means taking its successor out: a document carrying both `heading`
+    and `title` is not an older shape but a hand-fixed one, on which the rename conflicts and
+    writes nothing — and a property quantified over stable conflicts would say nothing about
+    a rename.
     """
     generated = draw(_documents_for(surface=SYNTHETIC_SURFACE))
     document = tomlkit.loads(generated.text).unwrap()
     if draw(st.booleans()):
+        document.pop("title", None)
         document["heading"] = "a heading from before the rename"
     if draw(st.booleans()):
+        cast("dict[str, Any]", document.get("section", {})).pop("enabled", None)
         document["chatty"] = True
     if draw(st.booleans()):
         document["tone"] = "shouty"
@@ -275,6 +282,23 @@ class TestTheReplayProperties:
         found = find(_documents_at_an_older_shape(), lambda text: replay_ledger_over_text(ledger=SYNTHETIC_LEDGER, text=text).did_change_document)
 
         assert replay_ledger_over_text(ledger=SYNTHETIC_LEDGER, text=found).did_change_document
+
+    def test_the_older_shape_generator_reaches_documents_where_the_rename_and_the_move_really_apply(self) -> None:
+        """`did_change_document` is also true of a conflicting entry whose other operations landed.
+
+        A generator that put the retired keys back without taking their successors out would reach
+        `did_change_document` through the remap and the deletes alone, while the rename and the move
+        conflicted on every draw — and idempotence would then be a claim about stable conflicts.
+        """
+
+        def rename_and_move_applied(text: str) -> bool:
+            replay = replay_ledger_over_text(ledger=SYNTHETIC_LEDGER, text=text)
+            applied = [op for step in replay.steps for op in step.applied_ops]
+            return not replay.blocked and any(isinstance(op, RenameTableKeyOp) for op in applied) and any(isinstance(op, MoveKeyOp) for op in applied)
+
+        found = find(_documents_at_an_older_shape(), rename_and_move_applied)
+
+        assert rename_and_move_applied(found)
 
     @PROPERTY_SETTINGS
     @given(text=_documents_at_an_older_shape())

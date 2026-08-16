@@ -13,6 +13,7 @@ copy sitting beside it.
 See `docs/migration-ledger.md` → "Backups".
 """
 
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -24,6 +25,10 @@ so `pipelex.toml` backs up to `pipelex.toml.bak.<stamp>` and never shadows a rea
 
 BACKUP_STAMP_FORMAT = "%Y%m%dT%H%M%SZ"
 """A UTC stamp with no separators a filesystem dislikes — no colons, which Windows refuses."""
+
+_BACKUP_STAMP_PATTERN = re.compile(r"\d{8}T\d{6}Z")
+"""The stamp, as the shape `BACKUP_STAMP_FORMAT` renders — what tells one of our backups from a
+file the user named `<file>.bak.notes` themselves."""
 
 
 def backup_stamp(*, moment: datetime) -> str:
@@ -44,8 +49,12 @@ def existing_backups_of(*, path: Path) -> list[Path]:
 
     Matched by name rather than by a recorded list: the backups are the user's files too, and a
     side record of which ones we wrote would be one more piece of untracked state to go stale.
+    Matched by the *whole* name we write, stamp included, because a directory can also hold a
+    copy the user made by hand under a name that merely starts the same way — and pruning must
+    never take one of those.
     """
-    return sorted(path.parent.glob(f"{path.name}{BACKUP_INFIX}*"))
+    prefix = f"{path.name}{BACKUP_INFIX}"
+    return sorted(candidate for candidate in path.parent.glob(f"{prefix}*") if _BACKUP_STAMP_PATTERN.fullmatch(candidate.name[len(prefix) :]))
 
 
 def write_backup(*, snapshot: FileSnapshot, moment: datetime) -> Path:
@@ -53,11 +62,16 @@ def write_backup(*, snapshot: FileSnapshot, moment: datetime) -> Path:
 
     Staged and atomically renamed like any other write in this codebase, which also gets the mode
     right for free: the staged temp file is created `0600` and `fchmod`-ed to the source's mode
-    before it is ever visible under its final name.
+    before it is ever visible under its final name. A rename that fails takes the staged copy with
+    it — the user's directory is not where a half-made backup gets left.
     """
     destination = backup_path_for(path=snapshot.path, moment=moment)
     staged_path = write_staged_file(snapshot=snapshot, content=snapshot.content, label="backup")
-    staged_path.replace(destination)
+    try:
+        staged_path.replace(destination)
+    except OSError:
+        staged_path.unlink(missing_ok=True)
+        raise
     return destination
 
 
