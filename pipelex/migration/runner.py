@@ -15,16 +15,20 @@ See `docs/migration-ledger.md` → "Applying" and "Per-file transactions".
 from datetime import UTC, datetime
 from pathlib import Path
 
+import tomlkit
+from tomlkit import TOMLDocument
 from tomlkit.exceptions import TOMLKitError
 
 from pipelex import log
 from pipelex.migration.backup import RescuedBackup, WrittenBackup, keep_backup_for_rescue, prune_backups_except, write_backup
-from pipelex.migration.engine import replay_ledger_over_text
+from pipelex.migration.diagnosis import diagnose_unexplained_paths
+from pipelex.migration.engine import DocumentReplay, replay_ledger_over_text
 from pipelex.migration.ledger import MigrationLedger, load_ledger_cached
-from pipelex.migration.plan import FileBlockedReason, MigrationPlan, MigrationReport
+from pipelex.migration.plan import FileBlockedReason, MigrationPlan, MigrationReport, UnexplainedPath
 from pipelex.migration.surfaces import Surface, SurfaceRegistry
 from pipelex.pipeline.exceptions import FixTransactionError, FixWriteConflictError
 from pipelex.pipeline.fixes.file_transaction import FileSnapshot, PendingFileUpdate, commit_file_updates, read_file_snapshot
+from pipelex.system.configuration.config_surface import version_declared_below_the_floor
 
 
 def migrate_file(*, surface: Surface, ledger: MigrationLedger, file_path: Path, dry_run: bool, moment: datetime) -> MigrationPlan:
@@ -62,7 +66,7 @@ def migrate_file(*, surface: Surface, ledger: MigrationLedger, file_path: Path, 
         )
 
     try:
-        replay = replay_ledger_over_text(ledger=ledger, text=text)
+        document = tomlkit.loads(text)
     except TOMLKitError as exc:
         return _blocked_plan(
             surface_id=surface.surface_id,
@@ -72,15 +76,81 @@ def migrate_file(*, surface: Surface, ledger: MigrationLedger, file_path: Path, 
             detail=f"the file is not valid TOML: {exc}",
         )
 
+    below_the_floor = _refuse_a_file_below_the_floor(surface=surface, ledger=ledger, file_path=file_path, document=document)
+    if below_the_floor is not None:
+        return below_the_floor
+
+    try:
+        replay = replay_ledger_over_text(ledger=ledger, text=text)
+    except TOMLKitError as exc:
+        # The text parsed a moment ago, so this is an operation failing on a document that is
+        # valid TOML — an applier bug rather than a bad file. It is reported loudly against the
+        # one file it happened on rather than allowed to abort the walk, which is the per-file
+        # scope doing its job on a case nobody planned for.
+        return _blocked_plan(
+            surface_id=surface.surface_id,
+            file_path=file_path,
+            reason=FileBlockedReason.UNPARSEABLE,
+            detail=f"an operation could not be applied to this file: {exc}",
+        )
+
     plan = MigrationPlan(
         surface_id=surface.surface_id,
         file_path=file_path,
         steps=replay.steps,
         blocked=replay.blocked,
+        unexplained=_diagnose(surface=surface, ledger=ledger, document=document, replay=replay, text=text),
     )
     if not replay.did_change_document or dry_run:
         return plan
     return _write_migrated_file(plan=plan, snapshot=snapshot, new_content=replay.text, moment=moment)
+
+
+def _diagnose(*, surface: Surface, ledger: MigrationLedger, document: TOMLDocument, replay: DocumentReplay, text: str) -> list[UnexplainedPath]:
+    """Ask what the migration could not explain about the document it is about to leave behind.
+
+    **The document diagnosed is the migrated one**, not the one that was read: everything the
+    ledger explains has been carried forward by the time the replay ends, so what is left over is
+    genuinely left over. On a dry run that document exists only here, in memory, which is why the
+    diagnosis belongs to the run rather than to a later pass over the written file.
+
+    This is where a migration meets the model. The fingerprint is the surface's own projection —
+    the same one the coverage gate diffs — and computing it neither loads the user's configuration
+    nor touches the network, which is what keeps the command runnable on a machine that cannot
+    boot. It costs a walk of the model tree per file, on the order of a couple of milliseconds.
+    """
+    fingerprint = surface.fingerprint_at(schema_version=ledger.surface.current_schema_version)
+    migrated = document if replay.text == text else tomlkit.loads(replay.text)
+    return diagnose_unexplained_paths(fingerprint=fingerprint, document=migrated.unwrap(), ledger=ledger, blocked=replay.blocked)
+
+
+def _refuse_a_file_below_the_floor(*, surface: Surface, ledger: MigrationLedger, file_path: Path, document: TOMLDocument) -> MigrationPlan | None:
+    """Refuse a file that declares a schema version this ledger can no longer migrate from.
+
+    The floor is the one thing a replay cannot work out for itself. The applier skips an operation
+    whose target is absent and reports success, so a ledger whose oldest entries were squashed
+    away would run over a file older than the squash, change nothing, and say it was fine. A
+    document that *declares* where it stands is the only evidence available, which is why the
+    reserved `[meta] schema_version` is read here — and, through the same predicate, in the
+    boot-tolerance retry, which declines the file this refuses.
+
+    Almost every file declares nothing and this returns `None` — the floor is zero on every
+    surface today, and nothing writes the key. It earns its place the day a squash moves the floor.
+    """
+    declared = version_declared_below_the_floor(ledger=ledger, config_dict=document.unwrap())
+    if declared is None:
+        return None
+    floor = ledger.surface.min_supported_schema_version
+    return _blocked_plan(
+        surface_id=surface.surface_id,
+        file_path=file_path,
+        reason=FileBlockedReason.UNSUPPORTED_SCHEMA_VERSION,
+        detail=(
+            f"this file declares schema version {declared} and the '{surface.surface_id}' ledger only migrates from "
+            f"version {floor} onwards, so the entries that would bring it forward are no longer there — migrate it "
+            f"with a pipelex release that still carries them, or re-create the file"
+        ),
+    )
 
 
 def _write_migrated_file(*, plan: MigrationPlan, snapshot: FileSnapshot, new_content: str, moment: datetime) -> MigrationPlan:
@@ -229,17 +299,27 @@ def migrate_directories(
     migration_dir: Path,
     config_dirs: list[Path],
     dry_run: bool,
+    only_surface_id: str | None = None,
     moment: datetime | None = None,
 ) -> MigrationReport:
     """Migrate every claimed file in every given configuration directory.
 
     The walk is over the directories a caller names — in practice the global `~/.pipelex/` and the
     project's `.pipelex/`, and only those. A directory that does not exist is skipped.
+
+    `only_surface_id` narrows the answer to one surface, for a caller that is diagnosing a
+    particular model's refusal rather than migrating the machine. **It narrows the result, not the
+    registry, and that distinction is the whole point**: which surface owns a file is decided
+    across *all* of them — an exact base file claims before any glob — so a registry holding one
+    surface would hand `pipelex_service.toml` to `pipelex-config`'s `pipelex_*.toml` and replay
+    the wrong ledger over it. Arbitration first, then the filter.
     """
     stamp = moment if moment is not None else datetime.now(UTC)
     plans: list[MigrationPlan] = []
     for directory in config_dirs:
         for surface, file_path in registry.files_by_surface_in_directory(directory=directory):
+            if only_surface_id is not None and surface.surface_id != only_surface_id:
+                continue
             ledger = load_ledger_cached(migration_dir=migration_dir, surface_id=surface.surface_id)
             plans.append(migrate_file(surface=surface, ledger=ledger, file_path=file_path, dry_run=dry_run, moment=stamp))
     return MigrationReport(plans=plans)

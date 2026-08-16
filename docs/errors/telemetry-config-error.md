@@ -7,6 +7,8 @@ description: "Reference for the `TelemetryConfigError` Pipelex error class."
 
 # Telemetry config
 
+A telemetry configuration this process cannot use.
+
 | Field | Value |
 |---|---|
 | `error_type` | `TelemetryConfigError` |
@@ -14,6 +16,6 @@ description: "Reference for the `TelemetryConfigError` Pipelex error class."
 | `type_uri` | `https://docs.pipelex.com/latest/errors/telemetry-config-error/` |
 | `error_domain` | _(inherited from parent)_ |
 | Defined in | `pipelex.system.telemetry.exceptions` |
-| Parent class | [`PipelexError`](pipelex-error.md) |
+| Parent class | [`PipelexConfigError`](pipelex-config-error.md) |
 
 [Back to Error Reference](index.md)

@@ -11,7 +11,6 @@ gate: the earlier a malformed ledger stops, the fewer places have to cope with o
 See `docs/migration-ledger.md` → "The ledger file".
 """
 
-from enum import StrEnum
 from functools import cache
 from pathlib import Path
 from typing import Any
@@ -20,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from typing_extensions import Self
 
 from pipelex.migration.exceptions import MigrationLedgerError
+from pipelex.migration.safety import MigrationSafety
 from pipelex.suggested_fix import MigrationOp
 from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.toml_utils import load_toml_from_path
@@ -29,17 +29,15 @@ INITIAL_SCHEMA_VERSION = 1
 """Every surface starts here. There is no retroactive numbering of changes that predate the ledger."""
 
 
-class MigrationSafety(StrEnum):
-    """Whether the applier may act on an entry.
+def packaged_migration_dir() -> Path:
+    """The directory holding the checked-in ledgers and golden chains — this module's own.
 
-    Independent of `guidance`, which any entry may carry whatever its safety.
+    It lives beside `load_ledger` rather than beside the surface registry because boot tolerance
+    needs a ledger and must not need a registry: the registry names the configuration models, and
+    pulling those into a loader that is itself part of the configuration package is how an import
+    cycle starts. A loader already knows which surface it is.
     """
-
-    SAFE = "safe"
-    """Mechanically complete; applied after one confirmation."""
-
-    UNSAFE = "unsafe"
-    """Reported and never applied — the applier cannot tell a stale value from a deliberate one."""
+    return Path(__file__).resolve().parent
 
 
 class SurfaceBlock(BaseModel):

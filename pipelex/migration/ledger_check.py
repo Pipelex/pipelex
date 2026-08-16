@@ -42,9 +42,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from pipelex.migration.engine import replay_ledger_over_text
 from pipelex.migration.fingerprint import PATH_SEPARATOR, SurfaceFingerprint
 from pipelex.migration.goldens import read_fingerprint_golden
-from pipelex.migration.ledger import INITIAL_SCHEMA_VERSION, MigrationEntry, MigrationLedger, MigrationSafety, load_ledger
+from pipelex.migration.ledger import INITIAL_SCHEMA_VERSION, MigrationEntry, MigrationLedger, load_ledger
 from pipelex.migration.plan import BlockedEntryReason
 from pipelex.migration.reserved import ReservedRegistry, derive_reserved_registry
+from pipelex.migration.safety import MigrationSafety
 from pipelex.migration.surfaces import Surface, SurfaceRegistry
 from pipelex.migration.walk import EntryWalk, WalkedOp, op_source_path, walk_entry
 from pipelex.suggested_fix import WILDCARD_SEGMENT, MigrationOp, RemapValueOp

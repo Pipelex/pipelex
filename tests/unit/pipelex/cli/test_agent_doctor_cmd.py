@@ -14,8 +14,20 @@ if TYPE_CHECKING:
 from pipelex.cli.agent_cli.commands.agent_cli_factory import AGENT_CLI_STDERR_LOG_FIELDS
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.doctor_cmd import agent_doctor_cmd
+from pipelex.cli.commands.doctor_cmd import (
+    PendingMigrationsCheck,
+    PendingMigrationsFinding,
+    TelemetryConfigCheck,
+    TelemetryConfigFinding,
+)
 from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport
+from pipelex.core.validation import MIGRATE_COMMAND
 from pipelex.system.console_target import ConsoleTarget
+
+NO_PENDING_MIGRATIONS = PendingMigrationsCheck(
+    finding=PendingMigrationsFinding.UP_TO_DATE,
+    message="Every configuration file is at the current schema",
+)
 
 
 class TestAgentDoctorCmd:
@@ -37,6 +49,14 @@ class TestAgentDoctorCmd:
         mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.setup_doctor_runtime")
         mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.apply_agent_cli_output_discipline")
         mocker.patch("pipelex.cli.agent_cli.commands.doctor_cmd.silence_logging_for_agent_cli")
+        # And the migration row, for a fourth reason: unlike every other check it takes no
+        # directory, so it reads this machine's own `~/.pipelex/` and project `.pipelex/`. Tests
+        # about the output shape must not depend on whose laptop the suite is running on; the
+        # ones that are about this row re-patch it with what they need.
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_pending_migrations",
+            return_value=NO_PENDING_MIGRATIONS,
+        )
 
     def test_healthy_output_json(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """Healthy checks should produce JSON with all_healthy=true and no recommended_actions."""
@@ -46,7 +66,7 @@ class TestAgentDoctorCmd:
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
-            return_value=(True, "Telemetry configured"),
+            return_value=TelemetryConfigCheck(finding=TelemetryConfigFinding.HEALTHY, message="Telemetry configured"),
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",
@@ -64,15 +84,34 @@ class TestAgentDoctorCmd:
         assert parsed["all_healthy"] is True
         assert "recommended_actions" not in parsed
 
-    def test_unhealthy_includes_recommended_actions(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
-        """Unhealthy telemetry should produce recommended_actions in the JSON output."""
+    @pytest.mark.parametrize(
+        ("finding", "expected_action"),
+        [
+            (TelemetryConfigFinding.NOT_FOUND, "pipelex init telemetry"),
+            (TelemetryConfigFinding.OUT_OF_DATE, MIGRATE_COMMAND),
+            (TelemetryConfigFinding.INVALID, "Fix"),
+            (TelemetryConfigFinding.UNPARSEABLE, "Fix"),
+        ],
+    )
+    def test_each_telemetry_finding_gets_its_own_recommended_action(
+        self,
+        finding: TelemetryConfigFinding,
+        expected_action: str,
+        mocker: MockerFixture,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """One remedy per finding, and the finding itself rides the envelope for an agent to branch on.
+
+        All four used to be answered with `pipelex init telemetry`, which on the out-of-date one
+        writes a fresh file over the settings a migration would have kept.
+        """
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_config_files",
             return_value=(True, 0, "All config files present"),
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
-            return_value=(False, "Config format has changed - run 'pipelex init telemetry' to update"),
+            return_value=TelemetryConfigCheck(finding=finding, message="something is up with telemetry"),
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",
@@ -88,10 +127,164 @@ class TestAgentDoctorCmd:
         parsed = json.loads(capsys.readouterr().out)
         assert parsed["all_healthy"] is False
         assert parsed["checks"]["telemetry"]["healthy"] is False
-        assert "recommended_actions" in parsed
-        assert any("pipelex init telemetry" in action for action in parsed["recommended_actions"])
+        assert parsed["checks"]["telemetry"]["finding"] == finding
+        actions = parsed["recommended_actions"]
+        assert any(expected_action in action for action in actions)
         # Rich markup should be stripped from the message
         assert "[cyan]" not in parsed["checks"]["telemetry"]["message"]
+
+    def test_an_out_of_date_telemetry_file_is_never_told_to_start_over(
+        self,
+        mocker: MockerFixture,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """The destructive half of the old remedy, pinned absent on the finding it was worst for."""
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_config_files",
+            return_value=(True, 0, "All config files present"),
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
+            return_value=TelemetryConfigCheck(finding=TelemetryConfigFinding.OUT_OF_DATE, message="out of date"),
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",
+            return_value=(True, {}, "All backends healthy"),
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_models",
+            return_value=(True, "Models valid", {}),
+        )
+
+        agent_doctor_cmd(output_format=CliOutputFormat.JSON)
+
+        parsed = json.loads(capsys.readouterr().out)
+        assert not any("init telemetry" in action for action in parsed["recommended_actions"])
+
+    def _stub_every_other_check_healthy(self, mocker: MockerFixture) -> None:
+        """Everything but the migration row reporting healthy — the row under test speaks alone."""
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_config_files",
+            return_value=(True, 0, "All config files present"),
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
+            return_value=TelemetryConfigCheck(finding=TelemetryConfigFinding.HEALTHY, message="Telemetry configured"),
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",
+            return_value=(True, {}, "All backends healthy"),
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_models",
+            return_value=(True, "Models valid", {}),
+        )
+
+    def test_a_pending_migration_rides_the_envelope_with_the_files_it_is_about(
+        self,
+        mocker: MockerFixture,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """The only channel a machine has for this: a boot warns a person and says nothing here.
+
+        Both halves are reported — the run is worth starting *and* something is still owed after
+        it — because an agent that only heard the first would stop with a broken file in place.
+        """
+        self._stub_every_other_check_healthy(mocker)
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_pending_migrations",
+            return_value=PendingMigrationsCheck(
+                finding=PendingMigrationsFinding.PENDING,
+                message="1 configuration file(s) can be brought up to date",
+                migratable_files=["/home/user/.pipelex/telemetry.toml"],
+                attention_files=["/work/project/.pipelex/pipelex.toml"],
+            ),
+        )
+
+        agent_doctor_cmd(output_format=CliOutputFormat.JSON)
+
+        parsed = json.loads(capsys.readouterr().out)
+        assert parsed["all_healthy"] is False
+        row = parsed["checks"]["pending_migrations"]
+        assert row["healthy"] is False
+        assert row["finding"] == "pending"
+        assert row["migratable_files"] == ["/home/user/.pipelex/telemetry.toml"]
+        assert row["attention_files"] == ["/work/project/.pipelex/pipelex.toml"]
+        actions: list[str] = parsed["recommended_actions"]
+        assert any(action.startswith(f"Run '{MIGRATE_COMMAND}' ") for action in actions)
+        assert any(f"'{MIGRATE_COMMAND} --dry-run'" in action for action in actions)
+
+    def test_an_unreadable_row_is_reported_as_unchecked_rather_than_healthy(
+        self,
+        mocker: MockerFixture,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """A packaging problem of ours is not a verdict about the user's files."""
+        self._stub_every_other_check_healthy(mocker)
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_pending_migrations",
+            return_value=PendingMigrationsCheck(
+                finding=PendingMigrationsFinding.UNAVAILABLE,
+                message="Could not check for pending migrations: the packaged ledger will not load",
+            ),
+        )
+
+        agent_doctor_cmd(output_format=CliOutputFormat.JSON)
+
+        parsed = json.loads(capsys.readouterr().out)
+        assert parsed["all_healthy"] is False
+        assert parsed["checks"]["pending_migrations"]["finding"] == "unavailable"
+        assert any("could not" in action.lower() for action in parsed["recommended_actions"])
+
+    def test_the_same_command_is_not_recommended_twice_for_the_same_file(
+        self,
+        mocker: MockerFixture,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """The machine-wide row supersedes the telemetry-only one: it names the same command."""
+        self._stub_every_other_check_healthy(mocker)
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
+            return_value=TelemetryConfigCheck(finding=TelemetryConfigFinding.OUT_OF_DATE, message="out of date"),
+        )
+        mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_pending_migrations",
+            return_value=PendingMigrationsCheck(
+                finding=PendingMigrationsFinding.PENDING,
+                message="1 configuration file(s) can be brought up to date",
+                migratable_files=["/home/user/.pipelex/telemetry.toml"],
+            ),
+        )
+
+        agent_doctor_cmd(output_format=CliOutputFormat.JSON)
+
+        actions: list[str] = json.loads(capsys.readouterr().out)["recommended_actions"]
+        assert len(actions) == 1
+        assert "telemetry.toml up to date" not in actions[0]
+
+    def test_the_migration_row_is_not_scoped_by_global(
+        self,
+        mocker: MockerFixture,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """`--global` scopes the checks that report on a *file*; this one reports on a *command*.
+
+        `pipelex migrate` has no `--global` and walks both configuration directories, so a row
+        narrowed to one of them would name a command that rewrites a file it never mentioned.
+        """
+        self._stub_every_other_check_healthy(mocker)
+        migrations = mocker.patch(
+            "pipelex.cli.agent_cli.commands.doctor_cmd.check_pending_migrations",
+            return_value=PendingMigrationsCheck(
+                finding=PendingMigrationsFinding.UP_TO_DATE,
+                message="Every configuration file is at the current schema",
+            ),
+        )
+
+        agent_doctor_cmd(global_=True, output_format=CliOutputFormat.JSON)
+
+        capsys.readouterr()
+        migrations.assert_called_once_with()
 
     def test_backend_details_in_output(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """Backend credential reports should appear as structured data in the JSON output."""
@@ -110,7 +303,7 @@ class TestAgentDoctorCmd:
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
-            return_value=(True, "OK"),
+            return_value=TelemetryConfigCheck(finding=TelemetryConfigFinding.HEALTHY, message="OK"),
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",
@@ -167,7 +360,7 @@ class TestAgentDoctorCmd:
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
-            return_value=(True, "OK"),
+            return_value=TelemetryConfigCheck(finding=TelemetryConfigFinding.HEALTHY, message="OK"),
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",
@@ -218,7 +411,7 @@ class TestAgentDoctorCmd:
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
-            return_value=(True, "Telemetry configured"),
+            return_value=TelemetryConfigCheck(finding=TelemetryConfigFinding.HEALTHY, message="Telemetry configured"),
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",
@@ -263,7 +456,7 @@ class TestAgentDoctorCmd:
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
-            return_value=(True, "OK"),
+            return_value=TelemetryConfigCheck(finding=TelemetryConfigFinding.HEALTHY, message="OK"),
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",
@@ -314,7 +507,7 @@ class TestAgentDoctorCmd:
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
-            return_value=(True, "OK"),
+            return_value=TelemetryConfigCheck(finding=TelemetryConfigFinding.HEALTHY, message="OK"),
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",

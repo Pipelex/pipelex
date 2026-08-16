@@ -21,9 +21,10 @@ forever.
 """
 
 from pipelex.migration.engine import replay_ledger_over_text
-from pipelex.migration.ledger import MigrationLedger, MigrationSafety
+from pipelex.migration.ledger import MigrationLedger
 from pipelex.migration.material import declared_path_spellings, unsafe_op_variants
 from pipelex.migration.plan import BlockedEntryReason
+from pipelex.migration.safety import MigrationSafety
 from pipelex.suggested_fix import DeleteTableOp, RemapValueOp, RenameTableKeyOp
 from tests.unit.pipelex.migration.conftest import EntryBuilder, LedgerBuilder
 

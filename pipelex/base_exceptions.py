@@ -3,8 +3,10 @@ from enum import StrEnum
 from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
+from typing_extensions import override
 
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction
+from pipelex.migration.plan import MigrationPlan
 from pipelex.suggested_fix import SuggestedFix
 from pipelex.tools.misc.string_utils import pascal_case_to_kebab, pascal_case_to_sentence
 from pipelex.urls import URLs
@@ -67,6 +69,12 @@ INTERNAL_ERROR_PLACEHOLDER = "An internal error occurred."
 # shield — see its docstring). A hosted surface that validates from disk should
 # therefore use the in-memory path with logical sources rather than rely on STRICT
 # to scrub the path.
+#
+# ``migration`` is NOT surfaced, and the contrast with ``validation_errors`` is
+# the whole reason: a pending configuration migration describes the *host's* own
+# configuration directories — server filesystem paths, and the shape of a
+# deployment's settings — never anything the caller submitted. It is diagnostics
+# for whoever runs the process, which on a hosted surface is not the caller.
 _STRICT_KEPT_FIELDS: frozenset[str] = frozenset(
     {"error_type", "title", "type_uri", "error_domain", "error_category", "retryable", "validation_errors"}
 )
@@ -318,6 +326,45 @@ class ValidationErrorItem(BaseModel):
     suggested_fix: SuggestedFix | None = None
 
 
+class MigrationErrorBlock(BaseModel):
+    """A pending configuration migration, reported alongside the error it explains.
+
+    The structured half of the answer to *why does my configuration not load* — carried by
+    :attr:`ErrorReport.migration`, and present only when a scan of this machine's configuration
+    directories found something to say. **Consumers branch on its presence**, never on the
+    message text: an absent block means the failure is not staleness.
+
+    ``plans`` is the same shape ``pipelex-agent migrate --dry-run --format json`` emits under its
+    own ``plans`` key, deliberately — an agent that reads one has already parsed the other, and a
+    projection of its own here would be a second contract to keep in step with the first.
+
+    Declared in this module rather than beside the migration engine for the same reason
+    :class:`ValidationErrorItem` is: :class:`ErrorReport` references it as a typed field, and
+    ``base_exceptions`` must not import the migration package's error modules, which import back
+    into this one. ``pipelex.migration.plan`` holds itself to stdlib + pydantic + low-level
+    siblings precisely so this import stays legal.
+
+    > **No value read from a user's file is ever rendered** here either. The plans carry paths,
+    > operation kinds and ledger-supplied values, and nothing else — the same mechanical rule the
+    > migration report and the CLI output obey, on the third of the three channels it names.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    remedy: str
+    """The command that applies whatever can be applied without a decision."""
+
+    needs_attention: bool
+    """Whether something here is a person's to resolve rather than the tool's — a blocked file, a
+    blocked entry, or a path no ledger entry explains. When this is False, running ``remedy`` is
+    expected to be enough."""
+
+    plans: list[MigrationPlan]
+    """One per configuration file the scan found something in. Files with nothing to say are left
+    out: unlike the ``migrate`` commands' report, which answers *what did the walk visit*, this
+    block answers *what is wrong with this machine's configuration*."""
+
+
 class ErrorReport(BaseModel):
     """Structured error report — single source of truth for all error serialization.
 
@@ -359,6 +406,13 @@ class ErrorReport(BaseModel):
     # ``_STRICT_KEPT_FIELDS``): these describe the caller's own submitted bundle,
     # not server internals.
     validation_errors: list[ValidationErrorItem] | None = None
+    # A pending configuration migration that explains this failure. Populated only by
+    # ``PipelexConfigError`` reports whose raiser ran a scan (see
+    # ``pipelex.core.validation.report_validation_error``); None on every other report, so a
+    # consumer branching on its presence is asking exactly "is my configuration stale?".
+    # Deliberately outside ``_STRICT_KEPT_FIELDS`` — it describes the host's own configuration
+    # directories, not the caller's submission.
+    migration: MigrationErrorBlock | None = None
 
     def to_dict(self, *, disclosure_mode: DisclosureMode = DisclosureMode.VERBOSE) -> dict[str, Any]:
         """Return a dict with only non-None fields, projected through ``disclosure_mode``.
@@ -373,6 +427,13 @@ class ErrorReport(BaseModel):
         stable identifiers plus the curated ``provider_metadata`` slice.
         """
         payload = self.model_dump(exclude_none=True)
+        if self.migration is not None:
+            # JSON mode for this field alone. ``MigrationPlan`` carries real ``Path`` values, and
+            # a payload holding one is not serializable by ``json.dumps`` — which is what the
+            # webhook delivery path hands this dict to. Dumping the whole report in JSON mode
+            # instead would re-serialize every other field too, so the narrow fix is the safe one.
+            # ``from_dict`` still round-trips: pydantic accepts a string for a ``Path`` field.
+            payload["migration"] = self.migration.model_dump(mode="json")
         # ``caller_facing_message`` is redaction plumbing, not consumer-facing
         # classification: emit it only when set, so the common (non-caller-facing)
         # report serializes exactly as a report without the field would.
@@ -652,7 +713,25 @@ class PipelexUnexpectedError(PipelexError):
 
 
 class PipelexConfigError(PipelexError):
+    """A configuration this process cannot use, optionally with the migration that explains it.
+
+    ``error_domain`` stays :attr:`ErrorDomain.CONFIG` whether or not a migration is attached —
+    that value is a closed cross-repo enum and the agent-hook spec routes anything else to BLOCK,
+    so staleness is reported *inside* the CONFIG domain rather than as a domain of its own.
+    """
+
     error_domain = ErrorDomain.CONFIG
+
+    def __init__(self, message: str, *, migration: MigrationErrorBlock | None = None):
+        super().__init__(message)
+        self.migration = migration
+
+    @override
+    def to_error_report(self) -> ErrorReport:
+        report = super().to_error_report()
+        if self.migration is None:
+            return report
+        return report.model_copy(update={"migration": self.migration})
 
 
 class PipelexSetupError(PipelexError):

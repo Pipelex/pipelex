@@ -34,7 +34,7 @@ These two categories are managed by separate steps. `init_config()` copies only 
 | `pipelex init agreement` | `agreement` | Gateway terms acceptance (no reset) |
 | `pipelex init credentials` | `credentials` | Credential setup for enabled backends |
 
-All commands except `agreement` and `credentials` perform a **full reset** (overwrite existing files). Config updates are not yet supported.
+All commands except `agreement` and `credentials` perform a **full reset** (overwrite existing files) — every setting in the file is replaced by the template's. That is why init is not the answer to a configuration file that has fallen behind the current schema: [`pipelex migrate`](../tools/cli/migrate.md) rewrites such a file in place and keeps what is in it.
 
 ### Inputs
 
@@ -454,6 +454,9 @@ flowchart TD
 | `check_backend_credentials()` | `resolve_config_file()` | Finds `backends.toml` wherever it lives |
 | `check_backend_files()` | `resolve_config_file()` | Finds `inference/backends/` wherever it lives |
 | `check_models()` gateway terms | `global_config_dir` | **Always global** — reads from `~/.pipelex/` |
+| `check_pending_migrations()` | none | **Both directories, always** — see below |
+
+`check_pending_migrations()` is the one check that takes no `config_dir` at all, and that is deliberate. Every other row reports on a *file* and is scoped to the directory the doctor was pointed at, `--global` included. That one reports on a *command* — it is `pipelex migrate`'s own dry run — and `pipelex migrate` has no `--global`: it walks the global `~/.pipelex/` and the project `.pipelex/` both. Scoping the row narrower would name a command that then rewrites a file the row never mentioned. Every file it reports is named with its full path, so the wider scope stays legible.
 
 ### Fix Targeting
 
@@ -467,6 +470,8 @@ replace_backend_file(backend_name, config_dir=resolved_config_dir)
 ```
 
 This ensures the fix targets the same directory where the issue was found — if the broken file was in the project `.pipelex/`, the replacement goes there too, not to `~/.pipelex/`.
+
+The migration fix is the exception that follows from the row above it: it calls `apply_pending_migrations(config_dirs=config_directories_to_migrate())` and so writes to both directories, because that is what the command it is running does. It calls that helper rather than `migrate_cmd` itself — the command exits the process when a run leaves something for a person, which would cut off the doctor's remaining fixes, its remaining rows and its own exit code.
 
 ---
 

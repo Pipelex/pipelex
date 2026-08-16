@@ -405,29 +405,34 @@ def handle_inference_setup_required_error(exc: InferenceSetupRequiredError) -> N
 
 
 def handle_telemetry_config_validation_error(exc: TelemetryConfigValidationError) -> NoReturn:
-    """Handle and display TelemetryConfigValidationError with migration guidance.
+    """Handle and display TelemetryConfigValidationError, saying whether the file is old or wrong.
 
-    This error typically occurs when users have an old telemetry.toml format
-    that doesn't match the new nested structure.
+    This used to announce a breaking change and send every reader to ``pipelex init telemetry``,
+    which was written for one real event — the flat pre-``[custom_posthog]`` format — and then
+    kept being shown for every other way a telemetry file can fail. The ledger now carries that
+    format forward on its own, so a file reaching here is either one the ledger cannot fully
+    explain or one that is genuinely invalid, and telling either reader to regenerate the file
+    would throw away the keys and exporters in it.
+
+    What the error itself carries is the answer: the fields the model refused, and a migration
+    block when a scan found something a ``pipelex migrate`` would do.
 
     Args:
         exc: The telemetry config validation error exception
     """
     console = get_console()
     print_traceback_if_requested(console=console)
-    console.print("\n[bold red]❌ Telemetry configuration format has changed[/bold red]\n")
+    console.print("\n[bold red]❌ Telemetry configuration could not be loaded[/bold red]\n")
 
-    console.print(
-        "[bold yellow]⚠ Breaking Change:[/bold yellow] The telemetry.toml format has been updated.\n"
-        "Your existing configuration uses the old flat format.\n"
-    )
+    console.print(escape(exc.message))
+    console.print()
 
-    console.print("[bold green]💡 To fix:[/bold green] Run [cyan]pipelex init telemetry[/cyan] to create a new config\n")
-
-    console.print("[dim]This update brings powerful new telemetry options:[/dim]")
-    console.print("[dim]  • Langfuse integration for LLM observability[/dim]")
-    console.print("[dim]  • Support for any OpenTelemetry backend via OTLP exporters[/dim]")
-    console.print("[dim]  • Cleaner separation of PostHog, Langfuse, and OTLP settings[/dim]")
+    if exc.migration is not None:
+        console.print(f"[bold green]💡 To fix:[/bold green] Run [cyan]{exc.migration.remedy}[/cyan] to bring your configuration up to date\n")
+        console.print("[dim]The migration keeps every setting in the file — it does not start it over.[/dim]")
+    else:
+        console.print("[bold green]💡 To fix:[/bold green] Correct the settings named above in [cyan]telemetry.toml[/cyan]\n")
+        console.print("[dim]Or run [cyan]pipelex init telemetry[/cyan] to start the file over — this discards what is in it.[/dim]")
     console.print()
 
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")

@@ -32,7 +32,8 @@ See `docs/migration-ledger.md` → "What an `unsafe` entry promises".
 from collections.abc import Sequence
 
 from pipelex.migration.fingerprint import PATH_SEPARATOR
-from pipelex.migration.ledger import MigrationEntry, MigrationLedger, MigrationSafety
+from pipelex.migration.ledger import MigrationEntry, MigrationLedger
+from pipelex.migration.safety import MigrationSafety
 from pipelex.migration.walk import joined, op_source_path
 from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, MigrationOp, MoveKeyOp, RemapValueOp, RenameTableKeyOp
 

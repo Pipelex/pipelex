@@ -45,8 +45,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.migration.fingerprint import PATH_SEPARATOR, TABLE_TYPE, SurfaceFingerprint, compute_fingerprint
 from pipelex.migration.goldens import defaults_golden_path, read_fingerprint_golden
-from pipelex.migration.ledger import MigrationEntry, MigrationLedger, MigrationSafety, load_ledger
+from pipelex.migration.ledger import MigrationEntry, MigrationLedger, load_ledger
 from pipelex.migration.narrowing import describe_narrowing, is_remappable, lost_enumerated_spellings
+from pipelex.migration.safety import MigrationSafety
 from pipelex.migration.surfaces import Surface, SurfaceRegistry
 from pipelex.migration.walk import EntryWalk, walk_entry
 from pipelex.suggested_fix import WILDCARD_SEGMENT

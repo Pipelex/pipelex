@@ -244,6 +244,10 @@ rationale = "Parses the config_arg; single operand."
 param = "result"
 rationale = "Verb-object: emits the result; format options stay keyword."
 
+["pipelex/cli/agent_cli/commands/migrate_cmd.py::_render_markdown"]
+param = "result"
+rationale = "Positional-Callable protocol: passed as markdown_renderer, invoked renderer(result)."
+
 ["pipelex/cli/agent_cli/commands/pipe_cmd.py::_pipe_spec_to_toml"]
 param = "pipe_spec"
 rationale = "Serializes the pipe_spec to TOML; single operand."

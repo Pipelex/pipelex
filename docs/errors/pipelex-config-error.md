@@ -7,6 +7,8 @@ description: "Reference for the `PipelexConfigError` Pipelex error class."
 
 # Pipelex config
 
+A configuration this process cannot use, optionally with the migration that explains it.
+
 | Field | Value |
 |---|---|
 | `error_type` | `PipelexConfigError` |

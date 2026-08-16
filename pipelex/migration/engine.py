@@ -42,9 +42,10 @@ import tomlkit
 from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.migration.documents import document_carries_path, document_paths
-from pipelex.migration.ledger import MigrationEntry, MigrationLedger, MigrationSafety
+from pipelex.migration.ledger import MigrationEntry, MigrationLedger
 from pipelex.migration.material import declared_path_spellings, spelling_after_replay, unsafe_op_variants
 from pipelex.migration.plan import BlockedEntry, BlockedEntryReason, MigrationStep
+from pipelex.migration.safety import MigrationSafety
 from pipelex.pipeline.fixes.applier import FixOpApplication, apply_fix_ops
 from pipelex.suggested_fix import MigrationOp
 

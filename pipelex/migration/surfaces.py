@@ -21,6 +21,12 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from typing_extensions import Self
 
 from pipelex.migration.exceptions import MigrationRegistryError
+from pipelex.migration.fingerprint import SurfaceFingerprint, compute_fingerprint
+from pipelex.system.configuration.config_surface import (
+    PIPELEX_CONFIG_SURFACE_ID,
+    PIPELEX_SERVICE_CONFIG_SURFACE_ID,
+    TELEMETRY_CONFIG_SURFACE_ID,
+)
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.pipelex_service.pipelex_service_agreement import PIPELEX_SERVICE_CONFIG_FILE_NAME
 from pipelex.system.pipelex_service.pipelex_service_config import PipelexServiceConfig
@@ -32,11 +38,6 @@ PIPELEX_CONFIG_FILE_NAME = "pipelex.toml"
 # The package directory, `pipelex/` — this module sits one level under it.
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 _KIT_CONFIGS_DIR = _PACKAGE_ROOT / "kit" / "configs"
-
-
-def packaged_migration_dir() -> Path:
-    """The directory holding the checked-in ledgers and golden chains — this module's own."""
-    return Path(__file__).resolve().parent
 
 
 class DefaultsLayerKind(StrEnum):
@@ -87,6 +88,21 @@ class Surface(BaseModel):
             )
             raise ValueError(msg)
         return self
+
+    def fingerprint_at(self, *, schema_version: int) -> SurfaceFingerprint:
+        """This surface's live models, projected and labelled with the schema version they are at.
+
+        It lives on the surface because the surface is what holds both halves the projection needs
+        — the model tree and the defaults layer it is read against. Both readers want the same
+        answer for different reasons: the regenerator writes it into the golden chain, and a
+        migration run asks it which paths the current schema knows.
+        """
+        return compute_fingerprint(
+            surface_id=self.surface_id,
+            schema_version=schema_version,
+            config_model=self.config_model,
+            defaults_document=self.read_defaults_document(),
+        )
 
     def render_reference_document(self) -> str:
         """The surface's complete reference document as TOML text, ready to check in.
@@ -267,7 +283,7 @@ def build_config_surface_registry() -> SurfaceRegistry:
     return SurfaceRegistry(
         surfaces=[
             Surface(
-                surface_id="pipelex-config",
+                surface_id=PIPELEX_CONFIG_SURFACE_ID,
                 title="The main Pipelex configuration",
                 base_file=PIPELEX_CONFIG_FILE_NAME,
                 tier_glob="pipelex_*.toml",
@@ -277,7 +293,7 @@ def build_config_surface_registry() -> SurfaceRegistry:
                 kit_template_path=_KIT_CONFIGS_DIR / PIPELEX_CONFIG_FILE_NAME,
             ),
             Surface(
-                surface_id="telemetry-config",
+                surface_id=TELEMETRY_CONFIG_SURFACE_ID,
                 title="Telemetry destinations and capture settings",
                 base_file=TELEMETRY_CONFIG_FILE_NAME,
                 tier_glob="telemetry_*.toml",
@@ -286,7 +302,7 @@ def build_config_surface_registry() -> SurfaceRegistry:
                 kit_template_path=_KIT_CONFIGS_DIR / TELEMETRY_CONFIG_FILE_NAME,
             ),
             Surface(
-                surface_id="pipelex-service-config",
+                surface_id=PIPELEX_SERVICE_CONFIG_SURFACE_ID,
                 title="Pipelex service agreement and onboarding state",
                 base_file=PIPELEX_SERVICE_CONFIG_FILE_NAME,
                 config_model=PipelexServiceConfig,

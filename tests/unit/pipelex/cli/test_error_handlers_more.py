@@ -14,6 +14,7 @@ import pytest
 import typer
 from rich.console import Console
 
+from pipelex.base_exceptions import MigrationErrorBlock
 from pipelex.cli.error_handlers import (
     ErrorContext,
     display_error_panel,
@@ -32,6 +33,7 @@ from pipelex.cogt.inference.error_classification import UserAction, UserActionKi
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import PipeValidationErrorType
+from pipelex.core.validation import MIGRATE_COMMAND
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.system.pipelex_service.exceptions import (
     GatewayApiKeyMissingError,
@@ -212,17 +214,39 @@ class TestErrorHandlersExtended:
         # signature-specific tip used to leak here from the deleted handle_signatures_not_allowed_error).
         assert "--allow-signatures" not in output
 
-    def test_handle_telemetry_config_validation_error(self, console: Console) -> None:
-        """The telemetry handler explains the format migration."""
-        exc = TelemetryConfigValidationError("old flat format")
+    def test_handle_telemetry_config_validation_error_on_a_file_that_is_wrong(self, console: Console) -> None:
+        """No migration explains this one, so what the reader gets is the fields and an edit."""
+        exc = TelemetryConfigValidationError("'custom_posthog.mode': invalid enum value")
 
         with pytest.raises(typer.Exit) as exc_info:
             handle_telemetry_config_validation_error(exc)
 
         assert exc_info.value.exit_code == 1
         output = console.export_text()
-        assert "Telemetry configuration format has changed" in output
-        assert "pipelex init telemetry" in output
+        assert "custom_posthog.mode" in output
+        assert "Correct the settings named above" in output
+        assert MIGRATE_COMMAND not in output
+
+    def test_handle_telemetry_config_validation_error_on_a_file_that_is_out_of_date(self, console: Console) -> None:
+        """The remedy comes off the error rather than out of the handler.
+
+        This handler used to announce a breaking format change and send every reader to
+        `pipelex init telemetry` — which, on exactly this case, writes a fresh file over the
+        settings the migration it should have named would have carried forward.
+        """
+        exc = TelemetryConfigValidationError(
+            "extra forbidden field: 'telemetry_mode'",
+            migration=MigrationErrorBlock(remedy=MIGRATE_COMMAND, needs_attention=False, plans=[]),
+        )
+
+        with pytest.raises(typer.Exit) as exc_info:
+            handle_telemetry_config_validation_error(exc)
+
+        assert exc_info.value.exit_code == 1
+        output = console.export_text()
+        assert MIGRATE_COMMAND in output
+        assert "does not start it over" in output
+        assert "init telemetry" not in output
 
     def test_handle_gateway_terms_not_accepted_error(self, console: Console) -> None:
         """The terms handler points at init config and the BYOK alternative."""

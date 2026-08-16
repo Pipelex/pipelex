@@ -22,7 +22,7 @@ def plugins_list_command() -> None:
     No boot orchestrator is named: this is a listing, not a boot, so nothing claims a hub slot.
     """
     console = get_console()
-    config = PipelexConfig.model_validate(config_manager.load_config())
+    config = config_manager.load_config_validated(config_cls=PipelexConfig)
     registrar = build_registrar(
         config=config,
         boot_orchestrator=None,
