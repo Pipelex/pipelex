@@ -5,9 +5,10 @@ The charter is [`wip/migrator-3/sequencing.md` § S6](../../wip/migrator-3/seque
 **Venue.** S6 lands as **two** PRs, not the one the charter assumes.
 
 - **Part 1 — `feature/Migrator-3`: MERGED.** PR [#1113](https://github.com/Pipelex/pipelex/pull/1113), `dev` = `490d189df`. Milestones 1–4 below. The branch is deleted local and remote.
-- **Part 2 — `feature/Migrator-3b`**, cut from `dev` = `490d189df`, **no upstream set** (first push is `git push -u origin feature/Migrator-3b`). This is the branch a new session works on. Milestone 5 onwards.
+- **Part 2 — `feature/Migrator-3b`: BUILT, REVIEWED, OPEN.** PR [#1114](https://github.com/Pipelex/pipelex/pull/1114) against `dev`, head `d74b899d4`, every required check green; two bot review rounds executed on the branch, six threads left open as the recorded deferrals in [`migrator-pr-1114-review-followups.md`](./migrator-pr-1114-review-followups.md). Milestones 5–10 below. **Merging it is Louis' call** — squash only, then delete the branch local and remote.
+- **Part 3 — `feature/Migrator-3c`**, to be cut from `dev` once #1114 is squash-merged (`git fetch origin dev && git switch -c feature/Migrator-3c origin/dev && git branch --unset-upstream`; first push is `git push -u origin feature/Migrator-3c`). This is the branch a new session works on. Items 6–9 of [What is actually left](#what-is-actually-left): no code — the drift-contract review list, the two skills, the spec rows, publishing the contract.
 
-Record both numbers against S6.
+Record all three numbers against S6.
 
 ✅ **Cold-start state (part 1, on `dev`).** Two commits, both pushed, working tree clean:
 
@@ -16,7 +17,7 @@ Record both numbers against S6.
 
 `make agent-check` and the full `make agent-test` are both green on the branch as pushed.
 
-⚠ **S6 is well past half.** The pre-S7 bucket is closed (part 1, on `dev`), and on `feature/Migrator-3b` the two `migrate` commands (milestone 5), the downgrade diagnosis (milestone 6), boot tolerance (milestone 7), the validation-error report (milestone 8), the telemetry-remedy retirement (milestone 9) and the `doctor` pending-migrations row with `--fix` (milestone 10) are all built. What remains is the rest of the phase body — the drift-contract review list, the skills, the specs rows, and publishing the contract. See [What is actually left](#what-is-actually-left) at the bottom before planning a session.
+⚠ **S6 is well past half.** The pre-S7 bucket is closed (part 1, on `dev`), and on `feature/Migrator-3b` the two `migrate` commands (milestone 5), the downgrade diagnosis (milestone 6), boot tolerance (milestone 7), the validation-error report (milestone 8), the telemetry-remedy retirement (milestone 9) and the `doctor` pending-migrations row with `--fix` (milestone 10) are all built. What remains is the rest of the phase body — the drift-contract review list, the skills, the specs rows, and publishing the contract — as **part 3**, on a fresh branch after #1114 merges. See [What is actually left](#what-is-actually-left) at the bottom before planning a session.
 
 ## Build order chosen for this session
 
@@ -31,7 +32,7 @@ The charter lists a great many deliverables without an order. The order below wa
 7. **`report_validation_error` on the real plan** — done, see Milestone 8 below.
 8. **The telemetry remedies retired** — done, see Milestone 9 below.
 9. **The `doctor` pending-migrations row and `--fix` delegating to the migrate command** — done, see Milestone 10 below.
-10. **The skills (`add-migration`, `/release` step 3b), the `config-docs` drift-contract review list, `command-surface-map.md` rows, publishing the contract in the nav** — not started. **This is where the next session starts.**
+10. **The skills (`add-migration`, `/release` step 3b), the `config-docs` drift-contract review list, `command-surface-map.md` rows, publishing the contract in the nav** — not started. **This is part 3, where the next session starts**, on `feature/Migrator-3c` once #1114 is on `dev`.
 
 ## Milestone 1 — the golden-format bucket (DONE)
 
@@ -588,7 +589,9 @@ Mutation-tested: scoping the row to one directory, reporting a scan failure as u
 
 ## Where this session paused
 
-**Paused right after milestone 10 was committed.** Working tree clean. The branch is **two commits ahead** of `origin/feature/Migrator-3b` (whose head is milestone 8): milestones 9 and 10 are both unpushed, and no PR is open. `make agent-check` with everything staged (so `drift-check` is a real green), `make docs-check`, and the full `make agent-test` were all green on the exact tree that was committed.
+**Paused with PR [#1114](https://github.com/Pipelex/pipelex/pull/1114) open, reviewed and green, awaiting Louis' merge.** Milestones 5–10 were pushed and the PR opened after milestone 10; two bot review rounds (Codex, Cubic) followed and were executed on the branch as *"answer the PR #1114 bot review"* (`3fd7f82cb`) and *"answer the second PR #1114 bot review"* (`d74b899d4`, the head). What each round fixed is in those two commit messages and at the top of [`migrator-pr-1114-review-followups.md`](./migrator-pr-1114-review-followups.md); every thread was answered on the PR (fixed / false positive with the reason / deferred), and the six left open are exactly the deferrals §1–§5 of that note. Every required check is green on the head; `origin/dev` has not moved since the branch base `490d189df`, so the squash is clean. The merge button reads *blocked* only because `dev`'s ruleset requires thread resolution — the same state #1112 merged from, through the team bypass. Working tree clean at the head.
+
+**At the milestone-10 pause, before the PR:** `make agent-check` with everything staged (so `drift-check` is a real green), `make docs-check`, and the full `make agent-test` were all green on the exact tree that was committed.
 
 Only `cli-docs` came open at milestone 10 — no configuration model moved, so `config-docs` stayed shut. Its ack rationale records what was reviewed and what was deliberately left alone (`docs/features/cli.md`, `agent-cli.md`'s command table, `update.md`'s deck claim, and `index.md`, which has no doctor entry at all).
 
@@ -624,11 +627,17 @@ The phase body the charter lists under **Do**, in the order the next session sho
 8. **`docs/specs/command-surface-map.md` rows** — that file is in the **workspace-root** repo, not this one.
 9. **Publish the contract**: delete `docs/migration-ledger.md`'s Status banner, remove its `not_in_nav` entry and comment, add a Migration Ledger row to the nav's Project section.
 
-Then the PR to `dev` from `feature/Migrator-3b`.
+Then the part-3 PR to `dev` from `feature/Migrator-3c`, and Checkpoint C.
 
 ### Deferred from the #1114 review
 
-Four items the review-bot pass on PR #1114 raised and this branch parked rather than fixed — the out-of-walk warning text, what a `migration` block's presence means for an unexplained-only plan, the service loader's pre-logging warning, and the doctor's remaining unescaped fields — are in `migrator-pr-1114-review-followups.md`, each with its trigger.
+The items the review-bot pass on PR #1114 raised and this branch parked rather than fixed are in [`migrator-pr-1114-review-followups.md`](./migrator-pr-1114-review-followups.md), each verified against the code and each with its trigger, and their owners are recorded in the charter's [S6 Session 4](../../wip/migrator-3/sequencing.md#s6-session-4--milestones-6-to-10-pr-1114-and-the-two-review-rounds):
+
+- **§1, the out-of-walk warning text** → S7's final join, because the reshape's `pipelex-config@2` is the first `pipelex-config` entry and is what makes it live (no consumer in the workspace passes `config_dir=` outside tests, so it is an embedder wording fix, not a blocker).
+- **§2, what a `migration` block's *presence* means for an unexplained-only plan** (agent hint, `_migration_prose`, the doctor's telemetry row, and the contract's own sentence — one ruling over four surfaces) → **part 3**, as a wording ruling the session may take on its own authority; not blocking S7, but S7's first machine is where a real user first meets it.
+- **§3, the service loader warning before logging exists** (`pipelex init`, `pipelex plugins`) → named trigger: the first `pipelex-service-config` entry; the `warnings.warn` shape is on record.
+- **§4, the doctor's remaining unescaped Rich fields** → part 3 if there is room, else any session; the log-channel half is deliberately not owed anywhere.
+- **§5, a below-floor file that still validates boots silently** → named trigger: the first squash that moves a floor; documented design, and the doctor row already reports such a file.
 
 ### Small items still owed, folded in from the #1113 review
 
@@ -637,7 +646,7 @@ Four items the review-bot pass on PR #1114 raised and this branch parked rather 
 - **The rescue-copy race** (`pr-1113-review-notes.md` §3): a third run's prune can take the `.bak.` a rescue is about to rename. The commands now make concurrent runs producible, so this is decidable — revisit as an age-sparing prune, not a lock.
 - Deliberately past S7's freeze, with named triggers, in `pr-1113-review-notes.md` and `migrator-write-scope-and-rename-fidelity.md`: per-member bounds in the golden, the `safe`-entry sibling, the tomlkit raw-storage staleness pass, rename fidelity (§2), the taken-backup-name report, and the residual. §1 of the write-scope note is **closed** by Milestone 5.
 
-**The next session starts at item 6, the `config-docs` drift contract's `review` list.** Everything that touches *code* in the phase body is now built — items 1 through 5 — and what is left is four items of a different kind: a contract's review list (item 6), two skills (item 7), a spec file in the **workspace-root** repo (item 8), and publishing the ledger contract in the nav (item 9). None of them depends on another, so they can be taken in any order; item 6 is the cheapest and item 9 is the one that closes the phase.
+**The next session — part 3, on `feature/Migrator-3c` — starts at item 6, the `config-docs` drift contract's `review` list.** Everything that touches *code* in the phase body is now built — items 1 through 5, on `dev` once #1114 merges — and what is left is four items of a different kind: a contract's review list (item 6), two skills (item 7), a spec file in the **workspace-root** repo (item 8), and publishing the ledger contract in the nav (item 9). None of them depends on another, so they can be taken in any order; item 6 is the cheapest and item 9 is the one that closes the phase.
 
 Item 6 concretely: extend `drift.toml`'s `config-docs` contract so its `review` list also covers the ledger files (`pipelex/migration/goldens/`, the ledgers themselves) and the four validator sites R8 names — `KitConfig._validate_targets`, `DryRunConfig.validate_image_urls`, `ImgGenConfig.validate_quality_mapping`, `LLMConfig.validate_effort_to_budget_mapping`. R8's point is that a validator is a schema change the fingerprint cannot see, so a change to one is a review obligation the same way a model field is.
 
