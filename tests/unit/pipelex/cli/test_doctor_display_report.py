@@ -313,6 +313,28 @@ class TestDoctorDisplayReport:
 
         assert "telemetry.toml up to date" in console.export_text()
 
+    def test_a_message_carrying_brackets_renders_literally(self, console: Console) -> None:
+        """Both rows can quote a user's file or an OS error, and Rich reads `[...]` as markup.
+
+        A bracketed path segment would be silently dropped and a `[/x]` sequence would raise, so a
+        diagnostic that exists to name the file must escape what it prints.
+        """
+        kwargs = _healthy_report_kwargs()
+        kwargs["telemetry_check"] = TelemetryConfigCheck(
+            finding=TelemetryConfigFinding.INVALID,
+            message="Invalid configuration:\ninvalid enum value '[/x] not-a-mode'",
+        )
+        kwargs["pending_migrations_check"] = PendingMigrationsCheck(
+            finding=PendingMigrationsFinding.UNAVAILABLE,
+            message="Could not check for pending migrations: [Errno 13] Permission denied: '/home/[user]/.pipelex'",
+        )
+
+        display_health_report(**kwargs)
+
+        output = console.export_text()
+        assert "'[/x] not-a-mode'" in output
+        assert "'/home/[user]/.pipelex'" in output
+
     def test_doctor_cmd_catches_unexpected_errors(self, console: Console, mocker: MockerFixture) -> None:
         """The doctor entry point converts unexpected errors into a friendly exit 1."""
         mocker.patch("pipelex.cli.commands.doctor_cmd.do_doctor_cmd", side_effect=RuntimeError("totally unexpected"))

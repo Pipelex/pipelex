@@ -4,7 +4,6 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-from pipelex import log
 from pipelex.system.configuration.config_surface import (
     PIPELEX_CONFIG_SURFACE_ID,
     replay_surface_files_in_memory,
@@ -57,6 +56,19 @@ MODEL_DECKS_DIR_NAME = "deck"
 
 
 class ConfigLoader:
+    def __init__(self) -> None:
+        self._stale_warning: str | None = None
+
+    def take_stale_configuration_warning(self) -> str | None:
+        """The warning a tolerated boot owes the user, once — or ``None`` when the load was clean.
+
+        The loader parks it rather than logging it because the main configuration is what
+        *configures logging*: at the moment the retry succeeds there is no logger yet, and the
+        dispatch raises on any attempt. The boot emits it right after ``log.configure``.
+        """
+        warning, self._stale_warning = self._stale_warning, None
+        return warning
+
     @property
     def pipelex_root_dir(self) -> Path:
         """Get the root directory of the installed pipelex package.
@@ -404,7 +416,9 @@ class ConfigLoader:
         left behind by a schema change should not stop the world: when validation fails, the
         surface's ledger is replayed over the same files **in memory**, the result is validated
         again, and a boot that succeeds says so in a warning naming the files and the
-        ``pipelex migrate`` remedy. Nothing is written — only the explicit command writes.
+        ``pipelex migrate`` remedy — parked on the loader (``take_stale_configuration_warning``)
+        for the boot to emit once logging exists. Nothing is written — only the explicit command
+        writes.
 
         A configuration the ledger cannot explain raises exactly what it raised before: the retry
         is the only new behaviour, and it either recovers or gets out of the way.
@@ -445,7 +459,7 @@ class ConfigLoader:
             config = config_cls.model_validate(config_dict)
         except CONFIG_REFUSED:
             return None
-        log.warning(stale_configuration_warning(plans=replayed.plans))
+        self._stale_warning = stale_configuration_warning(plans=replayed.plans)
         return config
 
 

@@ -70,7 +70,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from pipelex.migration.documents import document_paths
+from pipelex.migration.documents import document_paths, path_matches_pattern
 from pipelex.migration.engine import apply_ops_over_text
 from pipelex.migration.exceptions import MigrationGoldenError
 from pipelex.migration.fingerprint import PATH_SEPARATOR, SurfaceFingerprint
@@ -78,7 +78,6 @@ from pipelex.migration.goldens import defaults_golden_path, pre_history_document
 from pipelex.migration.ledger import MigrationEntry, MigrationLedger, load_ledger
 from pipelex.migration.safety import MigrationSafety
 from pipelex.migration.surfaces import Surface, SurfaceRegistry
-from pipelex.suggested_fix import WILDCARD_SEGMENT
 from pipelex.system.configuration.config_surface import strip_reserved_meta
 from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_utils import load_toml_from_content
@@ -326,25 +325,10 @@ def _is_recorded(*, path: str, recorded_paths: set[str]) -> bool:
     A document names the user's own key where the fingerprint names `*`, so `deck.claude.new_name`
     is recorded as `deck.*.new_name`. Comparing the two literally would let a rename beneath an
     open mapping read as a misspelled destination whenever the reference document happens not to
-    carry that key under that entry.
+    carry that key under that entry. The matching rule is `path_matches_pattern`'s — the one
+    definition every comparison of a document against a schema path reads.
     """
-    if path in recorded_paths:
-        return True
-    segments = path.split(PATH_SEPARATOR)
-    for recorded in recorded_paths:
-        recorded_segments = recorded.split(PATH_SEPARATOR)
-        if len(recorded_segments) != len(segments):
-            continue
-        if all(
-            _segment_matches(recorded=recorded_segment, concrete=segment)
-            for recorded_segment, segment in zip(recorded_segments, segments, strict=True)
-        ):
-            return True
-    return False
-
-
-def _segment_matches(*, recorded: str, concrete: str) -> bool:
-    return recorded in {WILDCARD_SEGMENT, concrete}
+    return any(path_matches_pattern(path=path, pattern=recorded) for recorded in recorded_paths)
 
 
 def _ancestors_are_in(*, path: str, paths: set[str]) -> bool:

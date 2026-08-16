@@ -138,6 +138,15 @@ class FileBlockedReason(StrEnum):
     reaches the plan at all: a replacement that fails re-raises its own `OSError`, because rolling
     back nothing is trivially complete."""
 
+    @property
+    def leaves_the_write_unconfirmed(self) -> bool:
+        """Whether this reason means the file may hold something other than what it was found with.
+
+        Every other reason leaves the file exactly as it was; a summary that says "nothing was
+        written" is true of them and false of this one.
+        """
+        return self is FileBlockedReason.STATE_UNCERTAIN
+
 
 class UnexplainedPath(BaseModel):
     """A path the current schema does not know and no ledger entry removes.
@@ -180,6 +189,18 @@ class MigrationPlan(BaseModel):
         """Whether the file needs nothing: nothing applied, nothing blocked, nothing unexplained."""
         return not (self.steps or self.blocked or self.unexplained or self.blocked_reason)
 
+    @property
+    def did_change(self) -> bool:
+        """Whether anything applied to this file — a whole entry, or the part of a conflicting one
+        that landed before the conflict was found.
+
+        The plan-level twin of `DocumentReplay.did_change_document`, which is what the runner writes
+        on; the two must agree or a dry run stops predicting the write. A file can therefore be both
+        changed and blocked: the entry that conflicted is reported once, under `blocked`, carrying
+        the operations of it that did apply.
+        """
+        return bool(self.steps) or any(entry.applied_ops for entry in self.blocked)
+
 
 class MigrationReport(BaseModel):
     """Every file one run visited."""
@@ -198,9 +219,10 @@ class MigrationReport(BaseModel):
         """The files something applied to — whether or not this run was allowed to write them.
 
         The difference from `written_plans` is exactly what a dry run is for: these are the files
-        a write pass would rewrite.
+        a write pass would rewrite — including a file whose only change is the part of a
+        conflicting entry that applied before the conflict.
         """
-        return [plan for plan in self.plans if plan.steps]
+        return [plan for plan in self.plans if plan.did_change]
 
     @property
     def blocked_plans(self) -> list[MigrationPlan]:

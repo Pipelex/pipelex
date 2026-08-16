@@ -149,7 +149,11 @@ def check_config_files(*, config_dir: Path | None = None) -> tuple[bool, int, st
             validation_error = pydantic_error_behind(config_error=config_error)
             if validation_error is None:
                 return False, 0, f"Configuration validation failed: {config_error}"
-            report = report_validation_error(validation_error=validation_error, surface_id=PIPELEX_CONFIG_SURFACE_ID)
+            report = report_validation_error(
+                validation_error=validation_error,
+                surface_id=PIPELEX_CONFIG_SURFACE_ID,
+                config_dirs=[config_dir] if config_dir is not None else None,
+            )
             return False, 0, f"Configuration validation failed:\n{report.message}"
         except (TomlError, OSError) as exc:
             return False, 0, f"Error loading pipelex.toml: {exc}"
@@ -319,7 +323,10 @@ class PendingMigrationsCheck(BaseModel):
     """The files `pipelex migrate` would rewrite, each backed up first."""
 
     attention_files: list[str] = Field(default_factory=list[str])
-    """The files carrying something the command will not do on its own."""
+    """The files carrying something the command will not do on its own.
+
+    A file can be on both lists: an entry that conflicts partway through is blocked, and the
+    operations of it that applied before the conflict are still written."""
 
     @property
     def is_healthy(self) -> bool:
@@ -722,9 +729,9 @@ def display_health_report(
     # Telemetry Configuration section
     console.print("[bold]Telemetry Configuration[/bold]")
     if telemetry_check.is_healthy:
-        console.print(f"  [green]✓[/green] {telemetry_check.message}")
+        console.print(f"  [green]✓[/green] {escape(telemetry_check.message)}")
     else:
-        console.print(f"  [red]✗[/red] {telemetry_check.message}")
+        console.print(f"  [red]✗[/red] {escape(telemetry_check.message)}")
     console.print()
 
     # Backend Credentials section
@@ -944,15 +951,15 @@ def _print_pending_migrations(*, check: PendingMigrationsCheck) -> None:
     console = get_console()
     match check.finding:
         case PendingMigrationsFinding.UP_TO_DATE:
-            console.print(f"  [green]✓[/green] {check.message}")
+            console.print(f"  [green]✓[/green] {escape(check.message)}")
         case PendingMigrationsFinding.PENDING | PendingMigrationsFinding.NEEDS_ATTENTION:
-            console.print(f"  [yellow]⚠[/yellow]  {check.message}")
+            console.print(f"  [yellow]⚠[/yellow]  {escape(check.message)}")
             for file_path in check.migratable_files:
                 console.print(f"    [dim]{escape(file_path)}[/dim] — out of date")
             for file_path in check.attention_files:
                 console.print(f"    [dim]{escape(file_path)}[/dim] — needs a look")
         case PendingMigrationsFinding.UNAVAILABLE:
-            console.print(f"  [red]✗[/red] {check.message}")
+            console.print(f"  [red]✗[/red] {escape(check.message)}")
 
 
 def check_deck_sync(*, config_dir: Path | None = None) -> tuple[bool, DeckSyncReport, str]:
@@ -1028,7 +1035,11 @@ def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = Non
     try:
         runtime_hub.setup_config(config_cls=PipelexConfig, config_dir=config_dir)
     except CONFIG_REFUSED as config_error:
-        raise_config_setup_error(config_error=config_error, surface_id=PIPELEX_CONFIG_SURFACE_ID)
+        raise_config_setup_error(
+            config_error=config_error,
+            surface_id=PIPELEX_CONFIG_SURFACE_ID,
+            config_dirs=[config_dir] if config_dir is not None else None,
+        )
 
     log_config = get_config().pipelex.log_config
     if log_config_overrides is not None:
@@ -1037,6 +1048,8 @@ def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = Non
         log_config = LogConfig.model_validate(merged)
     runtime_hub.set_console_print_target(target=log_config.console_print_target)
     log.configure_if_unset(log_config=log_config)
+    if (stale_warning := config_manager.take_stale_configuration_warning()) is not None:
+        log.warning(stale_warning)
 
 
 def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str, BackendFileReport]]:
@@ -1378,7 +1391,7 @@ def do_doctor_cmd(
         # out-of-date file never reaches this branch: it has a migration that keeps its settings.
         if has_telemetry_validation_error:
             console.print("[bold]Telemetry validation error:[/bold]")
-            console.print(f"  {telemetry_check.message}")
+            console.print(f"  {escape(telemetry_check.message)}")
             console.print()
             console.print(f"You can fix this manually by editing [cyan]{config_location.config_dir}/telemetry.toml[/cyan]")
             console.print("or run [cyan]pipelex init telemetry[/cyan] to start the file over, discarding what is in it.")

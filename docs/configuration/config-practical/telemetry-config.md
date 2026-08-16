@@ -261,7 +261,7 @@ Pipelex tells you which of the two situations you are in, because the fix is dif
 pipelex migrate
 ```
 
-That rewrites the file into the current shape and **keeps everything in it** — your PostHog key, your Langfuse credentials, your OTLP exporters. It backs the file up first. See [the migration ledger](../../migration-ledger.md) for what it does and does not touch.
+That rewrites the file into the current shape and **keeps every setting that still has a home in it** — your PostHog key, your Langfuse credentials, your OTLP exporters. The few flat-format settings the current shape retired (`respect_dnt`, for one: `DO_NOT_TRACK` is now honoured unconditionally) are dropped, and the ledger entry names each of them and why. It backs the file up first. See [the migration ledger](../../migration-ledger.md) for what it does and does not touch.
 
 **Your file is wrong.** A setting that is not a setting, a value outside what it accepts, or TOML that does not parse. The error names the fields; correct them in `telemetry.toml`. No command fixes this one, because nothing but you knows what you meant.
 

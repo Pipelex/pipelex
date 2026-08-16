@@ -177,6 +177,45 @@ class TestWhatTheScanFinds:
         assert [plan.file_path.name for plan in report.migration.plans] == ["pipelex.toml"]
 
 
+class TestTheScanIsScopedToTheDirectoriesThatWereLoaded:
+    """A caller that loaded one directory must be diagnosed against that directory.
+
+    `doctor --global` and an embedder's `config_dir=` bypass the global/project layering and read
+    one directory. Answering their refusal with a scan of the default walk would name a file the
+    reader never loaded — and stay silent about the one they did.
+    """
+
+    def test_a_stale_file_in_a_directory_that_was_not_loaded_is_not_the_answer(self, machine: Path, tmp_path: Path) -> None:
+        project_dir = tmp_path / "project" / ".pipelex"
+        project_dir.mkdir()
+        project_dir.joinpath("pipelex.toml").write_text("not_a_real_setting = true\n", encoding="utf-8")
+
+        report = report_validation_error(validation_error=_make_validation_error(), surface_id=PIPELEX_CONFIG_SURFACE_ID, config_dirs=[machine])
+
+        assert report.migration is None
+
+    def test_a_directory_outside_the_walk_is_diagnosed_when_it_is_the_one_loaded(self, machine: Path, tmp_path: Path) -> None:
+        machine.joinpath("pipelex.toml").write_text("another_unknown_setting = true\n", encoding="utf-8")
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir()
+        elsewhere.joinpath("pipelex.toml").write_text("not_a_real_setting = true\n", encoding="utf-8")
+
+        report = report_validation_error(validation_error=_make_validation_error(), surface_id=PIPELEX_CONFIG_SURFACE_ID, config_dirs=[elsewhere])
+
+        assert report.migration is not None
+        assert [plan.file_path for plan in report.migration.plans] == [elsewhere / "pipelex.toml"]
+
+    def test_the_raised_error_is_scoped_the_same_way(self, machine: Path, tmp_path: Path) -> None:
+        project_dir = tmp_path / "project" / ".pipelex"
+        project_dir.mkdir()
+        project_dir.joinpath("pipelex.toml").write_text("not_a_real_setting = true\n", encoding="utf-8")
+
+        with pytest.raises(PipelexConfigError) as caught:
+            raise_config_setup_error(config_error=_make_validation_error(), surface_id=PIPELEX_CONFIG_SURFACE_ID, config_dirs=[machine])
+
+        assert caught.value.migration is None
+
+
 class TestTheScanNeedsNothingButTheFilesystem:
     def test_it_runs_with_no_hub_installed(self, machine: Path, mocker: MockerFixture) -> None:
         """The bootstrap property, on the one path that reaches it.

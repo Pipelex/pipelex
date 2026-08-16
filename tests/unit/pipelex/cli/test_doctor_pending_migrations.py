@@ -45,6 +45,15 @@ def old_shape_document() -> str:
     return path.read_text(encoding="utf-8")
 
 
+def half_migrated_document() -> str:
+    """The flat document with `host` already moved by hand into a `[custom_posthog]` the user created.
+
+    The shipped entry's first move (`telemetry_mode`) lands; its second (`host` → `endpoint`) finds
+    the destination taken and blocks the entry with what applied so far.
+    """
+    return 'telemetry_mode = "anonymous"\nhost = "https://eu.i.posthog.com"\n\n[custom_posthog]\nendpoint = "https://us.i.posthog.com"\n'
+
+
 class Machine(NamedTuple):
     """The two configuration directories a migration walks, on a fake home."""
 
@@ -123,6 +132,23 @@ class TestWhatTheRowReports:
         assert check.finding is PendingMigrationsFinding.PENDING, "there is still something to run"
         assert check.migratable_files == [str(stale)]
         assert check.attention_files == [str(broken)]
+
+    def test_a_file_a_conflict_only_partly_migrates_is_still_pending(self, machine: Machine) -> None:
+        """A file the user half-migrated by hand: the entry conflicts, yet part of it applies.
+
+        The write pass rewrites that file — the operations that landed before the conflict are
+        real — so the row must name it as migratable *and* as needing a look. A row that reported
+        only the conflict would tell `--fix` there is nothing to run on a machine the command
+        would change.
+        """
+        stale = machine.global_dir / "telemetry.toml"
+        stale.write_text(half_migrated_document(), encoding="utf-8")
+
+        check = check_pending_migrations()
+
+        assert check.finding is PendingMigrationsFinding.PENDING
+        assert check.migratable_files == [str(stale)]
+        assert check.attention_files == [str(stale)]
 
     def test_a_stale_file_in_either_directory_is_reported(self, machine: Machine) -> None:
         """Both directories, because both are what `pipelex migrate` would rewrite.

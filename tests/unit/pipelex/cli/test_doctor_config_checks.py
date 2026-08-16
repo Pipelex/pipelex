@@ -114,6 +114,32 @@ class TestDoctorConfigChecks:
         assert missing_count == 0
         assert message.startswith("Configuration validation failed:")
 
+    def test_check_config_files_scans_only_the_directory_it_read(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """The telemetry row's rule, on the configuration row: `--global` reads one directory.
+
+        A project `pipelex.toml` carrying a key this build knows nothing about, beside the global
+        directory under inspection whose own file refuses to load — the report must not name the
+        project file, which a `--global` reader never loaded.
+        """
+        fake_home = tmp_path / "home"
+        global_dir = fake_home / ".pipelex"
+        global_dir.mkdir(parents=True)
+        (global_dir / "pipelex.toml").write_text("[pipelex]\n", encoding="utf-8")
+        project_root = tmp_path / "project"
+        (project_root / ".git").mkdir(parents=True)
+        (project_root / ".pipelex").mkdir()
+        (project_root / ".pipelex" / "pipelex.toml").write_text("not_a_real_setting = true\n", encoding="utf-8")
+        mocker.patch.object(Path, "home", return_value=fake_home)
+        mocker.patch.object(Path, "cwd", return_value=project_root)
+        mocker.patch("pipelex.cli.commands.doctor_cmd.init_config", return_value=0)
+        mocker.patch.object(PipelexConfig, "model_validate", side_effect=_make_validation_error())
+
+        healthy, _, message = check_config_files(config_dir=global_dir)
+
+        assert healthy is False
+        assert "not_a_real_setting" not in message
+        assert MIGRATE_COMMAND not in message
+
     def test_check_config_files_config_validation_error_with_cause(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """A ConfigValidationError wrapping a ValidationError recovers the original report."""
         (tmp_path / "pipelex.toml").write_text("[pipelex]\n", encoding="utf-8")

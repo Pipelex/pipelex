@@ -626,6 +626,10 @@ The phase body the charter lists under **Do**, in the order the next session sho
 
 Then the PR to `dev` from `feature/Migrator-3b`.
 
+### Deferred from the #1114 review
+
+Four items the review-bot pass on PR #1114 raised and this branch parked rather than fixed — the out-of-walk warning text, what a `migration` block's presence means for an unexplained-only plan, the service loader's pre-logging warning, and the doctor's remaining unescaped fields — are in `migrator-pr-1114-review-followups.md`, each with its trigger.
+
 ### Small items still owed, folded in from the #1113 review
 
 - ~~**`MigrationLedger.entry_for_version` still has no caller.**~~ Answered by Milestone 6: the downgrade diagnosis looks a blocked entry's own operations up from the `to_schema_version` its `BlockedEntry` carries, which is the first real caller. It stays.

@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from pipelex import log
 from pipelex.migration.goldens import pre_history_document_path
 from pipelex.migration.ledger import packaged_migration_dir
 from pipelex.system.configuration import config_surface as config_surface_module
@@ -46,6 +47,7 @@ from pipelex.system.telemetry import telemetry_loader as telemetry_loader_module
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig
 from pipelex.system.telemetry.telemetry_loader import load_telemetry_config
+from pipelex.tools.log.log_dispatch import LogDispatch
 from pipelex.tools.log.log_levels import LogLevel
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
@@ -59,7 +61,7 @@ def old_shape_telemetry_document() -> str:
     return path.read_text(encoding="utf-8")
 
 
-def write_synthetic_ledger(*, migration_dir: Path, surface_id: str, base_file: str, ops_body: str) -> None:
+def write_synthetic_ledger(*, migration_dir: Path, surface_id: str, base_file: str, ops_body: str, min_supported_schema_version: int = 0) -> None:
     """A one-entry ledger for a surface whose real ledger has nothing in it yet."""
     ledgers_dir = migration_dir / "ledgers"
     ledgers_dir.mkdir(parents=True, exist_ok=True)
@@ -70,7 +72,7 @@ id = "{surface_id}"
 title = "A surface under test"
 base_file = "{base_file}"
 current_schema_version = 2
-min_supported_schema_version = 0
+min_supported_schema_version = {min_supported_schema_version}
 
 [[migration]]
 id = "{surface_id}@2"
@@ -198,6 +200,69 @@ class TestReplayingASurfaceInMemory:
         assert "meta" not in replayed.config_dict
 
 
+class TestTheRetryHonoursTheSchemaVersionFloor:
+    """A file older than the ledger reaches is refused by `pipelex migrate`; the retry must not boot it.
+
+    The applier skips an absent target and reports success, so a ledger whose oldest entries were
+    squashed away would carry such a file "forward" while leaving it under-migrated — and the boot
+    would then tell the user to run a command that declines the same file. The retry gets out of
+    the way instead, and the error path's scan reports the floor for what it is.
+    """
+
+    OPS = (
+        '[[migration.ops]]\nkind = "rename_table_key"\ntable_path = ["pipelex", "log_config"]\n'
+        'key = "old_default_log_level"\nnew_key = "default_log_level"\n'
+    )
+
+    def _stale_file(self, *, directory: Path, declared: int) -> Path:
+        stale = directory / "pipelex.toml"
+        stale.write_text(f'[meta]\nschema_version = {declared}\n\n[pipelex.log_config]\nold_default_log_level = "DEBUG"\n', encoding="utf-8")
+        return stale
+
+    def test_a_file_declaring_a_version_below_the_floor_declines_the_retry(self, tmp_path: Path, synthetic_migration_dir: Path) -> None:
+        write_synthetic_ledger(
+            migration_dir=synthetic_migration_dir,
+            surface_id=PIPELEX_CONFIG_SURFACE_ID,
+            base_file="pipelex.toml",
+            ops_body=self.OPS,
+            min_supported_schema_version=2,
+        )
+        stale = self._stale_file(directory=tmp_path, declared=1)
+
+        assert replay_surface_files_in_memory(surface_id=PIPELEX_CONFIG_SURFACE_ID, paths=[stale]) is None
+
+    def test_a_file_declaring_the_floor_itself_is_still_carried_forward(self, tmp_path: Path, synthetic_migration_dir: Path) -> None:
+        """The floor is the oldest version the ledger still reaches, not the first one it refuses."""
+        write_synthetic_ledger(
+            migration_dir=synthetic_migration_dir,
+            surface_id=PIPELEX_CONFIG_SURFACE_ID,
+            base_file="pipelex.toml",
+            ops_body=self.OPS,
+            min_supported_schema_version=2,
+        )
+        stale = self._stale_file(directory=tmp_path, declared=2)
+
+        replayed = replay_surface_files_in_memory(surface_id=PIPELEX_CONFIG_SURFACE_ID, paths=[stale])
+
+        assert replayed is not None
+        assert replayed.config_dict["pipelex"]["log_config"]["default_log_level"] == "DEBUG"
+
+    def test_the_loader_then_raises_the_users_own_error(self, fake_dirs: tuple[Path, Path], synthetic_migration_dir: Path) -> None:
+        """Which names the stale key — and whose `migration` block is where the floor gets reported."""
+        global_dir, _ = fake_dirs
+        write_synthetic_ledger(
+            migration_dir=synthetic_migration_dir,
+            surface_id=PIPELEX_CONFIG_SURFACE_ID,
+            base_file="pipelex.toml",
+            ops_body=self.OPS,
+            min_supported_schema_version=2,
+        )
+        self._stale_file(directory=global_dir, declared=1)
+
+        with pytest.raises(ConfigValidationError, match="old_default_log_level"):
+            ConfigLoader().load_config_validated(config_cls=PipelexConfig)
+
+
 class TestWhatTheWarningSays:
     def test_it_names_the_file_and_the_remedy(self, tmp_path: Path) -> None:
         stale = tmp_path / "telemetry.toml"
@@ -312,7 +377,12 @@ class TestTheMainConfigurationLoader:
         synthetic_migration_dir: Path,
         mocker: MockerFixture,
     ) -> None:
-        """And the *migrated* value is the one that lands, not merely a configuration that parses."""
+        """And the *migrated* value is the one that lands, not merely a configuration that parses.
+
+        The main configuration is what *configures logging*, so at this point in a boot no logger
+        exists yet: the warning is parked on the loader for the boot to emit once it does. The
+        unconfigured dispatch here is a cold boot's, and it raises on any attempt to log through it.
+        """
         global_dir, _ = fake_dirs
         write_synthetic_ledger(
             migration_dir=synthetic_migration_dir,
@@ -322,12 +392,24 @@ class TestTheMainConfigurationLoader:
             'key = "old_default_log_level"\nnew_key = "default_log_level"\n',
         )
         (global_dir / "pipelex.toml").write_text('[pipelex.log_config]\nold_default_log_level = "DEBUG"\n', encoding="utf-8")
-        warning = mocker.patch("pipelex.system.configuration.config_loader.log.warning")
+        mocker.patch.object(log, "log_dispatch", LogDispatch())
+        loader = ConfigLoader()
 
-        config = ConfigLoader().load_config_validated(config_cls=PipelexConfig)
+        config = loader.load_config_validated(config_cls=PipelexConfig)
 
         assert config.pipelex.log_config.default_log_level is LogLevel.DEBUG
-        assert "pipelex migrate" in warning.call_args.args[0]
+        parked = loader.take_stale_configuration_warning()
+        assert parked is not None
+        assert "pipelex migrate" in parked
+        assert loader.take_stale_configuration_warning() is None, "a warning is emitted once"
+
+    @pytest.mark.usefixtures("fake_dirs")
+    def test_a_healthy_configuration_parks_no_warning(self) -> None:
+        loader = ConfigLoader()
+
+        loader.load_config_validated(config_cls=PipelexConfig)
+
+        assert loader.take_stale_configuration_warning() is None
 
     def test_programmatic_overrides_are_re_applied_over_the_replay(
         self,

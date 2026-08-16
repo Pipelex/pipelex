@@ -29,7 +29,7 @@ import tomlkit
 from tomlkit.exceptions import TOMLKitError
 
 from pipelex.migration.exceptions import MigrationLedgerError
-from pipelex.migration.ledger import load_ledger_cached, packaged_migration_dir
+from pipelex.migration.ledger import MigrationLedger, load_ledger_cached, packaged_migration_dir
 from pipelex.migration.plan import MigrationPlan
 from pipelex.tools.misc.json_utils import deep_update
 
@@ -77,6 +77,22 @@ def declared_schema_version(*, config_dict: dict[str, Any]) -> int | None:
         return None
     declared = cast("dict[str, Any]", meta_table).get(RESERVED_SCHEMA_VERSION_KEY)
     if isinstance(declared, bool) or not isinstance(declared, int):
+        return None
+    return declared
+
+
+def version_declared_below_the_floor(*, ledger: MigrationLedger, config_dict: dict[str, Any]) -> int | None:
+    """The schema version a document declares when the ledger can no longer migrate from it, else `None`.
+
+    The one comparison against `min_supported_schema_version` in the tree, read by both the
+    migration runner (which refuses the file) and the boot-tolerance retry (which declines). The
+    applier skips an absent target and reports success, so a ledger whose oldest entries were
+    squashed away would run over such a file, change nothing, and call it fine — the declaration is
+    the only evidence there is, and both paths must read it the same way or a boot would carry
+    forward a file `pipelex migrate` then refuses.
+    """
+    declared = declared_schema_version(config_dict=config_dict)
+    if declared is None or declared >= ledger.surface.min_supported_schema_version:
         return None
     return declared
 
@@ -151,6 +167,10 @@ def replay_surface_files_in_memory(*, surface_id: str, paths: Sequence[Path]) ->
         except (OSError, UnicodeDecodeError):
             return None
         try:
+            if version_declared_below_the_floor(ledger=ledger, config_dict=tomlkit.loads(text).unwrap()) is not None:
+                # `pipelex migrate` refuses this file; a retry that carried it forward would boot on
+                # an under-migrated configuration and then name a command that declines it.
+                return None
             replay = replay_ledger_over_text(ledger=ledger, text=text)
             document = tomlkit.loads(replay.text)
         except TOMLKitError:

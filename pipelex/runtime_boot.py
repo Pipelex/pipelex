@@ -197,12 +197,18 @@ class RuntimeBoot(metaclass=MetaSingleton):
             # pydantic's: `PipelexConfig` is a `ConfigRoot`, whose custom `__init__` translates
             # into `ConfigValidationError`, so the arm never fired for the one configuration
             # everything depends on and every boot failure arrived as a bare traceback instead.
-            raise_config_setup_error(config_error=config_error, surface_id=PIPELEX_CONFIG_SURFACE_ID)
+            raise_config_setup_error(
+                config_error=config_error,
+                surface_id=PIPELEX_CONFIG_SURFACE_ID,
+                config_dirs=[config_dir] if config_dir is not None else None,
+            )
 
         log_config = get_config().pipelex.log_config
         self.runtime_hub.set_console_print_target(target=log_config.console_print_target)
         log.configure(log_config=log_config)
         log.verbose("Logs are configured")
+        if (stale_warning := config_manager.take_stale_configuration_warning()) is not None:
+            log.warning(stale_warning)
 
         # tools
         self.class_registry: ClassRegistryAbstract | None = None

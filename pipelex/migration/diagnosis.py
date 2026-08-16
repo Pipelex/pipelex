@@ -32,6 +32,7 @@ Three rules make the answer trustworthy rather than merely computable.
 See `docs/migration-ledger.md` → "The downgrade direction".
 """
 
+import copy
 from collections.abc import Sequence
 from typing import Any, cast
 
@@ -69,7 +70,9 @@ def diagnose_unexplained_paths(
     The document must be the one the run leaves behind. Passing the pre-migration document would
     report every stale key the ledger is about to repair, which is the opposite of the diagnosis.
     """
-    diagnosed = dict(document)
+    # A deep copy, because the strip below edits the nested `[meta]` table in place and this
+    # function only ever reads what it was handed.
+    diagnosed = copy.deepcopy(document)
     # Exactly what boot does before validating: the reserved key is tolerated there, so a document
     # carrying it must not be reported here either. A `[meta]` holding anything else is not
     # reserved, is left in place, and is diagnosed like any other unknown table.

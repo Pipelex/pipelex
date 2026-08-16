@@ -96,6 +96,8 @@ def migrate_cmd(*, dry_run: bool = False, yes: bool = False) -> None:
     written = len(applied.written_plans)
     if written:
         console.print(_panel(message=f"Migrated {written} file(s); a copy of each original is beside it.", style="green"))
+    elif any(plan.blocked_reason is not None and plan.blocked_reason.leaves_the_write_unconfirmed for plan in applied.plans):
+        console.print(_panel(message="No write could be confirmed — compare each file against the rescue copy named above.", style="red"))
     else:
         console.print(_panel(message="Nothing was written.", style="yellow"))
     console.print()

@@ -28,7 +28,7 @@ from pipelex.migration.plan import FileBlockedReason, MigrationPlan, MigrationRe
 from pipelex.migration.surfaces import Surface, SurfaceRegistry
 from pipelex.pipeline.exceptions import FixTransactionError, FixWriteConflictError
 from pipelex.pipeline.fixes.file_transaction import FileSnapshot, PendingFileUpdate, commit_file_updates, read_file_snapshot
-from pipelex.system.configuration.config_surface import declared_schema_version
+from pipelex.system.configuration.config_surface import version_declared_below_the_floor
 
 
 def migrate_file(*, surface: Surface, ledger: MigrationLedger, file_path: Path, dry_run: bool, moment: datetime) -> MigrationPlan:
@@ -131,15 +131,16 @@ def _refuse_a_file_below_the_floor(*, surface: Surface, ledger: MigrationLedger,
     whose target is absent and reports success, so a ledger whose oldest entries were squashed
     away would run over a file older than the squash, change nothing, and say it was fine. A
     document that *declares* where it stands is the only evidence available, which is why the
-    reserved `[meta] schema_version` is read here and nowhere else in a migration.
+    reserved `[meta] schema_version` is read here — and, through the same predicate, in the
+    boot-tolerance retry, which declines the file this refuses.
 
     Almost every file declares nothing and this returns `None` — the floor is zero on every
     surface today, and nothing writes the key. It earns its place the day a squash moves the floor.
     """
-    declared = declared_schema_version(config_dict=document.unwrap())
-    floor = ledger.surface.min_supported_schema_version
-    if declared is None or declared >= floor:
+    declared = version_declared_below_the_floor(ledger=ledger, config_dict=document.unwrap())
+    if declared is None:
         return None
+    floor = ledger.surface.min_supported_schema_version
     return _blocked_plan(
         surface_id=surface.surface_id,
         file_path=file_path,

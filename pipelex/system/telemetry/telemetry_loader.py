@@ -106,6 +106,10 @@ def load_telemetry_config(*, secrets_provider: SecretsProviderAbstract) -> Telem
         # something a `pipelex migrate` would do — the pending migration that partly explains it.
         # Reaching here is not the same as "the ledger has nothing to say": the retry also
         # declines when it applied real operations and the result still would not load.
+        # The scan below replays the ledger a second time, deliberately: it walks the surface's
+        # whole claim (`telemetry_*.toml`, not only the files this loader merged) and runs the
+        # downgrade diagnosis the retry does not, so its plans are not the retry's plans. An
+        # error path over a handful of small files is the right place to pay for that.
         report = report_validation_error(validation_error=exc, surface_id=TELEMETRY_CONFIG_SURFACE_ID)
         paths_str = "\n".join(str(path) for path in telemetry_config_paths)
         msg = f"Invalid telemetry configuration in '{paths_str}':\n{report.message}"

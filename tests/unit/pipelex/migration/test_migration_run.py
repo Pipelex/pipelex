@@ -11,7 +11,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.migration.ledger import MigrationLedger
-from pipelex.migration.plan import FileBlockedReason
+from pipelex.migration.plan import FileBlockedReason, MigrationReport
 from pipelex.migration.run import config_directories_to_migrate
 from pipelex.migration.runner import migrate_file
 from pipelex.migration.surfaces import build_config_surface_registry
@@ -257,3 +257,53 @@ class TestTheDocumentTheDiagnosisReadsIsTheOneTheRunLeaves:
 
         assert not plan.was_written
         assert [unexplained.path for unexplained in plan.unexplained] == ["reporting.retires"]
+
+
+class TestADryRunPredictsExactlyWhatAWritePassRewrites:
+    """`changed_plans` on a dry run must name the same files `written_plans` names after a write.
+
+    The runner writes a file whenever anything applied to it — a whole entry, or the part of a
+    conflicting one that landed before the conflict. A dry run that only counted whole entries
+    would tell the interactive command and the doctor there is nothing to run on a file the write
+    pass then rewrites.
+    """
+
+    def _half_migrated_file(self, *, tmp_path: Path) -> Path:
+        """`output_config` moves; `format` finds its destination already taken and blocks the entry."""
+        target = tmp_path / "example.toml"
+        target.write_text('[reporting]\noutput_config = "out"\nformat = "json"\ndestination_format = "toml"\n', encoding="utf-8")
+        return target
+
+    def _ledger(self, *, build_entry: EntryBuilder, build_ledger: LedgerBuilder) -> MigrationLedger:
+        return build_ledger(
+            entries=[
+                build_entry(
+                    to_schema_version=2,
+                    ops=[
+                        RenameTableKeyOp(table_path=["reporting"], key="output_config", new_key="output"),
+                        RenameTableKeyOp(table_path=["reporting"], key="format", new_key="destination_format"),
+                    ],
+                )
+            ]
+        )
+
+    def test_a_partly_applied_entry_counts_as_a_change_on_both_passes(
+        self,
+        tmp_path: Path,
+        build_entry: EntryBuilder,
+        build_ledger: LedgerBuilder,
+        build_surface: SurfaceBuilder,
+    ) -> None:
+        target = self._half_migrated_file(tmp_path=tmp_path)
+        ledger = self._ledger(build_entry=build_entry, build_ledger=build_ledger)
+
+        rehearsal = migrate_file(surface=build_surface(), ledger=ledger, file_path=target, dry_run=True, moment=MOMENT)
+        assert rehearsal.steps == [], "the scenario is worthless unless the entry actually blocks"
+        assert rehearsal.blocked, "…and worthless unless the block is an entry's"
+        assert rehearsal.blocked[0].applied_ops, "…and worthless unless part of it applied first"
+
+        dry = MigrationReport(plans=[rehearsal])
+        write = MigrationReport(plans=[migrate_file(surface=build_surface(), ledger=ledger, file_path=target, dry_run=False, moment=MOMENT)])
+
+        assert [plan.file_path for plan in write.written_plans] == [target]
+        assert [plan.file_path for plan in dry.changed_plans] == [plan.file_path for plan in write.written_plans]

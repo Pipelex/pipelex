@@ -47,7 +47,12 @@ class ValidationErrorReport(BaseModel):
     anything at all. `None` means the failure is not staleness — or that no surface was named."""
 
 
-def report_validation_error(*, validation_error: ValidationError, surface_id: str | None = None) -> ValidationErrorReport:
+def report_validation_error(
+    *,
+    validation_error: ValidationError,
+    surface_id: str | None = None,
+    config_dirs: list[Path] | None = None,
+) -> ValidationErrorReport:
     """Translate a validation failure, and say so when a pending migration would explain it.
 
     Args:
@@ -56,6 +61,10 @@ def report_validation_error(*, validation_error: ValidationError, surface_id: st
             turns on the migration scan; a caller validating something that is not a configuration
             surface — a `.mthds` bundle, an inference backend file, a model deck — passes nothing
             and gets the translation alone.
+        config_dirs: The directories the refused configuration was loaded from, when the caller
+            bypassed the global/project layering (`doctor --global`, an embedder's `config_dir=`).
+            The scan then diagnoses those and only those; `None` is the ordinary load, and the
+            scan walks what `pipelex migrate` walks.
 
     Returns:
         The translated message and, when a scan found something, the structured migration block.
@@ -63,13 +72,13 @@ def report_validation_error(*, validation_error: ValidationError, surface_id: st
     message = analyze_pydantic_validation_error(validation_error).error_msg
     if surface_id is None:
         return ValidationErrorReport(message=message)
-    block = _pending_migration(surface_id=surface_id)
+    block = _pending_migration(surface_id=surface_id, config_dirs=config_dirs)
     if block is None:
         return ValidationErrorReport(message=message)
     return ValidationErrorReport(message=f"{message}\n\n{_migration_prose(block=block)}", migration=block)
 
 
-def raise_config_setup_error(*, config_error: Exception, surface_id: str) -> NoReturn:
+def raise_config_setup_error(*, config_error: Exception, surface_id: str, config_dirs: list[Path] | None = None) -> NoReturn:
     """Turn a refused configuration into the `PipelexConfigError` a caller should see, migration and all.
 
     Shared by every site that loads a configuration surface and cannot continue without it, so
@@ -83,6 +92,8 @@ def raise_config_setup_error(*, config_error: Exception, surface_id: str) -> NoR
     Args:
         config_error: The refusal, either half of `CONFIG_REFUSED`.
         surface_id: The configuration surface that refused, which is what turns on the scan.
+        config_dirs: The directories the configuration was loaded from, when the caller named
+            them — see `report_validation_error`.
 
     Raises:
         PipelexConfigError: Always, unless `config_error` is re-raised as itself.
@@ -90,12 +101,12 @@ def raise_config_setup_error(*, config_error: Exception, surface_id: str) -> NoR
     validation_error = pydantic_error_behind(config_error=config_error)
     if validation_error is None:
         raise config_error
-    report = report_validation_error(validation_error=validation_error, surface_id=surface_id)
+    report = report_validation_error(validation_error=validation_error, surface_id=surface_id, config_dirs=config_dirs)
     msg = f"Could not setup config because of: {report.message}"
     raise PipelexConfigError(msg, migration=report.migration) from config_error
 
 
-def _pending_migration(*, surface_id: str) -> MigrationErrorBlock | None:
+def _pending_migration(*, surface_id: str, config_dirs: list[Path] | None) -> MigrationErrorBlock | None:
     """What a `pipelex migrate` would find for this surface, or `None` when it would find nothing.
 
     Runs on the failure path only, which is what lets it be a filesystem walk and a ledger replay
@@ -116,7 +127,7 @@ def _pending_migration(*, surface_id: str) -> MigrationErrorBlock | None:
     from pipelex.migration.run import scan_config_surface  # noqa: PLC0415
 
     try:
-        report = scan_config_surface(surface_id=surface_id)
+        report = scan_config_surface(surface_id=surface_id, config_dirs=config_dirs)
     except (MigrationError, OSError):
         return None
     plans = [plan for plan in report.plans if not plan.is_clean]

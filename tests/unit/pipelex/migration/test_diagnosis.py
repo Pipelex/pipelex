@@ -128,6 +128,7 @@ class TestTheReservedMetaTable:
         document = {"meta": {"schema_version": 2}, "label": "hi"}
 
         assert _diagnose(document=document, ledger=empty_ledger) == []
+        assert document == {"meta": {"schema_version": 2}, "label": "hi"}, "a diagnosis reads; it does not edit what it was handed"
 
     def test_a_meta_table_carrying_anything_else_is_reported(self, empty_ledger: MigrationLedger) -> None:
         """Only that one key is reserved, and what is left over is a table no schema knows.
