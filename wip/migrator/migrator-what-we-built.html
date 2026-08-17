@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Configuration migration: repairing a user's file instead of throwing it away</title>
+<style>
+  :root {
+    --bg: #fbfbfa;
+    --surface: #ffffff;
+    --surface-2: #f4f4f2;
+    --ink: #1a1a18;
+    --ink-soft: #55554f;
+    --ink-faint: #85857c;
+    --rule: #e2e2dc;
+    --accent: #9a3412;
+    --accent-soft: #fdf0e8;
+    --bad: #b42318;
+    --bad-soft: #fdf1f0;
+    --good: #2b6a45;
+    --good-soft: #edf6f0;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, -apple-system, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16171a;
+      --surface: #1d1f23;
+      --surface-2: #24262b;
+      --ink: #e9e9e4;
+      --ink-soft: #b3b3ab;
+      --ink-faint: #85857c;
+      --rule: #33363c;
+      --accent: #f0a072;
+      --accent-soft: #2c2018;
+      --bad: #f0837a;
+      --bad-soft: #2d1c1b;
+      --good: #7cc59b;
+      --good-soft: #172a20;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--sans); font-size: 16px; line-height: 1.62;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 3rem 1.25rem 6rem; }
+  header.masthead { border-bottom: 2px solid var(--ink); padding-bottom: 1.25rem; margin-bottom: 2rem; }
+  .eyebrow {
+    font-family: var(--mono); font-size: .72rem; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 .6rem;
+  }
+  h1 { font-size: clamp(1.7rem, 4.4vw, 2.4rem); line-height: 1.15; margin: 0 0 .7rem; letter-spacing: -.02em; }
+  .standfirst { font-size: 1.06rem; color: var(--ink-soft); margin: 0; max-width: 48rem; }
+  .meta { font-family: var(--mono); font-size: .78rem; color: var(--ink-faint); margin-top: 1.1rem; display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; }
+  h2 {
+    font-size: 1.3rem; margin: 3rem 0 1rem; letter-spacing: -.01em;
+    padding-top: 1.2rem; border-top: 1px solid var(--rule);
+  }
+  h3 { font-size: 1.02rem; margin: 1.8rem 0 .6rem; }
+  p { margin: 0 0 1rem; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  code { font-family: var(--mono); font-size: .87em; background: var(--surface-2); padding: .12em .35em; border-radius: 3px; }
+  pre { margin: 0; overflow-x: auto; background: var(--surface-2); border: 1px solid var(--rule); border-radius: 6px; padding: .9rem 1rem; }
+  pre code { background: none; padding: 0; font-size: .8rem; line-height: 1.55; }
+  ul, ol { margin: 0 0 1rem; padding-left: 1.3rem; }
+  li { margin-bottom: .4rem; }
+
+  .tldr {
+    background: var(--accent-soft); border: 1px solid var(--accent);
+    border-radius: 8px; padding: 1.3rem 1.5rem; margin: 0 0 2rem;
+  }
+  .tldr h2 { margin: 0 0 .7rem; border: none; padding: 0; font-size: 1.05rem; font-family: var(--mono);
+    letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+  .tldr p:last-child, .tldr ul:last-child { margin-bottom: 0; }
+
+  .note { background: var(--surface); border-left: 3px solid var(--rule); padding: .8rem 1rem; margin: 0 0 1rem; font-size: .93rem; color: var(--ink-soft); }
+  .note.warn { border-left-color: var(--bad); background: var(--bad-soft); color: var(--ink); }
+  .note.ok { border-left-color: var(--good); background: var(--good-soft); color: var(--ink); }
+
+  table { border-collapse: collapse; width: 100%; font-size: .89rem; margin: 0 0 1rem; }
+  th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-family: var(--mono); font-size: .74rem; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-faint); }
+  .tblwrap { overflow-x: auto; }
+
+  details { border: 1px solid var(--rule); border-radius: 6px; margin: 0 0 .8rem; background: var(--surface); }
+  summary { cursor: pointer; padding: .65rem .9rem; font-weight: 600; font-size: .93rem; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; color: var(--accent); font-weight: 400; }
+  details[open] summary::before { content: "▾ "; }
+  details > div, details > pre { margin: 0 .9rem .9rem; }
+  details > pre { margin-top: 0; }
+
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; margin: 0 0 1rem; }
+  @media (max-width: 42rem) { .cols { grid-template-columns: 1fr; } }
+  .col-label { font-family: var(--mono); font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-faint); margin: 0 0 .3rem; }
+
+  figure { margin: 1.4rem 0; }
+  figure svg { display: block; width: 100%; height: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; }
+  figcaption { font-size: .82rem; color: var(--ink-faint); margin-top: .5rem; }
+  .svg-box { fill: var(--surface-2); stroke: var(--rule); }
+  .svg-box-a { fill: var(--accent-soft); stroke: var(--accent); }
+  .svg-box-g { fill: var(--good-soft); stroke: var(--good); }
+  .svg-box-b { fill: var(--bad-soft); stroke: var(--bad); }
+  .svg-t { fill: var(--ink); font-family: var(--sans); font-size: 12px; }
+  .svg-t-s { fill: var(--ink-soft); font-family: var(--sans); font-size: 10.5px; }
+  .svg-m { fill: var(--ink); font-family: var(--mono); font-size: 11px; }
+  .svg-line { stroke: var(--ink-faint); fill: none; stroke-width: 1.3; }
+  .svg-arrow { fill: var(--ink-faint); }
+
+  .diff-add { color: var(--good); }
+  .diff-del { color: var(--bad); }
+  .pillrow { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0 0 1rem; }
+  .pill { font-family: var(--mono); font-size: .74rem; border: 1px solid var(--rule); border-radius: 999px; padding: .15rem .6rem; color: var(--ink-soft); background: var(--surface); }
+  footer { margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--rule); font-size: .84rem; color: var(--ink-faint); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">pipelex · v0.46.0</p>
+  <h1>Configuration migration: repairing a user's file instead of throwing it away</h1>
+  <p class="standfirst">
+    We changed the shape of every configuration file pipelex reads — and built the machinery that
+    makes that survivable on a machine that already has one. Migration is now recorded as data,
+    replayed over real files, and enforced by gates that refuse a schema change nobody accounted for.
+  </p>
+  <div class="meta">
+    <span>Release <strong>v0.46.0</strong></span>
+    <span>9 merged PRs · <a href="https://github.com/Pipelex/pipelex/pull/1117">#1117 cuts the release</a></span>
+    <span>Author-facing doc — for co-developers</span>
+  </div>
+</header>
+
+<div class="tldr">
+  <h2>TL;DR</h2>
+  <p>
+    <strong>The problem:</strong> a schema change used to be a landmine. <code>pipelex init</code> never
+    overwrites, so every machine in the field kept its old file, and the next boot died on
+    <code>extra="forbid"</code> naming a key the user never chose to have. The only remedy we could offer
+    was <code>pipelex init</code> — which resets the file and discards their API keys, buckets and log levels.
+  </p>
+  <p>
+    <strong>What we built:</strong> every configuration surface now carries a checked-in <em>ledger</em>
+    recording each shape change as data. <code>pipelex migrate</code> replays it over a user's real files,
+    in place, keeping their values and taking a timestamped backup. A stale-but-explainable config no
+    longer stops the boot — it warns. Three gates make it impossible to land a schema change without the
+    entry that repairs it.
+  </p>
+  <p>
+    <strong>What you need to do:</strong> after pulling, run <code>pipelex migrate</code> once. If you touch
+    a config model and <code>make cmig</code> refuses, invoke the <code>add-migration</code> skill — never
+    regenerate the goldens to silence it.
+  </p>
+</div>
+
+<h2>Why a "just edit the model" change was never just that</h2>
+
+<p>
+  Three of the four surfaces below changed shape in this release, and each change was, by itself,
+  reasonable. The reshape gave <code>pipelex.toml</code> a scheme. Retiring <code>prompting_target</code>
+  made templating an authoring decision. Neither is controversial. What made them dangerous is that
+  configuration files are <em>the user's</em>: we ship defaults, they edit and keep them, and we never
+  overwrite. So a field we delete lives on in their file forever, and the strict loader that protects
+  them from typos is exactly what turns our cleanup into their broken boot.
+</p>
+
+<p>
+  The failure had a particularly bad shape. The error named a key — but not which file put it there,
+  and certainly not whether that key was correct last month. A user reading
+  <code>Extra inputs are not permitted: prompting_target</code> has no way to tell a typo from a field
+  that we removed.
+</p>
+
+<h2>The ledger: a migration is data, not code</h2>
+
+<p>
+  The core move is that a shape change is recorded, in a checked-in TOML file, as a list of structural
+  operations. Not a Python function — data. That is what lets the same record be replayed by the
+  command, rehearsed by the boot, verified by a gate, and read by a human.
+</p>
+
+<figure>
+<svg viewBox="0 0 720 250" role="img" aria-label="A ledger is a surface plus ordered entries, each entry a list of structural operations">
+  <rect class="svg-box-a" x="8" y="12" width="180" height="60" rx="6"/>
+  <text class="svg-t" x="22" y="34" font-weight="600">[surface]</text>
+  <text class="svg-m" x="22" y="52">id, base_file,</text>
+  <text class="svg-m" x="22" y="66">current_schema_version</text>
+
+  <rect class="svg-box" x="8" y="90" width="180" height="66" rx="6"/>
+  <text class="svg-t" x="22" y="112" font-weight="600">[[migration]] @2</text>
+  <text class="svg-t-s" x="22" y="130">breaking, safety,</text>
+  <text class="svg-t-s" x="22" y="146">pre_history, guidance</text>
+
+  <rect class="svg-box" x="8" y="174" width="180" height="66" rx="6"/>
+  <text class="svg-t" x="22" y="196" font-weight="600">[[migration]] @3</text>
+  <text class="svg-t-s" x="22" y="214">ordered — @2 addresses</text>
+  <text class="svg-t-s" x="22" y="230">the pre-rename spelling</text>
+
+  <path class="svg-line" d="M188 123 H236"/>
+  <polygon class="svg-arrow" points="236,119 246,123 236,127"/>
+  <path class="svg-line" d="M188 207 H236"/>
+  <polygon class="svg-arrow" points="236,203 246,207 236,211"/>
+
+  <rect class="svg-box" x="250" y="86" width="200" height="74" rx="6"/>
+  <text class="svg-t" x="264" y="108" font-weight="600">[[migration.ops]]</text>
+  <text class="svg-m" x="264" y="126">move_key</text>
+  <text class="svg-m" x="264" y="142">rename_key · delete_table</text>
+  <text class="svg-m" x="264" y="156">remap_value · ensure_table</text>
+
+  <rect class="svg-box" x="250" y="174" width="200" height="66" rx="6"/>
+  <text class="svg-t-s" x="264" y="196">structural kinds only —</text>
+  <text class="svg-t-s" x="264" y="212">an op that would WRITE a</text>
+  <text class="svg-t-s" x="264" y="228">value is refused at parse</text>
+
+  <path class="svg-line" d="M450 123 H498"/>
+  <polygon class="svg-arrow" points="498,119 508,123 498,127"/>
+
+  <rect class="svg-box-g" x="512" y="86" width="196" height="74" rx="6"/>
+  <text class="svg-t" x="526" y="108" font-weight="600">replay over a real file</text>
+  <text class="svg-t-s" x="526" y="128">text in → text out, plus a</text>
+  <text class="svg-t-s" x="526" y="144">plan: applied / blocked /</text>
+  <text class="svg-t-s" x="526" y="158">unexplained</text>
+
+  <text class="svg-t-s" x="512" y="196">One record, four readers:</text>
+  <text class="svg-t-s" x="512" y="212">the command, the boot,</text>
+  <text class="svg-t-s" x="512" y="228">the gates, and a human.</text>
+</svg>
+<figcaption>A ledger is a surface header plus ordered entries. Order matters: the entry that carries <code>[pipelex.prompting_config]</code> forward sits <em>below</em> the reshape, because it addresses a spelling that only exists while the root table is still called <code>[pipelex]</code>.</figcaption>
+</figure>
+
+<details>
+<summary>The reshape entry, as it actually ships</summary>
+<pre><code>[[migration]]
+id = "pipelex-config@3"
+to_schema_version = 3
+introduced_in = "0.46.0"
+breaking = true
+safety = "safe"
+title = "The configuration reshape: one scheme for the root"
+
+# Children move out of [pipelex] BEFORE [pipelex] itself is renamed, so the
+# rename that follows carries only what belongs to the interpreter.
+[[migration.ops]]
+kind = "move_key"
+table_path = ["pipelex"]
+key = "storage_config"
+new_table_path = ["runtime"]
+new_key = "storage"</code></pre>
+</details>
+
+<h3>The four surfaces</h3>
+
+<div class="tblwrap">
+<table>
+<thead><tr><th>Surface</th><th>Files it claims</th><th>Schema</th><th>Ships in 0.46.0</th></tr></thead>
+<tbody>
+<tr><td><code>pipelex-config</code></td><td><code>pipelex.toml</code> + <code>pipelex_*.toml</code></td><td>v3</td><td><code>@2</code> templating, <code>@3</code> reshape</td></tr>
+<tr><td><code>telemetry-config</code></td><td><code>telemetry.toml</code> + tiers</td><td>v2</td><td><code>@2</code> flat → <code>[custom_posthog]</code></td></tr>
+<tr><td><code>inference-backend</code></td><td><code>inference/backends/*.toml</code></td><td>v2</td><td><code>@2</code> drop <code>prompting_target</code></td></tr>
+<tr><td><code>pipelex-service-config</code></td><td><code>pipelex_service.toml</code></td><td>v1</td><td>baseline, no entries</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+  The walk is deliberately narrow: the global <code>~/.pipelex/</code> and the project
+  <code>.pipelex/</code>, <strong>those two only</strong>, one level deep, and into a subdirectory only
+  when a configuration family owns it. <code>inference/backends/</code> is such a directory;
+  <code>inference/deck/</code> is not and is never entered. A file is claimed by the <em>pair</em>
+  (directory, name) — which is what stops <code>inference/backends/pipelex_gateway.toml</code>, a
+  <code>pipelex_*.toml</code> match by name, from being rewritten under the main config's ledger.
+</p>
+
+<h2>Boot tolerance: a stale file warns, it does not stop the world</h2>
+
+<p>
+  The command alone would not have been enough. A user upgrades, boots, and dies before they ever see
+  a message telling them to run it. So when a surface fails to validate, its ledger is replayed over
+  the same files <strong>in memory</strong> and the result re-validated.
+</p>
+
+<figure>
+<svg viewBox="0 0 720 300" role="img" aria-label="Boot tolerance decision flow">
+  <rect class="svg-box" x="250" y="8" width="200" height="38" rx="6"/>
+  <text class="svg-t" x="350" y="32" text-anchor="middle">load + validate config</text>
+
+  <path class="svg-line" d="M350 46 V74"/>
+  <polygon class="svg-arrow" points="346,74 350,84 354,74"/>
+
+  <rect class="svg-box-g" x="486" y="56" width="222" height="38" rx="6"/>
+  <text class="svg-t" x="597" y="80" text-anchor="middle">valid → boot. Zero cost:</text>
+  <path class="svg-line" d="M450 75 H486"/>
+  <polygon class="svg-arrow" points="486,71 496,75 486,79"/>
+  <text class="svg-t-s" x="597" y="110" text-anchor="middle">the engine is never even imported</text>
+
+  <rect class="svg-box-b" x="250" y="84" width="200" height="38" rx="6"/>
+  <text class="svg-t" x="350" y="108" text-anchor="middle">invalid</text>
+
+  <path class="svg-line" d="M350 122 V150"/>
+  <polygon class="svg-arrow" points="346,150 350,160 354,150"/>
+
+  <rect class="svg-box-a" x="228" y="160" width="244" height="42" rx="6"/>
+  <text class="svg-t" x="350" y="178" text-anchor="middle" font-weight="600">replay the ledger IN MEMORY</text>
+  <text class="svg-t-s" x="350" y="194" text-anchor="middle">nothing is written, ever</text>
+
+  <path class="svg-line" d="M228 181 H120 V226"/>
+  <polygon class="svg-arrow" points="116,226 120,236 124,226"/>
+  <path class="svg-line" d="M472 181 H600 V226"/>
+  <polygon class="svg-arrow" points="596,226 600,236 604,226"/>
+
+  <rect class="svg-box-g" x="14" y="236" width="212" height="54" rx="6"/>
+  <text class="svg-t" x="120" y="256" text-anchor="middle" font-weight="600">re-validates → BOOT</text>
+  <text class="svg-t-s" x="120" y="273" text-anchor="middle">warn, naming the files and</text>
+  <text class="svg-t-s" x="120" y="287" text-anchor="middle">`pipelex migrate`</text>
+
+  <rect class="svg-box-b" x="494" y="236" width="212" height="54" rx="6"/>
+  <text class="svg-t" x="600" y="256" text-anchor="middle" font-weight="600">still invalid → FAIL</text>
+  <text class="svg-t-s" x="600" y="273" text-anchor="middle">the user's own error stands —</text>
+  <text class="svg-t-s" x="600" y="287" text-anchor="middle">it names the key to fix</text>
+</svg>
+<figcaption>Tolerance widens what <em>starts</em>, never what is <em>accepted</em>: the re-validation is what decides, so material an <code>unsafe</code> entry is about still fails the boot because the model still refuses it.</figcaption>
+</figure>
+
+<details>
+<summary>Critical diff — the retry seam (<code>config_surface.py</code>)</summary>
+<div>
+<p style="font-size:.9rem;color:var(--ink-soft);margin:.8rem 0">
+Two things in here are load-bearing and easy to break. The import is deferred for an
+<em>architectural</em> reason, not for speed; and a file that cannot be read abandons the whole retry
+rather than being skipped.
+</p>
+</div>
+<pre><code><span class="diff-add">+ # Imported here rather than at module level, and the reason is architectural: the
++ # engine's applier lives under an interpreter package, while this module sits in
++ # runtime_hub's import closure — the kernel layer, which loads zero interpreter modules.
++ from pipelex.migration.engine import replay_ledger_over_text  # noqa: PLC0415
++
++ for path in paths:
++     try:
++         text = path.read_text(encoding="utf-8")
++     except FileNotFoundError:
++         continue
++     except (OSError, UnicodeDecodeError):
++         return None   # <- abandon, do NOT skip: dropping a layer from the merge
++                       #    could re-validate green and boot a config the user
++                       #    does not actually have
++     replay = replay_ledger_over_text(ledger=ledger, text=text)
++     deep_update(merged, updates=tomlkit.loads(replay.text).unwrap())
++
++ if all(plan.is_clean for plan in plans):
++     return None       # <- the ledger has nothing to say; not staleness.
++                       #    The caller's own error stands.</span></code></pre>
+</details>
+
+<div class="note">
+  <strong>A healthy configuration pays nothing.</strong> It reads no ledger, re-parses no document, and
+  does not even import the migration engine. That deferral is doubly required: the applier lives in the
+  interpreter layer and the config loaders sit in the kernel layer, which must not load it.
+</div>
+
+<h2>The gates: you cannot land a schema change without accounting for it</h2>
+
+<p>
+  A ledger nobody is forced to write is a ledger that will be forgotten on the one change that mattered.
+  Three checks close that.
+</p>
+
+<div class="tblwrap">
+<table>
+<thead><tr><th>Gate</th><th>Question it asks</th><th>Runs in</th></tr></thead>
+<tbody>
+<tr>
+  <td><code>make check-ledger</code><br><span class="pill">cl</span></td>
+  <td>Is what this entry <em>says</em> legal, and is replaying it harmless? An op may only act on material some version removed; replaying the whole ledger over the reference documents must return the very bytes it was given.</td>
+  <td><code>agent-check</code> + <code>check</code></td>
+</tr>
+<tr>
+  <td><code>make check-migration-schemas</code><br><span class="pill">cmig</span></td>
+  <td>Did a schema change go unaccounted for? Recomputes each surface's fingerprint and refuses a removed path, a lost enum spelling, or a narrowed value domain that no entry repairs. Also <em>performs</em> every migration against frozen before/after documents.</td>
+  <td><code>check</code> only</td>
+</tr>
+<tr>
+  <td><code>make up-migration-schemas</code><br><span class="pill">umig</span> <span class="pill">umigf</span></td>
+  <td>Regenerates the goldens. Deliberately <strong>left <code>make up</code></strong> — rewriting a head golden after deleting a field erases the very removal the gate exists to catch.</td>
+  <td>on purpose, by hand</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="note warn">
+  <strong>Because <code>cmig</code> is not in <code>agent-check</code>,</strong> an unaccounted schema change
+  reaches a release unseen. That is why <code>/release</code> gained step 3b, which blocks on it and
+  confirms a <code>**Migration:**</code> changelog bullet for every new breaking entry.
+</div>
+
+<h3>Catching a narrowing — the class of change that looks additive</h3>
+
+<p>
+  A change can keep every path and every enumerated spelling and still break a user's file:
+  <code>int</code> becomes <code>str</code>, a free string becomes an enum, a bound moves from
+  <code>ge=1</code> to <code>ge=5</code>. Read as a path diff those look like <em>additions</em>, so the
+  gate used to ask for a golden regeneration, demand nothing, and let the next boot reject a valid file
+  with a green gate behind it. The verdict is now split by <strong>direction</strong>.
+</p>
+
+<p>
+  To see a bound at all, the fingerprint has to record one — which is why
+  <code>annotated-types</code> became a declared runtime dependency. It is a closed whitelist, and
+  <code>pattern</code> is excluded permanently: regex containment is not decidable, so every pattern edit
+  would read as a tightening and teach everyone to wave the gate through.
+</p>
+
+<details>
+<summary>Critical diff — the constraint whitelist (<code>fingerprint.py</code>)</summary>
+<pre><code><span class="diff-add">+ from annotated_types import Ge, Gt, Le, Lt, MaxLen, MinLen, MultipleOf
++
++ CONSTRAINT_ATTRIBUTE_BY_CARRIER: dict[type[Any], ConstraintKind] = {
++     Gt: ConstraintKind.GT,   Ge: ConstraintKind.GE,
++     Lt: ConstraintKind.LT,   Le: ConstraintKind.LE,
++     MinLen: ConstraintKind.MIN_LENGTH,
++     MaxLen: ConstraintKind.MAX_LENGTH,
++     MultipleOf: ConstraintKind.MULTIPLE_OF,
++ }
++ # pattern is excluded ON PURPOSE and permanently.</span></code></pre>
+<div>
+<p style="font-size:.9rem;color:var(--ink-soft);margin:0 0 .8rem">
+The fingerprint is <em>not</em> raw <code>model_json_schema()</code> — that moves for reasons having
+nothing to do with our schema (ref layout, titles, ordering, pydantic's own version). A gate that cries
+wolf gets regenerated reflexively, and that is how a gate dies.
+</p>
+</div>
+</details>
+
+<h3>Replay neutrality, checked rather than asserted</h3>
+
+<p>
+  The guarantee every machine depends on: replaying a ledger over a file <em>already valid</em> changes
+  not one byte. The reference documents cannot prove it — they carry exactly one value per key, so they
+  never reach the other legal spelling of an enumerated field. <code>hypothesis</code> (dev-only) generates
+  documents that do, and checks neutrality, idempotence and prefix coherence.
+</p>
+
+<div class="note ok">
+  Each generator carries its own <strong>vacuity check</strong> —
+  <code>test_the_generator_does_not_merely_re_emit_the_reference_document</code>,
+  <code>test_the_generator_reaches_every_mutation_kind</code>. Every one of these properties is trivially
+  true over documents nothing acts on, so without those guards a green suite would prove nothing.
+</div>
+
+<h2>The breaking changes that rode along</h2>
+
+<details>
+<summary>The configuration root reshaped — <code>pipelex-config@3</code></summary>
+<div class="cols">
+  <div>
+    <p class="col-label">before</p>
+    <pre><code>[pipelex.log_config.rich_log_config]
+[pipelex.storage_config]
+[cogt.llm_config.instructor_config]
+[plugins]
+[migration.migration_maps]
+session_id = "..."</code></pre>
+  </div>
+  <div>
+    <p class="col-label">after</p>
+    <pre><code>[runtime.log.rich_log]
+[runtime.storage]
+[inference.llm.instructor]
+[runtime] / [inference]
+[interpreter] / [kit]
+# dropped</code></pre>
+  </div>
+</div>
+<div>
+<p style="font-size:.9rem;color:var(--ink-soft);margin:0 0 .8rem">
+Four roots mirroring the layers the code already had. The redundant <code>_config</code> suffix goes at
+every depth — <em>class</em> names keep theirs, because the redundancy was in the key, not the type.
+Three things are dropped rather than moved: <code>[migration.migration_maps]</code>,
+<code>session_id</code>, and <code>plugins.boot_orchestrator</code> (now strictly a boot argument).
+</p>
+</div>
+</details>
+
+<details>
+<summary>Templating style is now an authoring decision — <code>pipelex-config@2</code> + <code>inference-backend@2</code></summary>
+<div>
+<p style="font-size:.9rem;color:var(--ink-soft);margin:.8rem 0">
+How a pipe's inputs are tagged into a prompt is declared <em>on the pipe</em>, not inferred from the
+model — so the same method renders the same prompt shape everywhere. The global default is now XML tags
+instead of back-ticks, which means <strong>every prompt rendered for an OpenAI-family model changes
+shape</strong>. Compose, image-gen, search and structuring prompts follow the same default.
+</p>
+<p style="font-size:.9rem;color:var(--ink-soft);margin:.8rem 0">
+This is the change that created the <code>inference-backend</code> surface. <code>#1104</code> deleted
+<code>prompting_target</code> from every backend file we ship — but those files were reachable by no
+surface, no walk and no gate, so the key survived on every installation that predates it, where it is
+fatal twice over: in <code>[defaults]</code> it is copied wholesale into every model of the file, and on
+a single model it is rejected by name.
+</p>
+</div>
+</details>
+
+<details>
+<summary>Unknown per-model backend keys must be header-shaped</summary>
+<div>
+<p style="font-size:.9rem;color:var(--ink-soft);margin:.8rem 0">
+An unrecognised key in a per-model table is sent to the provider as an HTTP header. That mechanism is
+now documented and gated on shape: it must contain a hyphen. A typo like <code>max_tokns</code> used to
+go out on the wire silently while the real setting stayed unset; it now fails the boot naming the key,
+the model and the file. The key must also be <em>usable</em> as a header — RFC 7230 token characters,
+printable single-line string value.
+</p>
+</div>
+</details>
+
+<h2>Working with this from now on</h2>
+
+<ol>
+  <li><strong>You change a config model.</strong> <code>make cmig</code> refuses, printing a fingerprint diff.</li>
+  <li><strong>Invoke the <code>add-migration</code> skill.</strong> It is the only thing that writes a ledger — it derives the entry from what the gate refused, bumps the schema version, regenerates the goldens and adds the changelog bullet.</li>
+  <li><strong>Never regenerate goldens to silence the gate.</strong> A green gate over an unaccounted removal is precisely the failure it exists to prevent.</li>
+  <li><strong>At release, step 3b blocks</strong> until every new breaking entry has a <code>**Migration:**</code> bullet naming its id, and a correct <code>introduced_in</code>.</li>
+</ol>
+
+<div class="note warn">
+  <strong>Dogfood finding from cutting this release.</strong> A stale untracked
+  <code>.pipelex/pipelex_override.toml</code> on a dev machine reddened three tests with
+  <code>Extra forbidden fields: 'pipelex'</code>. It is not a code defect — it is exactly the situation
+  this work exists for. Note that <code>pipelex migrate</code> has <em>no scoping flag</em>: it walks both
+  directories, so it will also rewrite your global <code>~/.pipelex/inference/backends/*.toml</code>.
+  Backups are automatic, but be aware if you share a global config across worktrees.
+</div>
+
+<h2>PR map</h2>
+
+<div class="tblwrap">
+<table>
+<thead><tr><th>PR</th><th>What landed</th></tr></thead>
+<tbody>
+<tr><td><a href="https://github.com/Pipelex/pipelex/pull/1104">#1104</a></td><td>Templating style as an authoring decision — retire <code>prompting_target</code></td></tr>
+<tr><td><a href="https://github.com/Pipelex/pipelex/pull/1106">#1106</a></td><td>Strict templating tables, keyless <code>pipelex run --dry-run</code></td></tr>
+<tr><td><a href="https://github.com/Pipelex/pipelex/pull/1109">#1109</a></td><td>Rogue outbound headers guard</td></tr>
+<tr><td><a href="https://github.com/Pipelex/pipelex/pull/1110">#1110</a></td><td>Migrator Phases 0–1 — the contract, the operation vocabulary, the schema-1 cut</td></tr>
+<tr><td><a href="https://github.com/Pipelex/pipelex/pull/1111">#1111</a></td><td>Configuration reshape: one scheme for the root</td></tr>
+<tr><td><a href="https://github.com/Pipelex/pipelex/pull/1112">#1112</a></td><td>Migrator Phase 2 — the engine, the gates, the first real migration</td></tr>
+<tr><td><a href="https://github.com/Pipelex/pipelex/pull/1113">#1113</a></td><td>Phase 3.1 — what an <code>unsafe</code> entry promises, catching a narrowing, the write path</td></tr>
+<tr><td><a href="https://github.com/Pipelex/pipelex/pull/1114">#1114</a></td><td>Phase 3.2 — the migrate commands, boot tolerance</td></tr>
+<tr><td><a href="https://github.com/Pipelex/pipelex/pull/1115">#1115</a></td><td>Phase 3.3 — the review obligation, the two skills</td></tr>
+<tr><td><a href="https://github.com/Pipelex/pipelex/pull/1116">#1116</a></td><td>The <code>inference-backend</code> surface + the two pre-history entries</td></tr>
+<tr><td><a href="https://github.com/Pipelex/pipelex/pull/1117">#1117</a></td><td><strong>Release v0.46.0</strong> (open)</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="note">
+  <strong>Downstream, still pending.</strong> The MTHDS JSON Schema gained
+  <code>additionalProperties: false</code> on <code>TemplatingStyle</code> and <code>TemplateBlueprint</code>.
+  The committed copies in <code>mthds</code>, <code>vscode-pipelex</code> and <code>mthds-ui</code> are
+  release-gated and not yet synced — no PRs to link there yet.
+</div>
+
+<footer>
+  pipelex · <code>wip/migrator/what-we-built.html</code> · work-in-progress note for co-developers, not release documentation.
+</footer>
+
+</div>
+</body>
+</html>
