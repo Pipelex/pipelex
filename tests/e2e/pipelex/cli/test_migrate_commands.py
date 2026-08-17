@@ -14,7 +14,7 @@ fails ``TelemetryConfig``'s ``extra="forbid"`` today, in the field.
 
 **Two surfaces are planted here, and the second one is the whole main configuration.**
 ``telemetry-config`` is the small specimen — one flat document, nested — and it is what most of
-this module runs on because it is cheap and it shipped first. ``pipelex-config@2``, the
+this module runs on because it is cheap and it shipped first. ``pipelex-config@3``, the
 configuration reshape, is the other size of thing: it renames the root tables of the file every
 boot reads, so the machine it migrates is every existing installation. Its fixture is
 ``goldens/pipelex-config/defaults@1.toml`` — the packaged ``pipelex.toml`` as it stood at schema 1
@@ -91,6 +91,30 @@ default_output_dir = "build"
 """
 
 
+# The templating section as schema 1 spells it, and as the release before it did. `#1104` renamed
+# the section and its one key and dropped the per-target map, and the pre-history entry
+# `pipelex-config@2` is what carries a file written before that. The pair is used to rewind
+# `defaults@1.toml` one release further back — a text swap rather than a transcribed document, so
+# that everything the reshape entry is about goes on being read live and only the half this is
+# about is stated here. A swap that stopped matching would leave a fixture that is not old at all,
+# which is why the planting asserts on the result.
+TEMPLATING_SECTION_AT_SCHEMA_1 = """\
+[pipelex.templating_config]
+default_templating_style = { tag_style = "xml" }
+"""
+
+PROMPTING_SECTION_BEFORE_SCHEMA_1 = """\
+[pipelex.prompting_config]
+default_prompting_style = { tag_style = "xml" }
+
+[pipelex.prompting_config.prompting_styles]
+openai = { tag_style = "ticks" }
+anthropic = { tag_style = "xml" }
+mistral = { tag_style = "square_brackets" }
+gemini = { tag_style = "xml" }
+"""
+
+
 def _old_shape_telemetry_document() -> str:
     """The flat pre-history document the shipped entry is about, read from the package."""
     path = pre_history_document_path(migration_dir=packaged_migration_dir(), surface_id=TELEMETRY_CONFIG_SURFACE_ID, schema_version=2)
@@ -105,6 +129,11 @@ def _pre_reshape_pipelex_config_document() -> str:
     does not. Read live rather than transcribed here, for the same reason the telemetry fixture is:
     a transcribed one would eventually describe a shape the shipped ledger no longer migrates, and
     would go on passing.
+
+    It is read at schema 1 by name and not at the version the reshape now starts from, which is one
+    higher: the pre-history entry inserted below the reshape changed nothing in the models, so its
+    reference document is a byte copy of this one. Naming the version where the document's shape was
+    actually cut is the spelling that says what this is, rather than one inherited from a copy.
     """
     path = defaults_golden_path(migration_dir=packaged_migration_dir(), surface_id=PIPELEX_CONFIG_SURFACE_ID, schema_version=1)
     return path.read_text(encoding="utf-8")
@@ -114,7 +143,7 @@ def _todays_pipelex_config_document() -> dict[str, Any]:
     """What the package's own `pipelex.toml` says now — the shape a migration has to land on.
 
     Read through the surface rather than by path, so this tracks wherever the packaged document
-    lives, and read as the live file rather than as `defaults@2.toml`: the golden is a snapshot of
+    lives, and read as the live file rather than as the head golden: that golden is a snapshot of
     this, and comparing against the snapshot would leave a gap exactly the width of a stale one.
     """
     registry = build_config_surface_registry()
@@ -166,6 +195,33 @@ def _plant_a_pre_reshape_machine(*, hermetic_home: Path) -> tuple[Path, Path, Pa
     project_file = _project_config_dir(hermetic_home=hermetic_home) / "pipelex_override.toml"
     project_file.write_text(OLD_SHAPE_PROJECT_PIPELEX_OVERRIDE, encoding="utf-8")
     return hermetic_home / PROJECT_DIR_NAME, global_file, project_file
+
+
+def _plant_a_pre_prompting_style_machine(*, hermetic_home: Path) -> tuple[Path, Path]:
+    """One release further back than the machine above: a file that still names prompting styles.
+
+    Two entries have to run on it, in order, and the order is the whole point — the first addresses
+    `pipelex.prompting_config` at the spelling it had *before* the reshape renames `[pipelex]`, so a
+    file that met only the reshape would arrive at `[interpreter.prompting_config]`, which nothing
+    reads and the model refuses.
+
+    Only the global tier is planted. The project tier beside it is the reshape's specimen and it has
+    nothing to say about prompting styles; a second file carrying the same two tables would prove the
+    same thing twice.
+
+    Returns the project directory and the global file.
+    """
+    at_schema_1 = _pre_reshape_pipelex_config_document()
+    older = at_schema_1.replace(TEMPLATING_SECTION_AT_SCHEMA_1, PROMPTING_SECTION_BEFORE_SCHEMA_1)
+    if older == at_schema_1:
+        msg = f"the schema-1 templating section is no longer spelled the way this fixture rewinds:\n{TEMPLATING_SECTION_AT_SCHEMA_1}"
+        raise AssertionError(msg)
+
+    global_file = hermetic_home / ".pipelex" / "pipelex.toml"
+    global_file.write_text(older, encoding="utf-8")
+
+    _project_config_dir(hermetic_home=hermetic_home)
+    return hermetic_home / PROJECT_DIR_NAME, global_file
 
 
 def _run(*, args: list[str], env: dict[str, str], cwd: Path, answers: str | None = None) -> subprocess.CompletedProcess[str]:
@@ -355,7 +411,7 @@ class TestAPreReshapeMachine:
     """The machine this release actually meets: a main configuration written before the reshape.
 
     Everything above is planted on `telemetry-config`, whose entry nests one flat document — a
-    small change, and one that shipped before the reshape did. `pipelex-config@2` is the other
+    small change, and one that shipped before the reshape did. `pipelex-config@3` is the other
     size of thing. It renames the root tables of the file every boot reads, so the machine it
     migrates is not a corner case but every installation that predates this release, and the two
     tiers planted here are the two a real one has: the global `~/.pipelex/pipelex.toml` an install
@@ -375,8 +431,9 @@ class TestAPreReshapeMachine:
         """The whole loop through `pipelex migrate`, with the strong assertion on the global file.
 
         Migrated, it says exactly what the package's own `pipelex.toml` says today.
-        `make check-migration-schemas` already proves the *engine* turns `defaults@1` into
-        `defaults@2`; what is proved here is that the *command* does — walking two directories,
+        `make check-migration-schemas` already proves the *engine* turns the reference document the
+        reshape starts from into the one it lands on; what is proved here is that the *command*
+        does — walking two directories,
         reading a user's file off a disk, writing it back and leaving the original beside it —
         which no golden can show.
 
@@ -563,6 +620,82 @@ class TestAPreReshapeMachine:
         assert planted not in boot.stdout
         assert planted not in boot.stderr
         assert planted in global_file.read_text(encoding="utf-8"), "nothing was written, so the value is still there"
+
+
+class TestAPrePromptingStyleMachine:
+    """Two entries on one file, in the order that makes the first one's paths exist.
+
+    `pipelex-config@2` is the other half of the templating change: `#1104` deleted
+    `prompting_config` from the model and from the packaged file, and — because `pipelex init` never
+    overwrites — left it behind on every machine that had one. It is a *pre-history* entry inserted
+    below the reshape rather than appended above it, because it addresses `pipelex.prompting_config`,
+    the spelling that only exists while `[pipelex]` is still called `[pipelex]`. Appended after the
+    reshape it would find nothing, and the file would come out of the run carrying
+    `[interpreter.prompting_config]` — a table the model refuses, on a machine the tool has just
+    reported as migrated.
+
+    So the property here is not "the entry works" but "the two entries compose": one machine, one
+    run, and a file that arrives at exactly what the package ships today.
+    """
+
+    def test_the_human_command_carries_a_pre_prompting_style_machine_onto_todays_shape(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        project_dir, global_file = _plant_a_pre_prompting_style_machine(hermetic_home=hermetic_home)
+        original = global_file.read_text(encoding="utf-8")
+        planted: dict[str, Any] = load_toml_from_path(path=global_file)
+        assert "prompting_config" in planted["pipelex"], "the fixture has to start out old, or nothing below is measured"
+
+        _assert_boots(env=offline_subprocess_env, cwd=project_dir)
+
+        migrated = _run(args=[str(PIPELEX_BIN), "--no-logo", "migrate", "--yes"], env=offline_subprocess_env, cwd=project_dir)
+
+        assert migrated.returncode == 0, migrated.stdout + migrated.stderr
+        assert str(global_file) in migrated.stdout + migrated.stderr
+
+        # The whole document, against the live packaged one: the tuned per-target map is gone, the
+        # default it sat beside travels to where the reshape puts templating, and nothing else about
+        # a file that crossed two entries in one run came out different.
+        assert load_toml_from_path(path=global_file) == _todays_pipelex_config_document()
+
+        backups = existing_backups_of(path=global_file)
+        assert len(backups) == 1, f"expected exactly one backup of {global_file}, found {backups}"
+        assert backups[0].read_text(encoding="utf-8") == original
+
+        _assert_boots(env=offline_subprocess_env, cwd=project_dir)
+
+    def test_the_agent_loop_names_both_entries_for_the_one_file(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """A plan that named only the reshape would be a plan a consumer could not act on.
+
+        The order of the steps is the order they ran in, and it is the load-bearing half: a reader
+        of this plan has to be able to see that the prompting section was dealt with while it was
+        still under `[pipelex]`.
+        """
+        project_dir, global_file = _plant_a_pre_prompting_style_machine(hermetic_home=hermetic_home)
+
+        planned = _run(
+            args=[str(PIPELEX_AGENT_BIN), "migrate", "--dry-run", "--format", "json"],
+            env=offline_subprocess_env,
+            cwd=project_dir,
+        )
+        assert planned.returncode == 0, planned.stderr
+        plan: dict[str, Any] = json.loads(planned.stdout)
+
+        assert plan["is_clean"] is False
+        assert plan["needs_attention"] is False, "every path of a pre-prompting-style file is one the two entries explain"
+        stepped = {plan_dict["file_path"]: [step["title"] for step in plan_dict["steps"]] for plan_dict in plan["plans"] if plan_dict["steps"]}
+        assert stepped == {
+            str(global_file): [
+                "Prompting styles become a templating default",
+                "The configuration reshape: one scheme for the root",
+            ]
+        }
 
 
 class TestTheBootstrapPath:

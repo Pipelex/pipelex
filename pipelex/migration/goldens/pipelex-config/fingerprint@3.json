@@ -1,0 +1,1447 @@
+{
+  "surface_id": "pipelex-config",
+  "schema_version": 3,
+  "document_root_is_open": false,
+  "paths": {
+    "inference": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "inference.dry_run": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "inference.dry_run.allowed_to_fail_pipes": {
+      "value_type": "list[str]",
+      "required": false,
+      "default": [
+        "failing_pipelines.infinite_loop_1"
+      ],
+      "open_node": false
+    },
+    "inference.dry_run.image_urls": {
+      "value_type": "list[str]",
+      "required": true,
+      "default": [
+        "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg",
+        "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_2.png"
+      ],
+      "open_node": false
+    },
+    "inference.dry_run.nb_extract_pages": {
+      "value_type": "int",
+      "required": true,
+      "default": 4,
+      "open_node": false
+    },
+    "inference.dry_run.nb_list_items": {
+      "value_type": "int",
+      "required": true,
+      "default": 3,
+      "open_node": false
+    },
+    "inference.dry_run.text_gen_truncate_length": {
+      "value_type": "int",
+      "required": true,
+      "default": 256,
+      "open_node": false
+    },
+    "inference.extract": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "inference.extract.default_page_views_dpi": {
+      "value_type": "int",
+      "required": true,
+      "default": 72,
+      "open_node": false
+    },
+    "inference.gateway_test": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "inference.gateway_test.config_id_substitutions": {
+      "value_type": "dict[str, str]",
+      "required": true,
+      "default": {},
+      "open_node": true
+    },
+    "inference.gateway_test.config_id_substitutions.*": {
+      "value_type": "str",
+      "required": true,
+      "open_node": false
+    },
+    "inference.img_gen": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "inference.img_gen.img_gen_job": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "inference.img_gen.img_gen_job.is_sync_mode": {
+      "value_type": "bool",
+      "required": true,
+      "default": false,
+      "open_node": false
+    },
+    "inference.img_gen.img_gen_param_defaults": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "inference.img_gen.img_gen_param_defaults.aspect_ratio": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "landscape_16_9",
+        "landscape_21_9",
+        "landscape_3_2",
+        "landscape_4_1",
+        "landscape_4_3",
+        "landscape_8_1",
+        "portrait_1_4",
+        "portrait_1_8",
+        "portrait_2_3",
+        "portrait_3_4",
+        "portrait_9_16",
+        "portrait_9_21",
+        "square"
+      ],
+      "default": "square",
+      "open_node": false
+    },
+    "inference.img_gen.img_gen_param_defaults.background": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "auto",
+        "opaque",
+        "transparent"
+      ],
+      "default": "auto",
+      "open_node": false
+    },
+    "inference.img_gen.img_gen_param_defaults.guidance_scale": {
+      "value_type": "float",
+      "required": true,
+      "default": 2.5,
+      "open_node": false,
+      "constraints": {
+        "gt": 0
+      }
+    },
+    "inference.img_gen.img_gen_param_defaults.is_moderated": {
+      "value_type": "bool",
+      "required": false,
+      "default": true,
+      "open_node": false
+    },
+    "inference.img_gen.img_gen_param_defaults.is_raw": {
+      "value_type": "bool",
+      "required": false,
+      "default": false,
+      "open_node": false
+    },
+    "inference.img_gen.img_gen_param_defaults.nb_steps": {
+      "value_type": "int",
+      "required": false,
+      "default": 28,
+      "open_node": false,
+      "constraints": {
+        "gt": 0
+      }
+    },
+    "inference.img_gen.img_gen_param_defaults.quality": {
+      "value_type": "enum",
+      "required": false,
+      "enum_members": [
+        "high",
+        "low",
+        "medium"
+      ],
+      "default": "low",
+      "open_node": false
+    },
+    "inference.img_gen.img_gen_param_defaults.safety_tolerance": {
+      "value_type": "int",
+      "required": true,
+      "default": 5,
+      "open_node": false,
+      "constraints": {
+        "ge": 1,
+        "le": 6
+      }
+    },
+    "inference.img_gen.img_gen_param_defaults.seed": {
+      "value_type": "int | literal",
+      "required": true,
+      "enum_members": [
+        "auto"
+      ],
+      "default": "auto",
+      "open_node": false
+    },
+    "inference.img_gen.img_gen_param_defaults.size": {
+      "value_type": "enum | table",
+      "required": false,
+      "enum_members": [
+        "0.5k",
+        "1k",
+        "2k",
+        "4k"
+      ],
+      "open_node": false
+    },
+    "inference.img_gen.quality_to_steps_maps": {
+      "value_type": "dict[str, dict[str, int]]",
+      "required": true,
+      "default": {
+        "flux": {
+          "low": 14,
+          "medium": 28,
+          "high": 56
+        },
+        "sdxl_lightning": {
+          "low": 2,
+          "medium": 4,
+          "high": 8
+        },
+        "qwen_image": {
+          "low": 10,
+          "medium": 20,
+          "high": 28
+        }
+      },
+      "open_node": true
+    },
+    "inference.img_gen.quality_to_steps_maps.*": {
+      "value_type": "dict[str, int]",
+      "required": true,
+      "open_node": true
+    },
+    "inference.img_gen.quality_to_steps_maps.*.*": {
+      "value_type": "int",
+      "required": true,
+      "open_node": false
+    },
+    "inference.llm": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "inference.llm.anthropic": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "inference.llm.anthropic.effort_to_level_map": {
+      "value_type": "dict[str, str]",
+      "required": true,
+      "default": {
+        "none": "disabled",
+        "minimal": "low",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "xhigh": "xhigh",
+        "max": "max"
+      },
+      "open_node": true
+    },
+    "inference.llm.anthropic.effort_to_level_map.*": {
+      "value_type": "str",
+      "required": true,
+      "open_node": false
+    },
+    "inference.llm.anthropic.structured_output_timeout_seconds": {
+      "value_type": "int",
+      "required": true,
+      "default": 1200,
+      "open_node": false
+    },
+    "inference.llm.default_max_images": {
+      "value_type": "int",
+      "required": true,
+      "default": 100,
+      "open_node": false
+    },
+    "inference.llm.effort_to_budget_maps": {
+      "value_type": "dict[str, dict[str, int]]",
+      "required": true,
+      "default": {
+        "anthropic": {
+          "none": 0,
+          "minimal": 512,
+          "low": 1024,
+          "medium": 5000,
+          "high": 16384,
+          "xhigh": 32768,
+          "max": 65536
+        },
+        "gemini": {
+          "none": 0,
+          "minimal": 512,
+          "low": 1024,
+          "medium": 5000,
+          "high": 16384,
+          "xhigh": 32768,
+          "max": 65536
+        }
+      },
+      "open_node": true
+    },
+    "inference.llm.effort_to_budget_maps.*": {
+      "value_type": "dict[str, int]",
+      "required": true,
+      "open_node": true
+    },
+    "inference.llm.effort_to_budget_maps.*.*": {
+      "value_type": "int",
+      "required": true,
+      "open_node": false
+    },
+    "inference.llm.generic_templates": {
+      "value_type": "dict[str, str]",
+      "required": true,
+      "default": {
+        "output_structure_prompt": "\n\n---\nThe instance we want to generate will be for the following class:\n{{ class_structure_str }}\n\nDO NOT create information.\nIf some information is not present for an attribute, output the default value or None according to the attribute definition.\n",
+        "structuring_prompt": "Read the following text carefully and produce the requested structured output from it.\n\n---\n{{ text }}\n"
+      },
+      "open_node": true
+    },
+    "inference.llm.generic_templates.*": {
+      "value_type": "str",
+      "required": true,
+      "open_node": false
+    },
+    "inference.llm.google": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "inference.llm.google.effort_to_level_map": {
+      "value_type": "dict[str, str]",
+      "required": true,
+      "default": {
+        "none": "disabled",
+        "minimal": "minimal",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "xhigh": "high",
+        "max": "high"
+      },
+      "open_node": true
+    },
+    "inference.llm.google.effort_to_level_map.*": {
+      "value_type": "str",
+      "required": true,
+      "open_node": false
+    },
+    "inference.llm.instructor": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "inference.llm.instructor.is_dump_error_enabled": {
+      "value_type": "bool",
+      "required": true,
+      "default": false,
+      "open_node": false
+    },
+    "inference.llm.instructor.is_dump_kwargs_enabled": {
+      "value_type": "bool",
+      "required": true,
+      "default": false,
+      "open_node": false
+    },
+    "inference.llm.instructor.is_dump_response_enabled": {
+      "value_type": "bool",
+      "required": true,
+      "default": false,
+      "open_node": false
+    },
+    "inference.llm.is_dump_response_text_enabled": {
+      "value_type": "bool",
+      "required": true,
+      "default": false,
+      "open_node": false
+    },
+    "inference.llm.is_dump_text_prompts_enabled": {
+      "value_type": "bool",
+      "required": true,
+      "default": false,
+      "open_node": false
+    },
+    "inference.llm.is_structure_prompt_enabled": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "inference.llm.mistral": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "inference.llm.mistral.effort_to_level_map": {
+      "value_type": "dict[str, str]",
+      "required": true,
+      "default": {
+        "none": "disabled",
+        "minimal": "reasoning",
+        "low": "reasoning",
+        "medium": "reasoning",
+        "high": "reasoning",
+        "xhigh": "reasoning",
+        "max": "reasoning"
+      },
+      "open_node": true
+    },
+    "inference.llm.mistral.effort_to_level_map.*": {
+      "value_type": "str",
+      "required": true,
+      "open_node": false
+    },
+    "inference.llm.openai": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "inference.llm.openai.effort_to_level_map": {
+      "value_type": "dict[str, str]",
+      "required": true,
+      "default": {
+        "none": "none",
+        "minimal": "minimal",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "xhigh": "xhigh",
+        "max": "xhigh"
+      },
+      "open_node": true
+    },
+    "inference.llm.openai.effort_to_level_map.*": {
+      "value_type": "str",
+      "required": true,
+      "open_node": false
+    },
+    "inference.llm.schema_reask_max_attempts": {
+      "value_type": "int",
+      "required": true,
+      "default": 3,
+      "open_node": false,
+      "constraints": {
+        "ge": 1,
+        "le": 10
+      }
+    },
+    "inference.model_deck": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "inference.model_deck.is_model_fallback_enabled": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "inference.model_deck.missing_presets_reaction": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "log",
+        "none",
+        "raise"
+      ],
+      "default": "log",
+      "open_node": false
+    },
+    "inference.templating": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "inference.templating.default_templating_style": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "inference.templating.default_templating_style.tag_style": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "no_tag",
+        "square_brackets",
+        "ticks",
+        "xml"
+      ],
+      "default": "xml",
+      "open_node": false
+    },
+    "inference.templating.default_templating_style.text_format": {
+      "value_type": "enum",
+      "required": false,
+      "enum_members": [
+        "html",
+        "json",
+        "markdown",
+        "plain"
+      ],
+      "open_node": false
+    },
+    "inference.transport_max_retries": {
+      "value_type": "int",
+      "required": true,
+      "default": 2,
+      "open_node": false,
+      "constraints": {
+        "ge": 0,
+        "le": 10
+      }
+    },
+    "interpreter": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.builder": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.builder.default_bundle_file_name": {
+      "value_type": "str",
+      "required": true,
+      "default": "bundle",
+      "open_node": false
+    },
+    "interpreter.builder.default_directory_base_name": {
+      "value_type": "str",
+      "required": true,
+      "default": "pipeline",
+      "open_node": false
+    },
+    "interpreter.builder.default_output_dir": {
+      "value_type": "str",
+      "required": true,
+      "default": ".",
+      "open_node": false
+    },
+    "interpreter.builder.fix_loop_max_attempts": {
+      "value_type": "int",
+      "required": true,
+      "default": 10,
+      "open_node": false
+    },
+    "interpreter.mthds": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.mthds.concepts": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.mthds.concepts.structure_field_ordering": {
+      "value_type": "list[str]",
+      "required": true,
+      "default": [
+        "type",
+        "concept_ref",
+        "item_type",
+        "item_concept_ref",
+        "description",
+        "choices",
+        "required"
+      ],
+      "open_node": false
+    },
+    "interpreter.mthds.inline_tables": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.mthds.inline_tables.spaces_inside_curly_braces": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "interpreter.mthds.pipes": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.mthds.pipes.field_ordering": {
+      "value_type": "list[str]",
+      "required": true,
+      "default": [
+        "type",
+        "description",
+        "inputs",
+        "output"
+      ],
+      "open_node": false
+    },
+    "interpreter.mthds.strings": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.mthds.strings.ensure_leading_blank_line": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "interpreter.mthds.strings.ensure_trailing_newline": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "interpreter.mthds.strings.force_multiline": {
+      "value_type": "bool",
+      "required": true,
+      "default": false,
+      "open_node": false
+    },
+    "interpreter.mthds.strings.length_limit_to_multiline": {
+      "value_type": "int",
+      "required": true,
+      "default": 100,
+      "open_node": false
+    },
+    "interpreter.mthds.strings.prefer_literal": {
+      "value_type": "bool",
+      "required": true,
+      "default": false,
+      "open_node": false
+    },
+    "interpreter.pipe_func": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.pipe_func.execution_mode": {
+      "value_type": "str",
+      "required": true,
+      "default": "direct",
+      "open_node": false
+    },
+    "interpreter.pipe_run": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.pipe_run.pipe_stack_limit": {
+      "value_type": "int",
+      "required": true,
+      "default": 20,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.data_inclusion": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.data_inclusion.error_stack_traces": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.data_inclusion.pipe_and_concept_registry": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.data_inclusion.stuff_html_content": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.data_inclusion.stuff_json_content": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.data_inclusion.stuff_text_content": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.graphs_inclusion": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.graphs_inclusion.graphspec_json": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.graphs_inclusion.mermaidflow_html": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.graphs_inclusion.mermaidflow_mmd": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.graphs_inclusion.reactflow_html": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.mermaid": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.mermaid.direction": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "left_to_right",
+        "top_down"
+      ],
+      "default": "left_to_right",
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.mermaid.is_include_contains_edges": {
+      "value_type": "bool",
+      "required": true,
+      "default": false,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.mermaid.is_include_data_edges": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.mermaid.is_include_selected_outcome_edges": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.mermaid.is_show_stuff_codes": {
+      "value_type": "bool",
+      "required": true,
+      "default": false,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.mermaid.style": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.mermaid.style.theme": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "base",
+        "dark",
+        "default",
+        "forest",
+        "neutral"
+      ],
+      "default": "dark",
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.reactflow": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.reactflow.default_title": {
+      "value_type": "str",
+      "required": true,
+      "default": "Pipelex Graph",
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.reactflow.edge_type": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "bezier",
+        "smoothstep",
+        "step",
+        "straight"
+      ],
+      "default": "bezier",
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.reactflow.initial_zoom": {
+      "value_type": "float",
+      "required": true,
+      "default": 1.0,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.reactflow.is_use_cdn": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.reactflow.layout_direction": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "left_to_right",
+        "top_down"
+      ],
+      "default": "left_to_right",
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.reactflow.nodesep": {
+      "value_type": "int",
+      "required": true,
+      "default": 50,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.reactflow.pan_to_top": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.reactflow.ranksep": {
+      "value_type": "int",
+      "required": true,
+      "default": 30,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.reactflow.show_batch_controller": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.reactflow.style": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.reactflow.style.palette": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "dracula",
+        "yellow_blue"
+      ],
+      "default": "dracula",
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.graph.reactflow.style.theme": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "dark",
+        "light",
+        "system"
+      ],
+      "default": "dark",
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.is_generate_graph": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.is_generate_usage": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.is_mock_inputs": {
+      "value_type": "bool",
+      "required": true,
+      "default": false,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.is_normalize_data_urls_to_storage": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "interpreter.pipeline_execution.max_concurrency": {
+      "value_type": "int | literal",
+      "required": true,
+      "enum_members": [
+        "unbounded"
+      ],
+      "default": 8,
+      "open_node": false,
+      "constraints": {
+        "ge": 1
+      }
+    },
+    "interpreter.scan": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.scan.excluded_dirs": {
+      "value_type": "frozenset[str]",
+      "required": true,
+      "default": [
+        ".venv",
+        "venv",
+        "env",
+        ".env",
+        "virtualenv",
+        ".virtualenv",
+        ".git",
+        "__pycache__",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".ruff_cache",
+        "node_modules",
+        "results"
+      ],
+      "open_node": false
+    },
+    "kit": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "kit.preferred_agent_targets": {
+      "value_type": "list[enum]",
+      "required": true,
+      "enum_members": [
+        "agents",
+        "claude",
+        "cursor"
+      ],
+      "default": [
+        "claude",
+        "agents"
+      ],
+      "open_node": false
+    },
+    "runtime": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "runtime.aws": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "runtime.aws.api_key_method": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "env",
+        "secret_provider"
+      ],
+      "default": "env",
+      "open_node": false
+    },
+    "runtime.aws.bedrock_access_variant": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "aws_access",
+        "bedrock_token"
+      ],
+      "default": "aws_access",
+      "open_node": false
+    },
+    "runtime.log": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "runtime.log.caller_info_template": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "file_func",
+        "file_line",
+        "file_line_func",
+        "func",
+        "func_line",
+        "func_module",
+        "func_module_line"
+      ],
+      "default": "file_line",
+      "open_node": false
+    },
+    "runtime.log.console_log_target": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "file",
+        "stderr",
+        "stdout"
+      ],
+      "default": "stderr",
+      "open_node": false
+    },
+    "runtime.log.console_print_target": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "file",
+        "stderr",
+        "stdout"
+      ],
+      "default": "stdout",
+      "open_node": false
+    },
+    "runtime.log.default_log_level": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "CRITICAL",
+        "DEBUG",
+        "DEV",
+        "ERROR",
+        "INFO",
+        "OFF",
+        "VERBOSE",
+        "WARNING"
+      ],
+      "default": "INFO",
+      "open_node": false
+    },
+    "runtime.log.generic_poor_logger": {
+      "value_type": "str",
+      "required": true,
+      "default": "#poor-log",
+      "open_node": false
+    },
+    "runtime.log.is_caller_info_enabled": {
+      "value_type": "bool",
+      "required": true,
+      "default": false,
+      "open_node": false
+    },
+    "runtime.log.is_console_logging_enabled": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "runtime.log.json_logs_indent": {
+      "value_type": "int",
+      "required": true,
+      "default": 4,
+      "open_node": false
+    },
+    "runtime.log.log_mode": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "poor",
+        "rich"
+      ],
+      "default": "rich",
+      "open_node": false
+    },
+    "runtime.log.package_log_levels": {
+      "value_type": "dict[str, enum]",
+      "required": true,
+      "default": {
+        "anthropic": "INFO",
+        "asyncio": "INFO",
+        "botocore": "INFO",
+        "botocore-credentials": "WARNING",
+        "google": "INFO",
+        "httpx": "WARNING",
+        "httpcore": "INFO",
+        "openai": "INFO",
+        "instructor": "INFO",
+        "urllib3-connectionpool": "INFO",
+        "urllib3-util-retry": "INFO",
+        "pipelex": "INFO"
+      },
+      "open_node": true
+    },
+    "runtime.log.package_log_levels.*": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "CRITICAL",
+        "DEBUG",
+        "DEV",
+        "ERROR",
+        "INFO",
+        "OFF",
+        "VERBOSE",
+        "WARNING"
+      ],
+      "open_node": false
+    },
+    "runtime.log.poor_loggers": {
+      "value_type": "list[str]",
+      "required": true,
+      "default": [],
+      "open_node": false
+    },
+    "runtime.log.presentation_line_width": {
+      "value_type": "int",
+      "required": true,
+      "default": 120,
+      "open_node": false
+    },
+    "runtime.log.rich_log": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "runtime.log.rich_log.highlighter_name": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "json",
+        "repr"
+      ],
+      "default": "json",
+      "open_node": false
+    },
+    "runtime.log.rich_log.is_link_path_enabled": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "runtime.log.rich_log.is_markup_enabled": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "runtime.log.rich_log.is_rich_tracebacks": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "runtime.log.rich_log.is_show_level": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "runtime.log.rich_log.is_show_time": {
+      "value_type": "bool",
+      "required": true,
+      "default": false,
+      "open_node": false
+    },
+    "runtime.log.rich_log.is_tracebacks_show_locals": {
+      "value_type": "bool",
+      "required": true,
+      "default": false,
+      "open_node": false
+    },
+    "runtime.log.rich_log.is_tracebacks_word_wrap": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "runtime.log.rich_log.keywords_to_hilight": {
+      "value_type": "list[str]",
+      "required": true,
+      "default": [],
+      "open_node": false
+    },
+    "runtime.log.rich_log.tracebacks_suppress": {
+      "value_type": "list[str]",
+      "required": true,
+      "default": [],
+      "open_node": false
+    },
+    "runtime.log.silenced_problem_ids": {
+      "value_type": "list[str]",
+      "required": true,
+      "default": [
+        "azure_openai_no_stream_options"
+      ],
+      "open_node": false
+    },
+    "runtime.observer": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "runtime.observer.observer_dir": {
+      "value_type": "str",
+      "required": true,
+      "default": "results/observer",
+      "open_node": false
+    },
+    "runtime.plugins": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "runtime.plugins.disabled": {
+      "value_type": "list[str]",
+      "required": true,
+      "default": [],
+      "open_node": false
+    },
+    "runtime.reporting": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "runtime.reporting.cost_report_base_name": {
+      "value_type": "str",
+      "required": true,
+      "default": "cost_report",
+      "open_node": false
+    },
+    "runtime.reporting.cost_report_dir_path": {
+      "value_type": "str",
+      "required": true,
+      "default": "reports",
+      "open_node": false
+    },
+    "runtime.reporting.cost_report_extension": {
+      "value_type": "str",
+      "required": true,
+      "default": "csv",
+      "open_node": false
+    },
+    "runtime.reporting.cost_report_unit_scale": {
+      "value_type": "float",
+      "required": true,
+      "default": 1.0,
+      "open_node": false,
+      "constraints": {
+        "gt": 0
+      }
+    },
+    "runtime.reporting.is_generate_cost_report_file_enabled": {
+      "value_type": "bool",
+      "required": true,
+      "default": false,
+      "open_node": false
+    },
+    "runtime.reporting.is_log_costs_to_console": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "runtime.secrets": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "runtime.secrets.method": {
+      "value_type": "str",
+      "required": true,
+      "default": "env",
+      "open_node": false
+    },
+    "runtime.storage": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "runtime.storage.gcp": {
+      "value_type": "table",
+      "required": false,
+      "open_node": false
+    },
+    "runtime.storage.gcp.bucket_name": {
+      "value_type": "str",
+      "required": true,
+      "default": "",
+      "open_node": false
+    },
+    "runtime.storage.gcp.project_id": {
+      "value_type": "str",
+      "required": true,
+      "default": "",
+      "open_node": false
+    },
+    "runtime.storage.gcp.signed_urls_lifespan_seconds": {
+      "value_type": "int | literal",
+      "required": true,
+      "enum_members": [
+        "disabled"
+      ],
+      "default": 3600,
+      "open_node": false
+    },
+    "runtime.storage.gcp.uri_format": {
+      "value_type": "str",
+      "required": true,
+      "default": "{primary_id}/{secondary_id}/{hash}.{extension}",
+      "open_node": false
+    },
+    "runtime.storage.in_memory": {
+      "value_type": "table",
+      "required": false,
+      "open_node": false
+    },
+    "runtime.storage.in_memory.uri_format": {
+      "value_type": "str",
+      "required": true,
+      "default": "{primary_id}/{secondary_id}/{hash}.{extension}",
+      "open_node": false
+    },
+    "runtime.storage.is_fetch_remote_content_enabled": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "runtime.storage.is_upload_local_content_enabled": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "runtime.storage.local": {
+      "value_type": "table",
+      "required": false,
+      "open_node": false
+    },
+    "runtime.storage.local.local_storage_path": {
+      "value_type": "str",
+      "required": true,
+      "default": ".pipelex/storage",
+      "open_node": false
+    },
+    "runtime.storage.local.uri_format": {
+      "value_type": "str",
+      "required": true,
+      "default": "{primary_id}/{secondary_id}/{hash}.{extension}",
+      "open_node": false
+    },
+    "runtime.storage.method": {
+      "value_type": "str",
+      "required": true,
+      "default": "local",
+      "open_node": false
+    },
+    "runtime.storage.s3": {
+      "value_type": "table",
+      "required": false,
+      "open_node": false
+    },
+    "runtime.storage.s3.bucket_name": {
+      "value_type": "str",
+      "required": true,
+      "default": "",
+      "open_node": false
+    },
+    "runtime.storage.s3.region": {
+      "value_type": "str",
+      "required": true,
+      "default": "",
+      "open_node": false
+    },
+    "runtime.storage.s3.signed_urls_lifespan_seconds": {
+      "value_type": "int | literal",
+      "required": true,
+      "enum_members": [
+        "disabled"
+      ],
+      "default": 3600,
+      "open_node": false
+    },
+    "runtime.storage.s3.uri_format": {
+      "value_type": "str",
+      "required": true,
+      "default": "{primary_id}/{secondary_id}/{hash}.{extension}",
+      "open_node": false
+    },
+    "runtime.tracing": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "runtime.tracing.backend": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "dynamodb",
+        "ndjson"
+      ],
+      "default": "ndjson",
+      "open_node": false
+    },
+    "runtime.tracing.dynamodb": {
+      "value_type": "table",
+      "required": false,
+      "open_node": false
+    },
+    "runtime.tracing.dynamodb.region": {
+      "value_type": "str",
+      "required": true,
+      "default": "",
+      "open_node": false
+    },
+    "runtime.tracing.dynamodb.table_name": {
+      "value_type": "str",
+      "required": true,
+      "default": "",
+      "open_node": false
+    },
+    "runtime.tracing.is_enabled": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
+    "runtime.tracing.ndjson": {
+      "value_type": "table",
+      "required": false,
+      "open_node": false
+    },
+    "runtime.tracing.ndjson.traces_dir": {
+      "value_type": "str",
+      "required": true,
+      "default": ".pipelex/traces",
+      "open_node": false
+    }
+  }
+}

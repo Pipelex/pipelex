@@ -15,9 +15,10 @@ Two properties carry the whole design, and most of the tests below exist to hold
 
 The stale documents here are **real**: `telemetry-config@2` is the entry the package ships and
 `goldens/telemetry-config/before@2.toml` is the flat document it exists to carry forward, read
-live rather than copied. The other two surfaces have empty ledgers today, so their tests plant a
-synthetic one in a temporary migration directory — the wiring is what is under test there, and a
-synthetic ledger tests it without inventing a schema change nobody made.
+live rather than copied. The tests on the other surfaces plant a synthetic ledger in a temporary
+migration directory instead: what is under test there is the wiring — which loader retries, over
+which files, and what it warns — and a synthetic ledger holds that still while the shipped ledgers
+go on gaining entries underneath it.
 """
 
 from __future__ import annotations

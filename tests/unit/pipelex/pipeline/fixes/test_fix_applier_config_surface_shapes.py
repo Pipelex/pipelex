@@ -52,7 +52,7 @@ _ARRAY_OF_TABLES_FILE = Path("pipelex/kit/configs/plxt.toml")
 
 # The out-of-order specimen. The packaged defaults used to be written out of order — `[pipelex]` and
 # `[migration]` each split into several chunks — and the proxy tests below were written against them.
-# The configuration reshape (`pipelex-config@2`) rewrote that file in order, so the live document
+# The configuration reshape (`pipelex-config@3`) rewrote that file in order, so the live document
 # produces no proxy at all and can no longer witness the behaviour. Its schema-1 golden can: it is a
 # byte copy of the pre-reshape file, and every golden below the chain's head is frozen, so this
 # specimen keeps the shape permanently. Reaching for it here is deliberate — the alternative, a

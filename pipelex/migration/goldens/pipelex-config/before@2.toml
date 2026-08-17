@@ -1,0 +1,24 @@
+# The main configuration as it stood before prompting styles became a templating default —
+# hand-authored, and the one document in this directory that is neither snapshotted nor
+# regenerated. Entry `pipelex-config@2` is marked `pre_history` because the change it describes
+# predates the first fingerprint, so there is no `defaults@1.toml` on its far side to start from;
+# this file is what it starts from instead, and the transform check verifies the entry by migrating
+# it and looking at what comes out.
+#
+# It is the prompting section as the release before schema 1 shipped it — the per-target map and
+# the default that sat beside it — plus one table that has nothing to do with the change. That
+# table is the neutrality witness: it is in this document and in the reference document of the
+# version this entry lands on alike, so an operation that reached a parent where it meant to reach
+# one child would take it with them, and the transform check would say so.
+
+[pipelex.prompting_config]
+default_prompting_style = { tag_style = "xml" }
+
+[pipelex.prompting_config.prompting_styles]
+openai = { tag_style = "ticks" }
+anthropic = { tag_style = "xml" }
+mistral = { tag_style = "square_brackets" }
+gemini = { tag_style = "xml" }
+
+[pipelex.pipe_run_config]
+pipe_stack_limit = 20
