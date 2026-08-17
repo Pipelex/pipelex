@@ -1,5 +1,9 @@
 # Pipe-refs build-time qualification — implementation plan
 
+> **ARCHIVED from the repo-root `TODOS.md` on 2026-08-17 — the runtime work is complete, the cross-repo tail is not.** Phases 0 through 3 and Phase 4a item 1 shipped (PRs #1091, #1092, #1099, merged to `dev`); what remains open is the transport-boundary spec edit held for its verifying test, and all of Phase 4b, which is gated on a `pipelex` release carrying the `interpreter_hub` entry-pipe accessors. This file stays the plan of record for that tail: pick it up here rather than re-deriving it. It was moved off the repo root because the root tracker belongs to whatever work is currently in flight, and this work is waiting on a release rather than on a keyboard.
+>
+> **Paths below are relative to the repository root, not to this file's own directory** — they were written while this document sat at the root and are deliberately left as they were.
+
 Source of truth for the design: [wip/pipe-refs/build-time-qualification.md](wip/pipe-refs/build-time-qualification.md) (decided 2026-08-11). Evidence and pre-change state: [wip/pipe-refs/README.md](wip/pipe-refs/README.md). Venue: the `_refs` worktree — treat this worktree as the repo root.
 
 **What we are doing in one sentence:** bare in-body references (pipe steps, branches, outcomes, batch refs, concept I/O refs) get qualified to their owner domain once, at library build time, via one shared crate pass consumed by both the normalizer and `library_manager`; the live library lookup becomes strict; the crate-wide bare search survives only as an explicitly-named entry-point affordance for user-supplied codes.

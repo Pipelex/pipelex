@@ -1,6 +1,6 @@
 # The fall-through corpus, measured across the whole workspace
 
-**Status.** Measured 2026-08-11 for Phase 0 of [../../TODOS.md](../../TODOS.md). This widens [README.md](README.md) §5, which scoped its scan to a hand-written list of ten sibling repos. It does **not** gate shipping — the repo's no-backward-compatibility principle stands and there is no deprecation period. It calibrates the changelog wording and how much to invest in the error message.
+**Status.** Measured 2026-08-11 for Phase 0 of [implementation-plan.md](implementation-plan.md). This widens [README.md](README.md) §5, which scoped its scan to a hand-written list of ten sibling repos. It does **not** gate shipping — the repo's no-backward-compatibility principle stands and there is no deprecation period. It calibrates the changelog wording and how much to invest in the error message.
 
 This is a dated snapshot with a reproduction command, which is why it carries raw counts. Other documents should point here rather than restate them.
 

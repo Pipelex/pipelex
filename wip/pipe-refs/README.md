@@ -1,6 +1,6 @@
 # Bare references resolve across domains; the standard says they must not
 
-**Status (2026-08-11).** Decided: tighten the runtime to the standard, implemented via build-time qualification of in-body references. The design and phased plan are in [build-time-qualification.md](build-time-qualification.md); §7 below was its starting sketch and is superseded by that document. The evidence in §1–§6 remains the record of why.
+**Status (2026-08-11).** Decided: tighten the runtime to the standard, implemented via build-time qualification of in-body references. The design is in [build-time-qualification.md](build-time-qualification.md) and the phased plan in [implementation-plan.md](implementation-plan.md) (archived here from the repo-root `TODOS.md` on 2026-08-17, with the runtime phases done and the release-gated cross-repo tail still open); §7 below was the starting sketch and is superseded by those documents. The evidence in §1–§6 remains the record of why.
 
 **What this is.** A decision brief for the divergence recorded in [`../parity/bare-pipe-ref-spec-divergence.md`](../parity/bare-pipe-ref-spec-divergence.md), which closed with *"the direction of the fix is genuinely open"* and deferred it. This directory re-opens it with measurements instead of priors, and adds two things that note does not contain: the rule turns out to be **load-bearing for `[exports]`**, and the same divergence is **still live for concepts**, one file over from the pipes that were fixed.
 
