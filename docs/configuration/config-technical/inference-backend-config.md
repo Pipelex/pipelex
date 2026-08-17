@@ -327,6 +327,8 @@ model_id = "gpt-4o-mini"
 x-portkey-provider = "@openai"   # forwarded as the `x-portkey-provider` request header
 ```
 
+**A header belongs on a model table and cannot go in `[defaults]`.** The two tables are read differently and it matters here: a model table has its header-shaped keys split off before validation, while `[defaults]` is copied into every model of the file as-is — so a header put there is not a shared header, it is an unknown model-spec field on every model at once, and the backend fails to load naming a model that never mentioned it. To apply the same header to several models, repeat it on each.
+
 Because these strings go out over the network, an extra key is accepted as a header **only if it is shaped like one — it must contain a hyphen** (`x-portkey-provider`, `anthropic-beta`, `api-version`) **and its value must be a string** (quote it in TOML). Model-spec field names never contain a hyphen, so an unknown key without one is a misspelled setting or a field that no longer exists, and it is a configuration error rather than a header: the backend fails to load and the error names the key, the model and the file. A hyphenated spelling of a real field (`max-tokens` for `max_tokens`) is rejected the same way, with the field it resembles, and so is a header-shaped key whose value is not a string (`x-foo = 3`) — it is never stringified onto the wire. This holds in every boot mode, including the credential-free one used by `pipelex validate` and dry runs — a typo must never silently drop a backend and surface later as "model not found".
 
 ```text

@@ -133,10 +133,6 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         except FileNotFoundError as file_not_found_exc:
             msg = f"Could not find inference backend library at '{backends_library_path}': {file_not_found_exc}"
             raise InferenceBackendLibraryNotFoundError(msg) from file_not_found_exc
-        except ValidationError as exc:
-            valiation_error_msg = format_pydantic_validation_error(exc)
-            msg = f"Invalid inference backend library configuration in '{backends_library_path}': {valiation_error_msg}"
-            raise InferenceBackendLibraryValidationError(msg) from exc
 
         # Create a partial function with the secrets provider bound
         substitute_vars_with_provider = partial(substitute_vars, secrets_provider=secrets_provider)
@@ -200,7 +196,15 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 for backend_blueprint_key in backend_dict:
                     if backend_blueprint_key not in backend_blueprint_standard_fields:
                         extra_config[backend_blueprint_key] = inference_backend_blueprint_dict.pop(backend_blueprint_key)
-                backend_blueprint = InferenceBackendBlueprint.model_validate(inference_backend_blueprint_dict)
+                try:
+                    backend_blueprint = InferenceBackendBlueprint.model_validate(inference_backend_blueprint_dict)
+                except ValidationError as validation_error:
+                    # The index file's own refusal, said with the backend and the file in front of the
+                    # analysis: pydantic's error alone names a field, and every table of this file has
+                    # that field.
+                    validation_error_msg = format_pydantic_validation_error(validation_error)
+                    msg = f"Invalid inference backend '{backend_name}' in '{backends_library_path}': {validation_error_msg}"
+                    raise InferenceBackendLibraryValidationError(msg) from validation_error
 
                 # Handle pipelex_gateway specially - use remote config
                 backend_config_source: str
@@ -210,7 +214,14 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                         if lenient:
                             log.verbose(f"Skipping backend '{backend_name}': gateway model specs not available")
                             continue
-                        msg = "Pipelex Gateway backend is enabled but remote model specs were not provided"
+                        # A caller's omission rather than a user's: the boot fetches the gateway's
+                        # specs whenever `is_pipelex_gateway_enabled` reads this same file as enabled,
+                        # and that reader and this loop agree on what "enabled" means. Reachable only
+                        # by loading the library directly without a gateway config.
+                        msg = (
+                            f"Backend '{backend_name}' is enabled in '{backends_library_path}' but no Pipelex Gateway model specs "
+                            "were given to the loader: pass `gateway_config`, or disable the backend"
+                        )
                         raise InferenceBackendLibraryError(msg)
                     extra_config["aws_region"] = gateway_config.aws_region
                     model_spec_source = ModelSpecSource.REMOTE_GATEWAY

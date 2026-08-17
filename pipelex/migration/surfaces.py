@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from typing_extensions import Self
 
 from pipelex.cogt.model_backends.model_spec_document import (
+    MODEL_SPEC_DEFAULTS_TABLE,
     InferenceModelSpecFileNode,
     describe_model_spec_document_rejection,
 )
@@ -252,7 +253,7 @@ class Surface(BaseModel):
             case DocumentShape.MODEL_SPEC_TABLES:
                 return describe_model_spec_document_rejection(document=document)
 
-    def admits_unnamed_key(self, *, node_path: tuple[str, ...], key: str) -> bool:
+    def admits_unnamed_key(self, *, node_path: tuple[str, ...], document_node_path: tuple[str, ...], key: str) -> bool:
         """Whether a key the fingerprint cannot resolve is nevertheless one this surface expects.
 
         The diagnosis reports every path a migrated file carries that the current schema cannot
@@ -264,12 +265,32 @@ class Surface(BaseModel):
         named, because it is not header-shaped. A hyphenated spelling of a known field (`max-tokens`)
         *is* admitted here on purpose — the loader already rejects it by name with the right advice,
         and this channel has nothing to add to that.
+
+        **And narrower than the schema path can express, which is why the document path is here
+        too.** `[defaults]` and a model table are the same node to the fingerprint — both are the `*`
+        beneath an open root — but they are not the same to the loader: a model table goes through
+        `split_model_spec_keys`, and `[defaults]` is copied into every model of the file *unsplit*.
+        So a header in `[defaults]` is `extra_forbidden` on every model, and admitting it here would
+        report the one file that cannot boot as the one file with nothing to explain — on the command
+        the boot error sends that reader to.
+
+        Args:
+            node_path: The containing table's path in the *fingerprint's* vocabulary, where an open
+                node's children collapse to `*`.
+            document_node_path: The containing table's path as the document spells it, which is what
+                tells `[defaults]` from a model the user named.
+            key: The unresolved key itself.
         """
         match self.document_shape:
             case DocumentShape.WHOLE_DOCUMENT:
                 return False
             case DocumentShape.MODEL_SPEC_TABLES:
-                return node_path == (WILDCARD_SEGMENT,) and is_header_shaped(key=key) and is_legal_header_name(key=key)
+                return (
+                    node_path == (WILDCARD_SEGMENT,)
+                    and document_node_path != (MODEL_SPEC_DEFAULTS_TABLE,)
+                    and is_header_shaped(key=key)
+                    and is_legal_header_name(key=key)
+                )
 
     def render_reference_document(self) -> str:
         """The surface's complete reference document as TOML text, ready to check in.

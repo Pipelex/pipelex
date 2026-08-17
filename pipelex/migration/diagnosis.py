@@ -125,7 +125,7 @@ def _diagnose_table(
         resolved = _resolve_against_schema(schema_prefix=schema_prefix, key=str(key), fingerprint=fingerprint)
         if resolved is None:
             if not _is_accounted_for(path=document_path, accounted=accounted) and not surface.admits_unnamed_key(
-                node_path=schema_prefix, key=str(key)
+                node_path=schema_prefix, document_node_path=document_prefix, key=str(key)
             ):
                 unexplained.append(UnexplainedPath(path=PATH_SEPARATOR.join((*schema_prefix, str(key))), note=UNEXPLAINED_NOTE))
             # Never descended into: an unknown table's contents are unknown because it is, and

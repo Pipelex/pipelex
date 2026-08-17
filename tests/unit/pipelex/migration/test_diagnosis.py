@@ -126,6 +126,19 @@ class TestWhatTheSchemaDoesNotKnow:
 
         assert _diagnose_backend_document(document=document, ledger=empty_ledger) == []
 
+    def test_the_same_header_inside_defaults_is_reported_because_the_loader_refuses_it_there(self, empty_ledger: MigrationLedger) -> None:
+        """`[defaults]` and a model table are one node to the fingerprint and two to the loader.
+
+        A model table goes through `split_model_spec_keys`, so a header on it is legal. `[defaults]`
+        is copied into every model of the file **unsplit**, so the same key there is
+        `extra_forbidden` on all of them and the file does not boot. Admitting it would report the
+        one file that cannot start as the one file with nothing to explain — and on the command the
+        boot error sends that reader to for the diagnosis.
+        """
+        document = {"defaults": {"sdk": "openai", "x-portkey-provider": "openai"}, "gpt-4o": {"max_tokens": 1}}
+
+        assert _diagnose_backend_document(document=document, ledger=empty_ledger) == ["*.x-portkey-provider"]
+
     def test_a_typo_inside_a_model_table_is_still_reported_at_the_wildcard(self, empty_ledger: MigrationLedger) -> None:
         """The other half: the admission is by shape, not by "the model allows extras".
 

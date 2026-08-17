@@ -44,7 +44,6 @@ from typing import TYPE_CHECKING, Any, Self, TypeVar, cast
 from kajson.class_registry import ClassRegistry
 from kajson.class_registry_abstract import ClassRegistryAbstract
 from kajson.kajson_manager import KajsonManager
-from pydantic import ValidationError
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexSetupError
@@ -55,6 +54,7 @@ from pipelex.cogt.content_generation.content_generator_protocol import (
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.exceptions import (
     InferenceBackendCredentialsError,
+    InferenceBackendLibraryError,
     InferenceBackendLibraryNotFoundError,
     InferenceBackendLibraryValidationError,
     ModelDeckNotFoundError,
@@ -72,7 +72,7 @@ from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
 from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.stuffs.stuff_template_set import STUFF_TEMPLATE_SET
-from pipelex.core.validation import raise_config_setup_error, report_validation_error
+from pipelex.core.validation import raise_config_setup_error, report_config_refusal
 from pipelex.graph.mermaidflow.template_set import MERMAID_TEMPLATE_SET
 from pipelex.graph.reactflow.template_set import REACTFLOW_TEMPLATE_SET
 from pipelex.observer.multi_observer import MultiObserver
@@ -136,6 +136,28 @@ if TYPE_CHECKING:
 PACKAGE_NAME, PACKAGE_VERSION = get_package_info()
 
 _HubSlotImplT = TypeVar("_HubSlotImplT")
+
+
+BACKEND_LIBRARY_REFUSED: tuple[type[Exception], ...] = (
+    InferenceBackendLibraryValidationError,
+    InferenceBackendLibraryError,
+)
+"""Every way the inference backend library can report that its files are not loadable.
+
+Spelled once, and beside `BootComponent` for the same reason that enum exists: what the boot does
+with a refusal — name the surface, scan the ledger, drop the start-over tail — is only reachable if
+the `except` clause names the class the loader really raises, and a clause that names one class of a
+family is a silent hole rather than an error. `InferenceBackendLibraryError` is the one that matters
+in practice: it is what the model-spec build raises for an `extra_forbidden` merge and for a
+per-model key rejected by name, and it is what boot tolerance re-raises when the ledger cannot
+explain the file. It escaped `setup` uncaught until this constant, so the scan could never run for
+the one late component that has a ledger. `…ValidationError` is its sibling for the library index
+file, `backends.toml`: a backend table whose own fields fail the blueprint — and until it was raised
+there, that refusal left the loader as pydantic's bare error, which no clause here named either.
+Neither has subclasses, and no other class the chain handles descends from either, so this clause
+shadows nothing — `tests/unit/pipelex/test_runtime_boot_stale_backend_error.py` pins both halves
+against a refusal the real loader produced.
+"""
 
 
 class BootComponent(StrEnum):
@@ -270,35 +292,43 @@ class RuntimeBoot(metaclass=MetaSingleton):
         surface's ledger, so a user whose files are merely behind is told so instead of being left
         with the model's refusal alone.
 
+        **The refusal's own message is the body, and that is the whole reason this goes through
+        `report_config_refusal`.** Every loader behind these components says *where* before it says
+        what — model, backend and file, or the deck's paths — and then quotes the pydantic analysis;
+        a builder that reached through to the pydantic error and translated only that kept the half
+        a reader can least act on. It also could not handle the second shape a backend file refuses
+        in: a per-model key rejected by name for not being header-shaped carries no pydantic error at
+        all, and the old builder offered it no block on its way to saying `Unexpexted error:None`.
+
+        > **The block names every root `pipelex migrate` walks, which can be more than the one the
+        > loader read.** `backends_dir_path` resolves to a single directory (a project's `.pipelex/`
+        > wins the whole directory over the global one) while the remedy walks both, and the block
+        > describes what the remedy would do. Narrowing it to the directory the loader used would
+        > need the path off the concrete `ModelManager`, which `ModelManagerAbstract` — a public
+        > injection point — deliberately does not expose; see the note at the `models_manager.setup`
+        > call below.
+
         Args:
             component: What refused — the message names it, and it carries the surface.
-            validation_exc: The refusal, carrying the pydantic error on its `__cause__`.
+            validation_exc: The refusal, whose own message is the body of what the user reads.
 
         Returns:
             The message, carrying the migration paragraph when the scan found one.
         """
-        msg = ""
-        cause_exc = validation_exc.__cause__
-        if cause_exc is None:
-            msg += f"\nUnexpexted error:{cause_exc}"
-            raise PipelexSetupError(msg) from cause_exc
-        if not isinstance(cause_exc, ValidationError):
-            msg += f"\nUnexpexted cause:{cause_exc}"
-            raise PipelexSetupError(msg) from cause_exc
-        validation_report = report_validation_error(validation_error=cause_exc, surface_id=component.migration_surface_id)
-        if validation_report.migration is not None:
+        report = report_config_refusal(refusal=validation_exc, surface_id=component.migration_surface_id)
+        if report.migration is not None:
             # Regeneration is never offered beside a migration: the block has just promised that
             # `pipelex migrate` keeps every value the file holds, and `pipelex init config` is
             # described in the next breath as resetting them. Whichever a user followed, the other
             # sentence made it the wrong choice.
-            return f"""{msg}
-{validation_report.message}
+            return f"""
+{report.message}
 
 Config files are invalid for the {component}.
 If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 """
-        return f"""{msg}
-{validation_report.message}
+        return f"""
+{report.message}
 
 Config files are invalid for the {component}.
 You can fix them manually, or run `pipelex init config` to regenerate them.
@@ -546,7 +576,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             msg = f"Some backend(s) required for a routing profile is not enabled: {routing_profile_exc}"
             raise PipelexSetupError(msg) from routing_profile_exc
 
-        except InferenceBackendLibraryValidationError as backend_validation_exc:
+        except BACKEND_LIBRARY_REFUSED as backend_validation_exc:
             msg = self._get_validation_error_msg(component=BootComponent.INFERENCE_BACKEND_LIBRARY, validation_exc=backend_validation_exc)
             raise PipelexSetupError(msg) from backend_validation_exc
         except ModelDeckValidationError as deck_validation_exc:

@@ -71,6 +71,56 @@ def report_validation_error(
         The translated message and, when a scan found something, the structured migration block.
     """
     message = analyze_pydantic_validation_error(validation_error).error_msg
+    return _report_after_the_scan(message=message, surface_id=surface_id, config_dirs=config_dirs)
+
+
+def report_config_refusal(
+    *,
+    refusal: Exception,
+    surface_id: str | None = None,
+    config_dirs: list[Path] | None = None,
+) -> ValidationErrorReport:
+    """The same report as `report_validation_error`, for a refusal a loader has already put into words.
+
+    **The body is the refusal's own message, whole.** A loader that catches pydantic's error names
+    *where* before it quotes the analysis — `Invalid inference model spec 'gpt-4o' for backend
+    'openai' from file '…/openai.toml': Validation error(s): …` — and that sentence is the only thing
+    standing between a reader and a grep over a directory of files that all have a `max_tokens`. A
+    report that reached through to the `ValidationError` and translated *that* threw the sentence
+    away and kept the part the reader could least act on. So nothing is reached through here: the
+    exception is trusted to have said its piece, and a bare `ValidationError` — one no loader
+    wrapped — is the single case that gets translated, because pydantic's own rendering is not what
+    a user should read.
+
+    The migration scan is the constant half, and it runs whatever the body is. A backend definition
+    file is the case that made this necessary: a per-model key that is not header-shaped is rejected
+    by name rather than by the model, so the refusal reaching the boot carries no pydantic error at
+    all — and a report keyed on "reach through to the `ValidationError`" would silently offer that
+    file no migration block, which is the one thing it needs most.
+
+    Not to be confused with `raise_config_setup_error`, which faces the same fork and takes the other
+    branch on purpose: it *re-raises* a refusal that carries no pydantic error, because its callers
+    cannot continue and the refusal's own message is already the whole account. A caller that has to
+    compose a message rather than raise one — the boot, which names the component and chooses a tail
+    — needs the report either way, and that is this function.
+
+    Args:
+        refusal: The refusal as raised. Its own message is the body — or, for a bare pydantic
+            error, the field-level analysis of it.
+        surface_id: The configuration surface whose files refused, when one did — see
+            `report_validation_error`. `None` gets the body alone and pays for no walk.
+        config_dirs: The directories the refused configuration was loaded from, when the caller
+            named them — see `report_validation_error`.
+
+    Returns:
+        The body and, when a scan found something, the structured migration block.
+    """
+    message = analyze_pydantic_validation_error(refusal).error_msg if isinstance(refusal, ValidationError) else str(refusal)
+    return _report_after_the_scan(message=message, surface_id=surface_id, config_dirs=config_dirs)
+
+
+def _report_after_the_scan(*, message: str, surface_id: str | None, config_dirs: list[Path] | None) -> ValidationErrorReport:
+    """The body, plus the migration paragraph and block when a surface was named and the scan found something."""
     if surface_id is None:
         return ValidationErrorReport(message=message)
     block = _pending_migration(surface_id=surface_id, config_dirs=config_dirs)
