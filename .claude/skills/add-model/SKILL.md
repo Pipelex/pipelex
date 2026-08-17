@@ -179,6 +179,23 @@ make ccs
 This checks that the two directories match. If it reports differences, something
 went wrong with the sync.
 
+### If you edited `portkey.toml`, one migration golden moves with it
+
+The kit's `portkey.toml` is the `inference-backend` surface's **reference
+document** — the migration gates byte-compare `pipelex/migration/goldens/inference-backend/defaults@N.toml`
+against it, so adding a model to that one file turns `make check-migration-schemas`
+(alias `cmig`) red until the golden is regenerated:
+
+```bash
+make umig   # rewrites the head goldens from the live source
+make cmig   # then green again
+```
+
+That is the designed workflow, not a workaround — the refusal names both the
+golden and the file. No other backend TOML is coupled this way; the rest of the
+directory is only read as convergence witnesses, which adding a model does not
+disturb.
+
 ## Step 4: Add to test profile collections
 
 Edit `.pipelex-dev/test_profiles.toml` to include the new model in the

@@ -6,8 +6,13 @@ inference backend definitions under `inference/backends/`. Two things are the sa
 the read path, and this module is the one place that knows about either.
 
 **The reserved `[meta]` table.** The strip lives here and deliberately **not** in the generic TOML
-reader (`pipelex.tools.misc.toml_utils`), which also reads `.mthds` files, backend definitions and
-the kit index — none of which reserve that key, and all of which should keep rejecting it.
+reader (`pipelex.tools.misc.toml_utils`), which also reads `.mthds` files and the kit index —
+neither of which reserves that key, and both of which should keep rejecting it. Backend definitions
+are the one surface whose *loader* still reads through that generic reader rather than through this
+module, so a backend file carrying `[meta]` would be refused as an unknown model table even though
+the migration engine reads the key there. Nothing writes it, on any surface, so this is latent
+rather than live — but it is the asymmetry to close if anything ever starts stamping a version into
+a file.
 
 **Boot tolerance.** A stale configuration should warn rather than stop the world, but only when
 the ledger can explain it. Each surface's loader validates as it always did and, only when that

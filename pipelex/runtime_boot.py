@@ -37,6 +37,7 @@ orchestration-venue sense and keeps the word for good.
 import types
 import warnings
 from collections.abc import Callable
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Self, TypeVar, cast
 
@@ -92,7 +93,7 @@ from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.runtime_hub import RuntimeHub, set_runtime_hub
 from pipelex.system.configuration.config_loader import CONFIG_REFUSED, config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
-from pipelex.system.configuration.config_surface import PIPELEX_CONFIG_SURFACE_ID
+from pipelex.system.configuration.config_surface import INFERENCE_BACKEND_CONFIG_SURFACE_ID, PIPELEX_CONFIG_SURFACE_ID
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.pipelex_service.exceptions import (
     GatewayTermsNotAcceptedError,
@@ -135,6 +136,36 @@ if TYPE_CHECKING:
 PACKAGE_NAME, PACKAGE_VERSION = get_package_info()
 
 _HubSlotImplT = TypeVar("_HubSlotImplT")
+
+
+class BootComponent(StrEnum):
+    """A library whose files can refuse to load after the main configuration is already up.
+
+    The value is how the boot names the component to a user, and the member is what decides whether
+    its files belong to a migration surface. Pairing the two here rather than at each `except`
+    clause is deliberate: the surface is the difference between telling a user their files are
+    *old* and telling them only that they are *wrong*, and a call site passing a bare name is a
+    call site that can silently drop it.
+    """
+
+    ROUTING_PROFILE_LIBRARY = "routing profile library"
+    INFERENCE_BACKEND_LIBRARY = "inference backend library"
+    MODEL_DECK = "model deck"
+
+    @property
+    def migration_surface_id(self) -> str | None:
+        """The migration surface that claims this component's files, or `None` when none does.
+
+        Only the inference backend definitions are one. The model deck is the case worth naming:
+        it is package-managed content rather than a schema, so it has a content sync and no
+        ledger, and offering it `pipelex migrate` would send a user to a command with nothing to
+        do. Routing profiles have neither mechanism.
+        """
+        match self:
+            case BootComponent.INFERENCE_BACKEND_LIBRARY:
+                return INFERENCE_BACKEND_CONFIG_SURFACE_ID
+            case BootComponent.ROUTING_PROFILE_LIBRARY | BootComponent.MODEL_DECK:
+                return None
 
 
 class RuntimeBoot(metaclass=MetaSingleton):
@@ -226,13 +257,26 @@ class RuntimeBoot(metaclass=MetaSingleton):
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} runtime init done")
 
     @staticmethod
-    def _get_config_file_not_found_error_msg(*, component_name: str) -> str:
+    def _get_config_file_not_found_error_msg(*, component: BootComponent) -> str:
         """Generate error message for missing config files."""
-        return f"Config files are missing for the {component_name}. Run `pipelex init config` to generate the missing files."
+        return f"Config files are missing for the {component}. Run `pipelex init config` to generate the missing files."
 
     @staticmethod
-    def _get_validation_error_msg(*, component_name: str, validation_exc: Exception) -> str:
-        """Generate error message for invalid config files."""
+    def _get_validation_error_msg(*, component: BootComponent, validation_exc: Exception) -> str:
+        """Generate error message for invalid config files.
+
+        A component whose files belong to a migration surface gets the same treatment the loaders
+        reporting through `raise_config_setup_error` get: the refusal is scanned against that
+        surface's ledger, so a user whose files are merely behind is told so instead of being left
+        with the model's refusal alone.
+
+        Args:
+            component: What refused — the message names it, and it carries the surface.
+            validation_exc: The refusal, carrying the pydantic error on its `__cause__`.
+
+        Returns:
+            The message, carrying the migration paragraph when the scan found one.
+        """
         msg = ""
         cause_exc = validation_exc.__cause__
         if cause_exc is None:
@@ -241,15 +285,22 @@ class RuntimeBoot(metaclass=MetaSingleton):
         if not isinstance(cause_exc, ValidationError):
             msg += f"\nUnexpexted cause:{cause_exc}"
             raise PipelexSetupError(msg) from cause_exc
-        # No surface is named on purpose: the inference backend library and the model deck are not
-        # configuration surfaces — they have no ledger and the `migrate` walk does not claim their
-        # files — so offering a migration remedy for them would send the user to a command with
-        # nothing to do.
-        report = report_validation_error(validation_error=cause_exc).message
-        return f"""{msg}
-{report}
+        validation_report = report_validation_error(validation_error=cause_exc, surface_id=component.migration_surface_id)
+        if validation_report.migration is not None:
+            # Regeneration is never offered beside a migration: the block has just promised that
+            # `pipelex migrate` keeps every value the file holds, and `pipelex init config` is
+            # described in the next breath as resetting them. Whichever a user followed, the other
+            # sentence made it the wrong choice.
+            return f"""{msg}
+{validation_report.message}
 
-Config files are invalid for the {component_name}.
+Config files are invalid for the {component}.
+If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
+"""
+        return f"""{msg}
+{validation_report.message}
+
+Config files are invalid for the {component}.
 You can fix them manually, or run `pipelex init config` to regenerate them.
 Note that this command resets all config files to their default values.
 If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
@@ -483,23 +534,23 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 needs_inference=needs_inference,
             )
         except RoutingProfileLibraryNotFoundError as routing_not_found_exc:
-            msg = self._get_config_file_not_found_error_msg(component_name="routing profile library")
+            msg = self._get_config_file_not_found_error_msg(component=BootComponent.ROUTING_PROFILE_LIBRARY)
             raise PipelexSetupError(msg) from routing_not_found_exc
         except InferenceBackendLibraryNotFoundError as backend_not_found_exc:
-            msg = self._get_config_file_not_found_error_msg(component_name="inference backend library")
+            msg = self._get_config_file_not_found_error_msg(component=BootComponent.INFERENCE_BACKEND_LIBRARY)
             raise PipelexSetupError(msg) from backend_not_found_exc
         except ModelDeckNotFoundError as deck_not_found_exc:
-            msg = self._get_config_file_not_found_error_msg(component_name="model deck")
+            msg = self._get_config_file_not_found_error_msg(component=BootComponent.MODEL_DECK)
             raise PipelexSetupError(msg) from deck_not_found_exc
         except RoutingProfileDisabledBackendError as routing_profile_exc:
             msg = f"Some backend(s) required for a routing profile is not enabled: {routing_profile_exc}"
             raise PipelexSetupError(msg) from routing_profile_exc
 
         except InferenceBackendLibraryValidationError as backend_validation_exc:
-            msg = self._get_validation_error_msg(component_name="inference backend library", validation_exc=backend_validation_exc)
+            msg = self._get_validation_error_msg(component=BootComponent.INFERENCE_BACKEND_LIBRARY, validation_exc=backend_validation_exc)
             raise PipelexSetupError(msg) from backend_validation_exc
         except ModelDeckValidationError as deck_validation_exc:
-            msg = self._get_validation_error_msg(component_name="model deck", validation_exc=deck_validation_exc)
+            msg = self._get_validation_error_msg(component=BootComponent.MODEL_DECK, validation_exc=deck_validation_exc)
             msg += "\n\nIf you added your own config files to the model deck then you'll have to change them manually."
             raise PipelexSetupError(msg) from deck_validation_exc
 

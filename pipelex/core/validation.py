@@ -59,8 +59,9 @@ def report_validation_error(
         validation_error: The pydantic error to translate.
         surface_id: The configuration surface whose model refused, when one did. Naming it is what
             turns on the migration scan; a caller validating something that is not a configuration
-            surface — a `.mthds` bundle, an inference backend file, a model deck — passes nothing
-            and gets the translation alone.
+            surface — a `.mthds` bundle, a model deck, a routing profile — passes nothing and gets
+            the translation alone. An inference backend file *is* one, and the boot that catches
+            its library's refusal is what names it.
         config_dirs: The directories the refused configuration was loaded from, when the caller
             bypassed the global/project layering (`doctor --global`, an embedder's `config_dir=`).
             The scan then diagnoses those and only those; `None` is the ordinary load, and the

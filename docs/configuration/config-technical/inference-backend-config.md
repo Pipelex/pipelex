@@ -659,6 +659,37 @@ Common error types:
 - `LLMHandleNotFoundError`: Referenced model or alias not found
 - `ModelChoiceNotFoundError`: Referenced preset/choice not found
 
+## When you upgrade and a backend file is out of date
+
+`pipelex init` writes the backend definitions once and never overwrites a file you already have — which is what keeps your edits, and which also means a file written by an older Pipelex stays on your machine after the model-spec format changes. When a release removes a key, your copy still carries it, and the strict model that reads it refuses.
+
+You do not have to do anything about that at boot. Pipelex reads the migration history for the `inference/backends/` files, carries the out-of-date ones forward **in memory**, and starts with a warning naming each file:
+
+```
+Your configuration is out of date, and pipelex read it as if it had been migrated:
+'~/.pipelex/inference/backends/openai.toml'. What the ledger carried forward: Drop
+prompting_target from every backend definition. Nothing was written. Run
+`pipelex migrate` to bring the files up to date.
+```
+
+Nothing has been written at that point, so the warning comes back at the next boot until you run the command:
+
+```bash
+pipelex migrate --dry-run   # show what would change in each file, and stop
+pipelex migrate             # ask, then rewrite in place
+```
+
+What it touches and what it leaves alone:
+
+- **Every `*.toml` directly in `inference/backends/`** — the files this page describes, in both the global `~/.pipelex/` and a project's `.pipelex/`.
+- **Not** `inference/backends.toml`, which sits beside that directory rather than in it, and **not** the model deck under `inference/deck/`. The deck has its own `pipelex update`.
+- **Not a key you added yourself.** The history only describes keys *we* removed or renamed. An unknown key of your own — a misspelled `maxx_tokens`, an extra header that is not header-shaped — is still an error, and it names the file, the key and what to do. That is deliberate: silently dropping a key you meant to set would change which model you get.
+- **Every file it rewrites is copied first**, beside itself, as `<file>.bak.<UTC timestamp>`. Running the command twice is the same as running it once — a file already up to date comes back byte for byte identical.
+
+`pipelex doctor` shows the same thing before anything fails: its **Configuration Migrations** row names every backend file a migration would rewrite, and `pipelex doctor --fix` offers to run it for you.
+
+See [The Migration Ledger](../../migration-ledger.md) for what the history may contain and what it guarantees, and [`pipelex migrate`](../../tools/cli/migrate.md) for the command itself.
+
 ## Best Practices
 
 1. **Choosing Your Configuration Approach**:
