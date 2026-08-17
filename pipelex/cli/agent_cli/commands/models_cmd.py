@@ -44,8 +44,11 @@ def agent_models_cmd(
                 agent_success({"success": True, **result})
             case CliOutputFormat.MARKDOWN:
                 print(format_models_markdown(result))
-    except SystemExit:
-        # agent_error already handled and called sys.exit
+    except (SystemExit, typer.Exit):
+        # `agent_error` has already emitted the envelope and is on its way out. `typer.Exit` is a
+        # `RuntimeError`, *not* a `SystemExit`, so leaving it out of this arm dropped it into the
+        # broad catch below and printed a second envelope after the first — stderr then held two
+        # JSON documents and a machine consumer parsing it got "Extra data".
         raise
     except Exception as exc:  # noqa: BLE001
         # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.

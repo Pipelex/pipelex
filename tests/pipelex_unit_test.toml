@@ -1,7 +1,7 @@
 
-[pipelex.storage_config]
+[runtime.storage]
 method = "local"
 
-[cogt.model_deck_config]
+[inference.model_deck]
 # Allow tests to run with restrictive routing profiles that don't support all presets
 missing_presets_reaction = "none"

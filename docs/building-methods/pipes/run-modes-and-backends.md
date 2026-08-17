@@ -22,10 +22,10 @@ Pipelex separates **what the inference leaves do** (the run mode) from **where t
 | Backend | Trigger | What runs where |
 |---|---|---|
 | **Direct** (default) | — | Everything in your process |
-| **Temporal** | `--orchestrator temporal`, or config `plugins.boot_orchestrator = "temporal"` | Controllers as child workflows, inference leaves as activities on workers |
+| **Temporal** | `--orchestrator temporal`, or `Pipelex.setup(boot_orchestrator="temporal")` | Controllers as child workflows, inference leaves as activities on workers |
 
 !!! info "Durable backends are a commercial capability"
-    The Temporal backend is part of Pipelex's [durable & distributed execution offer](https://pipelex.com/products#durable-execution) — the [Temporal backend](https://pipelex.com/products#temporal) is delivered through the Pipelex platform. The `--orchestrator <name>` flag (and its `plugins.boot_orchestrator` config equivalent) boots the process under the named orchestrator plugin; omit it for in-process execution.
+    The Temporal backend is part of Pipelex's [durable & distributed execution offer](https://pipelex.com/products#durable-execution) — the [Temporal backend](https://pipelex.com/products#temporal) is delivered through the Pipelex platform. The `--orchestrator <name>` flag (and its Python equivalent, `Pipelex.setup(boot_orchestrator=...)`) boots the process under the named orchestrator plugin — it is a boot argument, never a `pipelex.toml` setting; omit it for in-process execution.
 
 The run mode rides across the wire with every inference job, so the backend never changes *what* a leaf does — only *where* it does it. In particular, when you run a **pipeline** in dry mode on Temporal, the real inference activities are still dispatched and mock **inside** them on the worker. That's by design: it lets you test the entire distribution machinery — dispatch, scheduling, serialization, task-queue routing, cross-worker graph tracing — with zero AI spend and no credentials.
 

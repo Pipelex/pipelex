@@ -172,7 +172,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
             # delivered (connect / pool errors), or Azure rejected it before generating (408 / 429).
             response = await request_with_transport_retry(
                 send_request=_post_image_request,
-                max_retries=get_config().cogt.transport_max_retries,
+                max_retries=get_config().inference.transport_max_retries,
                 retry_on_ambiguous_failure=False,
             )
         except httpx.HTTPStatusError as exc:

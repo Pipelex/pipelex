@@ -35,9 +35,9 @@ def _mock_config(mocker: MockerFixture) -> None:
     mocker.patch(
         "pipelex.providers.openai.openai_completions_llm_worker.get_config",
         return_value=mocker.MagicMock(
-            cogt=mocker.MagicMock(
-                llm_config=mocker.MagicMock(
-                    openai_config=openai_config,
+            inference=mocker.MagicMock(
+                llm=mocker.MagicMock(
+                    openai=openai_config,
                 ),
             ),
         ),

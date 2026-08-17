@@ -108,6 +108,12 @@ class RuntimeHub:
         # review D4): the backend still picks inline vs in-workflow on its own; the leaf mocks.
         # Consumed by ``PipeRunParamsFactory.make_run_params`` (the single writer of run_mode).
         self._is_dry_run_forced: bool = False
+        # The orchestrator plugin this process booted under, when one was named (CLI ``--orchestrator``
+        # / ``Pipelex.setup(boot_orchestrator=...)``). Boot-scoped state rather than a configuration
+        # value: it is never written in a TOML, and a boot argument stored on the config object would
+        # be a side channel. A boot-orchestrator plugin claims the process-global hub slots in its
+        # ``register`` iff this equals its own name; ``None`` leaves execution in-process.
+        self._boot_orchestrator: str | None = None
         # Ambient probe claimed by a boot-orchestrator plugin (ISOLATED_EXECUTION_PROBE): True when
         # the current call runs inside an isolated sub-execution (a Temporal activity) whose emissions
         # must bypass the parent run's registered buffer. Core default never isolated (see
@@ -153,8 +159,11 @@ class RuntimeHub:
                 overrides *are* overrides of). Used by the doctor ``--global`` path
                 so the hub reflects exactly the directory being reported on.
         """
-        config_dict = config_manager.load_config(extra_overrides=config_overrides, config_dir=config_dir)
-        self.set_config(config=config_cls.model_validate(config_dict))
+        # ``load_config_validated`` rather than a load followed by a validate here, and the
+        # difference is boot tolerance: a configuration a schema change left behind is replayed
+        # through its ledger in memory and re-validated before this raises, so a stale file warns
+        # instead of stopping the boot. See ``docs/migration-ledger.md`` → "Boot tolerance".
+        self.set_config(config=config_manager.load_config_validated(config_cls=config_cls, extra_overrides=config_overrides, config_dir=config_dir))
 
     def set_config(self, config: ConfigRoot):
         if self._config is not None:
@@ -162,9 +171,31 @@ class RuntimeHub:
             return
         self._config = config
 
-    def reset_config(self) -> None:
-        """Reset the global configuration instance and the config manager."""
+    def reset_boot_state(self) -> None:
+        """Release the process-global state a boot established: the config, the logs, and the boot-scoped flags.
+
+        Called from both teardown paths — the normal ``_teardown_runtime`` and ``_release_after_failed_boot``
+        — which is why the boot-scoped flags are cleared *here* rather than at either call site: a second
+        hand-maintained release list is exactly what drifts.
+
+        The flags are boot arguments, not configuration, so nothing reloads them: ``setup()`` writes both
+        unconditionally on the way up, and without this a torn-down process answers ``get_boot_orchestrator()``
+        with the previous boot's orchestrator (and ``is_dry_run_forced()`` with the previous boot's keyless
+        verdict) while no boot is active at all.
+
+        The isolated-execution probe is released for the same reason and needs it slightly more, because
+        it is the one of the three a boot writes **conditionally** — only when a plugin claims
+        ``HubSlot.ISOLATED_EXECUTION_PROBE`` in ``RuntimeBoot.setup``. A boot that claims nothing
+        therefore *inherits* rather than overwrites, so the release is what a fresh ``RuntimeHub`` per
+        boot would otherwise be the only thing providing. What this closes is the window both teardown
+        paths open: between teardown and the next boot ``get_runtime_hub()`` still hands out the dead
+        hub, and ``is_in_isolated_execution()`` is a module-level accessor (``ReportingManager`` reads
+        it) that would answer with the torn-down boot's runtime split.
+        """
         self._config = None
+        self._is_dry_run_forced = False
+        self._boot_orchestrator = None
+        self._isolated_execution_probe = _never_in_isolated_execution
         log.reset()
 
     def set_console_print_target(self, target: ConsoleTarget):
@@ -229,6 +260,12 @@ class RuntimeHub:
 
     def is_dry_run_forced(self) -> bool:
         return self._is_dry_run_forced
+
+    def set_boot_orchestrator(self, *, boot_orchestrator: str | None) -> None:
+        self._boot_orchestrator = boot_orchestrator
+
+    def get_boot_orchestrator(self) -> str | None:
+        return self._boot_orchestrator
 
     def set_isolated_execution_probe(self, probe: Callable[[], bool]) -> None:
         self._isolated_execution_probe = probe
@@ -527,6 +564,16 @@ def is_dry_run_forced() -> bool:
     return get_runtime_hub().is_dry_run_forced()
 
 
+def get_boot_orchestrator() -> str | None:
+    """The orchestrator plugin this process booted under, or ``None`` for in-process execution.
+
+    The read side of a boot argument, not of a setting: nothing in a ``pipelex.toml`` names it.
+    A boot-orchestrator plugin gates its slot claim on ``boot_orchestrator == its own name``, and
+    reads it back here at run time when it needs to know whether it owns the process.
+    """
+    return get_runtime_hub().get_boot_orchestrator()
+
+
 def resolve_run_mode_for_boot(*, requested: PipeRunMode) -> PipeRunMode:
     """Apply the keyless-boot forced-DRY flag to a requested run mode (eng review D4).
 
@@ -574,7 +621,7 @@ def scoped_event_log(event_log: "EventLogProtocol") -> Generator[None, None, Non
     backend via ``make_event_log``, so emit and assemble share the SAME instance — which
     is what makes a plain in-memory event log usable for graph assembly (no external
     store bridges the two sides). A set override implies tracing-enabled: it is honored
-    even when ``tracing_config.is_enabled`` is False.
+    even when ``runtime.tracing.is_enabled`` is False.
 
     Lifecycle: the machinery never calls ``cleanup`` on the instance and the read side does
     not ``close`` it — but the write-side tracer DOES call ``close()`` on its event log at

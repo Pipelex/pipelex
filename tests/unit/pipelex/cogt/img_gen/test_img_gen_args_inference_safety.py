@@ -36,7 +36,7 @@ class TestImgGenArgsInferenceSafety:
         )
 
         assert result == {"num_inference_steps": nb_steps}
-        mock_config.cogt.img_gen_config.get_num_inference_steps.assert_not_called()
+        mock_config.inference.img_gen.get_num_inference_steps.assert_not_called()
 
     @pytest.mark.parametrize("nb_steps", [3, 5, 16])
     def test_sdxl_lightning_coerces_invalid_steps_to_four(self, mocker: MockerFixture, nb_steps: int) -> None:
@@ -64,7 +64,7 @@ class TestImgGenArgsInferenceSafety:
     def test_sdxl_lightning_none_steps_uses_config_lookup(self, mocker: MockerFixture, quality: Quality | None, expected_quality: Quality) -> None:
         """SDXL Lightning derives missing steps from the config, defaulting quality to MEDIUM."""
         mock_config = mocker.MagicMock()
-        mock_config.cogt.img_gen_config.get_num_inference_steps.return_value = 8
+        mock_config.inference.img_gen.get_num_inference_steps.return_value = 8
         mocker.patch("pipelex.cogt.img_gen.img_gen_args_factory.get_config", return_value=mock_config)
 
         result = ImgGenArgsFactory.make_args_from_inference(
@@ -76,7 +76,7 @@ class TestImgGenArgsInferenceSafety:
         )
 
         assert result == {"num_inference_steps": 8}
-        mock_config.cogt.img_gen_config.get_num_inference_steps.assert_called_once_with(
+        mock_config.inference.img_gen.get_num_inference_steps.assert_called_once_with(
             model_name="sdxl_lightning",
             quality=expected_quality,
         )
@@ -111,7 +111,7 @@ class TestImgGenArgsInferenceSafety:
         )
 
         assert result == expected_args
-        mock_config.cogt.img_gen_config.get_num_inference_steps.assert_not_called()
+        mock_config.inference.img_gen.get_num_inference_steps.assert_not_called()
 
     @pytest.mark.parametrize(
         ("inference_taxonomy", "expected_model_name"),
@@ -128,7 +128,7 @@ class TestImgGenArgsInferenceSafety:
     ) -> None:
         """Flux and Qwen derive missing steps from the config using their own model_name key."""
         mock_config = mocker.MagicMock()
-        mock_config.cogt.img_gen_config.get_num_inference_steps.return_value = 12
+        mock_config.inference.img_gen.get_num_inference_steps.return_value = 12
         mocker.patch("pipelex.cogt.img_gen.img_gen_args_factory.get_config", return_value=mock_config)
 
         result = ImgGenArgsFactory.make_args_from_inference(
@@ -140,7 +140,7 @@ class TestImgGenArgsInferenceSafety:
         )
 
         assert result == {"num_inference_steps": 12}
-        mock_config.cogt.img_gen_config.get_num_inference_steps.assert_called_once_with(
+        mock_config.inference.img_gen.get_num_inference_steps.assert_called_once_with(
             model_name=expected_model_name,
             quality=Quality.LOW,
         )

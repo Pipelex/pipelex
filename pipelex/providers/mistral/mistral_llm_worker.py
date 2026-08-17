@@ -93,7 +93,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
             effort = job_params.reasoning_effort
             match thinking_mode:
                 case ThinkingMode.MANUAL:
-                    prompt_mode = get_config().cogt.llm_config.mistral_config.get_reasoning_level(effort=effort)
+                    prompt_mode = get_config().inference.llm.mistral.get_reasoning_level(effort=effort)
                     if prompt_mode is None:
                         log.verbose("Mistral prompt_mode omitted (reasoning disabled)")
                         return UNSET

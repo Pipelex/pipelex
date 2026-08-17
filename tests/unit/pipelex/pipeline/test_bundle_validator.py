@@ -42,7 +42,7 @@ class TestBundleValidator:
         """
         telemetry_manager = mocker.patch("pipelex.pipeline.bundle_validator.get_telemetry_manager").return_value
         mock_get_config = mocker.patch("pipelex.pipeline.bundle_validator.get_config")
-        mock_get_config.return_value.pipelex.dry_run_config.allowed_to_fail_pipes = allowed_to_fail or []
+        mock_get_config.return_value.inference.dry_run.allowed_to_fail_pipes = allowed_to_fail or []
         prepare_mock = mocker.patch("pipelex.pipeline.bundle_validator.prepare_pipe_job")
         prepare_mock.return_value = mocker.MagicMock(name="pipe_job")
         pipe_run = mocker.MagicMock(name="pipe_run")

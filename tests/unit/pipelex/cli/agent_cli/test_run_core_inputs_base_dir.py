@@ -25,7 +25,7 @@ class TestRunCoreInputsBaseDir:
     @pytest.fixture
     def config_mock(self, mocker: MockerFixture) -> Any:
         fake_config = mocker.MagicMock()
-        fake_config.pipelex.pipeline_execution_config.with_execution_overrides.return_value = mocker.MagicMock()
+        fake_config.interpreter.pipeline_execution.with_execution_overrides.return_value = mocker.MagicMock()
         mocker.patch(f"{RUN_CORE_MODULE}.get_config", return_value=fake_config)
         return fake_config
 

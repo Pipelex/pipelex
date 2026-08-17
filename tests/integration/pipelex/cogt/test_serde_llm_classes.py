@@ -5,7 +5,7 @@ from kajson import kajson
 from pydantic import BaseModel
 
 from pipelex import pretty_print
-from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
+from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from tests.integration.pipelex.cogt.test_data import SerDeTestLLMCases
 
 
@@ -45,8 +45,8 @@ class TestSerDeLLMClasses:
         test_dict: dict[str, Any],
     ):
         pretty_print(test_dict, title="Original dict")
-        # Deserialize the dictionary to a LLMPromptTemplate model
-        the_obj = LLMPromptTemplate.model_validate(test_dict)
+        # Deserialize the dictionary to a LLMPrompt model
+        the_obj = LLMPrompt.model_validate(test_dict)
         pretty_print(the_obj, title="Deserialized from dict")
 
         # Serialize the model to a dictionary
@@ -66,8 +66,8 @@ class TestSerDeLLMClasses:
         test_dict: dict[str, Any],
     ):
         pretty_print(test_dict, title="Original dict")
-        # Deserialize the dictionary to a LLMPromptTemplate model
-        the_obj = LLMPromptTemplate(**test_dict)
+        # Deserialize the dictionary to a LLMPrompt model
+        the_obj = LLMPrompt(**test_dict)
         pretty_print(the_obj, title="Deserialized from dict")
 
         # Serialize the model to a dictionary

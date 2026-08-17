@@ -107,7 +107,7 @@ class Log:
 
         self._log_config_instance = log_config
 
-        self.rich_handler = log_config.rich_log_config.make_rich_handler(target=log_config.console_log_target)
+        self.rich_handler = log_config.rich_log.make_rich_handler(target=log_config.console_log_target)
         self.rich_handler.setFormatter(EmojiLogFormatter())
 
         # Configure the root logger

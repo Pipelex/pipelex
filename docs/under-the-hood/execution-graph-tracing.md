@@ -280,10 +280,10 @@ with scoped_event_log(InMemoryEventLog()):
 Semantics:
 
 - The override is ContextVar-scoped (mirrors `scoped_pipe_router`), so concurrent runs with separate scopes never cross-contaminate, and the prior value is restored on exit.
-- A set override **implies tracing-enabled**: it is honored even when `tracing_config.is_enabled` is `False`, on both the write side and the read side's early-return.
+- A set override **implies tracing-enabled**: it is honored even when `runtime.tracing.is_enabled` is `False`, on both the write side and the read side's early-return.
 - Lifecycle: the read side does not `close()` the scoped instance and the machinery never calls `cleanup()` on it — but the write-side tracer DOES call `close()` on its event log at teardown, before the read side assembles. A scoped event log's `close()` must therefore be idempotent or a no-op (as `InMemoryEventLog`'s is); scoping a backend whose `close()` releases a real resource would break its own assembly read.
 
-This is what lets a graph-producing dry-run trace entirely in memory (no NDJSON file, no DynamoDB round-trip). Both dry-run entrypoints rely on it: `dry_run_pipe_in_process` (`pipelex/pipe_run/dry_run_in_process.py` — the graph arm of protocol `validate` and of the single Temporal validation activity) and `dry_run_pipeline` (`pipelex/pipeline/dry_run_pipeline.py`) itself — these functions exist to produce a graph, so they install their own scoped `InMemoryEventLog` rather than depending on the host having tracing configured (a host with `tracing_config.is_enabled = false`, like pipelex-api's `/validate` in direct mode, still gets its graph). A run that nonetheless finishes without a graph raises the typed `DryRunGraphNotProducedError`.
+This is what lets a graph-producing dry-run trace entirely in memory (no NDJSON file, no DynamoDB round-trip). Both dry-run entrypoints rely on it: `dry_run_pipe_in_process` (`pipelex/pipe_run/dry_run_in_process.py` — the graph arm of protocol `validate` and of the single Temporal validation activity) and `dry_run_pipeline` (`pipelex/pipeline/dry_run_pipeline.py`) itself — these functions exist to produce a graph, so they install their own scoped `InMemoryEventLog` rather than depending on the host having tracing configured (a host with `runtime.tracing.is_enabled = false`, like pipelex-api's `/validate` in direct mode, still gets its graph). A run that nonetheless finishes without a graph raises the typed `DryRunGraphNotProducedError`.
 
 ### TraceContext Propagation
 
@@ -416,16 +416,16 @@ ReactFlow HTML is generated directly from GraphSpec — no intermediate ViewSpec
 
 ```toml
 # pipelex.toml (default values)
-[pipelex.pipeline_execution_config.graph_config]
+[interpreter.pipeline_execution.graph]
 
-[pipelex.pipeline_execution_config.graph_config.data_inclusion]
+[interpreter.pipeline_execution.graph.data_inclusion]
 stuff_json_content = true       # Include full serialized data
 stuff_text_content = true       # Include ASCII text representation
 stuff_html_content = true       # Include HTML representation
 error_stack_traces = true       # Include full stack traces
 pipe_and_concept_registry = true  # Include pipe and concept registries in the GraphSpec
 
-[pipelex.pipeline_execution_config.graph_config.graphs_inclusion]
+[interpreter.pipeline_execution.graph.graphs_inclusion]
 graphspec_json = true           # Generate GraphSpec JSON
 mermaidflow_mmd = true          # Generate Mermaid code
 mermaidflow_html = true         # Generate Mermaid HTML
@@ -525,7 +525,7 @@ validate_graphspec(graph_spec)
 | `pipelex/graph/graph_tracer_manager.py` | Singleton manager for tracers |
 | `pipelex/graph/graph_tracer_protocol.py` | Protocol + NoOp implementation |
 | `pipelex/system/trace_context.py` | Serializable tracing context — sits below `graph/` because it rides in every job's metadata |
-| `pipelex/system/data_inclusion_config.py` | Data-capture flags carried by the trace context, surfaced in the TOML under `graph_config.data_inclusion` |
+| `pipelex/system/data_inclusion_config.py` | Data-capture flags carried by the trace context, surfaced in the TOML under `interpreter.pipeline_execution.graph.data_inclusion` |
 | `pipelex/graph/graph_analysis.py` | Pre-computed graph analysis |
 | `pipelex/graph/graph_factory.py` | Output generation factory |
 | `pipelex/graph/graph_config.py` | Configuration models |

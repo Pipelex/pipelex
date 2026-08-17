@@ -276,7 +276,7 @@ class ReportingManager(ReportingProtocol):
         backend's emit-time infra failures (see ``_EMIT_BEST_EFFORT_EXCEPTIONS``).
         Other exceptions propagate.
         """
-        tracing_config = get_config().pipelex.tracing_config
+        tracing_config = get_config().runtime.tracing
         if not tracing_config.is_enabled:
             return
 

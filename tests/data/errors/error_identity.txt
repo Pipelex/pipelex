@@ -145,7 +145,6 @@ LLMHandleNotFoundError | LLM handle not found | https://docs.pipelex.com/latest/
 LLMModelNotFoundError | LLM model not found | https://docs.pipelex.com/latest/errors/llm-model-not-found-error/
 LLMPromptParameterError | LLM prompt parameter | https://docs.pipelex.com/latest/errors/llm-prompt-parameter-error/
 LLMPromptSpecError | LLM prompt spec | https://docs.pipelex.com/latest/errors/llm-prompt-spec-error/
-LLMPromptTemplateInputsError | LLM prompt template inputs | https://docs.pipelex.com/latest/errors/llm-prompt-template-inputs-error/
 LLMSettingsValidationError | LLM settings validation | https://docs.pipelex.com/latest/errors/llm-settings-validation-error/
 LangfuseCredentialsError | Langfuse credentials | https://docs.pipelex.com/latest/errors/langfuse-credentials-error/
 LibraryError | Library error | https://docs.pipelex.com/latest/errors/library-error/
@@ -154,6 +153,11 @@ LinkupError | Linkup | https://docs.pipelex.com/latest/errors/linkup-error/
 LinkupSearchEmptyResultError | Linkup search empty result | https://docs.pipelex.com/latest/errors/linkup-search-empty-result-error/
 LinkupSearchResponseError | Linkup search response | https://docs.pipelex.com/latest/errors/linkup-search-response-error/
 ListWhereSingularError | List where singular | https://docs.pipelex.com/latest/errors/list-where-singular-error/
+MigrationError | Migration error | https://docs.pipelex.com/latest/errors/migration-error/
+MigrationGoldenError | Migration golden error | https://docs.pipelex.com/latest/errors/migration-golden-error/
+MigrationLedgerError | Migration ledger error | https://docs.pipelex.com/latest/errors/migration-ledger-error/
+MigrationRegistryError | Migration registry error | https://docs.pipelex.com/latest/errors/migration-registry-error/
+MigrationSnapshotRefusedError | Migration snapshot refused | https://docs.pipelex.com/latest/errors/migration-snapshot-refused-error/
 MissingBundleValidatorError | Missing bundle validator | https://docs.pipelex.com/latest/errors/missing-bundle-validator-error/
 MissingDependencyError | Missing dependency | https://docs.pipelex.com/latest/errors/missing-dependency-error/
 MissingOrchestratorError | Missing orchestrator | https://docs.pipelex.com/latest/errors/missing-orchestrator-error/

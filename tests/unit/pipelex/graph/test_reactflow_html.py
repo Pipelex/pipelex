@@ -13,7 +13,7 @@ class TestReactFlowHtml:
     """Tests for generate_reactflow_html function."""
 
     def _rf_config(self) -> ReactFlowRenderingConfig:
-        return get_config().pipelex.pipeline_execution_config.graph_config.reactflow_config
+        return get_config().interpreter.pipeline_execution.graph.reactflow
 
     def _empty_graphspec(self) -> GraphSpec:
         return GraphSpec(

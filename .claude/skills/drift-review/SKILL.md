@@ -35,7 +35,9 @@ Work from the trigger diff to the review targets:
 
 - For each added/modified/removed trigger file, identify what a reader of the review targets could observe changing: new, renamed, or removed options, settings, defaults, commands, behaviors. Use `git diff` on the trigger files; the previous ack's rationale tells you what the last review already covered, so focus on what changed since.
 - Grep the review targets for the changed names, settings, and symbols — then read the surrounding prose. A mention can be present but stale (wrong default, wrong behavior, incomplete), not just missing.
-- Fix what's stale, following the repo's doc rules: docs describe current reality, no hardcoded counts, MkDocs conventions (blank line before lists).
+- **Grep finds wrong mentions; it cannot find missing ones.** A claim that quantifies — *every*, *all*, *only*, *the sole exception*, *none*, or any count — is a claim about a **set**, and it rots by omission: the symbol that falsified it appears nowhere in the sentence that is now false, so searching the target for what changed will never surface it. Read the targets for their quantified claims and re-derive each set from the code. (Same root as the no-hardcoded-counts rule — "the three helpers" and "the sole exception" go stale identically.)
+- **Verify each claim against the artifact it is about, never against another document.** A claim about a test is checked by reading what the test *executes* — its calls, its parametrize lists — not its docstring; a claim about a module, by enumerating the module. A docstring, a sibling doc, or the previous ack is not evidence: prose drifts from the same edit that missed it, so two documents agreeing is agreement, not verification.
+- Fix what's stale, following the repo's doc rules: docs describe current reality, no hardcoded counts, MkDocs conventions (blank line before lists). When the fix is to a quantified claim, prefer converting the construct over correcting the value — name the class ("the deck-reading helpers") rather than restating a count that will rot again.
 - "Nothing to update" is a legitimate verdict — but only after you actually opened and read the review targets. If you didn't open them, you haven't reviewed.
 
 ### 3. Stage, then ack
@@ -51,6 +53,7 @@ As an agent, always pass `BY` with your **own actual identity** — the model yo
 **The rationale is the on-the-record review decision.** It must say what was reviewed and what the verdict was:
 
 - Bad: `"docs fine"`, `"reviewed"`, `"re-ack after refactor"`
+- Bad: `"the page's claim still matches the test's stated exception"` — that is two documents agreeing. Name what you re-derived from the code, so a weak method is visible at write time rather than in the next merge.
 - Good: `"Documented the new activity_queues setting in general-config.md; other config pages unaffected."`
 - Good: `"CLI change is internal plumbing (renamed a private helper); no user-visible surface moved; cli docs and agent-CLI contract doc verified unchanged."`
 

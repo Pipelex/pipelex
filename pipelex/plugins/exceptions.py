@@ -28,7 +28,7 @@ class InferenceBackendNotFoundError(PluginError):
 
     Raised by the family worker factories on a registry-lookup miss — typically a
     model whose backend plugin is not installed or was disabled via
-    ``plugins.disabled``.
+    ``runtime.plugins.disabled``.
     """
 
     def __init__(self, *, family: str, sdk: str):
@@ -166,11 +166,11 @@ class HubSlotAlreadyClaimedError(PluginError):
 
 
 class CoreUnconditionalPluginDisabledError(PluginError):
-    """A plugin that core requires unconditionally was named in plugins.disabled."""
+    """A plugin that core requires unconditionally was named in ``runtime.plugins.disabled``."""
 
     def __init__(self, *, plugin_name: str):
         self.plugin_name = plugin_name
-        message = f"Plugin '{plugin_name}' is required by core and cannot be disabled via plugins.disabled. Remove it from the denylist."
+        message = f"Plugin '{plugin_name}' is required by core and cannot be disabled via runtime.plugins.disabled. Remove it from the denylist."
         super().__init__(message)
 
 
@@ -273,12 +273,12 @@ class BrokenPluginError(PluginError):
 class UnknownBootOrchestratorError(PluginError):
     """An explicit boot orchestrator was requested, but no plugin of that name is registered.
 
-    ``plugins.boot_orchestrator`` (set via the CLI ``--orchestrator`` flag or
-    ``Pipelex.setup(boot_orchestrator=...)``) names the *plugin* this process should boot under:
-    a boot-orchestrator plugin claims the process-global hub slots iff
-    ``plugins.boot_orchestrator == its own name``. When no discovered, registered plugin carries
-    that name — the plugin is not installed, was disabled via ``plugins.disabled``, or the name is
-    a typo — nothing claims the slots and execution would silently fall back to the in-process core
+    The boot orchestrator (a boot argument, set via the CLI ``--orchestrator`` flag or
+    ``Pipelex.setup(boot_orchestrator=...)``; never a ``pipelex.toml`` setting) names the *plugin*
+    this process should boot under: a boot-orchestrator plugin claims the process-global hub slots
+    iff ``boot_orchestrator == its own name``. When no discovered, registered plugin carries that
+    name — the plugin is not installed, was disabled via ``runtime.plugins.disabled``, or the name
+    is a typo — nothing claims the slots and execution would silently fall back to the in-process core
     defaults. We fail loud at boot instead. The message names no specific plugin, so core stays
     decoupled from its plugins.
     """
@@ -291,7 +291,7 @@ class UnknownBootOrchestratorError(PluginError):
         self.requested = requested
         message = (
             f"Boot orchestrator '{requested}' was requested, but no plugin named '{requested}' is registered "
-            "(its plugin may not be installed, may be disabled via plugins.disabled, or the name may be a typo). "
+            "(its plugin may not be installed, may be disabled via runtime.plugins.disabled, or the name may be a typo). "
             "Core provides only in-process execution; booting under a distributed orchestrator requires installing its plugin."
         )
         super().__init__(message)
@@ -300,10 +300,10 @@ class UnknownBootOrchestratorError(PluginError):
 class UnknownStorageMethodError(PluginError):
     """A configured storage method has no registered provider factory.
 
-    ``storage_config.method`` selects a storage provider from the registry the built-in
+    ``runtime.storage.method`` selects a storage provider from the registry the built-in
     ``StoragePlugin`` (and any external ``pipelex-storage-<backend>`` plugin) populates. When
     the token names no registered factory — a typo, or an external provider plugin that is not
-    installed or was disabled via ``plugins.disabled`` — boot fails loud here rather than
+    installed or was disabled via ``runtime.plugins.disabled`` — boot fails loud here rather than
     starting with no storage. The message lists the registered methods so the fix is obvious.
     """
 
@@ -317,7 +317,7 @@ class UnknownStorageMethodError(PluginError):
         available = ", ".join(sorted(registered_methods)) or "(none)"
         message = (
             f"No storage provider is registered for method '{method}'. Registered methods: {available}. "
-            "Check storage_config.method, or install/enable the plugin that provides that method."
+            "Check runtime.storage.method, or install/enable the plugin that provides that method."
         )
         super().__init__(message)
 
@@ -325,10 +325,10 @@ class UnknownStorageMethodError(PluginError):
 class UnknownPipeFuncExecutionModeError(PluginError):
     """A configured PipeFunc execution mode has no registered executor factory.
 
-    ``pipe_func_config.execution_mode`` selects a PipeFunc executor from the registry the built-in
+    ``interpreter.pipe_func.execution_mode`` selects a PipeFunc executor from the registry the built-in
     ``PipeFuncPlugin`` (``direct``) and any external sandbox plugin (e.g.
     our Daytona plugin → ``daytona``) populate. When the token names no registered factory —
-    a typo, or a sandbox-backend plugin that is not installed or was disabled via ``plugins.disabled`` —
+    a typo, or a sandbox-backend plugin that is not installed or was disabled via ``runtime.plugins.disabled`` —
     boot fails loud here rather than starting with no PipeFunc executor. The message lists the
     registered modes so the fix is obvious.
     """
@@ -343,7 +343,7 @@ class UnknownPipeFuncExecutionModeError(PluginError):
         available = ", ".join(sorted(registered_modes)) or "(none)"
         message = (
             f"No PipeFunc executor is registered for execution mode '{mode}'. Registered modes: {available}. "
-            "Check pipe_func_config.execution_mode, or install/enable the plugin that provides that mode."
+            "Check interpreter.pipe_func.execution_mode, or install/enable the plugin that provides that mode."
         )
         super().__init__(message)
 
@@ -351,10 +351,10 @@ class UnknownPipeFuncExecutionModeError(PluginError):
 class UnknownSecretsMethodError(PluginError):
     """A configured secrets method has no registered provider factory.
 
-    ``secrets_config.method`` selects a secrets provider from the registry the built-in
+    ``runtime.secrets.method`` selects a secrets provider from the registry the built-in
     ``SecretsPlugin`` (and any external ``pipelex-secrets-<backend>`` plugin) populates. When
     the token names no registered factory — a typo, or an external provider plugin that is not
-    installed or was disabled via ``plugins.disabled`` — boot fails loud here rather than
+    installed or was disabled via ``runtime.plugins.disabled`` — boot fails loud here rather than
     starting with no secrets provider. The message lists the registered methods so the fix is obvious.
     """
 
@@ -368,6 +368,6 @@ class UnknownSecretsMethodError(PluginError):
         available = ", ".join(sorted(registered_methods)) or "(none)"
         message = (
             f"No secrets provider is registered for method '{method}'. Registered methods: {available}. "
-            "Check secrets_config.method, or install/enable the plugin that provides that method."
+            "Check runtime.secrets.method, or install/enable the plugin that provides that method."
         )
         super().__init__(message)

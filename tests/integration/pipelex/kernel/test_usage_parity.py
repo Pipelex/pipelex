@@ -45,9 +45,10 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.kernel.llm_ops import derive_templating_style, resolve_llm_setting_for_text, run_llm_text
+from pipelex.kernel.llm_ops import resolve_llm_setting_for_text, run_llm_text
 from pipelex.kernel.llm_prompt_content import LlmPromptContent
 from pipelex.kernel.pipelex_kernel import PipelexKernel
+from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.reporting.usage_records import TokensUsageRecord, make_tokens_usage_record
@@ -87,12 +88,12 @@ class TestKernelUsageParity:
         return [make_tokens_usage_record(tokens_usage) for tokens_usage in tokens_usages]
 
     async def _run_through_the_interpreter(self, mocker: MockerFixture, traces_dir: str) -> list[TokensUsageRecord]:
-        tracing_config = get_config().pipelex.tracing_config
+        tracing_config = get_config().runtime.tracing
         mocker.patch.object(tracing_config, "is_enabled", True)
         mocker.patch.object(tracing_config, "backend", TracingBackend.NDJSON)
         mocker.patch.object(tracing_config, "ndjson", NdjsonTracingConfig(traces_dir=traces_dir))
 
-        execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+        execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
             generate_graph=False,
             generate_usage=True,
         )
@@ -114,7 +115,7 @@ class TestKernelUsageParity:
         event_log = InMemoryEventLog()
         trace_context = TraceContext(
             graph_id="kernel-usage-parity",
-            data_inclusion=get_config().pipelex.pipeline_execution_config.graph_config.data_inclusion,
+            data_inclusion=get_config().interpreter.pipeline_execution.graph.data_inclusion,
             emit_graph_events=False,
             emit_usage_events=True,
         )
@@ -142,7 +143,7 @@ class TestKernelUsageParity:
                     output_class=TextContent,
                     job_metadata=kernel.make_step_metadata(pipe_code=_PIPE_CODE),
                     cogt_run_params=kernel.cogt_run_params,
-                    templating_style=derive_templating_style(llm_setting=llm_setting),
+                    templating_style=resolve_templating_style(authored=None),
                     result_name="written",
                 )
             else:

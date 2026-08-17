@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:cd4c268d3557cedc0f5594d73f3db9f9c6eea5781baa184fb29c82cb93c9b5b9"
+digest = "sha256:28bbb28a72966c425d409154d0ae3c8c07bdff6e1ce01e0e0a7fb3b5897d94f7"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-13T09:17:09Z"
-rationale = "Trigger is interpreter_hub.py arriving at this merge changed on both sides: the branch added the two public entry accessors get_required_entry_pipe and get_optional_entry_pipe, and dev renamed the layer vocabulary from runtime to kernel in two of its comments. Verified the page mechanically rather than by eye, because the staleness this contract exists to catch is an enumeration going quietly out of date: parsed both hub modules with ast for public module-level functions and checked every one against the doc -- 33 on interpreter_hub, 33 on runtime_hub, zero untabulated. The library-lookups row already lists both new accessors and the page already carries the paragraph on choosing between the strict in-body pair and the entry pair, plus the cross-package alias caveat; all of that merged in cleanly from this branch alongside dev's rename, so the tables and the prose agree with the merged modules. Zero occurrences of the stale runtime layer or runtime-layer vocabulary remain on the page. No layer boundary moved: both new symbols are interpreter-layer, live beside their siblings, and add no kernel-layer import, and check-hub-layering passes on the merged tree. Reviewed end to end; no doc change needed."
+reviewed_at = "2026-08-17T08:18:22Z"
+rationale = "The trigger is runtime_hub.py, and the change is reset_boot_state releasing the isolated-execution probe: a body and a docstring, with no accessor added, renamed or removed. Re-derived the partition table rather than reading it - enumerated every public module-level function in pipelex/runtime_hub.py by AST and checked each against docs/contribute/hub-layering.md, and every one is named there, so the table is still complete and the probe's accessor is_in_isolated_execution keeps its existing reporting row. The page specifies the boundary and the accessor partition and says nothing about what a teardown releases, so the release reaches no sentence in it. No doc change needed."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:2dbadcbab7d44364a7b5f1d16268b23b26700a00"
 "pipelex/interpreter_hub.py" = "blob:b8c35e37814f0e94c3bf1c364b06a98d0c22ee93"
-"pipelex/runtime_hub.py" = "blob:7f538d2acb10f263d7e1b6907b42d37199cbc654"
+"pipelex/runtime_hub.py" = "blob:498312f15921753263a4ad3475c9da5eefb8e4ba"

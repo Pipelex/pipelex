@@ -10,9 +10,15 @@
 # - All values below are set to their defaults - modify them as needed
 # - The values here will override the defaults from the Pipelex package
 #
+# The three top-level sections mirror the layers of the runtime:
+# - [runtime]     process-scoped infrastructure: storage, secrets, logging, tracing, plugins
+# - [inference]   the model-calling seam: model deck, LLM, image generation, extraction
+# - [interpreter] library-scoped method machinery: parsing, pipe runs, pipeline execution
+#
 # Finding Available Settings:
 # - See the full default configuration in: pipelex/pipelex.toml (in the Pipelex package)
-# - See the configuration structure classes in: pipelex/config.py and pipelex/cogt/config_cogt.py
+# - See the configuration structure classes in: pipelex/system/configuration/configs.py
+#   and pipelex/cogt/config_cogt.py
 #
 # Common customizations include:
 # - Logging levels and behavior
@@ -27,68 +33,10 @@
 ####################################################################################################
 
 ####################################################################################################
-# Pipeline Execution Config
-####################################################################################################
-
-[pipelex.pipeline_execution_config]
-# Set to false to disable conversion of incoming data URLs to pipelex-storage:// URIs
-is_normalize_data_urls_to_storage = true
-# Set to false to disable generation of execution graphs
-is_generate_graph = true
-# Set to false to stop emitting usage (cost) tracing events
-is_generate_usage = true
-
-# Bounded fan-out concurrency for PipeBatch: at most this many branches run at once.
-# Set max_concurrency = "unbounded" to disable the bound.
-max_concurrency = 8
-
-[pipelex.pipeline_execution_config.graph_config.data_inclusion]
-# Control what data is included in graph outputs
-stuff_json_content = true
-stuff_text_content = true
-stuff_html_content = true
-error_stack_traces = true
-pipe_and_concept_registry = true
-
-[pipelex.pipeline_execution_config.graph_config.graphs_inclusion]
-# Control which graph outputs are generated
-graphspec_json = true
-mermaidflow_mmd = true
-mermaidflow_html = true
-reactflow_html = true
-
-[pipelex.pipeline_execution_config.graph_config.reactflow_config]
-# Customize ReactFlow graph rendering
-edge_type = "bezier" # Options: "bezier", "smoothstep", "step", "straight"
-nodesep = 50         # Horizontal spacing between nodes
-ranksep = 30         # Vertical spacing between ranks/levels
-initial_zoom = 1.0   # Initial zoom level (1.0 = 100%)
-pan_to_top = true    # Pan to show top of graph on load
-
-[pipelex.pipeline_execution_config.graph_config.reactflow_config.style]
-theme = "dark"
-palette = "dracula"
-
-####################################################################################################
-# Tracing Config (event log for distributed tracing across workers)
-####################################################################################################
-
-[pipelex.tracing_config]
-is_enabled = true
-backend = "ndjson"
-
-[pipelex.tracing_config.ndjson]
-traces_dir = ".pipelex/traces"
-
-[pipelex.tracing_config.dynamodb]
-table_name = ""
-region = ""
-
-####################################################################################################
 # Storage Config
 ####################################################################################################
 
-[pipelex.storage_config]
+[runtime.storage]
 # Whether to fetch remote HTTP URLs and store them locally
 is_fetch_remote_content_enabled = true
 # Whether to upload local file paths to storage and replace with pipelex-storage:// URIs
@@ -96,23 +44,23 @@ is_upload_local_content_enabled = true
 # Storage method: "local", "in_memory", "s3", or "gcp"
 method = "local"
 
-[pipelex.storage_config.local]
+[runtime.storage.local]
 # Local storage settings
 uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
 local_storage_path = ".pipelex/storage"
 
-[pipelex.storage_config.in_memory]
+[runtime.storage.in_memory]
 # In-memory storage settings
 uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
 
-[pipelex.storage_config.s3]
+[runtime.storage.s3]
 # AWS S3 storage settings (requires boto3: `uv pip install "pipelex[s3]"`)
 uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
 bucket_name = ""
 region = ""
 signed_urls_lifespan_seconds = 3600                           # Set to "disabled" for public URLs
 
-[pipelex.storage_config.gcp]
+[runtime.storage.gcp]
 # Google Cloud Storage settings (requires google-cloud-storage: `uv pip install "pipelex[gcp-storage]"`)
 uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
 bucket_name = ""
@@ -123,16 +71,99 @@ signed_urls_lifespan_seconds = 3600                           # Set to "disabled
 # Secrets Config
 ####################################################################################################
 
-[pipelex.secrets_config]
+[runtime.secrets]
 # Secrets provider method: "env" (built-in, reads secrets from environment variables).
 # An external pipelex-secrets-<backend> plugin can add its own method (e.g. "vault").
 method = "env"
 
 ####################################################################################################
+# Log Config
+####################################################################################################
+
+[runtime.log]
+# Default logging level: "DEBUG", "INFO", "WARNING", "ERROR"
+default_log_level = "INFO"
+# Log output target: "stdout" or "stderr"
+# console_log_target controls the RichHandler used by the logging system (log.debug/info/...).
+# Logs are diagnostics → stderr.
+console_log_target = "stderr"
+# console_print_target controls the Console returned by get_console(), used for banners,
+# deck notices, and the main `pipelex` CLI's data tables (`show backends`, `show models`,
+# `which`, `doctor`). Tables are data the user pipes to a file → stdout.
+# Note: the agent CLI (`pipelex-agent`) emits its actual JSON/markdown results via bare
+# builtin `print(...)` to sys.stdout, bypassing Rich entirely — so this knob does NOT
+# affect the agent CLI data channel. The agent CLI factory additionally forces both
+# targets to stderr internally to keep its stdout strictly reserved for the success
+# envelope.
+console_print_target = "stdout"
+
+[runtime.log.package_log_levels]
+# Log levels for specific packages (use "-" instead of "." in package names)
+pipelex = "INFO"
+
+####################################################################################################
+# Reporting Config
+####################################################################################################
+
+[runtime.reporting]
+# Cost reporting settings
+is_log_costs_to_console = true
+is_generate_cost_report_file_enabled = false
+cost_report_dir_path = "reports"
+cost_report_base_name = "cost_report"
+cost_report_extension = "csv"
+cost_report_unit_scale = 1.0
+
+####################################################################################################
+# Tracing Config (event log for distributed tracing across workers)
+####################################################################################################
+
+[runtime.tracing]
+is_enabled = true
+backend = "ndjson"
+
+[runtime.tracing.ndjson]
+traces_dir = ".pipelex/traces"
+
+[runtime.tracing.dynamodb]
+table_name = ""
+region = ""
+
+####################################################################################################
+# Plugins
+####################################################################################################
+
+[runtime.plugins]
+# Names of discovered plugins to skip at startup (a denylist). Discovery is the
+# source of truth for which plugins are present; this only turns one off.
+disabled = []
+
+####################################################################################################
+# Inference Config (model deck, LLM, image generation, extraction)
+####################################################################################################
+
+[inference.model_deck]
+# Model fallback behavior: if true, uses secondary model options when primary fails
+is_model_fallback_enabled = true
+# Reaction to missing presets: "raise", "log", or "none"
+missing_presets_reaction = "log"
+
+[inference.llm]
+# Enable dumping of LLM inputs/outputs for debugging
+is_dump_text_prompts_enabled = false
+is_dump_response_text_enabled = false
+
+[inference.llm.instructor]
+# Enable dumping of structured content generation details for debugging
+is_dump_kwargs_enabled = false
+is_dump_response_enabled = false
+is_dump_error_enabled = false
+
+####################################################################################################
 # Scan Config
 ####################################################################################################
 
-[pipelex.scan_config]
+[interpreter.scan]
 # Directories to exclude when scanning for pipeline files
 excluded_dirs = [
   ".venv",
@@ -154,76 +185,51 @@ excluded_dirs = [
 # Builder Config
 ####################################################################################################
 
-[pipelex.builder_config]
+[interpreter.builder]
 # Settings for generated pipelines
 default_output_dir = "."
 default_bundle_file_name = "bundle"
 default_directory_base_name = "pipeline"
 
 ####################################################################################################
-# Log Config
+# Pipeline Execution Config
 ####################################################################################################
 
-[pipelex.log_config]
-# Default logging level: "DEBUG", "INFO", "WARNING", "ERROR"
-default_log_level = "INFO"
-# Log output target: "stdout" or "stderr"
-# console_log_target controls the RichHandler used by the logging system (log.debug/info/...).
-# Logs are diagnostics → stderr.
-console_log_target = "stderr"
-# console_print_target controls the Console returned by get_console(), used for banners,
-# deck notices, and the main `pipelex` CLI's data tables (`show backends`, `show models`,
-# `which`, `doctor`). Tables are data the user pipes to a file → stdout.
-# Note: the agent CLI (`pipelex-agent`) emits its actual JSON/markdown results via bare
-# builtin `print(...)` to sys.stdout, bypassing Rich entirely — so this knob does NOT
-# affect the agent CLI data channel. The agent CLI factory additionally forces both
-# targets to stderr internally to keep its stdout strictly reserved for the success
-# envelope.
-console_print_target = "stdout"
+[interpreter.pipeline_execution]
+# Set to false to disable conversion of incoming data URLs to pipelex-storage:// URIs
+is_normalize_data_urls_to_storage = true
+# Set to false to disable generation of execution graphs
+is_generate_graph = true
+# Set to false to stop emitting usage (cost) tracing events
+is_generate_usage = true
 
-[pipelex.log_config.package_log_levels]
-# Log levels for specific packages (use "-" instead of "." in package names)
-pipelex = "INFO"
+# Bounded fan-out concurrency for PipeBatch: at most this many branches run at once.
+# Set max_concurrency = "unbounded" to disable the bound.
+max_concurrency = 8
 
-####################################################################################################
-# Reporting Config
-####################################################################################################
+[interpreter.pipeline_execution.graph.data_inclusion]
+# Control what data is included in graph outputs
+stuff_json_content = true
+stuff_text_content = true
+stuff_html_content = true
+error_stack_traces = true
+pipe_and_concept_registry = true
 
-[pipelex.reporting_config]
-# Cost reporting settings
-is_log_costs_to_console = true
-is_generate_cost_report_file_enabled = false
-cost_report_dir_path = "reports"
-cost_report_base_name = "cost_report"
-cost_report_extension = "csv"
-cost_report_unit_scale = 1.0
+[interpreter.pipeline_execution.graph.graphs_inclusion]
+# Control which graph outputs are generated
+graphspec_json = true
+mermaidflow_mmd = true
+mermaidflow_html = true
+reactflow_html = true
 
-####################################################################################################
-# Cogt (Cognitive Tools) Config
-####################################################################################################
+[interpreter.pipeline_execution.graph.reactflow]
+# Customize ReactFlow graph rendering
+edge_type = "bezier" # Options: "bezier", "smoothstep", "step", "straight"
+nodesep = 50         # Horizontal spacing between nodes
+ranksep = 30         # Vertical spacing between ranks/levels
+initial_zoom = 1.0   # Initial zoom level (1.0 = 100%)
+pan_to_top = true    # Pan to show top of graph on load
 
-[cogt.model_deck_config]
-# Model fallback behavior: if true, uses secondary model options when primary fails
-is_model_fallback_enabled = true
-# Reaction to missing presets: "raise", "log", or "none"
-missing_presets_reaction = "log"
-
-[cogt.llm_config]
-# Enable dumping of LLM inputs/outputs for debugging
-is_dump_text_prompts_enabled = false
-is_dump_response_text_enabled = false
-
-[cogt.llm_config.instructor_config]
-# Enable dumping of structured content generation details for debugging
-is_dump_kwargs_enabled = false
-is_dump_response_enabled = false
-is_dump_error_enabled = false
-
-####################################################################################################
-# Plugins
-####################################################################################################
-
-[plugins]
-# Names of discovered plugins to skip at startup (a denylist). Discovery is the
-# source of truth for which plugins are present; this only turns one off.
-disabled = []
+[interpreter.pipeline_execution.graph.reactflow.style]
+theme = "dark"
+palette = "dracula"

@@ -244,6 +244,10 @@ rationale = "Parses the config_arg; single operand."
 param = "result"
 rationale = "Verb-object: emits the result; format options stay keyword."
 
+["pipelex/cli/agent_cli/commands/migrate_cmd.py::_render_markdown"]
+param = "result"
+rationale = "Positional-Callable protocol: passed as markdown_renderer, invoked renderer(result)."
+
 ["pipelex/cli/agent_cli/commands/pipe_cmd.py::_pipe_spec_to_toml"]
 param = "pipe_spec"
 rationale = "Serializes the pipe_spec to TOML; single operand."
@@ -1244,10 +1248,6 @@ rationale = "Parser: the text is the operand; comment_prefix is context."
 param = "model_name"
 rationale = "Keyed accessor by the model_name; single operand."
 
-["pipelex/cogt/config_cogt.py::LLMConfig.get_reasoning_budget"]
-param = "prompting_target"
-rationale = "Keyed accessor by the prompting_target; single operand."
-
 ["pipelex/cogt/config_cogt.py::LLMConfig.get_template"]
 param = "template_name"
 rationale = "Keyed accessor by the template_name; single operand."
@@ -1923,14 +1923,6 @@ rationale = "Prepares the job against the inference_model; single operand."
 ["pipelex/cogt/llm/llm_job_factory.py::LLMJobFactory.make_llm_job"]
 param = "llm_prompt"
 rationale = "Factory from source: builds the result from the llm_prompt; single operand."
-
-["pipelex/cogt/llm/llm_prompt_template_inputs.py::LLMPromptTemplateInputs.complemented_by"]
-param = "additional_template_inputs"
-rationale = "Operates on the additional_template_inputs; single operand (qualifiers keyword-only)."
-
-["pipelex/cogt/llm/llm_prompt_template_inputs.py::LLMPromptTemplateInputs.complemented_by_dict"]
-param = "additional_inputs_dict"
-rationale = "Operates on the additional_inputs_dict; single operand (qualifiers keyword-only)."
 
 ["pipelex/cogt/llm/llm_report.py::LLMTokenCostReportField.report_field_for_cost_by_category"]
 param = "token_category"
@@ -4448,33 +4440,45 @@ rationale = "Verb-object: renders the diagnostic; single operand."
 param = "toml_doc"
 rationale = "Single-operand serialization of the TOML document."
 
+["pipelex/pipeline/fixes/file_transaction.py::_cleanup_staged_updates"]
+param = "staged_updates"
+rationale = "Verb-object: cleans up the staged updates; single operand."
+
+["pipelex/pipeline/fixes/file_transaction.py::_commit_staged_updates"]
+param = "staged_updates"
+rationale = "Verb-object: commits the staged updates; single operand."
+
+["pipelex/pipeline/fixes/file_transaction.py::_rollback_committed_updates"]
+param = "committed_updates"
+rationale = "Verb-object: rolls back the committed updates; single operand."
+
+["pipelex/pipeline/fixes/file_transaction.py::assert_snapshot_unchanged"]
+param = "snapshot"
+rationale = "Validator: the snapshot is the single operand checked."
+
+["pipelex/pipeline/fixes/file_transaction.py::commit_file_updates"]
+param = "updates"
+rationale = "Verb-object: commits the updates; single operand."
+
+["pipelex/pipeline/fixes/file_transaction.py::read_file_snapshot"]
+param = "path"
+rationale = "Factory from source: reads the snapshot of the file at path."
+
+["pipelex/pipeline/fixes/file_transaction.py::stage_file_update"]
+param = "update"
+rationale = "Verb-object: stages the update; single operand."
+
 ["pipelex/pipeline/fixes/fix_loop.py::_absolute_source_path"]
 param = "path"
 rationale = "Single-operand conversion of the path."
-
-["pipelex/pipeline/fixes/fix_loop.py::_assert_snapshot_unchanged"]
-param = "snapshot"
-rationale = "Validator: the snapshot is the single operand checked."
 
 ["pipelex/pipeline/fixes/fix_loop.py::_bind_fixes_to_snapshots"]
 param = "fixes"
 rationale = "Verb-object: binds the fixes; the rest is context."
 
-["pipelex/pipeline/fixes/fix_loop.py::_cleanup_staged_updates"]
-param = "staged_updates"
-rationale = "Verb-object: cleans up the staged updates; single operand."
-
 ["pipelex/pipeline/fixes/fix_loop.py::_colliding_op_name"]
 param = "fix_op"
 rationale = "Noun-named derivation from the fix op; scopes stay keyword."
-
-["pipelex/pipeline/fixes/fix_loop.py::_commit_file_updates"]
-param = "updates"
-rationale = "Verb-object: commits the updates; single operand."
-
-["pipelex/pipeline/fixes/fix_loop.py::_commit_staged_updates"]
-param = "staged_updates"
-rationale = "Verb-object: commits the staged updates; single operand."
 
 ["pipelex/pipeline/fixes/fix_loop.py::_fix_fingerprint"]
 param = "fix"
@@ -4492,14 +4496,6 @@ rationale = "Verb-object: partitions the fixes; scope params stay keyword."
 param = "validation_result"
 rationale = "Noun-named derivation from the validation result; single operand."
 
-["pipelex/pipeline/fixes/fix_loop.py::_read_file_snapshot"]
-param = "path"
-rationale = "Factory from source: reads the snapshot of the file at path."
-
-["pipelex/pipeline/fixes/fix_loop.py::_rollback_committed_updates"]
-param = "committed_updates"
-rationale = "Verb-object: rolls back the committed updates; single operand."
-
 ["pipelex/pipeline/fixes/fix_loop.py::_safe_fixes"]
 param = "items"
 rationale = "Noun-named derivation: filters the error items down to safe fixes; the rest is context."
@@ -4507,10 +4503,6 @@ rationale = "Noun-named derivation: filters the error items down to safe fixes; 
 ["pipelex/pipeline/fixes/fix_loop.py::_split_cross_file_collisions"]
 param = "fixes"
 rationale = "Verb-object: splits the fixes; codes_by_file is context."
-
-["pipelex/pipeline/fixes/fix_loop.py::_stage_file_update"]
-param = "update"
-rationale = "Verb-object: stages the update; single operand."
 
 ["pipelex/pipeline/fixes/fix_loop.py::_validation_error_items"]
 param = "exc"
@@ -5463,18 +5455,6 @@ rationale = "Verb-object: transforms the input dict; enum class stays keyword."
 ["pipelex/system/configuration/config_model.py::ConfigModel.transform_list_of_str_to_enum"]
 param = "input_list"
 rationale = "Verb-object: transforms the input list; enum class stays keyword."
-
-["pipelex/system/configuration/configs.py::MigrationConfig.text_in_renaming_keys"]
-param = "text"
-rationale = "Predicate on the text; single operand."
-
-["pipelex/system/configuration/configs.py::MigrationConfig.text_in_renaming_values"]
-param = "text"
-rationale = "Predicate on the text; single operand."
-
-["pipelex/system/configuration/configs.py::PromptingConfig.get_prompting_style"]
-param = "prompting_target"
-rationale = "Config getter keyed by the prompting target; single operand."
 
 ["pipelex/system/environment.py::all_env_vars_are_set"]
 param = "keys"

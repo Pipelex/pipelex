@@ -1,0 +1,350 @@
+# The migration ledger for the main Pipelex configuration.
+#
+# Every shape change this surface undergoes is recorded here as data, in order, and replayed in
+# full over every one of the surface's files on every run. See docs/migration-ledger.md — it is
+# normative, and it explains why there are no `set_key`-style operations in this vocabulary and
+# why no version record ever causes work to be skipped.
+#
+# Entries are appended by `make umig` through the add-migration skill, never hand-invented.
+
+[surface]
+id = "pipelex-config"
+title = "The main Pipelex configuration"
+base_file = "pipelex.toml"
+tier_glob = "pipelex_*.toml"
+current_schema_version = 3
+min_supported_schema_version = 0
+
+# This entry is inserted *below* the reshape rather than appended above it, and the order is what
+# makes it work: it addresses `pipelex.prompting_config`, the spelling that exists only while the
+# root table is still called `[pipelex]`. After the reshape it would find nothing, and the file
+# would come out of the run carrying `[interpreter.prompting_config]` — a table nothing reads.
+[[migration]]
+id = "pipelex-config@2"
+to_schema_version = 2
+introduced_in = "0.46.0"
+breaking = true
+safety = "safe"
+pre_history = true
+title = "Prompting styles become a templating default"
+description = """
+A prompting style used to be chosen for you, per *target*: the configuration held a map from a \
+model family — `openai`, `anthropic`, `mistral`, `gemini` — to the tag style prompts for it should \
+use, and a `default_prompting_style` for everything else. Styling is now a property of the prompt \
+rather than of the model that receives it, so the map went away and what remains is one default, \
+under the name the templating section gives it. This entry carries a file written before that \
+change onto the shape the reshape then moves.
+"""
+guidance = """
+`default_prompting_style` travels: it becomes `default_templating_style`, and the reshape entry \
+after this one carries it on to `[inference.templating]` with the rest of that section.
+
+A tuned `[pipelex.prompting_config.prompting_styles]` map is **dropped**, and nothing restores it \
+from somewhere else — per-target styling is not a concept any more. Where a particular pipe needs \
+a particular style, say so on the pipe: `templating_style` on a `PipeLLM`.
+"""
+
+# Declared rather than derived: this change predates the first fingerprint, so no snapshot shows
+# these paths going away and there is no diff to account the entry against. The hand-authored
+# document the operations below are verified against is goldens/pipelex-config/before@2.toml.
+declared_removed_paths = [
+  "pipelex.prompting_config",
+  "pipelex.prompting_config.default_prompting_style",
+  "pipelex.prompting_config.prompting_styles",
+]
+
+[[migration.ops]] # the destination table does not exist before this: the move creates it
+kind = "move_key"
+table_path = ["pipelex", "prompting_config"]
+key = "default_prompting_style"
+new_table_path = ["pipelex", "templating_config"]
+new_key = "default_templating_style"
+
+[[migration.ops]] # the map goes first, so what is left of the section is empty when it goes
+kind = "delete_table"
+table_path = ["pipelex", "prompting_config", "prompting_styles"]
+
+[[migration.ops]]
+kind = "delete_table"
+table_path = ["pipelex", "prompting_config"]
+
+[[migration]]
+id = "pipelex-config@3"
+to_schema_version = 3
+introduced_in = "0.46.0"
+breaking = true
+safety = "safe"
+title = "The configuration reshape: one scheme for the root"
+description = """
+The root gets the layers the code already has, instead of a grab-bag (`[pipelex]`), a codename \
+(`[cogt]`), a plugin-system table (`[plugins]`), a rename-hint table (`[migration]`) and a stray \
+`session_id`. Kernel-layer infrastructure moves under `[runtime]`, the model-calling seam becomes \
+`[inference]`, library-scoped method machinery becomes `[interpreter]`, and the dev-tooling section \
+becomes `[kit]`. The redundant `_config` suffix is dropped from every key, at every depth. Every \
+setting keeps its value; only its address changes.
+"""
+guidance = """
+Values are unchanged — only addresses. Three things do go away, and none of them is recoverable by \
+moving it somewhere else:
+
+- Custom `[migration.migration_maps.*]` entries have no equivalent and are dropped. They only ever \
+  annotated validation-error messages with old-to-new name hints, and renames are recorded as \
+  ledger entries now. The `.mthds` renaming hints go with them until the language surface restores them.
+- `session_id`, if you ever pinned it, is dropped: it was process state living on the config object, \
+  and nothing in `pipelex` reads it.
+- `boot_orchestrator`, if anyone ever wrote it into a file, is dropped because it is a boot \
+  argument (`--orchestrator`, or `Pipelex.setup(boot_orchestrator=...)`), not a setting.
+
+A moved section may appear at the end of the migrated file rather than where it was, and a banner \
+comment introducing a moved section stays behind, now labelling whatever followed it. Both are \
+expected; the file is otherwise untouched.
+"""
+
+# --- Kernel-layer infrastructure out of [pipelex], into [runtime] ------------------------------
+# Children move out of [pipelex] before [pipelex] itself is renamed, so the rename that follows
+# carries only what belongs to the interpreter.
+
+[[migration.ops]]
+kind = "move_key"
+table_path = ["pipelex"]
+key = "storage_config"
+new_table_path = ["runtime"]
+new_key = "storage"
+
+[[migration.ops]]
+kind = "move_key"
+table_path = ["pipelex"]
+key = "secrets_config"
+new_table_path = ["runtime"]
+new_key = "secrets"
+
+[[migration.ops]]
+kind = "move_key"
+table_path = ["pipelex"]
+key = "log_config"
+new_table_path = ["runtime"]
+new_key = "log"
+
+# A rename inside a parent that has already moved: the source path is intermediate by construction,
+# which is why op legality is evaluated over the entry's own sequential path state.
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["runtime", "log"]
+key = "rich_log_config"
+new_key = "rich_log"
+
+[[migration.ops]]
+kind = "move_key"
+table_path = ["pipelex"]
+key = "aws_config"
+new_table_path = ["runtime"]
+new_key = "aws"
+
+[[migration.ops]]
+kind = "move_key"
+table_path = ["pipelex"]
+key = "reporting_config"
+new_table_path = ["runtime"]
+new_key = "reporting"
+
+[[migration.ops]]
+kind = "move_key"
+table_path = ["pipelex"]
+key = "tracing_config"
+new_table_path = ["runtime"]
+new_key = "tracing"
+
+[[migration.ops]]
+kind = "move_key"
+table_path = ["pipelex"]
+key = "observer_config"
+new_table_path = ["runtime"]
+new_key = "observer"
+
+# Before [plugins] moves, so the deleted key's source is a schema-1 path rather than an
+# intermediate one. It was never settable in practice, so this skips on every real file.
+[[migration.ops]]
+kind = "delete_key"
+table_path = ["plugins"]
+key = "boot_orchestrator"
+
+[[migration.ops]]
+kind = "move_key"
+table_path = []
+key = "plugins"
+new_table_path = ["runtime"]
+new_key = "plugins"
+
+# --- [cogt] becomes [inference] ----------------------------------------------------------------
+# The root rename comes before anything moves *into* [inference]: renaming the root table rewrites
+# every `[cogt.*]` header in place, keeping each child where the user put it.
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = []
+key = "cogt"
+new_key = "inference"
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["inference"]
+key = "model_deck_config"
+new_key = "model_deck"
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["inference"]
+key = "llm_config"
+new_key = "llm"
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["inference", "llm"]
+key = "instructor_config"
+new_key = "instructor"
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["inference", "llm"]
+key = "openai_config"
+new_key = "openai"
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["inference", "llm"]
+key = "anthropic_config"
+new_key = "anthropic"
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["inference", "llm"]
+key = "google_config"
+new_key = "google"
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["inference", "llm"]
+key = "mistral_config"
+new_key = "mistral"
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["inference"]
+key = "img_gen_config"
+new_key = "img_gen"
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["inference", "img_gen"]
+key = "img_gen_job_config"
+new_key = "img_gen_job"
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["inference"]
+key = "extract_config"
+new_key = "extract"
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["inference"]
+key = "gateway_test_config"
+new_key = "gateway_test"
+
+# The two sections whose readers are the kernel's inference seam (ruling R3).
+
+[[migration.ops]]
+kind = "move_key"
+table_path = ["pipelex"]
+key = "templating_config"
+new_table_path = ["inference"]
+new_key = "templating"
+
+[[migration.ops]]
+kind = "move_key"
+table_path = ["pipelex"]
+key = "dry_run_config"
+new_table_path = ["inference"]
+new_key = "dry_run"
+
+# --- Dev tooling to the root -------------------------------------------------------------------
+
+[[migration.ops]]
+kind = "move_key"
+table_path = ["pipelex"]
+key = "kit_config"
+new_table_path = []
+new_key = "kit"
+
+# --- What remains of [pipelex] is the interpreter -----------------------------------------------
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = []
+key = "pipelex"
+new_key = "interpreter"
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["interpreter"]
+key = "mthds_config"
+new_key = "mthds"
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["interpreter"]
+key = "pipe_run_config"
+new_key = "pipe_run"
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["interpreter"]
+key = "pipe_func_config"
+new_key = "pipe_func"
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["interpreter"]
+key = "pipeline_execution_config"
+new_key = "pipeline_execution"
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["interpreter", "pipeline_execution"]
+key = "graph_config"
+new_key = "graph"
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["interpreter", "pipeline_execution", "graph"]
+key = "mermaid_config"
+new_key = "mermaid"
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["interpreter", "pipeline_execution", "graph"]
+key = "reactflow_config"
+new_key = "reactflow"
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["interpreter"]
+key = "scan_config"
+new_key = "scan"
+
+[[migration.ops]]
+kind = "rename_table_key"
+table_path = ["interpreter"]
+key = "builder_config"
+new_key = "builder"
+
+# --- Deletions last ------------------------------------------------------------------------------
+
+[[migration.ops]]
+kind = "delete_table"
+table_path = ["migration"]
+
+[[migration.ops]]
+kind = "delete_key"
+table_path = []
+key = "session_id"

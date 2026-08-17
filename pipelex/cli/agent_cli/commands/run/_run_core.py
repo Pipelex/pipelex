@@ -59,7 +59,7 @@ async def run_pipeline_core(
     """
     pipe_run_mode = PipeRunMode.DRY if dry_run else None
 
-    execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+    execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
         generate_graph=graph,
         generate_usage=costs,
         mock_inputs=mock_inputs or None,
@@ -141,7 +141,7 @@ async def run_pipeline_core(
 
     # Generate and save graph visualizations if requested
     if graph and pipe_output.graph_spec:
-        graph_config = execution_config.graph_config
+        graph_config = execution_config.graph
         # Enable ReactFlow HTML output and data inclusion for the render
         render_graph_config = graph_config.model_copy(
             update={

@@ -86,12 +86,17 @@ When adding a model to multiple backends, be aware of these differences:
   `gpt-5.4-2026-03-01`). SDK is `azure_openai_responses`. Inputs typically use
   `images` but not `pdf`. Image gen models use `azure_rest_img_gen` SDK and need
   a `.rules` sub-table.
-- **Anthropic direct**: SDK is `anthropic`. Uses `prompting_target = "anthropic"`,
+- **Anthropic direct**: SDK is `anthropic`. Uses
   `structure_method = "instructor/anthropic_tools"`. Often has `max_tokens` and
   `max_prompt_images`.
-- **Bedrock**: SDK is `bedrock_converse`. Has its own `prompting_target`.
-- **Google direct**: SDK is `google`. Uses `prompting_target = "gemini"`,
+- **Bedrock**: SDK is `bedrock_converse`.
+- **Google direct**: SDK is `google`. Uses
   `structure_method = "instructor/genai_tools"`.
+
+A model spec never declares how its prompts are formatted: templating style is an
+authoring decision on the pipe (`templating_style` on `PipeLLM`) with a single
+runtime default. Any key you write that the model-spec blueprint does not know is
+sent to the provider as an outbound HTTP header — so do not invent fields.
 
 Each backend TOML has a `[defaults]` section — the model entry only needs to
 specify fields that differ from those defaults. Read the defaults before writing
@@ -173,6 +178,23 @@ make ccs
 
 This checks that the two directories match. If it reports differences, something
 went wrong with the sync.
+
+### If you edited `portkey.toml`, one migration golden moves with it
+
+The kit's `portkey.toml` is the `inference-backend` surface's **reference
+document** — the migration gates byte-compare `pipelex/migration/goldens/inference-backend/defaults@N.toml`
+against it, so adding a model to that one file turns `make check-migration-schemas`
+(alias `cmig`) red until the golden is regenerated:
+
+```bash
+make umig   # rewrites the head goldens from the live source
+make cmig   # then green again
+```
+
+That is the designed workflow, not a workaround — the refusal names both the
+golden and the file. No other backend TOML is coupled this way; the rest of the
+directory is only read as convergence witnesses, which adding a model does not
+disturb.
 
 ## Step 4: Add to test profile collections
 

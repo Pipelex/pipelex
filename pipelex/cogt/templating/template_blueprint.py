@@ -1,6 +1,6 @@
 from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
@@ -11,8 +11,16 @@ from pipelex.tools.templating.templating_style import TemplatingStyle
 
 
 class TemplateBlueprint(BaseModel):
+    """The rich form of a template: its Jinja2 source and category, plus an optional templating style and extra context."""
+
+    # An authored surface (the `[pipe.name.template]` table): unknown keys are rejected, as on every blueprint.
+    model_config = ConfigDict(extra="forbid")
+
     template: str = Field(description="Raw template source")
-    templating_style: TemplatingStyle | None = Field(default=None, description="Style of prompting to use (typically for different LLMs)")
+    templating_style: TemplatingStyle | None = Field(
+        default=None,
+        description="How the tag and format filters render in this template; omit it to take the runtime default templating style",
+    )
     category: TemplateCategory = Field(
         description="Category of the template (could also be HTML, MARKDOWN, MERMAID, etc.), influences template rendering rules",
     )

@@ -6,8 +6,8 @@ from pipelex.config import get_config
 
 
 def dump_prompt(llm_prompt: LLMPrompt) -> None:
-    """Print the prompt for debugging. No-op unless `cogt.llm_config.is_dump_text_prompts_enabled`."""
-    if not get_config().cogt.llm_config.is_dump_text_prompts_enabled:
+    """Print the prompt for debugging. No-op unless `inference.llm.is_dump_text_prompts_enabled`."""
+    if not get_config().inference.llm.is_dump_text_prompts_enabled:
         return
     prompt_dump = ""
     if user_text := llm_prompt.user_text:
@@ -24,8 +24,8 @@ def dump_prompt(llm_prompt: LLMPrompt) -> None:
 
 
 def dump_response_from_text_gen(response: Any) -> None:
-    """Print the LLM response for debugging. No-op unless `cogt.llm_config.is_dump_response_text_enabled`."""
-    if not get_config().cogt.llm_config.is_dump_response_text_enabled:
+    """Print the LLM response for debugging. No-op unless `inference.llm.is_dump_response_text_enabled`."""
+    if not get_config().inference.llm.is_dump_response_text_enabled:
         return
     pretty_print(response, title="Response from LLM provider")
 

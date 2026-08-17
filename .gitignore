@@ -15,6 +15,7 @@ site/
 # Unit test / coverage reports
 htmlcov/
 .pytest_cache/
+.hypothesis/
 .coverage
 coverage.xml
 
@@ -51,6 +52,9 @@ telemetry_override.toml
 
 # local pipelex service configuration
 .pipelex/pipelex_service.toml
+
+# the timestamped copy `pipelex migrate` leaves beside every file it rewrites
+*.bak.[0-9]*Z
 
 # temporary files
 temp/

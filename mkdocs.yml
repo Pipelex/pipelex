@@ -118,7 +118,8 @@ plugins:
         'setup/index.md': 'get-started/build-with-claude-code.md'
         'setup/project-organization.md': 'get-started/build-with-claude-code.md'
         'setup/configure-ai-providers.md': 'get-started/configure-ai-providers.md'
-        'home/6-build-reliable-ai-workflows/adapt-to-llm-prompting-style-openai-anthropic-mistral.md': 'building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md'
+        'home/6-build-reliable-ai-workflows/adapt-to-llm-prompting-style-openai-anthropic-mistral.md': 'building-methods/templating-style.md'
+        'building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md': 'building-methods/templating-style.md'
         'home/6-build-reliable-ai-workflows/concepts/define_your_concepts.md': 'building-methods/concepts/define_your_concepts.md'
         'home/6-build-reliable-ai-workflows/concepts/inline-structures.md': 'building-methods/concepts/inline-structures.md'
         'home/6-build-reliable-ai-workflows/concepts/native-concepts.md': 'building-methods/concepts/native-concepts.md'
@@ -156,7 +157,9 @@ plugins:
         'home/7-configuration/config-practical/reporting-config.md': 'configuration/config-practical/reporting-config.md'
         'home/7-configuration/config-practical/telemetry-config.md': 'configuration/config-practical/telemetry-config.md'
         'home/7-configuration/config-technical/aws-config.md': 'configuration/config-technical/aws-config.md'
-        'home/7-configuration/config-technical/cogt-config.md': 'configuration/config-technical/cogt-config.md'
+        'home/7-configuration/config-technical/cogt-config.md': 'configuration/config-technical/inference-config.md'
+        # Renamed by the configuration reshape: `[cogt]` became `[inference]`, so the page did too.
+        'configuration/config-technical/cogt-config.md': 'configuration/config-technical/inference-config.md'
         'home/7-configuration/config-technical/inference-backend-config.md': 'configuration/config-technical/inference-backend-config.md'
         'home/7-configuration/config-technical/library-config.md': 'configuration/config-technical/library-config.md'
         'home/7-configuration/index.md': 'configuration/index.md'
@@ -268,11 +271,12 @@ plugins:
         - building-methods/pipes/pipe-controllers/PipeCondition.md: "PipeCondition"
         - building-methods/pipes/signature-pipes.md: "Signature Pipes"
         - building-methods/configure-ai-llm-to-optimize-methods.md: "Optimize Cost & Quality"
-        - building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md: "LLM Prompting Style"
+        - building-methods/templating-style.md: "Templating Style"
         Reference:
         - tools/cli/index.md: "CLI Reference Overview"
         - tools/cli/init.md: "CLI Init"
         - tools/cli/update.md: "CLI Update"
+        - tools/cli/migrate.md: "CLI Migrate"
         - tools/cli/validate.md: "CLI Validate"
         - tools/cli/fix.md: "CLI Fix"
         - tools/cli/run.md: "CLI Run"
@@ -291,7 +295,7 @@ plugins:
         - configuration/config-practical/reporting-config.md: "Reporting Configuration"
         - configuration/config-practical/telemetry-config.md: "Telemetry Configuration"
         - configuration/config-technical/aws-config.md: "AWS Configuration"
-        - configuration/config-technical/cogt-config.md: "Cogt Configuration"
+        - configuration/config-technical/inference-config.md: "Inference Configuration"
         - configuration/config-technical/inference-backend-config.md: "LLM Providers & Models Configuration"
         - configuration/config-technical/library-config.md: "Library Configuration"
         - tools/plxt.md: "plxt (Formatter & Linter)"
@@ -337,6 +341,7 @@ plugins:
         - contribute/hub-layering.md: "Hub Layering"
         - contribute/registration-surface.md: "Registration Surface"
         - contribute/drift-contracts.md: "Drift Contracts"
+        - migration-ledger.md: "Migration Ledger"
         - changelog.md: "Changelog"
 
 markdown_extensions:
@@ -489,7 +494,7 @@ nav:
           - PipeCondition: building-methods/pipes/pipe-controllers/PipeCondition.md
         - Signature Pipes: building-methods/pipes/signature-pipes.md
       - Optimize Cost & Quality: building-methods/configure-ai-llm-to-optimize-methods.md
-      - LLM Prompting Style: building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
+      - Templating Style: building-methods/templating-style.md
     - Retries & Resilience:
       - Overview: reliability/retries-and-resilience.md
       - Automatic Retries: reliability/automatic-retries.md
@@ -502,6 +507,7 @@ nav:
       - Overview: tools/cli/index.md
       - Init: tools/cli/init.md
       - Update: tools/cli/update.md
+      - Migrate: tools/cli/migrate.md
       - Validate: tools/cli/validate.md
       - Fix: tools/cli/fix.md
       - Run: tools/cli/run.md
@@ -537,7 +543,7 @@ nav:
         - Telemetry: configuration/config-practical/telemetry-config.md
       - Technical Configuration:
         - AWS: configuration/config-technical/aws-config.md
-        - Cogt: configuration/config-technical/cogt-config.md
+        - Inference: configuration/config-technical/inference-config.md
         - LLM Providers & Models: configuration/config-technical/inference-backend-config.md
         - Library: configuration/config-technical/library-config.md
   - Advanced:
@@ -579,6 +585,7 @@ nav:
     - Hub Layering: contribute/hub-layering.md
     - Registration Surface: contribute/registration-surface.md
     - Drift Contracts: contribute/drift-contracts.md
+    - Migration Ledger: migration-ledger.md
     - Code of Conduct: CODE_OF_CONDUCT.md
     - License: license.md
     - Changelog: changelog.md

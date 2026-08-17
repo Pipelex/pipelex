@@ -15,9 +15,9 @@ class ImgGenJobFactory:
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
     ) -> ImgGenJob:
-        img_gen_config = get_config().cogt.img_gen_config
+        img_gen_config = get_config().inference.img_gen
         job_params = img_gen_job_params or img_gen_config.make_default_img_gen_job_params()
-        job_config = img_gen_job_config or img_gen_config.img_gen_job_config
+        job_config = img_gen_job_config or img_gen_config.img_gen_job
         job_report = ImgGenJobReport()
 
         return ImgGenJob(
@@ -38,10 +38,10 @@ class ImgGenJobFactory:
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
     ) -> ImgGenJob:
-        img_gen_config = get_config().cogt.img_gen_config
+        img_gen_config = get_config().inference.img_gen
         img_gen_prompt = ImgGenPrompt(positive_text=positive_text, negative_text=negative_text)
         job_params = img_gen_job_params or img_gen_config.make_default_img_gen_job_params()
-        job_config = img_gen_job_config or img_gen_config.img_gen_job_config
+        job_config = img_gen_job_config or img_gen_config.img_gen_job
         job_report = ImgGenJobReport()
 
         return ImgGenJob(

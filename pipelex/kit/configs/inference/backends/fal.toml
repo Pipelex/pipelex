@@ -23,7 +23,6 @@
 [defaults]
 model_type = "img_gen"
 sdk = "fal"
-prompting_target = "fal"
 thinking_mode = "none"
 
 ################################################################################

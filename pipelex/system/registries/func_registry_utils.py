@@ -102,7 +102,7 @@ class FuncRegistryUtils:
             dir_path=folder_path,
             pattern="*.py",
             is_recursive=is_recursive,
-            excluded_dirs=list(get_config().pipelex.scan_config.excluded_dirs),
+            excluded_dirs=list(get_config().interpreter.scan.excluded_dirs),
             force_include_dirs=[str(force_include_dir) for force_include_dir in force_include_dirs] if force_include_dirs is not None else None,
         )
 
@@ -139,7 +139,7 @@ class FuncRegistryUtils:
             dir_path=folder_path,
             pattern="*.py",
             is_recursive=is_recursive,
-            excluded_dirs=list(get_config().pipelex.scan_config.excluded_dirs),
+            excluded_dirs=list(get_config().interpreter.scan.excluded_dirs),
         )
 
         sources: dict[str, str] = {}

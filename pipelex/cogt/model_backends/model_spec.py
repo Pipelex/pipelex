@@ -7,7 +7,6 @@ from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.usage.cost_category import CostsByCategoryDict
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.typing.pydantic_utils import empty_dict_factory_of, empty_list_factory_of
@@ -30,11 +29,11 @@ class InferenceModelSpec(ConfigModel):
     thinking_mode: ThinkingMode = Field(strict=False)
     max_tokens: int | None
     max_prompt_images: int | None
-    prompting_target: PromptingTarget | None = Field(default=None, strict=False)
     listed_constraints: list[ListedConstraint] = Field(default_factory=empty_list_factory_of(ListedConstraint))
     valued_constraints: dict[ValuedConstraint, Any] = Field(default_factory=empty_dict_factory_of(ValuedConstraint))
     extra_headers: dict[str, str] | None = None
     rules: ImgGenModelRules | None = None
+    endpoint_path: str | None = None
 
     @property
     def tag(self) -> str:

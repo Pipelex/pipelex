@@ -20,6 +20,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.interpreter_hub import get_concept_library, get_native_concept
 from pipelex.kernel.llm_ops import concrete_llm_model_handle, derive_structure_prompt, generate_object_content, resolve_llm_setting_for_object
 from pipelex.kernel.memory_ops import store_result
+from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.runtime_hub import get_class_registry
@@ -120,12 +121,16 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
         # Render the structuring prompt template against the input text. Prompt *assembly* is not
         # shared with PipeLLM: this pipe has no template of its own and no memory-borne references —
         # it renders one configured template over one input string.
-        llm_config = get_config().cogt.llm_config
+        # No authored style on this operator: the structuring prompt takes the runtime default, the
+        # same one an LLM pipe that declares nothing gets.
+        templating_style = resolve_templating_style(authored=None)
+        llm_config = get_config().inference.llm
         structuring_template = llm_config.get_template(template_name="structuring_prompt")
         rendered_user_prompt = await render_template(
             template=structuring_template,
             category=TemplateCategory.LLM_PROMPT,
             context={"text": text_str},
+            templating_style=templating_style,
         )
 
         content_class: type[StuffContent] = get_class_registry().get_required_subclass(
@@ -134,7 +139,7 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
         )
 
         # Append the schema description, from the same kernel derivation PipeLLM's object path uses.
-        output_structure_prompt = await derive_structure_prompt(output_class=content_class)
+        output_structure_prompt = await derive_structure_prompt(output_class=content_class, templating_style=templating_style)
         if output_structure_prompt:
             rendered_user_prompt += output_structure_prompt
 

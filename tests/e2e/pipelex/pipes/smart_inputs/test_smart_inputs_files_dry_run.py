@@ -34,7 +34,7 @@ def _no_normalize_config() -> "PipelineExecutionConfig":
     path stays a filesystem path (normalization would otherwise rewrite it to a pipelex-storage URI
     — a legitimate downstream step, but it would obscure exactly the resolution this test pins).
     """
-    return get_config().pipelex.pipeline_execution_config.model_copy(update={"is_normalize_data_urls_to_storage": False})
+    return get_config().interpreter.pipeline_execution.model_copy(update={"is_normalize_data_urls_to_storage": False})
 
 
 @pytest.mark.asyncio(loop_scope="class")

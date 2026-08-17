@@ -1,0 +1,21 @@
+# The telemetry configuration as it was before the ledger existed — hand-authored, and the one
+# document in this directory that is neither snapshotted nor regenerated. Entry `telemetry-config@2`
+# is marked `pre_history` because the change it describes predates the first fingerprint, so there
+# is no `defaults@1.toml` on its far side to start from; this file is what it starts from instead,
+# and the transform check verifies the entry by migrating it and looking at what comes out.
+#
+# It carries every root key that shipped in the flat format across its lifetime, so that every
+# operation of the entry is exercised by that check rather than merely declared. A real file of the
+# era carried most of these and not all — the shape is faithful, the census is deliberate.
+
+settings_customized = false
+telemetry_mode = "anonymous"
+host = "https://eu.i.posthog.com"
+project_api_key = "phc_example_project_api_key"
+respect_dnt = true
+redact = ["prompt", "system_prompt", "response", "file_path", "url"]
+geoip_enabled = true
+dry_mode_enabled = false
+verbose_enabled = false
+debug = false
+user_id = ""

@@ -33,6 +33,7 @@ from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
 from pipelex.tools.misc.dict_utils import substitute_nested_in_context
 from pipelex.tools.misc.exceptions import ContextProviderError
+from pipelex.tools.templating.templating_style import TemplatingStyle
 
 if TYPE_CHECKING:
     from pipelex.cogt.image.prompt_image import PromptImage
@@ -41,6 +42,7 @@ if TYPE_CHECKING:
 async def assemble_img_gen_prompt(
     *,
     context_provider: ContextProviderAbstract,
+    templating_style: TemplatingStyle,
     prompt_blueprint: TemplateBlueprint | None = None,
     negative_prompt_blueprint: TemplateBlueprint | None = None,
     image_references: list[ImageReference] | None = None,
@@ -48,9 +50,12 @@ async def assemble_img_gen_prompt(
 ) -> ImgGenPrompt:
     """Build an `ImgGenPrompt`: resolve image references, render the templates, collect the images.
 
-    `context_provider` is typically the `WorkingMemory` the step runs against. Raises
-    `PromptContentError` when an image reference names something the context does not hold, or holds
-    as the wrong type.
+    `context_provider` is typically the `WorkingMemory` the step runs against. `templating_style` is
+    required for the reason `assemble_llm_prompt` states: an image prompt is a prompt, so it renders
+    under a style the caller resolved rather than under whatever a filter would have defaulted to.
+
+    Raises `PromptContentError` when an image reference names something the context does not hold, or
+    holds as the wrong type.
     """
     image_registry = ImageRegistry()
     # Maps image variable name to its 0-based registry index (for placeholder generation)
@@ -91,6 +96,7 @@ async def assemble_img_gen_prompt(
     if prompt_blueprint:
         positive_text = await _render_text(
             context_provider=context_provider,
+            templating_style=templating_style,
             template_blueprint=prompt_blueprint,
             extra_params=extra_params,
             image_registry=image_registry,
@@ -100,6 +106,7 @@ async def assemble_img_gen_prompt(
     if negative_prompt_blueprint:
         negative_text = await _render_text(
             context_provider=context_provider,
+            templating_style=templating_style,
             template_blueprint=negative_prompt_blueprint,
             extra_params=extra_params,
             image_registry=image_registry,
@@ -226,10 +233,15 @@ async def _render_text(
     *,
     context_provider: ContextProviderAbstract,
     template_blueprint: TemplateBlueprint,
+    templating_style: TemplatingStyle,
     extra_params: dict[str, Any] | None = None,
     image_registry: ImageRegistry | None = None,
 ) -> str:
     """Render a template with context and optional image registry."""
+    # A style declared on the blueprint wins over the resolved one — the same precedence
+    # `_unravel_text` applies on the LLM path, and kept as a local for the same reason.
+    effective_style = template_blueprint.templating_style or templating_style
+
     context: dict[str, Any] = context_provider.generate_context()
     if extra_params:
         context = substitute_nested_in_context(context=context, extra_params=extra_params)
@@ -246,6 +258,6 @@ async def _render_text(
         template=template_blueprint.template,
         category=template_blueprint.category,
         context=context,
-        templating_style=template_blueprint.templating_style,
+        templating_style=effective_style,
         finalize=finalize,
     )

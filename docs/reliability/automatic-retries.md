@@ -14,7 +14,7 @@ Every inference SDK call retries transient transport failures before giving up. 
 It is controlled by one top-level setting, which you override in your project's `.pipelex/pipelex.toml`:
 
 ```toml
-[cogt]
+[inference]
 transport_max_retries = 2
 ```
 
@@ -32,7 +32,7 @@ When a pipe asks an LLM for a structured object, the model sometimes returns JSO
 This is **output shaping, not resilience**. The re-ask happens only on a schema-validation failure — a transport error is *not* re-asked here; it propagates to Tier 1, which is the sole transport-retry layer. The re-ask count is configured separately:
 
 ```toml
-[cogt.llm_config]
+[inference.llm]
 schema_reask_max_attempts = 3   # instructor schema re-ask attempts — distinct from transport_max_retries
 ```
 
@@ -43,7 +43,7 @@ Keep the two settings distinct in your mind: `transport_max_retries` handles a f
 When `PipeBatch` maps a pipe over a large list, it does not spawn every branch at once. Branches run in bounded concurrent chunks, capped by `max_concurrency` (default `8`):
 
 ```toml
-[pipelex.pipeline_execution_config]
+[interpreter.pipeline_execution]
 max_concurrency = 8
 ```
 

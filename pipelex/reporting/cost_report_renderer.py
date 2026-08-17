@@ -35,8 +35,8 @@ def render_run_cost_report(
     gating on cost alone would wrongly hide them. The two channels follow D6, each applied only when costs
     are on:
 
-    - console (Rich table): gated by ``reporting_config.is_log_costs_to_console``
-    - CSV file: gated by ``reporting_config.is_generate_cost_report_file_enabled``
+    - console (Rich table): gated by ``runtime.reporting.is_log_costs_to_console``
+    - CSV file: gated by ``runtime.reporting.is_generate_cost_report_file_enabled``
 
     A cost-report failure never fails an otherwise-successful run: the aggregation, the CSV directory/path
     setup, and the render all run inside one try, so ``OSError`` (directory create / CSV write),
@@ -51,7 +51,7 @@ def render_run_cost_report(
     if not is_generate_costs or not tokens_usages:
         return
 
-    reporting_config = get_config().pipelex.reporting_config
+    reporting_config = get_config().runtime.reporting
     print_to_console = reporting_config.is_log_costs_to_console
     is_csv_enabled = reporting_config.is_generate_cost_report_file_enabled
     if not (print_to_console or is_csv_enabled):

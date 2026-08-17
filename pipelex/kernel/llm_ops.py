@@ -1,4 +1,4 @@
-"""LLM operator semantics: deck resolution, style derivation, generation, memory write-back.
+"""LLM operator semantics: deck resolution, generation, memory write-back.
 
 These are the functions the interpreter's `PipeLLM` and `PipeStructure` call, and the ones a
 programmatic caller invokes on a `RuntimeBoot`-only process. They read the runtime hub for the
@@ -23,7 +23,6 @@ from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
-from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_reference import ModelReferenceKind, ensure_model_reference
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.config import get_config
@@ -108,30 +107,18 @@ def concrete_llm_model_handle(model: str) -> str:
     return current
 
 
-def derive_templating_style(*, llm_setting: LLMSetting) -> TemplatingStyle | None:
-    """The configured prompting style for a resolved setting, via its prompting target.
-
-    Derived per call and never cached: the deck and the config can both change under a live process,
-    and a cached style would shadow that with whatever the first call saw.
-
-    Returns `None` when the deck has no inference model for the handle, which is what an external
-    LLM plugin looks like from here — the model is real, it is just not in the deck.
-    """
-    inference_model = get_model_deck().get_optional_inference_model(model_handle=llm_setting.model, model_type=ModelType.LLM)
-    if inference_model is None:
-        return None
-    prompting_target = llm_setting.prompting_target or inference_model.prompting_target
-    return get_config().pipelex.prompting_config.get_prompting_style(prompting_target=prompting_target)
-
-
-async def derive_structure_prompt(*, output_class: type[StuffContent]) -> str | None:
+async def derive_structure_prompt(*, output_class: type[StuffContent], templating_style: TemplatingStyle) -> str | None:
     """Render the structure-description prompt for an output class.
 
     Derived from the class in hand — no concept-to-class registry hop, because the caller already
     holds the class. Returns `None` when structure prompts are disabled in config, or when the class
     has no printable structure (a bare text content has none).
+
+    It renders under a style like every other prompt fragment: the shipped template uses no tagging
+    filter, but the template is config-editable, and one that reached this render style-less could
+    not use one at all.
     """
-    llm_config = get_config().cogt.llm_config
+    llm_config = get_config().inference.llm
     if not llm_config.is_structure_prompt_enabled:
         return None
     class_structure = StructurePrinter().get_type_structure(tp=output_class, base_class=StuffContent)
@@ -141,6 +128,7 @@ async def derive_structure_prompt(*, output_class: type[StuffContent]) -> str | 
         template=llm_config.get_template(template_name="output_structure_prompt"),
         category=TemplateCategory.LLM_PROMPT,
         context={"class_structure_str": "\n".join(class_structure)},
+        templating_style=templating_style,
     )
 
 
@@ -193,16 +181,15 @@ async def run_llm_text(
     output_class: type[StuffContent],
     job_metadata: JobMetadata,
     cogt_run_params: CogtRunParams,
-    templating_style: TemplatingStyle | None = None,
+    templating_style: TemplatingStyle,
     extra_params: dict[str, Any] | None = None,
     result_name: str | None = None,
     result_code: str | None = None,
 ) -> LlmTextResult:
     """A whole LLM step with a text output: assemble, generate, store, report.
 
-    `templating_style` is an argument rather than derived here because a caller may hold more than
-    one resolved setting for a step and has to say which one governs rendering — `PipeLLM` derives
-    it from its text setting even on its object path.
+    `templating_style` is an argument because the style is an authoring decision the caller holds —
+    what the step declared, resolved against the runtime default — not something derivable here.
     """
     llm_prompt = await assemble_llm_prompt(
         prompt_content=prompt_content,
@@ -243,7 +230,7 @@ async def run_llm_object(
     structure_prompt: str | None = None,
     is_multiple_output: bool = False,
     fixed_nb_output: int | None = None,
-    templating_style: TemplatingStyle | None = None,
+    templating_style: TemplatingStyle,
     extra_params: dict[str, Any] | None = None,
     result_name: str | None = None,
     result_code: str | None = None,
@@ -255,7 +242,11 @@ async def run_llm_object(
     same prompt by default — a prompt supplied only from outside would have left the derivation at
     each caller and let the two defaults fork.
     """
-    output_structure_prompt = structure_prompt if structure_prompt is not None else await derive_structure_prompt(output_class=output_class)
+    output_structure_prompt = (
+        structure_prompt
+        if structure_prompt is not None
+        else await derive_structure_prompt(output_class=output_class, templating_style=templating_style)
+    )
     llm_prompt = await assemble_llm_prompt(
         prompt_content=prompt_content,
         context_provider=memory,

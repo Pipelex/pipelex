@@ -72,7 +72,7 @@ async def assemble_llm_prompt(
     context_provider: ContextProviderAbstract,
     output_structure_prompt: str | None = None,
     extra_params: dict[str, Any] | None = None,
-    templating_style: TemplatingStyle | None = None,
+    templating_style: TemplatingStyle,
 ) -> LLMPrompt:
     """Render both templates against the context and collect the images and documents they reference."""
     ############################################################
@@ -380,7 +380,7 @@ async def _unravel_text(
     jinja2_blueprint: TemplateBlueprint,
     extra_params: dict[str, Any] | None = None,
     image_registry: ImageRegistry | None = None,
-    templating_style: TemplatingStyle | None = None,
+    templating_style: TemplatingStyle,
 ) -> str:
     # A style declared on the blueprint wins over the run-derived one. Kept as a local: writing
     # it onto `jinja2_blueprint` would mutate an object the pipe library holds and hands out.

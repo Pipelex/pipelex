@@ -13,6 +13,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_native_concept
 from pipelex.kernel.prompt_references import DocumentReferenceKind, ImageReferenceKind
+from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
@@ -150,6 +151,7 @@ class TestSystemPromptReferences:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -189,6 +191,7 @@ class TestSystemPromptReferences:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -238,6 +241,7 @@ class TestSystemPromptReferences:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -289,6 +293,7 @@ class TestSystemPromptReferences:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -339,6 +344,7 @@ class TestSystemPromptReferences:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )

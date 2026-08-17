@@ -32,7 +32,7 @@ def _excluded_copy_entries(  # kw-only: ignore - shutil.copytree invokes ignore 
     preserves them as links instead of copying data from outside the requested root.
     """
     excluded_entries: set[str] = set()
-    excluded_dirs = get_config().pipelex.scan_config.excluded_dirs
+    excluded_dirs = get_config().interpreter.scan.excluded_dirs
     current_dir = Path(directory)
     for name in names:
         candidate = current_dir / name

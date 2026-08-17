@@ -40,7 +40,7 @@ prompt = "Echo the $subject as a topic"
 
 
 def _dry_mock_config() -> PipelineExecutionConfig:
-    return get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+    return get_config().interpreter.pipeline_execution.with_execution_overrides(
         generate_graph=False,
         mock_inputs=True,
     )
@@ -177,7 +177,7 @@ class TestExecutionSeams:
             normalize_spy = mocker.spy(execution_seams_module, "normalize_data_urls_to_storage")
             normalize_config = (
                 get_config()
-                .pipelex.pipeline_execution_config.with_execution_overrides(
+                .interpreter.pipeline_execution.with_execution_overrides(
                     generate_graph=False,
                     mock_inputs=False,
                 )

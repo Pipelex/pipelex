@@ -43,7 +43,7 @@ class LLMJobParams(BaseModel):
 
 class LLMJobConfig(BaseModel):
     # instructor's schema re-ask budget for one LLM job — total attempts (initial + re-asks).
-    # Default sourced from cogt.llm_config.schema_reask_max_attempts.
+    # Default sourced from inference.llm.schema_reask_max_attempts.
     schema_reask_max_attempts: int = Field(..., ge=1, le=10)
 
 

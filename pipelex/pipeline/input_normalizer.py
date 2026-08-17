@@ -223,7 +223,7 @@ async def _normalize_url_content(
             }
         )
     elif isinstance(resolved_uri, ResolvedLocalPath):
-        if not get_config().pipelex.storage_config.is_upload_local_content_enabled:
+        if not get_config().runtime.storage.is_upload_local_content_enabled:
             return content
 
         # Read local file, detect type, upload to storage. OSError covers

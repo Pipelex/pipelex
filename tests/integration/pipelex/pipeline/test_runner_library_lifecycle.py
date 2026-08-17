@@ -58,7 +58,7 @@ prompt = "Echo the $subject as a topic"
 
 
 def _dry_mock_config() -> PipelineExecutionConfig:
-    return get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+    return get_config().interpreter.pipeline_execution.with_execution_overrides(
         generate_graph=False,
         mock_inputs=True,
     )

@@ -1,6 +1,6 @@
 # Deferred: `normalize_crate` drops `python_sources`
 
-**Status.** Noticed 2026-08-11 during Phase 1 of [../../TODOS.md](../../TODOS.md), while auditing the crate copy path for dropped fields (the plan asks for that audit precisely so a new pass does not reproduce the bug). Pre-existing, unrelated to the pipe-refs change, and deliberately **not** fixed on `fix/Pipe-refs` — the fix is a one-line addition whose *consequences* need a decision this branch is not the place to take.
+**Status.** Noticed 2026-08-11 during Phase 1 of [implementation-plan.md](implementation-plan.md), while auditing the crate copy path for dropped fields (the plan asks for that audit precisely so a new pass does not reproduce the bug). Pre-existing, unrelated to the pipe-refs change, and deliberately **not** fixed on `fix/Pipe-refs` — the fix is a one-line addition whose *consequences* need a decision this branch is not the place to take.
 
 ## What happens
 

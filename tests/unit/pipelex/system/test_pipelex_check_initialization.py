@@ -27,7 +27,7 @@ class TestPipelexCheckInitialization:
         inference_dir = config_dir / "inference"
         inference_dir.mkdir(parents=True)
         if config_files:
-            (config_dir / CONFIG_NAME).write_text("[pipelex]\n")
+            (config_dir / CONFIG_NAME).write_text("[runtime]\n")
             (config_dir / PLXT_CONFIG_NAME).write_text("[plxt]\n")
         return config_dir
 

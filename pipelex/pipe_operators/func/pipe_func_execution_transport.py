@@ -34,9 +34,11 @@ def build_pipe_func_execution_request(
     (transported, workflow) paths make it available through ``get_crate``. Building the request is
     pure/deterministic, so it is safe to call inside a Temporal workflow before dispatching.
 
-    ``timeout_seconds`` is the PipeFunc kill-timeout that rides on the request. Callers pass the
-    configured ``pipe_func_config.timeout_seconds`` (they live in plugins, outside core's import graph,
-    so they can read the config without a cycle); it falls back to the module default otherwise.
+    ``timeout_seconds`` is the PipeFunc kill-timeout that rides on the request. **The timeout is
+    plugin-configured**: core has no key for it — ``[interpreter.pipe_func]`` holds ``execution_mode``
+    and nothing else — and each out-of-process executor reads it from its own plugin configuration
+    root (our Daytona plugin's ``pipe_func_timeout_seconds``, for one). Callers that have one pass it;
+    it falls back to the module default otherwise.
     """
     library_id = get_current_library()
     crate = get_library_manager().get_crate(library_id=library_id)

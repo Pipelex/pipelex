@@ -65,7 +65,7 @@ class StoragePlugin:
 
     Core-unconditional: storage is required infra, so this plugin cannot be disabled into a
     boot with no storage (see ``KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES``). It registers one factory per
-    built-in method; ``storage_config.method`` selects which one boot invokes. Importing this
+    built-in method; ``runtime.storage.method`` selects which one boot invokes. Importing this
     module is import-light — the s3/gcp SDKs load lazily inside their providers, not at register.
     """
 

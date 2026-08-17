@@ -4,7 +4,7 @@ description: "Configure AWS authentication for Pipelex — choose between enviro
 
 # AWS Configuration
 
-Configuration section: `[pipelex.aws_config]`
+Configuration section: `[runtime.aws]`
 
 ## Overview
 
@@ -13,7 +13,7 @@ The AWS configuration controls how Pipelex authenticates with AWS services. It s
 ## Authentication Methods
 
 ```toml
-[pipelex.aws_config]
+[runtime.aws]
 api_key_method = "env"  # or "secret_provider"
 bedrock_access_variant = "bedrock_token" # or "aws_access"
 ```

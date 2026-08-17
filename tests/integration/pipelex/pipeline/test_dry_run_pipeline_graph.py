@@ -2,7 +2,7 @@
 
 ``dry_run_pipeline`` explicitly requests a graph (``generate_graph=True``), so producing it must
 not depend on the host's ``tracing_config`` — the validation host that surfaced this (pipelex-api
-in direct mode) ships ``tracing_config.is_enabled = false``, which used to leave the tracer with
+in direct mode) ships ``runtime.tracing.is_enabled = false``, which used to leave the tracer with
 no transport and the run with ``graph_spec=None``. The function now installs a scoped in-memory
 event log around the run, so:
 
@@ -54,7 +54,7 @@ class TestDryRunPipelineGraphTransport:
 
     async def test_graph_produced_with_tracing_disabled(self, mocker: MockerFixture) -> None:
         """The pipelex-api regression: tracing off must not mean graph off."""
-        mocker.patch.object(get_config().pipelex.tracing_config, "is_enabled", False)
+        mocker.patch.object(get_config().runtime.tracing, "is_enabled", False)
         self._forbid_event_log_factory(mocker)
 
         graph_spec, pipe_code = await dry_run_pipeline(mthds_contents=[_DRY_RUN_GRAPH_MTHDS])
@@ -69,7 +69,7 @@ class TestDryRunPipelineGraphTransport:
 
     async def test_scoped_log_takes_priority_over_enabled_backend(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:
         """With tracing enabled, the scoped in-memory log still owns the run — no trace files written."""
-        cfg = get_config().pipelex.tracing_config
+        cfg = get_config().runtime.tracing
         traces_dir = tmp_path_factory.mktemp("dry_run_pipeline_traces")
         mocker.patch.object(cfg, "is_enabled", True)
         mocker.patch.object(cfg, "backend", TracingBackend.NDJSON)
@@ -83,7 +83,7 @@ class TestDryRunPipelineGraphTransport:
 
     async def test_explicit_pipe_code_without_main_pipe_produces_graph(self, mocker: MockerFixture) -> None:
         """An explicit graph target removes the main_pipe requirement for graph generation."""
-        mocker.patch.object(get_config().pipelex.tracing_config, "is_enabled", False)
+        mocker.patch.object(get_config().runtime.tracing, "is_enabled", False)
         self._forbid_event_log_factory(mocker)
 
         graph_spec, pipe_code = await dry_run_pipeline(

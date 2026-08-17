@@ -49,14 +49,17 @@ In addition to the base `pipelex.toml`, Pipelex applies override files from **in
 
 ## Configuration Structure
 
-The configuration is organized into four main sections:
+The configuration is organized into four main sections, which mirror the layers of the runtime:
 
-1. `[pipelex]` - Core Pipelex settings
-2. `[cogt]` - Cognitive tools and LLM settings
-3. `[plugins]` - Plugin-specific configurations
-4. `[migration]` - Migration helpers for renamed settings
+1. `[runtime]` - process-scoped infrastructure: storage, secrets, logging, cloud credentials, reporting, tracing, observation, and the plugin denylist
+2. `[inference]` - the model-calling seam: the model deck, LLM, image generation, extraction, the default templating style, and dry-run mocks
+3. `[interpreter]` - library-scoped method machinery: MTHDS parsing, pipe runs, pipe functions, pipeline execution, source scanning, and the builder
+4. `[kit]` - settings for the `pipelex-dev` kit tooling
 
-Each section contains multiple subsections for specific features and functionalities.
+Each section contains multiple subsections for specific features and functionalities. A setting's address tells you which layer owns it: `[runtime.*]` applies to any process, whatever it loads; `[interpreter.*]` only means something once a method is loaded.
+
+!!! tip "If your file predates this layout"
+    A `pipelex.toml` written against an older layout still boots. Pipelex carries it forward in memory, warns you that it did, and changes nothing on disk; `pipelex doctor` reports the pending migration. `pipelex migrate` is what makes it permanent — it rewrites each file in place and keeps the original beside it as a timestamped `.bak`. Your settings move address, they do not change value. The command walks the global `~/.pipelex/` and your project's `.pipelex/`, so a file you load from somewhere else — through `Pipelex.make(config_dir=…)` — is yours to update where it lives, and the boot warning says so rather than naming a command that would not reach it. Your inference backend definitions under `inference/backends/` are migratable the same way; the [inference backend page](config-technical/inference-backend-config.md) says what a migration will and will not touch in one. See [Migration Ledger](../migration-ledger.md) for what a migration may and may not do to your file.
 
 ## Configuration Override System
 

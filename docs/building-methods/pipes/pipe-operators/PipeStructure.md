@@ -16,7 +16,7 @@ Use `PipeStructure` whenever the source of the text is not the LLM call itself �
 3. It picks an LLM setting using the same precedence as `PipeLLM` for object generation: explicit `model` on the pipe → `llm_choice_overrides.for_object` → `llm_choice_defaults.for_object`.
 4. It calls `make_object` (or `make_object_list` when the output multiplicity is a list) and emits the result as the pipe's output.
 
-`PipeStructure` does not accept user-controlled prompt templates. The structuring prompt lives in `pipelex.toml` under `[cogt.llm_config.generic_templates] structuring_prompt`; the only variable rendered into it is `text`, fed automatically from the declared input.
+`PipeStructure` does not accept user-controlled prompt templates. The structuring prompt lives in `pipelex.toml` under `[inference.llm.generic_templates] structuring_prompt`; the only variable rendered into it is `text`, fed automatically from the declared input.
 
 ## Configuration
 

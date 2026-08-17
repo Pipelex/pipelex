@@ -22,6 +22,7 @@ This skill handles the full release cycle for the `pipelex` Python package.
 - **`uv.lock`** — regenerated via `make li` (lock + install)
 - **`.badges/tests.json`** — test count updated to match actual count
 - **`.test_durations`** — regenerated via `make store-test-durations` so the CI test shards stay balanced (see step 8b)
+- **`pipelex/migration/ledgers/*.toml`** and **`pipelex/migration/goldens/`** — only when step 3b finds an unaccounted schema change; written by the `add-migration` skill, never by hand
 
 ## Workflow
 
@@ -46,6 +47,59 @@ the new version would be for each option so the choice is concrete.
 Run `make agent-check`. This is the gate — if it fails, stop and report the
 errors so they can be fixed before retrying. Do not proceed past this step on
 failure.
+
+### 3b. Ledger completeness
+
+`make agent-check` does not run the coverage gate — it is a golden check and lives
+in `make check` only — so a schema change that has not been accounted for reaches
+here unseen. This step is what makes it impossible for a release to ship a moved
+configuration schema without the migration that repairs a user's file.
+
+Run:
+
+```bash
+make check-migration-schemas
+```
+
+- **If it fails**, the release is blocked. Invoke the **`add-migration`** skill: it
+  derives the entry from the fingerprint diff the gate just printed, bumps the
+  surface's schema version, regenerates the goldens and adds the changelog bullet.
+  Then re-run this step. Do not proceed on a red gate, and do not regenerate the
+  goldens to make it quiet — a green gate over an unaccounted removal is exactly
+  the failure the gate exists to prevent.
+- **If it passes**, check whether any schema version moved in this release. Diff
+    the ledgers against the tag of the version read in step 1 — the previous
+    release, whichever branch the skill was invoked from (`origin/main` is not a
+    safe baseline: from `main` itself that diff is empty):
+
+    ```bash
+    git diff v<current version> -- pipelex/migration/ledgers/
+    ```
+
+    For each entry that is new since that release and carries `breaking = true`, confirm
+    the changelog carries a matching `**Migration:**` bullet naming the entry id and
+    what a user has to do. The ledger and the changelog are deliberately separate
+    artifacts saying the same thing to different readers, and this is the only place
+    they are checked against each other — if the bullet is missing, write it now
+    (house style: bold label, then two to four complete sentences).
+
+    **A renumbered entry shows up in that diff as two ids, and both need a mention.**
+    A pre-history entry inserted below existing ones takes a version already in use
+    and pushes everything above it up, so the diff reads as one id modified and one
+    added — which looks like two independent breaking changes and is one insertion.
+    Do not treat the pushed-up id as an unbulleted new entry: the changelog must
+    name the new entry *and* say that the existing one was renumbered, so a reader
+    who quoted the old id somewhere can find it. Confirm `introduced_in` on both.
+
+    **A breaking ledger entry makes this a minor release**, per the house
+    convention — if step 2 chose a patch bump and this step found one, go back and
+    settle the bump first, because the next check writes the new version into the
+    entry.
+
+    Then confirm each such entry's `introduced_in` matches the version being cut.
+    It is written when the entry is authored, before the release number is known, so
+    it is routinely one bump off. Nothing branches on it, but it is what a reader
+    correlates the changelog against, so fix it here rather than leaving it wrong.
 
 ### 4. Ensure we're on the right branch
 
@@ -170,6 +224,9 @@ Report the PR URL back to the user.
 - Always confirm the bump type with the user before making changes.
 - If `make agent-check` fails, the release is blocked — help the user fix the
   issues rather than skipping the checks.
+- If `make check-migration-schemas` fails (step 3b), the release is blocked too,
+  and the fix is an entry written by the `add-migration` skill — never a golden
+  regeneration that makes the gate quiet.
 - The CI will validate that:
   - The `pyproject.toml` version matches the branch name (`version-check.yml`)
   - The `CHANGELOG.md` has an entry for the version (`changelog-check.yml`)

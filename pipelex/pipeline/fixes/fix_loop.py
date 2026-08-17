@@ -23,9 +23,6 @@ Two scoping rules bound what gets touched:
 """
 
 import os
-import stat
-import sys
-import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, NamedTuple, cast
@@ -38,187 +35,34 @@ from pipelex.config import get_config
 from pipelex.interpreter_hub import resolve_library_dirs
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.pipe_machinery.pipe_blueprint import SIGNATURE_ONLY_KEYS
-from pipelex.pipeline.exceptions import FixTransactionError, FixWriteConflictError, ValidateBundleError
+from pipelex.pipeline.exceptions import FixWriteConflictError, ValidateBundleError
 from pipelex.pipeline.fixes.applicability import is_safe_fix_for_load_scope, is_target_in_write_scope
 from pipelex.pipeline.fixes.applier import apply_fix_ops, serialize_and_format
+from pipelex.pipeline.fixes.file_transaction import (
+    FileSnapshot,
+    PendingFileUpdate,
+    assert_snapshot_unchanged,
+    commit_file_updates,
+    read_file_snapshot,
+)
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validation_errors import build_validation_error_items
-from pipelex.suggested_fix import FixOp, FixOpKind, SuggestedFix
+from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, EnsureTableOp, FixOp, MoveKeyOp, RemapValueOp, RenameTableKeyOp, SetKeyOp, SuggestedFix
 from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 _MAIN_PIPE_KEY = "main_pipe"
 
 
-class _FileSnapshot(NamedTuple):
-    """Bytes and permission bits read from one target before fixes are applied."""
-
-    path: Path
-    content: bytes
-    mode: int
-    device: int
-    inode: int
-
-
-class _PendingFileUpdate(NamedTuple):
-    """A fully rendered replacement paired with the snapshot it was derived from."""
-
-    snapshot: _FileSnapshot
-    new_content: str
-
-
-class _StagedFileUpdate(NamedTuple):
-    """Same-directory temp files for one replacement and its rollback copy."""
-
-    snapshot: _FileSnapshot
-    replacement_snapshot: _FileSnapshot
-    rollback_path: Path
-
-
 class _BoundFix(NamedTuple):
     """A suggested fix pinned to the source identity snapshotted before validation."""
 
     fix: SuggestedFix
-    snapshot: _FileSnapshot
+    snapshot: FileSnapshot
 
     @property
     def target_path(self) -> Path:
         return self.snapshot.path
-
-
-def _read_file_snapshot(path: Path) -> _FileSnapshot:
-    """Read bytes and mode from one open file descriptor, avoiding split stat/read state."""
-    with path.open("rb") as file:
-        content = file.read()
-        file_stat = os.fstat(file.fileno())
-    return _FileSnapshot(
-        path=path,
-        content=content,
-        mode=stat.S_IMODE(file_stat.st_mode),
-        device=file_stat.st_dev,
-        inode=file_stat.st_ino,
-    )
-
-
-def _write_staged_file(*, snapshot: _FileSnapshot, content: bytes, label: str) -> Path:
-    """Write and fsync a same-directory temp file ready for atomic replacement."""
-    temp_file = tempfile.NamedTemporaryFile(  # noqa: SIM115 - closed before the atomic replace
-        mode="wb",
-        dir=str(snapshot.path.parent),
-        prefix=f".{snapshot.path.name}.pipelex-fix-{label}.",
-        suffix=".tmp",
-        delete=False,
-    )
-    temp_path = Path(temp_file.name)
-    try:
-        try:
-            temp_file.write(content)
-            os.fchmod(temp_file.fileno(), snapshot.mode)
-            temp_file.flush()
-            os.fsync(temp_file.fileno())
-        finally:
-            temp_file.close()
-    except OSError:
-        temp_path.unlink(missing_ok=True)
-        raise
-    return temp_path
-
-
-def _stage_file_update(update: _PendingFileUpdate) -> _StagedFileUpdate:
-    replacement_path = _write_staged_file(snapshot=update.snapshot, content=update.new_content.encode("utf-8"), label="new")
-    try:
-        replacement_snapshot = _read_file_snapshot(replacement_path)
-        rollback_path = _write_staged_file(snapshot=update.snapshot, content=update.snapshot.content, label="rollback")
-    except OSError:
-        replacement_path.unlink(missing_ok=True)
-        raise
-    return _StagedFileUpdate(snapshot=update.snapshot, replacement_snapshot=replacement_snapshot, rollback_path=rollback_path)
-
-
-def _file_state_matches(*, current_snapshot: _FileSnapshot, expected_snapshot: _FileSnapshot) -> bool:
-    """Whether content, permissions, and filesystem identity still match an observed file."""
-    return (
-        current_snapshot.content == expected_snapshot.content
-        and current_snapshot.mode == expected_snapshot.mode
-        and current_snapshot.device == expected_snapshot.device
-        and current_snapshot.inode == expected_snapshot.inode
-    )
-
-
-def _assert_snapshot_unchanged(snapshot: _FileSnapshot) -> None:
-    """Verify that a path still names the exact file state previously observed."""
-    try:
-        current_snapshot = _read_file_snapshot(snapshot.path)
-    except FileNotFoundError as exc:
-        msg = f"refusing to overwrite '{snapshot.path}': the file was removed while fixes were being prepared"
-        raise FixWriteConflictError(msg) from exc
-    if not _file_state_matches(current_snapshot=current_snapshot, expected_snapshot=snapshot):
-        msg = f"refusing to overwrite '{snapshot.path}': the file changed while fixes were being prepared"
-        raise FixWriteConflictError(msg)
-
-
-def _rollback_committed_updates(committed_updates: list[_StagedFileUpdate]) -> list[str]:
-    """Restore targets still owned by this transaction, returning rollback failures."""
-    failures: list[str] = []
-    for staged_update in reversed(committed_updates):
-        target_path = staged_update.snapshot.path
-        try:
-            current_snapshot = _read_file_snapshot(target_path)
-            if not _file_state_matches(current_snapshot=current_snapshot, expected_snapshot=staged_update.replacement_snapshot):
-                failures.append(f"{target_path}: file changed after the autofix replacement was committed")
-                continue
-            staged_update.rollback_path.replace(target_path)
-        except OSError as exc:
-            failures.append(f"{target_path}: {exc}")
-    return failures
-
-
-def _commit_staged_updates(staged_updates: list[_StagedFileUpdate]) -> None:
-    committed_updates: list[_StagedFileUpdate] = []
-    try:
-        for staged_update in staged_updates:
-            # Accepted portability tradeoff: this check and Path.replace() are not one compare-and-swap operation.
-            # An edit in the tiny gap can be overwritten; keep this portable unless real-world evidence justifies serialization.
-            _assert_snapshot_unchanged(staged_update.snapshot)
-            staged_update.replacement_snapshot.path.replace(staged_update.snapshot.path)
-            committed_updates.append(staged_update)
-    except (FixWriteConflictError, OSError) as exc:
-        rollback_failures = _rollback_committed_updates(committed_updates)
-        if rollback_failures:
-            failures = "; ".join(rollback_failures)
-            msg = f"autofix commit failed and rollback was incomplete ({failures}); inspect the named files before retrying"
-            raise FixTransactionError(msg) from exc
-        raise
-
-
-def _cleanup_staged_updates(staged_updates: list[_StagedFileUpdate]) -> list[str]:
-    """Remove transaction temps and record cleanup failures for the caller to report."""
-    failures: list[str] = []
-    for staged_update in staged_updates:
-        for temp_path in (staged_update.replacement_snapshot.path, staged_update.rollback_path):
-            try:
-                temp_path.unlink(missing_ok=True)
-            except OSError as exc:
-                failures.append(f"{temp_path}: {exc}")
-    return failures
-
-
-def _commit_file_updates(updates: list[_PendingFileUpdate]) -> None:
-    """Stage a round completely, then atomically replace targets with rollback on failure."""
-    staged_updates: list[_StagedFileUpdate] = []
-    try:
-        for update in updates:
-            staged_updates.append(_stage_file_update(update))
-        _commit_staged_updates(staged_updates)
-    finally:
-        cleanup_failures = _cleanup_staged_updates(staged_updates)
-        active_exception = sys.exception()
-        if cleanup_failures and active_exception is not None:
-            active_exception.add_note(f"autofix temporary-file cleanup also failed ({'; '.join(cleanup_failures)})")
-        elif cleanup_failures:
-            failures = "; ".join(cleanup_failures)
-            msg = f"autofix target changes were committed, but temporary-file cleanup failed ({failures})"
-            raise FixTransactionError(msg)
 
 
 class FixBundleResult(BaseModel):
@@ -245,12 +89,14 @@ class FixBundleResult(BaseModel):
 
 
 def _fix_fingerprint(fix: SuggestedFix) -> str:
-    """Stable identity of a fix attempt: fix_code + source + each op's (kind, path, key, value, new_key).
+    """Stable identity of a fix attempt: ``fix_code`` + ``source`` + every op serialized whole.
 
-    ``new_key`` participates so two ``rename_table_key`` ops that differ only in their target name
-    are distinct fingerprints (they would otherwise collide and trip the no-progress bail).
+    Serializing each op rather than listing chosen fields means every field of every variant
+    participates by construction — two ``rename_table_key`` ops differing only in their target
+    name stay distinct fingerprints (they would otherwise collide and trip the no-progress
+    bail), and a new op kind cannot silently collapse two different fixes into one identity.
     """
-    op_parts = [f"{op.kind}:{'.'.join(op.table_path)}:{op.key}:{op.value!r}:{op.new_key}" for op in fix.ops]
+    op_parts = [op.model_dump_json() for op in fix.ops]
     return f"{fix.fix_code}|{fix.source}|{'|'.join(op_parts)}"
 
 
@@ -284,7 +130,7 @@ def _absolute_source_path(path: Path) -> Path:
     return Path(os.path.abspath(path))
 
 
-def _snapshot_loaded_sources(*, entry_source_path: Path, effective_dirs: Sequence[Path]) -> dict[Path, _FileSnapshot]:
+def _snapshot_loaded_sources(*, entry_source_path: Path, effective_dirs: Sequence[Path]) -> dict[Path, FileSnapshot]:
     """Snapshot every source identity validation is about to load.
 
     Keys are lexical absolute source names, while each snapshot is pinned to the destination
@@ -296,10 +142,10 @@ def _snapshot_loaded_sources(*, entry_source_path: Path, effective_dirs: Sequenc
         _absolute_source_path(mthds_path)
         for mthds_path in get_pipelex_mthds_files_from_dirs(dirs={_absolute_source_path(directory) for directory in effective_dirs})
     )
-    snapshots_by_source: dict[Path, _FileSnapshot] = {}
+    snapshots_by_source: dict[Path, FileSnapshot] = {}
     for source_path in sorted(source_paths, key=str):
         target_path = source_path.resolve()
-        snapshot = _read_file_snapshot(target_path)
+        snapshot = read_file_snapshot(target_path)
         snapshots_by_source[source_path] = snapshot
         snapshots_by_source.setdefault(target_path, snapshot)
     return snapshots_by_source
@@ -309,7 +155,7 @@ def _bind_fixes_to_snapshots(
     fixes: list[SuggestedFix],
     *,
     entry_source_path: Path,
-    snapshots_by_source: dict[Path, _FileSnapshot],
+    snapshots_by_source: dict[Path, FileSnapshot],
 ) -> list[_BoundFix]:
     """Bind each fix once to the pre-validation file identity that supplied its source."""
     bound_fixes: list[_BoundFix] = []
@@ -328,7 +174,7 @@ def _bind_fixes_to_snapshots(
         if current_target != snapshot.path:
             msg = f"refusing to apply fix from '{absolute_source}': its source was retargeted during validation"
             raise FixWriteConflictError(msg)
-        _assert_snapshot_unchanged(snapshot)
+        assert_snapshot_unchanged(snapshot)
         bound_fixes.append(_BoundFix(fix=fix, snapshot=snapshot))
     return bound_fixes
 
@@ -459,12 +305,12 @@ def _colliding_op_name(
       value, the ``main_pipe`` remains bundle-local and safe despite same-named sibling pipes.
       The categorizer cannot see cross-file state, so this suppression lives here.
     """
-    match fix_op.kind:
-        case FixOpKind.RENAME_TABLE_KEY:
-            if fix_op.table_path == ["pipe"] and fix_op.new_key is not None and fix_op.new_key in other_file_pipe_codes:
+    match fix_op:
+        case RenameTableKeyOp():
+            if fix_op.table_path == ["pipe"] and fix_op.new_key in other_file_pipe_codes:
                 return fix_op.new_key
             return None
-        case FixOpKind.SET_KEY:
+        case SetKeyOp():
             if (
                 not fix_op.table_path
                 and fix_op.key == _MAIN_PIPE_KEY
@@ -474,7 +320,7 @@ def _colliding_op_name(
             ):
                 return fix_op.value
             return None
-        case FixOpKind.ENSURE_TABLE | FixOpKind.DELETE_KEY | FixOpKind.DELETE_TABLE:
+        case EnsureTableOp() | DeleteKeyOp() | DeleteTableOp() | MoveKeyOp() | RemapValueOp():
             return None
 
 
@@ -556,7 +402,7 @@ async def fix_bundle_file(
     rules may apply (see ``_safe_fixes``); the CLI validates the codes before calling.
     """
     if max_iterations is None:
-        max_iterations = get_config().pipelex.builder_config.fix_loop_max_attempts
+        max_iterations = get_config().interpreter.builder.fix_loop_max_attempts
     entry_source_path = _absolute_source_path(mthds_file_path)
     entry_path = entry_source_path.resolve()
     effective_dirs, _ = resolve_library_dirs(library_dirs)
@@ -659,12 +505,12 @@ async def fix_bundle_file(
                 bail_reason=bail_reason,
             )
 
-        fixes_by_target: dict[Path, tuple[_FileSnapshot, list[SuggestedFix]]] = {}
+        fixes_by_target: dict[Path, tuple[FileSnapshot, list[SuggestedFix]]] = {}
         for bound_fix in new_fixes:
             target_group = fixes_by_target.setdefault(bound_fix.target_path, (bound_fix.snapshot, []))
             target_group[1].append(bound_fix.fix)
 
-        pending_updates: list[_PendingFileUpdate] = []
+        pending_updates: list[PendingFileUpdate] = []
         round_fixes_applied: list[SuggestedFix] = []
         round_written_paths: list[Path] = []
         for target_path, (snapshot, target_fixes) in fixes_by_target.items():
@@ -676,10 +522,10 @@ async def fix_bundle_file(
                     round_fixes_applied.append(target_fix)
                     any_op_applied = True
             if any_op_applied:
-                pending_updates.append(_PendingFileUpdate(snapshot=snapshot, new_content=serialize_and_format(toml_doc)))
+                pending_updates.append(PendingFileUpdate(snapshot=snapshot, new_content=serialize_and_format(toml_doc)))
                 round_written_paths.append(target_path)
 
-        _commit_file_updates(pending_updates)
+        commit_file_updates(pending_updates)
         seen_fingerprints.update(_fix_fingerprint(fix.fix) for fix in new_fixes)
         fixes_applied.extend(round_fixes_applied)
         for target_path in round_written_paths:

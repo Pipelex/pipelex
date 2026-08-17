@@ -119,7 +119,18 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     # Interpreter errors
     "MthdsParserError": "Check MTHDS file TOML syntax and ensure all referenced concepts and pipes are defined",
     # Configuration/initialization errors
-    "TelemetryConfigValidationError": "Run 'pipelex init telemetry' to create a valid telemetry configuration",
+    # Three readings, and two fields on this same payload separate them: an absent `migration`
+    # means the file is wrong, and a present one means the migration history has something to say
+    # about it — `migration.would_write` then says whether a command repairs it or whether the
+    # plans are a diagnosis to act on by hand. Never `pipelex init telemetry` on either of the
+    # last two: that writes a fresh file over settings a migration would have kept.
+    "TelemetryConfigValidationError": (
+        "If this payload carries a 'migration' field, read its 'would_write': true means the "
+        "configuration is out of date and 'pipelex-agent migrate --yes' repairs it — run "
+        "'pipelex-agent migrate --dry-run --format json' first to show the user what would change. "
+        "False means the migration would write nothing and its 'plans' name what to correct by hand. "
+        "Without a 'migration' field, correct the telemetry.toml settings named in the message."
+    ),
     "GatewayTermsNotAcceptedError": "Run 'pipelex init config' to accept gateway terms, or disable pipelex_gateway in backends.toml",
     "GatewayApiKeyMissingError": "Set the PIPELEX_GATEWAY_API_KEY environment variable, or disable pipelex_gateway in backends.toml",
     "GatewayDoNotTrackConflictError": "Unset the DO_NOT_TRACK environment variable, or disable pipelex_gateway in backends.toml",
@@ -188,7 +199,6 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "PipeOperatorModelChoiceError": "config",
     "PipeOperatorModelAvailabilityError": "config",
     "ModelDeckPresetValidatonError": "config",
-    "TelemetryConfigValidationError": "config",
     "BinaryNotFoundError": "config",
     "GatewayUnknownModelError": "config",
     "InitConfigError": "config",
@@ -233,6 +243,12 @@ def _assemble_error_payload(message: str, *, error_type: str, cause: BaseExcepti
     ``model`` / ``provider`` from a ``PipelexError`` cause's ``to_error_report()``
     first, falling back to the lookup dicts for error types that cannot
     self-describe. ``extra`` is merged last and overrides everything.
+
+    ``migration`` comes from the report too, and it is the one field here that an agent is meant
+    to *act* on rather than classify by: its presence says the configuration is stale rather than
+    wrong, and the loop it opens is ``pipelex-agent migrate --dry-run --format json`` followed by
+    ``--yes``. Emitted only when the report carries one, so branching on its presence is the
+    whole test.
     """
     error_json: dict[str, Any] = {
         "error": True,
@@ -257,6 +273,8 @@ def _assemble_error_payload(message: str, *, error_type: str, cause: BaseExcepti
             report_extras["model"] = report.model
         if report.provider:
             report_extras["provider"] = report.provider
+        if report.migration is not None:
+            report_extras["migration"] = report.migration.model_dump(mode="json")
 
     # hint: report-first, fallback to lookup dict
     hint = report_hint or AGENT_ERROR_HINTS.get(error_type)

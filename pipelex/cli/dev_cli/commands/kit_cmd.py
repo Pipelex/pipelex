@@ -41,7 +41,7 @@ def _sync_agent_rules(
     agent_set = agent_set or loaded_kit_index.agent_rules.default_set
 
     config = get_config()
-    preferred_targets: list[AgentTarget] = list(config.pipelex.kit_config.preferred_agent_targets)
+    preferred_targets: list[AgentTarget] = list(config.kit.preferred_agent_targets)
 
     if targets_filter is not None:
         unknown = [target for target in targets_filter if target not in preferred_targets]

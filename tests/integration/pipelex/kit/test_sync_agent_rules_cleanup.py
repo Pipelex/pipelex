@@ -27,7 +27,7 @@ class TestSyncAgentRulesCleanup:
         claude_path.write_text("# CLAUDE\n", encoding="utf-8")
 
         fake_config = mocker.MagicMock()
-        fake_config.pipelex.kit_config.preferred_agent_targets = [AgentTarget.CLAUDE, AgentTarget.AGENTS]
+        fake_config.kit.preferred_agent_targets = [AgentTarget.CLAUDE, AgentTarget.AGENTS]
         mocker.patch.object(kit_cmd, "get_config", return_value=fake_config)
 
         kit_cmd._sync_agent_rules(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]

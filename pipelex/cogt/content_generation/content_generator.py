@@ -141,14 +141,14 @@ class ContentGenerator(ContentGeneratorProtocol):
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
     ) -> ImageContent:
-        img_gen_config = get_config().cogt.img_gen_config
+        img_gen_config = get_config().inference.img_gen
         img_gen_assignment = ImgGenAssignment(
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,
             img_gen_handle=img_gen_handle,
             img_gen_prompt=img_gen_prompt,
             img_gen_job_params=img_gen_job_params or img_gen_config.make_default_img_gen_job_params(),
-            img_gen_job_config=img_gen_job_config or img_gen_config.img_gen_job_config,
+            img_gen_job_config=img_gen_job_config or img_gen_config.img_gen_job,
             nb_images=1,
         )
         image_content = await img_gen_single_image_and_store(
@@ -171,14 +171,14 @@ class ContentGenerator(ContentGeneratorProtocol):
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
     ) -> list[ImageContent]:
-        img_gen_config = get_config().cogt.img_gen_config
+        img_gen_config = get_config().inference.img_gen
         img_gen_assignment = ImgGenAssignment(
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,
             img_gen_handle=img_gen_handle,
             img_gen_prompt=img_gen_prompt,
             img_gen_job_params=img_gen_job_params or img_gen_config.make_default_img_gen_job_params(),
-            img_gen_job_config=img_gen_job_config or img_gen_config.img_gen_job_config,
+            img_gen_job_config=img_gen_job_config or img_gen_config.img_gen_job,
             nb_images=nb_images,
         )
         image_contents = await img_gen_image_list_and_store(
@@ -225,7 +225,7 @@ class ContentGenerator(ContentGeneratorProtocol):
             msg = "PDF URI is required to render page views"
             raise ValueError(msg)
         job_params = extract_job_params or ExtractJobParams.make_default_extract_job_params()
-        page_views_dpi = job_params.page_views_dpi or get_config().cogt.extract_config.default_page_views_dpi
+        page_views_dpi = job_params.page_views_dpi or get_config().inference.extract.default_page_views_dpi
         render_assignment = RenderPageViewsAssignment(
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,

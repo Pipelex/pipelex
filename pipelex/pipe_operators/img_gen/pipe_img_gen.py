@@ -21,6 +21,7 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.interpreter_hub import get_concept_library, get_native_concept
 from pipelex.kernel.exceptions import PromptContentError
 from pipelex.kernel.img_gen_ops import build_img_gen_job_params, resolve_img_gen_setting, run_img_gen
+from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.template_guard_lint import lint_optional_input_guards
 from pipelex.pipe_operators.img_gen.exceptions import PipeImgGenFactoryError, PipeImgGenRunError
 from pipelex.pipe_operators.img_gen.img_gen_prompt_blueprint import ImgGenPromptBlueprint
@@ -175,6 +176,9 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         try:
             img_gen_prompt = await self.img_gen_prompt_blueprint.make_img_gen_prompt(
                 context_provider=working_memory,
+                # No authored style on this operator: an image prompt takes the runtime default, the
+                # same one an LLM pipe that declares nothing gets.
+                templating_style=resolve_templating_style(authored=None),
                 extra_params=pipe_run_params.params,
                 max_prompt_images=max_prompt_images,
             )

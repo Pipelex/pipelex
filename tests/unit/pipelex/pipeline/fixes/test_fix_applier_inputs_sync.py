@@ -13,7 +13,7 @@ from pathlib import Path
 import tomlkit
 
 from pipelex.pipeline.fixes.applier import FixOpOutcome, apply_fix_ops, serialize_and_format
-from pipelex.suggested_fix import FixOp, FixOpKind
+from pipelex.suggested_fix import DeleteKeyOp, EnsureTableOp, FixOp, SetKeyOp
 
 _FIXES_DIR = Path("tests/data/fixes")
 _INPUTS_TABLE_PATH = ["pipe", "make_summary", "inputs"]
@@ -32,20 +32,20 @@ def _golden(name: str) -> str:
     return (_FIXES_DIR / f"{name}.golden.mthds").read_text(encoding="utf-8")
 
 
-_INLINE_OPS = [
-    FixOp(kind=FixOpKind.SET_KEY, table_path=_INPUTS_TABLE_PATH, key="text", value="Text"),
-    FixOp(kind=FixOpKind.SET_KEY, table_path=_INPUTS_TABLE_PATH, key="style", value="Text"),
-    FixOp(kind=FixOpKind.DELETE_KEY, table_path=_INPUTS_TABLE_PATH, key="note"),
+_INLINE_OPS: list[FixOp] = [
+    SetKeyOp(table_path=_INPUTS_TABLE_PATH, key="text", value="Text"),
+    SetKeyOp(table_path=_INPUTS_TABLE_PATH, key="style", value="Text"),
+    DeleteKeyOp(table_path=_INPUTS_TABLE_PATH, key="note"),
 ]
 
-_BLOCK_OPS = [
-    FixOp(kind=FixOpKind.SET_KEY, table_path=_INPUTS_TABLE_PATH, key="text", value="Text"),
-    FixOp(kind=FixOpKind.DELETE_KEY, table_path=_INPUTS_TABLE_PATH, key="note"),
+_BLOCK_OPS: list[FixOp] = [
+    SetKeyOp(table_path=_INPUTS_TABLE_PATH, key="text", value="Text"),
+    DeleteKeyOp(table_path=_INPUTS_TABLE_PATH, key="note"),
 ]
 
-_MISSING_TABLE_OPS = [
-    FixOp(kind=FixOpKind.ENSURE_TABLE, table_path=_INPUTS_TABLE_PATH),
-    FixOp(kind=FixOpKind.SET_KEY, table_path=_INPUTS_TABLE_PATH, key="text", value="Text"),
+_MISSING_TABLE_OPS: list[FixOp] = [
+    EnsureTableOp(table_path=_INPUTS_TABLE_PATH),
+    SetKeyOp(table_path=_INPUTS_TABLE_PATH, key="text", value="Text"),
 ]
 
 
@@ -116,7 +116,7 @@ output = "Text"
         """
         source = '[pipe.make_summary]\ntype = "PipeSequence"\ninputs = { "cv.name" = "Text", cv = "Curriculum", note = "Text" }\n'
         toml_doc = tomlkit.loads(source)
-        applications = apply_fix_ops(toml_doc=toml_doc, ops=[FixOp(kind=FixOpKind.DELETE_KEY, table_path=_INPUTS_TABLE_PATH, key="note")])
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[DeleteKeyOp(table_path=_INPUTS_TABLE_PATH, key="note")])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
         formatted = serialize_and_format(toml_doc)
         assert '"cv.name" = "Text"' in formatted

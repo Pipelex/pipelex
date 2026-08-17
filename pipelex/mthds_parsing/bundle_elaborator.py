@@ -143,6 +143,8 @@ class BundleElaborator:
         # --- step 1: PipeLLM that produces a single Text draft ---
         # Image variables on the original prompt naturally flow only here, since step-2's prompt
         # template is the canned `structuring_prompt` which references only `{{ text }}`.
+        # This step renders the author's own prompt, so it carries the author's declared style too:
+        # dropping it here would silently re-render that prompt under the runtime default.
         draft_blueprint = PipeLLMBlueprint(
             type="PipeLLM",
             pipe_category="PipeOperator",
@@ -154,6 +156,7 @@ class BundleElaborator:
             model=pipe_blueprint.model,
             model_to_structure=None,
             structuring_method=None,
+            templating_style=pipe_blueprint.templating_style,
         )
 
         # --- step 2: PipeStructure that turns the draft Text into the original structured output ---

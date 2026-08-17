@@ -35,7 +35,7 @@ class TestRenderGenerateDryBranch:
         )
 
         factory.make_image_content.assert_not_called()
-        assert len(page_views) == get_config().pipelex.dry_run_config.nb_extract_pages
+        assert len(page_views) == get_config().inference.dry_run.nb_extract_pages
         assert all(page_view.url for page_view in page_views)
 
     @pytest.mark.asyncio

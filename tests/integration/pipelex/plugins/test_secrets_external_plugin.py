@@ -4,7 +4,7 @@ and the storage↔secrets ordering guard.
 The built-in ``env`` method is the default and is selected onto the hub by an ordinary boot; an
 explicit ``setup(secrets_provider=...)`` still wins ahead of registry selection; a fake external
 method token discovered through a ``pipelex.plugins.kernel`` entry point is selectable via
-``secrets_config.method``. The final test is the ordering guard: with a non-env secrets method AND
+``runtime.secrets.method``. The final test is the ordering guard: with a non-env secrets method AND
 ``gcp`` storage, storage's gcp factory reads the config-selected secrets provider from the hub —
 proving secrets is resolved and set on the hub before storage selection runs.
 """
@@ -127,7 +127,7 @@ class TestSecretsExternalPlugin:
         Pipelex.make(
             integration_mode=_test_integration_mode(),
             needs_inference=False,
-            config_overrides={"pipelex": {"secrets_config": {"method": EXTERNAL_SECRETS_METHOD}}},
+            config_overrides={"runtime": {"secrets": {"method": EXTERNAL_SECRETS_METHOD}}},
         )
 
         assert get_secrets_provider_registry().has(method=EXTERNAL_SECRETS_METHOD)
@@ -145,9 +145,9 @@ class TestSecretsExternalPlugin:
             integration_mode=_test_integration_mode(),
             needs_inference=False,
             config_overrides={
-                "pipelex": {
-                    "secrets_config": {"method": EXTERNAL_SECRETS_METHOD},
-                    "storage_config": {"method": "gcp", "gcp": {"bucket_name": "test-bucket", "project_id": "test-project"}},
+                "runtime": {
+                    "secrets": {"method": EXTERNAL_SECRETS_METHOD},
+                    "storage": {"method": "gcp", "gcp": {"bucket_name": "test-bucket", "project_id": "test-project"}},
                 }
             },
         )

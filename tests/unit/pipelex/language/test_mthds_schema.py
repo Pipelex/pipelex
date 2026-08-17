@@ -108,6 +108,17 @@ class TestMthdsSchemaGeneration:
             props = definitions[def_name].get("properties", {})
             assert "pipe_category" not in props, f"pipe_category should be excluded from {def_name}"
 
+    def test_pipe_llm_carries_optional_templating_style(self, schema: dict[str, Any]) -> None:
+        """The authored styling surface is published as a typed union, and stays optional."""
+        definitions = schema.get("definitions", {})
+        props = definitions["PipeLLMBlueprint"].get("properties", {})
+
+        assert "templating_style" in props, "PipeLLMBlueprint should publish its authored templating_style"
+        arms = props["templating_style"].get("anyOf", [])
+        assert {"$ref": "#/definitions/TagStyle"} in arms, "the bare-string arm should be the TagStyle enum, not a free-form string"
+        assert {"$ref": "#/definitions/TemplatingStyle"} in arms, "the inline-table arm should be the full TemplatingStyle"
+        assert {"type": "null"} in arms, "templating_style must stay optional"
+
     def test_construct_alias_used(self, schema: dict[str, Any]) -> None:
         """Verify PipeComposeBlueprint uses 'construct' alias, not 'construct_blueprint'."""
         definitions = schema.get("definitions", {})

@@ -37,16 +37,16 @@ orchestration-venue sense and keeps the word for good.
 import types
 import warnings
 from collections.abc import Callable
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Self, TypeVar, cast
 
 from kajson.class_registry import ClassRegistry
 from kajson.class_registry_abstract import ClassRegistryAbstract
 from kajson.kajson_manager import KajsonManager
-from pydantic import ValidationError
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexConfigError, PipelexSetupError
+from pipelex.base_exceptions import PipelexSetupError
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
@@ -54,6 +54,7 @@ from pipelex.cogt.content_generation.content_generator_protocol import (
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.exceptions import (
     InferenceBackendCredentialsError,
+    InferenceBackendLibraryError,
     InferenceBackendLibraryNotFoundError,
     InferenceBackendLibraryValidationError,
     ModelDeckNotFoundError,
@@ -71,7 +72,7 @@ from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
 from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.stuffs.stuff_template_set import STUFF_TEMPLATE_SET
-from pipelex.core.validation import report_validation_error
+from pipelex.core.validation import raise_config_setup_error, report_config_refusal
 from pipelex.graph.mermaidflow.template_set import MERMAID_TEMPLATE_SET
 from pipelex.graph.reactflow.template_set import REACTFLOW_TEMPLATE_SET
 from pipelex.observer.multi_observer import MultiObserver
@@ -90,8 +91,9 @@ from pipelex.providers.builtins import KERNEL_BUILTIN_PLUGINS, KERNEL_CORE_UNCON
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.runtime_hub import RuntimeHub, set_runtime_hub
-from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.configuration.config_loader import CONFIG_REFUSED, config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
+from pipelex.system.configuration.config_surface import INFERENCE_BACKEND_CONFIG_SURFACE_ID, PIPELEX_CONFIG_SURFACE_ID
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.pipelex_service.exceptions import (
     GatewayTermsNotAcceptedError,
@@ -134,6 +136,58 @@ if TYPE_CHECKING:
 PACKAGE_NAME, PACKAGE_VERSION = get_package_info()
 
 _HubSlotImplT = TypeVar("_HubSlotImplT")
+
+
+BACKEND_LIBRARY_REFUSED: tuple[type[Exception], ...] = (
+    InferenceBackendLibraryValidationError,
+    InferenceBackendLibraryError,
+)
+"""Every way the inference backend library can report that its files are not loadable.
+
+Spelled once, and beside `BootComponent` for the same reason that enum exists: what the boot does
+with a refusal — name the surface, scan the ledger, drop the start-over tail — is only reachable if
+the `except` clause names the class the loader really raises, and a clause that names one class of a
+family is a silent hole rather than an error. `InferenceBackendLibraryError` is the one that matters
+in practice: it is what the model-spec build raises for an `extra_forbidden` merge and for a
+per-model key rejected by name, and it is what boot tolerance re-raises when the ledger cannot
+explain the file. It escaped `setup` uncaught until this constant, so the scan could never run for
+the one late component that has a ledger. `…ValidationError` is its sibling for the library index
+file, `backends.toml`: a backend table whose own fields fail the blueprint — and until it was raised
+there, that refusal left the loader as pydantic's bare error, which no clause here named either.
+Neither has subclasses, and no other class the chain handles descends from either, so this clause
+shadows nothing — `tests/unit/pipelex/test_runtime_boot_stale_backend_error.py` pins both halves
+against a refusal the real loader produced.
+"""
+
+
+class BootComponent(StrEnum):
+    """A library whose files can refuse to load after the main configuration is already up.
+
+    The value is how the boot names the component to a user, and the member is what decides whether
+    its files belong to a migration surface. Pairing the two here rather than at each `except`
+    clause is deliberate: the surface is the difference between telling a user their files are
+    *old* and telling them only that they are *wrong*, and a call site passing a bare name is a
+    call site that can silently drop it.
+    """
+
+    ROUTING_PROFILE_LIBRARY = "routing profile library"
+    INFERENCE_BACKEND_LIBRARY = "inference backend library"
+    MODEL_DECK = "model deck"
+
+    @property
+    def migration_surface_id(self) -> str | None:
+        """The migration surface that claims this component's files, or `None` when none does.
+
+        Only the inference backend definitions are one. The model deck is the case worth naming:
+        it is package-managed content rather than a schema, so it has a content sync and no
+        ledger, and offering it `pipelex migrate` would send a user to a command with nothing to
+        do. Routing profiles have neither mechanism.
+        """
+        match self:
+            case BootComponent.INFERENCE_BACKEND_LIBRARY:
+                return INFERENCE_BACKEND_CONFIG_SURFACE_ID
+            case BootComponent.ROUTING_PROFILE_LIBRARY | BootComponent.MODEL_DECK:
+                return None
 
 
 class RuntimeBoot(metaclass=MetaSingleton):
@@ -191,15 +245,23 @@ class RuntimeBoot(metaclass=MetaSingleton):
                 config_overrides=config_overrides,
                 config_dir=config_dir,
             )
-        except ValidationError as validation_error:
-            validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
-            msg = f"Could not setup config because of: {validation_error_msg}"
-            raise PipelexConfigError(msg) from validation_error
+        except CONFIG_REFUSED as config_error:
+            # Both halves of the pair, and the reason is that this arm used to catch only
+            # pydantic's: `PipelexConfig` is a `ConfigRoot`, whose custom `__init__` translates
+            # into `ConfigValidationError`, so the arm never fired for the one configuration
+            # everything depends on and every boot failure arrived as a bare traceback instead.
+            raise_config_setup_error(
+                config_error=config_error,
+                surface_id=PIPELEX_CONFIG_SURFACE_ID,
+                config_dirs=[config_dir] if config_dir is not None else None,
+            )
 
-        log_config = get_config().pipelex.log_config
+        log_config = get_config().runtime.log
         self.runtime_hub.set_console_print_target(target=log_config.console_print_target)
         log.configure(log_config=log_config)
         log.verbose("Logs are configured")
+        if (stale_warning := config_manager.take_stale_configuration_warning()) is not None:
+            log.warning(stale_warning)
 
         # tools
         self.class_registry: ClassRegistryAbstract | None = None
@@ -217,26 +279,58 @@ class RuntimeBoot(metaclass=MetaSingleton):
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} runtime init done")
 
     @staticmethod
-    def _get_config_file_not_found_error_msg(*, component_name: str) -> str:
+    def _get_config_file_not_found_error_msg(*, component: BootComponent) -> str:
         """Generate error message for missing config files."""
-        return f"Config files are missing for the {component_name}. Run `pipelex init config` to generate the missing files."
+        return f"Config files are missing for the {component}. Run `pipelex init config` to generate the missing files."
 
     @staticmethod
-    def _get_validation_error_msg(*, component_name: str, validation_exc: Exception) -> str:
-        """Generate error message for invalid config files."""
-        msg = ""
-        cause_exc = validation_exc.__cause__
-        if cause_exc is None:
-            msg += f"\nUnexpexted error:{cause_exc}"
-            raise PipelexSetupError(msg) from cause_exc
-        if not isinstance(cause_exc, ValidationError):
-            msg += f"\nUnexpexted cause:{cause_exc}"
-            raise PipelexSetupError(msg) from cause_exc
-        report = report_validation_error(category="config", validation_error=cause_exc)
-        return f"""{msg}
-{report}
+    def _get_validation_error_msg(*, component: BootComponent, validation_exc: Exception) -> str:
+        """Generate error message for invalid config files.
 
-Config files are invalid for the {component_name}.
+        A component whose files belong to a migration surface gets the same treatment the loaders
+        reporting through `raise_config_setup_error` get: the refusal is scanned against that
+        surface's ledger, so a user whose files are merely behind is told so instead of being left
+        with the model's refusal alone.
+
+        **The refusal's own message is the body, and that is the whole reason this goes through
+        `report_config_refusal`.** Every loader behind these components says *where* before it says
+        what — model, backend and file, or the deck's paths — and then quotes the pydantic analysis;
+        a builder that reached through to the pydantic error and translated only that kept the half
+        a reader can least act on. It also could not handle the second shape a backend file refuses
+        in: a per-model key rejected by name for not being header-shaped carries no pydantic error at
+        all, and the old builder offered it no block on its way to saying `Unexpexted error:None`.
+
+        > **The block names every root `pipelex migrate` walks, which can be more than the one the
+        > loader read.** `backends_dir_path` resolves to a single directory (a project's `.pipelex/`
+        > wins the whole directory over the global one) while the remedy walks both, and the block
+        > describes what the remedy would do. Narrowing it to the directory the loader used would
+        > need the path off the concrete `ModelManager`, which `ModelManagerAbstract` — a public
+        > injection point — deliberately does not expose; see the note at the `models_manager.setup`
+        > call below.
+
+        Args:
+            component: What refused — the message names it, and it carries the surface.
+            validation_exc: The refusal, whose own message is the body of what the user reads.
+
+        Returns:
+            The message, carrying the migration paragraph when the scan found one.
+        """
+        report = report_config_refusal(refusal=validation_exc, surface_id=component.migration_surface_id)
+        if report.migration is not None:
+            # Regeneration is never offered beside a migration: the block has just promised that
+            # `pipelex migrate` keeps every value the file holds, and `pipelex init config` is
+            # described in the next breath as resetting them. Whichever a user followed, the other
+            # sentence made it the wrong choice.
+            return f"""
+{report.message}
+
+Config files are invalid for the {component}.
+If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
+"""
+        return f"""
+{report.message}
+
+Config files are invalid for the {component}.
 You can fix them manually, or run `pipelex init config` to regenerate them.
 Note that this command resets all config files to their default values.
 If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
@@ -279,12 +373,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if kwargs:
             msg = f"The base setup method does not support any additional arguments: {kwargs}"
             raise PipelexSetupError(msg)
-
-        # Boot this process under the named orchestrator plugin, when explicitly provided.
-        # The matching boot-orchestrator plugin (e.g. Temporal) claims the hub slots in its
-        # register() iff plugins.boot_orchestrator == its own name; any other value is in-process.
-        if boot_orchestrator is not None:
-            get_config().plugins.boot_orchestrator = boot_orchestrator
 
         # --- Pipelex Service and Telemetry --------------------------------------------------
 
@@ -366,6 +454,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # applied at their ordered apply-points in later phases.
         plugin_registrar = build_registrar(
             config=get_config(),
+            boot_orchestrator=boot_orchestrator,
             builtin_plugins=KERNEL_BUILTIN_PLUGINS if builtin_plugins is None else builtin_plugins,
             core_unconditional_plugin_names=(
                 KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES if core_unconditional_plugin_names is None else core_unconditional_plugin_names
@@ -374,7 +463,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         )
         self._plugin_registrar = plugin_registrar
         # Reject an unknown boot orchestrator before falling through to the core defaults. The requested
-        # name (CLI --orchestrator / setup(boot_orchestrator=...) / config) is matched against registered
+        # name (CLI --orchestrator / setup(boot_orchestrator=...)) is matched against registered
         # plugin names — the same namespace the slot-claim gate uses (boot_orchestrator == plugin.name).
         # When no plugin of that name registered (not installed, disabled, or a typo) nothing claims the
         # hub slots, so without this guard the run would silently execute in-process instead of under the
@@ -390,9 +479,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # ``PIPE_FUNC_EXECUTOR``, all applied in ``Pipelex.setup``). What closed it is the entry-point
         # group split: the layer signal that remedy needed is now carried by the plugin's own
         # declaration.
-        requested_boot_orchestrator = get_config().plugins.boot_orchestrator
-        if requested_boot_orchestrator is not None and requested_boot_orchestrator not in plugin_registrar.registered_plugin_names:
-            raise UnknownBootOrchestratorError(requested=requested_boot_orchestrator)
+        if boot_orchestrator is not None and boot_orchestrator not in plugin_registrar.registered_plugin_names:
+            raise UnknownBootOrchestratorError(requested=boot_orchestrator)
 
         # Secrets provider precedence: explicit setup() param > config-selected registry factory.
         # The built-in SecretsPlugin supplies the "env" method, so there is no separate core default.
@@ -400,7 +488,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         secrets_provider_registry = SecretsProviderRegistry(plugin_registrar.secrets_providers)
         self.runtime_hub.set_secrets_provider_registry(secrets_provider_registry)
         if secrets_provider is None:
-            secrets_config = get_config().pipelex.secrets_config
+            secrets_config = get_config().runtime.secrets
             secrets_provider = secrets_provider_registry.get_required(method=secrets_config.method)(secrets_config)
 
         # Disable Pipelex telemetry when:
@@ -476,23 +564,23 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 needs_inference=needs_inference,
             )
         except RoutingProfileLibraryNotFoundError as routing_not_found_exc:
-            msg = self._get_config_file_not_found_error_msg(component_name="routing profile library")
+            msg = self._get_config_file_not_found_error_msg(component=BootComponent.ROUTING_PROFILE_LIBRARY)
             raise PipelexSetupError(msg) from routing_not_found_exc
         except InferenceBackendLibraryNotFoundError as backend_not_found_exc:
-            msg = self._get_config_file_not_found_error_msg(component_name="inference backend library")
+            msg = self._get_config_file_not_found_error_msg(component=BootComponent.INFERENCE_BACKEND_LIBRARY)
             raise PipelexSetupError(msg) from backend_not_found_exc
         except ModelDeckNotFoundError as deck_not_found_exc:
-            msg = self._get_config_file_not_found_error_msg(component_name="model deck")
+            msg = self._get_config_file_not_found_error_msg(component=BootComponent.MODEL_DECK)
             raise PipelexSetupError(msg) from deck_not_found_exc
         except RoutingProfileDisabledBackendError as routing_profile_exc:
             msg = f"Some backend(s) required for a routing profile is not enabled: {routing_profile_exc}"
             raise PipelexSetupError(msg) from routing_profile_exc
 
-        except InferenceBackendLibraryValidationError as backend_validation_exc:
-            msg = self._get_validation_error_msg(component_name="inference backend library", validation_exc=backend_validation_exc)
+        except BACKEND_LIBRARY_REFUSED as backend_validation_exc:
+            msg = self._get_validation_error_msg(component=BootComponent.INFERENCE_BACKEND_LIBRARY, validation_exc=backend_validation_exc)
             raise PipelexSetupError(msg) from backend_validation_exc
         except ModelDeckValidationError as deck_validation_exc:
-            msg = self._get_validation_error_msg(component_name="model deck", validation_exc=deck_validation_exc)
+            msg = self._get_validation_error_msg(component=BootComponent.MODEL_DECK, validation_exc=deck_validation_exc)
             msg += "\n\nIf you added your own config files to the model deck then you'll have to change them manually."
             raise PipelexSetupError(msg) from deck_validation_exc
 
@@ -526,7 +614,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # The built-in StoragePlugin supplies every method, so there is no separate core default.
         # Resolves here (after secrets is on the hub) so the GCP factory's secret read works.
         if storage_provider is None:
-            storage_config = get_config().pipelex.storage_config
+            storage_config = get_config().runtime.storage
             storage_provider = storage_provider_registry.get_required(method=storage_config.method)(storage_config)
         self.runtime_hub.set_storage_provider(storage_provider)
 
@@ -537,6 +625,13 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # dispatch activities and mock inside them, so `needs_inference` plays no role in picking the
         # generator. Its other boot roles (gateway/model setup, credentials, telemetry) are unchanged.
         self.runtime_hub.set_dry_run_forced(is_forced=not needs_inference)
+        # The orchestrator plugin this process booted under, recorded as boot-scoped hub state rather
+        # than written into the config object — nothing in a pipelex.toml names an orchestrator, and
+        # routing a boot argument through the config would make it look settable. The slot-claim *gate*
+        # does not read this: a plugin's register() matched `registrar.boot_orchestrator` back at
+        # discovery, and the unknown-name guard above reads the argument. What reads it is run-time
+        # code asking whether it owns the process, so it must be set before the thunks below run.
+        self.runtime_hub.set_boot_orchestrator(boot_orchestrator=boot_orchestrator)
         # Injection precedence (codex C8): explicit setup() param > plugin slot-claim thunk > core default.
         # A boot-orchestrator plugin (Temporal worker) claims the CONTENT_GENERATOR slot; its thunk runs
         # only here, never at register, so booting a non-worker process imports no host-runtime SDK.
@@ -683,10 +778,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
             log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done (except config & logs)")
         finally:
-            # The runtime hub releases its process-global config. ``class_registry_scoping`` is reset here
+            # The runtime hub releases its process-global config and boot-scoped flags. ``class_registry_scoping``
+            # is reset here
             # too: the interpreter half installs the resolver at boot, so releasing it belongs to whichever
             # teardown runs — and on a kernel-only boot nothing installed it, where the reset is a no-op.
-            self.runtime_hub.reset_config()
+            self.runtime_hub.reset_boot_state()
             class_registry_scoping.reset()
             # The same three ``_release_after_failed_boot`` releases, deliberately kept identical: these are
             # the ones that *poison* the next boot rather than merely dangle, so they must not sit above a
@@ -729,8 +825,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         A failed boot must release the process-global singletons it acquired, not just the singleton
         registration — otherwise they leak and poison the next boot in the same process. ``setup()``
         establishes these progressively (logging + hub config in ``__init__``, the ``KajsonManager``
-        class registry, the template registries) and may mutate config (e.g.
-        ``plugins.boot_orchestrator``); failing partway skips ``teardown()``, the normal release point.
+        class registry, the template registries) and sets boot-scoped hub state (e.g. the boot
+        orchestrator); failing partway skips ``teardown()``, the normal release point.
 
         It exists rather than calling ``teardown()`` because that path reads ``self.inference_manager``
         (and, on the interpreter half, ``self.pipeline_manager``) unguarded, and both are assigned
@@ -738,7 +834,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         deliberate: guarding them would let a half-built teardown look successful.
 
         It releases a **subset** of what ``teardown()`` does, and the subset is chosen: everything that
-        would otherwise *poison the next boot* is here — the hub config, the class-registry scoping, the
+        would otherwise *poison the next boot* is here — the hub config and its boot-scoped flags, the class-registry scoping, the
         ``KajsonManager``, the template registries, the telemetry singleton and the ``MetaSingleton``
         registration. What is deliberately absent is ``sdk_client_manager``, ``reporting_delegate``,
         ``func_registry``, ``inference_manager`` and ``class_registry``. The first three leave resources
@@ -757,7 +853,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         already stood its runtime up, and only the plugin knows what that cost. Our Temporal plugin's
         thunk registers its own process-global singletons and installs a sandbox predicate — it does not
         yet start a poller, which is a property of that thunk today and not of the slot. A failure
-        anywhere after that thunk — the ``pipe_func_config.execution_mode`` lookup raising on an unregistered mode is the
+        anywhere after that thunk — the ``interpreter.pipe_func.execution_mode`` lookup raising on an unregistered mode is the
         most reachable one, since it is a plain config error — would otherwise leak it, because nothing
         else on this path calls the callbacks. Not a hypothetical widened by the boot split: the thunk
         used to run *after* the pipe-func executor resolution, ``pipeline_manager.setup()`` and the
@@ -802,7 +898,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                     # (2) an injected telemetry manager is unbounded code; its exception surface cannot
                     # be enumerated, and the releases below must happen regardless.
                     log.error(f"Telemetry teardown failed while releasing a failed boot: {telemetry_exc}")
-            self.runtime_hub.reset_config()
+            self.runtime_hub.reset_boot_state()
             class_registry_scoping.reset()
             KajsonManager.teardown()
             TemplateLoader.reset()

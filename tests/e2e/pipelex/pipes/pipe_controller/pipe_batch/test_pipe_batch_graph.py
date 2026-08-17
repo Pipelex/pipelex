@@ -43,7 +43,7 @@ class TestPipeBatchGraph:
         4. Saves the GraphSpec for inspection
         """
         # Build effective config with graph tracing enabled
-        exec_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+        exec_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
             generate_graph=True,
             force_include_full_data=False,
         )
@@ -166,15 +166,15 @@ class TestPipeBatchGraph:
         No fancy assertions - just generate the outputs like CLI does.
         """
         # Build config with graph tracing and all graph outputs enabled
-        base_config = get_config().pipelex.pipeline_execution_config
+        base_config = get_config().interpreter.pipeline_execution
         exec_config = base_config.with_execution_overrides(
             generate_graph=True,
             force_include_full_data=False,
         )
         # Enable all graph outputs
-        graph_config = exec_config.graph_config.model_copy(
+        graph_config = exec_config.graph.model_copy(
             update={
-                "graphs_inclusion": exec_config.graph_config.graphs_inclusion.model_copy(
+                "graphs_inclusion": exec_config.graph.graphs_inclusion.model_copy(
                     update={
                         "graphspec_json": True,
                         "mermaidflow_html": True,
@@ -183,7 +183,7 @@ class TestPipeBatchGraph:
                 )
             }
         )
-        exec_config = exec_config.model_copy(update={"graph_config": graph_config})
+        exec_config = exec_config.model_copy(update={"graph": graph_config})
 
         # Run joke batch pipeline
         runner = PipelexMTHDSProtocol(

@@ -187,7 +187,7 @@ async def _execute_run(
     pipe_run_mode = PipeRunMode.DRY if dry_run else None
 
     # Build effective execution config with CLI overrides
-    execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+    execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
         generate_graph=graph,
         generate_usage=costs,
         force_include_full_data=graph_full_data,
@@ -249,7 +249,7 @@ async def _execute_run(
 
         graph_outputs = await generate_graph_outputs(
             graph_spec=graph_spec,
-            graph_config=execution_config.graph_config,
+            graph_config=execution_config.graph,
             pipe_code=pipe_code,
         )
 
@@ -416,7 +416,20 @@ def execute_run(
 
     Shared between the ``method`` and ``pipe`` subcommands.
     """
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN, library_dirs=library_dir, boot_orchestrator=orchestrator)
+    # A dry run makes no inference call, so it must not demand credentials: `needs_inference=False`
+    # forces every run to DRY and skips a backend whose key is missing instead of failing the boot.
+    # `needs_model_specs=True` keeps the real gateway model specs (not the dummy ones), so wherever
+    # credentials ARE present a dry run resolves model handles exactly as a live run would. It does not
+    # help on a machine with no key at all: a skipped backend contributes no models, so a pipe pinning a
+    # bare handle served only by that backend reports it as not found (see docs/features/validation-dry-run.md).
+    # This is the same boot `pipelex-agent run --dry-run` uses, so the two CLIs agree either way.
+    make_pipelex_for_cli(
+        context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN,
+        library_dirs=library_dir,
+        needs_inference=not dry_run,
+        boot_orchestrator=orchestrator,
+        needs_model_specs=True,
+    )
 
     try:
         with get_telemetry_manager().telemetry_context():

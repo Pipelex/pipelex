@@ -16,6 +16,7 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.interpreter_hub import get_native_concept
+from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
@@ -54,6 +55,7 @@ class TestPromptImageExtraction:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -94,6 +96,7 @@ class TestPromptImageExtraction:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -138,6 +141,7 @@ class TestPromptImageExtraction:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -196,6 +200,7 @@ class TestPromptImageExtraction:
         # Should raise error because tag converts to string before with_images
         with pytest.raises(Jinja2TemplateRenderError, match="does not implement the ImageRenderable protocol"):
             await pipe_llm.llm_prompt_spec.make_llm_prompt(
+                templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
                 output_concept_ref="Text",
                 context_provider=working_memory,
             )
@@ -205,6 +210,7 @@ class TestPromptImageExtraction:
 
         This demonstrates the CORRECT way to use the tag filter for formatted output.
         Note: tag returns a string, so no images are extracted (use with_images for that).
+        Rendered under the resolved style, which is what every real entry point supplies.
         """
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
 
@@ -242,13 +248,14 @@ class TestPromptImageExtraction:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
 
         # Tag filter produces formatted text output but NO image tokens or extraction
         assert llm_prompt.user_text is not None
-        assert "```" in llm_prompt.user_text  # Tag wraps in code blocks by default
+        assert "<pages>" in llm_prompt.user_text  # Tag wraps in XML tags under the house default
         assert "[Image 1]" not in llm_prompt.user_text  # No image tokens from tag
         assert llm_prompt.user_images is None or len(llm_prompt.user_images) == 0
         pretty_print(llm_prompt.user_text, title="tag filter prompt - formatted text, no images")
@@ -258,7 +265,7 @@ class TestPromptImageExtraction:
 
         This order works because:
         1. with_images extracts images and returns string with [Image N] tokens
-        2. tag wraps that string in tags (```...``` or XML)
+        2. tag wraps that string in tags, under the resolved style
 
         The images are extracted because with_images processes structured data first.
         """
@@ -298,13 +305,16 @@ class TestPromptImageExtraction:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
 
         # with_images | tag: images ARE extracted AND content is wrapped in tags
         assert llm_prompt.user_text is not None
-        assert "```" in llm_prompt.user_text  # Tag wraps in code blocks
+        # `with_images` hands `tag` a plain string, which has no name of its own, so the XML arm
+        # falls back to the generic `data` tag.
+        assert "<data>" in llm_prompt.user_text
         assert "[Image 1]" in llm_prompt.user_text  # Image tokens present
         assert "[Image 2]" in llm_prompt.user_text
         assert llm_prompt.user_images is not None
@@ -353,6 +363,7 @@ class TestPromptImageExtraction:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -402,6 +413,7 @@ class TestPromptImageExtraction:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -450,6 +462,7 @@ class TestPromptImageExtraction:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -506,10 +519,12 @@ class TestPromptImageExtraction:
         )
 
         prompt_at = await pipe_at.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_at.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
         prompt_dollar = await pipe_dollar.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_dollar.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -578,10 +593,12 @@ class TestPromptImageExtraction:
         )
 
         prompt_at = await pipe_at.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_at.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
         prompt_dollar = await pipe_dollar.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_dollar.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -667,6 +684,7 @@ class TestPromptImageExtraction:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )
@@ -719,6 +737,7 @@ class TestPromptImageExtraction:
         )
 
         llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            templating_style=resolve_templating_style(authored=pipe_llm.templating_style),
             output_concept_ref="Text",
             context_provider=working_memory,
         )

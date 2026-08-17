@@ -15,6 +15,7 @@ The Pipelex CLI is organized into several command groups:
 |---------|-------------|
 | [**init**](init.md) | Initialize Pipelex configuration |
 | [**update**](update.md) | Refresh the model deck to match the installed pipelex version |
+| [**migrate**](migrate.md) | Bring your configuration files up to the schema the installed version expects |
 | [**validate**](validate.md) | Validate configuration and pipelines |
 | [**fix**](fix.md) | Apply deterministic safe fixes to a bundle and re-validate |
 | [**show**](show.md) | Inspect configuration, pipes, and AI models |

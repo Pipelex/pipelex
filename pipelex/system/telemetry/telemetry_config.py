@@ -1,18 +1,17 @@
+"""The telemetry configuration models — what a `telemetry.toml` parses into.
+
+Models only. `telemetry_loader.py` beside this reads the files and returns a `TelemetryConfig`,
+and it is a module of its own because its failure path reaches the migration registry, which
+imports every configuration model including these. See its docstring for the whole account.
+"""
+
 from enum import StrEnum
-from functools import partial
 from typing import Self
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_model import ConfigModel
-from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
-from pipelex.tools.misc.dict_utils import apply_to_strings_recursive
-from pipelex.tools.misc.toml_utils import load_toml_from_path_and_merge_with_overrides
-from pipelex.tools.secrets.exceptions import UnknownVarPrefixError
-from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
-from pipelex.tools.secrets.secrets_utils import substitute_vars
-from pipelex.tools.typing.pydantic_utils import empty_list_factory_of, format_pydantic_validation_error
+from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 TELEMETRY_CONFIG_FILE_NAME = "telemetry.toml"
 TELEMETRY_CONFIG_OVERRIDE_FILE_NAME = "telemetry_override.toml"
@@ -235,63 +234,3 @@ class TelemetryRedactionConfig(BaseModel):
                 redact_output_class_names=True,
                 content_max_length=None,
             )
-
-
-def load_telemetry_config(*, secrets_provider: SecretsProviderAbstract) -> TelemetryConfig:
-    """Load telemetry configuration from a TOML file with variable substitution.
-
-    Files are deep-merged in this order (later wins per leaf key):
-
-    1. ~/.pipelex/telemetry.toml (global base)
-    2. ~/.pipelex/telemetry_override.toml
-    3. {project_root}/.pipelex/telemetry.toml (if project dir exists and is
-       distinct from the global dir)
-    4. {project_root}/.pipelex/telemetry_override.toml (same condition)
-
-    This means a project telemetry config layers *on top of* the user's global
-    one rather than replacing it — secrets and personal observability settings
-    declared once in ~/.pipelex/ stay in effect across all projects.
-
-    Supports variable placeholders in string values:
-    - ${VAR_NAME} -> use secrets provider by default
-    - ${env:ENV_VAR_NAME} -> force use environment variable
-    - ${secret:SECRET_NAME} -> force use secrets provider
-    - ${env:ENV_VAR|secret:SECRET} -> try env first, then secret as fallback
-
-    Args:
-        secrets_provider: Provider for resolving secret/env variable placeholders.
-
-    Returns:
-        Validated TelemetryConfig instance.
-
-    Raises:
-        TelemetryConfigValidationError: If configuration is invalid or variable substitution fails.
-    """
-    global_config_dir = config_manager.global_config_dir
-    telemetry_config_paths = [
-        global_config_dir / TELEMETRY_CONFIG_FILE_NAME,
-        global_config_dir / TELEMETRY_CONFIG_OVERRIDE_FILE_NAME,
-    ]
-    project_config_dir = config_manager.project_config_dir
-    if project_config_dir is not None and project_config_dir != global_config_dir:
-        telemetry_config_paths.append(project_config_dir / TELEMETRY_CONFIG_FILE_NAME)
-        telemetry_config_paths.append(project_config_dir / TELEMETRY_CONFIG_OVERRIDE_FILE_NAME)
-    telemetry_config_toml_raw = load_toml_from_path_and_merge_with_overrides(paths=telemetry_config_paths)
-
-    # Apply variable substitution to all string values (keep placeholders for missing vars)
-    substitute_vars_with_provider = partial(substitute_vars, secrets_provider=secrets_provider, raise_on_missing_var=False)
-    try:
-        telemetry_config_toml = apply_to_strings_recursive(telemetry_config_toml_raw, transform_func=substitute_vars_with_provider)
-    except UnknownVarPrefixError as exc:
-        paths_str = "\n".join(str(path) for path in telemetry_config_paths)
-        msg = f"Variable substitution failed in telemetry configuration based on '{paths_str}': {exc}"
-        raise TelemetryConfigValidationError(msg) from exc
-
-    try:
-        telemetry_config = TelemetryConfig.model_validate(telemetry_config_toml)
-    except ValidationError as exc:
-        validation_error_msg = format_pydantic_validation_error(exc)
-        paths_str = "\n".join(str(path) for path in telemetry_config_paths)
-        msg = f"Invalid telemetry configuration in '{paths_str}':\n{validation_error_msg}"
-        raise TelemetryConfigValidationError(msg) from exc
-    return telemetry_config

@@ -31,7 +31,7 @@ def _test_integration_mode() -> IntegrationMode:
 class TestConfigDirReachesTheConfigLoader:
     def test_an_explicit_config_dir_is_what_gets_loaded(self, tmp_path: Path) -> None:
         # WARNING is quieter than the INFO default, never noisier — this boot configures logging.
-        (tmp_path / "pipelex.toml").write_text('[pipelex.log_config]\ndefault_log_level = "WARNING"\n')
+        (tmp_path / "pipelex.toml").write_text('[runtime.log]\ndefault_log_level = "WARNING"\n')
 
         Pipelex.teardown_if_needed()
         try:
@@ -45,7 +45,7 @@ class TestConfigDirReachesTheConfigLoader:
                 config_dir=tmp_path,
             )
             try:
-                assert get_config().pipelex.log_config.default_log_level == "WARNING"
+                assert get_config().runtime.log.default_log_level == "WARNING"
             finally:
                 runtime_boot.teardown()
         finally:

@@ -47,7 +47,7 @@ class TestLocalObserver:
     async def test_constructor_default_dir_comes_from_config(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """Without an explicit storage_dir, the directory comes from the observer config."""
         default_dir = tmp_path / "configured" / "observer"
-        config_stub = SimpleNamespace(pipelex=SimpleNamespace(observer_config=SimpleNamespace(observer_dir=str(default_dir))))
+        config_stub = SimpleNamespace(runtime=SimpleNamespace(observer=SimpleNamespace(observer_dir=str(default_dir))))
         get_config_mock = mocker.patch(f"{MODULE}.get_config", return_value=config_stub)
 
         observer = LocalObserver()

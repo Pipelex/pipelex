@@ -155,7 +155,7 @@ class TestPipeBatchBranchDispatch:
 
         monkeypatch.setattr(pipe_batch_module, "gather_bounded", _spying_gather_bounded)
 
-        execution_config = get_config().pipelex.pipeline_execution_config
+        execution_config = get_config().interpreter.pipeline_execution
         original_setting = execution_config.max_concurrency
         try:
             execution_config.max_concurrency = 2

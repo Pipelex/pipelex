@@ -7,7 +7,7 @@ description: "Reference for the `CoreUnconditionalPluginDisabledError` Pipelex e
 
 # Core unconditional plugin disabled
 
-A plugin that core requires unconditionally was named in plugins.disabled.
+A plugin that core requires unconditionally was named in ``runtime.plugins.disabled``.
 
 | Field | Value |
 |---|---|

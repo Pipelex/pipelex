@@ -72,7 +72,7 @@ async def dry_run_pipeline(
         msg = "Bundle does not declare a main_pipe, cannot generate graph"
         raise MthdsParserError(msg)
 
-    execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+    execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
         generate_graph=True,
         mock_inputs=True,
     )

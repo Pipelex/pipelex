@@ -44,7 +44,7 @@ def list_bedrock_models(
 
     try:
         # Get AWS region for display
-        aws_config = get_config().pipelex.aws_config
+        aws_config = get_config().runtime.aws
         _, _, aws_region = aws_config.get_aws_access_keys()
     except AwsCredentialsError as exc:
         msg = f"Error getting AWS credentials for Bedrock: {exc}"

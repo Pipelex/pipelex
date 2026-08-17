@@ -43,7 +43,7 @@ if TYPE_CHECKING:
 
 
 def _set_package_log_level(pipelex_toml_path: Path, *, package_name: str, level: str) -> None:
-    """Set ``<package_name> = "<level>"`` inside ``[pipelex.log_config.package_log_levels]``.
+    """Set ``<package_name> = "<level>"`` inside ``[runtime.log.package_log_levels]``.
 
     Uses the project's ``tomlkit``-based helpers (the same pair ``init_cmd`` relies
     on) to parse-edit-dump the file. This handles every edge case the previous
@@ -53,7 +53,7 @@ def _set_package_log_level(pipelex_toml_path: Path, *, package_name: str, level:
     config loader.
     """
     doc = load_toml_with_tomlkit(pipelex_toml_path)
-    doc["pipelex"]["log_config"]["package_log_levels"][package_name] = level  # type: ignore[index]
+    doc["runtime"]["log"]["package_log_levels"][package_name] = level  # type: ignore[index]
     save_toml_to_path(doc, path=pipelex_toml_path)
 
 
@@ -94,7 +94,7 @@ def _assert_stderr_is_clean_or_structured_envelope(stderr: str) -> None:
 
 def _set_console_targets(pipelex_toml_path: Path, *, log_target: str, print_target: str) -> None:
     """Rewrite ``console_log_target`` and ``console_print_target`` directly under
-    ``[pipelex.log_config]`` to the given values.
+    ``[runtime.log]`` to the given values.
 
     Used by the adversarial defense-in-depth test to simulate a user who overrides both
     targets to ``"stdout"`` in their ``~/.pipelex/pipelex.toml``. The agent CLI must keep
@@ -111,7 +111,7 @@ def _set_console_targets(pipelex_toml_path: Path, *, log_target: str, print_targ
     for index, line in enumerate(lines):
         stripped = line.strip()
         if stripped.startswith("[") and stripped.endswith("]"):
-            in_target_section = stripped == "[pipelex.log_config]"
+            in_target_section = stripped == "[runtime.log]"
             continue
         if not in_target_section:
             continue
@@ -122,10 +122,10 @@ def _set_console_targets(pipelex_toml_path: Path, *, log_target: str, print_targ
             lines[index] = f'console_print_target = "{print_target}"\n'
             print_target_rewritten = True
     if not log_target_rewritten:
-        msg = f"Could not find 'console_log_target = ...' under [pipelex.log_config] in {pipelex_toml_path}"
+        msg = f"Could not find 'console_log_target = ...' under [runtime.log] in {pipelex_toml_path}"
         raise AssertionError(msg)
     if not print_target_rewritten:
-        msg = f"Could not find 'console_print_target = ...' under [pipelex.log_config] in {pipelex_toml_path}"
+        msg = f"Could not find 'console_print_target = ...' under [runtime.log] in {pipelex_toml_path}"
         raise AssertionError(msg)
     pipelex_toml_path.write_text("".join(lines), encoding="utf-8")
 

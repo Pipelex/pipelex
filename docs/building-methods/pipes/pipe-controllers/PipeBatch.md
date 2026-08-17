@@ -20,7 +20,7 @@ This is the ideal controller for processing collections of documents, images, or
 
 ## Concurrency
 
-`PipeBatch` does not spawn every branch at once. Branches run in bounded concurrent chunks, capped by the `max_concurrency` setting under `[pipelex.pipeline_execution_config]` (default `8`). This keeps a large batch — one pipe over thousands of items — from overwhelming memory, the asyncio event loop, and provider rate limits.
+`PipeBatch` does not spawn every branch at once. Branches run in bounded concurrent chunks, capped by the `max_concurrency` setting under `[interpreter.pipeline_execution]` (default `8`). This keeps a large batch — one pipe over thousands of items — from overwhelming memory, the asyncio event loop, and provider rate limits.
 
 To restore unbounded fan-out (every branch started at once), set `max_concurrency = "unbounded"`.
 

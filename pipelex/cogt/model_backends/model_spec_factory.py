@@ -8,7 +8,6 @@ from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.typing.pydantic_utils import empty_dict_factory_of, empty_list_factory_of
@@ -29,10 +28,12 @@ class InferenceModelSpecBlueprint(ConfigModel):
     thinking_mode: ThinkingMode = Field(default=ThinkingMode.NONE, strict=False)
     max_tokens: int | None = None
     max_prompt_images: int | None = None
-    prompting_target: PromptingTarget | None = Field(default=None, strict=False)
     listed_constraints: list[ListedConstraint] = Field(default_factory=empty_list_factory_of(ListedConstraint))
     valued_constraints: dict[ValuedConstraint, Any] = Field(default_factory=empty_dict_factory_of(ValuedConstraint))
     rules: ImgGenModelRules | None = None
+    # Provider-side route for models the worker calls by raw path (today: the gateway image models). Our own
+    # routing metadata, not a request header — which is why it is a declared field and not an `extra_headers` entry.
+    endpoint_path: str | None = None
 
     @field_validator("rules", mode="before")
     @staticmethod
@@ -105,9 +106,9 @@ class InferenceModelSpecFactory(BaseModel):
             thinking_mode=blueprint.thinking_mode,
             max_tokens=blueprint.max_tokens,
             max_prompt_images=blueprint.max_prompt_images,
-            prompting_target=blueprint.prompting_target,
             listed_constraints=merged_listed_constraints,
             valued_constraints=merged_valued_constraints,
             extra_headers=extra_headers,
             rules=blueprint.rules,
+            endpoint_path=blueprint.endpoint_path,
         )

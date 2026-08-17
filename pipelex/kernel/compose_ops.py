@@ -69,13 +69,18 @@ async def run_compose_template(
     category: TemplateCategory,
     concept: Concept,
     output_class: type[StuffContent],
-    templating_style: TemplatingStyle | None = None,
+    templating_style: TemplatingStyle,
     runtime_params: dict[str, Any] | None = None,
     extra_context: dict[str, Any] | None = None,
     result_name: str | None = None,
     result_code: str | None = None,
 ) -> ComposeResult:
-    """A whole compose step over a template: build the context, render, wrap, store, report."""
+    """A whole compose step over a template: build the context, render, wrap, store, report.
+
+    `templating_style` is required rather than nullable: a composed template can tag its inputs like
+    any prompt does, and the filters that do it have no default of their own. The caller resolves what
+    the step authored against the runtime default.
+    """
     rendered_text = await render_template(
         template=template,
         category=category,

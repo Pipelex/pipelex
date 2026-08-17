@@ -23,7 +23,7 @@ class GoogleFactory:
         # Tier 1 transport retry: the Google GenAI SDK does NOT retry transient transport failures
         # unless retry_options is set. Wire it explicitly from config so it matches the other
         # SDK-backed workers. HttpRetryOptions.attempts counts the original attempt, hence the +1.
-        transport_max_retries = get_config().cogt.transport_max_retries
+        transport_max_retries = get_config().inference.transport_max_retries
         http_options = genai_types.HttpOptions(retry_options=genai_types.HttpRetryOptions(attempts=transport_max_retries + 1))
         return GoogleGenAiClient(api_key=backend.api_key, http_options=http_options)
 

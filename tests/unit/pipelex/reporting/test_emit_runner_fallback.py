@@ -102,7 +102,7 @@ def _reset_activity_event_log_state() -> Any:  # pyright: ignore[reportUnusedFun
 
 def _enable_ndjson_tracing(mocker: MockerFixture, traces_dir: Path) -> None:
     """Patch the live tracing config to enabled NDJSON pointing at traces_dir."""
-    cfg = get_config().pipelex.tracing_config
+    cfg = get_config().runtime.tracing
     mocker.patch.object(cfg, "is_enabled", True)
     mocker.patch.object(cfg, "backend", TracingBackend.NDJSON)
     mocker.patch.object(cfg, "ndjson", NdjsonTracingConfig(traces_dir=str(traces_dir)))
@@ -197,7 +197,7 @@ class TestEmitRunnerFallback:
         construct their own backend, generating two writer_ids and racing on the file.
         """
         _enable_ndjson_tracing(mocker, tmp_path)
-        cfg = get_config().pipelex.tracing_config
+        cfg = get_config().runtime.tracing
 
         nb_threads = 16
         barrier = threading.Barrier(nb_threads)
@@ -228,8 +228,8 @@ class TestEmitRunnerFallback:
         tmp_path: Path,
         mocker: MockerFixture,
     ) -> None:
-        """When tracing_config.is_enabled=False, the fallback returns without writing any file."""
-        cfg = get_config().pipelex.tracing_config
+        """When runtime.tracing.is_enabled=False, the fallback returns without writing any file."""
+        cfg = get_config().runtime.tracing
         mocker.patch.object(cfg, "is_enabled", False)
 
         manager = ReportingManager()

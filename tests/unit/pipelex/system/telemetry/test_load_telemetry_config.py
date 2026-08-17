@@ -13,8 +13,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipelex.kit.paths import get_kit_configs_dir
-from pipelex.system.telemetry import telemetry_config as telemetry_config_module
-from pipelex.system.telemetry.telemetry_config import load_telemetry_config
+from pipelex.system.telemetry import telemetry_loader as telemetry_loader_module
+from pipelex.system.telemetry.telemetry_loader import load_telemetry_config
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
 if TYPE_CHECKING:
@@ -154,7 +154,7 @@ class TestLoadTelemetryConfigLayering:
         mocker.patch.object(Path, "home", return_value=fake_home)
         mocker.patch.object(Path, "cwd", return_value=fake_home)
 
-        spy = mocker.spy(telemetry_config_module, "load_toml_from_path_and_merge_with_overrides")
+        spy = mocker.spy(telemetry_loader_module, "load_toml_from_path_and_merge_with_overrides")
 
         config = load_telemetry_config(secrets_provider=secrets_provider)
 

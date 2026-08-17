@@ -31,7 +31,7 @@ def _usage(job_metadata: JobMetadata) -> LLMTokensUsage:
 
 class TestRenderCostReportForOutput:
     def _enable_channels(self, mocker: MockerFixture) -> None:
-        reporting_config = get_config().pipelex.reporting_config
+        reporting_config = get_config().runtime.reporting
         mocker.patch.object(reporting_config, "is_log_costs_to_console", True)
         mocker.patch.object(reporting_config, "is_generate_cost_report_file_enabled", False)
 

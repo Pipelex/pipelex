@@ -9,7 +9,7 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 def resolve_batch_max_concurrency(max_concurrency_setting: int | Literal["unbounded"]) -> int | None:
-    """Translate the ``pipeline_execution_config.max_concurrency`` setting into a ``gather_bounded`` bound.
+    """Translate the ``interpreter.pipeline_execution.max_concurrency`` setting into a ``gather_bounded`` bound.
 
     The config exposes the explicit literal ``"unbounded"``; ``gather_bounded`` takes ``None`` for no
     bound. Any int value is passed through unchanged. Centralizing this guards against passing the
@@ -52,13 +52,13 @@ class PipeRunParamsFactory:
         """
         check_mock_usage_requires_dry(run_mode=pipe_run_mode, is_mock_usage=is_mock_usage)
         pipe_run_mode = resolve_run_mode_for_boot(requested=pipe_run_mode)
-        config = get_config().pipelex
-        pipe_stack_limit = pipe_stack_limit or config.pipe_run_config.pipe_stack_limit
+        config = get_config().interpreter
+        pipe_stack_limit = pipe_stack_limit or config.pipe_run.pipe_stack_limit
         return PipeRunParams(
             run_mode=pipe_run_mode,
             is_mock_usage=is_mock_usage,
             pipe_stack_limit=pipe_stack_limit,
-            batch_max_concurrency=resolve_batch_max_concurrency(config.pipeline_execution_config.max_concurrency),
+            batch_max_concurrency=resolve_batch_max_concurrency(config.pipeline_execution.max_concurrency),
             output_multiplicity=output_multiplicity,
             dynamic_output_concept_ref=dynamic_output_concept_ref,
             batch_params=batch_params,

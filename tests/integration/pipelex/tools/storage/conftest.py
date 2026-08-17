@@ -176,7 +176,7 @@ def storage_provider(
 @pytest.fixture
 def uri_format(storage_method: StorageMethodLiteral) -> str:
     """Get the URI format for the given storage method from the config."""
-    storage_config = get_config().pipelex.storage_config
+    storage_config = get_config().runtime.storage
     match storage_method:
         case "local":
             assert storage_config.local is not None
@@ -211,7 +211,7 @@ def mock_fetch_remote_content_enabled(mocker: MockerFixture) -> None:
     """
     original_config = get_config()
     mocker.patch.object(
-        original_config.pipelex.storage_config,
+        original_config.runtime.storage,
         "is_fetch_remote_content_enabled",
         True,
     )
@@ -226,7 +226,7 @@ def mock_fetch_remote_content_disabled(mocker: MockerFixture) -> None:
     """
     original_config = get_config()
     mocker.patch.object(
-        original_config.pipelex.storage_config,
+        original_config.runtime.storage,
         "is_fetch_remote_content_enabled",
         False,
     )
@@ -241,7 +241,7 @@ def mock_upload_local_content_enabled(mocker: MockerFixture) -> None:
     """
     original_config = get_config()
     mocker.patch.object(
-        original_config.pipelex.storage_config,
+        original_config.runtime.storage,
         "is_upload_local_content_enabled",
         True,
     )
@@ -256,7 +256,7 @@ def mock_upload_local_content_disabled(mocker: MockerFixture) -> None:
     """
     original_config = get_config()
     mocker.patch.object(
-        original_config.pipelex.storage_config,
+        original_config.runtime.storage,
         "is_upload_local_content_enabled",
         False,
     )

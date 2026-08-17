@@ -169,10 +169,10 @@ Each provider has an `effort_to_level_map` configured in its provider subconfig 
 
 ### OpenAI (Completions & Responses)
 
-OpenAI models use `thinking_mode = "manual"` and map `ReasoningEffort` to the `reasoning_effort` parameter via `openai_config.effort_to_level_map`:
+OpenAI models use `thinking_mode = "manual"` and map `ReasoningEffort` to the `reasoning_effort` parameter via `inference.llm.openai.effort_to_level_map`:
 
 ```toml
-[cogt.llm_config.openai_config.effort_to_level_map]
+[inference.llm.openai.effort_to_level_map]
 none = "none"
 minimal = "minimal"
 low = "low"
@@ -201,10 +201,10 @@ When reasoning is active, `temperature` is omitted from the SDK call (OpenAI req
 
 ### Anthropic
 
-Anthropic supports both `manual` and `adaptive` thinking modes. The effort mapping is configured via `anthropic_config.effort_to_level_map`:
+Anthropic supports both `manual` and `adaptive` thinking modes. The effort mapping is configured via `inference.llm.anthropic.effort_to_level_map`:
 
 ```toml
-[cogt.llm_config.anthropic_config.effort_to_level_map]
+[inference.llm.anthropic.effort_to_level_map]
 none = "disabled"
 minimal = "low"
 low = "low"
@@ -224,11 +224,11 @@ max = "max"
 | `XHIGH` | `"xhigh"` |
 | `MAX` | `"max"` |
 
-Both modes first check `anthropic_config.effort_to_level_map` to gate reasoning. If the map returns `"disabled"` (e.g., for `NONE` effort), thinking is disabled entirely — no `thinking` parameter is sent to the SDK.
+Both modes first check `inference.llm.anthropic.effort_to_level_map` to gate reasoning. If the map returns `"disabled"` (e.g., for `NONE` effort), thinking is disabled entirely — no `thinking` parameter is sent to the SDK.
 
 **ADAPTIVE mode** uses `{"type": "adaptive"}` with an `OutputConfigParam(effort=...)` where the effort value comes from the level map.
 
-**MANUAL mode** resolves effort to a token budget via the `effort_to_budget_maps` config (keyed by `prompting_target`), then sends `{"type": "enabled", "budget_tokens": N}`. The budget is capped to `min(budget, max_tokens - 1)` to satisfy Anthropic's API constraint.
+**MANUAL mode** resolves effort to a token budget via the `effort_to_budget_maps` config (keyed by the worker-owned reasoning family — `"anthropic"` for the Anthropic worker), then sends `{"type": "enabled", "budget_tokens": N}`. The budget is capped to `min(budget, max_tokens - 1)` to satisfy Anthropic's API constraint.
 
 **`reasoning_budget`** (explicit) always uses `{"type": "enabled", "budget_tokens": N}` regardless of thinking mode. The same `min(budget, max_tokens - 1)` cap is applied.
 
@@ -239,10 +239,10 @@ When thinking is active, `temperature` is suppressed (Anthropic requires `temper
 
 ### Google Gemini
 
-Google models use either `thinking_mode = "manual"` (Gemini 2.5 series) or `thinking_mode = "adaptive"` (Gemini 3 series). Both modes use `google_config.effort_to_level_map` as a gate:
+Google models use either `thinking_mode = "manual"` (Gemini 2.5 series) or `thinking_mode = "adaptive"` (Gemini 3 series). Both modes use `inference.llm.google.effort_to_level_map` as a gate:
 
 ```toml
-[cogt.llm_config.google_config.effort_to_level_map]
+[inference.llm.google.effort_to_level_map]
 none = "disabled"
 minimal = "minimal"
 low = "low"
@@ -286,10 +286,10 @@ Temperature is passed normally to the Google API regardless of reasoning mode.
 
 ### Mistral
 
-Mistral models use `thinking_mode = "manual"`. The effort mapping is configured via `mistral_config.effort_to_level_map`:
+Mistral models use `thinking_mode = "manual"`. The effort mapping is configured via `inference.llm.mistral.effort_to_level_map`:
 
 ```toml
-[cogt.llm_config.mistral_config.effort_to_level_map]
+[inference.llm.mistral.effort_to_level_map]
 none = "disabled"
 minimal = "reasoning"
 low = "reasoning"
@@ -341,7 +341,7 @@ The level is resolved at runtime via `<ProviderConfig>.get_reasoning_level()` in
 For providers that use token budgets (Anthropic MANUAL, Google MANUAL), `ReasoningEffort` is resolved to a token count via the `effort_to_budget_maps` in `pipelex.toml`:
 
 ```toml
-[cogt.llm_config.effort_to_budget_maps.anthropic]
+[inference.llm.effort_to_budget_maps.anthropic]
 none = 0
 minimal = 512
 low = 1024
@@ -350,7 +350,7 @@ high = 16384
 xhigh = 32768
 max = 65536
 
-[cogt.llm_config.effort_to_budget_maps.gemini]
+[inference.llm.effort_to_budget_maps.gemini]
 none = 0
 minimal = 512
 low = 1024
@@ -360,7 +360,7 @@ xhigh = 32768
 max = 65536
 ```
 
-The map is keyed by `prompting_target` (from the model spec). A validated mapping must contain entries for all `ReasoningEffort` values (including `none`, even though it is unreachable at runtime — the level map gates `NONE` as disabled before the budget lookup).
+The map is keyed by the reasoning family each worker owns (`reasoning_budget_family`, a class attribute: `"anthropic"` on the Anthropic worker, `"gemini"` on the Google worker) — the model spec plays no part in the lookup. A validated mapping must contain entries for all `ReasoningEffort` values (including `none`, even though it is unreachable at runtime — the level map gates `NONE` as disabled before the budget lookup).
 
 The budget is resolved at runtime via `LLMConfig.get_reasoning_budget()` (`pipelex/cogt/config_cogt.py`).
 

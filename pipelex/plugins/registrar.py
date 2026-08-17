@@ -145,8 +145,13 @@ class PluginRegistrar:
     All duplicate detection is fail-loud and names both contributing plugins.
     """
 
-    def __init__(self, *, config: "PipelexConfig"):
+    def __init__(self, *, config: "PipelexConfig", boot_orchestrator: str | None = None):
         self.config = config
+        # The orchestrator plugin this process boots under, or ``None``. A boot argument, not a
+        # setting: it arrives from ``build_registrar`` rather than off ``config``, so a plugin's
+        # ``register`` gates on ``registrar.boot_orchestrator == self.name``. Defaulted so a focused
+        # unit test can build a registrar without naming one.
+        self.boot_orchestrator = boot_orchestrator
         self.inference_backends: dict[tuple[InferenceFamily, str], MakeWorkerFn] = {}
         self.model_listers: dict[str, ListModelsFn] = {}
         self.orchestrators: dict[OrchestrationMode, OrchestratorProtocol] = {}
@@ -242,7 +247,7 @@ class PluginRegistrar:
 
         The built-in ``StoragePlugin`` registers the ``local`` / ``in_memory`` / ``s3`` / ``gcp``
         methods; an external ``pipelex-storage-<backend>`` plugin registers its own token (e.g.
-        ``"azure"``). Boot reads ``storage_config.method`` and calls the looked-up factory to
+        ``"azure"``). Boot reads ``runtime.storage.method`` and calls the looked-up factory to
         produce the one storage provider set on the hub. ``factory`` is invoked at that boot
         apply-point, never here — so a factory may do heavy work (SDK import, a hub secrets read)
         while ``register`` stays import-light. Fail-loud on a duplicate method, naming both plugins.
@@ -263,7 +268,7 @@ class PluginRegistrar:
 
         The built-in ``SecretsPlugin`` registers the ``env`` method; an external
         ``pipelex-secrets-<backend>`` plugin registers its own token (e.g. ``"vault"``). Boot reads
-        ``secrets_config.method`` and calls the looked-up factory to produce the one secrets provider
+        ``runtime.secrets.method`` and calls the looked-up factory to produce the one secrets provider
         set on the hub. ``factory`` is invoked at that boot apply-point, never here — so a factory may
         do heavy work (SDK import) while ``register`` stays import-light. Fail-loud on a duplicate
         method, naming both plugins.
@@ -284,7 +289,7 @@ class PluginRegistrar:
 
         The built-in ``PipeFuncPlugin`` registers ``direct`` (in-process); an external sandbox plugin
         (e.g. our Daytona plugin) registers its own token
-        (e.g. ``"daytona"``). Boot reads ``pipe_func_config.execution_mode`` and calls the looked-up
+        (e.g. ``"daytona"``). Boot reads ``interpreter.pipe_func.execution_mode`` and calls the looked-up
         factory to produce the one PipeFunc executor set on the hub. ``factory`` is invoked at that boot
         apply-point, never here — so a factory may do heavy work (SDK import, config self-load) while
         ``register`` stays import-light. This is the PipeFunc-execution axis, orthogonal to the
@@ -354,7 +359,7 @@ class PluginRegistrar:
     def registered_plugin_names(self) -> set[str]:
         """Names of plugins that discovered and registered successfully.
 
-        The authoritative namespace the ``plugins.boot_orchestrator`` gate matches against: a
+        The authoritative namespace the ``boot_orchestrator`` gate matches against: a
         boot-orchestrator plugin claims its hub slots iff ``boot_orchestrator == its own name``.
         Disabled/broken discoveries are excluded — they never run ``register`` and so never claim a
         slot, making them invalid boot-orchestrator targets.

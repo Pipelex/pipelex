@@ -23,7 +23,6 @@
 [defaults]
 model_type = "llm"
 sdk = "azure_openai_responses"
-prompting_target = "openai"
 structure_method = "instructor/openai_responses_tools"
 thinking_mode = "none"
 

@@ -42,9 +42,9 @@ class TestGenerateViewForBundle:
         )
 
         execution_config_mock = mocker.MagicMock()
-        execution_config_mock.graph_config.reactflow_config.layout_direction = config_layout_direction
+        execution_config_mock.graph.reactflow.layout_direction = config_layout_direction
         config_mock = mocker.MagicMock()
-        config_mock.pipelex.pipeline_execution_config.with_execution_overrides.return_value = execution_config_mock
+        config_mock.interpreter.pipeline_execution.with_execution_overrides.return_value = execution_config_mock
         mocker.patch(f"{BUNDLE_GRAPH_RENDERING_MODULE}.get_config", return_value=config_mock)
 
         return bundle_path, graph_spec_mock, dry_run_mock

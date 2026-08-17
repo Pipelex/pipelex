@@ -50,7 +50,7 @@ class _FakeSecretsProvider:
 
 
 def _build_storage_registry() -> StorageProviderRegistry:
-    registrar = PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(plugins=SimpleNamespace(disabled=[]))))
+    registrar = PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(runtime=SimpleNamespace(plugins=SimpleNamespace(disabled=[])))))
     StoragePlugin().register(registrar)
     return StorageProviderRegistry(registrar.storage_providers)
 
@@ -62,7 +62,7 @@ class TestStoragePlugin:
         assert plugin.name == "storage"
         assert plugin.targets_api == PLUGIN_API_VERSION
 
-        registrar = PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(plugins=SimpleNamespace(disabled=[]))))
+        registrar = PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(runtime=SimpleNamespace(plugins=SimpleNamespace(disabled=[])))))
         discovery = registrar.begin_plugin(name="storage", origin=PluginOrigin.BUILTIN, targets_api=PLUGIN_API_VERSION, group=None)
         plugin.register(registrar)
 

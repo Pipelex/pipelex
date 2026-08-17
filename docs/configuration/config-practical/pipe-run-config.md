@@ -20,7 +20,7 @@ class PipeRunConfig(ConfigModel):
 ## Example Configuration
 
 ```toml
-[pipelex.pipe_run_config]
+[interpreter.pipe_run]
 pipe_stack_limit = 20
 ```
 

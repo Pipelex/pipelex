@@ -16,7 +16,7 @@ class LocalObserverEventType(StrEnum):
 
 class LocalObserver(ObserverProtocol):
     def __init__(self, storage_dir: str | Path | None = None) -> None:
-        self.storage_dir = Path(storage_dir or get_config().pipelex.observer_config.observer_dir)
+        self.storage_dir = Path(storage_dir or get_config().runtime.observer.observer_dir)
         self.storage_dir.mkdir(parents=True, exist_ok=True)
 
     def _write_to_jsonl(self, *, event_type: str, payload: PayloadType) -> None:

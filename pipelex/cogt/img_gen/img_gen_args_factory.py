@@ -458,21 +458,19 @@ class ImgGenArgsFactory:
                         log.warning(f"Number of inference steps {num_inference_steps} for SDXL Lightning must be one of {acceptable_steps}")
                         num_inference_steps = 4
                 else:
-                    num_inference_steps = get_config().cogt.img_gen_config.get_num_inference_steps(
+                    num_inference_steps = get_config().inference.img_gen.get_num_inference_steps(
                         model_name="sdxl_lightning", quality=quality or Quality.MEDIUM
                     )
                 args_dict["num_inference_steps"] = num_inference_steps
             case InferenceTaxonomy.FLUX:
                 if num_inference_steps is None:
-                    num_inference_steps = get_config().cogt.img_gen_config.get_num_inference_steps(
-                        model_name="flux", quality=quality or Quality.MEDIUM
-                    )
+                    num_inference_steps = get_config().inference.img_gen.get_num_inference_steps(model_name="flux", quality=quality or Quality.MEDIUM)
                 args_dict["num_inference_steps"] = num_inference_steps
                 if guidance_scale:
                     args_dict["guidance_scale"] = guidance_scale
             case InferenceTaxonomy.QWEN_IMAGE:
                 if num_inference_steps is None:
-                    num_inference_steps = get_config().cogt.img_gen_config.get_num_inference_steps(
+                    num_inference_steps = get_config().inference.img_gen.get_num_inference_steps(
                         model_name="qwen_image", quality=quality or Quality.MEDIUM
                     )
                 args_dict["num_inference_steps"] = num_inference_steps

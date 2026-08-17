@@ -6,7 +6,7 @@ class (pre-flight decision 2), exercising real datamodel-code-generator codegen.
 - a representative ``StructuredContent`` mocks into a valid instance of the original class
   (the object-mock fidelity pin mandated by pre-flight decision 2);
 - ``nb_items`` carried on ``ObjectAssignment`` controls the dry list length, falling back to
-  ``dry_run_config.nb_list_items`` (eng review D11);
+  ``inference.dry_run.nb_list_items`` (eng review D11);
 - the structured-search dry leaf splits the same way the object leaf does: at the boundary it returns a
   dict built from the schema rebuild, where a dropped invariant surfaces as ``DryRunObjectFidelityError``
   (eng review D6); in-process it mocks the caller's real class, where that invariant is present at build
@@ -143,10 +143,10 @@ class TestLeafDryObjectMocks:
         assert first_item_pipe_code == "mock_main"
 
     async def test_dry_object_list_defaults_to_config_length(self) -> None:
-        """Without nb_items the dry list falls back to dry_run_config.nb_list_items."""
+        """Without nb_items the dry list falls back to inference.dry_run.nb_list_items."""
         mocks = dry_llm_gen_object_list(_dry_object_assignment(RepresentativeInvoiceLine))
 
-        assert len(mocks) == get_config().pipelex.dry_run_config.nb_list_items
+        assert len(mocks) == get_config().inference.dry_run.nb_list_items
 
     async def test_generator_dry_object_list_keeps_fixed_length(self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol) -> None:
         """End-to-end through ContentGenerator: a fixed nb_items survives down to the dry leaf (D11 regression)."""
