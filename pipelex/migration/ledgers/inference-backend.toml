@@ -11,5 +11,45 @@ id = "inference-backend"
 title = "Inference backend model definitions"
 subdirectory = "inference/backends"
 tier_glob = "*.toml"
-current_schema_version = 1
+current_schema_version = 2
 min_supported_schema_version = 0
+
+[[migration]]
+id = "inference-backend@2"
+to_schema_version = 2
+introduced_in = "0.46.0"
+breaking = true
+safety = "safe"
+pre_history = true
+title = "Drop prompting_target from every backend definition"
+description = """
+`prompting_target` used to name the prompt dialect a model wanted — `anthropic`, `gemini` — and a \
+backend file set it in `[defaults]` for the whole file and overrode it on the models that differed. \
+Prompt templating is now authored on the pipe (`templating_style` on a `PipeLLM`) rather than \
+inferred from the model, so the field was removed from the model-spec blueprint and from every \
+backend file we ship. A file written before that removal is not merely out of date: the blueprint \
+is strict, and `pipelex init` never overwrites a file you already have, so the key stays behind and \
+breaks the boot. This entry deletes it wherever it sits.
+"""
+guidance = """
+The key is deleted rather than moved, because nothing today holds a per-model prompt dialect: choose
+the style on the pipe that needs it, with `templating_style` on the `PipeLLM`.
+
+One occurrence in `[defaults]` is enough to break the whole file — that table is copied into every
+model of it before validation — which is why the operation below addresses every root table and not
+only the models that spelled the key out.
+
+This entry accounts for what *we* removed, and for nothing else. A per-model key of your own that
+the loader refuses is still yours to fix: it is named, with the reason, in the message that refuses
+it.
+"""
+
+# Declared rather than derived: this change predates the first fingerprint, so no snapshot shows the
+# path going away and there is no diff to account the entry against. The hand-authored document the
+# operation below is verified against is goldens/inference-backend/before@2.toml.
+declared_removed_paths = ["*.prompting_target"]
+
+[[migration.ops]] # `["*"]` is every root table of the file: `[defaults]` and each model alike
+kind = "delete_key"
+table_path = ["*"]
+key = "prompting_target"

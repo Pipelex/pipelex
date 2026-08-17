@@ -1,0 +1,43 @@
+# A backend definition file as it stood before `prompting_target` was removed — hand-authored, and
+# the one document in this directory that is neither snapshotted nor regenerated. Entry
+# `inference-backend@2` is marked `pre_history` because the change it describes predates the first
+# fingerprint, so there is no `defaults@1.toml` on its far side to start from; this file is what it
+# starts from instead, and the transform check verifies the entry by migrating it and looking at
+# what comes out.
+#
+# It is shaped on the Portkey backend of that era and trimmed to the tables that make the entry's
+# single operation exercised rather than merely declared. Three things are deliberate:
+#
+# - `prompting_target` sits in `[defaults]`, where one occurrence used to break *every* model of the
+#   file, because the loader copies that table wholesale into each model's blueprint;
+# - one model table carries it and one does not, so the operation is seen both applying and skipping
+#   within the same document;
+# - the header-shaped keys belong to the request rather than to the model, and must come through
+#   byte-untouched — deleting a key the loader never validates is the failure this witnesses against.
+
+[defaults]
+model_type = "llm"
+sdk = "portkey_completions"
+structure_method = "instructor/openai_tools"
+prompting_target = "anthropic"
+thinking_mode = "none"
+
+[gpt-4o]
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 2.5, output = 10.0 }
+sdk = "portkey_responses"
+structure_method = "instructor/openai_responses_tools"
+thinking_mode = "none"
+x-portkey-provider = "@openai"
+
+["gemini-2.5-pro"]
+model_id = "gemini-2.5-pro"
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 1.25, output = 10.0 }
+thinking_mode = "manual"
+prompting_target = "gemini"
+x-portkey-provider = "@google"
+x-portkey-config = "pc-example-config-id"
