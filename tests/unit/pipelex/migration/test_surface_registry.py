@@ -23,12 +23,17 @@ class _Required(BaseModel):
     label: str
 
 
-def _surface(*, surface_id: str, base_file: str, tier_glob: str | None = None) -> Surface:
+CONFIGURATION_ROOT = Path()
+BACKENDS = Path("inference") / "backends"
+
+
+def _surface(*, surface_id: str, base_file: str | None, tier_glob: str | None = None, subdirectory: Path = CONFIGURATION_ROOT) -> Surface:
     return Surface(
         surface_id=surface_id,
         title=surface_id,
         base_file=base_file,
         tier_glob=tier_glob,
+        subdirectory=subdirectory,
         config_model=_Defaulted,
         defaults_layer_kind=DefaultsLayerKind.MODEL_DEFAULTS,
     )
@@ -138,6 +143,35 @@ class TestRegistryConsistency:
                     _surface(surface_id="b", base_file="b.toml", tier_glob="shared_*.toml"),
                 ]
             )
+
+    def test_two_surfaces_sharing_a_tier_glob_in_different_directories_are_fine(self) -> None:
+        """A glob is a claim within one directory, so the same glob shape twice is not a collision.
+
+        `*.toml` is the obvious one: it would be the whole language of any surface that owns a
+        directory of its own, and forbidding it globally would mean the second such surface has to
+        invent a narrower glob for no reason but the registry's bookkeeping.
+        """
+        registry = SurfaceRegistry(
+            surfaces=[
+                _surface(surface_id="a", base_file="a.toml", tier_glob="*.toml"),
+                _surface(surface_id="b", base_file=None, tier_glob="*.toml", subdirectory=BACKENDS),
+            ]
+        )
+        assert len(registry.surfaces) == 2
+
+    def test_two_surfaces_sharing_a_tier_glob_in_the_same_directory_are_still_refused(self) -> None:
+        with pytest.raises(ValidationError, match="share the tier glob"):
+            SurfaceRegistry(
+                surfaces=[
+                    _surface(surface_id="a", base_file="a.toml", tier_glob="shared_*.toml", subdirectory=BACKENDS),
+                    _surface(surface_id="b", base_file="b.toml", tier_glob="shared_*.toml", subdirectory=BACKENDS),
+                ]
+            )
+
+    def test_a_surface_that_claims_nothing_is_refused(self) -> None:
+        """A surface with no base file must say which files in its directory are its own."""
+        with pytest.raises(ValidationError, match="claims no file"):
+            _surface(surface_id="a", base_file=None, tier_glob=None, subdirectory=BACKENDS)
 
     def test_a_base_file_matching_another_surfaces_glob_is_fine(self) -> None:
         """This is the real configuration: `pipelex_service.toml` matches `pipelex_*.toml`.

@@ -499,6 +499,12 @@ def _check_ledger_agrees_with_registry(*, surface: Surface, ledger: MigrationLed
     Both halves are hand-written and both are consumed as truth — the ledger's when a migration
     walks a directory, the registry's when a gate fingerprints a model — so a disagreement between
     them is a silent mis-migration waiting for the day the two readers meet.
+
+    `subdirectory` is the one that has a second reader on the boot path: a stale-configuration
+    warning names `pipelex migrate` only for a file the walk reaches, and it works out where the
+    walk reaches from the **ledger**, because its own module may not import the registry. A ledger
+    saying one directory while the registry walks another is a boot promising a remedy the command
+    then declines, which is exactly the defect the one-derivation rule exists to prevent.
     """
     mismatches = [
         (label, declared, recorded)
@@ -506,6 +512,7 @@ def _check_ledger_agrees_with_registry(*, surface: Surface, ledger: MigrationLed
             ("id", surface.surface_id, ledger.surface.id),
             ("base_file", surface.base_file, ledger.surface.base_file),
             ("tier_glob", surface.tier_glob, ledger.surface.tier_glob),
+            ("subdirectory", surface.subdirectory.as_posix(), Path(ledger.surface.subdirectory).as_posix()),
         )
         if declared != recorded
     ]

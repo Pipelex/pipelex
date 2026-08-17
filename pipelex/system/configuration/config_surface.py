@@ -183,12 +183,36 @@ def replay_surface_files_in_memory(*, surface_id: str, paths: Sequence[Path]) ->
     return ReplayedSurface(config_dict=merged, plans=plans)
 
 
-def _is_within(*, path: Path, directories: Sequence[Path]) -> bool:
-    """Whether a file sits directly in one of these directories.
+def _subdirectory_owned_by(*, surface_id: str) -> Path:
+    """The directory this surface's files sit in, relative to a configuration directory.
 
-    Directly, not underneath: the walk is not recursive, so a file in a subdirectory of a
-    configuration directory is as far out of `pipelex migrate`'s reach as one on the other side of
-    the disk.
+    Read from the **ledger**, not from the surface registry, and the reason is layering: the
+    registry imports every configuration model, and this module sits in `runtime_hub`'s import
+    closure — the kernel layer, which loads none of them. A ledger is the one half of the pair a
+    loader may reach, and `make check-migration-schemas` cross-checks it against the registry, so
+    reading it here is not a second derivation of the walk but the same one read from its other
+    end.
+
+    A ledger that will not load answers "directly in a configuration directory", which is what
+    every surface but one says anyway. Nothing here is allowed to become the failure the user
+    sees: they have a configuration error in front of them, and a packaging problem of ours is
+    loud in `make check-ledger` and in `pipelex migrate` instead.
+    """
+    try:
+        ledger = load_ledger_cached(migration_dir=packaged_migration_dir(), surface_id=surface_id)
+    except MigrationLedgerError:
+        return Path()
+    return Path(ledger.surface.subdirectory)
+
+
+def _is_within(*, plan: MigrationPlan, directories: Sequence[Path]) -> bool:
+    """Whether `pipelex migrate` would reach this plan's file, given the directories it walks.
+
+    The walk is one level deep, but not always at the top: it is **the directory this file's own
+    surface owns** under each configuration directory. So a `telemetry.toml` under
+    `inference/backends/` is out of reach — that directory belongs to another surface — while an
+    `openai.toml` in it is in reach, and a file under `inference/deck/` is out of reach whatever
+    it is called, because no surface owns that directory and the walk never enters it.
 
     **The parent is resolved; the file is not**, and that asymmetry is the whole of it. Resolving
     the *directory* is what the walk itself effectively does — a caller's `config_dir=` may be the
@@ -199,11 +223,12 @@ def _is_within(*, path: Path, directories: Sequence[Path]) -> bool:
     when the walk enumerates the link by `iterdir` and writes straight through it. Where the file
     *points* is not where the command looks for it.
     """
+    subdirectory = _subdirectory_owned_by(surface_id=plan.surface_id)
     try:
-        parent = path.parent.resolve()
+        parent = plan.file_path.parent.resolve()
     except OSError:
         return False
-    return any(parent == directory.resolve() for directory in directories)
+    return any(parent == (directory / subdirectory).resolve() for directory in directories)
 
 
 def _quoted_files(*, plans: Sequence[MigrationPlan]) -> str:
@@ -227,8 +252,8 @@ def stale_configuration_warning(*, plans: Sequence[MigrationPlan], walked_dirs: 
     directory is theirs to update, and `--config-dir` is deliberately not the answer.
     """
     stale = [plan for plan in plans if not plan.is_clean]
-    in_reach = [plan for plan in stale if _is_within(path=plan.file_path, directories=walked_dirs)]
-    out_of_reach = [plan for plan in stale if not _is_within(path=plan.file_path, directories=walked_dirs)]
+    in_reach = [plan for plan in stale if _is_within(plan=plan, directories=walked_dirs)]
+    out_of_reach = [plan for plan in stale if not _is_within(plan=plan, directories=walked_dirs)]
     carried = sorted({step.title for plan in stale for step in plan.steps})
     sentences = [f"Your configuration is out of date, and pipelex read it as if it had been migrated: {_quoted_files(plans=stale)}."]
     if carried:

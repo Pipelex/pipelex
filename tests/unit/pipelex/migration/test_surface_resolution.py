@@ -3,6 +3,9 @@
 Which ledger runs over a file must never be an accident of iteration order. The registry refuses
 what it can decide by name alone when it loads; what it cannot decide — whether two glob languages
 overlap — is decided here, where there is a real file to point at.
+
+A claim is the pair (directory, name); this module is the *name* half, with every file at the root
+of a configuration directory. `test_surface_directories.py` is the directory half.
 """
 
 import re
@@ -12,7 +15,7 @@ import pytest
 
 from pipelex.migration.exceptions import MigrationRegistryError
 from pipelex.migration.surfaces import SurfaceRegistry
-from tests.unit.pipelex.migration.conftest import SurfaceBuilder
+from tests.unit.pipelex.migration.conftest import CONFIGURATION_ROOT, SurfaceBuilder
 
 
 class TestSurfaceResolution:
@@ -25,7 +28,7 @@ class TestSurfaceResolution:
             ]
         )
 
-        resolved = registry.surface_for_file_name(file_name="pipelex_service.toml")
+        resolved = registry.surface_for_file(subdirectory=CONFIGURATION_ROOT, file_name="pipelex_service.toml")
 
         assert resolved is not None
         assert resolved.surface_id == "pipelex-service-config"
@@ -33,7 +36,7 @@ class TestSurfaceResolution:
     def test_a_tier_file_resolves_to_the_surface_whose_glob_matches(self, build_surface: SurfaceBuilder) -> None:
         registry = SurfaceRegistry(surfaces=[build_surface(surface_id="pipelex-config", base_file="pipelex.toml", tier_glob="pipelex_*.toml")])
 
-        resolved = registry.surface_for_file_name(file_name="pipelex_staging.toml")
+        resolved = registry.surface_for_file(subdirectory=CONFIGURATION_ROOT, file_name="pipelex_staging.toml")
 
         assert resolved is not None
         assert resolved.surface_id == "pipelex-config"
@@ -41,7 +44,7 @@ class TestSurfaceResolution:
     def test_a_file_no_surface_claims_resolves_to_nothing(self, build_surface: SurfaceBuilder) -> None:
         registry = SurfaceRegistry(surfaces=[build_surface(surface_id="pipelex-config", base_file="pipelex.toml", tier_glob="pipelex_*.toml")])
 
-        assert registry.surface_for_file_name(file_name="plxt.toml") is None
+        assert registry.surface_for_file(subdirectory=CONFIGURATION_ROOT, file_name="plxt.toml") is None
 
     def test_a_file_two_globs_both_claim_stops_by_name(self, build_surface: SurfaceBuilder) -> None:
         """The registry accepts these globs — deciding overlap between glob *languages* is not its
@@ -58,7 +61,7 @@ class TestSurfaceResolution:
         )
 
         with pytest.raises(MigrationRegistryError, match=re.escape("pipelex_local.toml")):
-            registry.surface_for_file_name(file_name="pipelex_local.toml")
+            registry.surface_for_file(subdirectory=CONFIGURATION_ROOT, file_name="pipelex_local.toml")
 
     def test_a_directory_walk_returns_the_claimed_files_with_their_surfaces(
         self,

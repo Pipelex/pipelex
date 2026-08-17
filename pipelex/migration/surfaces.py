@@ -61,8 +61,24 @@ class Surface(BaseModel):
 
     surface_id: str
     title: str
-    base_file: str
+
+    base_file: str | None = None
+    """The one file of the family that is distinguished by name, when there is one.
+
+    A family whose members are all alike — the inference backend definitions, one file per backend
+    — has none, and claims its files by `tier_glob` alone."""
+
     tier_glob: str | None = None
+
+    subdirectory: Path = Path()
+    """The directory, relative to a configuration directory, whose files this surface claims.
+
+    Empty for a surface that lives directly in `~/.pipelex/` or `.pipelex/`. A surface that owns a
+    subdirectory owns it *one level deep and to the exclusion of every other surface*, which is
+    what makes `inference/backends/pipelex_gateway.toml` safe: its name matches the main
+    configuration's tier glob exactly, and only the directory it sits in says it is not a
+    `pipelex.toml` tier file."""
+
     config_model: type[BaseModel]
     defaults_layer_kind: DefaultsLayerKind
     packaged_document_path: Path | None = None
@@ -75,6 +91,13 @@ class Surface(BaseModel):
     reference document because the two are different shapes — the complete document has every key
     set, the template has almost none — and an operation that misbehaves on an absent key would
     pass over one and fail over the other."""
+
+    @model_validator(mode="after")
+    def check_the_surface_claims_some_file(self) -> Self:
+        if self.base_file is None and self.tier_glob is None:
+            msg = f"surface '{self.surface_id}': claims no file — a surface with no base file must claim its files by a tier glob"
+            raise ValueError(msg)
+        return self
 
     @model_validator(mode="after")
     def check_defaults_layer_is_reachable(self) -> Self:
@@ -201,11 +224,19 @@ class SurfaceRegistry(BaseModel):
         filenames claim before globs across all surfaces, so a base file matching another
         surface's glob is fine and resolved by that rule — but two surfaces sharing an id, a
         base file or a tier glob have no rule to separate them.
+
+        **A name collides only within one directory.** A base file and a glob are both claims over
+        a directory's own listing, so the same spelling in two directories is two different claims
+        — and `*.toml` in particular is the whole language of a surface that owns a directory,
+        which the second such surface must not have to narrow for the registry's sake.
         """
         _reject_duplicates(values=[surface.surface_id for surface in self.surfaces], label="surface id")
-        _reject_duplicates(values=[surface.base_file for surface in self.surfaces], label="base file")
-        _reject_duplicates(
-            values=[surface.tier_glob for surface in self.surfaces if surface.tier_glob is not None],
+        _reject_duplicates_per_directory(
+            values=[(surface.subdirectory, surface.base_file) for surface in self.surfaces if surface.base_file is not None],
+            label="base file",
+        )
+        _reject_duplicates_per_directory(
+            values=[(surface.subdirectory, surface.tier_glob) for surface in self.surfaces if surface.tier_glob is not None],
             label="tier glob",
         )
         return self
@@ -217,16 +248,23 @@ class SurfaceRegistry(BaseModel):
         msg = f"no surface '{surface_id}' in this registry"
         raise MigrationRegistryError(msg)
 
-    def surface_for_file_name(self, *, file_name: str) -> Surface | None:
-        """Which surface owns a file, by its name alone, or `None` when no surface claims it.
+    def surface_for_file(self, *, subdirectory: Path, file_name: str) -> Surface | None:
+        """Which surface owns a file, by the directory it sits in and its name, or `None`.
 
-        > **Exact filenames claim before globs, across all surfaces.** A file matched by any
-        > surface's exact pattern belongs to that surface and is excluded from every surface's
-        > glob.
+        > **A file is claimed by the pair (directory, name).** Only the surfaces that own the
+        > directory the file sits in are candidates; among those, exact filenames claim before
+        > globs.
 
-        Without the rule, `pipelex_service.toml` is both the base file of one surface and a match
-        for another's `pipelex_*.toml`, and which ledger runs over it becomes an accident of
-        iteration order.
+        Both halves are load-bearing and each answers a real collision. Without the *name* rule,
+        `pipelex_service.toml` is both the base file of one surface and a match for another's
+        `pipelex_*.toml`. Without the *directory* rule, `inference/backends/pipelex_gateway.toml`
+        is a `pipelex_*.toml` match too — and it is an inference backend definition, so the main
+        configuration's ledger would be replayed over it and rewrite it.
+
+        Args:
+            subdirectory: The file's directory, relative to a configuration directory. Empty for a
+                file sitting directly in one.
+            file_name: The file's own name, with no directory part.
 
         Raises:
             MigrationRegistryError: two surfaces' globs both claim this file. That the registry
@@ -235,10 +273,11 @@ class SurfaceRegistry(BaseModel):
                 contract's *a file claimed by two globs is a registry error* becomes enforceable,
                 by name, on the file that proves it.
         """
-        for surface in self.surfaces:
+        candidates = [surface for surface in self.surfaces if surface.subdirectory == subdirectory]
+        for surface in candidates:
             if surface.base_file == file_name:
                 return surface
-        claimants = [surface for surface in self.surfaces if surface.tier_glob is not None and fnmatch(file_name, surface.tier_glob)]
+        claimants = [surface for surface in candidates if surface.tier_glob is not None and fnmatch(file_name, surface.tier_glob)]
         if len(claimants) > 1:
             named = ", ".join(f"'{surface.surface_id}' ({surface.tier_glob})" for surface in claimants)
             msg = f"registry error: '{file_name}' is claimed by the tier globs of {named} — a file belongs to exactly one surface"
@@ -246,21 +285,29 @@ class SurfaceRegistry(BaseModel):
         return claimants[0] if claimants else None
 
     def files_by_surface_in_directory(self, *, directory: Path) -> list[tuple[Surface, Path]]:
-        """Every file in one configuration directory that a surface claims, with its surface.
+        """Every file one configuration directory holds that a surface claims, with its surface.
 
-        A directory that does not exist is skipped rather than refused: the global `~/.pipelex/`
-        and a project's `.pipelex/` are both optional, and a machine that has only one of them is
-        an ordinary machine, not a broken one.
+        The walk is **each surface's own directory under this one, one level deep**: the
+        configuration directory itself for the surfaces that live in it, and `directory /
+        subdirectory` for a surface that owns one. A directory no surface owns — `inference/deck/`
+        — is never entered at all, which is the property that keeps the walk from wandering into
+        the parts of a configuration directory that are not configuration surfaces.
+
+        A directory that does not exist is skipped rather than refused, and that goes for both
+        levels: the global `~/.pipelex/` and a project's `.pipelex/` are both optional, and a
+        machine that has never touched an inference backend has no `inference/` under either.
         """
-        if not directory.is_dir():
-            return []
         claimed: list[tuple[Surface, Path]] = []
-        for path in sorted(directory.iterdir()):
-            if not path.is_file():
+        for subdirectory in sorted({surface.subdirectory for surface in self.surfaces}):
+            owned_directory = directory / subdirectory
+            if not owned_directory.is_dir():
                 continue
-            surface = self.surface_for_file_name(file_name=path.name)
-            if surface is not None:
-                claimed.append((surface, path))
+            for path in sorted(owned_directory.iterdir()):
+                if not path.is_file():
+                    continue
+                surface = self.surface_for_file(subdirectory=subdirectory, file_name=path.name)
+                if surface is not None:
+                    claimed.append((surface, path))
         return claimed
 
 
@@ -271,6 +318,20 @@ def _reject_duplicates(*, values: list[str], label: str) -> None:
             msg = f"registry error: two surfaces share the {label} '{value}'"
             raise ValueError(msg)
         seen.add(value)
+
+
+def _reject_duplicates_per_directory(*, values: list[tuple[Path, str]], label: str) -> None:
+    """The same rule as `_reject_duplicates`, scoped to one directory.
+
+    A base file and a tier glob are claims over a directory's own listing, so two surfaces collide
+    on one only when they own the same directory.
+    """
+    seen: set[tuple[Path, str]] = set()
+    for subdirectory, value in values:
+        if (subdirectory, value) in seen:
+            msg = f"registry error: two surfaces share the {label} '{value}' in the same directory '{subdirectory.as_posix()}'"
+            raise ValueError(msg)
+        seen.add((subdirectory, value))
 
 
 def build_config_surface_registry() -> SurfaceRegistry:
