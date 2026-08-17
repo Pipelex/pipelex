@@ -67,7 +67,7 @@ class SurfaceBlock(BaseModel):
 
     @model_validator(mode="after")
     def check_the_surface_claims_some_file(self) -> Self:
-        if self.base_file is None and self.tier_glob is None:
+        if not self.base_file and not self.tier_glob:
             msg = f"surface '{self.id}': claims no file — a surface with no base file must claim its files by a tier glob"
             raise ValueError(msg)
         return self

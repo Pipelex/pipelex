@@ -1093,15 +1093,23 @@ class TestAStaleBackendDirectory:
     below, and per surface in `tests/unit/pipelex/cogt/model_backends/test_backend_boot_tolerance.py`.
     """
 
-    def _untouched_neighbours(self, *, hermetic_home: Path) -> dict[Path, bytes]:
+    def _untouched_neighbours(self, *, hermetic_home: Path, migrated: tuple[Path, ...]) -> dict[Path, bytes]:
         """Everything in and beside the directory that no migration may rewrite.
 
-        The two `.md` files fall out of the surface's `*.toml` glob by extension, and
-        `inference/backends.toml` sits one level up, which is a different claim entirely: it is a
-        table per backend rather than a table per model, and `#1104` never touched it.
+        Excluded by name rather than by extension, and the difference is the whole point of this
+        class: the kit ships `pipelex_gateway.toml` in this directory, which the main configuration's
+        `pipelex_*.toml` glob would claim by name alone, so it is the one file a walk that forgot
+        about directories would rewrite. An extension filter dropped it — and every other `.toml` in
+        here — out of the snapshot, leaving the class's own claim unasserted. Only the files the
+        fixture aged are excluded now. `inference/backends.toml` is added back from one level up,
+        which is a different claim entirely: it is a table per backend rather than a table per model,
+        and `#1104` never touched it.
+
+        The snapshot is taken before the migration runs, so the `.bak` siblings it writes never enter
+        it and cannot break the comparison.
         """
         backends_dir = _backends_dir(hermetic_home=hermetic_home)
-        neighbours = [path for path in sorted(backends_dir.iterdir()) if path.suffix != ".toml"]
+        neighbours = [path for path in sorted(backends_dir.iterdir()) if path not in migrated]
         neighbours.append(hermetic_home / ".pipelex" / INFERENCE_DIR_NAME / BACKENDS_FILE_NAME)
         return {path: path.read_bytes() for path in neighbours}
 
@@ -1112,7 +1120,7 @@ class TestAStaleBackendDirectory:
     ) -> None:
         openai_file, portkey_file = _plant_a_stale_backend_directory(hermetic_home=hermetic_home)
         originals = {path: path.read_text(encoding="utf-8") for path in (openai_file, portkey_file)}
-        neighbours = self._untouched_neighbours(hermetic_home=hermetic_home)
+        neighbours = self._untouched_neighbours(hermetic_home=hermetic_home, migrated=(openai_file, portkey_file))
 
         _assert_boots(env=offline_subprocess_env, cwd=hermetic_home)
 

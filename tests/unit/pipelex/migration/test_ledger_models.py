@@ -60,6 +60,27 @@ class TestTheSurfaceBlock:
         with pytest.raises(ValidationError):
             MigrationLedger.model_validate({"surface": surface})
 
+    @pytest.mark.parametrize(
+        ("base_file", "tier_glob"),
+        [
+            (None, None),
+            ("", ""),
+            ("", None),
+            (None, ""),
+        ],
+    )
+    def test_a_surface_block_claiming_nothing_is_refused(self, base_file: str | None, tier_glob: str | None) -> None:
+        """Absent and empty are the same claim — none — and the guard has to say so for both.
+
+        An empty string is not a narrower claim than `None`, it is the same claim spelled in a way
+        that reads as a value: `fnmatch(name, "")` never matches, and a `base_file` of `""` equals no
+        filename. Left admitted, a ledger like that parses, resolves nothing, and migrates nothing,
+        which is the one failure mode a migration must never have — silence.
+        """
+        surface = {**_SURFACE_BLOCK, "base_file": base_file, "tier_glob": tier_glob}
+        with pytest.raises(ValidationError, match="claims no file"):
+            MigrationLedger.model_validate({"surface": surface})
+
 
 class TestEntryInvariants:
     def test_a_well_formed_entry_parses_into_typed_operations(self) -> None:

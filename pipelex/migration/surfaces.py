@@ -175,7 +175,7 @@ class Surface(BaseModel):
 
     @model_validator(mode="after")
     def check_the_surface_claims_some_file(self) -> Self:
-        if self.base_file is None and self.tier_glob is None:
+        if not self.base_file and not self.tier_glob:
             msg = f"surface '{self.surface_id}': claims no file — a surface with no base file must claim its files by a tier glob"
             raise ValueError(msg)
         return self
@@ -273,6 +273,14 @@ class Surface(BaseModel):
         So a header in `[defaults]` is `extra_forbidden` on every model, and admitting it here would
         report the one file that cannot boot as the one file with nothing to explain — on the command
         the boot error sends that reader to.
+
+        **Only the key, never its value, and that is deliberate.** A header whose value the loader
+        refuses (`x-foo = 3`, or one carrying a line break) is admitted here, because this channel
+        speaks one sentence — *the schema has no setting there and no entry retires it, so either the
+        name is a typo or this file came from a newer pipelex* — and that sentence is simply false
+        about a well-named header with a bad value. No surface's diagnosis reads values, and the
+        loader already says the right thing in full, naming the model, the backend and the file; a
+        scan that finds nothing attaches no migration block, so nothing competes with it.
 
         Args:
             node_path: The containing table's path in the *fingerprint's* vocabulary, where an open

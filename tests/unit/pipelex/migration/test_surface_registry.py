@@ -168,10 +168,25 @@ class TestRegistryConsistency:
                 ]
             )
 
-    def test_a_surface_that_claims_nothing_is_refused(self) -> None:
-        """A surface with no base file must say which files in its directory are its own."""
+    @pytest.mark.parametrize(
+        ("base_file", "tier_glob"),
+        [
+            (None, None),
+            ("", ""),
+            ("", None),
+            (None, ""),
+        ],
+    )
+    def test_a_surface_that_claims_nothing_is_refused(self, base_file: str | None, tier_glob: str | None) -> None:
+        """A surface with no base file must say which files in its directory are its own.
+
+        Empty counts as none: `fnmatch(name, "")` matches nothing and no file is named `""`, so an
+        empty spelling claims exactly as little as an absent one while looking like a declaration.
+        The ledger block carries the same guard and is parametrized the same way — one rule, and it
+        has to be one rule in both places or the coverage gate is comparing two different questions.
+        """
         with pytest.raises(ValidationError, match="claims no file"):
-            _surface(surface_id="a", base_file=None, tier_glob=None, subdirectory=BACKENDS)
+            _surface(surface_id="a", base_file=base_file, tier_glob=tier_glob, subdirectory=BACKENDS)
 
     def test_a_base_file_matching_another_surfaces_glob_is_fine(self) -> None:
         """This is the real configuration: `pipelex_service.toml` matches `pipelex_*.toml`.

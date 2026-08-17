@@ -61,6 +61,19 @@ class RecoveredModelSpecs(NamedTuple):
     plans: list[MigrationPlan]
 
 
+def backend_toml_path(*, backends_dir_path: str, backend_name: str) -> Path:
+    """Where a backend's per-model file lives, spelled once.
+
+    Boot tolerance replays a stale file in memory and rebuilds the specs from the result, so the
+    retry must read *the file the load read*. Two independent constructions of that path is a
+    divergence waiting to happen, and it already was one: a backend name is a raw top-level table
+    key of the user's own `inference/backends.toml` and nothing validates it, TOML permits a quoted
+    `["/abs/path"]` key, and `Path(directory) / "/abs/path.toml"` drops the directory — so the retry
+    would leave the backends directory the load had stayed inside.
+    """
+    return Path(f"{backends_dir_path}/{backend_name}.toml")
+
+
 class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
     root: InferenceBackendLibraryRoot = Field(default_factory=dict)
 
@@ -377,7 +390,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 return None
             case ModelSpecSource.LOCAL_FILE:
                 pass
-        path_to_model_specs_toml = Path(backends_dir_path) / f"{backend_name}.toml"
+        path_to_model_specs_toml = backend_toml_path(backends_dir_path=backends_dir_path, backend_name=backend_name)
         replayed = replay_surface_files_in_memory(surface_id=INFERENCE_BACKEND_CONFIG_SURFACE_ID, paths=[path_to_model_specs_toml])
         if replayed is None:
             return None
@@ -464,7 +477,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             InferenceBackendLibraryError: If the file is missing.
             InferenceBackendCredentialsError: If variable substitution fails.
         """
-        path_to_model_specs_toml = f"{backends_dir_path}/{backend_name}.toml"
+        path_to_model_specs_toml = backend_toml_path(backends_dir_path=backends_dir_path, backend_name=backend_name)
         try:
             model_specs_dict_raw = load_toml_from_path(path=path_to_model_specs_toml)
         except FileNotFoundError as file_not_found_exc:

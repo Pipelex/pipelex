@@ -87,7 +87,7 @@ make check-migration-schemas
     A pre-history entry inserted below existing ones takes a version already in use
     and pushes everything above it up, so the diff reads as one id modified and one
     added — which looks like two independent breaking changes and is one insertion.
-    Do not treat the pushed-up id as an unbullet-ed new entry: the changelog must
+    Do not treat the pushed-up id as an unbulleted new entry: the changelog must
     name the new entry *and* say that the existing one was renumbered, so a reader
     who quoted the old id somewhere can find it. Confirm `introduced_in` on both.
 
