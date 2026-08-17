@@ -133,7 +133,12 @@ def _pending_migration(*, surface_id: str, config_dirs: list[Path] | None) -> Mi
     plans = [plan for plan in report.plans if not plan.is_clean]
     if not plans:
         return None
-    return MigrationErrorBlock(remedy=MIGRATE_COMMAND, needs_attention=report.needs_attention, plans=plans)
+    return MigrationErrorBlock(
+        remedy=MIGRATE_COMMAND,
+        would_write=any(plan.did_change for plan in plans),
+        needs_attention=report.needs_attention,
+        plans=plans,
+    )
 
 
 def _migration_prose(*, block: MigrationErrorBlock) -> str:
@@ -144,16 +149,35 @@ def _migration_prose(*, block: MigrationErrorBlock) -> str:
     is attached to a failure rather than to a boot that carried on. Everything it names comes from
     the ledger or from a file path: **no value read from a user's file appears here**, which is
     the third of the three channels that rule covers.
+
+    **The paragraph opens and closes on `would_write`, never on the block's presence.** A block
+    means the migration history has something to say about these files; only `would_write` means
+    the command would change them. Telling a reader to run a migration over a file it would not
+    touch is a sentence whose honest outcome is *nothing was written*, with their error still in
+    front of them — so on that side the paragraph says so and points at the dry run, which is where
+    the diagnosis is. And when the command would write but the paragraph has just listed what it
+    cannot do, the closing sentence says both, rather than promising a repair the list above has
+    already qualified.
     """
     files = ", ".join(f"'{plan.file_path}'" for plan in block.plans)
     carried = sorted({step.title for plan in block.plans for step in plan.steps})
-    sentences = [f"Your configuration may be out of date rather than wrong: {files}."]
+    if block.would_write:
+        sentences = [f"Your configuration may be out of date rather than wrong: {files}."]
+    else:
+        sentences = [f"The migration history has something to say about these files: {files}."]
     if carried:
         sentences.append(f"What `{block.remedy}` would carry forward: {'; '.join(carried)}.")
     unresolved = _what_needs_a_person(plans=block.plans)
     if unresolved:
         sentences.append(f"What it cannot do for you: {'; '.join(unresolved)}.")
-    sentences.append(f"Run `{block.remedy}` to bring these files up to date.")
+    if block.would_write and unresolved:
+        sentences.append(f"Run `{block.remedy}` to carry forward what it can; the rest is yours to fix.")
+    elif block.would_write:
+        sentences.append(f"Run `{block.remedy}` to bring these files up to date.")
+    else:
+        sentences.append(
+            f"`{block.remedy}` would rewrite nothing here — run `{block.remedy} --dry-run` to read what it found, and fix these files by hand."
+        )
     return " ".join(sentences)
 
 

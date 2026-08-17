@@ -354,6 +354,19 @@ class MigrationErrorBlock(BaseModel):
     remedy: str
     """The command that applies whatever can be applied without a decision."""
 
+    would_write: bool
+    """Whether running ``remedy`` would actually rewrite any of these files.
+
+    The block's *presence* says the migration history has something to report about this machine.
+    It does not say the remedy repairs it, and this field is what separates the two. A block whose
+    ``would_write`` is False carries a diagnosis and nothing to apply — a path no entry explains, a
+    file that could not be read, an entry blocked before any of its operations landed — so naming
+    ``remedy`` there would send a reader to a run that visits the files, writes nothing, and leaves
+    the same refusal standing. The dry run is what carries the answer on that side.
+
+    Independent of :attr:`needs_attention`, and the pair is never both False: a file with nothing to
+    write and nothing for a person is clean, and clean files are not in ``plans``."""
+
     needs_attention: bool
     """Whether something here is a person's to resolve rather than the tool's — a blocked file, a
     blocked entry, or a path no ledger entry explains. When this is False, running ``remedy`` is

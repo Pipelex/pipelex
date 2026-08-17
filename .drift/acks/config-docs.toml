@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:31b470d034b3bcd4072bb4b286a4e1cf37b4414d5b884c42cd78f421fe72a679"
+digest = "sha256:9de76c70a5219d0073dacc6b93f3336c9ee9e9d37b798ca2dc025c97b03c19d5"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-16T20:18:24Z"
-rationale = "Review of the PR 1114 fixes to config_loader.py and config_surface.py: the main-configuration stale warning is now parked on the loader and emitted after logging is configured, and the in-memory retry declines a file declaring a schema version below the ledger floor. Both are boot-tolerance mechanics documented in docs/migration-ledger.md, which was updated in the same change; docs/configuration/ describes files and keys, and telemetry-config.md's out-of-date section still says exactly what a user sees - a boot that warns and names pipelex migrate. No configuration key, default or file moved, so no page under docs/configuration/ is stale."
+reviewed_at = "2026-08-16T22:14:43Z"
+rationale = "The contract definition itself changed: its review list now carries pipelex/migration/ledgers/ and the two modules holding the four validators that narrow a configuration value domain (KitConfig._validate_targets, DryRunConfig.validate_image_urls, ImgGenConfig.validate_quality_mapping, LLMConfig.validate_effort_to_budget_mapping), which R8 established the fingerprint projection cannot see. No trigger file moved, so this is the first read of the new targets rather than a review of a change: the three ledgers are legal and convergent and the three surfaces are accounted for (make cl, make cmig both green), and none of the four validators narrowed anything in this change, so no unsafe entry with declared_narrowed_paths is owed. docs/configuration/ is unaffected - no key, default or file moved."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:ee1ee2d0c1474dcef5e07690268de37ae3ff0987"

@@ -339,6 +339,7 @@ plugins:
         - contribute/hub-layering.md: "Hub Layering"
         - contribute/registration-surface.md: "Registration Surface"
         - contribute/drift-contracts.md: "Drift Contracts"
+        - migration-ledger.md: "Migration Ledger"
         - changelog.md: "Changelog"
 
 markdown_extensions:
@@ -379,13 +380,8 @@ extra_css:
 #   gotchas) referenced from the root `CLAUDE.md`. They are built and searchable but
 #   intentionally kept out of the user-facing nav so they don't clutter the reading
 #   flow for human readers of the docs site.
-# - `migration-ledger.md` is the configuration-migration contract, written ahead of the
-#   engine it specifies. It stays out of the nav until `pipelex migrate` and boot
-#   tolerance ship, so the reading flow never advertises a command that does not exist
-#   yet; move it into the Project section in the same change that ships them.
 not_in_nav: |
   CLAUDE.md
-  migration-ledger.md
   errors/*.md
   !errors/index.md
   !errors/authoring-and-language.md
@@ -587,6 +583,7 @@ nav:
     - Hub Layering: contribute/hub-layering.md
     - Registration Surface: contribute/registration-surface.md
     - Drift Contracts: contribute/drift-contracts.md
+    - Migration Ledger: migration-ledger.md
     - Code of Conduct: CODE_OF_CONDUCT.md
     - License: license.md
     - Changelog: changelog.md

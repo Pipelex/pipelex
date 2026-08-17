@@ -271,15 +271,15 @@ def _telemetry_is_out_of_date_or_wrong(*, validation_error: ValidationError, con
     except (MigrationError, OSError):
         report = None
     own_plan = next((plan for plan in report.plans if plan.file_path == config_path), None) if report is not None else None
-    if own_plan is not None and not own_plan.is_clean:
+    if own_plan is not None and own_plan.did_change:
         return TelemetryConfigCheck(
             finding=TelemetryConfigFinding.OUT_OF_DATE,
             message=f"Configuration is out of date — run '{MIGRATE_COMMAND}' to bring it up to date",
         )
-    return TelemetryConfigCheck(
-        finding=TelemetryConfigFinding.INVALID,
-        message=f"Invalid configuration:\n{report_validation_error(validation_error=validation_error).message}",
-    )
+    message = f"Invalid configuration:\n{report_validation_error(validation_error=validation_error).message}"
+    if own_plan is not None and not own_plan.is_clean:
+        message += f"\nThe migration found something here it will not do on its own — run '{MIGRATE_COMMAND} --dry-run' for the detail."
+    return TelemetryConfigCheck(finding=TelemetryConfigFinding.INVALID, message=message)
 
 
 class PendingMigrationsFinding(StrEnum):
@@ -707,20 +707,20 @@ def display_health_report(
     # Configuration Location section
     console.print("[bold]Configuration Location[/bold]")
     if config_location.is_project_local:
-        console.print(f"  [green]✓[/green] Using project config: [cyan]{config_location.config_dir}[/cyan]")
-        console.print(f"  [dim]Project root: {config_location.project_root}[/dim]")
-        console.print(f"  [dim]Global config: {config_location.global_config_dir}[/dim]")
+        console.print(f"  [green]✓[/green] Using project config: [cyan]{escape(config_location.config_dir)}[/cyan]")
+        console.print(f"  [dim]Project root: {escape(str(config_location.project_root))}[/dim]")
+        console.print(f"  [dim]Global config: {escape(config_location.global_config_dir)}[/dim]")
     else:
-        console.print(f"  [green]✓[/green] Using global config: [cyan]{config_location.config_dir}[/cyan]")
+        console.print(f"  [green]✓[/green] Using global config: [cyan]{escape(config_location.config_dir)}[/cyan]")
         console.print("  [dim]No project .pipelex/ directory found[/dim]")
     console.print()
 
     # Configuration Files section
     console.print("[bold]Configuration Files[/bold]")
     if config_healthy:
-        console.print(f"  [green]✓[/green] {config_message}")
+        console.print(f"  [green]✓[/green] {escape(config_message)}")
     else:
-        console.print(f"  [red]✗[/red] {config_message}")
+        console.print(f"  [red]✗[/red] {escape(config_message)}")
     console.print()
 
     # Configuration Migrations section. It sits next to Configuration Files because it is about
@@ -740,27 +740,27 @@ def display_health_report(
     # Backend Credentials section
     console.print("[bold]Backend Credentials[/bold]")
     if backends_healthy:
-        console.print(f"  [green]✓[/green] {backends_message}")
+        console.print(f"  [green]✓[/green] {escape(backends_message)}")
     elif not backend_credential_reports:
         # No backends were checked (e.g., file not found)
-        console.print(f"  [red]✗[/red] {backends_message}")
+        console.print(f"  [red]✗[/red] {escape(backends_message)}")
     else:
-        console.print(f"  [yellow]⚠[/yellow]  {backends_message}")
+        console.print(f"  [yellow]⚠[/yellow]  {escape(backends_message)}")
         console.print()
 
         # Show details for each backend
         bad_backend_credential_reports: dict[str, BackendCredentialsReport] = {}
         for backend_name, backend_credential_report in backend_credential_reports.items():
             if backend_credential_report.all_credentials_valid:
-                console.print(f"  [dim]{backend_name}[/dim]")
+                console.print(f"  [dim]{escape(backend_name)}[/dim]")
                 console.print("    [green]✓[/green] All credentials set")
             else:
                 bad_backend_credential_reports[backend_name] = backend_credential_report
-                console.print(f"  [bold]{backend_name}[/bold]")
+                console.print(f"  [bold]{escape(backend_name)}[/bold]")
                 if backend_credential_report.missing_vars:
-                    console.print(f"    [red]✗[/red] Missing: {', '.join(backend_credential_report.missing_vars)}")
+                    console.print(f"    [red]✗[/red] Missing: {escape(', '.join(backend_credential_report.missing_vars))}")
                 if backend_credential_report.placeholder_vars:
-                    console.print(f"    [yellow]⚠[/yellow] Placeholders: {', '.join(backend_credential_report.placeholder_vars)}")
+                    console.print(f"    [yellow]⚠[/yellow] Placeholders: {escape(', '.join(backend_credential_report.placeholder_vars))}")
 
         error_msg = BackendCredentialsErrorMsgFactory.make_comprehensive_error_msg(backend_credential_reports=bad_backend_credential_reports)
         console.print(error_msg)
@@ -769,13 +769,13 @@ def display_health_report(
     # Models section
     console.print("[bold]Models[/bold]")
     if models_healthy:
-        console.print(f"  [green]✓[/green] {models_message}")
+        console.print(f"  [green]✓[/green] {escape(models_message)}")
     elif models_skipped:
         # Skipped reads as advisory, not failure — the Config Files row is the real issue.
-        console.print(f"  [yellow]⚠[/yellow]  {models_message}")
+        console.print(f"  [yellow]⚠[/yellow]  {escape(models_message)}")
         console.print("    [dim]Models check deferred until config errors are fixed.[/dim]")
     else:
-        console.print(f"  [red]✗[/red] {models_message}")
+        console.print(f"  [red]✗[/red] {escape(models_message)}")
 
         # Show details for backend file issues if any
         if backend_file_reports:
@@ -783,7 +783,7 @@ def display_health_report(
             if invalid_backends:
                 console.print()
                 for backend_name, backend_file_report in invalid_backends.items():
-                    console.print(f"  [bold]{backend_name}[/bold]")
+                    console.print(f"  [bold]{escape(backend_name)}[/bold]")
                     if backend_file_report.has_kit_template:
                         console.print("    [yellow]⚠[/yellow] Backend configuration format may be outdated")
                         console.print("    [dim]Template available for replacement[/dim]")
@@ -793,21 +793,21 @@ def display_health_report(
                     if backend_file_report.error_message:
                         # Show first line of error
                         error_lines = backend_file_report.error_message.split("\n")
-                        console.print(f"    [dim]{error_lines[0][:100]}[/dim]")
+                        console.print(f"    [dim]{escape(error_lines[0][:100])}[/dim]")
     console.print()
 
     # Model Deck section
     console.print("[bold]Model Deck[/bold]")
     if deck_healthy:
-        console.print(f"  [green]✓[/green] {deck_message}")
+        console.print(f"  [green]✓[/green] {escape(deck_message)}")
     else:
-        console.print(f"  [yellow]⚠[/yellow]  {deck_message}")
+        console.print(f"  [yellow]⚠[/yellow]  {escape(deck_message)}")
         # Per-file detail when there are pending actions
         actionable_statuses = {name: status for name, status in deck_report.files.items() if status != DeckFileStatus.UP_TO_DATE}
         if actionable_statuses:
             for filename in sorted(actionable_statuses):
                 status = actionable_statuses[filename]
-                console.print(f"    [dim]{filename}[/dim] — {status_rich_label(status)}")
+                console.print(f"    [dim]{escape(filename)}[/dim] — {status_rich_label(status)}")
     console.print()
 
     # Recommended actions
@@ -884,7 +884,7 @@ def display_health_report(
                 console.print(f"  • Run [cyan]{MIGRATE_COMMAND}[/cyan] to bring telemetry.toml up to date")
 
             if has_telemetry_validation_error:
-                console.print(f"  • Fix validation errors in [cyan]{config_location.config_dir}/telemetry.toml[/cyan]")
+                console.print(f"  • Fix validation errors in [cyan]{escape(config_location.config_dir)}/telemetry.toml[/cyan]")
 
             if has_deck_drift:
                 console.print("  • Run [cyan]pipelex update[/cyan] to refresh the model deck from the current kit")
@@ -903,9 +903,8 @@ def display_health_report(
             if has_custom_backend_issues:
                 invalid_custom = [name for name, report in backend_file_reports.items() if not report.is_valid and not report.has_kit_template]
                 for backend_name in invalid_custom:
-                    console.print(
-                        f"  • Manually fix backend configuration in [cyan]{config_location.config_dir}/inference/backends/{backend_name}.toml[/cyan]"
-                    )
+                    backend_file = f"{escape(config_location.config_dir)}/inference/backends/{escape(backend_name)}.toml"
+                    console.print(f"  • Manually fix backend configuration in [cyan]{backend_file}[/cyan]")
 
             if not backends_healthy and backend_credential_reports:
                 # Collect all missing and placeholder vars
@@ -920,12 +919,12 @@ def display_health_report(
                 if all_missing_vars:
                     console.print("  • Set the following environment variables:")
                     for var_name in sorted(all_missing_vars):
-                        console.print(f"    - {var_name}")
+                        console.print(f"    - {escape(var_name)}")
 
                 if all_placeholder_vars:
                     console.print("  • Replace placeholder values for:")
                     for var_name in sorted(all_placeholder_vars):
-                        console.print(f"    - {var_name}")
+                        console.print(f"    - {escape(var_name)}")
 
             console.print()
 
@@ -1169,7 +1168,7 @@ def doctor_cmd(
     except Exception as exc:  # noqa: BLE001
         # Handle unexpected errors gracefully without printing traces
         console.print()
-        console.print(f"[red]✗ Unexpected error: {exc!s}[/red]")
+        console.print(f"[red]✗ Unexpected error: {escape(str(exc))}[/red]")
         console.print()
         console.print("[dim]If you need help:[/dim]")
         console.print("  [cyan]https://docs.pipelex.com[/cyan] - Documentation")
@@ -1298,7 +1297,7 @@ def do_doctor_cmd(
                     console.print("[green]✓[/green] Configuration files installed")
                 except Exception as exc:  # noqa: BLE001
                     # Doctor --fix handler: wraps the whole init_cmd sub-command; a fix failure is reported and the doctor run continues.
-                    console.print(f"[red]Failed to install configuration files: {exc!s}[/red]")
+                    console.print(f"[red]Failed to install configuration files: {escape(str(exc))}[/red]")
                 console.print()
 
         # Migrate the configuration files the ledger can carry forward. This runs the same write
@@ -1317,7 +1316,7 @@ def do_doctor_cmd(
                     console.print("[dim]Re-run[/dim] [cyan]pipelex doctor[/cyan] [dim]for an updated report.[/dim]")
                 except Exception as exc:  # noqa: BLE001
                     # Doctor --fix handler: wraps the whole migration pass; a fix failure is reported and the doctor run continues.
-                    console.print(f"[red]Failed to migrate configuration files: {exc!s}[/red]")
+                    console.print(f"[red]Failed to migrate configuration files: {escape(str(exc))}[/red]")
                 console.print()
 
         # Fix a missing telemetry config
@@ -1329,7 +1328,7 @@ def do_doctor_cmd(
                     console.print("[green]✓[/green] Telemetry configured")
                 except Exception as exc:  # noqa: BLE001
                     # Doctor --fix handler: wraps the whole init_cmd sub-command; a fix failure is reported and the doctor run continues.
-                    console.print(f"[red]Failed to configure telemetry: {exc!s}[/red]")
+                    console.print(f"[red]Failed to configure telemetry: {escape(str(exc))}[/red]")
                 console.print()
 
         # Fix outdated model deck
@@ -1341,7 +1340,7 @@ def do_doctor_cmd(
                     console.print("[green]✓[/green] Model deck updated")
                 except Exception as exc:  # noqa: BLE001
                     # Doctor --fix handler: wraps the whole update_cmd sub-command; a fix failure is reported and the doctor run continues.
-                    console.print(f"[red]Failed to update deck: {exc!s}[/red]")
+                    console.print(f"[red]Failed to update deck: {escape(str(exc))}[/red]")
                 console.print()
 
         # Fix outdated backend files
@@ -1350,8 +1349,8 @@ def do_doctor_cmd(
             console.print()
 
             for backend_name, backend_file_report in fixable_backends:
-                console.print(f"  Backend: [cyan]{backend_name}[/cyan]")
-                console.print(f"  File: [dim]{backend_file_report.file_path}[/dim]")
+                console.print(f"  Backend: [cyan]{escape(backend_name)}[/cyan]")
+                console.print(f"  File: [dim]{escape(backend_file_report.file_path)}[/dim]")
                 console.print("  [yellow]⚠[/yellow] Configuration format may be outdated")
                 console.print()
 
@@ -1363,15 +1362,15 @@ def do_doctor_cmd(
                         resolved_config_dir = Path(backend_file_report.file_path).parent.parent.parent
                         success = replace_backend_file(backend_name, dry_run=False, config_dir=resolved_config_dir)
                         if success:
-                            console.print(f"[green]✓[/green] Replaced {backend_name} backend configuration")
+                            console.print(f"[green]✓[/green] Replaced {escape(backend_name)} backend configuration")
                         else:
-                            console.print(f"[red]Failed to replace {backend_name}: Template not found or copy failed[/red]")
+                            console.print(f"[red]Failed to replace {escape(backend_name)}: Template not found or copy failed[/red]")
                     except Exception as exc:  # noqa: BLE001
                         # Doctor --fix handler: wraps replace_backend_file; a fix failure is reported and the doctor run continues.
-                        console.print(f"[red]Failed to replace {backend_name}: {exc!s}[/red]")
+                        console.print(f"[red]Failed to replace {escape(backend_name)}: {escape(str(exc))}[/red]")
                     console.print()
                 else:
-                    console.print(f"[dim]Skipped {backend_name}[/dim]")
+                    console.print(f"[dim]Skipped {escape(backend_name)}[/dim]")
                     console.print()
 
     # Handle issues that can't be auto-fixed
@@ -1383,9 +1382,9 @@ def do_doctor_cmd(
         # Config validation errors
         if has_config_validation_error:
             console.print("[bold]Configuration validation error:[/bold]")
-            console.print(f"  {config_message}")
+            console.print(f"  {escape(config_message)}")
             console.print()
-            console.print(f"You can fix this manually by editing [cyan]{config_location.config_dir}/pipelex.toml[/cyan]")
+            console.print(f"You can fix this manually by editing [cyan]{escape(config_location.config_dir)}/pipelex.toml[/cyan]")
             console.print("or run [cyan]pipelex init config[/cyan] to regenerate from template.")
             console.print()
 
@@ -1396,7 +1395,7 @@ def do_doctor_cmd(
             console.print("[bold]Telemetry validation error:[/bold]")
             console.print(f"  {escape(telemetry_check.message)}")
             console.print()
-            console.print(f"You can fix this manually by editing [cyan]{config_location.config_dir}/telemetry.toml[/cyan]")
+            console.print(f"You can fix this manually by editing [cyan]{escape(config_location.config_dir)}/telemetry.toml[/cyan]")
             console.print("or run [cyan]pipelex init telemetry[/cyan] to start the file over, discarding what is in it.")
             console.print()
 
@@ -1416,7 +1415,7 @@ def do_doctor_cmd(
                 # Show .env file syntax first
                 console.print("[dim]# In your .env file:[/dim]")
                 for var_name in sorted(all_missing_vars):
-                    console.print(f"{var_name}=[yellow]your_value_here[/yellow]")
+                    console.print(f"{escape(var_name)}=[yellow]your_value_here[/yellow]")
                 console.print()
 
                 # Show shell syntax for different platforms
@@ -1426,19 +1425,19 @@ def do_doctor_cmd(
                 # Linux/MacOS
                 console.print("[dim]# Linux/MacOS[/dim]")
                 for var_name in sorted(all_missing_vars):
-                    console.print(f"export {var_name}=[yellow]your_value_here[/yellow]")
+                    console.print(f"export {escape(var_name)}=[yellow]your_value_here[/yellow]")
                 console.print()
 
                 # Windows PowerShell
                 console.print("[dim]# Windows PowerShell[/dim]")
                 for var_name in sorted(all_missing_vars):
-                    console.print(f'$env:{var_name}="[yellow]your_value_here[/yellow]"')
+                    console.print(f'$env:{escape(var_name)}="[yellow]your_value_here[/yellow]"')
                 console.print()
 
                 # Windows CMD
                 console.print("[dim]# Windows CMD[/dim]")
                 for var_name in sorted(all_missing_vars):
-                    console.print(f"set {var_name}=[yellow]your_value_here[/yellow]")
+                    console.print(f"set {escape(var_name)}=[yellow]your_value_here[/yellow]")
                 console.print()
 
     sys.exit(1)
