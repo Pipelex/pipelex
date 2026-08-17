@@ -17,12 +17,15 @@ def plugins_list_command() -> None:
 
     Runs the pure ``build_registrar`` against the loaded config — the same
     discovery the runtime uses at boot — so the listing reflects exactly what
-    would be wired in (and what the ``plugins.disabled`` denylist turns off).
+    would be wired in (and what the ``runtime.plugins.disabled`` denylist turns off).
+
+    No boot orchestrator is named: this is a listing, not a boot, so nothing claims a hub slot.
     """
     console = get_console()
     config = config_manager.load_config_validated(config_cls=PipelexConfig)
     registrar = build_registrar(
         config=config,
+        boot_orchestrator=None,
         builtin_plugins=BUILTIN_PLUGINS,
         core_unconditional_plugin_names=CORE_UNCONDITIONAL_PLUGIN_NAMES,
         entry_point_groups=ENTRY_POINT_GROUPS,

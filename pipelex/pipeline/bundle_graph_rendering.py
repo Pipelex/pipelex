@@ -101,7 +101,7 @@ async def generate_graph_for_bundle(
     """
     graph_spec, resolved_pipe_code = await _dry_run_bundle(bundle_path, library_dirs=library_dirs, pipe_code=pipe_code)
 
-    execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+    execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
         generate_graph=True,
         mock_inputs=True,
     )
@@ -122,7 +122,7 @@ async def generate_graph_for_bundle(
     output_dir = bundle_path.parent
     saved_files = await render_graph_from_spec(
         graph_spec=graph_spec,
-        graph_config=execution_config.graph_config,
+        graph_config=execution_config.graph,
         include_mermaidflow=include_mermaidflow,
         include_reactflow=include_reactflow,
         output_dir=output_dir,
@@ -174,11 +174,11 @@ async def generate_view_for_bundle(
     """
     graph_spec, resolved_pipe_code = await _dry_run_bundle(bundle_path, library_dirs=library_dirs, pipe_code=pipe_code)
 
-    execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+    execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
         generate_graph=True,
         mock_inputs=True,
     )
-    rf_config = execution_config.graph_config.reactflow_config
+    rf_config = execution_config.graph.reactflow
     effective_direction = direction or rf_config.layout_direction
 
     return {

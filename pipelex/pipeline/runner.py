@@ -193,7 +193,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         created_at = datetime.now(UTC).isoformat()
 
         # Use provided config or get default
-        execution_config = self.execution_config or get_config().pipelex.pipeline_execution_config
+        execution_config = self.execution_config or get_config().interpreter.pipeline_execution
 
         # Cast inputs: the protocol accepts WorkingMemoryAbstract but pipelex expects WorkingMemory
         pipelex_inputs: PipelineInputs | WorkingMemory | None = cast("PipelineInputs | WorkingMemory | None", inputs)

@@ -71,7 +71,7 @@ def _service_config_the_ledger_can_explain(*, config_path: Path) -> PipelexServi
         service_config = PipelexServiceConfig.model_validate(replayed.config_dict)
     except ValidationError:
         return None
-    log.warning(stale_configuration_warning(plans=replayed.plans))
+    log.warning(stale_configuration_warning(plans=replayed.plans, walked_dirs=config_manager.existing_config_dirs))
     return service_config
 
 

@@ -148,7 +148,7 @@ class PipeRunParams(BaseModel):
     # frozen for the same reason as `run_mode`.
     is_mock_usage: bool = Field(default=False, frozen=True)
 
-    # Bounded fan-out for PipeBatch, resolved from `pipeline_execution_config.max_concurrency`
+    # Bounded fan-out for PipeBatch, resolved from `interpreter.pipeline_execution.max_concurrency`
     # once at construction (`PipeRunParamsFactory.make_run_params`). `None` means unbounded —
     # `gather_bounded`'s own no-bound sentinel, so the field is passed straight through.
     #

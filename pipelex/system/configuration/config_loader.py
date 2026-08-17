@@ -127,6 +127,30 @@ class ConfigLoader:
         return None
 
     @property
+    def existing_config_dirs(self) -> list[Path]:
+        """The user's configuration directories that exist on this machine, in tier order.
+
+        The global directory comes first and the project one second, which is the order the load
+        merges them in. A project directory that *is* the global one — a project rooted at the home
+        directory — is listed once rather than twice.
+
+        This is the loader's own answer to "where does this machine keep its configuration", and it
+        is deliberately the only answer there is: `pipelex migrate`'s walk is exactly this set (see
+        `pipelex.migration.run.config_directories_to_migrate`, which reads it), and the stale-boot
+        warning decides whether it may name that command by asking whether the stale file is under
+        one of these. Two derivations of "the configuration directories" would let a boot promise a
+        remedy the command then declines.
+        """
+        directories: list[Path] = []
+        global_dir = self.global_config_dir
+        if global_dir.is_dir():
+            directories.append(global_dir)
+        project_dir = self.project_config_dir
+        if project_dir is not None and project_dir.resolve() not in {directory.resolve() for directory in directories}:
+            directories.append(project_dir)
+        return directories
+
+    @property
     def pipelex_config_dir(self) -> Path:
         """Get the effective config directory (project if exists, else global).
 
@@ -459,7 +483,7 @@ class ConfigLoader:
             config = config_cls.model_validate(config_dict)
         except CONFIG_REFUSED:
             return None
-        self._stale_warning = stale_configuration_warning(plans=replayed.plans)
+        self._stale_warning = stale_configuration_warning(plans=replayed.plans, walked_dirs=self.existing_config_dirs)
         return config
 
 

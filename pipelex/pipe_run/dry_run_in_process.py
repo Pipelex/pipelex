@@ -105,7 +105,7 @@ async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str) -> Gra
     Raises:
         DryRunGraphNotProducedError: If the dry-run completes without producing a graph spec.
     """
-    execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+    execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
         generate_graph=True,
         mock_inputs=True,
     )
@@ -124,7 +124,7 @@ async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str) -> Gra
     graph_tracer_manager = GraphTracerManager.get_or_create_instance()
     trace_context = graph_tracer_manager.open_tracer(
         graph_id=pipeline_run_id,
-        data_inclusion=execution_config.graph_config.data_inclusion,
+        data_inclusion=execution_config.graph.data_inclusion,
         pipeline_ref_domain=pipe.domain_code,
         pipeline_ref_main_pipe=pipe.code,
         event_log=event_log,

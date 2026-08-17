@@ -127,12 +127,12 @@ This is what lets the public `pipelex-api` base be orchestrator-agnostic and sti
 
 ## Boot-orchestrator plugins: claiming the runtime
 
-Some orchestrators don't just serve a per-call mode — they reconfigure the whole process to run *as* that runtime (a Temporal worker). Such a plugin **claims process-global hub slots**, but only when the core-owned boot gate names it. `plugins.boot_orchestrator == self.name` means "boot this process as a Temporal-default runtime", not "the Temporal plugin is on". The gate is a backend-agnostic name-match — core names no orchestrator, and `register` reads no config file (the rich orchestrator config self-loads inside the thunks):
+Some orchestrators don't just serve a per-call mode — they reconfigure the whole process to run *as* that runtime (a Temporal worker). Such a plugin **claims process-global hub slots**, but only when the core-owned boot gate names it. `boot_orchestrator == self.name` means "boot this process as a Temporal-default runtime", not "the Temporal plugin is on". The gate is a backend-agnostic name-match — core names no orchestrator, and `register` reads no config file (the rich orchestrator config self-loads inside the thunks):
 
 Not every orchestrator goes this far. A per-call-only plugin — our Mistral Workflows plugin is the minimal example — contributes just its `"mistral-workflows"` orchestrator and claims **no** hub slots: its router is installed per workflow invocation by the workflow body itself, so there is no process-global boot slot to claim and it never participates in the boot gate below. The boot-orchestrator machinery in this section applies only to a plugin that boots the process as its runtime (today, our Temporal plugin).
 
 ```python
-if registrar.config.plugins.boot_orchestrator == self.name:
+if registrar.boot_orchestrator == self.name:
     registrar.claim_content_generator(_make_temporal_content_generator)   # a thunk, not an instance
     registrar.claim_task_manager(_setup_temporal_task_manager)
     registrar.claim_pipe_router(_make_temporal_pipe_router)
@@ -147,7 +147,7 @@ Each `claim_*` takes a **thunk** (a zero-arg factory), never a constructed insta
 
 The first four slots swap in the runtime's implementations of core execution services. The fifth, `claim_isolated_execution_probe`, is different in kind: its thunk resolves not a service but an **ambient predicate** (`Callable[[], bool]`) reporting whether the current call runs inside an isolated sub-execution — a Temporal activity — whose side-effecting emissions must not be written into the parent run's replay-deterministic buffer. `ReportingManager` consults it (`hub.is_in_isolated_execution()`) to route an activity-side usage emission to the per-process log instead of the workflow's registered buffer. It exists as a hub slot for the same reason the others do: only a boot-orchestrator plugin whose runtime has a replay/activity split knows how to answer, and core names no such runtime. Unclaimed (any in-process boot), the hub's core default answers "never isolated" — the in-process orchestrator has no such split.
 
-Because the gate is a name-match, `plugins.boot_orchestrator` must name a plugin that actually registered. After discovery, `Pipelex.setup` rejects a `boot_orchestrator` that no registered plugin carries — a typo or a missing plugin (e.g. `--orchestrator temporal` without the Temporal plugin installed) raises `UnknownBootOrchestratorError` instead of silently running in-process: nothing would claim the hub slots, so the process would otherwise fall through to the core defaults and execute on the wrong runtime. The check matches against **plugin names** (the same namespace the gate uses), not the `orchestration_mode` registry — a plugin's name and the token(s) it serves are separate namespaces that *may* differ, even where a shipped plugin keeps them identical (our Temporal plugin is named `temporal` and serves `temporal`). The error names no specific plugin, keeping core decoupled.
+Because the gate is a name-match, `boot_orchestrator` must name a plugin that actually registered. After discovery, `Pipelex.setup` rejects a `boot_orchestrator` that no registered plugin carries — a typo or a missing plugin (e.g. `--orchestrator temporal` without the Temporal plugin installed) raises `UnknownBootOrchestratorError` instead of silently running in-process: nothing would claim the hub slots, so the process would otherwise fall through to the core defaults and execute on the wrong runtime. The check matches against **plugin names** (the same namespace the gate uses), not the `orchestration_mode` registry — a plugin's name and the token(s) it serves are separate namespaces that *may* differ, even where a shipped plugin keeps them identical (our Temporal plugin is named `temporal` and serves `temporal`). The error names no specific plugin, keeping core decoupled.
 
 ### Injection precedence
 
@@ -201,7 +201,7 @@ What an out-of-tree orchestrator imports *is* a contract. The SPI is a documente
 Our Temporal plugin — external, closed-source, shipped as its own distribution — is the reference orchestrator plugin. Its `register`:
 
 - **always** (regardless of the boot gate): contributes a single `TemporalOrchestrator` registered once under the `"temporal"` token (import-light; `temporalio` is pulled lazily inside `execute`/`start`), the matching `TemporalBundleValidator` under the same token (the worker-dispatched `/validate` arm), and an HTTP error mapper classifying Temporal transport faults. The orchestrator advertises `supports_fire_and_forget = True`; its `execute` awaits completion and reports `make_workflow_id(...)`, its `start` enqueues the workflow and returns a `PipelexPipeDispatchAck` carrying the workflow id;
-- **only when `plugins.boot_orchestrator == "temporal"`**: claims the content-generator / task-manager / pipe-router / pipe-run / isolated-execution-probe hub slots with thunks and registers the teardown callback — booting this process as a Temporal-default runtime.
+- **only when `boot_orchestrator == "temporal"`**: claims the content-generator / task-manager / pipe-router / pipe-run / isolated-execution-probe hub slots with thunks and registers the teardown callback — booting this process as a Temporal-default runtime.
 
 The orchestrator itself keeps the `WorkflowExecutionError` catch and the `make_workflow_id` recompute in the blocking `execute` arm. It serializes its `PipeOutput` through `pipelex.runtime_bridge.serialization`, shared with the core DIRECT orchestrator so the boundary shape cannot drift.
 
@@ -224,4 +224,4 @@ my_runtime = "my_package.my_plugin:MyRuntimePlugin"
 
 An interpreter-group plugin is *not* restricted to interpreter-layer capabilities — the cross-check runs one way only. Our own Temporal plugin contributes an orchestrator and an HTTP-error mapper (kernel-tier) from the same `register`, which is why the rule is asymmetric.
 
-Installing the distribution makes the mode available; uninstalling removes it. No core change, no central registration list. A discovered plugin can be quarantined without uninstalling via the `plugins.disabled` denylist (see [Inference Backend Plugins](inference-backend-plugins.md) for the shared discovery/denylist machinery).
+Installing the distribution makes the mode available; uninstalling removes it. No core change, no central registration list. A discovered plugin can be quarantined without uninstalling via the `runtime.plugins.disabled` denylist (see [Inference Backend Plugins](inference-backend-plugins.md) for the shared discovery/denylist machinery).

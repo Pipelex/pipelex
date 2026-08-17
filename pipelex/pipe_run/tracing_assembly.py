@@ -84,7 +84,7 @@ def assemble_tracing(
         A TracingAssembly carrying whichever artifacts were requested and succeeded.
     """
     result = TracingAssembly()
-    tracing_config = get_config().pipelex.tracing_config
+    tracing_config = get_config().runtime.tracing
     # A scoped override (see hub.scoped_event_log) is the run's transport and implies
     # tracing-enabled (D1) — it must not be skipped by the is_enabled early-return.
     event_log_override = get_event_log_override()

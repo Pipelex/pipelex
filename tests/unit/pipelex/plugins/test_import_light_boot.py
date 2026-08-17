@@ -58,9 +58,10 @@ _GUARD_SCRIPT = textwrap.dedent(
 
     # Core's built-ins claim no hub slots; building the registrar must register them all
     # import-light, pulling none of the BLOCKED backend SDKs into sys.modules.
-    config = SimpleNamespace(plugins=SimpleNamespace(disabled=[]))
+    config = SimpleNamespace(runtime=SimpleNamespace(plugins=SimpleNamespace(disabled=[])))
     registrar = discovery.build_registrar(
         config=config,
+        boot_orchestrator=None,
         builtin_plugins=BUILTIN_PLUGINS,
         core_unconditional_plugin_names=CORE_UNCONDITIONAL_PLUGIN_NAMES,
         entry_point_groups=ENTRY_POINT_GROUPS,

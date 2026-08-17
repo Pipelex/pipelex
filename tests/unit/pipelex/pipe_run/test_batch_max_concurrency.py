@@ -57,7 +57,7 @@ class TestBatchMaxConcurrency:
             PipeRunParams.model_validate({"run_mode": PipeRunMode.DRY, "pipe_stack_limit": 20})
 
     def test_factory_freezes_the_live_config_value(self) -> None:
-        execution_config = get_config().pipelex.pipeline_execution_config
+        execution_config = get_config().interpreter.pipeline_execution
         expected = resolve_batch_max_concurrency(execution_config.max_concurrency)
 
         run_params = PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY)
@@ -66,7 +66,7 @@ class TestBatchMaxConcurrency:
 
     def test_later_config_change_does_not_reach_existing_run_params(self) -> None:
         """The whole point: params built before a config edit keep the bound they were born with."""
-        execution_config = get_config().pipelex.pipeline_execution_config
+        execution_config = get_config().interpreter.pipeline_execution
         original_setting = execution_config.max_concurrency
         try:
             execution_config.max_concurrency = 3

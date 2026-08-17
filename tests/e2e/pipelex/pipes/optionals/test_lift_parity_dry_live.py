@@ -29,7 +29,7 @@ class TestLiftedChainDryLiveParity:
         seeding), yields identical ledgers (keys, kinds, producing pipes) and identical skipped
         graph nodes with the same skip reasons.
         """
-        execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(generate_graph=True)
+        execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=True)
 
         live_runner = PipelexMTHDSProtocol(library_dirs=[str(_FIXTURE_DIR)], execution_config=execution_config)
         live_response = await live_runner.execute(pipe_code="opar_flow", inputs={})

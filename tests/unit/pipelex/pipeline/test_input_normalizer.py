@@ -39,7 +39,7 @@ def _patch_storage_and_config(mocker: MockerFixture) -> None:
     )
     mocker.patch(
         "pipelex.pipeline.input_normalizer.get_config",
-        return_value=mocker.Mock(pipelex=mocker.Mock(storage_config=mocker.Mock(is_upload_local_content_enabled=True))),
+        return_value=mocker.Mock(runtime=mocker.Mock(storage=mocker.Mock(is_upload_local_content_enabled=True))),
     )
 
 

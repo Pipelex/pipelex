@@ -48,7 +48,7 @@ class AnthropicFactory:
 
         # Tier 1 transport retry: set the SDK client's retry budget explicitly from config
         # instead of inheriting the silent SDK default (anthropic's own DEFAULT_MAX_RETRIES).
-        transport_max_retries = get_config().cogt.transport_max_retries
+        transport_max_retries = get_config().inference.transport_max_retries
 
         match sdk_variant:
             case AnthropicSdkVariant.ANTHROPIC:
@@ -58,7 +58,7 @@ class AnthropicFactory:
                     max_retries=transport_max_retries,
                 )
             case AnthropicSdkVariant.BEDROCK_ANTHROPIC:
-                aws_config = get_config().pipelex.aws_config
+                aws_config = get_config().runtime.aws
                 match aws_config.bedrock_access_variant:
                     case BedrockAccessVariant.AWS_ACCESS:
                         aws_access_key_id, aws_secret_access_key, aws_region = aws_config.get_aws_access_keys()

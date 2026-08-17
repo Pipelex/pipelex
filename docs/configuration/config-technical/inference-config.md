@@ -1,30 +1,30 @@
 ---
-description: "Configure cognitive tools in Pipelex — LLM inference, image generation, and OCR extraction settings through TOML configuration."
+description: "Configure inference in Pipelex — LLM, image generation, extraction, templating and dry-run settings through TOML configuration."
 ---
 
-# Cognitive Tools (Cogt) Configuration
+# Inference Configuration
 
-The Cogt configuration manages all cognitive tools in Pipelex, including LLM (Language Models), Image Generation, and OCR (Optical Character Recognition) capabilities.
+The `[inference]` section configures everything Pipelex uses to call a model: LLM inference, image generation, document extraction, the model deck, the default templating style, and the shape of dry-run mocks.
 
 ## Overview
 
 ```toml
-[cogt]
+[inference]
 # Tier 1 transport retry attempts
 transport_max_retries = 2
 
-# Main Cogt configuration sections
-[cogt.llm_config]
-[cogt.img_gen_config]
-[cogt.extract_config]
+# Main inference configuration sections
+[inference.llm]
+[inference.img_gen]
+[inference.extract]
 ```
 
 ## Transport Retry
 
-`transport_max_retries` is a top-level `[cogt]` setting that controls how many times an inference SDK client retries a transient transport failure before giving up.
+`transport_max_retries` is a top-level `[inference]` setting that controls how many times an inference SDK client retries a transient transport failure before giving up.
 
 ```toml
-[cogt]
+[inference]
 transport_max_retries = 2
 ```
 
@@ -32,14 +32,14 @@ transport_max_retries = 2
 
 This is "Tier 1" of the retry model. It is wired uniformly into every inference SDK client factory — Anthropic, OpenAI / Azure OpenAI, the Pipelex Gateway clients, Mistral, and Google — as well as the raw-`httpx` Azure image-generation path, so the retry posture is a deliberate, uniform policy rather than a per-provider SDK default.
 
-It is distinct from `llm_config.schema_reask_max_attempts`, which is `instructor`'s schema re-ask count for structured-output validation failures — a different concern.
+It is distinct from `inference.llm.schema_reask_max_attempts`, which is `instructor`'s schema re-ask count for structured-output validation failures — a different concern.
 
 ## LLM Configuration
 
 Configuration for all Language Model interactions:
 
 ```toml
-[cogt.llm_config]
+[inference.llm]
 default_max_images = 100  # Maximum number of images in prompts
 is_structure_prompt_enabled = true
 schema_reask_max_attempts = 3  # instructor schema re-ask attempts, between 1 and 10
@@ -58,11 +58,11 @@ When configuring LLM jobs, you can set:
 Configuration for image generation capabilities:
 
 ```toml
-[cogt.img_gen_config.img_gen_job_config]
+[inference.img_gen.img_gen_job]
 is_sync_mode = false
 
 # Default parameters for image generation
-[cogt.img_gen_config.img_gen_param_defaults]
+[inference.img_gen.img_gen_param_defaults]
 aspect_ratio = "square"  # Options: square, landscape_4_3, landscape_3_2, landscape_16_9, landscape_21_9, landscape_4_1, landscape_8_1,
                          # portrait_3_4, portrait_2_3, portrait_9_16, portrait_9_21, portrait_1_4, portrait_1_8
 background = "auto"     # Options: transparent, opaque, auto
@@ -115,7 +115,7 @@ Image generation jobs support these parameters:
 Configuration for Optical Character Recognition:
 
 ```toml
-[cogt.extract_config]
+[inference.extract]
 default_page_views_dpi = 72
 ```
 
@@ -174,18 +174,18 @@ All model types support the same routing, aliasing, and preset systems.
 ## Example Complete Configuration
 
 ```toml
-[cogt]
+[inference]
 transport_max_retries = 2
 
-[cogt.llm_config]
+[inference.llm]
 default_max_images = 100
 is_structure_prompt_enabled = true
 schema_reask_max_attempts = 3
 
-[cogt.img_gen_config.img_gen_job_config]
+[inference.img_gen.img_gen_job]
 is_sync_mode = false
 
-[cogt.img_gen_config.img_gen_param_defaults]
+[inference.img_gen.img_gen_param_defaults]
 aspect_ratio = "square"
 background = "auto"
 quality = "low"
@@ -196,7 +196,7 @@ safety_tolerance = 5
 is_raw = false
 seed = "auto"
 
-[cogt.extract_config]
+[inference.extract]
 default_page_views_dpi = 72
 ```
 

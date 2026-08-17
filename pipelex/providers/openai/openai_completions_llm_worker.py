@@ -63,7 +63,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
         else:
             self.instructor_for_objects = from_openai(client=sdk_instance)
 
-        instructor_config = get_config().cogt.llm_config.instructor_config
+        instructor_config = get_config().inference.llm.instructor
         if instructor_config.is_dump_kwargs_enabled:
             self.instructor_for_objects.on(hook_name="completion:kwargs", handler=dump_kwargs)
         if instructor_config.is_dump_response_enabled:
@@ -100,7 +100,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
             effort = job_params.reasoning_effort
             match thinking_mode:
                 case ThinkingMode.MANUAL:
-                    openai_effort = get_config().cogt.llm_config.openai_config.get_reasoning_level(effort=effort)
+                    openai_effort = get_config().inference.llm.openai.get_reasoning_level(effort=effort)
                     log.verbose(f"OpenAI Chat Completions reasoning_effort={openai_effort}")
                     return openai_effort
                 case ThinkingMode.ADAPTIVE:

@@ -56,7 +56,7 @@ class TestOptionalsShowcaseE2E:
         the `continue` arm, and the absorbing sink still delivers the main output — with the graph
         marking the lifted pipes as skipped.
         """
-        execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(generate_graph=True)
+        execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=True)
         runner = PipelexMTHDSProtocol(library_dirs=[str(_FIXTURE_DIR)], execution_config=execution_config)
 
         response = await runner.execute(pipe_code="oshow_main_flow", inputs={"contract": "a clean contract"})

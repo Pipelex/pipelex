@@ -55,7 +55,7 @@ def _free_model_usage(job_metadata: JobMetadata) -> LLMTokensUsage:
 
 class TestRenderRunCostReport:
     def _set_channels(self, mocker: MockerFixture, *, console: bool, csv: bool, csv_dir: Path | None = None) -> None:
-        reporting_config = get_config().pipelex.reporting_config
+        reporting_config = get_config().runtime.reporting
         mocker.patch.object(reporting_config, "is_log_costs_to_console", console)
         mocker.patch.object(reporting_config, "is_generate_cost_report_file_enabled", csv)
         if csv_dir is not None:

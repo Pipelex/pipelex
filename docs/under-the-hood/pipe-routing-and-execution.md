@@ -112,11 +112,11 @@ PipeRouter.run(pipe_job)
 
 ### Router Selection
 
-The router is selected during `Pipelex.setup()` by resolving the hub's `PIPE_ROUTER` slot. A boot-orchestrator plugin (e.g. our closed Temporal plugin) claims that slot in its `register()` when `plugins.boot_orchestrator` names it; otherwise the default in-process router is used:
+The router is selected during `Pipelex.setup()` by resolving the hub's `PIPE_ROUTER` slot. A boot-orchestrator plugin (e.g. our closed Temporal plugin) claims that slot in its `register()` when `boot_orchestrator` names it; otherwise the default in-process router is used:
 
 ```python
 # A boot-orchestrator plugin swaps in its distributed router when
-# plugins.boot_orchestrator == its own name; otherwise this default runs.
+# boot_orchestrator == its own name; otherwise this default runs.
 effective_pipe_router = self._resolve_hub_slot(
     slot=HubSlot.PIPE_ROUTER,
     default=lambda: PipeRouter(observer=multi_observer),   # Direct, in-process

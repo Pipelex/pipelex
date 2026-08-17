@@ -36,7 +36,7 @@ prompt = "Echo the $subject as a topic"
 class TestPipelineRunSetupRequestId:
     async def test_request_id_threads_onto_job_metadata(self) -> None:
         """``pipeline_run_setup(..., request_id=...)`` puts the value on ``job_metadata.request_id``."""
-        execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+        execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
             generate_graph=False,
         )
         pipe_job, _, _ = await pipeline_run_setup(
@@ -49,7 +49,7 @@ class TestPipelineRunSetupRequestId:
 
     async def test_request_id_absent_defaults_to_none(self) -> None:
         """Omitting ``request_id`` leaves ``job_metadata.request_id`` as ``None``."""
-        execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+        execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
             generate_graph=False,
         )
         pipe_job, _, _ = await pipeline_run_setup(

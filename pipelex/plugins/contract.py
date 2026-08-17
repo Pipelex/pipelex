@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 # HTTP error response).
 #
 # v3 added ``add_storage_provider`` and ``add_secrets_provider`` — two config-selected,
-# process-global provider registries (``storage_config.method`` / ``secrets_config.method`` pick
+# process-global provider registries (``runtime.storage.method`` / ``runtime.secrets.method`` pick
 # the factory at boot). DX-1 batches both menu additions under this single bump so external plugins
 # re-declare ``targets_api`` only once.
 #

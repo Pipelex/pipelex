@@ -37,7 +37,7 @@ class TestMermaidFromJson:
 
     def _get_graph_config_with_data(self):
         """Get a graph config with stuff data inclusion enabled."""
-        base_graph_config = get_config().pipelex.pipeline_execution_config.graph_config
+        base_graph_config = get_config().interpreter.pipeline_execution.graph
         new_data_inclusion = base_graph_config.data_inclusion.model_copy(update={"stuff_json_content": True})
         return base_graph_config.model_copy(update={"data_inclusion": new_data_inclusion})
 

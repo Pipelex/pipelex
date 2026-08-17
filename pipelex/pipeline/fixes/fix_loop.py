@@ -402,7 +402,7 @@ async def fix_bundle_file(
     rules may apply (see ``_safe_fixes``); the CLI validates the codes before calling.
     """
     if max_iterations is None:
-        max_iterations = get_config().pipelex.builder_config.fix_loop_max_attempts
+        max_iterations = get_config().interpreter.builder.fix_loop_max_attempts
     entry_source_path = _absolute_source_path(mthds_file_path)
     entry_path = entry_source_path.resolve()
     effective_dirs, _ = resolve_library_dirs(library_dirs)

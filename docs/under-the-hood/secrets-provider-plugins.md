@@ -5,7 +5,7 @@ description: "How Pipelex selects a secrets backend by config, the keyed-registr
 
 # Secrets Provider Plugins
 
-Every credential Pipelex reads — an API key, a service-account file path, a signing secret — is resolved through a single **secrets provider** set on the hub at boot. Which provider that is comes entirely from data: one config field, `secrets_config.method`, names a backend, and a **secrets plugin** is what teaches Pipelex how to build the provider for that method.
+Every credential Pipelex reads — an API key, a service-account file path, a signing secret — is resolved through a single **secrets provider** set on the hub at boot. Which provider that is comes entirely from data: one config field, `runtime.secrets.method`, names a backend, and a **secrets plugin** is what teaches Pipelex how to build the provider for that method.
 
 Core names no secrets backend by import or by string. The built-in `env` provider (reads secrets from environment variables) is a plugin too — the always-on `SecretsPlugin` — riding the exact same seam an out-of-tree `pipelex-secrets-<backend>` package (Vault, AWS Secrets Manager, GCP Secret Manager, …) would. This page documents that seam, the factory contract a plugin registers, and how to write one.
 
@@ -17,9 +17,9 @@ This is the second application of the mechanism the [storage provider](storage-p
 
 The [inference-backend](inference-backend-plugins.md) and [orchestrator](orchestrator-plugins.md) registries are selected **per call** — a model's `sdk`, a request's `orchestration_mode`. Secrets is not: it is a **process-global singleton selected by its own config key**, independent of the orchestrator. So it rides the same **keyed registry + config-selected singleton** mechanism storage uses:
 
-> Plugins register N provider factories into a registry keyed by an open `method` token. At boot, core reads `secrets_config.method`, looks that token up in the registry, and calls the factory to produce the one provider set on the hub.
+> Plugins register N provider factories into a registry keyed by an open `method` token. At boot, core reads `runtime.secrets.method`, looks that token up in the registry, and calls the factory to produce the one provider set on the hub.
 
-This is deliberately **not** a hub slot (those are orchestrator-coupled, claimed only when `boot_orchestrator == plugin.name`). Secrets selection has nothing to do with the orchestrator, so it gets its own registry and its own config key — the sibling of `storage_config.method`.
+This is deliberately **not** a hub slot (those are orchestrator-coupled, claimed only when `boot_orchestrator == plugin.name`). Secrets selection has nothing to do with the orchestrator, so it gets its own registry and its own config key — the sibling of `runtime.storage.method`.
 
 ---
 
@@ -34,11 +34,11 @@ boot (Pipelex.setup)
             └─ plugin.register(registrar)            # side-effect-free
                  └─ registrar.add_secrets_provider(method=…, factory=…)
   └─ SecretsProviderRegistry(registrar.secrets_providers)    # stored on the hub
-  └─ secrets_provider = registry.get_required(method=secrets_config.method)(secrets_config)
+  └─ secrets_provider = registry.get_required(method=runtime.secrets.method)(runtime.secrets)
   └─ set_secrets_provider(secrets_provider)          # the one provider every consumer reads
 ```
 
-There is no `match secrets_config.method:` anywhere in boot — the token set is open, so validation *is* the registry lookup. Adding a backend means registering a factory for its token; nothing in core changes. Every downstream consumer (`get_secret(...)`, telemetry credentials, the storage `gcp` arm, search/extract workers) keeps calling `get_secrets_provider()` and is unaffected by which method was selected.
+There is no `match runtime.secrets.method:` anywhere in boot — the token set is open, so validation *is* the registry lookup. Adding a backend means registering a factory for its token; nothing in core changes. Every downstream consumer (`get_secret(...)`, telemetry credentials, the storage `gcp` arm, search/extract workers) keeps calling `get_secrets_provider()` and is unaffected by which method was selected.
 
 ### Where in boot secrets is resolved
 
@@ -52,7 +52,7 @@ Secrets is resolved **early** — right after plugin discovery, after the gatewa
 `Pipelex.setup` resolves the secrets provider in this order:
 
 1. an explicit `setup(secrets_provider=...)` parameter (test/host injection) — always wins;
-2. the config-selected registry factory (`get_required(method=secrets_config.method)(config)`).
+2. the config-selected registry factory (`get_required(method=runtime.secrets.method)(config)`).
 
 There is no separate core default: the built-in `SecretsPlugin` *is* the default supplier of the `env` method, so an ordinary boot always resolves through step 2.
 
@@ -111,11 +111,11 @@ def _make_env_secrets_provider(config: SecretsProviderConfig) -> SecretsProvider
 
 ## Selecting a method by config
 
-`secrets_config.method` is an **open `str` token** (Decision S1), not a closed enum. The built-in uses `"env"`; an external `pipelex-secrets-<backend>` plugin registers its own (e.g. `"vault"`). A config naming an external method **parses fine** — the token is stored verbatim and its installability is validated later, at registry lookup:
+`runtime.secrets.method` is an **open `str` token** (Decision S1), not a closed enum. The built-in uses `"env"`; an external `pipelex-secrets-<backend>` plugin registers its own (e.g. `"vault"`). A config naming an external method **parses fine** — the token is stored verbatim and its installability is validated later, at registry lookup:
 
 ```toml
 # .pipelex/pipelex.toml
-[pipelex.secrets_config]
+[runtime.secrets]
 method = "vault"          # an out-of-tree provider — selected iff its plugin is installed
 ```
 
@@ -130,10 +130,10 @@ Whether that token names an *installed* provider is validated at **registry look
 
 | Condition | Error |
 |-----------|-------|
-| `secrets_config.method` names no registered provider | `UnknownSecretsMethodError` (lists the registered methods) |
+| `runtime.secrets.method` names no registered provider | `UnknownSecretsMethodError` (lists the registered methods) |
 | published under the retired `pipelex.plugins` group | `RetiredPluginEntryPointGroupError` (names the plugins and the group each should move to) |
 | two plugins register the same `method` | `DuplicateSecretsProviderError` (names both plugins) |
-| `name` (`"secrets"`) in `plugins.disabled` | `CoreUnconditionalPluginDisabledError` |
+| `name` (`"secrets"`) in `runtime.plugins.disabled` | `CoreUnconditionalPluginDisabledError` |
 | entry point raises while loading/registering | `BrokenPluginError` |
 | optional SDK missing at use | `MissingDependencyError` (package + `pipelex[<extra>]` hint) |
 
@@ -155,7 +155,7 @@ A third-party secrets plugin is a distribution that:
 vault_secrets = "pipelex_secrets_vault.plugin:VaultSecretsPlugin"
 ```
 
-Installing the distribution makes the method selectable (`secrets_config.method = "vault"`); uninstalling removes it. No core change, no central registration list — *presence* is the source of truth. A discovered plugin can be quarantined without uninstalling via the `plugins.disabled` denylist (matched against the entry-point name *before* load, so a broken install can still be disabled to recover startup — see [Inference Backend Plugins](inference-backend-plugins.md) for the shared discovery/denylist machinery).
+Installing the distribution makes the method selectable (`runtime.secrets.method = "vault"`); uninstalling removes it. No core change, no central registration list — *presence* is the source of truth. A discovered plugin can be quarantined without uninstalling via the `runtime.plugins.disabled` denylist (matched against the entry-point name *before* load, so a broken install can still be disabled to recover startup — see [Inference Backend Plugins](inference-backend-plugins.md) for the shared discovery/denylist machinery).
 
 Use `pipelex plugins list` to see every discovered plugin, the entry-point group it was found under, what each contributed, and its denylist state. The **Group** column is the first thing to read when a plugin is missing: a built-in shows `—`, and an external plugin that resolved to the wrong layer shows it there.
 

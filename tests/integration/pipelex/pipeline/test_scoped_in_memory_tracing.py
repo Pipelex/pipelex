@@ -6,7 +6,7 @@ A dry-run-with-graph executed under ``with scoped_event_log(InMemoryEventLog())`
 - write NO NDJSON file and touch NO configured backend (the factory is never called —
   the scoped instance is the single transport);
 - emit and assemble against the SAME instance (the fix for the two-instance problem);
-- assemble the graph even when ``tracing_config.is_enabled`` is False — a set override
+- assemble the graph even when ``runtime.tracing.is_enabled`` is False — a set override
   implies tracing-enabled (decision D1);
 - keep concurrently-scoped runs isolated from each other.
 """
@@ -54,7 +54,7 @@ class TestScopedInMemoryTracing:
         mocker.patch("pipelex.pipe_run.tracing_assembly.make_event_log", side_effect=factory_error)
 
     async def _run_dry_with_graph(self) -> PipeOutput:
-        execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+        execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
             generate_graph=True,
             mock_inputs=True,
         )
@@ -66,7 +66,7 @@ class TestScopedInMemoryTracing:
         """With NDJSON tracing configured, the scoped log wins: graph assembles in memory, zero file I/O."""
         traces_dir = tmp_path / "traces"
         traces_dir.mkdir()
-        cfg = get_config().pipelex.tracing_config
+        cfg = get_config().runtime.tracing
         mocker.patch.object(cfg, "is_enabled", True)
         mocker.patch.object(cfg, "backend", TracingBackend.NDJSON)
         mocker.patch.object(cfg, "ndjson", NdjsonTracingConfig(traces_dir=str(traces_dir)))
@@ -95,7 +95,7 @@ class TestScopedInMemoryTracing:
 
     async def test_override_implies_enabled_when_tracing_disabled(self, mocker: MockerFixture) -> None:
         """D1 regression: is_enabled=False + scoped override → the GraphSpec still assembles in memory."""
-        cfg = get_config().pipelex.tracing_config
+        cfg = get_config().runtime.tracing
         mocker.patch.object(cfg, "is_enabled", False)
         self._forbid_event_log_factory(mocker)
 
@@ -109,7 +109,7 @@ class TestScopedInMemoryTracing:
 
     async def test_concurrent_scoped_runs_do_not_cross_contaminate(self, mocker: MockerFixture) -> None:
         """Two concurrently-scoped runs each trace into their own log, with no shared/merged events."""
-        cfg = get_config().pipelex.tracing_config
+        cfg = get_config().runtime.tracing
         mocker.patch.object(cfg, "is_enabled", False)
         self._forbid_event_log_factory(mocker)
 

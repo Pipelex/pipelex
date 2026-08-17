@@ -49,7 +49,7 @@ There is no third level. The style is never derived from the model, the provider
 The shipped default is `xml` with `plain` text, set in `pipelex.toml`:
 
 ```toml
-[pipelex.templating_config]
+[inference.templating]
 default_templating_style = { tag_style = "xml" }
 ```
 

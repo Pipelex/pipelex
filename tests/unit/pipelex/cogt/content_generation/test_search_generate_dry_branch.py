@@ -37,7 +37,7 @@ class TestSearchGenerateDryBranch:
 
         deck_spy.assert_not_called()
         assert isinstance(result, SearchResultContent)
-        assert len(result.sources) == get_config().pipelex.dry_run_config.nb_list_items
+        assert len(result.sources) == get_config().inference.dry_run.nb_list_items
 
     @pytest.mark.asyncio
     async def test_live_resolves_worker(self, mocker: MockerFixture) -> None:

@@ -118,7 +118,7 @@ async def derive_structure_prompt(*, output_class: type[StuffContent], templatin
     filter, but the template is config-editable, and one that reached this render style-less could
     not use one at all.
     """
-    llm_config = get_config().cogt.llm_config
+    llm_config = get_config().inference.llm
     if not llm_config.is_structure_prompt_enabled:
         return None
     class_structure = StructurePrinter().get_type_structure(tp=output_class, base_class=StuffContent)

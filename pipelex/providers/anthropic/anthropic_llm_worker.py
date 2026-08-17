@@ -58,7 +58,7 @@ class _ThinkingParams:
 
 
 class AnthropicLLMWorker(LLMWorkerAbstract):
-    # Key into cogt.llm_config.effort_to_budget_maps for manual-thinking budget resolution
+    # Key into inference.llm.effort_to_budget_maps for manual-thinking budget resolution
     reasoning_budget_family: ClassVar[str] = "anthropic"
 
     def __init__(
@@ -100,7 +100,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         else:
             self.instructor_for_objects = from_anthropic(client=sdk_instance)
 
-        instructor_config = get_config().cogt.llm_config.instructor_config
+        instructor_config = get_config().inference.llm.instructor
         if instructor_config.is_dump_kwargs_enabled:
             self.instructor_for_objects.on(hook_name="completion:kwargs", handler=dump_kwargs)
         if instructor_config.is_dump_response_enabled:
@@ -155,7 +155,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         """Build thinking params when reasoning_effort is specified."""
         match thinking_mode:
             case ThinkingMode.ADAPTIVE:
-                anthropic_effort = get_config().cogt.llm_config.anthropic_config.get_reasoning_level(effort=effort)
+                anthropic_effort = get_config().inference.llm.anthropic.get_reasoning_level(effort=effort)
                 if anthropic_effort is None:
                     # NONE effort means don't enable thinking at all
                     return _ThinkingParams(
@@ -172,7 +172,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                     suppress_temperature=True,
                 )
             case ThinkingMode.MANUAL:
-                anthropic_effort = get_config().cogt.llm_config.anthropic_config.get_reasoning_level(effort=effort)
+                anthropic_effort = get_config().inference.llm.anthropic.get_reasoning_level(effort=effort)
                 if anthropic_effort is None:
                     # NONE effort means don't enable thinking
                     return _ThinkingParams(
@@ -180,7 +180,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                         output_config=None,
                         suppress_temperature=False,
                     )
-                budget = get_config().cogt.llm_config.get_reasoning_budget(
+                budget = get_config().inference.llm.get_reasoning_budget(
                     family=self.reasoning_budget_family,
                     effort=effort,
                 )
@@ -316,7 +316,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         messages = await AnthropicFactory.make_simple_messages(llm_job=llm_job)
 
         # Get Anthropic-specific config for structured output
-        anthropic_config = get_config().cogt.llm_config.anthropic_config
+        anthropic_config = get_config().inference.llm.anthropic
         timeout_seconds = anthropic_config.structured_output_timeout_seconds
 
         # Calculate safe max_tokens based on timeout

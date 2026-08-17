@@ -52,10 +52,10 @@ KERNEL_BUILTIN_PLUGINS: list[PipelexPlugin] = [
     LinkupPlugin(),
 ]
 
-# Kernel-layer built-ins that core requires unconditionally — naming one in ``plugins.disabled`` is a
+# Kernel-layer built-ins that core requires unconditionally — naming one in ``runtime.plugins.disabled`` is a
 # configuration error, not a no-op. ``storage`` supplies every built-in storage backend
-# (``storage_config.method`` must resolve to a registered factory or boot fails loud); ``secrets``
-# supplies the built-in ``env`` secrets backend (``secrets_config.method`` must likewise resolve or boot
+# (``runtime.storage.method`` must resolve to a registered factory or boot fails loud); ``secrets``
+# supplies the built-in ``env`` secrets backend (``runtime.secrets.method`` must likewise resolve or boot
 # fails loud); ``openai`` is the always-on default inference driver (no optional SDK to avoid), so
 # disabling it would only break the out-of-the-box experience. The interpreter-layer half of this set
 # lives beside its plugins, in ``pipelex.interpreter_plugins.builtins``.

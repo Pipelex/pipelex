@@ -39,7 +39,7 @@ def _get_next_output_folder() -> Path:
 async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[str, int]:
     """Save all graph outputs and return stats about stuff_data collection."""
     # Get graph config with ALL stuff data formats enabled for interactive rendering
-    base_graph_config = get_config().pipelex.pipeline_execution_config.graph_config
+    base_graph_config = get_config().interpreter.pipeline_execution.graph
     new_data_inclusion = base_graph_config.data_inclusion.model_copy(
         update={
             "stuff_json_content": True,
@@ -50,7 +50,7 @@ async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[s
     graph_config = base_graph_config.model_copy(update={"data_inclusion": new_data_inclusion})
 
     # Get theme from config
-    mermaid_theme = graph_config.mermaid_config.style.theme
+    mermaid_theme = graph_config.mermaid.style.theme
 
     # Save graph.json
     graph_json_path = output_dir / "graph.json"
@@ -106,7 +106,7 @@ class TestGraphWithFullData:
         4. Verifies interactive rendering works with the captured data
         """
         # Build effective config with graph tracing and full data capture enabled
-        exec_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+        exec_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
             generate_graph=True,
             force_include_full_data=True,
         )
@@ -257,7 +257,7 @@ class TestGraphWithFullData:
         )
 
         # Generate ReactFlow HTML
-        rf_config = get_config().pipelex.pipeline_execution_config.graph_config.reactflow_config
+        rf_config = get_config().interpreter.pipeline_execution.graph.reactflow
         reactflow_html = await generate_reactflow_html_async(graph_spec, config=rf_config, title="Graph: cv_job_matcher")
         reactflow_path = output_dir / "reactflow.html"
         reactflow_path.write_text(reactflow_html, encoding="utf-8")

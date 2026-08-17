@@ -227,7 +227,7 @@ def _nb_list_items(object_assignment: ObjectAssignment) -> int:
     """Resolve the object-list mock length: the assignment's fixed ``nb_items`` wins (D11), including 0."""
     if object_assignment.nb_items is not None:
         return object_assignment.nb_items
-    return get_config().pipelex.dry_run_config.nb_list_items
+    return get_config().inference.dry_run.nb_list_items
 
 
 class _ReportLLMJobFunc(Protocol):
@@ -287,7 +287,7 @@ def _dry_report_func(cogt_run_params: CogtRunParams) -> _ReportLLMJobFunc:
 
 
 def _dry_text_gen_truncate_length() -> int:
-    return get_config().pipelex.dry_run_config.text_gen_truncate_length
+    return get_config().inference.dry_run.text_gen_truncate_length
 
 
 def dry_llm_gen_text(llm_assignment: LLMAssignment) -> str:
@@ -365,7 +365,7 @@ def dry_img_gen_image_contents(img_gen_assignment: ImgGenAssignment) -> list[Ima
     touches the storage provider (eng review D10).
     """
     log.verbose(f"🤡 DRY RUN: img_gen for '{img_gen_assignment.img_gen_handle}'")
-    image_urls = get_config().pipelex.dry_run_config.image_urls
+    image_urls = get_config().inference.dry_run.image_urls
     return [
         _dry_image_content(image_url=image_urls[image_index % len(image_urls)], img_gen_assignment=img_gen_assignment)
         for image_index in range(img_gen_assignment.nb_images)
@@ -383,7 +383,7 @@ def dry_extract_page_contents(extract_assignment: ExtractAssignment) -> list[Pag
     if extract_assignment.extract_input.image_uri:
         nb_pages = 1
     else:
-        nb_pages = get_config().pipelex.dry_run_config.nb_extract_pages
+        nb_pages = get_config().inference.dry_run.nb_extract_pages
     return [
         PageContent(
             text_and_images=TextAndImagesContent(
@@ -399,19 +399,19 @@ def dry_extract_page_contents(extract_assignment: ExtractAssignment) -> list[Pag
 def dry_render_page_views(render_assignment: RenderPageViewsAssignment) -> list[ImageContent]:
     """Dry leaf for page-view rendering: URL-only page-view image mocks, no pdf rendering, no storage IO.
 
-    Fake URLs come from ``dry_run_config.image_urls`` (validated non-empty) — the single configured
+    Fake URLs come from ``inference.dry_run.image_urls`` (validated non-empty) — the single configured
     source of truth for dry fake images, same as the img-gen mock.
     """
     log.verbose(f"🤡 DRY RUN: render_page_views for '{render_assignment.job_metadata.pipeline_run_id}'")
-    nb_pages = get_config().pipelex.dry_run_config.nb_extract_pages
-    image_urls = get_config().pipelex.dry_run_config.image_urls
+    nb_pages = get_config().inference.dry_run.nb_extract_pages
+    image_urls = get_config().inference.dry_run.image_urls
     return [_dry_image_content(image_url=image_urls[page_index % len(image_urls)]) for page_index in range(nb_pages)]
 
 
 def dry_search_gen_sourced_answer(search_assignment: SearchAssignment) -> SearchResultContent:
     """Dry leaf for sourced-answer search: polyfactory-built result with mock sources, no provider."""
     log.verbose(f"🤡 DRY RUN: search_gen_sourced_answer for '{search_assignment.search_handle}'")
-    nb_sources = get_config().pipelex.dry_run_config.nb_list_items
+    nb_sources = get_config().inference.dry_run.nb_list_items
     mock_sources = build_mock_objects(DocumentContent, count=nb_sources)
     return build_mock_object(SearchResultContent, sources=mock_sources)
 

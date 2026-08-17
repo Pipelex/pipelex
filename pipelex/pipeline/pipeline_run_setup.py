@@ -220,7 +220,7 @@ async def pipeline_run_setup(
             # Create the event log when tracing is enabled — it is the shared transport for both graph
             # (node/edge) events and usage (cost) events.
             config = get_config()
-            tracing_config = config.pipelex.tracing_config
+            tracing_config = config.runtime.tracing
             # A scoped override (see hub.scoped_event_log) is the run's transport and implies
             # tracing-enabled (D1); otherwise build the configured backend when tracing is on.
             event_log = get_event_log_override()
@@ -232,7 +232,7 @@ async def pipeline_run_setup(
             # the correct values — no post-hoc model_copy. Propagated to child contexts via copy_for_child.
             trace_context = graph_tracer_manager.open_tracer(
                 graph_id=pipeline_run_id,
-                data_inclusion=execution_config.graph_config.data_inclusion,
+                data_inclusion=execution_config.graph.data_inclusion,
                 pipeline_ref_domain=pipe.domain_code,
                 pipeline_ref_main_pipe=pipe_code,
                 # D5: in costs-only mode (--no-graph --costs) pass event_log=None so the tracer accumulates

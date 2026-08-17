@@ -76,7 +76,7 @@ class TestAbsentMainOutputSurfaces:
         """Omitting the optional input lifts the whole chain: the execute response is a success
         naming the declared slot, the ledger chains provenance, and the graph marks skips.
         """
-        execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(generate_graph=True)
+        execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=True)
         runner = PipelexMTHDSProtocol(execution_config=execution_config)
 
         response = await runner.execute(mthds_contents=[_BUNDLE], inputs={})

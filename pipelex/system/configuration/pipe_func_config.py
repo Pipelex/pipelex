@@ -5,7 +5,7 @@ from pipelex.system.configuration.config_model import ConfigModel
 
 class PipeFuncConfig(ConfigModel):
     # Which PipeFunc execution mode this process runs, selected from the PipeFuncExecutorRegistry the
-    # plugins populate (the config-selected-singleton seam, sibling of storage_config.method). An open
+    # plugins populate (the config-selected-singleton seam, sibling of runtime.storage.method). An open
     # string token: "direct" (core, in-process — imports and runs the customer function here) is the
     # default; "daytona" (our Daytona sandbox plugin) runs it out-of-process. Any non-"direct" mode is a remote/sandbox
     # backend: library loading captures the customer .py source as text (onto the crate) instead of

@@ -45,14 +45,14 @@ class TestPipeParallelGraph:
         Expected: DATA edges flow from PipeParallel to combine_summaries (not from sub-pipes).
         """
         # Build config with graph tracing and all graph outputs enabled
-        base_config = get_config().pipelex.pipeline_execution_config
+        base_config = get_config().interpreter.pipeline_execution
         exec_config = base_config.with_execution_overrides(
             generate_graph=True,
             force_include_full_data=False,
         )
-        graph_config = exec_config.graph_config.model_copy(
+        graph_config = exec_config.graph.model_copy(
             update={
-                "graphs_inclusion": exec_config.graph_config.graphs_inclusion.model_copy(
+                "graphs_inclusion": exec_config.graph.graphs_inclusion.model_copy(
                     update={
                         "graphspec_json": True,
                         "mermaidflow_html": True,
@@ -61,7 +61,7 @@ class TestPipeParallelGraph:
                 )
             }
         )
-        exec_config = exec_config.model_copy(update={"graph_config": graph_config})
+        exec_config = exec_config.model_copy(update={"graph": graph_config})
 
         # Run pipeline with input text
         runner = PipelexMTHDSProtocol(
@@ -185,14 +185,14 @@ class TestPipeParallelGraph:
         - pg3_sequence: 3-branch PipeParallel with selective downstream consumption (1 branch unused)
         """
         # Build config with graph tracing
-        base_config = get_config().pipelex.pipeline_execution_config
+        base_config = get_config().interpreter.pipeline_execution
         exec_config = base_config.with_execution_overrides(
             generate_graph=True,
             force_include_full_data=False,
         )
-        graph_config = exec_config.graph_config.model_copy(
+        graph_config = exec_config.graph.model_copy(
             update={
-                "graphs_inclusion": exec_config.graph_config.graphs_inclusion.model_copy(
+                "graphs_inclusion": exec_config.graph.graphs_inclusion.model_copy(
                     update={
                         "graphspec_json": True,
                         "reactflow_html": True,
@@ -200,7 +200,7 @@ class TestPipeParallelGraph:
                 )
             }
         )
-        exec_config = exec_config.model_copy(update={"graph_config": graph_config})
+        exec_config = exec_config.model_copy(update={"graph": graph_config})
 
         # Run pipeline
         runner = PipelexMTHDSProtocol(

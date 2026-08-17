@@ -75,7 +75,7 @@ class TestKeylessBootForcedDry:
             pipe_job = await prepare_pipe_job(
                 pipe=pipe,
                 library_id=library_id,
-                execution_config=get_config().pipelex.pipeline_execution_config,
+                execution_config=get_config().interpreter.pipeline_execution,
                 pipe_run_mode=PipeRunMode.LIVE,
                 pipeline_run_id="keyless_forced_dry_run",
                 user_id="test-user",

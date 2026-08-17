@@ -203,7 +203,7 @@ class RuntimeBoot(metaclass=MetaSingleton):
                 config_dirs=[config_dir] if config_dir is not None else None,
             )
 
-        log_config = get_config().pipelex.log_config
+        log_config = get_config().runtime.log
         self.runtime_hub.set_console_print_target(target=log_config.console_print_target)
         log.configure(log_config=log_config)
         log.verbose("Logs are configured")
@@ -293,12 +293,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             msg = f"The base setup method does not support any additional arguments: {kwargs}"
             raise PipelexSetupError(msg)
 
-        # Boot this process under the named orchestrator plugin, when explicitly provided.
-        # The matching boot-orchestrator plugin (e.g. Temporal) claims the hub slots in its
-        # register() iff plugins.boot_orchestrator == its own name; any other value is in-process.
-        if boot_orchestrator is not None:
-            get_config().plugins.boot_orchestrator = boot_orchestrator
-
         # --- Pipelex Service and Telemetry --------------------------------------------------
 
         # Check if Pipelex Gateway is enabled
@@ -379,6 +373,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # applied at their ordered apply-points in later phases.
         plugin_registrar = build_registrar(
             config=get_config(),
+            boot_orchestrator=boot_orchestrator,
             builtin_plugins=KERNEL_BUILTIN_PLUGINS if builtin_plugins is None else builtin_plugins,
             core_unconditional_plugin_names=(
                 KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES if core_unconditional_plugin_names is None else core_unconditional_plugin_names
@@ -387,7 +382,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         )
         self._plugin_registrar = plugin_registrar
         # Reject an unknown boot orchestrator before falling through to the core defaults. The requested
-        # name (CLI --orchestrator / setup(boot_orchestrator=...) / config) is matched against registered
+        # name (CLI --orchestrator / setup(boot_orchestrator=...)) is matched against registered
         # plugin names — the same namespace the slot-claim gate uses (boot_orchestrator == plugin.name).
         # When no plugin of that name registered (not installed, disabled, or a typo) nothing claims the
         # hub slots, so without this guard the run would silently execute in-process instead of under the
@@ -403,9 +398,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # ``PIPE_FUNC_EXECUTOR``, all applied in ``Pipelex.setup``). What closed it is the entry-point
         # group split: the layer signal that remedy needed is now carried by the plugin's own
         # declaration.
-        requested_boot_orchestrator = get_config().plugins.boot_orchestrator
-        if requested_boot_orchestrator is not None and requested_boot_orchestrator not in plugin_registrar.registered_plugin_names:
-            raise UnknownBootOrchestratorError(requested=requested_boot_orchestrator)
+        if boot_orchestrator is not None and boot_orchestrator not in plugin_registrar.registered_plugin_names:
+            raise UnknownBootOrchestratorError(requested=boot_orchestrator)
 
         # Secrets provider precedence: explicit setup() param > config-selected registry factory.
         # The built-in SecretsPlugin supplies the "env" method, so there is no separate core default.
@@ -413,7 +407,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         secrets_provider_registry = SecretsProviderRegistry(plugin_registrar.secrets_providers)
         self.runtime_hub.set_secrets_provider_registry(secrets_provider_registry)
         if secrets_provider is None:
-            secrets_config = get_config().pipelex.secrets_config
+            secrets_config = get_config().runtime.secrets
             secrets_provider = secrets_provider_registry.get_required(method=secrets_config.method)(secrets_config)
 
         # Disable Pipelex telemetry when:
@@ -539,7 +533,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # The built-in StoragePlugin supplies every method, so there is no separate core default.
         # Resolves here (after secrets is on the hub) so the GCP factory's secret read works.
         if storage_provider is None:
-            storage_config = get_config().pipelex.storage_config
+            storage_config = get_config().runtime.storage
             storage_provider = storage_provider_registry.get_required(method=storage_config.method)(storage_config)
         self.runtime_hub.set_storage_provider(storage_provider)
 
@@ -550,6 +544,13 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # dispatch activities and mock inside them, so `needs_inference` plays no role in picking the
         # generator. Its other boot roles (gateway/model setup, credentials, telemetry) are unchanged.
         self.runtime_hub.set_dry_run_forced(is_forced=not needs_inference)
+        # The orchestrator plugin this process booted under, recorded as boot-scoped hub state rather
+        # than written into the config object — nothing in a pipelex.toml names an orchestrator, and
+        # routing a boot argument through the config would make it look settable. The slot-claim *gate*
+        # does not read this: a plugin's register() matched `registrar.boot_orchestrator` back at
+        # discovery, and the unknown-name guard above reads the argument. What reads it is run-time
+        # code asking whether it owns the process, so it must be set before the thunks below run.
+        self.runtime_hub.set_boot_orchestrator(boot_orchestrator=boot_orchestrator)
         # Injection precedence (codex C8): explicit setup() param > plugin slot-claim thunk > core default.
         # A boot-orchestrator plugin (Temporal worker) claims the CONTENT_GENERATOR slot; its thunk runs
         # only here, never at register, so booting a non-worker process imports no host-runtime SDK.
@@ -696,10 +697,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
             log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done (except config & logs)")
         finally:
-            # The runtime hub releases its process-global config. ``class_registry_scoping`` is reset here
+            # The runtime hub releases its process-global config and boot-scoped flags. ``class_registry_scoping``
+            # is reset here
             # too: the interpreter half installs the resolver at boot, so releasing it belongs to whichever
             # teardown runs — and on a kernel-only boot nothing installed it, where the reset is a no-op.
-            self.runtime_hub.reset_config()
+            self.runtime_hub.reset_boot_state()
             class_registry_scoping.reset()
             # The same three ``_release_after_failed_boot`` releases, deliberately kept identical: these are
             # the ones that *poison* the next boot rather than merely dangle, so they must not sit above a
@@ -742,8 +744,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         A failed boot must release the process-global singletons it acquired, not just the singleton
         registration — otherwise they leak and poison the next boot in the same process. ``setup()``
         establishes these progressively (logging + hub config in ``__init__``, the ``KajsonManager``
-        class registry, the template registries) and may mutate config (e.g.
-        ``plugins.boot_orchestrator``); failing partway skips ``teardown()``, the normal release point.
+        class registry, the template registries) and sets boot-scoped hub state (e.g. the boot
+        orchestrator); failing partway skips ``teardown()``, the normal release point.
 
         It exists rather than calling ``teardown()`` because that path reads ``self.inference_manager``
         (and, on the interpreter half, ``self.pipeline_manager``) unguarded, and both are assigned
@@ -751,7 +753,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         deliberate: guarding them would let a half-built teardown look successful.
 
         It releases a **subset** of what ``teardown()`` does, and the subset is chosen: everything that
-        would otherwise *poison the next boot* is here — the hub config, the class-registry scoping, the
+        would otherwise *poison the next boot* is here — the hub config and its boot-scoped flags, the class-registry scoping, the
         ``KajsonManager``, the template registries, the telemetry singleton and the ``MetaSingleton``
         registration. What is deliberately absent is ``sdk_client_manager``, ``reporting_delegate``,
         ``func_registry``, ``inference_manager`` and ``class_registry``. The first three leave resources
@@ -770,7 +772,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         already stood its runtime up, and only the plugin knows what that cost. Our Temporal plugin's
         thunk registers its own process-global singletons and installs a sandbox predicate — it does not
         yet start a poller, which is a property of that thunk today and not of the slot. A failure
-        anywhere after that thunk — the ``pipe_func_config.execution_mode`` lookup raising on an unregistered mode is the
+        anywhere after that thunk — the ``interpreter.pipe_func.execution_mode`` lookup raising on an unregistered mode is the
         most reachable one, since it is a plain config error — would otherwise leak it, because nothing
         else on this path calls the callbacks. Not a hypothetical widened by the boot split: the thunk
         used to run *after* the pipe-func executor resolution, ``pipeline_manager.setup()`` and the
@@ -815,7 +817,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                     # (2) an injected telemetry manager is unbounded code; its exception surface cannot
                     # be enumerated, and the releases below must happen regardless.
                     log.error(f"Telemetry teardown failed while releasing a failed boot: {telemetry_exc}")
-            self.runtime_hub.reset_config()
+            self.runtime_hub.reset_boot_state()
             class_registry_scoping.reset()
             KajsonManager.teardown()
             TemplateLoader.reset()

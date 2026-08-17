@@ -45,7 +45,7 @@ Pass an explicit `storage_dir`: the observer is constructed before `Pipelex.make
 Once registered:
 
 - **Location**: Local filesystem in JSONL format
-- **Default Directory**: if you omit `storage_dir`, the directory comes from `observer_config.observer_dir` in your Pipelex settings — but that fallback only works once Pipelex is booted, not in the pre-boot construction shown above
+- **Default Directory**: if you omit `storage_dir`, the directory comes from `runtime.observer.observer_dir` in your Pipelex settings — but that fallback only works once Pipelex is booted, not in the pre-boot construction shown above
 - **Files Created**:
 
 - `before_run.jsonl` - Pre-execution snapshots

@@ -46,7 +46,7 @@ def sandbox_hosted_mode() -> Generator[None, None, None]:
     plugin, so this open-core test uses a neutral ``"sandbox"`` token — it only flips the hosted flag
     (the executor already on the hub is never re-resolved here), so no registered mode is needed.
     """
-    pipe_func_config = get_config().pipelex.pipe_func_config
+    pipe_func_config = get_config().interpreter.pipe_func
     previous = pipe_func_config.execution_mode
     pipe_func_config.execution_mode = "sandbox"
     try:

@@ -37,19 +37,14 @@ from pipelex.system.configuration.config_loader import config_manager
 def config_directories_to_migrate() -> list[Path]:
     """The configuration directories a migration run walks, in tier order, each of which exists.
 
-    The global directory comes first and the project one second, which is the order the loader
-    merges them in and therefore the order a report reads most naturally. A machine with only one
-    of them is an ordinary machine; a project directory that *is* the global one — a project rooted
-    at the home directory — is walked once rather than twice.
+    **The walk is the loader's own set of configuration directories, and this is the sentence that
+    says so.** The derivation lives on `ConfigLoader.existing_config_dirs` rather than here, because
+    the loader is also what must decide — at boot, on the failure path, before any part of the
+    migration package is reachable from it — whether a stale file it just carried forward is one
+    this command would reach. One derivation, read from both ends; a second one would let a boot
+    warning name a remedy the walk then declines.
     """
-    directories: list[Path] = []
-    global_dir = config_manager.global_config_dir
-    if global_dir.is_dir():
-        directories.append(global_dir)
-    project_dir = config_manager.project_config_dir
-    if project_dir is not None and project_dir.resolve() not in {directory.resolve() for directory in directories}:
-        directories.append(project_dir)
-    return directories
+    return config_manager.existing_config_dirs
 
 
 def migrate_config_directories(*, config_dirs: list[Path], dry_run: bool) -> MigrationReport:

@@ -35,9 +35,9 @@ def _mock_config_for_adaptive(mocker: MockerFixture) -> None:
     mocker.patch(
         "pipelex.providers.google.google_llm_worker.get_config",
         return_value=mocker.MagicMock(
-            cogt=mocker.MagicMock(
-                llm_config=mocker.MagicMock(
-                    google_config=google_config,
+            inference=mocker.MagicMock(
+                llm=mocker.MagicMock(
+                    google=google_config,
                 ),
             ),
         ),
@@ -71,10 +71,10 @@ class TestGoogleReasoning:
         mocker.patch(
             "pipelex.providers.google.google_llm_worker.get_config",
             return_value=mocker.MagicMock(
-                cogt=mocker.MagicMock(
-                    llm_config=mocker.MagicMock(
+                inference=mocker.MagicMock(
+                    llm=mocker.MagicMock(
                         get_reasoning_budget=budget_mock,
-                        google_config=google_config,
+                        google=google_config,
                     ),
                 ),
             ),
@@ -117,9 +117,9 @@ class TestGoogleReasoning:
         mocker.patch(
             "pipelex.providers.google.google_llm_worker.get_config",
             return_value=mocker.MagicMock(
-                cogt=mocker.MagicMock(
-                    llm_config=mocker.MagicMock(
-                        google_config=google_config,
+                inference=mocker.MagicMock(
+                    llm=mocker.MagicMock(
+                        google=google_config,
                     ),
                 ),
             ),
@@ -190,10 +190,10 @@ class TestGoogleReasoning:
         mocker.patch(
             "pipelex.providers.google.google_llm_worker.get_config",
             return_value=mocker.MagicMock(
-                cogt=mocker.MagicMock(
-                    llm_config=mocker.MagicMock(
+                inference=mocker.MagicMock(
+                    llm=mocker.MagicMock(
                         get_reasoning_budget=mocker.MagicMock(return_value=16384),
-                        google_config=google_config,
+                        google=google_config,
                     ),
                 ),
             ),

@@ -1,6 +1,6 @@
 """Construction tests for Tier 1 transport-retry wiring in the SDK client factories.
 
-Each inference client factory must pass the configured ``cogt.transport_max_retries`` explicitly
+Each inference client factory must pass the configured ``inference.transport_max_retries`` explicitly
 to the SDK client it builds, rather than inheriting the SDK's silent default. These tests patch
 the SDK client constructor and assert the factory hands it the configured retry budget — they do
 not exercise SDK retry over the network.
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 def _config_with(mocker: MockerFixture, transport_max_retries: int) -> object:
     config = mocker.MagicMock()
-    config.cogt.transport_max_retries = transport_max_retries
+    config.inference.transport_max_retries = transport_max_retries
     return config
 
 

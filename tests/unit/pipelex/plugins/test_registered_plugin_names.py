@@ -1,5 +1,5 @@
 """The ``PluginRegistrar.registered_plugin_names`` accessor — the namespace the
-``plugins.boot_orchestrator`` gate validates against. Only ``REGISTERED`` discoveries count;
+``boot_orchestrator`` gate validates against. Only ``REGISTERED`` discoveries count;
 ``DISABLED`` / ``BROKEN`` ones never ran ``register`` and so could never claim a hub slot, making
 them invalid boot-orchestrator targets.
 """
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 
 def _registrar() -> PluginRegistrar:
-    return PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(plugins=SimpleNamespace(disabled=[]))))
+    return PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(runtime=SimpleNamespace(plugins=SimpleNamespace(disabled=[])))))
 
 
 class TestRegisteredPluginNames:

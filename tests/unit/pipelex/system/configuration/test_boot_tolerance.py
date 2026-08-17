@@ -54,6 +54,8 @@ from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
+    from pipelex.migration.plan import MigrationPlan
+
 
 def old_shape_telemetry_document() -> str:
     """The flat pre-`[custom_posthog]` document the shipped entry is about, read from the package."""
@@ -210,13 +212,13 @@ class TestTheRetryHonoursTheSchemaVersionFloor:
     """
 
     OPS = (
-        '[[migration.ops]]\nkind = "rename_table_key"\ntable_path = ["pipelex", "log_config"]\n'
+        '[[migration.ops]]\nkind = "rename_table_key"\ntable_path = ["runtime", "log"]\n'
         'key = "old_default_log_level"\nnew_key = "default_log_level"\n'
     )
 
     def _stale_file(self, *, directory: Path, declared: int) -> Path:
         stale = directory / "pipelex.toml"
-        stale.write_text(f'[meta]\nschema_version = {declared}\n\n[pipelex.log_config]\nold_default_log_level = "DEBUG"\n', encoding="utf-8")
+        stale.write_text(f'[meta]\nschema_version = {declared}\n\n[runtime.log]\nold_default_log_level = "DEBUG"\n', encoding="utf-8")
         return stale
 
     def test_a_file_declaring_a_version_below_the_floor_declines_the_retry(self, tmp_path: Path, synthetic_migration_dir: Path) -> None:
@@ -245,7 +247,7 @@ class TestTheRetryHonoursTheSchemaVersionFloor:
         replayed = replay_surface_files_in_memory(surface_id=PIPELEX_CONFIG_SURFACE_ID, paths=[stale])
 
         assert replayed is not None
-        assert replayed.config_dict["pipelex"]["log_config"]["default_log_level"] == "DEBUG"
+        assert replayed.config_dict["runtime"]["log"]["default_log_level"] == "DEBUG"
 
     def test_the_loader_then_raises_the_users_own_error(self, fake_dirs: tuple[Path, Path], synthetic_migration_dir: Path) -> None:
         """Which names the stale key — and whose `migration` block is where the floor gets reported."""
@@ -264,13 +266,18 @@ class TestTheRetryHonoursTheSchemaVersionFloor:
 
 
 class TestWhatTheWarningSays:
-    def test_it_names_the_file_and_the_remedy(self, tmp_path: Path) -> None:
-        stale = tmp_path / "telemetry.toml"
-        stale.write_text(old_shape_telemetry_document(), encoding="utf-8")
+    @staticmethod
+    def _stale_telemetry_plans(*, directory: Path, body: str | None = None) -> tuple[Path, list[MigrationPlan]]:
+        stale = directory / "telemetry.toml"
+        stale.write_text(body if body is not None else old_shape_telemetry_document(), encoding="utf-8")
         replayed = replay_surface_files_in_memory(surface_id=TELEMETRY_CONFIG_SURFACE_ID, paths=[stale])
         assert replayed is not None
+        return stale, replayed.plans
 
-        warning = stale_configuration_warning(plans=replayed.plans)
+    def test_it_names_the_file_and_the_remedy(self, tmp_path: Path) -> None:
+        stale, plans = self._stale_telemetry_plans(directory=tmp_path)
+
+        warning = stale_configuration_warning(plans=plans, walked_dirs=[tmp_path])
 
         assert str(stale) in warning
         assert "pipelex migrate" in warning
@@ -280,15 +287,86 @@ class TestWhatTheWarningSays:
         """Ledger text only, the same rule the migration report obeys — a boot warning is read in
         the same places a report is, and a user's own values have no business in either.
         """
-        stale = tmp_path / "telemetry.toml"
-        stale.write_text('telemetry_mode = "off"\nproject_api_key = "phc_a_secret_the_user_owns"\n', encoding="utf-8")
-        replayed = replay_surface_files_in_memory(surface_id=TELEMETRY_CONFIG_SURFACE_ID, paths=[stale])
-        assert replayed is not None
+        _, plans = self._stale_telemetry_plans(directory=tmp_path, body='telemetry_mode = "off"\nproject_api_key = "phc_a_secret_the_user_owns"\n')
 
-        warning = stale_configuration_warning(plans=replayed.plans)
+        warning = stale_configuration_warning(plans=plans, walked_dirs=[tmp_path])
 
         assert "Nest the flat telemetry settings under [custom_posthog]" in warning
         assert "phc_a_secret_the_user_owns" not in warning
+
+    def test_a_file_outside_the_walk_is_not_offered_the_command(self, tmp_path: Path) -> None:
+        """`Pipelex.make(config_dir=…)` outside the two walked directories is the live case.
+
+        Boot tolerance replays whatever the loader merged, so it reaches such a file; `pipelex
+        migrate`'s walk is fixed and never will. Naming the command there would promise, on every
+        boot, a remedy that then reports nothing to do — the same rule the migration report obeys:
+        a remedy is named only where it would write.
+        """
+        embedder_dir = tmp_path / "embedder"
+        embedder_dir.mkdir()
+        stale, plans = self._stale_telemetry_plans(directory=embedder_dir)
+
+        warning = stale_configuration_warning(plans=plans, walked_dirs=[tmp_path / "global", tmp_path / "project"])
+
+        assert str(stale) in warning
+        assert "Nothing was written" in warning
+        assert "does not reach" in warning
+        assert "yours to update where it lives" in warning
+        assert "Run `pipelex migrate`" not in warning
+
+    def test_a_walk_of_one_file_in_and_one_out_names_each_side(self, tmp_path: Path) -> None:
+        """The mixed case is reachable, and a single closing sentence would be wrong for one of them.
+
+        A load merges tiers from several directories at once — under unit testing it also merges
+        this repository's own `tests/pipelex_{run_mode}.toml`, which is outside the walk by design.
+        So the warning splits the files rather than picking one verb for all of them.
+        """
+        walked = tmp_path / "walked"
+        walked.mkdir()
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        inside_file, inside_plans = self._stale_telemetry_plans(directory=walked)
+        outside_file, outside_plans = self._stale_telemetry_plans(directory=outside)
+
+        warning = stale_configuration_warning(plans=inside_plans + outside_plans, walked_dirs=[walked])
+
+        assert f"Run `pipelex migrate` to bring '{inside_file}' up to date." in warning
+        assert f"`pipelex migrate` does not reach '{outside_file}' — that file is yours to update where it lives." in warning
+
+    def test_the_walk_is_not_recursive_so_a_subdirectory_is_out_of_reach(self, tmp_path: Path) -> None:
+        """`.pipelex/inference/backends/` is the specimen the walk deliberately skips."""
+        nested = tmp_path / "inference" / "backends"
+        nested.mkdir(parents=True)
+        _, plans = self._stale_telemetry_plans(directory=nested)
+
+        warning = stale_configuration_warning(plans=plans, walked_dirs=[tmp_path])
+
+        assert "does not reach" in warning
+        assert "Run `pipelex migrate`" not in warning
+
+    def test_a_file_symlinked_out_of_a_walked_directory_is_still_in_reach(self, tmp_path: Path) -> None:
+        """Where the file points is not where the command looks for it.
+
+        A `telemetry.toml` symlinked out to a dotfiles repository — chezmoi, stow and yadm all do
+        this — is enumerated by the walk's `iterdir` like any other entry and written straight
+        through, so the remedy applies to it. Resolving the file rather than its directory would
+        move its parent outside the walk and tell the user to go and edit it by hand, which is both
+        wrong and the advice most likely to be followed, since the target really is somewhere else.
+        """
+        walked = tmp_path / "walked"
+        walked.mkdir()
+        elsewhere = tmp_path / "dotfiles"
+        elsewhere.mkdir()
+        target, _ = self._stale_telemetry_plans(directory=elsewhere)
+        link = walked / "telemetry.toml"
+        link.symlink_to(target)
+
+        replayed = replay_surface_files_in_memory(surface_id=TELEMETRY_CONFIG_SURFACE_ID, paths=[link])
+        assert replayed is not None
+        warning = stale_configuration_warning(plans=replayed.plans, walked_dirs=[walked])
+
+        assert "Run `pipelex migrate` to bring the files up to date." in warning
+        assert "does not reach" not in warning
 
 
 class TestTheTelemetryLoader:
@@ -388,20 +466,54 @@ class TestTheMainConfigurationLoader:
             migration_dir=synthetic_migration_dir,
             surface_id=PIPELEX_CONFIG_SURFACE_ID,
             base_file="pipelex.toml",
-            ops_body='[[migration.ops]]\nkind = "rename_table_key"\ntable_path = ["pipelex", "log_config"]\n'
+            ops_body='[[migration.ops]]\nkind = "rename_table_key"\ntable_path = ["runtime", "log"]\n'
             'key = "old_default_log_level"\nnew_key = "default_log_level"\n',
         )
-        (global_dir / "pipelex.toml").write_text('[pipelex.log_config]\nold_default_log_level = "DEBUG"\n', encoding="utf-8")
+        (global_dir / "pipelex.toml").write_text('[runtime.log]\nold_default_log_level = "DEBUG"\n', encoding="utf-8")
         mocker.patch.object(log, "log_dispatch", LogDispatch())
         loader = ConfigLoader()
 
         config = loader.load_config_validated(config_cls=PipelexConfig)
 
-        assert config.pipelex.log_config.default_log_level is LogLevel.DEBUG
+        assert config.runtime.log.default_log_level is LogLevel.DEBUG
         parked = loader.take_stale_configuration_warning()
         assert parked is not None
         assert "pipelex migrate" in parked
         assert loader.take_stale_configuration_warning() is None, "a warning is emitted once"
+
+    def test_the_warning_reads_the_walk_off_the_loader_rather_than_deriving_its_own(
+        self,
+        fake_dirs: tuple[Path, Path],
+        synthetic_migration_dir: Path,
+        mocker: MockerFixture,
+    ) -> None:
+        """The other end of the one derivation `pipelex migrate`'s walk also reads.
+
+        Patched to walk nothing, the loader must decline to name the command for the very file it
+        just carried forward. A second derivation living here would keep naming it — and that is
+        precisely the disagreement the shared property exists to make impossible, in the direction
+        that matters, since a boot promising a remedy the command declines is the one a user acts
+        on.
+        """
+        global_dir, _ = fake_dirs
+        write_synthetic_ledger(
+            migration_dir=synthetic_migration_dir,
+            surface_id=PIPELEX_CONFIG_SURFACE_ID,
+            base_file="pipelex.toml",
+            ops_body='[[migration.ops]]\nkind = "rename_table_key"\ntable_path = ["runtime", "log"]\n'
+            'key = "old_default_log_level"\nnew_key = "default_log_level"\n',
+        )
+        (global_dir / "pipelex.toml").write_text('[runtime.log]\nold_default_log_level = "DEBUG"\n', encoding="utf-8")
+        mocker.patch.object(log, "log_dispatch", LogDispatch())
+        mocker.patch.object(ConfigLoader, "existing_config_dirs", new_callable=mocker.PropertyMock, return_value=[])
+        loader = ConfigLoader()
+
+        loader.load_config_validated(config_cls=PipelexConfig)
+
+        parked = loader.take_stale_configuration_warning()
+        assert parked is not None
+        assert "does not reach" in parked
+        assert "Run `pipelex migrate`" not in parked
 
     @pytest.mark.usefixtures("fake_dirs")
     def test_a_healthy_configuration_parks_no_warning(self) -> None:
@@ -424,17 +536,17 @@ class TestTheMainConfigurationLoader:
             migration_dir=synthetic_migration_dir,
             surface_id=PIPELEX_CONFIG_SURFACE_ID,
             base_file="pipelex.toml",
-            ops_body='[[migration.ops]]\nkind = "rename_table_key"\ntable_path = ["pipelex", "log_config"]\n'
+            ops_body='[[migration.ops]]\nkind = "rename_table_key"\ntable_path = ["runtime", "log"]\n'
             'key = "old_default_log_level"\nnew_key = "default_log_level"\n',
         )
-        (global_dir / "pipelex.toml").write_text('[pipelex.log_config]\nold_default_log_level = "DEBUG"\n', encoding="utf-8")
+        (global_dir / "pipelex.toml").write_text('[runtime.log]\nold_default_log_level = "DEBUG"\n', encoding="utf-8")
 
         config = ConfigLoader().load_config_validated(
             config_cls=PipelexConfig,
-            extra_overrides={"pipelex": {"log_config": {"default_log_level": "WARNING"}}},
+            extra_overrides={"runtime": {"log": {"default_log_level": "WARNING"}}},
         )
 
-        assert config.pipelex.log_config.default_log_level is LogLevel.WARNING
+        assert config.runtime.log.default_log_level is LogLevel.WARNING
 
     @pytest.mark.usefixtures("fake_dirs", "synthetic_migration_dir")
     def test_a_configuration_the_ledger_cannot_explain_still_raises_the_users_own_error(self) -> None:

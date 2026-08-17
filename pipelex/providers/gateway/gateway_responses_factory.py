@@ -44,7 +44,7 @@ class GatewayResponsesFactory(OpenAIResponsesFactory):
             api_key="unused-auth-via-portkey-headers",
             # Tier 1 transport retry: set explicitly from config rather than inheriting the SDK default,
             # so a transport_max_retries override applies to the gateway LLM path too (matches PortkeyResponsesFactory).
-            max_retries=get_config().cogt.transport_max_retries,
+            max_retries=get_config().inference.transport_max_retries,
             default_headers=createHeaders(
                 api_key=api_key,
                 debug=is_debug_enabled,

@@ -18,5 +18,5 @@ class GraphConfig(ConfigModel):
 
     data_inclusion: DataInclusionConfig
     graphs_inclusion: GraphsInclusionConfig
-    mermaid_config: MermaidRenderingConfig
-    reactflow_config: ReactFlowRenderingConfig
+    mermaid: MermaidRenderingConfig
+    reactflow: ReactFlowRenderingConfig

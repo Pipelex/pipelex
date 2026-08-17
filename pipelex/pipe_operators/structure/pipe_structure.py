@@ -124,7 +124,7 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
         # No authored style on this operator: the structuring prompt takes the runtime default, the
         # same one an LLM pipe that declares nothing gets.
         templating_style = resolve_templating_style(authored=None)
-        llm_config = get_config().cogt.llm_config
+        llm_config = get_config().inference.llm
         structuring_template = llm_config.get_template(template_name="structuring_prompt")
         rendered_user_prompt = await render_template(
             template=structuring_template,

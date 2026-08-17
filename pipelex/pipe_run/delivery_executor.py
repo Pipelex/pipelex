@@ -272,7 +272,7 @@ class DeliveryExecutor:
 
     async def _generate_graph_files(self, graph_spec: Any, *, files: dict[str, ResultFile]) -> None:
         try:
-            graph_config = get_config().pipelex.pipeline_execution_config.graph_config
+            graph_config = get_config().interpreter.pipeline_execution.graph
             graph_outputs = await generate_graph_outputs(
                 graph_spec=graph_spec,
                 graph_config=graph_config,

@@ -61,14 +61,14 @@ def _recording_console() -> Console:
 @pytest.mark.asyncio(loop_scope="class")
 class TestMockUsageDirect:
     def _enable_ndjson_tracing(self, mocker: MockerFixture, traces_dir: str) -> None:
-        cfg = get_config().pipelex.tracing_config
+        cfg = get_config().runtime.tracing
         mocker.patch.object(cfg, "is_enabled", True)
         mocker.patch.object(cfg, "backend", TracingBackend.NDJSON)
         mocker.patch.object(cfg, "ndjson", NdjsonTracingConfig(traces_dir=traces_dir))
 
     def _config(self) -> PipelineExecutionConfig:
         # Costs on (default) so usage assembles; mock_inputs fills the `subject` input for the dry run.
-        return get_config().pipelex.pipeline_execution_config.with_execution_overrides(
+        return get_config().interpreter.pipeline_execution.with_execution_overrides(
             generate_graph=False,
             generate_usage=True,
             mock_inputs=True,
@@ -118,7 +118,7 @@ class TestMockUsageDirect:
         """The end-of-run cost report RENDERS for an is_mock_usage run (non-suppressed), under the sentinel model."""
         self._enable_ndjson_tracing(mocker, str(tmp_path_factory.mktemp("traces_mock_render")))
         mocker.patch("pipelex.cogt.content_generation.llm_generate.get_llm_worker")
-        reporting_config = get_config().pipelex.reporting_config
+        reporting_config = get_config().runtime.reporting
         mocker.patch.object(reporting_config, "is_log_costs_to_console", True)
         mocker.patch.object(reporting_config, "is_generate_cost_report_file_enabled", False)
         console = _recording_console()

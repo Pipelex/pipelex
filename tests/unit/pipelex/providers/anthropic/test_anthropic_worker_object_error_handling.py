@@ -88,7 +88,7 @@ def _make_worker(mocker: MockerFixture) -> AnthropicLLMWorker:
 def _patch_gen_object_dependencies(mocker: MockerFixture) -> None:
     """Patch the module-level helpers _gen_object relies on."""
     config_mock = mocker.MagicMock()
-    config_mock.cogt.llm_config.anthropic_config.structured_output_timeout_seconds = 1200
+    config_mock.inference.llm.anthropic.structured_output_timeout_seconds = 1200
     mocker.patch("pipelex.providers.anthropic.anthropic_llm_worker.get_config", return_value=config_mock)
     mocker.patch(
         "pipelex.providers.anthropic.anthropic_llm_worker.AnthropicFactory.make_simple_messages",

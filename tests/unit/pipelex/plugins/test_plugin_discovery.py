@@ -1,6 +1,6 @@
 """Contract-conformance tests for plugin discovery: protocol satisfaction, fail-loud
 conflict/version policy, the side-effect-free (idempotent) register invariant, and the
-plugins.disabled denylist.
+runtime.plugins.disabled denylist.
 """
 
 from __future__ import annotations
@@ -49,10 +49,10 @@ def _noop_make_worker(**_kwargs: object) -> InferenceWorkerAbstract:
 
 
 def _fake_config(disabled: list[str]) -> PipelexConfig:
-    # Discovery reads ``config.plugins.disabled`` to apply the denylist. No builtin's
+    # Discovery reads ``config.runtime.plugins.disabled`` to apply the denylist. No builtin's
     # register() reads config: Temporal — the only plugin that did, via ``temporal.is_enabled``
     # — now ships as our external Temporal plugin.
-    return cast("PipelexConfig", SimpleNamespace(plugins=SimpleNamespace(disabled=disabled)))
+    return cast("PipelexConfig", SimpleNamespace(runtime=SimpleNamespace(plugins=SimpleNamespace(disabled=disabled))))
 
 
 class _InferencePlugin:
@@ -109,6 +109,7 @@ def _build_registrar_with(
     mocker.patch(f"{DISCOVERY_MODULE}._external_entry_points", return_value=[])
     return build_registrar(
         config=_fake_config(disabled or []),
+        boot_orchestrator=None,
         builtin_plugins=cast("Sequence[PipelexPlugin]", plugins),
         core_unconditional_plugin_names=core_unconditional,
         entry_point_groups=BOTH_GROUPS,
@@ -200,12 +201,16 @@ class TestPluginDiscovery:
         mocker.patch(f"{DISCOVERY_MODULE}._external_entry_points", return_value=[grouped])
         with pytest.raises(BrokenPluginError) as exc_info:
             build_registrar(
-                config=_fake_config([]), builtin_plugins=[], core_unconditional_plugin_names=NO_CORE_UNCONDITIONAL, entry_point_groups=BOTH_GROUPS
+                config=_fake_config([]),
+                boot_orchestrator=None,
+                builtin_plugins=[],
+                core_unconditional_plugin_names=NO_CORE_UNCONDITIONAL,
+                entry_point_groups=BOTH_GROUPS,
             )
         assert "bad_ep" in str(exc_info.value)
 
     def test_disabled_broken_external_entry_point_is_skipped_before_load(self, mocker: MockerFixture) -> None:
-        """A broken external entry point listed in plugins.disabled is skipped by its entry-point name
+        """A broken external entry point listed in runtime.plugins.disabled is skipped by its entry-point name
         *before* load(), so the denylist can recover from a bad installed plugin instead of raising BrokenPluginError.
         """
 
@@ -218,7 +223,11 @@ class TestPluginDiscovery:
         mocker.patch(f"{DISCOVERY_MODULE}._external_entry_points", return_value=[grouped])
 
         registrar = build_registrar(
-            config=_fake_config(["bad_ep"]), builtin_plugins=[], core_unconditional_plugin_names=NO_CORE_UNCONDITIONAL, entry_point_groups=BOTH_GROUPS
+            config=_fake_config(["bad_ep"]),
+            boot_orchestrator=None,
+            builtin_plugins=[],
+            core_unconditional_plugin_names=NO_CORE_UNCONDITIONAL,
+            entry_point_groups=BOTH_GROUPS,
         )
 
         disabled_discovery = next(discovery for discovery in registrar.discoveries if discovery.name == "bad_ep")
@@ -247,6 +256,7 @@ class TestPluginDiscovery:
         with pytest.raises(CoreUnconditionalPluginDisabledError) as exc_info:
             build_registrar(
                 config=_fake_config([plugin_name]),
+                boot_orchestrator=None,
                 builtin_plugins=BUILTIN_PLUGINS,
                 core_unconditional_plugin_names=CORE_UNCONDITIONAL_PLUGIN_NAMES,
                 entry_point_groups=BOTH_GROUPS,
@@ -259,6 +269,7 @@ class TestPluginDiscovery:
 
         registrar = build_registrar(
             config=_fake_config([]),
+            boot_orchestrator=None,
             builtin_plugins=BUILTIN_PLUGINS,
             core_unconditional_plugin_names=CORE_UNCONDITIONAL_PLUGIN_NAMES,
             entry_point_groups=BOTH_GROUPS,

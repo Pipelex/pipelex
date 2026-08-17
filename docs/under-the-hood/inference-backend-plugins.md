@@ -192,11 +192,11 @@ The entry point may resolve to a plugin instance or a zero-argument factory. A b
 
 ### Disabling a discovered plugin
 
-`build_registrar` skips (and logs) any plugin whose `name` appears in the core-owned `plugins.disabled` denylist:
+`build_registrar` skips (and logs) any plugin whose `name` appears in the core-owned `runtime.plugins.disabled` denylist:
 
 ```toml
 # .pipelex/pipelex.toml
-[plugins]
+[runtime.plugins]
 disabled = ["acme"]
 ```
 
@@ -239,7 +239,7 @@ The SPI is a documented, versioned **module/symbol list** gated by `PLUGIN_API_V
 | a `pipelex.plugins.kernel` plugin registers an interpreter-layer capability | `PluginLayerViolationError` (names the capability and the group to move to) |
 | duplicate `(family, sdk)` | `DuplicateInferenceBackendError` (names both plugins) |
 | duplicate `sdk` model lister | `DuplicateModelListerError` (names both plugins) |
-| `name` in `plugins.disabled` but core-unconditional | `CoreUnconditionalPluginDisabledError` |
+| `name` in `runtime.plugins.disabled` but core-unconditional | `CoreUnconditionalPluginDisabledError` |
 | entry point raises while loading/registering | `BrokenPluginError` |
 | lookup for an unregistered `(family, sdk)` | `InferenceBackendNotFoundError` ("… Is its plugin installed and enabled?") |
 | optional SDK missing at use | `MissingDependencyError` (package + `pipelex[<extra>]` hint) |
@@ -249,8 +249,8 @@ The SPI is a documented, versioned **module/symbol list** gated by `PLUGIN_API_V
 ## Related
 
 - [Orchestrator Plugins](orchestrator-plugins.md) — the other per-call seam, riding the same discovery/denylist machinery
-- [Storage Provider Plugins](storage-provider-plugins.md) — the config-selected-singleton seam (storage backend by `storage_config.method`)
-- [Secrets Provider Plugins](secrets-provider-plugins.md) — the config-selected-singleton seam (secrets backend by `secrets_config.method`)
+- [Storage Provider Plugins](storage-provider-plugins.md) — the config-selected-singleton seam (storage backend by `runtime.storage.method`)
+- [Secrets Provider Plugins](secrets-provider-plugins.md) — the config-selected-singleton seam (secrets backend by `runtime.secrets.method`)
 - [Pipe Routing & Execution](pipe-routing-and-execution.md) — where worker construction sits in the run path
 - [Error Model](error-model.md) — how these errors render and dereference
 - [Architecture Overview](architecture-overview.md)

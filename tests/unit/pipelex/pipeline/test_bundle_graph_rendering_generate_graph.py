@@ -49,7 +49,7 @@ class TestGenerateGraphForBundle:
 
         execution_config_mock = mocker.MagicMock()
         config_mock = mocker.MagicMock()
-        config_mock.pipelex.pipeline_execution_config.with_execution_overrides.return_value = execution_config_mock
+        config_mock.interpreter.pipeline_execution.with_execution_overrides.return_value = execution_config_mock
         mocker.patch(f"{BUNDLE_GRAPH_RENDERING_MODULE}.get_config", return_value=config_mock)
 
         mock_render = mocker.patch(
@@ -94,8 +94,8 @@ class TestGenerateGraphForBundle:
         render_kwargs = mocks["mock_render"].call_args.kwargs
         assert render_kwargs["include_mermaidflow"] is expected_mermaidflow
         assert render_kwargs["include_reactflow"] is expected_reactflow
-        assert render_kwargs["graph_config"] is mocks["execution_config_mock"].graph_config
-        overrides_kwargs = mocks["config_mock"].pipelex.pipeline_execution_config.with_execution_overrides.call_args.kwargs
+        assert render_kwargs["graph_config"] is mocks["execution_config_mock"].graph
+        overrides_kwargs = mocks["config_mock"].interpreter.pipeline_execution.with_execution_overrides.call_args.kwargs
         assert overrides_kwargs == {"generate_graph": True, "mock_inputs": True}
 
     async def test_rename_branch_sanitizes_traversal_name(

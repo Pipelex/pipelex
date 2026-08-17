@@ -318,13 +318,13 @@ class TestReportingEventEmission:
     def test_no_emit_when_no_event_log_set_and_no_fallback_yet(self, mocker: MockerFixture) -> None:
         """Pin the tracing-disabled silent baseline.
 
-        When set_event_log is never called and tracing_config.is_enabled=False,
+        When set_event_log is never called and runtime.tracing.is_enabled=False,
         report_inference_job must not write any event anywhere — even after the
         Phase 2 fallback lands. The fallback path is only allowed to engage when
         tracing is enabled.
         """
         # Force tracing to disabled regardless of process config.
-        mocker.patch.object(get_config().pipelex.tracing_config, "is_enabled", False)
+        mocker.patch.object(get_config().runtime.tracing, "is_enabled", False)
 
         manager = ReportingManager()
         manager.setup()

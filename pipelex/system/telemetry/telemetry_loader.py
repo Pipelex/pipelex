@@ -142,5 +142,5 @@ def _telemetry_config_the_ledger_can_explain(
         telemetry_config = TelemetryConfig.model_validate(substituted)
     except (UnknownVarPrefixError, ValidationError):
         return None
-    log.warning(stale_configuration_warning(plans=replayed.plans))
+    log.warning(stale_configuration_warning(plans=replayed.plans, walked_dirs=config_manager.existing_config_dirs))
     return telemetry_config

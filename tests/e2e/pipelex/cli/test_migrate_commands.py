@@ -12,6 +12,15 @@ migrates it is the one the package ships. Nothing about this test is synthetic e
 it runs on, which is what makes the state it starts from a real one: a flat ``telemetry.toml``
 fails ``TelemetryConfig``'s ``extra="forbid"`` today, in the field.
 
+**Two surfaces are planted here, and the second one is the whole main configuration.**
+``telemetry-config`` is the small specimen — one flat document, nested — and it is what most of
+this module runs on because it is cheap and it shipped first. ``pipelex-config@2``, the
+configuration reshape, is the other size of thing: it renames the root tables of the file every
+boot reads, so the machine it migrates is every existing installation. Its fixture is
+``goldens/pipelex-config/defaults@1.toml`` — the packaged ``pipelex.toml`` as it stood at schema 1
+— plus a hand-written project tier, and ``TestAPreReshapeMachine`` is where they meet the two
+binaries.
+
 **Boot tolerance is why that machine boots at all.** Such a machine used to die at boot; it now
 starts, carries the file forward in memory, and warns a person that it did. So the boot probe here
 no longer measures "broken, then fixed" — it asserts the machine boots on *both* sides of every
@@ -33,8 +42,10 @@ import subprocess  # noqa: S404 - invokes the real pipelex binaries for E2E cove
 from typing import TYPE_CHECKING, Any
 
 from pipelex.migration.backup import existing_backups_of
-from pipelex.migration.goldens import pre_history_document_path
+from pipelex.migration.goldens import defaults_golden_path, pre_history_document_path
 from pipelex.migration.ledger import packaged_migration_dir
+from pipelex.migration.surfaces import build_config_surface_registry
+from pipelex.system.configuration.config_surface import PIPELEX_CONFIG_SURFACE_ID, TELEMETRY_CONFIG_SURFACE_ID
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 from tests.e2e.agent_cli.conftest import REPO_ROOT
 
@@ -44,7 +55,7 @@ if TYPE_CHECKING:
 PIPELEX_BIN = REPO_ROOT / ".venv" / "bin" / "pipelex"
 PIPELEX_AGENT_BIN = REPO_ROOT / ".venv" / "bin" / "pipelex-agent"
 
-TELEMETRY_SURFACE_ID = "telemetry-config"
+PROJECT_DIR_NAME = "workspace"
 
 # A tier file of the flat era, as a user would have written one: a couple of overrides on top of
 # the global file, not the whole census the golden carries.
@@ -54,11 +65,71 @@ telemetry_mode = "off"
 host = "https://project.example.invalid"
 """
 
+# The same idea one surface up: a project tier of the pre-reshape era. Modelled on a real machine's
+# `pipelex_override.toml` — its table headers, with every value invented, because a checked-in
+# fixture must carry none of a person's. The handful of tables is deliberate and it is what makes
+# this a fair specimen: each one leaves `[pipelex]` by a different route (two `move_key`s, the root
+# rename, and a rename inside what that rename leaves behind), so a tier file exercises four of the
+# entry's operation shapes without being a second census.
+OLD_SHAPE_PROJECT_PIPELEX_OVERRIDE = """\
+# This project keeps its own bucket and turns the logs up.
+[pipelex.log_config]
+default_log_level = "DEBUG"
+
+[pipelex.log_config.package_log_levels]
+pipelex = "DEBUG"
+
+[pipelex.storage_config]
+method = "s3"
+
+[pipelex.storage_config.s3]
+bucket_name = "example-project-bucket"
+region = "eu-west-3"
+
+[pipelex.builder_config]
+default_output_dir = "build"
+"""
+
 
 def _old_shape_telemetry_document() -> str:
     """The flat pre-history document the shipped entry is about, read from the package."""
-    path = pre_history_document_path(migration_dir=packaged_migration_dir(), surface_id=TELEMETRY_SURFACE_ID, schema_version=2)
+    path = pre_history_document_path(migration_dir=packaged_migration_dir(), surface_id=TELEMETRY_CONFIG_SURFACE_ID, schema_version=2)
     return path.read_text(encoding="utf-8")
+
+
+def _pre_reshape_pipelex_config_document() -> str:
+    """The whole main configuration in its pre-reshape shape, read from the package.
+
+    `defaults@1.toml` is the packaged `pipelex.toml` as it stood at schema 1 — the document the
+    reshape entry was authored against — so it names every path the entry touches and nothing it
+    does not. Read live rather than transcribed here, for the same reason the telemetry fixture is:
+    a transcribed one would eventually describe a shape the shipped ledger no longer migrates, and
+    would go on passing.
+    """
+    path = defaults_golden_path(migration_dir=packaged_migration_dir(), surface_id=PIPELEX_CONFIG_SURFACE_ID, schema_version=1)
+    return path.read_text(encoding="utf-8")
+
+
+def _todays_pipelex_config_document() -> dict[str, Any]:
+    """What the package's own `pipelex.toml` says now — the shape a migration has to land on.
+
+    Read through the surface rather than by path, so this tracks wherever the packaged document
+    lives, and read as the live file rather than as `defaults@2.toml`: the golden is a snapshot of
+    this, and comparing against the snapshot would leave a gap exactly the width of a stale one.
+    """
+    registry = build_config_surface_registry()
+    return registry.surface_for_id(surface_id=PIPELEX_CONFIG_SURFACE_ID).read_defaults_document()
+
+
+def _project_config_dir(*, hermetic_home: Path) -> Path:
+    """The `.pipelex/` of a project rooted inside the hermetic HOME, created if it is not there.
+
+    `exist_ok`, because a machine can be behind on more than one surface at once and the plantings
+    that make it so are separate functions that both need this directory.
+    """
+    config_dir = hermetic_home / PROJECT_DIR_NAME / ".pipelex"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    return config_dir
 
 
 def _plant_a_stale_machine(*, hermetic_home: Path) -> tuple[Path, Path, Path]:
@@ -74,12 +145,27 @@ def _plant_a_stale_machine(*, hermetic_home: Path) -> tuple[Path, Path, Path]:
     global_file = hermetic_home / ".pipelex" / "telemetry.toml"
     global_file.write_text(_old_shape_telemetry_document(), encoding="utf-8")
 
-    project_dir = hermetic_home / "workspace"
-    project_config_dir = project_dir / ".pipelex"
-    project_config_dir.mkdir(parents=True)
-    project_file = project_config_dir / "telemetry_override.toml"
+    project_file = _project_config_dir(hermetic_home=hermetic_home) / "telemetry_override.toml"
     project_file.write_text(OLD_SHAPE_PROJECT_OVERRIDE, encoding="utf-8")
-    return project_dir, global_file, project_file
+    return hermetic_home / PROJECT_DIR_NAME, global_file, project_file
+
+
+def _plant_a_pre_reshape_machine(*, hermetic_home: Path) -> tuple[Path, Path, Path]:
+    """The same two tiers, one surface up: a main configuration written before the reshape.
+
+    The global file **replaces** what `hermetic_home` seeded there, which is the current kit
+    template — a machine that had already been migrated would prove nothing. The project tier is a
+    `pipelex_override.toml`, claimed by the surface's `pipelex_*.toml` glob and merged by the
+    loader, so a run that reached only the base file would come back visibly short.
+
+    Returns the project directory, the global file and the project file.
+    """
+    global_file = hermetic_home / ".pipelex" / "pipelex.toml"
+    global_file.write_text(_pre_reshape_pipelex_config_document(), encoding="utf-8")
+
+    project_file = _project_config_dir(hermetic_home=hermetic_home) / "pipelex_override.toml"
+    project_file.write_text(OLD_SHAPE_PROJECT_PIPELEX_OVERRIDE, encoding="utf-8")
+    return hermetic_home / PROJECT_DIR_NAME, global_file, project_file
 
 
 def _run(*, args: list[str], env: dict[str, str], cwd: Path, answers: str | None = None) -> subprocess.CompletedProcess[str]:
@@ -263,6 +349,220 @@ class TestTheAgentMigrateLoop:
 
         assert refused.returncode == 2
         assert json.loads(refused.stderr)["error_type"] == "ArgumentError"
+
+
+class TestAPreReshapeMachine:
+    """The machine this release actually meets: a main configuration written before the reshape.
+
+    Everything above is planted on `telemetry-config`, whose entry nests one flat document — a
+    small change, and one that shipped before the reshape did. `pipelex-config@2` is the other
+    size of thing. It renames the root tables of the file every boot reads, so the machine it
+    migrates is not a corner case but every installation that predates this release, and the two
+    tiers planted here are the two a real one has: the global `~/.pipelex/pipelex.toml` an install
+    left behind, and a project's `pipelex_override.toml` beside it.
+
+    Until this class the entry was proved by the engine's own goldens and by nothing else. What is
+    added is the rest of the chain — the walk, the filesystem, the backup, the binary a person
+    types — and the property that only the whole chain can show: a boot that carries the old shape
+    forward in memory, a command that then writes it, and a boot that has nothing left to carry.
+    """
+
+    def test_the_human_command_carries_a_pre_reshape_machine_onto_todays_shape(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """The whole loop through `pipelex migrate`, with the strong assertion on the global file.
+
+        Migrated, it says exactly what the package's own `pipelex.toml` says today.
+        `make check-migration-schemas` already proves the *engine* turns `defaults@1` into
+        `defaults@2`; what is proved here is that the *command* does — walking two directories,
+        reading a user's file off a disk, writing it back and leaving the original beside it —
+        which no golden can show.
+
+        Semantically, not byte for byte, and the entry's own guidance says why: a moved section may
+        land at the end of the migrated file rather than where it was, and a banner comment
+        introducing one stays behind. What the migration keeps is settings, not layout.
+        """
+        project_dir, global_file, project_file = _plant_a_pre_reshape_machine(hermetic_home=hermetic_home)
+        originals = {path: path.read_text(encoding="utf-8") for path in (global_file, project_file)}
+
+        _assert_boots(env=offline_subprocess_env, cwd=project_dir)
+
+        migrated = _run(args=[str(PIPELEX_BIN), "--no-logo", "migrate", "--yes"], env=offline_subprocess_env, cwd=project_dir)
+
+        assert migrated.returncode == 0, migrated.stdout + migrated.stderr
+        report = migrated.stdout + migrated.stderr
+        assert str(global_file) in report
+        assert str(project_file) in report
+
+        assert load_toml_from_path(path=global_file) == _todays_pipelex_config_document()
+        # The tier keeps its four settings and nothing else — a migration that had quietly folded
+        # the package defaults into a user's override would satisfy the assertion above and ruin
+        # the layering, since an override is read as "only these, on top of whatever is beneath".
+        assert load_toml_from_path(path=project_file) == {
+            "runtime": {
+                "log": {"default_log_level": "DEBUG", "package_log_levels": {"pipelex": "DEBUG"}},
+                "storage": {"method": "s3", "s3": {"bucket_name": "example-project-bucket", "region": "eu-west-3"}},
+            },
+            "interpreter": {"builder": {"default_output_dir": "build"}},
+        }
+
+        for path, original in originals.items():
+            backups = existing_backups_of(path=path)
+            assert len(backups) == 1, f"expected exactly one backup of {path}, found {backups}"
+            assert backups[0].read_text(encoding="utf-8") == original
+
+        _assert_boots(env=offline_subprocess_env, cwd=project_dir)
+
+    def test_the_agent_loop_plans_the_reshape_then_applies_it(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """The same machine through the other binary, where the plan is a document rather than prose.
+
+        The entry is named per file rather than once for the run, and both files name it: a tier
+        migrates on its own terms, and a plan that summarized the run would leave a consumer unable
+        to tell which of its files a given step was about.
+        """
+        project_dir, global_file, project_file = _plant_a_pre_reshape_machine(hermetic_home=hermetic_home)
+
+        planned = _run(
+            args=[str(PIPELEX_AGENT_BIN), "migrate", "--dry-run", "--format", "json"],
+            env=offline_subprocess_env,
+            cwd=project_dir,
+        )
+        assert planned.returncode == 0, planned.stderr
+        plan: dict[str, Any] = json.loads(planned.stdout)
+
+        assert plan["applied"] is False
+        assert plan["is_clean"] is False
+        assert plan["needs_attention"] is False, "every path in a pre-reshape file is one the entry explains"
+        assert plan["summary"]["files_changed"] == 2
+        assert plan["summary"]["files_written"] == 0
+        stepped = {plan_dict["file_path"]: [step["title"] for step in plan_dict["steps"]] for plan_dict in plan["plans"] if plan_dict["steps"]}
+        assert stepped == {
+            str(global_file): ["The configuration reshape: one scheme for the root"],
+            str(project_file): ["The configuration reshape: one scheme for the root"],
+        }
+        assert existing_backups_of(path=global_file) == [], "a plan is not a write"
+
+        applied = _run(args=[str(PIPELEX_AGENT_BIN), "migrate", "--yes", "--format", "json"], env=offline_subprocess_env, cwd=project_dir)
+        assert applied.returncode == 0, applied.stderr
+        outcome: dict[str, Any] = json.loads(applied.stdout)
+
+        assert outcome["applied"] is True
+        assert outcome["summary"]["files_written"] == 2
+        written = {plan_dict["file_path"] for plan_dict in outcome["plans"] if plan_dict["was_written"]}
+        assert written == {str(global_file), str(project_file)}
+
+        _assert_boots(env=offline_subprocess_env, cwd=project_dir)
+
+    def test_one_run_migrates_every_surface_the_machine_is_behind_on(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """A machine upgrading across this release is behind on two surfaces, not one.
+
+        Nothing else in this module puts two ledgers in one run, and the run is where they could
+        interfere: the walk claims each file for exactly one surface, and a file claimed for the
+        wrong one would either be reported clean or be handed a ledger with nothing to say about
+        it. Four files written, from two directories, under two entries.
+        """
+        _plant_a_stale_machine(hermetic_home=hermetic_home)
+        project_dir, _, _ = _plant_a_pre_reshape_machine(hermetic_home=hermetic_home)
+
+        applied = _run(args=[str(PIPELEX_AGENT_BIN), "migrate", "--yes", "--format", "json"], env=offline_subprocess_env, cwd=project_dir)
+
+        assert applied.returncode == 0, applied.stderr
+        outcome: dict[str, Any] = json.loads(applied.stdout)
+        assert outcome["summary"]["files_written"] == 4
+        assert outcome["needs_attention"] is False
+
+        _assert_boots(env=offline_subprocess_env, cwd=project_dir)
+
+        settled = _run(
+            args=[str(PIPELEX_AGENT_BIN), "migrate", "--dry-run", "--format", "json"],
+            env=offline_subprocess_env,
+            cwd=project_dir,
+        )
+        assert json.loads(settled.stdout)["is_clean"] is True
+
+    def test_no_value_from_a_pre_reshape_file_is_rendered_while_it_is_moved(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """The contract's mechanical rule again, on the entry that moves the most.
+
+        The planted value is a bucket name rather than a credential, because the main configuration
+        holds no credentials — secrets reach it through the environment. It is still exactly what
+        must not leave the machine: private infrastructure, in the file a person pastes into an
+        issue when a boot goes wrong. It rides a `move_key` the reshape performs, so the run
+        demonstrably read it, wrote it under its new address, and never said it.
+        """
+        planted = "s3-prod-eu-pipelex-artifacts-must-never-be-rendered"
+        project_dir, _, project_file = _plant_a_pre_reshape_machine(hermetic_home=hermetic_home)
+        project_file.write_text(OLD_SHAPE_PROJECT_PIPELEX_OVERRIDE.replace("example-project-bucket", planted), encoding="utf-8")
+
+        channels = [
+            _run(args=[str(PIPELEX_BIN), "--no-logo", "migrate", "--dry-run"], env=offline_subprocess_env, cwd=project_dir),
+            _run(
+                args=[str(PIPELEX_AGENT_BIN), "migrate", "--dry-run", "--format", "json"],
+                env=offline_subprocess_env,
+                cwd=project_dir,
+            ),
+            _run(
+                args=[str(PIPELEX_AGENT_BIN), "migrate", "--dry-run", "--format", "markdown"],
+                env=offline_subprocess_env,
+                cwd=project_dir,
+            ),
+            _run(args=[str(PIPELEX_BIN), "--no-logo", "migrate", "--yes"], env=offline_subprocess_env, cwd=project_dir),
+        ]
+        for channel in channels:
+            assert planted not in channel.stdout
+            assert planted not in channel.stderr
+
+        assert load_toml_from_path(path=project_file)["runtime"]["storage"]["s3"]["bucket_name"] == planted
+
+    def test_a_pre_reshape_file_the_entry_only_half_explains_reports_both_halves(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """Old *and* wrong: the boot fails, and the block says which part the command can take.
+
+        This is the machine a person actually writes to support about, and it is the one where the
+        two halves of the report have to coexist — the reshape is pending on this file *and* it
+        holds a key no entry explains. A block that reported only the second would read as "your
+        configuration is broken", when most of what is wrong with it is a command away.
+        """
+        planted = "phc_L1VE_pre_reshape_key_that_must_never_be_rendered"
+        _plant_a_pre_reshape_machine(hermetic_home=hermetic_home)
+        global_file = hermetic_home / ".pipelex" / "pipelex.toml"
+        # At the top of the document, so the key lands at the root rather than inside whichever
+        # table happens to be last — and the root is where no ledger operation would remove it.
+        global_file.write_text(f'posthog_project_key = "{planted}"\n{global_file.read_text(encoding="utf-8")}', encoding="utf-8")
+
+        boot = _boot(env=offline_subprocess_env, cwd=hermetic_home)
+
+        assert boot.returncode != 0, "a file the ledger cannot fully explain still fails the boot"
+        assert boot.stderr.count('"error": true') == 1, boot.stderr
+        envelope: dict[str, Any] = json.loads(boot.stderr)
+        assert envelope["error_type"] == "PipelexConfigError"
+        assert envelope["error_domain"] == "config"
+
+        block: dict[str, Any] = envelope["migration"]
+        assert block["remedy"] == "pipelex migrate"
+        assert block["needs_attention"] is True
+        assert [step["title"] for plan in block["plans"] for step in plan["steps"]] == ["The configuration reshape: one scheme for the root"]
+        assert [found["path"] for plan in block["plans"] for found in plan["unexplained"]] == ["posthog_project_key"]
+
+        assert planted not in boot.stdout
+        assert planted not in boot.stderr
+        assert planted in global_file.read_text(encoding="utf-8"), "nothing was written, so the value is still there"
 
 
 class TestTheBootstrapPath:

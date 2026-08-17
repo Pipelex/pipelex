@@ -42,7 +42,7 @@ class _FakeBundleValidator:
 
 
 def _make_registrar() -> PluginRegistrar:
-    return PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(plugins=SimpleNamespace(disabled=[]))))
+    return PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(runtime=SimpleNamespace(plugins=SimpleNamespace(disabled=[])))))
 
 
 class TestBundleValidatorRegistry:

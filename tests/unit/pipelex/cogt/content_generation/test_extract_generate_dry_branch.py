@@ -43,7 +43,7 @@ class TestExtractGenerateDryBranch:
 
         worker_spy.assert_not_called()
         factory.make_page_contents.assert_not_called()
-        assert len(page_contents) == get_config().pipelex.dry_run_config.nb_extract_pages
+        assert len(page_contents) == get_config().inference.dry_run.nb_extract_pages
         for page_content in page_contents:
             assert page_content.text_and_images.text is not None
             assert page_content.text_and_images.text.text.startswith("DRY RUN:")

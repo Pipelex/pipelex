@@ -1043,7 +1043,7 @@ def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = Non
             config_dirs=[config_dir] if config_dir is not None else None,
         )
 
-    log_config = get_config().pipelex.log_config
+    log_config = get_config().runtime.log
     if log_config_overrides is not None:
         merged = log_config.model_dump()
         deep_update(merged, updates=log_config_overrides)

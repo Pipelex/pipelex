@@ -567,7 +567,7 @@ class TestFixLoopMultiFileScoping:
         bundle_path = tmp_path / "scoping.mthds"
         bundle_path.write_text(_MINIMAL_MTHDS, encoding="utf-8")
         fake_config = mocker.MagicMock()
-        fake_config.pipelex.builder_config.fix_loop_max_attempts = 1
+        fake_config.interpreter.builder.fix_loop_max_attempts = 1
         mocker.patch("pipelex.pipeline.fixes.fix_loop.get_config", return_value=fake_config)
         # The error persists past the single allowed apply round: the loop must run exactly one
         # round then take its final-validation verdict and bail on max_iterations.

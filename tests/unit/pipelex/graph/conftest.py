@@ -93,7 +93,7 @@ def make_graph_config(
     Returns:
         A GraphConfig configured for testing.
     """
-    default_graph_config = get_config().pipelex.pipeline_execution_config.graph_config
+    default_graph_config = get_config().interpreter.pipeline_execution.graph
     return default_graph_config.model_copy(
         update={
             "data_inclusion": default_graph_config.data_inclusion.model_copy(

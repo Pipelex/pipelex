@@ -59,7 +59,7 @@ class GeneratedContentFactory:
                     extension = "jpg"
         else:
             extension = "jpg"
-        uri_format = get_config().pipelex.storage_config.uri_format
+        uri_format = get_config().runtime.storage.uri_format
         return uri_format.format(primary_id=primary_id, secondary_id=secondary_id, hash=hash_digest, extension=extension)
 
     async def _fetch_remote_content(self, url: str) -> bytes:
@@ -129,7 +129,7 @@ class GeneratedContentFactory:
             mime_type = "image/jpeg"
 
         public_url: str | None
-        if is_remote_url and get_config().pipelex.storage_config.is_fetch_remote_content_enabled:
+        if is_remote_url and get_config().runtime.storage.is_fetch_remote_content_enabled:
             try:
                 actual_bytes = await self._fetch_remote_content(url=url)
             except (httpx.HTTPStatusError, httpx.RequestError) as exc:

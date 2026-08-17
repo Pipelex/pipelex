@@ -56,7 +56,7 @@ class MistralFactory:
         # Note: the Mistral SDK's retry is backoff/time-budget based — it has no attempt-count
         # knob — so transport_max_retries acts here as an on/off switch (a positive value enables
         # a bounded-backoff retry of transient transport failures, including connection errors).
-        transport_max_retries = get_config().cogt.transport_max_retries
+        transport_max_retries = get_config().inference.transport_max_retries
         retry_config: RetryConfig | None = None
         if transport_max_retries > 0:
             retry_config = RetryConfig(
