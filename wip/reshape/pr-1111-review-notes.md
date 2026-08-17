@@ -19,6 +19,8 @@ The docstring itself says the callers "live in plugins, outside core's import gr
 
 **Thread:** none — this one was not reported; it surfaced from sweeping the class.
 
+**Resolved at S7.** The open question was answered by reading the plugin: our Daytona plugin owns a separate root, `daytona.toml` → `pipe_func_timeout_seconds` on `config_daytona.py`, and does **not** extend `[interpreter.pipe_func]`, which still holds `execution_mode` and nothing else. So the mechanical correction would indeed have asserted an address no reader could find. The docstring now says the timeout is plugin-configured, names our Daytona plugin's key as one instance rather than as the contract, and stops naming a core address altogether.
+
 ## 2. Should `reset_boot_state` also release the isolated-execution probe?
 
 **Reporter:** greptile (P1), on `pipelex/runtime_hub.py:183-185`.
@@ -36,6 +38,8 @@ The argument for adding `self._isolated_execution_probe = _never_in_isolated_exe
 The argument against is that the docstring's justification would stop being true. It says the flags are boot arguments that "`setup()` writes both unconditionally on the way up" — and that is precisely the difference. The probe is written *conditionally*, only when an orchestrator plugin claims the slot (`pipelex/runtime_boot.py:596-598`), and unlike `is_dry_run_forced()` and `get_boot_orchestrator()` it has no module-level accessor that outside code calls between boots. Adding the line means also rewriting the docstring to explain a release that guards against a hub-reuse pattern the code forbids.
 
 **Decision needed:** add the line and generalise the docstring, or leave it out and add one sentence to the docstring saying explicitly why the probe is not in the list. Doing nothing leaves the asymmetry unexplained, which is the weakest of the three.
+
+**Resolved at S7 — the line was added, and the docstring says why.** Half of the argument against did not survive checking: the probe **does** have a module-level accessor that outside code calls, `is_in_isolated_execution`, and `ReportingManager` is what reads it. What is left of the argument — that the probe is written *conditionally*, only when a plugin claims `HubSlot.ISOLATED_EXECUTION_PROBE` in `RuntimeBoot.setup` — turns out to argue the other way: a boot that claims nothing *inherits* rather than overwrites, so the release is what a fresh `RuntimeHub` per boot would otherwise be the only thing providing. The docstring now records both, and a second test in `tests/unit/pipelex/test_runtime_boot_releases_boot_scoped_state.py` pins the release. The greptile finding itself stays a false positive: the failure it described still cannot happen, for the two reasons above.
 
 ## 3. Nothing mechanically guards the "stale config path in a string" class
 

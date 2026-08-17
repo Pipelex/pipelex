@@ -58,6 +58,9 @@ The configuration is organized into four main sections, which mirror the layers 
 
 Each section contains multiple subsections for specific features and functionalities. A setting's address tells you which layer owns it: `[runtime.*]` applies to any process, whatever it loads; `[interpreter.*]` only means something once a method is loaded.
 
+!!! tip "If your file predates this layout"
+    A `pipelex.toml` written against an older layout still boots. Pipelex carries it forward in memory, warns you that it did, and changes nothing on disk; `pipelex doctor` reports the pending migration. `pipelex migrate` is what makes it permanent — it rewrites each file in place and keeps the original beside it as a timestamped `.bak`. Your settings move address, they do not change value. The command walks the global `~/.pipelex/` and your project's `.pipelex/`, so a file you load from somewhere else — through `Pipelex.make(config_dir=…)` — is yours to update where it lives, and the boot warning says so rather than naming a command that would not reach it. See [Migration Ledger](../migration-ledger.md) for what a migration may and may not do to your file.
+
 ## Configuration Override System
 
 Pipelex uses a sophisticated configuration override system that loads and merges configurations in a specific order. This allows for fine-grained control over settings in different environments and scenarios.

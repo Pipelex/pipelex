@@ -182,10 +182,20 @@ class RuntimeHub:
         unconditionally on the way up, and without this a torn-down process answers ``get_boot_orchestrator()``
         with the previous boot's orchestrator (and ``is_dry_run_forced()`` with the previous boot's keyless
         verdict) while no boot is active at all.
+
+        The isolated-execution probe is released for the same reason and needs it slightly more, because
+        it is the one of the three a boot writes **conditionally** — only when a plugin claims
+        ``HubSlot.ISOLATED_EXECUTION_PROBE`` in ``RuntimeBoot.setup``. A boot that claims nothing
+        therefore *inherits* rather than overwrites, so the release is what a fresh ``RuntimeHub`` per
+        boot would otherwise be the only thing providing. What this closes is the window both teardown
+        paths open: between teardown and the next boot ``get_runtime_hub()`` still hands out the dead
+        hub, and ``is_in_isolated_execution()`` is a module-level accessor (``ReportingManager`` reads
+        it) that would answer with the torn-down boot's runtime split.
         """
         self._config = None
         self._is_dry_run_forced = False
         self._boot_orchestrator = None
+        self._isolated_execution_probe = _never_in_isolated_execution
         log.reset()
 
     def set_console_print_target(self, target: ConsoleTarget):

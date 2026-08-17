@@ -183,20 +183,60 @@ def replay_surface_files_in_memory(*, surface_id: str, paths: Sequence[Path]) ->
     return ReplayedSurface(config_dict=merged, plans=plans)
 
 
-def stale_configuration_warning(*, plans: Sequence[MigrationPlan]) -> str:
+def _is_within(*, path: Path, directories: Sequence[Path]) -> bool:
+    """Whether a file sits directly in one of these directories.
+
+    Directly, not underneath: the walk is not recursive, so a file in a subdirectory of a
+    configuration directory is as far out of `pipelex migrate`'s reach as one on the other side of
+    the disk. `resolve()` on both sides because a caller's `config_dir=` may well be the global
+    directory reached by a symlink or a relative path, and the same file under two spellings must
+    not read as two different places.
+    """
+    try:
+        parent = path.resolve().parent
+    except OSError:
+        return False
+    return any(parent == directory.resolve() for directory in directories)
+
+
+def _quoted_files(*, plans: Sequence[MigrationPlan]) -> str:
+    return ", ".join(f"'{plan.file_path}'" for plan in plans)
+
+
+def stale_configuration_warning(*, plans: Sequence[MigrationPlan], walked_dirs: Sequence[Path]) -> str:
     """What a boot says when it carried a stale configuration forward in memory rather than dying.
 
     Names the files and the remedy, and takes everything else it says from the ledger — the same
     rule the migration report obeys, because a boot warning is read in the same places a report is
     and a value read from a user's file has no business in either.
+
+    **`pipelex migrate` is named only for a file it would reach**, which is what `walked_dirs` is
+    for. Boot tolerance replays exactly the files the loader merged, and a loader pointed at a
+    directory of its own — `Pipelex.make(config_dir=…)`, or this repository's own
+    `tests/pipelex_{run_mode}.toml` — merges files the command's fixed walk will never touch. A
+    warning that closed on "run `pipelex migrate`" there would name, on every boot, a command that
+    then reports nothing to do. The same rule as the migration report's: a remedy is named only
+    where it would write. Pass the walk (`config_manager.existing_config_dirs`); an embedder's
+    directory is theirs to update, and `--config-dir` is deliberately not the answer.
     """
     stale = [plan for plan in plans if not plan.is_clean]
-    files = ", ".join(f"'{plan.file_path}'" for plan in stale)
+    in_reach = [plan for plan in stale if _is_within(path=plan.file_path, directories=walked_dirs)]
+    out_of_reach = [plan for plan in stale if not _is_within(path=plan.file_path, directories=walked_dirs)]
     carried = sorted({step.title for plan in stale for step in plan.steps})
-    sentences = [f"Your configuration is out of date, and pipelex read it as if it had been migrated: {files}."]
+    sentences = [f"Your configuration is out of date, and pipelex read it as if it had been migrated: {_quoted_files(plans=stale)}."]
     if carried:
         sentences.append(f"What the ledger carried forward: {'; '.join(carried)}.")
     if any(plan.blocked for plan in stale):
-        sentences.append("Some of what these files need cannot be applied for you — `pipelex migrate` reports it.")
-    sentences.append("Nothing was written: run `pipelex migrate` to bring the files up to date.")
+        blocked_note = "Some of what these files need cannot be applied for you"
+        sentences.append(f"{blocked_note} — `pipelex migrate` reports it." if in_reach else f"{blocked_note}.")
+    sentences.append("Nothing was written.")
+    if in_reach:
+        subject = _quoted_files(plans=in_reach) if out_of_reach else "the files"
+        sentences.append(f"Run `pipelex migrate` to bring {subject} up to date.")
+    if out_of_reach:
+        sentences.append(
+            f"`pipelex migrate` does not reach {_quoted_files(plans=out_of_reach)} — "
+            f"{'that file is' if len(out_of_reach) == 1 else 'those files are'} yours to update where "
+            f"{'it lives' if len(out_of_reach) == 1 else 'they live'}."
+        )
     return " ".join(sentences)

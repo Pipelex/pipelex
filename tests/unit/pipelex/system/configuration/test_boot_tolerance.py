@@ -54,6 +54,8 @@ from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
+    from pipelex.migration.plan import MigrationPlan
+
 
 def old_shape_telemetry_document() -> str:
     """The flat pre-`[custom_posthog]` document the shipped entry is about, read from the package."""
@@ -264,13 +266,18 @@ class TestTheRetryHonoursTheSchemaVersionFloor:
 
 
 class TestWhatTheWarningSays:
-    def test_it_names_the_file_and_the_remedy(self, tmp_path: Path) -> None:
-        stale = tmp_path / "telemetry.toml"
-        stale.write_text(old_shape_telemetry_document(), encoding="utf-8")
+    @staticmethod
+    def _stale_telemetry_plans(*, directory: Path, body: str | None = None) -> tuple[Path, list[MigrationPlan]]:
+        stale = directory / "telemetry.toml"
+        stale.write_text(body if body is not None else old_shape_telemetry_document(), encoding="utf-8")
         replayed = replay_surface_files_in_memory(surface_id=TELEMETRY_CONFIG_SURFACE_ID, paths=[stale])
         assert replayed is not None
+        return stale, replayed.plans
 
-        warning = stale_configuration_warning(plans=replayed.plans)
+    def test_it_names_the_file_and_the_remedy(self, tmp_path: Path) -> None:
+        stale, plans = self._stale_telemetry_plans(directory=tmp_path)
+
+        warning = stale_configuration_warning(plans=plans, walked_dirs=[tmp_path])
 
         assert str(stale) in warning
         assert "pipelex migrate" in warning
@@ -280,15 +287,62 @@ class TestWhatTheWarningSays:
         """Ledger text only, the same rule the migration report obeys — a boot warning is read in
         the same places a report is, and a user's own values have no business in either.
         """
-        stale = tmp_path / "telemetry.toml"
-        stale.write_text('telemetry_mode = "off"\nproject_api_key = "phc_a_secret_the_user_owns"\n', encoding="utf-8")
-        replayed = replay_surface_files_in_memory(surface_id=TELEMETRY_CONFIG_SURFACE_ID, paths=[stale])
-        assert replayed is not None
+        _, plans = self._stale_telemetry_plans(directory=tmp_path, body='telemetry_mode = "off"\nproject_api_key = "phc_a_secret_the_user_owns"\n')
 
-        warning = stale_configuration_warning(plans=replayed.plans)
+        warning = stale_configuration_warning(plans=plans, walked_dirs=[tmp_path])
 
         assert "Nest the flat telemetry settings under [custom_posthog]" in warning
         assert "phc_a_secret_the_user_owns" not in warning
+
+    def test_a_file_outside_the_walk_is_not_offered_the_command(self, tmp_path: Path) -> None:
+        """`Pipelex.make(config_dir=…)` outside the two walked directories is the live case.
+
+        Boot tolerance replays whatever the loader merged, so it reaches such a file; `pipelex
+        migrate`'s walk is fixed and never will. Naming the command there would promise, on every
+        boot, a remedy that then reports nothing to do — the same rule the migration report obeys:
+        a remedy is named only where it would write.
+        """
+        embedder_dir = tmp_path / "embedder"
+        embedder_dir.mkdir()
+        stale, plans = self._stale_telemetry_plans(directory=embedder_dir)
+
+        warning = stale_configuration_warning(plans=plans, walked_dirs=[tmp_path / "global", tmp_path / "project"])
+
+        assert str(stale) in warning
+        assert "Nothing was written" in warning
+        assert "does not reach" in warning
+        assert "yours to update where it lives" in warning
+        assert "Run `pipelex migrate`" not in warning
+
+    def test_a_walk_of_one_file_in_and_one_out_names_each_side(self, tmp_path: Path) -> None:
+        """The mixed case is reachable, and a single closing sentence would be wrong for one of them.
+
+        A load merges tiers from several directories at once — under unit testing it also merges
+        this repository's own `tests/pipelex_{run_mode}.toml`, which is outside the walk by design.
+        So the warning splits the files rather than picking one verb for all of them.
+        """
+        walked = tmp_path / "walked"
+        walked.mkdir()
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        inside_file, inside_plans = self._stale_telemetry_plans(directory=walked)
+        outside_file, outside_plans = self._stale_telemetry_plans(directory=outside)
+
+        warning = stale_configuration_warning(plans=inside_plans + outside_plans, walked_dirs=[walked])
+
+        assert f"Run `pipelex migrate` to bring '{inside_file}' up to date." in warning
+        assert f"`pipelex migrate` does not reach '{outside_file}' — that file is yours to update where it lives." in warning
+
+    def test_the_walk_is_not_recursive_so_a_subdirectory_is_out_of_reach(self, tmp_path: Path) -> None:
+        """`.pipelex/inference/backends/` is the specimen the walk deliberately skips."""
+        nested = tmp_path / "inference" / "backends"
+        nested.mkdir(parents=True)
+        _, plans = self._stale_telemetry_plans(directory=nested)
+
+        warning = stale_configuration_warning(plans=plans, walked_dirs=[tmp_path])
+
+        assert "does not reach" in warning
+        assert "Run `pipelex migrate`" not in warning
 
 
 class TestTheTelemetryLoader:

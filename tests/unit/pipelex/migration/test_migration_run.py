@@ -16,11 +16,24 @@ from pipelex.migration.run import config_directories_to_migrate
 from pipelex.migration.runner import migrate_file
 from pipelex.migration.surfaces import build_config_surface_registry
 from pipelex.suggested_fix import RenameTableKeyOp
+from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_surface import declared_schema_version
 from tests.unit.pipelex.migration.conftest import EntryBuilder, LedgerBuilder, SurfaceBuilder
 from tests.unit.pipelex.migration.test_runner import MOMENT
 
-CONFIG_LOADER = "pipelex.migration.run.config_manager"
+CONFIG_LOADER_CLASS = "pipelex.system.configuration.config_loader.ConfigLoader"
+
+
+def pretend_config_dirs(mocker: MockerFixture, *, global_dir: Path, project_dir: Path | None) -> None:
+    """Put the loader's two directory properties where the test wants them.
+
+    The properties are patched on the class rather than the `config_manager` singleton being
+    replaced wholesale, and that is the point: the walk *is* `ConfigLoader.existing_config_dirs`
+    (`config_directories_to_migrate` reads it and does nothing else), so a mocked-out loader would
+    leave the derivation and its one caller both untested.
+    """
+    mocker.patch(f"{CONFIG_LOADER_CLASS}.global_config_dir", new_callable=mocker.PropertyMock, return_value=global_dir)
+    mocker.patch(f"{CONFIG_LOADER_CLASS}.project_config_dir", new_callable=mocker.PropertyMock, return_value=project_dir)
 
 
 class TestWhichDirectoriesAreWalked:
@@ -29,22 +42,19 @@ class TestWhichDirectoriesAreWalked:
         project_dir = tmp_path / "project" / ".pipelex"
         global_dir.mkdir(parents=True)
         project_dir.mkdir(parents=True)
-        mocker.patch(CONFIG_LOADER).global_config_dir = global_dir
-        mocker.patch(f"{CONFIG_LOADER}.project_config_dir", project_dir)
+        pretend_config_dirs(mocker, global_dir=global_dir, project_dir=project_dir)
 
         assert config_directories_to_migrate() == [global_dir, project_dir]
 
     def test_a_machine_with_no_project_directory_is_an_ordinary_machine(self, tmp_path: Path, mocker: MockerFixture) -> None:
         global_dir = tmp_path / "home" / ".pipelex"
         global_dir.mkdir(parents=True)
-        mocker.patch(CONFIG_LOADER).global_config_dir = global_dir
-        mocker.patch(f"{CONFIG_LOADER}.project_config_dir", None)
+        pretend_config_dirs(mocker, global_dir=global_dir, project_dir=None)
 
         assert config_directories_to_migrate() == [global_dir]
 
     def test_a_global_directory_that_does_not_exist_is_skipped(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        mocker.patch(CONFIG_LOADER).global_config_dir = tmp_path / "nowhere" / ".pipelex"
-        mocker.patch(f"{CONFIG_LOADER}.project_config_dir", None)
+        pretend_config_dirs(mocker, global_dir=tmp_path / "nowhere" / ".pipelex", project_dir=None)
 
         assert config_directories_to_migrate() == []
 
@@ -56,10 +66,22 @@ class TestWhichDirectoriesAreWalked:
         """
         shared_dir = tmp_path / ".pipelex"
         shared_dir.mkdir(parents=True)
-        mocker.patch(CONFIG_LOADER).global_config_dir = shared_dir
-        mocker.patch(f"{CONFIG_LOADER}.project_config_dir", shared_dir)
+        pretend_config_dirs(mocker, global_dir=shared_dir, project_dir=shared_dir)
 
         assert config_directories_to_migrate() == [shared_dir]
+
+    def test_the_walk_is_the_same_set_the_stale_boot_warning_decides_against(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """One derivation, read from both ends.
+
+        `stale_configuration_warning` names `pipelex migrate` only for a file under one of these
+        directories. If the walk were derived a second time, a boot could promise a remedy the
+        command then declines — which is the defect this delegation exists to make impossible.
+        """
+        global_dir = tmp_path / "home" / ".pipelex"
+        global_dir.mkdir(parents=True)
+        pretend_config_dirs(mocker, global_dir=global_dir, project_dir=None)
+
+        assert config_directories_to_migrate() == config_manager.existing_config_dirs
 
 
 class TestTheWalkIsNotRecursive:
