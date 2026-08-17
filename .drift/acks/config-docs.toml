@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:96480e570162939939bf6d07b626041ccbb0e0327fb81b5a231fef752b3b3893"
+digest = "sha256:820c272d92e41c21d884f2a1daee775e689282ee51f176a99fa40ea3d47f86e3"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-17T08:30:52Z"
-rationale = "Re-ack after one cosmetic line. Since the previous ack on this branch the only change to a trigger file is a single expression in config_surface.py, the ternary that picks the subject of the run pipelex migrate sentence, rewritten to drop a redundant f-string wrapper; the string it produces is byte-identical and the boot-tolerance, migration and telemetry unit modules are green over it. No config model, no ledger and no page moved since that ack, so the value-domain question and the docs sweep it recorded both still stand as answered there, including the note added to docs/configuration/index.md."
+reviewed_at = "2026-08-17T08:49:54Z"
+rationale = "Re-ack after the review round on the first push. One trigger file moved, config_surface.py, and it carries a real fix rather than a wording change: _is_within resolved the whole path before taking its parent, so a pipelex.toml symlinked out to a dotfiles repository resolved to a parent outside the walk and was told pipelex migrate could not reach it, when the walk enumerates the link by iterdir and writes straight through. It now resolves the parent and not the file, which keeps the reason the resolve was there - a config_dir reaching the same directory by another spelling - and drops the question it was accidentally answering. Pinned by a new symlink test in test_boot_tolerance.py, mutation-tested by reverting the expression. Asked the contract's own question again and the answer is unchanged: no config model moved, configs.py and config_cogt.py are untouched, no ledger moved, so no unsafe entry carrying declared_narrowed_paths is owed, and make cl stays green. On the docs half, this is a correction to which files the warning names, not to what a migration may do, so the note added to docs/configuration/index.md at the previous ack is still accurate as written - it says the walk is the global and project directories and that a file loaded from elsewhere is yours to update, which is exactly what the fixed predicate now decides correctly."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:02f71cb4a6b01aebda59c2e31f262ef9c865e17b"
@@ -13,7 +13,7 @@ rationale = "Re-ack after one cosmetic line. Since the previous ack on this bran
 "pipelex/system/configuration/config_loader.py" = "blob:fadc4557422f0c93335446a854d9883b3cceaf8c"
 "pipelex/system/configuration/config_model.py" = "blob:83b29dc6e93393c9b98c4353636caf0135c80339"
 "pipelex/system/configuration/config_root.py" = "blob:c7d43851270912d17413cfc6a511247d3c7cc160"
-"pipelex/system/configuration/config_surface.py" = "blob:0867031b54c982fb25aaf26c39e545ad7de28c3e"
+"pipelex/system/configuration/config_surface.py" = "blob:0ab49a3bf69f55d5ab0930665ab98e14547c9b4a"
 "pipelex/system/configuration/configs.py" = "blob:60f346ba1205b762d4b6cff63494b0b34171e6ad"
 "pipelex/system/configuration/pipe_func_config.py" = "blob:dc8890e914fbcdb611147e42eaa0cd87b32288a5"
 "pipelex/system/telemetry/telemetry_config.py" = "blob:7070951a6d3e4c10cb7d59822ce168c6590c53be"

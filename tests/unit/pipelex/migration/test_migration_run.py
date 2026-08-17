@@ -16,7 +16,6 @@ from pipelex.migration.run import config_directories_to_migrate
 from pipelex.migration.runner import migrate_file
 from pipelex.migration.surfaces import build_config_surface_registry
 from pipelex.suggested_fix import RenameTableKeyOp
-from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_surface import declared_schema_version
 from tests.unit.pipelex.migration.conftest import EntryBuilder, LedgerBuilder, SurfaceBuilder
 from tests.unit.pipelex.migration.test_runner import MOMENT
@@ -70,18 +69,24 @@ class TestWhichDirectoriesAreWalked:
 
         assert config_directories_to_migrate() == [shared_dir]
 
-    def test_the_walk_is_the_same_set_the_stale_boot_warning_decides_against(self, tmp_path: Path, mocker: MockerFixture) -> None:
+    def test_the_walk_is_read_from_the_loader_rather_than_derived_here(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """One derivation, read from both ends.
 
         `stale_configuration_warning` names `pipelex migrate` only for a file under one of these
-        directories. If the walk were derived a second time, a boot could promise a remedy the
-        command then declines — which is the defect this delegation exists to make impossible.
-        """
-        global_dir = tmp_path / "home" / ".pipelex"
-        global_dir.mkdir(parents=True)
-        pretend_config_dirs(mocker, global_dir=global_dir, project_dir=None)
+        directories, and it asks `ConfigLoader.existing_config_dirs`. If this command derived the
+        walk a second time, a boot could promise a remedy the command then declines — the defect
+        the delegation exists to make impossible.
 
-        assert config_directories_to_migrate() == config_manager.existing_config_dirs
+        A sentinel rather than a comparison against the property itself: comparing the two would
+        pass however this function were written, since both sides would come from the same patched
+        directories. Patching the property to a directory neither of them could compute is what
+        makes a second derivation fail here.
+        """
+        sentinel = tmp_path / "a-directory-no-derivation-would-produce"
+        sentinel.mkdir()
+        mocker.patch(f"{CONFIG_LOADER_CLASS}.existing_config_dirs", new_callable=mocker.PropertyMock, return_value=[sentinel])
+
+        assert config_directories_to_migrate() == [sentinel]
 
 
 class TestTheWalkIsNotRecursive:

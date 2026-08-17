@@ -90,7 +90,7 @@ Nothing on this branch is affected: `files_by_surface_in_directory` does not exi
 
 The `pipelex-config@2` entry declares `introduced_in = "0.46.0"` while `pyproject.toml` is on `0.45.0`. That is deliberate — the entry ships in a future release — and it is consistent with the changelog's forward-written `pipelex migrate` line, which Louis already ruled to keep.
 
-The point worth recording is that **nothing checks it**. `ledger.py:79` types `introduced_in` as a bare `str`, so any value parses, and no gate compares it to the package version at any point.
+The point worth recording is that **nothing checks it**. `MigrationEntry.introduced_in`, in `pipelex/migration/ledger.py`, is typed as a bare `str`, so any value parses, and no gate compares it to the package version at any point.
 
 **Action:** re-check this at release time. If the release lands on a number other than `0.46.0`, the field is silently wrong. A cheap release-time assertion (the head entry's `introduced_in` must equal the version being cut, or be unreleased) would close it permanently, but that is a decision for the release session, not this PR.
 

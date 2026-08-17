@@ -188,12 +188,19 @@ def _is_within(*, path: Path, directories: Sequence[Path]) -> bool:
 
     Directly, not underneath: the walk is not recursive, so a file in a subdirectory of a
     configuration directory is as far out of `pipelex migrate`'s reach as one on the other side of
-    the disk. `resolve()` on both sides because a caller's `config_dir=` may well be the global
-    directory reached by a symlink or a relative path, and the same file under two spellings must
-    not read as two different places.
+    the disk.
+
+    **The parent is resolved; the file is not**, and that asymmetry is the whole of it. Resolving
+    the *directory* is what the walk itself effectively does — a caller's `config_dir=` may be the
+    global directory reached by a symlink or a relative path, and the same directory under two
+    spellings must not read as two different places. Resolving the *file* would answer a different
+    question: a `pipelex.toml` symlinked out to a dotfiles repository — chezmoi, stow, yadm all do
+    this — would resolve to a parent outside the walk and be told the command cannot reach it,
+    when the walk enumerates the link by `iterdir` and writes straight through it. Where the file
+    *points* is not where the command looks for it.
     """
     try:
-        parent = path.resolve().parent
+        parent = path.parent.resolve()
     except OSError:
         return False
     return any(parent == directory.resolve() for directory in directories)

@@ -344,6 +344,30 @@ class TestWhatTheWarningSays:
         assert "does not reach" in warning
         assert "Run `pipelex migrate`" not in warning
 
+    def test_a_file_symlinked_out_of_a_walked_directory_is_still_in_reach(self, tmp_path: Path) -> None:
+        """Where the file points is not where the command looks for it.
+
+        A `telemetry.toml` symlinked out to a dotfiles repository — chezmoi, stow and yadm all do
+        this — is enumerated by the walk's `iterdir` like any other entry and written straight
+        through, so the remedy applies to it. Resolving the file rather than its directory would
+        move its parent outside the walk and tell the user to go and edit it by hand, which is both
+        wrong and the advice most likely to be followed, since the target really is somewhere else.
+        """
+        walked = tmp_path / "walked"
+        walked.mkdir()
+        elsewhere = tmp_path / "dotfiles"
+        elsewhere.mkdir()
+        target, _ = self._stale_telemetry_plans(directory=elsewhere)
+        link = walked / "telemetry.toml"
+        link.symlink_to(target)
+
+        replayed = replay_surface_files_in_memory(surface_id=TELEMETRY_CONFIG_SURFACE_ID, paths=[link])
+        assert replayed is not None
+        warning = stale_configuration_warning(plans=replayed.plans, walked_dirs=[walked])
+
+        assert "Run `pipelex migrate` to bring the files up to date." in warning
+        assert "does not reach" not in warning
+
 
 class TestTheTelemetryLoader:
     """The one surface whose shipped ledger already carries a real entry."""
@@ -456,6 +480,40 @@ class TestTheMainConfigurationLoader:
         assert parked is not None
         assert "pipelex migrate" in parked
         assert loader.take_stale_configuration_warning() is None, "a warning is emitted once"
+
+    def test_the_warning_reads_the_walk_off_the_loader_rather_than_deriving_its_own(
+        self,
+        fake_dirs: tuple[Path, Path],
+        synthetic_migration_dir: Path,
+        mocker: MockerFixture,
+    ) -> None:
+        """The other end of the one derivation `pipelex migrate`'s walk also reads.
+
+        Patched to walk nothing, the loader must decline to name the command for the very file it
+        just carried forward. A second derivation living here would keep naming it — and that is
+        precisely the disagreement the shared property exists to make impossible, in the direction
+        that matters, since a boot promising a remedy the command declines is the one a user acts
+        on.
+        """
+        global_dir, _ = fake_dirs
+        write_synthetic_ledger(
+            migration_dir=synthetic_migration_dir,
+            surface_id=PIPELEX_CONFIG_SURFACE_ID,
+            base_file="pipelex.toml",
+            ops_body='[[migration.ops]]\nkind = "rename_table_key"\ntable_path = ["runtime", "log"]\n'
+            'key = "old_default_log_level"\nnew_key = "default_log_level"\n',
+        )
+        (global_dir / "pipelex.toml").write_text('[runtime.log]\nold_default_log_level = "DEBUG"\n', encoding="utf-8")
+        mocker.patch.object(log, "log_dispatch", LogDispatch())
+        mocker.patch.object(ConfigLoader, "existing_config_dirs", new_callable=mocker.PropertyMock, return_value=[])
+        loader = ConfigLoader()
+
+        loader.load_config_validated(config_cls=PipelexConfig)
+
+        parked = loader.take_stale_configuration_warning()
+        assert parked is not None
+        assert "does not reach" in parked
+        assert "Run `pipelex migrate`" not in parked
 
     @pytest.mark.usefixtures("fake_dirs")
     def test_a_healthy_configuration_parks_no_warning(self) -> None:
