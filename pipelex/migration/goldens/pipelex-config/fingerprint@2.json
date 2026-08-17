@@ -1,6 +1,7 @@
 {
   "surface_id": "pipelex-config",
   "schema_version": 2,
+  "document_root_is_open": false,
   "paths": {
     "inference": {
       "value_type": "table",

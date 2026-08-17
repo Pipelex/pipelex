@@ -16,6 +16,7 @@ from pipelex.migration.fingerprint import SurfaceFingerprint, compute_fingerprin
 from pipelex.migration.ledger import MigrationLedger
 from pipelex.migration.plan import BlockedEntry, BlockedEntryReason
 from pipelex.migration.safety import MigrationSafety
+from pipelex.migration.surfaces import DefaultsLayerKind, DocumentShape, Surface
 from pipelex.suggested_fix import DeleteKeyOp, MigrationOp, RemapValueOp, RenameTableKeyOp
 from tests.unit.pipelex.migration.conftest import EXAMPLE_SURFACE_ID, EntryBuilder, LedgerBuilder
 
@@ -40,12 +41,48 @@ class Schema(BaseModel):
     queues: dict[str, Queue] = Field(default_factory=dict[str, Queue])
 
 
+class BackendFileNode(BaseModel):
+    """One root table of a document whose root keys are the user's — every field optional."""
+
+    sdk: str | None = None
+    max_tokens: int | None = None
+
+
+def _surface(*, config_model: type[BaseModel] = Schema, document_shape: DocumentShape = DocumentShape.WHOLE_DOCUMENT) -> Surface:
+    return Surface(
+        surface_id=EXAMPLE_SURFACE_ID,
+        title="An example configuration surface",
+        base_file="example.toml",
+        config_model=config_model,
+        document_shape=document_shape,
+        defaults_layer_kind=DefaultsLayerKind.MODEL_DEFAULTS,
+    )
+
+
 def _fingerprint() -> SurfaceFingerprint:
     return compute_fingerprint(surface_id=EXAMPLE_SURFACE_ID, schema_version=3, config_model=Schema, defaults_document={})
 
 
 def _diagnose(*, document: dict[str, Any], ledger: MigrationLedger, blocked: list[BlockedEntry] | None = None) -> list[str]:
-    found = diagnose_unexplained_paths(fingerprint=_fingerprint(), document=document, ledger=ledger, blocked=blocked or [])
+    found = diagnose_unexplained_paths(
+        surface=_surface(),
+        fingerprint=_fingerprint(),
+        document=document,
+        ledger=ledger,
+        blocked=blocked or [],
+    )
+    return [unexplained.path for unexplained in found]
+
+
+def _diagnose_backend_document(*, document: dict[str, Any], ledger: MigrationLedger) -> list[str]:
+    surface = _surface(config_model=BackendFileNode, document_shape=DocumentShape.MODEL_SPEC_TABLES)
+    found = diagnose_unexplained_paths(
+        surface=surface,
+        fingerprint=surface.fingerprint_at(schema_version=1),
+        document=document,
+        ledger=ledger,
+        blocked=[],
+    )
     return [unexplained.path for unexplained in found]
 
 
@@ -66,6 +103,7 @@ def empty_ledger(build_ledger: LedgerBuilder) -> MigrationLedger:
 class TestWhatTheSchemaDoesNotKnow:
     def test_a_root_key_no_model_knows_is_reported_with_both_readings(self, empty_ledger: MigrationLedger) -> None:
         found = diagnose_unexplained_paths(
+            surface=_surface(),
             fingerprint=_fingerprint(),
             document={"label": "hi", "not_a_real_setting": True},
             ledger=empty_ledger,
@@ -76,6 +114,28 @@ class TestWhatTheSchemaDoesNotKnow:
         note = found[0].note
         assert "typo" in note
         assert "newer pipelex" in note, "the downgrade reading is the one nothing else in the report offers"
+
+    def test_a_per_model_request_header_is_not_something_the_schema_cannot_explain(self, empty_ledger: MigrationLedger) -> None:
+        """A backend file's headers are legal by *shape*, so they resolve against no recorded path.
+
+        Without this the diagnosis would report `x-portkey-provider` on **every** `pipelex migrate`
+        run over a machine that has a portkey backend — the kit's own file carries such keys — and the
+        report would be telling the user to fix a key we ship and endorse.
+        """
+        document = {"defaults": {"sdk": "openai"}, "gpt-4o": {"max_tokens": 1, "x-portkey-provider": "openai"}}
+
+        assert _diagnose_backend_document(document=document, ledger=empty_ledger) == []
+
+    def test_a_typo_inside_a_model_table_is_still_reported_at_the_wildcard(self, empty_ledger: MigrationLedger) -> None:
+        """The other half: the admission is by shape, not by "the model allows extras".
+
+        `promting_target` carries no hyphen, so it is a typo or a dead field rather than a header —
+        exactly the key class this surface exists to explain — and it is reported at the spelling the
+        schema uses, with the model name the user chose left out of it.
+        """
+        document = {"defaults": {"sdk": "openai"}, "gpt-4o": {"promting_target": "openai"}}
+
+        assert _diagnose_backend_document(document=document, ledger=empty_ledger) == ["*.promting_target"]
 
     def test_a_document_the_schema_knows_entirely_is_reported_clean(self, empty_ledger: MigrationLedger) -> None:
         document = {"label": "hi", "reporting": {"output": {"directory": "elsewhere"}, "retries": 3}}

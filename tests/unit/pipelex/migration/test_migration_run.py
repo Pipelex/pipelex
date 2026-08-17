@@ -94,14 +94,15 @@ class TestTheWalkIsNotRecursive:
 
     The specimen is real and it is the reason this is pinned rather than assumed:
     `.pipelex/inference/backends/pipelex_gateway.toml` matches the `pipelex-config` tier glob
-    `pipelex_*.toml` exactly, and is an inference backend definition rather than a configuration
-    surface file. A recursive walk would claim it, replay the main configuration's ledger over it,
-    and rewrite it.
+    `pipelex_*.toml` exactly, and is an inference backend definition rather than a main-configuration
+    tier file. The walk *does* reach it now, because `inference/backends/` has a surface of its own —
+    which makes the directory half of the claim rule load-bearing rather than academic: get it wrong
+    and the main configuration's ledger is replayed over a backend definition and rewrites it.
     """
 
     SPECIMEN = Path("inference") / "backends" / "pipelex_gateway.toml"
 
-    def test_the_real_gateway_backend_file_is_not_claimed_where_it_actually_lives(self, tmp_path: Path) -> None:
+    def test_the_real_gateway_backend_file_is_claimed_by_its_own_directorys_surface(self, tmp_path: Path) -> None:
         specimen = tmp_path / self.SPECIMEN
         specimen.parent.mkdir(parents=True)
         specimen.write_text("", encoding="utf-8")
@@ -109,13 +110,30 @@ class TestTheWalkIsNotRecursive:
 
         claimed = build_config_surface_registry().files_by_surface_in_directory(directory=tmp_path)
 
-        assert [path.name for _, path in claimed] == ["pipelex.toml"]
+        assert [(surface.surface_id, path.name) for surface, path in claimed] == [
+            ("pipelex-config", "pipelex.toml"),
+            ("inference-backend", self.SPECIMEN.name),
+        ]
 
-    def test_the_same_file_name_at_the_top_level_is_claimed(self, tmp_path: Path) -> None:
-        """The other half of the claim: depth is what saves the specimen, not its name.
+    def test_a_directory_no_surface_owns_is_never_entered(self, tmp_path: Path) -> None:
+        """`inference/deck/` is a different mechanism's directory, and one level up is a different document.
+
+        Both are deliberate exclusions rather than accidents of the glob — a model deck has its own
+        manifest-driven sync, and `inference/backends.toml` is a table per backend, not per model.
+        """
+        (tmp_path / "inference" / "deck").mkdir(parents=True)
+        (tmp_path / "inference" / "deck" / "x.toml").write_text("", encoding="utf-8")
+        (tmp_path / "inference" / "backends.toml").write_text("", encoding="utf-8")
+
+        claimed = build_config_surface_registry().files_by_surface_in_directory(directory=tmp_path)
+
+        assert claimed == []
+
+    def test_the_same_file_name_at_the_top_level_is_claimed_by_the_main_configuration(self, tmp_path: Path) -> None:
+        """The other half of the claim: which directory it sits in is what decides, not its name.
 
         Without this, the test above would still pass if the tier glob stopped matching, and it
-        would be proving nothing about recursion at all.
+        would be proving nothing about the directory rule at all.
         """
         (tmp_path / self.SPECIMEN.name).write_text("", encoding="utf-8")
 

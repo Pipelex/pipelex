@@ -43,7 +43,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex.migration.fingerprint import PATH_SEPARATOR, TABLE_TYPE, SurfaceFingerprint, compute_fingerprint
+from pipelex.migration.fingerprint import PATH_SEPARATOR, TABLE_TYPE, SurfaceFingerprint
 from pipelex.migration.goldens import defaults_golden_path, read_fingerprint_golden
 from pipelex.migration.ledger import MigrationEntry, MigrationLedger, load_ledger
 from pipelex.migration.narrowing import describe_narrowing, is_remappable, lost_enumerated_spellings
@@ -453,12 +453,10 @@ def check_surface(*, surface: Surface, migration_dir: Path) -> list[CoverageIssu
     issues = _check_ledger_agrees_with_registry(surface=surface, ledger=ledger)
 
     current_version = ledger.surface.current_schema_version
-    live = compute_fingerprint(
-        surface_id=surface_id,
-        schema_version=current_version,
-        config_model=surface.config_model,
-        defaults_document=surface.read_defaults_document(),
-    )
+    # Through the surface rather than straight to `compute_fingerprint`: the surface holds both
+    # halves of the projection — the model tree and whether the document's root is open — and one
+    # route is what keeps this gate and the regenerator fingerprinting the same shape.
+    live = surface.fingerprint_at(schema_version=current_version)
     issues.extend(check_defaults_layer(surface_id=surface_id, fingerprint=live))
     issues.extend(_check_stored_links(surface_id=surface_id, ledger=ledger, live=live, migration_dir=migration_dir))
     issues.extend(_check_head_link(surface_id=surface_id, current_version=current_version, live=live, migration_dir=migration_dir))

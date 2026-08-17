@@ -1,0 +1,15 @@
+# The migration ledger for the inference backend definitions.
+#
+# One file per backend under `inference/backends/`, each a `[defaults]` table plus one root table per
+# model name. The root keys of such a file are the model names *that machine* chose, so every
+# operation here addresses `["*"]` — every root table, `[defaults]` included — and none may name one.
+#
+# See docs/migration-ledger.md for the contract this file obeys.
+
+[surface]
+id = "inference-backend"
+title = "Inference backend model definitions"
+subdirectory = "inference/backends"
+tier_glob = "*.toml"
+current_schema_version = 1
+min_supported_schema_version = 0

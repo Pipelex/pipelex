@@ -138,6 +138,12 @@ class SurfaceFingerprint(BaseModel):
 
     surface_id: str
     schema_version: int
+    document_root_is_open: bool = False
+    """Whether the document's own root keys belong to the user, as they do in a backend definition
+    file — one root table per model name. Recorded here rather than read from the live surface so
+    that a **frozen** link answers for the version it describes: an operation is checked against the
+    fingerprint before it, and whether *that* schema's root was open is a fact about that schema."""
+
     paths: dict[str, PathFingerprint] = Field(default_factory=dict[str, PathFingerprint])
 
     def path_names(self) -> set[str]:
@@ -163,19 +169,45 @@ def compute_fingerprint(
     schema_version: int,
     config_model: type[BaseModel],
     defaults_document: dict[str, Any],
+    document_root_is_open: bool = False,
 ) -> SurfaceFingerprint:
-    """Project a surface's model tree against its defaults document."""
+    """Project a surface's model tree against its defaults document.
+
+    `document_root_is_open` seeds the walk one segment down, at `*`, for a surface whose document is
+    a table per user-chosen key rather than one model — a backend definition file, whose root keys
+    are model names. It is a *seed* and not a modelling choice because the two ways of modelling it
+    both record paths no such file has: a `dict[str, X]` field puts its own name in front of every
+    path, and a `RootModel` puts `root.` there. Neither is addressable in a document, and the
+    fingerprint's whole job is to be the vocabulary an operation is written in.
+
+    The defaults document is not consulted for an open root: the keys beneath it are the user's, so
+    no default can be attached to any of them, and there is nothing above them to attach one to.
+    """
     collected: dict[str, PathFingerprint] = {}
-    _walk_model(
-        config_model=config_model,
-        prefix=(),
-        defaults=defaults_document,
-        ancestry=(config_model,),
-        collected=collected,
-    )
+    if document_root_is_open:
+        # `ancestry=()` and not `(config_model,)`: the recursion guard compares the annotation being
+        # recorded against the ancestry, and the annotation *is* `config_model` here — seeded with
+        # itself, the guard would fire immediately and record `*` as a table with nothing beneath it.
+        _record_field(
+            path=(WILDCARD_SEGMENT,),
+            annotation=config_model,
+            required=True,
+            defaults_value=None,
+            ancestry=(),
+            collected=collected,
+        )
+    else:
+        _walk_model(
+            config_model=config_model,
+            prefix=(),
+            defaults=defaults_document,
+            ancestry=(config_model,),
+            collected=collected,
+        )
     return SurfaceFingerprint(
         surface_id=surface_id,
         schema_version=schema_version,
+        document_root_is_open=document_root_is_open,
         paths={path: collected[path] for path in sorted(collected)},
     )
 

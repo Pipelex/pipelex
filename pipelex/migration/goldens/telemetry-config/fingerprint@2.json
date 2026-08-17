@@ -1,6 +1,7 @@
 {
   "surface_id": "telemetry-config",
   "schema_version": 2,
+  "document_root_is_open": false,
   "paths": {
     "custom_portkey": {
       "value_type": "table",

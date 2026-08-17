@@ -199,13 +199,17 @@ class TestTheReplayProperties:
         individual value. It is asserted here, on the emitted text, because that is the artifact
         the property is quantified over.
 
-        The document is validated the way a user's file is really read, merged beneath the
-        surface's defaults layer: an absent optional key is the ordinary shape of a configuration
-        file, not an error.
+        The document is validated the way a user's file is really read — for a layered surface, merged
+        beneath its defaults layer, because an absent optional key is the ordinary shape of a
+        configuration file rather than an error; and through the surface rather than through
+        `config_model`, because for a backend definition file the model describes one root table while
+        the document is a table per model.
         """
         generated = data.draw(_documents_for(surface=surface))
 
-        surface.config_model.model_validate(merge_text_beneath_defaults(surface=surface, text=generated.text))
+        rejection = surface.validate_document(document=merge_text_beneath_defaults(surface=surface, text=generated.text))
+
+        assert rejection is None, rejection
 
     @pytest.mark.parametrize("surface", REAL_SURFACES, ids=REAL_SURFACE_IDS)
     def test_the_generator_does_not_merely_re_emit_the_reference_document(self, surface: Surface) -> None:

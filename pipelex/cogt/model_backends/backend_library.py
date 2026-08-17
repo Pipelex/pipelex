@@ -19,6 +19,7 @@ from pipelex.cogt.model_backends.backend_factory import (
     InferenceBackendFactory,
 )
 from pipelex.cogt.model_backends.gateway_config import GatewayConfig, drop_unknown_gateway_defaults
+from pipelex.cogt.model_backends.model_spec_document import MODEL_SPEC_DEFAULTS_TABLE
 from pipelex.cogt.model_backends.model_spec_factory import (
     BackendModelSpecs,
     InferenceModelSpecBlueprint,
@@ -182,7 +183,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                         substitute_vars_with_provider=substitute_vars_with_provider,
                     )
 
-                defaults_dict: dict[str, Any] = model_specs_dict.pop("defaults", {})
+                defaults_dict: dict[str, Any] = model_specs_dict.pop(MODEL_SPEC_DEFAULTS_TABLE, {})
                 backend_model_specs: dict[str, InferenceModelSpec] = {}
                 for model_spec_name, value in model_specs_dict.items():
                     if not isinstance(value, dict):

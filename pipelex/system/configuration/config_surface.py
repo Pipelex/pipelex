@@ -1,9 +1,9 @@
 """Read-side helpers shared by every configuration surface.
 
 A **configuration surface** is one family of user-owned TOML files with one schema and one
-migration ledger — today `pipelex.toml` and its tiers, `telemetry.toml`, and
-`pipelex_service.toml`. Two things are the same for all three on the read path, and this module
-is the one place that knows about either.
+migration ledger — `pipelex.toml` and its tiers, `telemetry.toml`, `pipelex_service.toml`, and the
+inference backend definitions under `inference/backends/`. Two things are the same for all of them on
+the read path, and this module is the one place that knows about either.
 
 **The reserved `[meta]` table.** The strip lives here and deliberately **not** in the generic TOML
 reader (`pipelex.tools.misc.toml_utils`), which also reads `.mthds` files, backend definitions and
@@ -14,8 +14,9 @@ the ledger can explain it. Each surface's loader validates as it always did and,
 fails, asks `replay_surface_files_in_memory` for the same files carried forward — writing nothing,
 because nothing writes but the explicit `migrate` command. What the loaders do *not* share is the
 step between their merge and their validate: one deep-merges programmatic overrides, one
-substitutes `${VAR}` placeholders, one does nothing at all. So the shared part is the failure path
-alone, and each loader re-runs its own steps over what comes back.
+substitutes `${VAR}` placeholders, one splits header-shaped keys off each model table, one does
+nothing at all. So the shared part is the failure path alone, and each loader re-runs its own steps
+over what comes back.
 
 See `docs/migration-ledger.md` → "Schema versions, and why every run replays everything" and
 "Boot tolerance".
@@ -97,13 +98,14 @@ def version_declared_below_the_floor(*, ledger: MigrationLedger, config_dict: di
     return declared
 
 
-# The surface ids, spelled once. The migration registry names the same three, and every ledger
+# The surface ids, spelled once. The migration registry names the same ones, and every ledger
 # file's `[surface] id` must agree with them — a boot-tolerance retry that asked for a surface id
 # nothing ships would raise rather than tolerate, so the constant is the seam that keeps the
 # loader and the registry from drifting apart on a string literal.
 PIPELEX_CONFIG_SURFACE_ID = "pipelex-config"
 TELEMETRY_CONFIG_SURFACE_ID = "telemetry-config"
 PIPELEX_SERVICE_CONFIG_SURFACE_ID = "pipelex-service-config"
+INFERENCE_BACKEND_CONFIG_SURFACE_ID = "inference-backend"
 
 
 class ReplayedSurface(NamedTuple):
