@@ -83,6 +83,14 @@ make check-migration-schemas
     they are checked against each other — if the bullet is missing, write it now
     (house style: bold label, then two to four complete sentences).
 
+    **A renumbered entry shows up in that diff as two ids, and both need a mention.**
+    A pre-history entry inserted below existing ones takes a version already in use
+    and pushes everything above it up, so the diff reads as one id modified and one
+    added — which looks like two independent breaking changes and is one insertion.
+    Do not treat the pushed-up id as an unbulleted new entry: the changelog must
+    name the new entry *and* say that the existing one was renumbered, so a reader
+    who quoted the old id somewhere can find it. Confirm `introduced_in` on both.
+
     **A breaking ledger entry makes this a minor release**, per the house
     convention — if step 2 chose a patch bump and this step found one, go back and
     settle the bump first, because the next check writes the new version into the

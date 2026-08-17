@@ -15,9 +15,10 @@ Two properties carry the whole design, and most of the tests below exist to hold
 
 The stale documents here are **real**: `telemetry-config@2` is the entry the package ships and
 `goldens/telemetry-config/before@2.toml` is the flat document it exists to carry forward, read
-live rather than copied. The other two surfaces have empty ledgers today, so their tests plant a
-synthetic one in a temporary migration directory — the wiring is what is under test there, and a
-synthetic ledger tests it without inventing a schema change nobody made.
+live rather than copied. The tests on the other surfaces plant a synthetic ledger in a temporary
+migration directory instead: what is under test there is the wiring — which loader retries, over
+which files, and what it warns — and a synthetic ledger holds that still while the shipped ledgers
+go on gaining entries underneath it.
 """
 
 from __future__ import annotations
@@ -63,7 +64,15 @@ def old_shape_telemetry_document() -> str:
     return path.read_text(encoding="utf-8")
 
 
-def write_synthetic_ledger(*, migration_dir: Path, surface_id: str, base_file: str, ops_body: str, min_supported_schema_version: int = 0) -> None:
+def write_synthetic_ledger(
+    *,
+    migration_dir: Path,
+    surface_id: str,
+    base_file: str,
+    ops_body: str,
+    min_supported_schema_version: int = 0,
+    subdirectory: str = "",
+) -> None:
     """A one-entry ledger for a surface whose real ledger has nothing in it yet."""
     ledgers_dir = migration_dir / "ledgers"
     ledgers_dir.mkdir(parents=True, exist_ok=True)
@@ -73,6 +82,7 @@ def write_synthetic_ledger(*, migration_dir: Path, surface_id: str, base_file: s
 id = "{surface_id}"
 title = "A surface under test"
 base_file = "{base_file}"
+subdirectory = "{subdirectory}"
 current_schema_version = 2
 min_supported_schema_version = {min_supported_schema_version}
 
@@ -266,6 +276,12 @@ class TestTheRetryHonoursTheSchemaVersionFloor:
 
 
 class TestWhatTheWarningSays:
+    RENAME_OPS = (
+        '[[migration.ops]]\nkind = "rename_table_key"\ntable_path = ["runtime", "log"]\n'
+        'key = "old_default_log_level"\nnew_key = "default_log_level"\n'
+    )
+    STALE_BODY = '[runtime.log]\nold_default_log_level = "DEBUG"\n'
+
     @staticmethod
     def _stale_telemetry_plans(*, directory: Path, body: str | None = None) -> tuple[Path, list[MigrationPlan]]:
         stale = directory / "telemetry.toml"
@@ -333,13 +349,71 @@ class TestWhatTheWarningSays:
         assert f"Run `pipelex migrate` to bring '{inside_file}' up to date." in warning
         assert f"`pipelex migrate` does not reach '{outside_file}' — that file is yours to update where it lives." in warning
 
-    def test_the_walk_is_not_recursive_so_a_subdirectory_is_out_of_reach(self, tmp_path: Path) -> None:
-        """`.pipelex/inference/backends/` is the specimen the walk deliberately skips."""
+    def test_a_file_in_a_directory_its_own_surface_does_not_own_is_out_of_reach(self, tmp_path: Path) -> None:
+        """The walk reaches `inference/backends/` now — but for the surface that owns it, not for any file in it.
+
+        A `telemetry.toml` sitting there is out of reach exactly as it was when the walk stopped at
+        the top level, because the telemetry surface's own directory is the configuration directory
+        itself. Reach is per surface, not per path.
+        """
         nested = tmp_path / "inference" / "backends"
         nested.mkdir(parents=True)
         _, plans = self._stale_telemetry_plans(directory=nested)
 
         warning = stale_configuration_warning(plans=plans, walked_dirs=[tmp_path])
+
+        assert "does not reach" in warning
+        assert "Run `pipelex migrate`" not in warning
+
+    def test_a_file_in_the_directory_its_surface_owns_is_in_reach(self, tmp_path: Path, synthetic_migration_dir: Path) -> None:
+        """The other half, and the one the fourth surface needs: reach follows the surface's own directory.
+
+        The ledger is synthetic because the reach is read from the ledger rather than from the
+        surface registry — this module's own layering rule — so the ledger *is* what is under test
+        here, and a synthetic one exercises it without waiting on a real surface to own a
+        subdirectory.
+        """
+        write_synthetic_ledger(
+            migration_dir=synthetic_migration_dir,
+            surface_id=PIPELEX_CONFIG_SURFACE_ID,
+            base_file="pipelex.toml",
+            subdirectory="inference/backends",
+            ops_body=self.RENAME_OPS,
+        )
+        owned = tmp_path / "inference" / "backends"
+        owned.mkdir(parents=True)
+        stale = owned / "pipelex.toml"
+        stale.write_text(self.STALE_BODY, encoding="utf-8")
+        replayed = replay_surface_files_in_memory(surface_id=PIPELEX_CONFIG_SURFACE_ID, paths=[stale])
+        assert replayed is not None
+
+        warning = stale_configuration_warning(plans=replayed.plans, walked_dirs=[tmp_path])
+
+        assert "Run `pipelex migrate` to bring the files up to date." in warning
+        assert "does not reach" not in warning
+
+    def test_a_directory_no_surface_owns_stays_out_of_reach(self, tmp_path: Path, synthetic_migration_dir: Path) -> None:
+        """`inference/deck/` is beside a directory the walk now enters and is still never entered itself.
+
+        The pair with the test above is the point: the same surface, the same configuration
+        directory, one directory deeper on either side of the claim — and only the one the ledger
+        names is offered the command.
+        """
+        write_synthetic_ledger(
+            migration_dir=synthetic_migration_dir,
+            surface_id=PIPELEX_CONFIG_SURFACE_ID,
+            base_file="pipelex.toml",
+            subdirectory="inference/backends",
+            ops_body=self.RENAME_OPS,
+        )
+        unowned = tmp_path / "inference" / "deck"
+        unowned.mkdir(parents=True)
+        stale = unowned / "pipelex.toml"
+        stale.write_text(self.STALE_BODY, encoding="utf-8")
+        replayed = replay_surface_files_in_memory(surface_id=PIPELEX_CONFIG_SURFACE_ID, paths=[stale])
+        assert replayed is not None
+
+        warning = stale_configuration_warning(plans=replayed.plans, walked_dirs=[tmp_path])
 
         assert "does not reach" in warning
         assert "Run `pipelex migrate`" not in warning

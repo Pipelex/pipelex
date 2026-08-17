@@ -16,11 +16,16 @@ user would be told one thing by their boot and another by their tool.
 > this repository's own test fixture. Neither is a user's configuration, and migrating a
 > directory nobody asked about is how a tool earns a reputation for touching things.
 
-> **The walk is not recursive.** A surface's tier files sit beside its base file; a subdirectory
-> under a configuration directory holds a different kind of thing — `inference/backends/`,
-> `deck/` — whose files are not configuration surfaces even when their names would match a tier
-> glob. `.pipelex/inference/backends/pipelex_gateway.toml` is the specimen: it matches the
-> `pipelex-config` tier glob `pipelex_*.toml` and must never be claimed by it.
+> **The walk is each surface's own directory, one level, and nothing else.** Most surfaces live
+> directly in a configuration directory; a surface may instead own a subdirectory of it, and then
+> that subdirectory is walked one level in the same way. A subdirectory no surface owns —
+> `inference/deck/` — is never entered at all.
+>
+> **A file is claimed by the pair (directory, name), never by its name alone.**
+> `.pipelex/inference/backends/pipelex_gateway.toml` is the specimen: its name matches the
+> `pipelex-config` tier glob `pipelex_*.toml` exactly, and the directory it sits in is what says
+> it belongs to `inference-backend` instead. Depth used to be what protected it, back when no
+> surface owned a subdirectory; now the claim rule is.
 
 See `docs/migration-ledger.md` → "Surfaces" and "Applying".
 """

@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:1f527dbd72ff687de022ec7c8a7340ac386615487ce1405cec8f630f2a0ea6f2"
-reviewed_by = "Claude (Opus 5)"
-reviewed_at = "2026-08-17T06:56:06Z"
-rationale = "Merging dev into the configuration-reshape branch; the trigger diff is PR 1115's would_write tri-state in agent_output.py and error_handlers.py plus the doctor's remaining Rich escaping. Both review targets arrived rewritten in the same change, so the review was to re-derive their claims from the code rather than to read them against each other. The field set agent-cli.md enumerates for the migration object - remedy, would_write, needs_attention, plans - is exactly what MigrationErrorBlock declares under extra=forbid, so nothing else can appear; its 'present when and only when the scan found something' holds because the builder in core/validation.py returns None on an empty or failed scan; and would_write is any(plan.did_change), which is also what makes the doctor's out_of_date row a promise the file gets rewritten. Re-derived both enumerated finding sets from the enums rather than from the table: TelemetryConfigFinding and PendingMigrationsFinding match the members agent-cli.md and the agent-CLI contract doc list, with nothing left over. Checked migrate.md's quantified claim that nothing will ever suggest deleting an out-of-date file and starting over: it survives and is now stronger, because the new would_write false branch points at the dry run and hand-correction while the start-over line remains only on the no-block path, where the file is wrong rather than old. docs/tools/cli/index.md still has no doctor page. The escaping half is presentation - no flag, stream, format, structured field or exit code moved. No doc change needed."
+digest = "sha256:e0ae9abafd983c542d19e338a7b7f6cefa720d8c668872efa08d324ff417b13b"
+reviewed_by = "Louis Choquel"
+reviewed_at = "2026-08-17T13:45:26Z"
+rationale = "Reviewed docs/tools/cli/ and the agent-CLI contract doc against the two CLI changes in this commit. One target was genuinely stale and is now false rather than merely incomplete: migrate.md said the command does not descend into subdirectories and that inference backends are never rewritten by it, which stopped being true when the walk learned to enter a directory a surface owns. Rewritten to say what it now does and, just as importantly, what it still does not - one level, only into a directory some configuration family owns, so inference/deck/ and the inference/backends.toml beside the directory stay out, and the model deck keeps its own update command. The other change is the wording of one rendered operation, which turns a literal wildcard segment into English: it renders ledger material only, so the agent-CLI doc's standing claim that paths, operation kinds and ledger-supplied values are all that appear is unaffected, and no flag, stream, format, structured field or exit code moved. docs/tools/cli/index.md still has no doctor page."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -105,7 +105,7 @@ rationale = "Merging dev into the configuration-reshape branch; the trigger diff
 "pipelex/cli/commands/init/ui/types.py" = "blob:1361f29ca95bacc90bca90ea6c0e39f44b6734ab"
 "pipelex/cli/commands/login/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/login/command.py" = "blob:ace1db9879626cc1722adaac12761aadaa6b24ed"
-"pipelex/cli/commands/migrate_cmd.py" = "blob:be405b6310ad28be02f7a17c9abe2a37629845a3"
+"pipelex/cli/commands/migrate_cmd.py" = "blob:fa352e722f238b4785e83e37e413d8728a820c0c"
 "pipelex/cli/commands/plugins_cmd.py" = "blob:9657b713c3650ff4a929e92ae68af453d896393e"
 "pipelex/cli/commands/resolve_cmd.py" = "blob:2928a0e26eab7983367a59a78533f6618817feba"
 "pipelex/cli/commands/run/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"

@@ -15,7 +15,8 @@ description: >
 # Add a Migration Entry
 
 A configuration **surface** — `pipelex.toml` and its tiers, `telemetry.toml`,
-`pipelex_service.toml` — ships a checked-in ledger at
+`pipelex_service.toml`, the inference backend definitions in
+`inference/backends/` — ships a checked-in ledger at
 `pipelex/migration/ledgers/<surface-id>.toml` recording, as data, every shape
 change it has ever undergone. A user's existing file is repaired by replaying that
 ledger over it, so a schema change with no entry is a schema change that breaks
@@ -221,9 +222,48 @@ pair to verify. This is rare and it is not a way past the gate — reach for it 
 when there genuinely is no diff, and read
 `docs/migration-ledger.md` → "Pre-history entries" first.
 
+### Inserting a pre-history entry *below* entries that already exist
+
+The change you are accounting for may be older than an entry already in the
+ledger — a key that moved before a later entry renamed the table it lived in. The
+new entry then has to run **first**, because its operations address the historical
+spelling, so it takes a version the ledger already uses and everything above it is
+renumbered. Ids, versions and `current_schema_version` are forced to agree, so
+this is one atomic edit, and the goldens move with it:
+
+1. Insert the entry at `@N` and renumber every entry above it (`@N` → `@N+1`, and
+   so on); bump `current_schema_version` to the new top.
+2. `git mv goldens/<surface-id>/fingerprint@N.json fingerprint@N+1.json`, and the
+   same for `defaults@N.toml`. Repeat upwards, highest first.
+3. **Copy** `fingerprint@N-1.json → fingerprint@N.json` and
+   `defaults@N-1.toml → defaults@N.toml`. A pre-history entry's fingerprint pair
+   must show no diff at all, and a copy makes that true by construction rather
+   than by luck.
+4. **Hand-edit one line per moved or copied fingerprint: the `"schema_version"` in
+   its body.** A golden whose body disagrees with its filename is refused when it
+   is read, and `make umig` reads the stored head *before* it writes anything — so
+   a fingerprint still saying `N` under the name `@N+1` makes `umig` raise instead
+   of regenerating. This is the one sanctioned exception to "never hand-edit a
+   golden", and it is bounded to that single line.
+5. Hand-author `goldens/<surface-id>/before@N.toml` for the new entry.
+6. Run `make umig`. **It must be a byte-pure no-op on everything the moves
+   produced** — verify with `shasum -c` over the directory, or by diffing each
+   moved golden against its pre-move self in `HEAD` and finding only the version
+   line. That no-op *is* the proof the renumber was pure; any other diff is a
+   finding, not something to regenerate around.
+7. Sweep the tree for the old id (`git grep -n '<surface-id>@N'` across
+   `pipelex/ tests/ docs/ CHANGELOG.md .claude/`). Every hit is either the new
+   entry or a stale quote of the renumbered one; there is no third kind. Where a
+   test or a docstring named a golden by version but meant "the shape before the
+   change", make it say so rather than bumping the number — the construct is what
+   goes stale, not the value.
+8. Both ids need a changelog mention: a renumber otherwise reads as a new breaking
+   entry that nobody wrote a bullet for.
+
 ## What this skill must never do
 
-- **Never hand-edit a fingerprint or defaults golden.** They are generated; the
+- **Never hand-edit a fingerprint or defaults golden**, with the single exception
+  of the `"schema_version"` line during a renumber, above. They are generated; the
   generator is `make umig` and the diff is the review artifact.
 - **Never make a gate green by widening it.** If a check refuses the change,
   either the change owes an entry or the check found a real defect. Editing the

@@ -22,7 +22,11 @@ Two directories, and only those:
 - the global `~/.pipelex/`
 - the project `.pipelex/`, when the current directory is inside a project that has one
 
-Within each, it looks at the configuration files themselves — `pipelex.toml` and its `pipelex_*.toml` tiers, `telemetry.toml` and its tiers, `pipelex_service.toml`. It does not descend into subdirectories, so your inference backends and model deck are never rewritten by it.
+Within each, it looks at the configuration files themselves — `pipelex.toml` and its `pipelex_*.toml` tiers, `telemetry.toml` and its tiers, `pipelex_service.toml` — and at the inference backend definitions in `inference/backends/`.
+
+It goes one level deep, and only into a directory some configuration family owns. `inference/backends/` is such a directory, so every `*.toml` in it is repaired the same way a `pipelex.toml` is. `inference/deck/` is not one, and neither is `inference/backends.toml`, which sits beside the backends directory rather than in it — neither is ever entered or rewritten by this command, and the model deck has its own `pipelex update`.
+
+Within a file it repairs, it only ever undoes a change *we* made. A key you added yourself — a misspelling, or a setting from a plugin — is reported rather than removed, because the migration history describes our renames and removals and has nothing to say about your keys.
 
 ## What it does to a file
 
@@ -42,7 +46,7 @@ The command exits non-zero when it leaves something for you to look at.
 
 ## The warning that sends you here
 
-You will usually meet this command through a warning rather than a crash. When a configuration file is out of date in a way the migration history explains, Pipelex boots anyway: it carries the file forward **in memory**, tells you which files it did that for, and points at this command. Nothing is written, so the same warning appears at the next boot, and the one after — running `pipelex migrate` is what makes the change to the file and stops it.
+You will usually meet this command through a warning rather than a crash. When a file is out of date in a way the migration history explains, Pipelex boots anyway: it carries the file forward **in memory**, tells you which files it did that for, and points at this command. That covers your inference backend definitions as well as the configuration files proper — a backend file left behind by a model-spec change boots on the models it would have loaded anyway, and the warning arrives with the rest of the model setup. Nothing is written, so the same warning appears at the next boot, and the one after — running `pipelex migrate` is what makes the change to the file and stops it.
 
 A file the history cannot explain is a different case, and it still fails the boot with the configuration error itself: tolerance widens what starts, never what is accepted. That error names this command too, though — beside the key it could not accept, it tells you which of your files a migration would touch, what it would carry forward, and what only you can decide.
 

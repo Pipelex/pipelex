@@ -11,7 +11,7 @@ that is not about configuration, which teaches the reflex the whole design exist
 
 import tomlkit
 
-from pipelex.migration.coverage import check_registry
+from pipelex.migration.coverage import check_defaults_layer, check_registry
 from pipelex.migration.diagnosis import diagnose_unexplained_paths
 from pipelex.migration.ledger import INITIAL_SCHEMA_VERSION, load_ledger, packaged_migration_dir
 from pipelex.migration.ledger_check import check_ledgers
@@ -26,12 +26,41 @@ class TestTheRealRegistry:
             "pipelex-config",
             "telemetry-config",
             "pipelex-service-config",
+            "inference-backend",
         ]
 
     def test_every_surface_has_a_reachable_defaults_layer(self) -> None:
-        """The premise the whole vocabulary rests on: without it, an added key breaks every file."""
+        """The premise the whole vocabulary rests on: without it, an added key breaks every file.
+
+        Stated per kind rather than as "the defaults document is non-empty", which was a proxy that
+        held only while every surface had one. A **copied**-document surface honestly has none — its
+        files stand alone, nothing is merged beneath them — and its half of the premise is that the
+        rule holds anyway, because no path of such a file is one a defaults layer would have to supply.
+        That is what `check_defaults_layer` decides, and it is asked here rather than assumed: a
+        document faked to satisfy a truthiness check would attribute one backend file's values to
+        every other one.
+        """
         for surface in build_config_surface_registry().surfaces:
-            assert surface.read_defaults_document(), f"surface '{surface.surface_id}' supplies no defaults"
+            if surface.defaults_layer_kind.is_layered_beneath_the_users_file:
+                assert surface.read_defaults_document(), f"surface '{surface.surface_id}' supplies no defaults"
+                continue
+            assert surface.read_defaults_document() == {}, f"surface '{surface.surface_id}' fakes a defaults document"
+            issues = check_defaults_layer(surface_id=surface.surface_id, fingerprint=surface.fingerprint_at(schema_version=1))
+            assert issues == [], f"surface '{surface.surface_id}': {[issue.message for issue in issues]}"
+
+    def test_a_surface_whose_documents_root_keys_are_the_users_records_an_open_root(self) -> None:
+        """The shape the whole fourth surface rests on, asserted once against the real registry.
+
+        `*` and every path beneath it, and no path above it: a fingerprint that recorded `sdk` at the
+        top would be describing a document nobody has, and every operation written against it would
+        be dead on every file in the field.
+        """
+        for surface in build_config_surface_registry().surfaces:
+            if not surface.document_shape.document_root_is_open:
+                continue
+            fingerprint = surface.fingerprint_at(schema_version=1)
+            assert fingerprint.document_root_is_open is True
+            assert all(path == "*" or path.startswith("*.") for path in fingerprint.paths)
 
     def test_no_surfaces_own_documents_carry_anything_the_diagnosis_cannot_explain(self) -> None:
         """The downgrade diagnosis, over the two documents it must always be silent about.
@@ -46,6 +75,7 @@ class TestTheRealRegistry:
             fingerprint = surface.fingerprint_at(schema_version=ledger.surface.current_schema_version)
             for label, text in surface.reference_documents():
                 unexplained = diagnose_unexplained_paths(
+                    surface=surface,
                     fingerprint=fingerprint,
                     document=tomlkit.loads(text).unwrap(),
                     ledger=ledger,

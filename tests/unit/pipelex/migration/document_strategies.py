@@ -55,10 +55,10 @@ from typing import Any, cast
 
 import tomlkit
 from hypothesis import strategies as st
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.migration.documents import flatten_document
-from pipelex.migration.fingerprint import ENUM_TYPE, PATH_SEPARATOR, PathFingerprint, SurfaceFingerprint, compute_fingerprint
+from pipelex.migration.fingerprint import ENUM_TYPE, PATH_SEPARATOR, PathFingerprint, SurfaceFingerprint
 from pipelex.migration.surfaces import Surface
 from pipelex.suggested_fix import WILDCARD_SEGMENT
 from pipelex.system.configuration.config_surface import strip_reserved_meta
@@ -93,19 +93,29 @@ class GeneratedDocument(BaseModel):
 
 def surface_fingerprint(*, surface: Surface) -> SurfaceFingerprint:
     """The surface's model tree projected against its own defaults, at its current shape."""
-    return compute_fingerprint(
-        surface_id=surface.surface_id,
-        schema_version=1,
-        config_model=surface.config_model,
-        defaults_document=surface.read_defaults_document(),
-    )
+    return surface.fingerprint_at(schema_version=1)
+
+
+def starting_document(*, surface: Surface) -> dict[str, Any]:
+    """The document every draw mutates: the richest one the surface has at its current schema.
+
+    For a layered surface that is the defaults layer, which is also what a user's file is read
+    beneath. A **copied**-document surface has no defaults layer to seed from — its files stand alone
+    — so the seed is its reference document, one real backend definition. Seeding from `{}` there
+    would leave the sampler with nothing to mutate and every property over it vacuously green.
+    """
+    if surface.defaults_layer_kind.is_layered_beneath_the_users_file:
+        return surface.read_defaults_document()
+    return tomlkit.loads(surface.render_reference_document()).unwrap()
 
 
 def merge_beneath_defaults(*, surface: Surface, document: dict[str, Any]) -> dict[str, Any]:
     """A file's content as the models will really see it: merged beneath the defaults layer.
 
-    Validating a user's file on its own would report the defaults layer doing its job as a
-    failure — an absent optional key is the normal shape of a configuration file, not an error.
+    Validating a layered surface's file on its own would report the defaults layer doing its job as a
+    failure — an absent optional key is the normal shape of a configuration file, not an error. A
+    copied document is read exactly as it is, so there is nothing to merge and merging the reference
+    copy of one backend definition beneath another would validate a hybrid no machine has.
     """
     merged: dict[str, Any] = surface.read_defaults_document()
     deep_update(merged, updates=document)
@@ -119,20 +129,24 @@ def merge_text_beneath_defaults(*, surface: Surface, text: str) -> dict[str, Any
 
 
 def is_accepted_by_the_surface(*, surface: Surface, document: dict[str, Any]) -> bool:
-    """Whether the models accept this document — the only authority on schema membership."""
+    """Whether the surface accepts this document — the only authority on schema membership.
+
+    Asked of the surface rather than of `config_model` directly, because for a backend definition file
+    the model describes one root table and the document is a table per model: what "accepted" means is
+    the loader's own merge-then-validate, and `Surface.validate_document` is where that is stated once.
+    """
     try:
-        surface.config_model.model_validate(merge_beneath_defaults(surface=surface, document=document))
-    except (ValidationError, ConfigValidationError):
-        # Both spellings of the same answer: a `ConfigRoot` re-raises pydantic's rejection as its
-        # own error, and the surfaces are a mix of the two.
+        return surface.validate_document(document=merge_beneath_defaults(surface=surface, document=document)) is None
+    except ConfigValidationError:
+        # A `ConfigRoot` re-raises pydantic's rejection as its own error rather than returning it, and
+        # the surfaces are a mix of the two.
         return False
-    return True
 
 
 def within_schema_documents(*, surface: Surface) -> st.SearchStrategy[GeneratedDocument]:
     """Documents a user could legitimately have, at the surface's current schema."""
     fingerprint = surface_fingerprint(surface=surface)
-    flattened = flatten_document(document=surface.read_defaults_document())
+    flattened = flatten_document(document=starting_document(surface=surface))
 
     return _sampled_documents(
         surface=surface,
@@ -157,7 +171,7 @@ def _sampled_documents(  # kw-only: ignore — Hypothesis passes `draw` position
     swapped = draw(_path_subsets(paths=swappable, max_size=MAX_SWAPPED_ENUM_MEMBERS))
     flipped = draw(_path_subsets(paths=flippable, max_size=MAX_FLIPPED_BOOLS))
 
-    document = surface.read_defaults_document()
+    document = starting_document(surface=surface)
     mutations: list[DocumentMutation] = []
 
     for path in sorted(swapped):
@@ -171,10 +185,17 @@ def _sampled_documents(  # kw-only: ignore — Hypothesis passes `draw` position
         if _assign_if_accepted(surface=surface, document=document, path=path, value=not _value_at(mapping=document, path=path)):
             _record(mutations=mutations, mutation=DocumentMutation.FLIPPED_BOOL)
 
-    # Dropping runs last and is never checked, because the defaults layer restores whatever it
-    # removes: the document the models see is the same one they just accepted.
+    # Dropping runs last. For a layered surface it needs no check, because the defaults layer restores
+    # whatever it removes: the document the models see is the same one they just accepted. A copied
+    # document has nothing to restore it, so there a drop is checked like any other mutation —
+    # `[defaults] sdk` is the case that proves it, since dropping it invalidates every model in the
+    # file, and an unchecked drop would emit a document no machine could boot on.
+    layer_restores_a_dropped_key = surface.defaults_layer_kind.is_layered_beneath_the_users_file
     for path in sorted(dropped):
-        if _drop(mapping=document, path=path):
+        applied = (
+            _drop(mapping=document, path=path) if layer_restores_a_dropped_key else _drop_if_accepted(surface=surface, document=document, path=path)
+        )
+        if applied:
             _record(mutations=mutations, mutation=DocumentMutation.DROPPED_PATH)
 
     text: str = tomlkit.dumps(document)  # pyright: ignore[reportUnknownMemberType]
@@ -211,11 +232,18 @@ def fingerprint_at(*, fingerprint: SurfaceFingerprint, path: str) -> PathFingerp
     document carries the user's own key where the fingerprint carries a `*`. Walking segment by
     segment, and substituting `*` the moment the parent is an open node, translates one into the
     other — including through nesting, where `dict[str, dict[str, int]]` addresses `a.*.*`.
+
+    The **document root** is one of the nodes that can be open, and then the very first segment is the
+    user's: `gpt-4o.max_tokens` in a backend file is `*.max_tokens` to the fingerprint.
     """
     translated: list[str] = []
     for segment in path.split(PATH_SEPARATOR):
-        parent = fingerprint.paths.get(PATH_SEPARATOR.join(translated)) if translated else None
-        translated.append(WILDCARD_SEGMENT if parent is not None and parent.open_node else segment)
+        if translated:
+            parent = fingerprint.paths.get(PATH_SEPARATOR.join(translated))
+            parent_is_open = parent is not None and parent.open_node
+        else:
+            parent_is_open = fingerprint.document_root_is_open
+        translated.append(WILDCARD_SEGMENT if parent_is_open else segment)
         if PATH_SEPARATOR.join(translated) not in fingerprint.paths:
             return None
     return fingerprint.paths[PATH_SEPARATOR.join(translated)]
@@ -234,6 +262,25 @@ def _assign_if_accepted(*, surface: Surface, document: dict[str, Any], path: str
     parent, key = located
     previous = parent[key]
     parent[key] = value
+    if is_accepted_by_the_surface(surface=surface, document=document):
+        return True
+    parent[key] = previous
+    return False
+
+
+def _drop_if_accepted(*, surface: Surface, document: dict[str, Any], path: str) -> bool:
+    """Remove a path, keep it removed only if the surface still accepts the document, and say which.
+
+    The drop counterpart of `_assign_if_accepted`, for a surface with no defaults layer beneath its
+    files. Restoring puts the value back where it was rather than deep-merging it, so a drawn set of
+    paths cannot leave the document holding something no draw asked for.
+    """
+    located = _parent_of(mapping=document, path=path)
+    if located is None:
+        return False
+    parent, key = located
+    previous = parent[key]
+    del parent[key]
     if is_accepted_by_the_surface(surface=surface, document=document):
         return True
     parent[key] = previous

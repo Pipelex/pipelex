@@ -18,6 +18,8 @@ from pipelex.suggested_fix import MigrationOp
 EXAMPLE_SURFACE_ID = "example-config"
 EXAMPLE_BASE_FILE = "example.toml"
 EXAMPLE_TIER_GLOB = "example_*.toml"
+CONFIGURATION_ROOT = Path()
+"""The subdirectory a surface that lives directly in a configuration directory owns — none."""
 
 EntryBuilder = Callable[..., MigrationEntry]
 LedgerBuilder = Callable[..., MigrationLedger]
@@ -110,14 +112,16 @@ def build_surface() -> SurfaceBuilder:
     def _build_surface(
         *,
         surface_id: str = EXAMPLE_SURFACE_ID,
-        base_file: str = EXAMPLE_BASE_FILE,
+        base_file: str | None = EXAMPLE_BASE_FILE,
         tier_glob: str | None = EXAMPLE_TIER_GLOB,
+        subdirectory: Path = CONFIGURATION_ROOT,
     ) -> Surface:
         return Surface(
             surface_id=surface_id,
             title=surface_id,
             base_file=base_file,
             tier_glob=tier_glob,
+            subdirectory=subdirectory,
             config_model=ExampleConfig,
             defaults_layer_kind=DefaultsLayerKind.MODEL_DEFAULTS,
         )

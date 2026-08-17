@@ -376,6 +376,12 @@ def _check_open_node_addressing(
 ) -> list[LedgerIssue]:
     """`*` exactly at an open node, and never a concrete key beneath one.
 
+    **The document root is one of the nodes this rule reads.** For most surfaces it is closed: the
+    root keys of `pipelex.toml` are ours and enumerable, so a `*` there addresses nothing. For a
+    backend definition file the root keys are model names the user chose, and then `*` at the root is
+    the only legal address for the whole file — while naming one of those tables is the same defect
+    as reaching inside an open mapping, and is reported as one.
+
     The check runs on the source traced back to the previous fingerprint's spelling, so that an
     operation acting inside a table an earlier operation in the same entry renamed is judged
     against the node it really addresses. A pre-history source has no such spelling to trace back
@@ -392,8 +398,16 @@ def _check_open_node_addressing(
     segments = origin_path.split(PATH_SEPARATOR)
     for index, segment in enumerate(segments):
         parent_path = PATH_SEPARATOR.join(segments[:index])
-        parent_record = before.paths.get(parent_path) if index else None
-        parent_is_open = parent_record is not None and parent_record.open_node
+        if index:
+            parent_record = before.paths.get(parent_path)
+            parent_is_open = parent_record is not None and parent_record.open_node
+        else:
+            # The first segment's parent is the document itself, which has no record of its own — its
+            # openness is a property of the whole fingerprint. Both halves of the rule then hold at
+            # the root for free: `*` is legal there for a backend definition file, and naming one
+            # root table of one is a concrete key under an open node, which is exactly right — those
+            # keys are the model names that machine chose.
+            parent_is_open = before.document_root_is_open
         if segment == WILDCARD_SEGMENT and not parent_is_open:
             parent_label = f"'{parent_path}'" if parent_path else "the document root"
             issues.append(

@@ -12,12 +12,65 @@ id = "pipelex-config"
 title = "The main Pipelex configuration"
 base_file = "pipelex.toml"
 tier_glob = "pipelex_*.toml"
-current_schema_version = 2
+current_schema_version = 3
 min_supported_schema_version = 0
 
+# This entry is inserted *below* the reshape rather than appended above it, and the order is what
+# makes it work: it addresses `pipelex.prompting_config`, the spelling that exists only while the
+# root table is still called `[pipelex]`. After the reshape it would find nothing, and the file
+# would come out of the run carrying `[interpreter.prompting_config]` — a table nothing reads.
 [[migration]]
 id = "pipelex-config@2"
 to_schema_version = 2
+introduced_in = "0.46.0"
+breaking = true
+safety = "safe"
+pre_history = true
+title = "Prompting styles become a templating default"
+description = """
+A prompting style used to be chosen for you, per *target*: the configuration held a map from a \
+model family — `openai`, `anthropic`, `mistral`, `gemini` — to the tag style prompts for it should \
+use, and a `default_prompting_style` for everything else. Styling is now a property of the prompt \
+rather than of the model that receives it, so the map went away and what remains is one default, \
+under the name the templating section gives it. This entry carries a file written before that \
+change onto the shape the reshape then moves.
+"""
+guidance = """
+`default_prompting_style` travels: it becomes `default_templating_style`, and the reshape entry \
+after this one carries it on to `[inference.templating]` with the rest of that section.
+
+A tuned `[pipelex.prompting_config.prompting_styles]` map is **dropped**, and nothing restores it \
+from somewhere else — per-target styling is not a concept any more. Where a particular pipe needs \
+a particular style, say so on the pipe: `templating_style` on a `PipeLLM`.
+"""
+
+# Declared rather than derived: this change predates the first fingerprint, so no snapshot shows
+# these paths going away and there is no diff to account the entry against. The hand-authored
+# document the operations below are verified against is goldens/pipelex-config/before@2.toml.
+declared_removed_paths = [
+  "pipelex.prompting_config",
+  "pipelex.prompting_config.default_prompting_style",
+  "pipelex.prompting_config.prompting_styles",
+]
+
+[[migration.ops]] # the destination table does not exist before this: the move creates it
+kind = "move_key"
+table_path = ["pipelex", "prompting_config"]
+key = "default_prompting_style"
+new_table_path = ["pipelex", "templating_config"]
+new_key = "default_templating_style"
+
+[[migration.ops]] # the map goes first, so what is left of the section is empty when it goes
+kind = "delete_table"
+table_path = ["pipelex", "prompting_config", "prompting_styles"]
+
+[[migration.ops]]
+kind = "delete_table"
+table_path = ["pipelex", "prompting_config"]
+
+[[migration]]
+id = "pipelex-config@3"
+to_schema_version = 3
 introduced_in = "0.46.0"
 breaking = true
 safety = "safe"

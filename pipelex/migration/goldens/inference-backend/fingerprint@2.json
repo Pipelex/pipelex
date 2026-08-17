@@ -1,0 +1,155 @@
+{
+  "surface_id": "inference-backend",
+  "schema_version": 2,
+  "document_root_is_open": true,
+  "paths": {
+    "*": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "*.costs": {
+      "value_type": "dict[enum, float]",
+      "required": false,
+      "open_node": true
+    },
+    "*.costs.*": {
+      "value_type": "float",
+      "required": true,
+      "open_node": false
+    },
+    "*.enabled": {
+      "value_type": "bool",
+      "required": false,
+      "open_node": false
+    },
+    "*.endpoint_path": {
+      "value_type": "str",
+      "required": false,
+      "open_node": false
+    },
+    "*.inputs": {
+      "value_type": "list[str]",
+      "required": false,
+      "open_node": false
+    },
+    "*.listed_constraints": {
+      "value_type": "list[enum]",
+      "required": false,
+      "enum_members": [
+        "max_tokens_must_be_high_enough",
+        "temperature_must_be_multiplied_by_2",
+        "temperature_unsupported"
+      ],
+      "open_node": false
+    },
+    "*.max_prompt_images": {
+      "value_type": "int",
+      "required": false,
+      "open_node": false
+    },
+    "*.max_tokens": {
+      "value_type": "int",
+      "required": false,
+      "open_node": false
+    },
+    "*.model_id": {
+      "value_type": "str",
+      "required": false,
+      "open_node": false
+    },
+    "*.model_type": {
+      "value_type": "enum",
+      "required": false,
+      "enum_members": [
+        "img_gen",
+        "llm",
+        "search",
+        "text_extractor"
+      ],
+      "open_node": false
+    },
+    "*.outputs": {
+      "value_type": "list[str]",
+      "required": false,
+      "open_node": false
+    },
+    "*.rules": {
+      "value_type": "dict[enum, str]",
+      "required": false,
+      "open_node": true
+    },
+    "*.rules.*": {
+      "value_type": "str",
+      "required": true,
+      "open_node": false
+    },
+    "*.sdk": {
+      "value_type": "str",
+      "required": false,
+      "open_node": false
+    },
+    "*.structure_method": {
+      "value_type": "enum",
+      "required": false,
+      "enum_members": [
+        "instructor/anthropic_json",
+        "instructor/anthropic_reasoning_tools",
+        "instructor/anthropic_tools",
+        "instructor/bedrock_json",
+        "instructor/bedrock_tools",
+        "instructor/cerebras_json",
+        "instructor/cerebras_tools",
+        "instructor/cohere_json_schema",
+        "instructor/cohere_tools",
+        "instructor/fireworks_json",
+        "instructor/fireworks_tools",
+        "instructor/genai_structured_outputs",
+        "instructor/genai_tools",
+        "instructor/json",
+        "instructor/json_schema",
+        "instructor/md_json",
+        "instructor/mistral_structured_outputs",
+        "instructor/mistral_tools",
+        "instructor/openai_json_o1",
+        "instructor/openai_parallel_tools",
+        "instructor/openai_responses_tools",
+        "instructor/openai_responses_tools_with_inbuilt_tools",
+        "instructor/openai_structured_outputs",
+        "instructor/openai_tools",
+        "instructor/openrouter_structured_outputs",
+        "instructor/perplexity_json",
+        "instructor/vertexai_json",
+        "instructor/vertexai_parallel_tools",
+        "instructor/vertexai_tools",
+        "instructor/writer_tools"
+      ],
+      "open_node": false
+    },
+    "*.thinking_mode": {
+      "value_type": "enum",
+      "required": false,
+      "enum_members": [
+        "adaptive",
+        "manual",
+        "none"
+      ],
+      "open_node": false
+    },
+    "*.valued_constraints": {
+      "value_type": "dict[enum, any]",
+      "required": false,
+      "open_node": true
+    },
+    "*.valued_constraints.*": {
+      "value_type": "any",
+      "required": true,
+      "open_node": false
+    },
+    "*.variant": {
+      "value_type": "str",
+      "required": false,
+      "open_node": false
+    }
+  }
+}

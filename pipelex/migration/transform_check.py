@@ -25,9 +25,11 @@ keys, edits comments and flips unrelated defaults:
   an entry that dropped a parent table where it meant to drop one child. A path the new shape no
   longer has is not this check's business: the schema removed it, and coverage is what demands the
   operation that accounts for it.
-- **The last link's migrated document is accepted by the current model**, read the way a user's
-  file is actually read: beneath the current defaults layer. This is where a wrong value lands —
-  a remap rewriting to a spelling the schema rejects, a destination the model does not know.
+- **The last link's migrated document is accepted at the current schema**, read the way a user's
+  file is actually read: beneath the current defaults layer for a surface that has one, on its own for
+  a copied document, and validated the way that surface's loader validates. This is where a wrong
+  value lands — a remap rewriting to a spelling the schema rejects, a destination the model does not
+  know.
 
 This is also where a **pre-history** entry is verified, and it is verified by exactly these three
 claims: an entry whose change predates the first fingerprint has no `defaults@N-1` to start from,
@@ -68,7 +70,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.migration.documents import document_paths, path_matches_pattern
 from pipelex.migration.engine import apply_ops_over_text
@@ -224,30 +226,41 @@ def _check_paths(
 
 
 def _check_the_migrated_document_is_accepted(*, surface: Surface, entry: MigrationEntry, after_text: str, migrated_text: str) -> list[TransformIssue]:
-    """The last link's output must be something the current model accepts.
+    """The last link's output must be something the current schema accepts.
 
-    Read the way a user's file is really read: beneath the surface's current defaults layer, not
-    alone. A migrated file is *expected* to lack whatever the new version added — that is what
-    makes an additive change absorbable — so validating it on its own would report the defaults
-    layer doing its job as a failure.
+    Read the way a user's file is really read, which is where the surface's own two declarations come
+    in. A **layered** surface's file is read beneath the current defaults layer, and a migrated file is
+    *expected* to lack whatever the new version added — that is what makes an additive change
+    absorbable — so validating it alone would report the defaults layer doing its job as a failure. A
+    **copied** document has nothing beneath it, and merging the reference copy of one backend
+    definition under another user's would validate a hybrid no machine has.
+
+    What "accepted" means is likewise the surface's to say (`Surface.validate_document`): for a backend
+    definition file it is the loader's own merge-then-validate, because neither `[defaults]` nor a model
+    table validates alone.
 
     Only the last link can be checked this way, and that is not a shortcut: it is the only link
     whose model we still have. Earlier ones are covered by induction, having been the last link
     when they were authored.
     """
-    document: dict[str, Any] = load_toml_from_content(after_text)
+    document: dict[str, Any]
+    if surface.defaults_layer_kind.is_layered_beneath_the_users_file:
+        document = load_toml_from_content(after_text)
+        read_as = "read beneath the current defaults"
+    else:
+        document = {}
+        read_as = "read on its own, as a copied document is"
     deep_update(document, updates=load_toml_from_content(migrated_text))
     strip_reserved_meta(config_dict=document)
-    try:
-        surface.config_model.model_validate(document)
-    except ValidationError as exc:
+    rejection = surface.validate_document(document=document)
+    if rejection is not None:
         return [
             _issue(
                 surface=surface,
                 kind=TransformIssueKind.MIGRATED_DOCUMENT_REJECTED,
                 message=(
                     f"entry '{entry.id}': {_starting_document_label(entry=entry)}, migrated by this "
-                    f"entry and read beneath the current defaults, is not accepted by {surface.config_model.__name__} — {exc}. "
+                    f"entry and {read_as}, is not accepted at the current schema — {rejection}. "
                     f"An operation writes a value or a key the schema does not take, so every file it migrates fails to load"
                 ),
             )

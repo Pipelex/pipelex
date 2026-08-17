@@ -80,6 +80,14 @@ def is_pipelex_gateway_enabled(backends_file_path: Path | None = None) -> bool:
 
     This reads the backends.toml file directly without loading the full backend library.
 
+    **It must read `enabled` exactly as the library loader does** — the raw value's truthiness, and
+    enabled when the key is absent — because the two are read over the same file and the boot acts
+    on the answer here: it fetches the gateway's model specs only when this says enabled, then hands
+    them to a loader that decides for itself which backends are enabled. Reading the literal `true`
+    here while the loader read truthiness left `enabled = 1` in a state neither could name: no specs
+    fetched, backend loaded — refused as *"model specs were not provided"* on a strict boot, silently
+    dropped from the deck on a lenient one.
+
     Args:
         backends_file_path: Explicit path to the ``backends.toml`` file to inspect. When
             ``None`` (default), uses the layered/project-preferred path from
@@ -100,5 +108,4 @@ def is_pipelex_gateway_enabled(backends_file_path: Path | None = None) -> bool:
         return False
 
     gateway_config_dict = cast("dict[str, Any]", gateway_config)
-    enabled_value = gateway_config_dict.get("enabled", True)
-    return enabled_value is True
+    return bool(gateway_config_dict.get("enabled", True))

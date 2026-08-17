@@ -150,6 +150,32 @@ class TestFingerprintPaths:
         assert fingerprint.paths["optional_leaf"].required is False
         assert fingerprint.paths["optional_leaf.name"].required is True
 
+    def test_an_open_document_root_records_a_wildcard_with_the_model_beneath_it(self) -> None:
+        """A document whose *root* keys belong to the user — one table per inference-backend model.
+
+        The shape has to be seeded rather than modelled, and that is the whole reason the flag
+        exists. A `dict[str, _Leaf]` **field** would record every path under a parent segment
+        (`models.*.name`) that no such file has, and a `RootModel` puts a `root.` prefix there
+        instead. Seeding the walk at `*` is what makes the recorded paths the ones a ledger
+        operation can actually address in the file.
+        """
+        fingerprint = compute_fingerprint(
+            surface_id="synthetic",
+            schema_version=1,
+            config_model=_Leaf,
+            defaults_document={},
+            document_root_is_open=True,
+        )
+
+        assert fingerprint.document_root_is_open is True
+        assert fingerprint.path_names() == {"*", "*.name", "*.count"}
+        assert fingerprint.paths["*"].value_type == TABLE_TYPE
+        assert fingerprint.paths["*.name"].value_type == "str"
+
+    def test_a_document_root_is_closed_unless_the_surface_says_otherwise(self) -> None:
+        """The flag is recorded, not inferred, so a frozen golden answers for the version it describes."""
+        assert _fingerprint().document_root_is_open is False
+
     def test_a_self_referential_model_terminates(self) -> None:
         """Nothing in the configuration tree is recursive today; this is what stops the next one hanging the gate.
 

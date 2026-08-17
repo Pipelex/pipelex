@@ -17,11 +17,10 @@ import pytest
 from pydantic import BaseModel, Field
 
 from pipelex.migration.exceptions import MigrationLedgerError
-from pipelex.migration.fingerprint import compute_fingerprint
 from pipelex.migration.goldens import write_fingerprint_golden
 from pipelex.migration.ledger import ledgers_dir
 from pipelex.migration.ledger_check import LedgerIssue, LedgerIssueKind, check_ledger
-from pipelex.migration.surfaces import DefaultsLayerKind, Surface
+from pipelex.migration.surfaces import DefaultsLayerKind, DocumentShape, Surface
 
 SURFACE_ID = "synthetic-config"
 
@@ -137,19 +136,39 @@ class _SchemaThreeLabelBack(BaseModel):
     deck: dict[str, _DeckEntry] = Field(default_factory=dict[str, _DeckEntry])
 
 
+class _RootTableWithLegacyKey(BaseModel):
+    """One root table of a document whose *root* keys are the user's — a backend definition file.
+
+    Every field is optional, as every field of such a table has to be: the document's own root
+    carries one table per user-chosen name, and each is a partial description.
+    """
+
+    sdk: str | None = None
+    legacy_style: str | None = None
+
+
+class _RootTableLegacyKeyGone(BaseModel):
+    """The same table with `legacy_style` retired."""
+
+    sdk: str | None = None
+
+
 def _surface(
     *,
     config_model: type[BaseModel],
     packaged_document_path: Path | None = None,
     kit_template_path: Path | None = None,
+    document_root_is_open: bool = False,
 ) -> Surface:
     defaults_layer_kind = DefaultsLayerKind.PACKAGED_DOCUMENT if packaged_document_path is not None else DefaultsLayerKind.MODEL_DEFAULTS
+    document_shape = DocumentShape.MODEL_SPEC_TABLES if document_root_is_open else DocumentShape.WHOLE_DOCUMENT
     return Surface(
         surface_id=SURFACE_ID,
         title="A synthetic surface",
         base_file="synthetic.toml",
         tier_glob="synthetic_*.toml",
         config_model=config_model,
+        document_shape=document_shape,
         defaults_layer_kind=defaults_layer_kind,
         packaged_document_path=packaged_document_path,
         kit_template_path=kit_template_path,
@@ -172,17 +191,9 @@ min_supported_schema_version = 0
     (directory / f"{SURFACE_ID}.toml").write_text(body, encoding="utf-8")
 
 
-def _snapshot(*, migration_dir: Path, config_model: type[BaseModel], schema_version: int) -> None:
-    surface = _surface(config_model=config_model)
-    write_fingerprint_golden(
-        migration_dir=migration_dir,
-        fingerprint=compute_fingerprint(
-            surface_id=SURFACE_ID,
-            schema_version=schema_version,
-            config_model=config_model,
-            defaults_document=surface.read_defaults_document(),
-        ),
-    )
+def _snapshot(*, migration_dir: Path, config_model: type[BaseModel], schema_version: int, document_root_is_open: bool = False) -> None:
+    surface = _surface(config_model=config_model, document_root_is_open=document_root_is_open)
+    write_fingerprint_golden(migration_dir=migration_dir, fingerprint=surface.fingerprint_at(schema_version=schema_version))
 
 
 def _entry(*, ops: str, to_schema_version: int = 2, safety: str = "safe", pre_history: str = "", declared_narrowed: str = "") -> str:
@@ -282,6 +293,71 @@ key        = "some_model_the_user_chose"
         issues = check_ledger(surface=_surface(config_model=_SchemaOne), migration_dir=tmp_path)
         assert _kinds(issues) == [LedgerIssueKind.CONCRETE_KEY_UNDER_OPEN_NODE]
         assert "some_model_the_user_chose" in issues[0].message
+
+    def test_a_wildcard_at_an_open_document_root_stands_at_an_open_node(self, tmp_path: Path) -> None:
+        """The one address a backend-file ledger can use: every root table, none of them by name.
+
+        The keys of such a document are model names the user chose, so `["*"]` is not a convenience
+        — it is the only legal way to reach the key we retired, in `[defaults]` and in every model
+        table alike.
+        """
+        ops = """
+[[migration.ops]]
+kind       = "delete_key"
+table_path = ["*"]
+key        = "legacy_style"
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=_entry(ops=ops))
+        _snapshot(migration_dir=tmp_path, config_model=_RootTableWithLegacyKey, schema_version=1, document_root_is_open=True)
+        _snapshot(migration_dir=tmp_path, config_model=_RootTableLegacyKeyGone, schema_version=2, document_root_is_open=True)
+
+        surface = _surface(config_model=_RootTableLegacyKeyGone, document_root_is_open=True)
+        assert check_ledger(surface=surface, migration_dir=tmp_path) == []
+
+    def test_an_operation_naming_one_root_table_of_an_open_document_is_refused(self, tmp_path: Path) -> None:
+        """A backend ledger may not address one user's model by name, and the root is where that bites.
+
+        `openai.toml` on one machine holds the models that machine chose. An entry naming one of them
+        would fire on that machine and on no other, which is the same defect as reaching inside an
+        open mapping — reported here at the document root.
+        """
+        ops = """
+[[migration.ops]]
+kind       = "delete_key"
+table_path = ["gpt-4o"]
+key        = "legacy_style"
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=_entry(ops=ops))
+        _snapshot(migration_dir=tmp_path, config_model=_RootTableWithLegacyKey, schema_version=1, document_root_is_open=True)
+        _snapshot(migration_dir=tmp_path, config_model=_RootTableLegacyKeyGone, schema_version=2, document_root_is_open=True)
+
+        surface = _surface(config_model=_RootTableLegacyKeyGone, document_root_is_open=True)
+        issues = check_ledger(surface=surface, migration_dir=tmp_path)
+
+        assert LedgerIssueKind.CONCRETE_KEY_UNDER_OPEN_NODE in _kinds(issues)
+        assert "gpt-4o" in issues[0].message
+
+    def test_a_wildcard_at_a_closed_document_root_is_still_refused(self, tmp_path: Path) -> None:
+        """The other half of the same rule, and the mutation guard on it: openness is read, not assumed.
+
+        Teach the check that the document root is always open and this goes green — an entry over
+        `pipelex.toml` could then claim to address "every root key" of a document whose root keys are
+        ours and enumerable.
+        """
+        ops = """
+[[migration.ops]]
+kind       = "delete_key"
+table_path = ["*"]
+key        = "label"
+"""
+        _write_ledger(migration_dir=tmp_path, current_schema_version=2, entries=_entry(ops=ops))
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaTwoLabelGone, schema_version=2)
+
+        issues = check_ledger(surface=_surface(config_model=_SchemaTwoLabelGone), migration_dir=tmp_path)
+
+        assert LedgerIssueKind.WILDCARD_NOT_AT_OPEN_NODE in _kinds(issues)
+        assert "the document root" in issues[0].message
 
     def test_a_wildcard_anywhere_but_an_open_node_is_refused(self, tmp_path: Path) -> None:
         ops = """

@@ -1,6 +1,7 @@
 {
   "surface_id": "pipelex-service-config",
   "schema_version": 1,
+  "document_root_is_open": false,
   "paths": {
     "agreement": {
       "value_type": "table",

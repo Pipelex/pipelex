@@ -14,7 +14,7 @@ put to the surface's *fingerprint*: the same projection the coverage gate diffs,
 model the surface names. The diagnosis therefore lives here, beside the runner that has a surface,
 rather than inside the engine that has only text.
 
-Three rules make the answer trustworthy rather than merely computable.
+Four rules make the answer trustworthy rather than merely computable.
 
 - **The document diagnosed is the one the run leaves behind**, not the one it found. Everything the
   ledger explains has been carried forward by then, so what is left over is genuinely left over. On
@@ -28,6 +28,10 @@ Three rules make the answer trustworthy rather than merely computable.
   says `levels.*` where the file says `levels.my_package`, and a typo *inside* such an entry is
   reported at `queues.*.retries`. The unknown segment is named, because naming it is the whole
   point; the user's own key beside it is not.
+- **A key the surface admits by shape is not unexplained.** One surface has a key class that is legal
+  without being named by any model: a backend file's per-model request headers, legal because they are
+  shaped like headers. The surface is asked (`Surface.admits_unnamed_key`), and the answer is
+  deliberately narrow — a key with no hyphen is still a typo, and still reported.
 
 See `docs/migration-ledger.md` → "The downgrade direction".
 """
@@ -41,6 +45,7 @@ from pipelex.migration.fingerprint import PATH_SEPARATOR, TABLE_TYPE, PathFinger
 from pipelex.migration.ledger import MigrationEntry, MigrationLedger
 from pipelex.migration.material import spelling_after_replay
 from pipelex.migration.plan import BlockedEntry, UnexplainedPath
+from pipelex.migration.surfaces import Surface
 from pipelex.migration.walk import op_source_path
 from pipelex.suggested_fix import WILDCARD_SEGMENT, RemapValueOp
 from pipelex.system.configuration.config_surface import strip_reserved_meta
@@ -60,6 +65,7 @@ tell apart once they are asked.
 
 def diagnose_unexplained_paths(
     *,
+    surface: Surface,
     fingerprint: SurfaceFingerprint,
     document: dict[str, Any],
     ledger: MigrationLedger,
@@ -69,6 +75,13 @@ def diagnose_unexplained_paths(
 
     The document must be the one the run leaves behind. Passing the pre-migration document would
     report every stale key the ledger is about to repair, which is the opposite of the diagnosis.
+
+    The surface is here for the fourth rule, which the other three did not need: **a key the surface
+    itself admits by shape rather than by name is not unexplained.** A backend file's per-model
+    request headers are the case — see `Surface.admits_unnamed_key`. It is asked of the surface and
+    not read off the fingerprint because it is a live rule about a key's spelling, and because the
+    coarser answer a snapshot could carry ("this node takes extras") would silence exactly the key
+    class the ledger is there to repair.
     """
     # A deep copy, because the strip below edits the nested `[meta]` table in place and this
     # function only ever reads what it was handed.
@@ -83,6 +96,7 @@ def diagnose_unexplained_paths(
         table=diagnosed,
         document_prefix=(),
         schema_prefix=(),
+        surface=surface,
         fingerprint=fingerprint,
         accounted=accounted,
         unexplained=unexplained,
@@ -95,6 +109,7 @@ def _diagnose_table(
     table: dict[str, Any],
     document_prefix: tuple[str, ...],
     schema_prefix: tuple[str, ...],
+    surface: Surface,
     fingerprint: SurfaceFingerprint,
     accounted: list[str],
     unexplained: list[UnexplainedPath],
@@ -109,7 +124,9 @@ def _diagnose_table(
         document_path = (*document_prefix, str(key))
         resolved = _resolve_against_schema(schema_prefix=schema_prefix, key=str(key), fingerprint=fingerprint)
         if resolved is None:
-            if not _is_accounted_for(path=document_path, accounted=accounted):
+            if not _is_accounted_for(path=document_path, accounted=accounted) and not surface.admits_unnamed_key(
+                node_path=schema_prefix, document_node_path=document_prefix, key=str(key)
+            ):
                 unexplained.append(UnexplainedPath(path=PATH_SEPARATOR.join((*schema_prefix, str(key))), note=UNEXPLAINED_NOTE))
             # Never descended into: an unknown table's contents are unknown because it is, and
             # listing every key inside it buries the one name the user has to fix.
@@ -126,6 +143,7 @@ def _diagnose_table(
             table=cast("dict[str, Any]", value),
             document_prefix=document_path,
             schema_prefix=schema_path,
+            surface=surface,
             fingerprint=fingerprint,
             accounted=accounted,
             unexplained=unexplained,

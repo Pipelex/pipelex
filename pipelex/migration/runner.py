@@ -121,7 +121,7 @@ def _diagnose(*, surface: Surface, ledger: MigrationLedger, document: TOMLDocume
     """
     fingerprint = surface.fingerprint_at(schema_version=ledger.surface.current_schema_version)
     migrated = document if replay.text == text else tomlkit.loads(replay.text)
-    return diagnose_unexplained_paths(fingerprint=fingerprint, document=migrated.unwrap(), ledger=ledger, blocked=replay.blocked)
+    return diagnose_unexplained_paths(surface=surface, fingerprint=fingerprint, document=migrated.unwrap(), ledger=ledger, blocked=replay.blocked)
 
 
 def _refuse_a_file_below_the_floor(*, surface: Surface, ledger: MigrationLedger, file_path: Path, document: TOMLDocument) -> MigrationPlan | None:

@@ -83,7 +83,7 @@ The upcoming remote-methods system (GitHub addressing, cloning, version manageme
 
 ## Implementation phases
 
-The executable plan — phases, checkpoints, and per-phase task lists — lives in [../../TODOS.md](../../TODOS.md) and is the plan of record. It was restructured after the engineering review into C0–C4, splitting what this document originally described as one "Phase 1" into a pure-refactor extraction (Phase 1) and the rule flip (Phase 2), so that no checkpoint rests on a tree where the normalizer and the live library disagree. Do not maintain a second phase list here; record **outcomes** below as each checkpoint passes.
+The executable plan — phases, checkpoints, and per-phase task lists — lives in [implementation-plan.md](implementation-plan.md) and is the plan of record. It was restructured after the engineering review into C0–C4, splitting what this document originally described as one "Phase 1" into a pure-refactor extraction (Phase 1) and the rule flip (Phase 2), so that no checkpoint rests on a tree where the normalizer and the live library disagree. Do not maintain a second phase list here; record **outcomes** below as each checkpoint passes.
 
 ### Phase 1 outcome (C1)
 

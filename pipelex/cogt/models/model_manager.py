@@ -2,6 +2,7 @@ from pathlib import Path
 
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelManagerError
 from pipelex.cogt.extract.extract_setting import ExtractSetting
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
@@ -82,6 +83,12 @@ class ModelManager(ModelManagerAbstract):
             gateway_config=gateway_config,
             lenient=not needs_inference,
         )
+        # The loader parks its stale-configuration warning rather than logging it, so that the
+        # doctor's per-backend probe — which loads the whole library once per backend — does not
+        # repeat one directory's warning a dozen times. This is the boot that owes the user the
+        # single copy, and by here logging is configured.
+        if (stale_warning := self.inference_backend_library.take_stale_configuration_warning()) is not None:
+            log.warning(stale_warning)
         enabled_backends = self.inference_backend_library.all_enabled_backends()
         self._routing_profile = load_active_routing_profile(
             routing_profile_library_path=routing_profile_library_path or str(config_manager.routing_profiles_file_path),

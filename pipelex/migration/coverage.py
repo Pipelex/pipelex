@@ -43,7 +43,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex.migration.fingerprint import PATH_SEPARATOR, TABLE_TYPE, SurfaceFingerprint, compute_fingerprint
+from pipelex.migration.fingerprint import PATH_SEPARATOR, TABLE_TYPE, SurfaceFingerprint
 from pipelex.migration.goldens import defaults_golden_path, read_fingerprint_golden
 from pipelex.migration.ledger import MigrationEntry, MigrationLedger, load_ledger
 from pipelex.migration.narrowing import describe_narrowing, is_remappable, lost_enumerated_spellings
@@ -453,12 +453,10 @@ def check_surface(*, surface: Surface, migration_dir: Path) -> list[CoverageIssu
     issues = _check_ledger_agrees_with_registry(surface=surface, ledger=ledger)
 
     current_version = ledger.surface.current_schema_version
-    live = compute_fingerprint(
-        surface_id=surface_id,
-        schema_version=current_version,
-        config_model=surface.config_model,
-        defaults_document=surface.read_defaults_document(),
-    )
+    # Through the surface rather than straight to `compute_fingerprint`: the surface holds both
+    # halves of the projection — the model tree and whether the document's root is open — and one
+    # route is what keeps this gate and the regenerator fingerprinting the same shape.
+    live = surface.fingerprint_at(schema_version=current_version)
     issues.extend(check_defaults_layer(surface_id=surface_id, fingerprint=live))
     issues.extend(_check_stored_links(surface_id=surface_id, ledger=ledger, live=live, migration_dir=migration_dir))
     issues.extend(_check_head_link(surface_id=surface_id, current_version=current_version, live=live, migration_dir=migration_dir))
@@ -499,6 +497,12 @@ def _check_ledger_agrees_with_registry(*, surface: Surface, ledger: MigrationLed
     Both halves are hand-written and both are consumed as truth — the ledger's when a migration
     walks a directory, the registry's when a gate fingerprints a model — so a disagreement between
     them is a silent mis-migration waiting for the day the two readers meet.
+
+    `subdirectory` is the one that has a second reader on the boot path: a stale-configuration
+    warning names `pipelex migrate` only for a file the walk reaches, and it works out where the
+    walk reaches from the **ledger**, because its own module may not import the registry. A ledger
+    saying one directory while the registry walks another is a boot promising a remedy the command
+    then declines, which is exactly the defect the one-derivation rule exists to prevent.
     """
     mismatches = [
         (label, declared, recorded)
@@ -506,6 +510,7 @@ def _check_ledger_agrees_with_registry(*, surface: Surface, ledger: MigrationLed
             ("id", surface.surface_id, ledger.surface.id),
             ("base_file", surface.base_file, ledger.surface.base_file),
             ("tier_glob", surface.tier_glob, ledger.surface.tier_glob),
+            ("subdirectory", surface.subdirectory.as_posix(), Path(ledger.surface.subdirectory).as_posix()),
         )
         if declared != recorded
     ]

@@ -1030,6 +1030,34 @@ min_supported_schema_version = 0
         assert _kinds(issues) == [CoverageIssueKind.LEDGER_DISAGREES_WITH_REGISTRY]
         assert "elsewhere.toml" in issues[0].message
 
+    def test_a_ledger_describing_another_directory_is_refused(self, tmp_path: Path) -> None:
+        """The directory is the half with a second reader, and it is on the boot path.
+
+        A stale-configuration warning names `pipelex migrate` only for a file the walk would
+        reach, and it works out where the walk reaches from the ledger — its module may not import
+        the registry. So a ledger naming one directory while the registry walks another is a boot
+        offering a remedy the command then declines, and this is where the two are made to agree.
+        """
+        directory = ledgers_dir(migration_dir=tmp_path)
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / f"{SURFACE_ID}.toml").write_text(
+            f"""
+[surface]
+id                           = "{SURFACE_ID}"
+title                        = "A synthetic surface"
+base_file                    = "synthetic.toml"
+tier_glob                    = "synthetic_*.toml"
+subdirectory                 = "somewhere/else"
+current_schema_version       = 1
+min_supported_schema_version = 0
+""",
+            encoding="utf-8",
+        )
+        _snapshot(migration_dir=tmp_path, config_model=_SchemaOne, schema_version=1)
+        issues = check_surface(surface=_surface(config_model=_SchemaOne), migration_dir=tmp_path)
+        assert _kinds(issues) == [CoverageIssueKind.LEDGER_DISAGREES_WITH_REGISTRY]
+        assert "somewhere/else" in issues[0].message
+
 
 class TestTheDiff:
     def test_a_renamed_key_reads_as_one_removal_and_one_addition(self) -> None:

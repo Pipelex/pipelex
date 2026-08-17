@@ -47,13 +47,30 @@ class SurfaceBlock(BaseModel):
 
     id: str
     title: str
-    base_file: str
+    base_file: str | None = None
     tier_glob: str | None = None
+
+    subdirectory: str = ""
+    """The directory this surface's files sit in, relative to a configuration directory.
+
+    Empty for a surface that lives directly in `~/.pipelex/` or `.pipelex/`. Spelled with forward
+    slashes, because TOML has no `Path` and the registry converts at the edge. Read here rather
+    than from the registry by `stale_configuration_warning`, whose module may not import the
+    registry: the registry pulls in every configuration model, and it sits in the kernel layer's
+    import closure. The coverage gate cross-checks the two spellings against each other."""
+
     current_schema_version: int = Field(ge=INITIAL_SCHEMA_VERSION)
     min_supported_schema_version: int = Field(ge=0)
     """Held at zero until a ledger squash ever moves it. Without the floor, a squash silently
     under-migrates the oldest files in the field, because the applier skips absent targets and
     reports success. With it, the loader fails loudly instead."""
+
+    @model_validator(mode="after")
+    def check_the_surface_claims_some_file(self) -> Self:
+        if not self.base_file and not self.tier_glob:
+            msg = f"surface '{self.id}': claims no file — a surface with no base file must claim its files by a tier glob"
+            raise ValueError(msg)
+        return self
 
     @model_validator(mode="after")
     def check_floor_is_below_the_current_version(self) -> Self:

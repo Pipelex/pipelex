@@ -1,0 +1,432 @@
+####################################################################################################
+# Runtime — kernel-layer, process-scoped infrastructure (what runtime_hub brokers)
+####################################################################################################
+
+[runtime]
+
+[runtime.storage]
+is_fetch_remote_content_enabled = true
+is_upload_local_content_enabled = true
+method = "local"                       # local, in_memory, s3, gcp
+
+[runtime.storage.local]
+uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
+local_storage_path = ".pipelex/storage"
+
+[runtime.storage.in_memory]
+uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
+
+[runtime.storage.s3]
+uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
+bucket_name = ""
+region = ""
+signed_urls_lifespan_seconds = 3600
+
+[runtime.storage.gcp]
+uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
+bucket_name = ""
+project_id = ""
+signed_urls_lifespan_seconds = 3600
+
+[runtime.secrets]
+method = "env" # env (built-in); an external plugin may add e.g. vault
+
+####################################################################################################
+# Log config
+####################################################################################################
+
+[runtime.log]
+default_log_level = "INFO"
+# console_log_target controls the RichHandler used by the logging system (log.debug/info/...).
+# Logs are diagnostics → stderr.
+console_log_target = "stderr"
+# console_print_target controls the Console returned by get_console(), used for banners,
+# deck notices, and the main `pipelex` CLI's data tables (`show backends`, `show models`,
+# `which`, `doctor`). Tables are data the user pipes to a file → stdout.
+# Note: the agent CLI (`pipelex-agent`) emits its actual JSON/markdown results via bare
+# builtin `print(...)` to sys.stdout, bypassing Rich entirely — so this knob does NOT
+# affect the agent CLI data channel. The agent CLI factory additionally forces both
+# targets to stderr internally to keep its stdout strictly reserved for the success
+# envelope (see `_AGENT_CLI_STDERR_CONSOLE_OVERRIDES` in `agent_cli_factory.py`).
+console_print_target = "stdout"
+is_console_logging_enabled = true
+
+json_logs_indent = 4
+presentation_line_width = 120
+silenced_problem_ids = ["azure_openai_no_stream_options"]
+caller_info_template = "file_line"
+is_caller_info_enabled = false
+
+log_mode = "rich"
+
+poor_loggers = []
+generic_poor_logger = "#poor-log"
+
+[runtime.log.package_log_levels]
+# for logger names, the dots "." have been replaced by "-" to avoid toml parsing issues
+# TODO: use quotes to re-enable names with dots
+anthropic = "INFO"
+asyncio = "INFO"
+botocore = "INFO"
+botocore-credentials = "WARNING"
+google = "INFO"
+httpx = "WARNING"
+httpcore = "INFO"
+openai = "INFO"
+instructor = "INFO"
+urllib3-connectionpool = "INFO"
+urllib3-util-retry = "INFO"
+
+pipelex = "INFO"
+
+
+[runtime.log.rich_log]
+is_show_time = false
+is_show_level = true
+is_link_path_enabled = true
+is_markup_enabled = true
+highlighter_name = "json"
+is_rich_tracebacks = true
+is_tracebacks_word_wrap = true
+is_tracebacks_show_locals = false
+tracebacks_suppress = []
+keywords_to_hilight = []
+
+[runtime.aws]
+api_key_method = "env"
+bedrock_access_variant = "aws_access"
+
+[runtime.reporting]
+is_log_costs_to_console = true
+is_generate_cost_report_file_enabled = false
+cost_report_dir_path = "reports"
+cost_report_base_name = "cost_report"
+cost_report_extension = "csv"
+cost_report_unit_scale = 1.0
+
+####################################################################################################
+# Tracing config (event log for distributed tracing across workers)
+####################################################################################################
+
+[runtime.tracing]
+is_enabled = true
+backend = "ndjson"
+
+[runtime.tracing.ndjson]
+traces_dir = ".pipelex/traces"
+
+[runtime.tracing.dynamodb]
+table_name = ""
+region = ""
+
+[runtime.observer]
+observer_dir = "results/observer"
+
+[runtime.plugins]
+# Names of discovered plugins to skip at startup (a denylist). Discovery is the
+# source of truth for which plugins are present; this only turns one off.
+disabled = []
+
+####################################################################################################
+# Inference — the model-calling seam (was [cogt])
+####################################################################################################
+
+[inference]
+transport_max_retries = 2
+
+[inference.model_deck]
+is_model_fallback_enabled = true
+missing_presets_reaction = "log"
+
+[inference.llm]
+default_max_images = 100
+is_structure_prompt_enabled = true
+is_dump_text_prompts_enabled = false
+is_dump_response_text_enabled = false
+schema_reask_max_attempts = 3
+
+[inference.llm.instructor]
+is_dump_kwargs_enabled = false
+is_dump_response_enabled = false
+is_dump_error_enabled = false
+
+[inference.llm.openai.effort_to_level_map]
+none = "none"
+minimal = "minimal"
+low = "low"
+medium = "medium"
+high = "high"
+xhigh = "xhigh"
+max = "xhigh"
+
+[inference.llm.anthropic]
+structured_output_timeout_seconds = 1200
+
+[inference.llm.anthropic.effort_to_level_map]
+none = "disabled"
+minimal = "low"
+low = "low"
+medium = "medium"
+high = "high"
+xhigh = "xhigh"
+max = "max"
+
+[inference.llm.google.effort_to_level_map]
+none = "disabled"
+minimal = "minimal"
+low = "low"
+medium = "medium"
+high = "high"
+xhigh = "high"
+max = "high"
+
+[inference.llm.mistral.effort_to_level_map]
+none = "disabled"
+minimal = "reasoning"
+low = "reasoning"
+medium = "reasoning"
+high = "reasoning"
+xhigh = "reasoning"
+max = "reasoning"
+
+[inference.llm.effort_to_budget_maps.anthropic]
+none = 0      # Required by validator; unreachable at runtime (level map gates NONE as disabled before budget lookup)
+minimal = 512
+low = 1024
+medium = 5000
+high = 16384
+xhigh = 32768
+max = 65536
+
+[inference.llm.effort_to_budget_maps.gemini]
+none = 0      # Required by validator; unreachable at runtime (level map gates NONE as disabled before budget lookup)
+minimal = 512
+low = 1024
+medium = 5000
+high = 16384
+xhigh = 32768
+max = 65536
+
+[inference.llm.generic_templates]
+output_structure_prompt = """
+
+
+---
+The instance we want to generate will be for the following class:
+{{ class_structure_str }}
+
+DO NOT create information.
+If some information is not present for an attribute, output the default value or None according to the attribute definition.
+"""
+
+structuring_prompt = """
+Read the following text carefully and produce the requested structured output from it.
+
+---
+{{ text }}
+"""
+
+####################################################################################################
+# Image generation config
+####################################################################################################
+
+[inference.img_gen.img_gen_job]
+is_sync_mode = false
+
+[inference.img_gen.img_gen_param_defaults]
+nb_steps = 28           # 28 is a good default for Flux, possible values are [1,2,4,8] for SDXL Lightning
+quality = "low"
+aspect_ratio = "square" # "square", "landscape_4_3", "landscape_3_2", "landscape_16_9", "landscape_21_9", "landscape_4_1", "landscape_8_1", "portrait_3_4", "portrait_2_3", "portrait_9_16", "portrait_9_21", "portrait_1_4", "portrait_1_8"
+guidance_scale = 2.5
+background = "auto"
+is_moderated = true
+safety_tolerance = 5
+is_raw = false
+seed = "auto"
+
+[inference.img_gen.quality_to_steps_maps]
+flux = { "low" = 14, "medium" = 28, "high" = 56 }
+sdxl_lightning = { "low" = 2, "medium" = 4, "high" = 8 }
+qwen_image = { "low" = 10, "medium" = 20, "high" = 28 }
+
+####################################################################################################
+# Extract config
+####################################################################################################
+
+[inference.extract]
+default_page_views_dpi = 72
+
+####################################################################################################
+# Gateway test config
+####################################################################################################
+
+[inference.gateway_test.config_id_substitutions]
+# this is an empty dict, it's only used by Pipelex staff to override the ¨Pipelex Gateway¨ config
+# in order to test new model integrations or debug issues with the Gateway
+
+####################################################################################################
+# Templating config
+####################################################################################################
+
+[inference.templating]
+default_templating_style = { tag_style = "xml" }
+
+####################################################################################################
+# Dry run config
+####################################################################################################
+
+[inference.dry_run]
+text_gen_truncate_length = 256
+nb_list_items = 3
+nb_extract_pages = 4
+allowed_to_fail_pipes = [
+  "failing_pipelines.infinite_loop_1", # Loop but only for testing purposes — matched on the namespaced pipe_ref
+]
+image_urls = [
+  "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg",
+  "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_2.png",
+]
+
+####################################################################################################
+# Interpreter — library-scoped method machinery (what interpreter_hub brokers)
+####################################################################################################
+
+[interpreter]
+
+####################################################################################################
+# MTHDS config
+####################################################################################################
+
+[interpreter.mthds.inline_tables]
+spaces_inside_curly_braces = true
+
+[interpreter.mthds.strings]
+prefer_literal = false
+force_multiline = false
+length_limit_to_multiline = 100
+ensure_trailing_newline = true
+ensure_leading_blank_line = true
+
+[interpreter.mthds.concepts]
+structure_field_ordering = [
+  "type",
+  "concept_ref",
+  "item_type",
+  "item_concept_ref",
+  "description",
+  "choices",
+  "required",
+]
+
+[interpreter.mthds.pipes]
+field_ordering = ["type", "description", "inputs", "output"]
+
+####################################################################################################
+# Pipe run config
+####################################################################################################
+
+[interpreter.pipe_run]
+pipe_stack_limit = 20
+
+####################################################################################################
+# PipeFunc config
+####################################################################################################
+
+[interpreter.pipe_func]
+# PipeFunc execution mode, selected from the PipeFuncExecutorRegistry the plugins populate. "direct"
+# (core) imports and runs customer functions in this process; "daytona" (our Daytona sandbox plugin)
+# runs them in a remote box. Any non-"direct" mode carries customer PipeFunc code as source text and
+# executes it only inside an isolated sandbox, never imported here.
+execution_mode = "direct"
+
+####################################################################################################
+# Pipeline execution config
+####################################################################################################
+
+[interpreter.pipeline_execution]
+is_normalize_data_urls_to_storage = true
+is_mock_inputs = false
+is_generate_graph = true
+is_generate_usage = true
+
+# Bounded fan-out concurrency for PipeBatch: at most this many branches run at once.
+# A modest default keeps a large workload (one pipe over many items) from overwhelming
+# asyncio, memory, and provider rate limits. Set to "unbounded" to disable the bound.
+max_concurrency = 8
+
+[interpreter.pipeline_execution.graph]
+
+[interpreter.pipeline_execution.graph.data_inclusion]
+stuff_json_content = true
+stuff_text_content = true
+stuff_html_content = true
+error_stack_traces = true
+pipe_and_concept_registry = true
+
+[interpreter.pipeline_execution.graph.graphs_inclusion]
+graphspec_json = true
+mermaidflow_mmd = true
+mermaidflow_html = true
+reactflow_html = true
+
+[interpreter.pipeline_execution.graph.mermaid]
+direction = "left_to_right"
+is_include_data_edges = true
+is_include_contains_edges = false
+is_include_selected_outcome_edges = true
+is_show_stuff_codes = false
+
+[interpreter.pipeline_execution.graph.mermaid.style]
+theme = "dark"
+
+[interpreter.pipeline_execution.graph.reactflow]
+is_use_cdn = true
+layout_direction = "left_to_right"
+nodesep = 50
+ranksep = 30
+edge_type = "bezier"
+initial_zoom = 1.0
+pan_to_top = true
+default_title = "Pipelex Graph"
+# Forwarded to mthds-ui as `showControllers`: when true, controller pipes (PipeSequence,
+# PipeParallel, PipeCondition, PipeBatch) render as grouping containers around their children;
+# when false, they collapse out of the graph and edges connect stuff nodes directly.
+show_batch_controller = true
+
+[interpreter.pipeline_execution.graph.reactflow.style]
+theme = "dark"
+palette = "dracula"
+
+[interpreter.scan]
+excluded_dirs = [
+  ".venv",
+  "venv",
+  "env",
+  ".env",
+  "virtualenv",
+  ".virtualenv",
+  ".git",
+  "__pycache__",
+  ".pytest_cache",
+  ".mypy_cache",
+  ".ruff_cache",
+  "node_modules",
+  "results",
+]
+
+[interpreter.builder]
+fix_loop_max_attempts = 10
+default_output_dir = "."
+default_bundle_file_name = "bundle"
+default_directory_base_name = "pipeline"
+
+####################################################################################################
+# Kit Config
+####################################################################################################
+
+[kit]
+# Agent rule files to install (used by `pipelex-dev kit rules`)
+# Each entry is one of: "cursor", "agents", "claude"
+# - "cursor" installs .cursor/rules/*.mdc files (cannot be combined with others)
+# - "agents" / "claude" install AGENTS.md / CLAUDE.md respectively — both can be listed together
+preferred_agent_targets = ["claude", "agents"]

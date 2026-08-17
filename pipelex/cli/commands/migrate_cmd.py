@@ -206,8 +206,23 @@ def describe_op(*, op: MigrationOp) -> str:
 
 
 def _table_in_words(*, table_path: list[str]) -> str:
-    """A table path as a report names it, the empty one included."""
-    return f"'{'.'.join(table_path)}'" if table_path else "the document root"
+    """A table path as a report names it — the empty one and a trailing wildcard included.
+
+    A trailing `*` names no table of its own: it means *each entry of the table above it*, which is
+    how an open node is addressed — a `dict[str, X]` field, or the whole document of a surface whose
+    root is open, as every `inference/backends/*.toml` is. Spelling it verbatim would print `from
+    '*'`, which tells a reader nothing about which part of their file changed.
+
+    A wildcard anywhere but at the end falls back to the literal dotted spelling. Nothing addresses
+    one today, and inventing a phrase for a shape no ledger has would be guessing at what it should
+    say.
+    """
+    if not table_path:
+        return "the document root"
+    if table_path[-1] != WILDCARD_SEGMENT:
+        return f"'{'.'.join(table_path)}'"
+    parent = table_path[:-1]
+    return f"every entry of '{'.'.join(parent)}'" if parent else "every table of the document"
 
 
 def _panel(*, message: str, style: str) -> Panel:

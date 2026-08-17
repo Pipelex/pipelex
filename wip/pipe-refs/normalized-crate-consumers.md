@@ -1,6 +1,6 @@
 # Who consumes normalized-crate output
 
-**Status.** Inventoried 2026-08-11 for Phase 1 of [../../TODOS.md](../../TODOS.md). The plan asks for this before the Phase 2 rule flip, because the flip changes what a normalized in-body ref *says*: a bare `present_as_markdown` that today normalizes to the sibling domain's `presentation.present_as_markdown` will normalize to the owner's `orchestrator.present_as_markdown`. Anything that persists, stamps, or compares that output moves with it.
+**Status.** Inventoried 2026-08-11 for Phase 1 of [implementation-plan.md](implementation-plan.md). The plan asks for this before the Phase 2 rule flip, because the flip changes what a normalized in-body ref *says*: a bare `present_as_markdown` that today normalizes to the sibling domain's `presentation.present_as_markdown` will normalize to the owner's `orchestrator.present_as_markdown`. Anything that persists, stamps, or compares that output moves with it.
 
 ## The headline: nothing writes a normalized crate back to `.mthds`
 

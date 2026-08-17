@@ -239,7 +239,7 @@ class TestTheTransformGoldens:
         assert check_transform_chain(surface=_surface(config_model=_WithOptional), migration_dir=tmp_path) == []
 
     def test_a_surface_that_has_never_changed_shape_has_no_link_to_check(self, tmp_path: Path) -> None:
-        """The overwhelmingly common state, and the one all three surfaces are in today."""
+        """The overwhelmingly common state, and the one every shipped surface is in today."""
         _write_ledger(migration_dir=tmp_path, entries="", current_schema_version=1)
         _defaults(migration_dir=tmp_path, schema_version=1, document='label = "hello"\n')
         assert check_transform_chain(surface=_surface(config_model=_Renamed), migration_dir=tmp_path) == []

@@ -14,7 +14,7 @@ fails ``TelemetryConfig``'s ``extra="forbid"`` today, in the field.
 
 **Two surfaces are planted here, and the second one is the whole main configuration.**
 ``telemetry-config`` is the small specimen — one flat document, nested — and it is what most of
-this module runs on because it is cheap and it shipped first. ``pipelex-config@2``, the
+this module runs on because it is cheap and it shipped first. ``pipelex-config@3``, the
 configuration reshape, is the other size of thing: it renames the root tables of the file every
 boot reads, so the machine it migrates is every existing installation. Its fixture is
 ``goldens/pipelex-config/defaults@1.toml`` — the packaged ``pipelex.toml`` as it stood at schema 1
@@ -45,7 +45,12 @@ from pipelex.migration.backup import existing_backups_of
 from pipelex.migration.goldens import defaults_golden_path, pre_history_document_path
 from pipelex.migration.ledger import packaged_migration_dir
 from pipelex.migration.surfaces import build_config_surface_registry
-from pipelex.system.configuration.config_surface import PIPELEX_CONFIG_SURFACE_ID, TELEMETRY_CONFIG_SURFACE_ID
+from pipelex.system.configuration.config_loader import BACKENDS_DIR_NAME, BACKENDS_FILE_NAME, INFERENCE_DIR_NAME
+from pipelex.system.configuration.config_surface import (
+    INFERENCE_BACKEND_CONFIG_SURFACE_ID,
+    PIPELEX_CONFIG_SURFACE_ID,
+    TELEMETRY_CONFIG_SURFACE_ID,
+)
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 from tests.e2e.agent_cli.conftest import REPO_ROOT
 
@@ -91,6 +96,40 @@ default_output_dir = "build"
 """
 
 
+# The templating section as schema 1 spells it, and as the release before it did. `#1104` renamed
+# the section and its one key and dropped the per-target map, and the pre-history entry
+# `pipelex-config@2` is what carries a file written before that. The pair is used to rewind
+# `defaults@1.toml` one release further back — a text swap rather than a transcribed document, so
+# that everything the reshape entry is about goes on being read live and only the half this is
+# about is stated here. A swap that stopped matching would leave a fixture that is not old at all,
+# which is why the planting asserts on the result.
+TEMPLATING_SECTION_AT_SCHEMA_1 = """\
+[pipelex.templating_config]
+default_templating_style = { tag_style = "xml" }
+"""
+
+PROMPTING_SECTION_BEFORE_SCHEMA_1 = """\
+[pipelex.prompting_config]
+default_prompting_style = { tag_style = "xml" }
+
+[pipelex.prompting_config.prompting_styles]
+openai = { tag_style = "ticks" }
+anthropic = { tag_style = "xml" }
+mistral = { tag_style = "square_brackets" }
+gemini = { tag_style = "xml" }
+"""
+
+# The key `#1104` deleted from the model-spec blueprint and from every backend file we ship, and a
+# value no ledger sentence contains — so the reports can be searched for it, and finding it would be
+# a value read from a user's file having reached a channel that must never carry one.
+RETIRED_BACKEND_KEY = "prompting_target"
+PLANTED_BACKEND_VALUE = "a_prompting_target_no_report_may_ever_render"
+
+# How `stale_configuration_warning` opens. Matched in full rather than on a fragment: the same boot
+# also prints a deck-staleness notice, and "out of date" appears in both.
+STALE_CONFIGURATION_OPENING = "Your configuration is out of date"
+
+
 def _old_shape_telemetry_document() -> str:
     """The flat pre-history document the shipped entry is about, read from the package."""
     path = pre_history_document_path(migration_dir=packaged_migration_dir(), surface_id=TELEMETRY_CONFIG_SURFACE_ID, schema_version=2)
@@ -105,6 +144,11 @@ def _pre_reshape_pipelex_config_document() -> str:
     does not. Read live rather than transcribed here, for the same reason the telemetry fixture is:
     a transcribed one would eventually describe a shape the shipped ledger no longer migrates, and
     would go on passing.
+
+    It is read at schema 1 by name and not at the version the reshape now starts from, which is one
+    higher: the pre-history entry inserted below the reshape changed nothing in the models, so its
+    reference document is a byte copy of this one. Naming the version where the document's shape was
+    actually cut is the spelling that says what this is, rather than one inherited from a copy.
     """
     path = defaults_golden_path(migration_dir=packaged_migration_dir(), surface_id=PIPELEX_CONFIG_SURFACE_ID, schema_version=1)
     return path.read_text(encoding="utf-8")
@@ -114,7 +158,7 @@ def _todays_pipelex_config_document() -> dict[str, Any]:
     """What the package's own `pipelex.toml` says now — the shape a migration has to land on.
 
     Read through the surface rather than by path, so this tracks wherever the packaged document
-    lives, and read as the live file rather than as `defaults@2.toml`: the golden is a snapshot of
+    lives, and read as the live file rather than as the head golden: that golden is a snapshot of
     this, and comparing against the snapshot would leave a gap exactly the width of a stale one.
     """
     registry = build_config_surface_registry()
@@ -166,6 +210,76 @@ def _plant_a_pre_reshape_machine(*, hermetic_home: Path) -> tuple[Path, Path, Pa
     project_file = _project_config_dir(hermetic_home=hermetic_home) / "pipelex_override.toml"
     project_file.write_text(OLD_SHAPE_PROJECT_PIPELEX_OVERRIDE, encoding="utf-8")
     return hermetic_home / PROJECT_DIR_NAME, global_file, project_file
+
+
+def _plant_a_pre_prompting_style_machine(*, hermetic_home: Path) -> tuple[Path, Path]:
+    """One release further back than the machine above: a file that still names prompting styles.
+
+    Two entries have to run on it, in order, and the order is the whole point — the first addresses
+    `pipelex.prompting_config` at the spelling it had *before* the reshape renames `[pipelex]`, so a
+    file that met only the reshape would arrive at `[interpreter.prompting_config]`, which nothing
+    reads and the model refuses.
+
+    Only the global tier is planted. The project tier beside it is the reshape's specimen and it has
+    nothing to say about prompting styles; a second file carrying the same two tables would prove the
+    same thing twice.
+
+    Returns the project directory and the global file.
+    """
+    at_schema_1 = _pre_reshape_pipelex_config_document()
+    older = at_schema_1.replace(TEMPLATING_SECTION_AT_SCHEMA_1, PROMPTING_SECTION_BEFORE_SCHEMA_1)
+    if older == at_schema_1:
+        msg = f"the schema-1 templating section is no longer spelled the way this fixture rewinds:\n{TEMPLATING_SECTION_AT_SCHEMA_1}"
+        raise AssertionError(msg)
+
+    global_file = hermetic_home / ".pipelex" / "pipelex.toml"
+    global_file.write_text(older, encoding="utf-8")
+
+    _project_config_dir(hermetic_home=hermetic_home)
+    return hermetic_home / PROJECT_DIR_NAME, global_file
+
+
+def _backends_dir(*, hermetic_home: Path) -> Path:
+    return hermetic_home / ".pipelex" / INFERENCE_DIR_NAME / BACKENDS_DIR_NAME
+
+
+def _plant_a_stale_backend_directory(*, hermetic_home: Path) -> tuple[Path, Path]:
+    """The third surface's machine: backend definitions written before `#1104` deleted a key.
+
+    `hermetic_home` seeds `inference/backends/` from the kit, which is exactly what `pipelex init`
+    puts on a machine — so ageing it is a matter of putting `prompting_target` back where an
+    installation from before this release still has it: in one file's `[defaults]`, where it breaks
+    every model of that file at once, and on another file's model tables, where each is rejected by
+    name. Two files rather than one because the surface claims a directory, and a run that reached
+    only the first would come back visibly short.
+
+    The value planted is a marker no ledger sentence contains, which is what lets the reports be
+    checked for it. Both plantings raise if their anchor is gone, so a kit file that stops carrying
+    it turns this red rather than quietly ageing nothing.
+
+    Returns the two stale files.
+    """
+    backends_dir = _backends_dir(hermetic_home=hermetic_home)
+    openai_file = backends_dir / "openai.toml"
+    portkey_file = backends_dir / "portkey.toml"
+
+    in_defaults = openai_file.read_text(encoding="utf-8")
+    aged_defaults = in_defaults.replace("[defaults]\n", f'[defaults]\n{RETIRED_BACKEND_KEY} = "{PLANTED_BACKEND_VALUE}"\n', 1)
+    if aged_defaults == in_defaults:
+        msg = f"the kit's openai.toml no longer has a [defaults] block to age: {openai_file}"
+        raise AssertionError(msg)
+    openai_file.write_text(aged_defaults, encoding="utf-8")
+
+    per_model = portkey_file.read_text(encoding="utf-8")
+    aged_models = per_model
+    for table_header in ("[gpt-4o]", '["gemini-2.5-pro"]'):
+        aged_models = aged_models.replace(f"{table_header}\n", f'{table_header}\n{RETIRED_BACKEND_KEY} = "{PLANTED_BACKEND_VALUE}"\n', 1)
+    if aged_models == per_model:
+        msg = f"the kit's portkey.toml no longer has the model tables this fixture ages: {portkey_file}"
+        raise AssertionError(msg)
+    portkey_file.write_text(aged_models, encoding="utf-8")
+
+    return openai_file, portkey_file
 
 
 def _run(*, args: list[str], env: dict[str, str], cwd: Path, answers: str | None = None) -> subprocess.CompletedProcess[str]:
@@ -355,7 +469,7 @@ class TestAPreReshapeMachine:
     """The machine this release actually meets: a main configuration written before the reshape.
 
     Everything above is planted on `telemetry-config`, whose entry nests one flat document — a
-    small change, and one that shipped before the reshape did. `pipelex-config@2` is the other
+    small change, and one that shipped before the reshape did. `pipelex-config@3` is the other
     size of thing. It renames the root tables of the file every boot reads, so the machine it
     migrates is not a corner case but every installation that predates this release, and the two
     tiers planted here are the two a real one has: the global `~/.pipelex/pipelex.toml` an install
@@ -375,8 +489,9 @@ class TestAPreReshapeMachine:
         """The whole loop through `pipelex migrate`, with the strong assertion on the global file.
 
         Migrated, it says exactly what the package's own `pipelex.toml` says today.
-        `make check-migration-schemas` already proves the *engine* turns `defaults@1` into
-        `defaults@2`; what is proved here is that the *command* does — walking two directories,
+        `make check-migration-schemas` already proves the *engine* turns the reference document the
+        reshape starts from into the one it lands on; what is proved here is that the *command*
+        does — walking two directories,
         reading a user's file off a disk, writing it back and leaving the original beside it —
         which no golden can show.
 
@@ -563,6 +678,82 @@ class TestAPreReshapeMachine:
         assert planted not in boot.stdout
         assert planted not in boot.stderr
         assert planted in global_file.read_text(encoding="utf-8"), "nothing was written, so the value is still there"
+
+
+class TestAPrePromptingStyleMachine:
+    """Two entries on one file, in the order that makes the first one's paths exist.
+
+    `pipelex-config@2` is the other half of the templating change: `#1104` deleted
+    `prompting_config` from the model and from the packaged file, and — because `pipelex init` never
+    overwrites — left it behind on every machine that had one. It is a *pre-history* entry inserted
+    below the reshape rather than appended above it, because it addresses `pipelex.prompting_config`,
+    the spelling that only exists while `[pipelex]` is still called `[pipelex]`. Appended after the
+    reshape it would find nothing, and the file would come out of the run carrying
+    `[interpreter.prompting_config]` — a table the model refuses, on a machine the tool has just
+    reported as migrated.
+
+    So the property here is not "the entry works" but "the two entries compose": one machine, one
+    run, and a file that arrives at exactly what the package ships today.
+    """
+
+    def test_the_human_command_carries_a_pre_prompting_style_machine_onto_todays_shape(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        project_dir, global_file = _plant_a_pre_prompting_style_machine(hermetic_home=hermetic_home)
+        original = global_file.read_text(encoding="utf-8")
+        planted: dict[str, Any] = load_toml_from_path(path=global_file)
+        assert "prompting_config" in planted["pipelex"], "the fixture has to start out old, or nothing below is measured"
+
+        _assert_boots(env=offline_subprocess_env, cwd=project_dir)
+
+        migrated = _run(args=[str(PIPELEX_BIN), "--no-logo", "migrate", "--yes"], env=offline_subprocess_env, cwd=project_dir)
+
+        assert migrated.returncode == 0, migrated.stdout + migrated.stderr
+        assert str(global_file) in migrated.stdout + migrated.stderr
+
+        # The whole document, against the live packaged one: the tuned per-target map is gone, the
+        # default it sat beside travels to where the reshape puts templating, and nothing else about
+        # a file that crossed two entries in one run came out different.
+        assert load_toml_from_path(path=global_file) == _todays_pipelex_config_document()
+
+        backups = existing_backups_of(path=global_file)
+        assert len(backups) == 1, f"expected exactly one backup of {global_file}, found {backups}"
+        assert backups[0].read_text(encoding="utf-8") == original
+
+        _assert_boots(env=offline_subprocess_env, cwd=project_dir)
+
+    def test_the_agent_loop_names_both_entries_for_the_one_file(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """A plan that named only the reshape would be a plan a consumer could not act on.
+
+        The order of the steps is the order they ran in, and it is the load-bearing half: a reader
+        of this plan has to be able to see that the prompting section was dealt with while it was
+        still under `[pipelex]`.
+        """
+        project_dir, global_file = _plant_a_pre_prompting_style_machine(hermetic_home=hermetic_home)
+
+        planned = _run(
+            args=[str(PIPELEX_AGENT_BIN), "migrate", "--dry-run", "--format", "json"],
+            env=offline_subprocess_env,
+            cwd=project_dir,
+        )
+        assert planned.returncode == 0, planned.stderr
+        plan: dict[str, Any] = json.loads(planned.stdout)
+
+        assert plan["is_clean"] is False
+        assert plan["needs_attention"] is False, "every path of a pre-prompting-style file is one the two entries explain"
+        stepped = {plan_dict["file_path"]: [step["title"] for step in plan_dict["steps"]] for plan_dict in plan["plans"] if plan_dict["steps"]}
+        assert stepped == {
+            str(global_file): [
+                "Prompting styles become a templating default",
+                "The configuration reshape: one scheme for the root",
+            ]
+        }
 
 
 class TestTheBootstrapPath:
@@ -886,6 +1077,207 @@ class TestAStaleTelemetryFileIsMigratedNotReset:
         assert "out of date" in printed, printed
         assert "pipelex migrate" in printed
         assert "pipelex init telemetry" not in printed
+
+
+class TestAStaleBackendDirectory:
+    """The fourth surface, end to end: `inference/backends/*.toml` on a machine set up before `#1104`.
+
+    Everything else in this module is planted on a file that sits *directly* in a configuration
+    directory. These files do not: they are the reason the walk learned to enter a subdirectory at
+    all, and the reason a file is claimed by `(directory, name)` rather than by name — the kit ships
+    a `pipelex_gateway.toml` in there, which the main configuration's `pipelex_*.toml` glob would
+    otherwise have claimed. It is present here for that reason, untouched, and the assertions say so.
+
+    What a boot *says* is not asserted here and cannot be: the probe is `pipelex-agent`, which cuts
+    logging off process-wide as its first act. The warning is asserted through the human binary
+    below, and per surface in `tests/unit/pipelex/cogt/model_backends/test_backend_boot_tolerance.py`.
+    """
+
+    def _untouched_neighbours(self, *, hermetic_home: Path, migrated: tuple[Path, ...]) -> dict[Path, bytes]:
+        """Everything in and beside the directory that no migration may rewrite.
+
+        Excluded by name rather than by extension, and the difference is the whole point of this
+        class: the kit ships `pipelex_gateway.toml` in this directory, which the main configuration's
+        `pipelex_*.toml` glob would claim by name alone, so it is the one file a walk that forgot
+        about directories would rewrite. An extension filter dropped it — and every other `.toml` in
+        here — out of the snapshot, leaving the class's own claim unasserted. Only the files the
+        fixture aged are excluded now. `inference/backends.toml` is added back from one level up,
+        which is a different claim entirely: it is a table per backend rather than a table per model,
+        and `#1104` never touched it.
+
+        The snapshot is taken before the migration runs, so the `.bak` siblings it writes never enter
+        it and cannot break the comparison.
+        """
+        backends_dir = _backends_dir(hermetic_home=hermetic_home)
+        neighbours = [path for path in sorted(backends_dir.iterdir()) if path not in migrated]
+        neighbours.append(hermetic_home / ".pipelex" / INFERENCE_DIR_NAME / BACKENDS_FILE_NAME)
+        return {path: path.read_bytes() for path in neighbours}
+
+    def test_the_human_command_repairs_the_directory_in_place_and_leaves_one_backup_per_file(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        openai_file, portkey_file = _plant_a_stale_backend_directory(hermetic_home=hermetic_home)
+        originals = {path: path.read_text(encoding="utf-8") for path in (openai_file, portkey_file)}
+        neighbours = self._untouched_neighbours(hermetic_home=hermetic_home, migrated=(openai_file, portkey_file))
+
+        _assert_boots(env=offline_subprocess_env, cwd=hermetic_home)
+
+        migrated = _run(args=[str(PIPELEX_BIN), "--no-logo", "migrate", "--yes"], env=offline_subprocess_env, cwd=hermetic_home)
+
+        assert migrated.returncode == 0, migrated.stdout + migrated.stderr
+        report = migrated.stdout + migrated.stderr
+        assert str(openai_file) in report
+        assert str(portkey_file) in report
+
+        for path, original in originals.items():
+            assert RETIRED_BACKEND_KEY not in path.read_text(encoding="utf-8"), f"{path} still carries the retired key"
+            backups = existing_backups_of(path=path)
+            assert len(backups) == 1, f"expected exactly one backup of {path}, found {backups}"
+            assert backups[0].read_text(encoding="utf-8") == original
+        assert {path: path.read_bytes() for path in neighbours} == neighbours
+
+        _assert_boots(env=offline_subprocess_env, cwd=hermetic_home)
+
+    def test_a_second_run_writes_nothing_and_leaves_no_second_backup(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """Replay neutrality over a directory, which is where it is easiest to get wrong.
+
+        Every file of the surface is replayed on every run — twenty of them here — so a run that
+        was not neutral would show up as twenty backups of files nothing was ever wrong with.
+        """
+        openai_file, portkey_file = _plant_a_stale_backend_directory(hermetic_home=hermetic_home)
+
+        first = _run(args=[str(PIPELEX_AGENT_BIN), "migrate", "--yes", "--format", "json"], env=offline_subprocess_env, cwd=hermetic_home)
+        assert first.returncode == 0, first.stderr
+        assert json.loads(first.stdout)["summary"]["files_written"] == 2
+
+        after_first = {path: path.read_bytes() for path in sorted(_backends_dir(hermetic_home=hermetic_home).iterdir())}
+
+        second = _run(args=[str(PIPELEX_AGENT_BIN), "migrate", "--yes", "--format", "json"], env=offline_subprocess_env, cwd=hermetic_home)
+        assert second.returncode == 0, second.stderr
+        outcome: dict[str, Any] = json.loads(second.stdout)
+        assert outcome["is_clean"] is True
+        assert outcome["summary"]["files_written"] == 0
+        assert {path: path.read_bytes() for path in sorted(_backends_dir(hermetic_home=hermetic_home).iterdir())} == after_first
+        for path in (openai_file, portkey_file):
+            assert len(existing_backups_of(path=path)) == 1
+
+    def test_the_agent_loop_names_both_files_the_entry_and_its_operation(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        openai_file, portkey_file = _plant_a_stale_backend_directory(hermetic_home=hermetic_home)
+        original = openai_file.read_text(encoding="utf-8")
+
+        planned = _run(
+            args=[str(PIPELEX_AGENT_BIN), "migrate", "--dry-run", "--format", "json"],
+            env=offline_subprocess_env,
+            cwd=hermetic_home,
+        )
+
+        assert planned.returncode == 0, planned.stderr
+        plan: dict[str, Any] = json.loads(planned.stdout)
+        assert plan["applied"] is False
+        assert plan["needs_attention"] is False, "the ledger explains every key these files carry"
+        assert plan["summary"]["files_changed"] == 2
+
+        changed = {plan_dict["file_path"]: plan_dict for plan_dict in plan["plans"] if plan_dict["steps"]}
+        assert set(changed) == {str(openai_file), str(portkey_file)}
+        for plan_dict in changed.values():
+            assert [step["entry_id"] for step in plan_dict["steps"]] == [f"{INFERENCE_BACKEND_CONFIG_SURFACE_ID}@2"]
+            ops = [op for step in plan_dict["steps"] for op in step["applied_ops"]]
+            assert [(op["kind"], op["key"]) for op in ops] == [("delete_key", RETIRED_BACKEND_KEY)]
+
+        assert openai_file.read_text(encoding="utf-8") == original, "a plan is not a write"
+        assert existing_backups_of(path=openai_file) == []
+
+    def test_no_channel_renders_the_value_the_files_carry(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """The standing rule, on the surface whose files hold a value per model rather than per key.
+
+        The operation is a delete, so what a report *could* leak is the value it is deleting — which
+        is why the fixture plants a marker rather than a plausible-looking one: an assertion that
+        passed because the value happened to look like ledger text would prove nothing.
+        """
+        _plant_a_stale_backend_directory(hermetic_home=hermetic_home)
+
+        channels = [
+            _run(args=[str(PIPELEX_BIN), "--no-logo", "migrate", "--dry-run"], env=offline_subprocess_env, cwd=hermetic_home),
+            _run(
+                args=[str(PIPELEX_AGENT_BIN), "migrate", "--dry-run", "--format", "json"],
+                env=offline_subprocess_env,
+                cwd=hermetic_home,
+            ),
+            _run(
+                args=[str(PIPELEX_AGENT_BIN), "migrate", "--dry-run", "--format", "markdown"],
+                env=offline_subprocess_env,
+                cwd=hermetic_home,
+            ),
+            _run(args=[str(PIPELEX_BIN), "--no-logo", "migrate", "--yes"], env=offline_subprocess_env, cwd=hermetic_home),
+        ]
+        for channel in channels:
+            assert PLANTED_BACKEND_VALUE not in channel.stdout
+            assert PLANTED_BACKEND_VALUE not in channel.stderr
+
+    def test_the_doctor_row_names_the_backend_files_and_goes_quiet_once_they_are_migrated(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """The one channel a machine has for a pending migration, now that a stale directory boots."""
+        openai_file, portkey_file = _plant_a_stale_backend_directory(hermetic_home=hermetic_home)
+
+        checked = _run(args=[str(PIPELEX_AGENT_BIN), "doctor", "--format", "json"], env=offline_subprocess_env, cwd=hermetic_home)
+        row: dict[str, Any] = json.loads(checked.stdout)["checks"]["pending_migrations"]
+
+        assert row["finding"] == "pending"
+        assert sorted(row["migratable_files"]) == sorted([str(openai_file), str(portkey_file)])
+
+        _run(args=[str(PIPELEX_AGENT_BIN), "migrate", "--yes", "--format", "json"], env=offline_subprocess_env, cwd=hermetic_home)
+
+        rechecked = _run(args=[str(PIPELEX_AGENT_BIN), "doctor", "--format", "json"], env=offline_subprocess_env, cwd=hermetic_home)
+        assert json.loads(rechecked.stdout)["checks"]["pending_migrations"]["finding"] == "up_to_date"
+
+    def test_a_person_booting_the_stale_machine_is_told_and_stops_being_told_once_it_is_migrated(
+        self,
+        hermetic_home: Path,
+        offline_subprocess_env: dict[str, str],
+    ) -> None:
+        """The warning itself, through the human binary — the half `pipelex-agent` cannot show.
+
+        `show backends` is the cheapest human command that performs the inference half of a boot,
+        which is where the backend library is loaded and where a directory the ledger carried
+        forward is reported. The second run is what makes it a warning about staleness rather than
+        a line the command always prints.
+        """
+        openai_file, portkey_file = _plant_a_stale_backend_directory(hermetic_home=hermetic_home)
+
+        booted = _run(args=[str(PIPELEX_BIN), "--no-logo", "show", "backends"], env=offline_subprocess_env, cwd=hermetic_home)
+
+        assert booted.returncode == 0, booted.stdout + booted.stderr
+        printed = booted.stdout + booted.stderr
+        # The warning's own opening words, not a phrase it shares with the deck-staleness notice
+        # this same boot prints — "out of date" alone would match either of them.
+        assert STALE_CONFIGURATION_OPENING in printed
+        assert "pipelex migrate" in printed
+        assert PLANTED_BACKEND_VALUE not in printed
+        for path in (openai_file, portkey_file):
+            assert existing_backups_of(path=path) == [], "a boot writes nothing"
+
+        _run(args=[str(PIPELEX_AGENT_BIN), "migrate", "--yes", "--format", "json"], env=offline_subprocess_env, cwd=hermetic_home)
+
+        rebooted = _run(args=[str(PIPELEX_BIN), "--no-logo", "show", "backends"], env=offline_subprocess_env, cwd=hermetic_home)
+        assert rebooted.returncode == 0, rebooted.stdout + rebooted.stderr
+        assert STALE_CONFIGURATION_OPENING not in rebooted.stdout + rebooted.stderr
 
 
 class TestTheDoctorReportsAndRepairsAStaleMachine:
