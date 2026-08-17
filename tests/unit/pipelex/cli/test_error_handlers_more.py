@@ -236,7 +236,7 @@ class TestErrorHandlersExtended:
         """
         exc = TelemetryConfigValidationError(
             "extra forbidden field: 'telemetry_mode'",
-            migration=MigrationErrorBlock(remedy=MIGRATE_COMMAND, needs_attention=False, plans=[]),
+            migration=MigrationErrorBlock(remedy=MIGRATE_COMMAND, would_write=True, needs_attention=False, plans=[]),
         )
 
         with pytest.raises(typer.Exit) as exc_info:
@@ -247,6 +247,27 @@ class TestErrorHandlersExtended:
         assert MIGRATE_COMMAND in output
         assert "does not start it over" in output
         assert "init telemetry" not in output
+
+    def test_handle_telemetry_config_validation_error_on_a_file_the_migration_would_not_write(self, console: Console) -> None:
+        """A block is not a promise that a command repairs the file.
+
+        The block's presence used to be the whole branch, so a file whose only finding is a path no
+        entry explains was answered with *run `pipelex migrate` to bring your configuration up to
+        date* — a run that visits the file, writes nothing, and leaves this same error behind.
+        """
+        exc = TelemetryConfigValidationError(
+            "extra forbidden field: 'not_a_telemetry_setting'",
+            migration=MigrationErrorBlock(remedy=MIGRATE_COMMAND, would_write=False, needs_attention=True, plans=[]),
+        )
+
+        with pytest.raises(typer.Exit) as exc_info:
+            handle_telemetry_config_validation_error(exc)
+
+        assert exc_info.value.exit_code == 1
+        output = console.export_text()
+        assert "Correct the settings named above" in output
+        assert f"{MIGRATE_COMMAND} --dry-run" in output
+        assert "init telemetry" not in output, "a file the migration cannot repair is still never answered with a reset"
 
     def test_handle_gateway_terms_not_accepted_error(self, console: Console) -> None:
         """The terms handler points at init config and the BYOK alternative."""

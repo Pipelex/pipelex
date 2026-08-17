@@ -352,3 +352,73 @@ class TestNoValueFromAUsersFileIsEverRendered:
         )
         assert self.PLANTED_SECRET not in report.message
         assert self.PLANTED_SECRET not in json.dumps(report.migration.model_dump(mode="json"))
+
+
+class TestARemedyIsNamedOnlyWhereItWouldWrite:
+    """`would_write` — the field that separates *there is something to say* from *this repairs it*.
+
+    A block's presence means the migration engine had something to report about these files. It
+    does not mean the remedy would rewrite them: a file whose only finding is a path no entry
+    explains, or an entry blocked before any of its operations landed, produces a block with
+    nothing to apply. Naming the command there sends a reader to a run that writes nothing and
+    leaves the error exactly where it was — which is the failure this field exists to prevent.
+    """
+
+    def test_a_file_the_ledger_carries_forward_would_be_written(self, machine: Path) -> None:
+        machine.joinpath("telemetry.toml").write_text(_old_shape_telemetry_document(), encoding="utf-8")
+
+        report = report_validation_error(validation_error=_make_validation_error(), surface_id=TELEMETRY_CONFIG_SURFACE_ID)
+
+        assert report.migration is not None
+        assert report.migration.would_write is True
+        assert f"Run `{MIGRATE_COMMAND}` to bring these files up to date." in report.message
+
+    def test_a_file_with_nothing_to_apply_is_sent_to_the_dry_run_instead(self, machine: Path) -> None:
+        """The specimen the old wording got wrong: `pipelex-config` ships an entry-free ledger, so an
+        unknown root key is the whole finding and there is not one operation behind it.
+        """
+        machine.joinpath("pipelex.toml").write_text("not_a_real_setting = true\n", encoding="utf-8")
+
+        report = report_validation_error(validation_error=_make_validation_error(), surface_id=PIPELEX_CONFIG_SURFACE_ID)
+
+        assert report.migration is not None
+        assert report.migration.would_write is False
+        assert f"Run `{MIGRATE_COMMAND}` to bring these files up to date." not in report.message
+        assert f"{MIGRATE_COMMAND} --dry-run" in report.message
+        assert "by hand" in report.message
+
+    def test_a_block_that_would_write_nothing_and_needs_nobody_is_unreachable(self, machine: Path) -> None:
+        """The invariant that lets a reader treat the two flags as an exhaustive pair.
+
+        A plan is in the block only when it is not clean, and a plan that is not clean carries at
+        least one of a step, an applied operation under a blocked entry, a blocked entry, a path no
+        entry explains, or a file that could not be read — the first two make `would_write` true and
+        the rest make `needs_attention` true. Both specimens are checked, since between them they
+        cover both sides of the pair.
+        """
+        machine.joinpath("telemetry.toml").write_text(f"{_old_shape_telemetry_document()}\nnot_a_real_setting = true\n", encoding="utf-8")
+
+        report = report_validation_error(validation_error=_make_validation_error(), surface_id=TELEMETRY_CONFIG_SURFACE_ID)
+
+        assert report.migration is not None
+        assert report.migration.would_write, "the flat body is carried forward"
+        assert report.migration.needs_attention, "and the unknown key beside it is nobody's but a person's"
+
+    def test_a_file_that_is_both_old_and_wrong_is_not_promised_a_full_repair(self, machine: Path) -> None:
+        """The mixed case: the command would write, and something would still be there afterwards.
+
+        `would_write` picks the opening and closing sentences, and this specimen is on its true side —
+        but the closing sentence used to promise that the run brings the files up to date, over a
+        file whose unknown key it will not touch. The paragraph has just listed what the command
+        cannot do; its last sentence must not take that back.
+        """
+        machine.joinpath("telemetry.toml").write_text(f"{_old_shape_telemetry_document()}\nnot_a_real_setting = true\n", encoding="utf-8")
+
+        report = report_validation_error(validation_error=_make_validation_error(), surface_id=TELEMETRY_CONFIG_SURFACE_ID)
+
+        assert report.migration is not None
+        assert report.migration.would_write is True
+        assert "'not_a_real_setting', which this build knows nothing about" in report.message
+        assert f"Run `{MIGRATE_COMMAND}` to bring these files up to date." not in report.message
+        assert f"Run `{MIGRATE_COMMAND}` to carry forward what it can" in report.message
+        assert "yours to fix" in report.message

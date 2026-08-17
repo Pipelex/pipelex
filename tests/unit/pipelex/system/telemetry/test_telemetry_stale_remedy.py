@@ -140,3 +140,30 @@ class TestNoValueFromAUsersFileIsEverRendered:
         assert PLANTED_KEY not in exc.message
         assert exc.migration is not None
         assert PLANTED_KEY not in str(exc.migration.model_dump(mode="json"))
+
+
+class TestTheRemedyIsNamedOnlyWhereItWouldWrite:
+    """A block says the migration history has something to report; it does not say a command fixes it.
+
+    The two specimens below produce the same structured shape — a block, on a `telemetry.toml` that
+    refused — and the same command would do opposite things to them. One is rewritten and repaired;
+    the other is read, left untouched, and still refuses afterwards.
+    """
+
+    def test_a_file_the_ledger_carries_forward_is_told_to_run_the_command(self, global_dir: Path) -> None:
+        exc = load_and_capture(config_dir=global_dir, body=f"{old_shape_document()}\n{UNKNOWN_KEY} = true\n")
+
+        assert exc.migration is not None
+        assert exc.migration.would_write is True
+        # The specimen is both old and wrong, so the command is named for what it carries forward
+        # and the unknown key is left where it belongs — with a person.
+        assert f"Run `{MIGRATE_COMMAND}` to carry forward what it can; the rest is yours to fix." in exc.message
+
+    def test_a_file_with_nothing_to_apply_is_told_to_read_the_dry_run(self, global_dir: Path) -> None:
+        """An unknown root key on a file that is otherwise current: a finding without a single step."""
+        exc = load_and_capture(config_dir=global_dir, body=f'[custom_posthog]\nmode = "off"\n{UNKNOWN_KEY} = true\n')
+
+        assert exc.migration is not None
+        assert exc.migration.would_write is False
+        assert f"Run `{MIGRATE_COMMAND}` to bring these files up to date." not in exc.message
+        assert f"{MIGRATE_COMMAND} --dry-run" in exc.message
