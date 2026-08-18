@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:530a92f6f7fc70d71971da1903871a8504ee180563edca29af83118ba74f6cfe"
+digest = "sha256:c9397a992e49ffb14028f68fde3587b3127f88f7928519a75c0f0f9eabc7312f"
 reviewed_by = "Claude (Opus 5 (1M context))"
-reviewed_at = "2026-08-18T12:29:11Z"
-rationale = "init_config now writes a .pipelex/.gitignore, so pipelex init has a new user-visible artifact. Found one stale target and fixed it: the What Gets Initialized list in docs/tools/cli/init.md is a set claim about what the command creates, and it rots by omission - the new file appears nowhere in it - so I added the entry rather than leaving the list quietly incomplete. Also extended the backup section of docs/tools/cli/migrate.md, since migrate ensures the same file for a directory that predates it. Re-derived the reach and the guard from the code rather than from any docstring: both pipelex init and pipelex-agent init call init_config, and both migrate commands call migrate_config_directories, so the write is on every path; each call site guards it with 'if not dry_run', and agent_migrate_cmd passes dry_run = not yes while the bare command's first pass is dry_run=True, which is what keeps the agent-CLI contract's claim that migrate writes only with --yes true. No flag, format, stream, structured field, verdict or exit code moved, so pipelex/cli/agent_cli/CLAUDE.md needed no edit - I checked its migrate report contract line and its migrate command-table row specifically."
+reviewed_at = "2026-08-18T14:03:11Z"
+rationale = "pipelex migrate now ensures the config-directory .gitignore on its clean early-return path, so the reach of that file changed and the account in docs/tools/cli/migrate.md was stale by omission: it read as any real migrate, when the write pass was in fact the only site, which excluded exactly the machines that have nothing to migrate. Extended that paragraph to say the rule lands on a run that finds nothing to carry forward, and that a declined migration still writes nothing. init.md needed no edit since the pipelex init path is untouched. Re-derived the agent-CLI claims from the code rather than from the previous ack: agent_migrate_cmd passes dry_run = not yes into migrate_config_directories and the ensure sits under if not dry_run, so the migrate row claim that it writes only with --yes still holds, and the new write is neither reported nor rendered, so the migrate report-contract line is unchanged. Also re-checked the claim that doctor --fix runs the same run: doctor reaches migrate_config_directories with dry_run False through apply_pending_migrations, so that stays true for the pending-migration case the sentence describes."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -105,7 +105,7 @@ rationale = "init_config now writes a .pipelex/.gitignore, so pipelex init has a
 "pipelex/cli/commands/init/ui/types.py" = "blob:1361f29ca95bacc90bca90ea6c0e39f44b6734ab"
 "pipelex/cli/commands/login/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/login/command.py" = "blob:ace1db9879626cc1722adaac12761aadaa6b24ed"
-"pipelex/cli/commands/migrate_cmd.py" = "blob:ffd3b0ff4fb8448bd03204b4381fb4f214a88271"
+"pipelex/cli/commands/migrate_cmd.py" = "blob:da0a6e4d2f4f730ec27a084f0a013debe10217b0"
 "pipelex/cli/commands/plugins_cmd.py" = "blob:9657b713c3650ff4a929e92ae68af453d896393e"
 "pipelex/cli/commands/resolve_cmd.py" = "blob:2928a0e26eab7983367a59a78533f6618817feba"
 "pipelex/cli/commands/run/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
