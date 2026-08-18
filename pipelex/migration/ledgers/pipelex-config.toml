@@ -95,9 +95,8 @@ moving it somewhere else:
 - `boot_orchestrator`, if anyone ever wrote it into a file, is dropped because it is a boot \
   argument (`--orchestrator`, or `Pipelex.setup(boot_orchestrator=...)`), not a setting.
 
-A moved section may appear at the end of the migrated file rather than where it was, and a banner \
-comment introducing a moved section stays behind, now labelling whatever followed it. Both are \
-expected; the file is otherwise untouched.
+A moved section may appear at the end of the migrated file rather than where it was, and it takes \
+the comment banner that introduced it along. That is expected; the file is otherwise untouched.
 """
 
 # --- Kernel-layer infrastructure out of [pipelex], into [runtime] ------------------------------
