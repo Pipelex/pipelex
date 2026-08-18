@@ -35,8 +35,7 @@ model_id = "Qwen/Qwen-Image"
 inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.0, output = 0.0 }
-variant = "fal-ai"
-# variant = "replicate"
+variant = "fal-ai"                    # alternative: "replicate"
 
 [qwen-image.rules]
 model_choice = "model_id"

@@ -18,8 +18,9 @@ jobs:
 #     free ubuntu-latest runner. 8 free 4-vCPU runners beat one paid 8-vCPU
 #     Azure box on wall clock (~2m vs 6m20s) at zero cost — vertical scale is
 #     what Azure sells; horizontal scale is free and unlimited on this plan.
-#     Regenerate .test_durations (`pytest --store-durations`) every few months
-#     or the groups drift out of balance.
+#     Refresh .test_durations with `make store-test-durations` (incremental —
+#     it measures only tests missing from the map). What unbalances the groups
+#     is missing coverage, not stale values: see docs/contribute/test-duration-map.md.
 # --------------------------------------------------------------------------
   matrix-test:
     name: Tests (py3.11, shard ${{ matrix.group }}/8)

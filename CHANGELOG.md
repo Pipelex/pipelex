@@ -1,5 +1,15 @@
 # Changelog
 
+## [v0.46.1] - 2026-08-18
+
+### Changed
+
+- **Test-duration map refresh is now incremental (developer tooling):** `make store-test-durations` (`std`) no longer re-runs the whole suite. It collects the tests, measures only the ones missing from `.test_durations`, and leaves recorded values alone — which takes seconds when little has been added, instead of several minutes. This is driven by what actually unbalances the CI shards: measured against the real eight-way split, a map with stale values but complete coverage costs about 7% of balance, while one with current values and missing entries costs over 50%, because `pytest-split` imputes an unknown test at the suite mean (~0.25s) when the median test is ~0.002s. Added `make store-test-durations-force` (`stdf`) for the occasional full re-measurement. The refresh now also prunes entries whose test file no longer exists, making the `test_test_durations_paths` gate self-healing, and keeps any recorded value that has not meaningfully moved, which cuts the release diff for that file by about 95% — it had grown large enough that automated PR reviewers declined to read the branch at all. New page: `docs/contribute/test-duration-map.md`.
+
+### Fixed
+
+- **Migrator comment fidelity:** Fixed `pipelex migrate` so structural operations no longer leave comment banners behind or attach them to the wrong sections. Moved keys and tables now carry their introducing comment block with them; deleted keys and tables now drop their introducing comment block; items appended under an existing table now land *before* that table's trailing banner; and the `.mthds` fix path now drops comments above stripped native-concept redeclarations. Note: files already migrated by v0.46.0 are not rewritten automatically—tidy the comments by hand or restore the `.bak` files and re-run `pipelex migrate`.
+
 ## [v0.46.0] - 2026-08-17
 
 ### Added

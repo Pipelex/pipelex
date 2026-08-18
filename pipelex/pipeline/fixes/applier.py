@@ -4,7 +4,9 @@ Two clearly-separated steps, because they preserve different things — do not c
 
 - ``apply_fix_ops`` mutates the tomlkit DOM **in place**, never rebuilding containers, so at the
   DOM level tomlkit keeps the comments, ordering, and table style of untouched content (and of
-  the patched line itself) by construction. A caller that wants the mutated-but-unformatted DOM
+  the patched line itself) by construction. What tomlkit does *not* do on its own is keep a
+  comment on the item it introduces when that item moves or goes — the "Comment fidelity"
+  helpers below do that, see their heading. A caller that wants the mutated-but-unformatted DOM
   stops here.
 - ``serialize_and_format`` then serializes the whole DOM and hands it to the MTHDS formatter
   (``pipelex_tools.format_mthds``) for the one canonical style. This is a **whole-file** reflow:
@@ -29,7 +31,7 @@ from pipelex_tools import format_mthds
 from pydantic import BaseModel, ConfigDict, Field
 from tomlkit import TOMLDocument
 from tomlkit.container import Container, OutOfOrderTableProxy
-from tomlkit.items import AbstractTable, AoT, Item, Key, SingleKey, Table
+from tomlkit.items import AbstractTable, AoT, Comment, Item, Key, Null, SingleKey, Table, Whitespace
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.suggested_fix import (
@@ -265,6 +267,500 @@ def _rehome_key_indexes(*, container: Container, key: str, renamed: SingleKey, i
         dict.__setitem__(container, renamed.key, item.value)  # noqa: PLC2801 # pyright: ignore[reportUnknownMemberType]
 
 
+# --- Comment fidelity: the trivia that introduces an item goes where the item goes -----------------
+#
+# tomlkit keeps own-line comments and blank lines as keyless body entries (``Comment``,
+# ``Whitespace``), positioned wherever the parser met them: a comment above a key sits before that
+# key in the same container, and a banner written above a ``[table]`` header sits at the *tail of
+# the previous table in document order* — inside its deepest last container — because everything up
+# to the next header belongs to the table being parsed. Nothing ties either run to the item it
+# visibly introduces, so a plain ``del`` + re-add of a table leaves its banner behind (now labelling
+# whatever followed) and carries the *next* table's banner away inside the moved body; appending
+# under an existing table lands *after* that table's trailing banner, stealing it the same way.
+#
+# The rule the helpers below implement is the one a reader applies: **the last block of own-line
+# comments before an item, with the blank line above it and anything below it, introduces that
+# item.** Earlier blocks in the same run — a file preamble, a note closing the previous section —
+# stay where they are; a run holding no comment at all is spacing and travels whole. A moved item
+# takes its introduction along and leaves its trailing run, the next item's introduction, where it
+# was; a deleted item drops its introduction and keeps its trailing run in place; an item inserted at
+# the end of a container lands before that container's trailing run, never after it. Trivia is
+# always put back where the parser would have put it — a previous table's deepest tail rather than
+# a super-table's own body — so no implicit ``[parent]`` header starts rendering because a comment
+# now sits inside it. Inline tables are left alone: their whitespace entries are layout.
+
+
+class _TriviaRun(NamedTuple):
+    """The positions of a run of comment/blank-line entries in one container's body, ascending."""
+
+    container: Container
+    positions: list[int]
+
+    def items(self) -> list[Item]:
+        return [self.container.body[position][1] for position in self.positions]
+
+
+class _Slot(NamedTuple):
+    """One key's place in the document: the concrete container holding it and its body positions.
+
+    ``owner`` is the table whose ``.value`` the container is — one chunk of it, for a key of an
+    out-of-order table — and ``None`` at the document root.
+    """
+
+    container: Container
+    positions: list[int]
+    owner: Table | None
+
+    @property
+    def first(self) -> int:
+        return self.positions[0]
+
+    @property
+    def last(self) -> int:
+        return self.positions[-1]
+
+
+def _is_trivia(*, item: Item) -> bool:
+    return isinstance(item, (Comment, Whitespace))
+
+
+def _last_container(*, item: Item) -> Container | None:
+    """The container whose tail is the tail of ``item`` in document order, or ``None`` for a leaf.
+
+    Only block tables and arrays of tables extend across lines; an inline table renders on its
+    key's line and never owns any trailing trivia.
+    """
+    if isinstance(item, Table):
+        return item.value
+    if isinstance(item, AoT):
+        return item.body[-1].value if item.body else None
+    if isinstance(item, OutOfOrderTableProxy):
+        return item._tables[-1].value  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+    return None
+
+
+def _renders_header(*, table: Table, key: Key | None) -> bool:
+    """Whether tomlkit writes a ``[header]`` line for ``table``, stored under ``key`` — mirrors ``Container._render_table``.
+
+    An implicit super table has none: ``[a.b]`` written without ``[a]``, or a dotted assignment
+    ``a.b = 1`` whose owning key is dotted, so its scalars render on their own lines. Trivia sitting
+    above such a table's first entry is, to a reader, above the first entry's own header.
+    """
+    if not table.is_super_table():
+        return True
+    if key is not None and key.is_dotted():
+        return False
+    body = table.value.body
+    if any(not isinstance(item, (Table, AoT, Whitespace, Null)) for _, item in body):
+        return True
+    return any(body_key is not None and body_key.is_dotted() for body_key, item in body if isinstance(item, Table))
+
+
+def _key_slot(*, parent_table: dict[str, Any], key: str) -> _Slot:
+    """Where ``key`` is stored beneath ``parent_table``.
+
+    A key written as several dotted chunks has several positions in one container, and a key of an
+    out-of-order table can sit in any of the proxy's chunks: the chunk holding the key's first
+    position is the one taken, since that is where the key's introduction is.
+    """
+    candidates: list[tuple[Container, Table | None]]
+    if isinstance(parent_table, OutOfOrderTableProxy):
+        candidates = [(sub_table.value, sub_table) for sub_table in parent_table._tables if key in sub_table]  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+    elif isinstance(parent_table, Table):
+        candidates = [(parent_table.value, parent_table)]
+    elif isinstance(parent_table, Container):
+        candidates = [(parent_table, None)]
+    else:
+        msg = f"cannot locate key '{key}' in unsupported tomlkit node type '{type(parent_table).__name__}' — applier bug"
+        raise PipelexUnexpectedError(msg)
+    for container, owner in candidates:
+        position = container._map.get(SingleKey(key))  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        if position is None:
+            continue
+        positions = sorted(position) if isinstance(position, tuple) else [position]
+        return _Slot(container=container, positions=positions, owner=owner)
+    msg = f"key '{key}' is in the parent's facade but in none of its body entries — applier bug"
+    raise PipelexUnexpectedError(msg)
+
+
+def _slot_chain(*, toml_doc: TOMLDocument, path: list[str]) -> list[_Slot]:
+    """The slot of every segment of ``path``, root first — the ancestry a climb through implicit parents needs.
+
+    Stops short at an inline table: nothing beneath one carries introductions.
+    """
+    chain: list[_Slot] = []
+    node = cast("dict[str, Any]", toml_doc)
+    for segment in path:
+        if not _carries_trivia(parent_table=node):
+            break
+        chain.append(_key_slot(parent_table=node, key=segment))
+        node = cast("dict[str, Any]", node[segment])
+    return chain
+
+
+def _carries_trivia(*, parent_table: dict[str, Any]) -> bool:
+    """Whether the parent is a container whose comments and blank lines are introductions.
+
+    An inline table's whitespace entries are its layout, so the fidelity rule stays out of it.
+    """
+    return isinstance(parent_table, (Table, Container, OutOfOrderTableProxy))
+
+
+def _run_before(*, container: Container, index: int) -> _TriviaRun:
+    """The trivia run right before the body entry at ``index`` — possibly inside a previous table.
+
+    Walks back over comments and blank lines (``Null`` placeholders left by an earlier removal are
+    transparent). When nothing was collected and the entry before is a table, the run is that
+    table's trailing run in document order, so the walk descends into its deepest last container.
+    Trivia found at this level wins over a deeper tail: it is what the parser put here.
+    """
+    positions: list[int] = []
+    for position in range(index - 1, -1, -1):
+        _, item = container.body[position]
+        if isinstance(item, Null):
+            continue
+        if _is_trivia(item=item):
+            positions.insert(0, position)
+            continue
+        if not positions:
+            deeper = _last_container(item=item)
+            if deeper is not None:
+                return _trailing_run(container=deeper)
+        break
+    return _TriviaRun(container=container, positions=positions)
+
+
+def _run_after(*, container: Container, index: int) -> _TriviaRun:
+    """The trivia run right after the body entry at ``index``, at this level only."""
+    positions: list[int] = []
+    for position in range(index + 1, len(container.body)):
+        _, item = container.body[position]
+        if isinstance(item, Null):
+            continue
+        if not _is_trivia(item=item):
+            break
+        positions.append(position)
+    return _TriviaRun(container=container, positions=positions)
+
+
+def _first_entry_after(*, container: Container, index: int) -> Item | None:
+    """The first body entry after ``index`` that is neither a ``Null`` placeholder nor trivia."""
+    for position in range(index + 1, len(container.body)):
+        _, item = container.body[position]
+        if isinstance(item, Null) or _is_trivia(item=item):
+            continue
+        return item
+    return None
+
+
+def _trailing_run(*, container: Container) -> _TriviaRun:
+    """The trivia run at the tail of ``container`` in document order — its own, or its last table's."""
+    return _run_before(container=container, index=len(container.body))
+
+
+def _introduction(*, run: _TriviaRun, at_document_start: bool = False) -> _TriviaRun:
+    """The part of a run that introduces what follows it: the last comment block, its leading blank line, and what trails it.
+
+    A run with no comment is spacing and is taken whole. Earlier comment blocks stay put — a file
+    preamble above the first section's banner, or a closing note under the previous section. At the
+    very top of the document, a *lone* comment block that a blank line separates from what follows
+    is the file's preamble and stays too: only the blank line after it travels.
+    """
+    items = run.items()
+    last_comment = max((index for index, item in enumerate(items) if isinstance(item, Comment)), default=None)
+    if last_comment is None:
+        return run
+    start = last_comment
+    while start > 0 and isinstance(items[start - 1], Comment):
+        start -= 1
+    is_lone_block = not any(isinstance(item, Comment) for item in items[:start])
+    is_set_apart = last_comment + 1 < len(items) and isinstance(items[last_comment + 1], Whitespace)
+    if at_document_start and is_lone_block and is_set_apart:
+        return _TriviaRun(container=run.container, positions=run.positions[last_comment + 1 :])
+    if start > 0 and isinstance(items[start - 1], Whitespace):
+        start -= 1
+    return _TriviaRun(container=run.container, positions=run.positions[start:])
+
+
+def _at_document_start(*, run: _TriviaRun) -> bool:
+    """Whether the run is the first thing in the file — only a root-level run can be."""
+    if not isinstance(run.container, TOMLDocument):
+        return False
+    return not run.positions or _is_first_entry(container=run.container, index=run.positions[0])
+
+
+def _is_first_entry(*, container: Container, index: int) -> bool:
+    return all(isinstance(item, Null) for _, item in container.body[:index])
+
+
+def _owner_position(*, chain: list[_Slot]) -> int | None:
+    """Where the last link's owner sits in its parent's container — ``None`` at the root, or once it is gone.
+
+    Gone happens: deleting the last key of one chunk of an out-of-order table makes tomlkit drop the
+    emptied chunk from the parent, leaving a ``Null`` where the chunk was.
+    """
+    if len(chain) < 2:
+        return None
+    owner = chain[-1].owner
+    parent_container = chain[-2].container
+    for position in chain[-2].positions:
+        if parent_container.body[position][1] is owner:
+            return position
+    return None
+
+
+def _owner_key(*, chain: list[_Slot]) -> Key | None:
+    """The key the last link's owner is stored under in its parent — ``None`` at the root, or once it is gone."""
+    position = _owner_position(chain=chain)
+    if position is None:
+        return None
+    return chain[-2].container.body[position][0]
+
+
+def _implicit_owner_position(*, chain: list[_Slot]) -> int | None:
+    """Where the last link's owner sits in its own parent's container, when that owner renders no header.
+
+    That is the one situation in which the entries of a table are, to a reader, entries of whatever
+    encloses it: the trivia above the owner introduces the owner's first entry, and trivia meant for
+    the owner's first entry belongs above the owner. ``None`` when the owner writes a header (or is
+    the document root), or when the chain does not reach the parent.
+    """
+    if len(chain) < 2:
+        return None
+    owner = chain[-1].owner
+    if owner is None or _renders_header(table=owner, key=_owner_key(chain=chain)):
+        return None
+    position = _owner_position(chain=chain)
+    if position is None:
+        msg = "an out-of-order chunk is not among its parent's body positions — applier bug"
+        raise PipelexUnexpectedError(msg)
+    return position
+
+
+def _introduction_of_slot(*, chain: list[_Slot]) -> _TriviaRun:
+    """The introduction of the key at the end of ``chain``, climbing through implicit parents.
+
+    A key that is the first entry of a table with no rendered header — ``[runtime.storage]`` at the
+    top of a file that never writes ``[runtime]`` — is introduced by whatever sits above the parent.
+    """
+    slot = chain[-1]
+    run = _run_before(container=slot.container, index=slot.first)
+    if run.positions or not _is_first_entry(container=slot.container, index=slot.first):
+        return _introduction(run=run, at_document_start=_at_document_start(run=run))
+    owner_position = _implicit_owner_position(chain=chain)
+    if owner_position is None:
+        return _introduction(run=run, at_document_start=_at_document_start(run=run))
+    return _introduction_of_slot(chain=[*chain[:-2], chain[-2]._replace(positions=[owner_position])])
+
+
+def _shift_map(*, container: Container, from_index: int, delta: int) -> None:
+    """Keep the container's key→position index in step with a body insert or removal at ``from_index``."""
+    key_map = container._map  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+    for map_key, position in list(key_map.items()):
+        if isinstance(position, tuple):
+            key_map[map_key] = tuple(chunk + delta if chunk >= from_index else chunk for chunk in position)
+        elif position >= from_index:
+            key_map[map_key] = position + delta
+
+
+def _detach_run(*, run: _TriviaRun) -> list[Item]:
+    """Remove the run's entries from their container's body, returning them in document order."""
+    detached: list[Item] = []
+    for position in reversed(run.positions):
+        _, item = run.container.body.pop(position)
+        detached.insert(0, item)
+        _shift_map(container=run.container, from_index=position, delta=-1)
+    return detached
+
+
+def _insert_trivia_at(*, container: Container, index: int, items: Sequence[Item]) -> None:
+    for offset, item in enumerate(items):
+        container.body.insert(index + offset, (None, item))
+    if items:
+        _shift_map(container=container, from_index=index, delta=len(items))
+
+
+def _tail_slot(*, container: Container) -> tuple[Container, int]:
+    """Where an entry appended to ``container`` lands last in document order: after its last table's body."""
+    for position in range(len(container.body) - 1, -1, -1):
+        _, item = container.body[position]
+        if isinstance(item, Null):
+            continue
+        deeper = _last_container(item=item)
+        if deeper is not None:
+            return _tail_slot(container=deeper)
+        break
+    return container, len(container.body)
+
+
+def _insert_before(*, chain: list[_Slot], index: int, items: Sequence[Item]) -> None:
+    """Insert trivia so that it renders right before body entry ``index`` of the last chain link's container.
+
+    Put where the parser would have put it: at the tail of the previous table when there is one,
+    above an implicit parent when the entry is the first of a table with no rendered header, and at
+    this level otherwise.
+    """
+    if not items:
+        return
+    slot = chain[-1]
+    for position in range(index - 1, -1, -1):
+        _, item = slot.container.body[position]
+        if isinstance(item, Null):
+            continue
+        deeper = _last_container(item=item)
+        if deeper is None:
+            _insert_trivia_at(container=slot.container, index=index, items=items)
+            return
+        tail_container, tail_index = _tail_slot(container=deeper)
+        _insert_trivia_at(container=tail_container, index=tail_index, items=items)
+        return
+    owner_position = _implicit_owner_position(chain=chain)
+    if owner_position is not None:
+        _insert_before(chain=chain[:-1], index=owner_position, items=items)
+        return
+    _insert_trivia_at(container=slot.container, index=index, items=items)
+
+
+def _lift_out(*, toml_doc: TOMLDocument, parent_table: dict[str, Any], table_path: list[str], key: str) -> tuple[Item, list[Item]]:
+    """Remove ``key`` from its parent, keeping the document's comments on the items they introduce.
+
+    Returns the removed item and the trivia that introduced it. The removed item's own trailing run
+    — the introduction of whatever came next — is put back where the item was, so the next item
+    keeps its comment; the returned introduction is what a caller re-homes with the item, or drops
+    with it. On a parent that carries no trivia, this is a plain deletion.
+    """
+    moved_value = cast("Item", parent_table[key])
+    if not _carries_trivia(parent_table=parent_table):
+        del parent_table[key]
+        return moved_value, []
+    chain = _slot_chain(toml_doc=toml_doc, path=[*table_path, key])
+    introduction = _detach_run(run=_introduction_of_slot(chain=chain))
+    last_container = _last_container(item=moved_value)
+    trailing = _detach_run(run=_introduction(run=_trailing_run(container=last_container))) if last_container is not None else []
+    # Detaching the introduction may have shifted the key's own positions in the same container.
+    chain = _slot_chain(toml_doc=toml_doc, path=[*table_path, key])
+    resting = chain[-1].last
+    owner_position = _owner_position(chain=chain)
+    opened_the_file = _opens_the_document(chain=chain)
+    del parent_table[key]  # ``Container.remove`` leaves a ``Null`` in each slot, so positions hold.
+    if owner_position is not None and _owner_position(chain=chain) is None:
+        # The key was the last one of a chunk of an out-of-order table, and tomlkit dropped the
+        # emptied chunk from the parent: what came after the key now comes right after that slot.
+        _insert_before(chain=chain[:-1], index=owner_position + 1, items=trailing)
+    else:
+        _insert_before(chain=chain, index=resting + 1, items=trailing)
+    if opened_the_file:
+        _drop_leading_blank_line(toml_doc=toml_doc)
+    return moved_value, introduction
+
+
+def _opens_the_document(*, chain: list[_Slot]) -> bool:
+    """Whether the key at the end of ``chain`` is the first thing in the file, in document order.
+
+    It is when it comes first in its container and every parent on the way is itself first in
+    its own, rendering no header — ``[runtime.storage]`` at the top of a file that never writes
+    ``[runtime]``, or a dotted assignment opening the file.
+    """
+    for depth, link in enumerate(chain):
+        if not _is_first_entry(container=link.container, index=link.first):
+            return False
+        if depth > 0 and _implicit_owner_position(chain=chain[: depth + 1]) is None:
+            return False
+    return True
+
+
+def _drop_leading_blank_line(*, toml_doc: TOMLDocument) -> None:
+    """A file does not open on a blank line: the one that separated the removed first entry from the next goes."""
+    _drop_leading_blank_line_in(container=toml_doc)
+
+
+def _drop_leading_blank_line_in(*, container: Container) -> bool:
+    """Walk ``container`` in document order to its first rendered line, dropping it when it is blank.
+
+    A table that renders no header — an implicit parent emptied by the removal, or one whose first
+    entry is next — is walked through, since what opens the file is inside it. Returns whether the
+    walk met anything that renders; ``False`` means the container renders nothing at all.
+    """
+    for position, (body_key, item) in enumerate(container.body):
+        if isinstance(item, Null):
+            continue
+        if isinstance(item, Whitespace):
+            _detach_run(run=_TriviaRun(container=container, positions=[position]))
+            return True
+        if isinstance(item, Table) and not _renders_header(table=item, key=body_key):
+            if _drop_leading_blank_line_in(container=item.value):
+                return True
+            continue
+        return True
+    return False
+
+
+def _settle_inserted(*, toml_doc: TOMLDocument, table_path: list[str], key: str, introduction: Sequence[Item]) -> None:
+    """Give a just-inserted ``key`` its introduction, and the trivia around it back to what it introduces.
+
+    Every insertion goes through here — a moved item, a key ``set_key`` adds, a table ``ensure_table``
+    creates — with an empty introduction when there is nothing to carry. tomlkit appends a table
+    after everything, including the trailing run that introduced whatever came after the container
+    in the file — so that run is moved past the new item, to become the new item's own trailing run.
+    A key it inserts *before the first table* of a container can land in the middle of a run —
+    between a file's preamble and the blank line under it — so the run on both sides is read as
+    one: what introduces the next item goes below the key, what does not (the preamble) goes back
+    above it. The introduction is then inserted right above the item. A carried introduction brings
+    the blank line the source had with it, so the newline tomlkit puts before an appended table's
+    header is dropped in its favour.
+    """
+    chain = _slot_chain(toml_doc=toml_doc, path=[*table_path, key])
+    if len(chain) < len(table_path) + 1:
+        return  # beneath an inline table: nothing to settle
+    slot = chain[-1]
+    inserted = slot.container.body[slot.first][1]
+    before = _run_before(container=slot.container, index=slot.first)
+    after = _run_after(container=slot.container, index=slot.first)
+    at_document_start = _at_document_start(run=before)
+    if after.positions and before.container is slot.container:
+        combined = _TriviaRun(container=slot.container, positions=[*before.positions, *after.positions])
+        travelling = _introduction(run=combined, at_document_start=at_document_start).positions
+        moving_down = _TriviaRun(container=slot.container, positions=[pos for pos in before.positions if pos in travelling])
+        moving_up = _TriviaRun(container=slot.container, positions=[pos for pos in after.positions if pos not in travelling])
+    else:
+        moving_down = _introduction(run=before, at_document_start=at_document_start)
+        moving_up = _TriviaRun(container=slot.container, positions=[])
+    # Above-the-item positions come first in the body, so detaching the ones below first leaves them valid.
+    up_items = _detach_run(run=moving_up)
+    down_items = _detach_run(run=moving_down)
+    chain = _slot_chain(toml_doc=toml_doc, path=[*table_path, key])
+    slot = chain[-1]
+    if up_items:
+        _insert_trivia_at(container=slot.container, index=slot.first, items=up_items)
+        chain = _slot_chain(toml_doc=toml_doc, path=[*table_path, key])
+        slot = chain[-1]
+    if down_items:
+        last_container = _last_container(item=inserted)
+        if last_container is None:
+            # tomlkit gives the table that now follows an inserted key a newline of indent; that blank
+            # line belongs above the run going back under the key, not between the run and the header.
+            following = _first_entry_after(container=slot.container, index=slot.last)
+            if isinstance(following, Table) and following.trivia.indent:
+                if not isinstance(down_items[0], Whitespace):
+                    down_items = [Whitespace(following.trivia.indent), *down_items]
+                following.trivia.indent = ""
+            _insert_trivia_at(container=slot.container, index=slot.last + 1, items=down_items)
+        else:
+            tail_container, tail_index = _tail_slot(container=last_container)
+            _insert_trivia_at(container=tail_container, index=tail_index, items=down_items)
+    if introduction:
+        # tomlkit sets a table's indent to a newline when it appends it under content that does not
+        # already end on a blank line. That blank line belongs *above* the carried introduction, not
+        # between the introduction and the header, so it moves ahead of it unless the introduction
+        # brought its own.
+        lead: list[Item] = []
+        if isinstance(inserted, Table) and inserted.trivia.indent and not isinstance(introduction[0], Whitespace):
+            lead = [Whitespace(inserted.trivia.indent)]
+        _insert_before(chain=chain, index=slot.first, items=[*lead, *introduction])
+        if isinstance(inserted, Table):
+            inserted.trivia.indent = ""
+
+
 def _as_tomlkit_value(value: TomlValue | None) -> Any:
     """Convert a mapping value to an inline table (`inputs = { ... }`, the dominant authoring
     form), so a freshly-created mapping stays attached to its pipe rather than being emitted as
@@ -421,7 +917,11 @@ def _apply_at_table_path(*, toml_doc: TOMLDocument, fix_op: FixOp, table_path: l
             target_table = _resolve_table(toml_doc=toml_doc, table_path=table_path)
             if target_table is None:
                 return _OpResult(FixOpOutcome.SKIPPED, f"table '{table_path_str}' not found in document")
+            was_absent = fix_op.key not in target_table
             target_table[fix_op.key] = _as_tomlkit_value(fix_op.value)
+            if was_absent:
+                # A new key lands before the table's trailing run — the next section's banner — not after it.
+                _settle_inserted(toml_doc=toml_doc, table_path=table_path, key=fix_op.key, introduction=[])
             return _OpResult(FixOpOutcome.APPLIED)
         case EnsureTableOp():
             existing_table = _resolve_table(toml_doc=toml_doc, table_path=table_path)
@@ -438,6 +938,7 @@ def _apply_at_table_path(*, toml_doc: TOMLDocument, fix_op: FixOp, table_path: l
                 # found" this branch used to report.
                 return _OpResult(FixOpOutcome.CONFLICT, f"'{table_key}' is already present in '{'.'.join(table_path[:-1])}' and is not a table")
             parent_table[table_key] = tomlkit.inline_table()
+            _settle_inserted(toml_doc=toml_doc, table_path=table_path[:-1], key=table_key, introduction=[])
             return _OpResult(FixOpOutcome.APPLIED)
         case DeleteKeyOp():
             target_table = _resolve_table(toml_doc=toml_doc, table_path=table_path)
@@ -445,7 +946,8 @@ def _apply_at_table_path(*, toml_doc: TOMLDocument, fix_op: FixOp, table_path: l
                 return _OpResult(FixOpOutcome.SKIPPED, f"table '{table_path_str}' not found in document")
             if fix_op.key not in target_table:
                 return _OpResult(FixOpOutcome.SKIPPED, f"key '{fix_op.key}' not found in table '{table_path_str}'")
-            del target_table[fix_op.key]
+            # The comment above the key goes with it; the one above the next key stays there.
+            _lift_out(toml_doc=toml_doc, parent_table=target_table, table_path=table_path, key=fix_op.key)
             return _OpResult(FixOpOutcome.APPLIED)
         case DeleteTableOp():
             parent_table = _resolve_table(toml_doc=toml_doc, table_path=table_path[:-1])
@@ -454,7 +956,8 @@ def _apply_at_table_path(*, toml_doc: TOMLDocument, fix_op: FixOp, table_path: l
             # (same guarded-skip contract _resolve_table enforces for every other segment).
             if parent_table is None or not isinstance(parent_table.get(table_key), dict):
                 return _OpResult(FixOpOutcome.SKIPPED, f"table '{table_path_str}' not found in document")
-            del parent_table[table_key]
+            # The banner introducing the table goes with it; the next section's banner stays put.
+            _lift_out(toml_doc=toml_doc, parent_table=parent_table, table_path=table_path[:-1], key=table_key)
             return _OpResult(FixOpOutcome.APPLIED)
         case RenameTableKeyOp():
             parent_table = _resolve_table(toml_doc=toml_doc, table_path=table_path)
@@ -570,10 +1073,13 @@ def _apply_move_key(*, toml_doc: TOMLDocument, fix_op: MoveKeyOp, table_path: li
     if existing_destination is not None and fix_op.new_key in existing_destination:
         return _OpResult(FixOpOutcome.CONFLICT, f"cannot move to '{destination_path_str}.{fix_op.new_key}': already present")
 
-    moved_value = cast("Item", source_table[fix_op.key])
-    del source_table[fix_op.key]
-    destination_table = _create_block_table_path(toml_doc=toml_doc, table_path=fix_op.new_table_path)
-    destination_table[fix_op.new_key] = moved_value
+    moved_value, introduction = _lift_out(toml_doc=toml_doc, parent_table=source_table, table_path=table_path, key=fix_op.key)
+    destination = _create_block_table_path(toml_doc=toml_doc, table_path=fix_op.new_table_path)
+    destination.leaf[fix_op.new_key] = moved_value
+    # The introduction goes above whatever this operation put into a pre-existing container: the
+    # moved item itself, or the outermost parent created for it — that is the header a reader sees.
+    head = destination.head or _InsertionHead(table_path=fix_op.new_table_path, key=fix_op.new_key)
+    _settle_inserted(toml_doc=toml_doc, table_path=head.table_path, key=head.key, introduction=introduction)
     _refresh_table_headers(item=moved_value)
     return _OpResult(FixOpOutcome.APPLIED)
 
@@ -595,7 +1101,20 @@ def _first_non_table_segment(*, toml_doc: TOMLDocument, table_path: list[str]) -
     return None
 
 
-def _create_block_table_path(*, toml_doc: TOMLDocument, table_path: list[str]) -> dict[str, Any]:
+class _InsertionHead(NamedTuple):
+    """A key just added to a pre-existing container — the outermost thing an insertion put in the file."""
+
+    table_path: list[str]
+    key: str
+
+
+class _DestinationPath(NamedTuple):
+    leaf: dict[str, Any]
+    head: _InsertionHead | None
+    """The first segment that had to be created, under the deepest node that already existed; ``None`` when every segment existed."""
+
+
+def _create_block_table_path(*, toml_doc: TOMLDocument, table_path: list[str]) -> _DestinationPath:
     """Walk ``table_path``, creating missing segments as block tables, and return the leaf node.
 
     Block tables rather than inline ones, because this creates a *section* of a configuration
@@ -603,8 +1122,11 @@ def _create_block_table_path(*, toml_doc: TOMLDocument, table_path: list[str]) -
     ruled out a non-table segment first; this function would silently overwrite one.
     """
     node = cast("dict[str, Any]", toml_doc)
-    for segment in table_path:
+    head: _InsertionHead | None = None
+    for depth, segment in enumerate(table_path):
         if not isinstance(node.get(segment), dict):
             node[segment] = tomlkit.table()
+            if head is None:
+                head = _InsertionHead(table_path=table_path[:depth], key=segment)
         node = cast("dict[str, Any]", node[segment])
-    return node
+    return _DestinationPath(leaf=node, head=head)

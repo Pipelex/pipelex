@@ -26,6 +26,7 @@ from pipelex.cli.dev_cli.commands.generate_mthds_schema_cmd import generate_mthd
 from pipelex.cli.dev_cli.commands.kit_cmd import kit_app
 from pipelex.cli.dev_cli.commands.preprocess_test_models_cmd import preprocess_test_models_cmd
 from pipelex.cli.dev_cli.commands.refresh_graph_ui_sri_cmd import refresh_graph_ui_sri_cmd
+from pipelex.cli.dev_cli.commands.store_test_durations_cmd import store_test_durations_cmd
 from pipelex.cli.dev_cli.commands.subject_grant_cmd import subject_grant_cmd
 from pipelex.cli.dev_cli.commands.sync_kit_configs_cmd import sync_kit_configs_cmd
 from pipelex.cli.dev_cli.commands.sync_main_config_cmd import SyncTarget, sync_main_config_cmd
@@ -58,6 +59,7 @@ class PipelexDevCLI(TyperGroup):
             "kit",
             "preprocess-test-models",
             "refresh-graph-ui-sri",
+            "store-test-durations",
             "subject-grant",
             "sync-kit-configs",
             "sync-main-config",
@@ -545,6 +547,34 @@ def update_gateway_models_command(
     """Update the Pipelex Gateway models reference file from remote config."""
     try:
         update_gateway_models_cmd(quiet=quiet)
+    except (typer.Exit, typer.Abort):
+        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
+        raise
+    except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
+        console = get_console()
+        console.print()
+        console.print("[bold red]Unexpected error occurred[/bold red]")
+        console.print()
+        console.print(Traceback())
+        sys.exit(1)
+
+
+@app.command(name="store-test-durations", help="Refresh the .test_durations map pytest-split uses to balance the CI shards")
+def store_test_durations_command(
+    markers: Annotated[
+        str,
+        typer.Option("--markers", "-m", help="The pytest marker expression the sharded CI job runs (threaded through from the Makefile)"),
+    ],
+    force: Annotated[
+        bool,
+        typer.Option("--force", "-f", help="Re-measure the whole suite instead of only the tests missing from the map"),
+    ] = False,
+    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single status line on success")] = False,
+) -> None:
+    """Refresh the pytest-split duration map, measuring only what is missing unless --force is given."""
+    try:
+        store_test_durations_cmd(markers=markers, force=force, quiet=quiet)
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
