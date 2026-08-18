@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.46.4] - 2026-08-18
+
+### Changed
+
+- **This repo now dogfoods its own migration `.gitignore` convention:** the project-local `.pipelex/` directory picked up the `.gitignore` that `pipelex migrate`/`pipelex init` write to keep timestamped backup copies (`*.bak.<timestamp>`) out of `git status` — the same file every consumer project has received automatically since v0.46.2.
+
 ## [v0.46.3] - 2026-08-18
 
 ### Fixed
