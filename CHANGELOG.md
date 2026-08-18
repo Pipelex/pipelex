@@ -1,16 +1,14 @@
 # Changelog
 
-## [Unreleased]
-
-### Fixed
-
-- **The config-sync gate no longer goes red on what the migrator leaves behind:** `make check` compares the repository's own `.pipelex/` against the `pipelex/kit/configs/` templates by contents, and it had never been taught about the two things pipelex itself writes into a configuration directory — the `.gitignore` added in v0.46.2 (which has no kit counterpart by design) and the timestamped `*.bak.<stamp>` copies a real `pipelex migrate` leaves beside every file it rewrites. Dogfooding the `.gitignore` in v0.46.4 broke `make check` outright, and any developer who ran `pipelex migrate` in a checkout broke it again — putting the dirtied-repository problem that `.gitignore` exists to solve straight back, one gate over. Both the check and `make up-kit-configs` now look past those artifacts, matching backups and `.rescue.` copies by a glob built from the same infixes and stamp shape the backup namer writes, so a rename there cannot orphan the rule. This also closes a latent hole in `make up-kit-configs`, which would have mirrored a developer's backup copy into the shipped kit.
-
 ## [v0.46.4] - 2026-08-18
 
 ### Changed
 
 - **This repo now dogfoods its own migration `.gitignore` convention:** the project-local `.pipelex/` directory picked up the `.gitignore` that `pipelex migrate`/`pipelex init` write to keep timestamped backup copies (`*.bak.<timestamp>`) out of `git status` — the same file every consumer project has received automatically since v0.46.2.
+
+### Fixed
+
+- **The config-sync gate no longer goes red on what the migrator leaves behind:** `make check` compares the repository's own `.pipelex/` against the `pipelex/kit/configs/` templates by contents, and it had never been taught about the two things pipelex itself writes into a configuration directory — the `.gitignore` added in v0.46.2 (which has no kit counterpart by design) and the timestamped `*.bak.<stamp>` copies a real `pipelex migrate` leaves beside every file it rewrites. Dogfooding the `.gitignore` in v0.46.4 broke `make check` outright, and any developer who ran `pipelex migrate` in a checkout broke it again — putting the dirtied-repository problem that `.gitignore` exists to solve straight back, one gate over. Both the check and `make up-kit-configs` now look past those artifacts, matching backups and `.rescue.` copies by a glob built from the same infixes and stamp shape the backup namer writes, so a rename there cannot orphan the rule. This also closes a latent hole in `make up-kit-configs`, which would have mirrored a developer's backup copy into the shipped kit.
 
 ## [v0.46.3] - 2026-08-18
 
