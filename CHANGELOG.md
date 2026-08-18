@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.46.3] - 2026-08-18
+
+### Fixed
+
+- **The configuration-directory `.gitignore` now reaches machines with nothing to migrate:** v0.46.2 added a `.gitignore` inside `.pipelex/` to keep migration backups out of `git status`, but `pipelex migrate` only wrote it on a run that actually had a file to carry forward. A machine already at the current schema was reported clean and returned before the write pass, so it never got the rule — and that is the state every user is in between schema changes, which meant in practice almost nobody received it. Any real (non-`--dry-run`) `pipelex migrate` now writes it whether or not there is anything to migrate; a run whose migration you decline still writes nothing at all.
+
 ## [v0.46.2] - 2026-08-18
 
 ### Fixed
