@@ -1,6 +1,6 @@
 # Per-request API keys: where the key is bound today, and what each SDK lets us override
 
-Survey for `feature/API-key-per-request`. Two questions are in scope: **how do we decide to change the key, and how do we get it**, and **do the SDKs we ship let us override the key on the request rather than on the client**. Everything below about SDK behaviour was verified by reading and executing the versions actually pinned in `.venv` — versions are named at each claim, because several of these answers changed within the last few releases.
+Survey for `feature/API-key-per-request`. The narrowed Gateway-only, Temporal-only design lives beside this file in `gateway-per-request-key-under-temporal.md`. Two questions are in scope: **how do we decide to change the key, and how do we get it**, and **do the SDKs we ship let us override the key on the request rather than on the client**. Everything below about SDK behaviour was verified by reading and executing the versions actually pinned in `.venv` — versions are named at each claim, because several of these answers changed within the last few releases.
 
 ## 1. Where the key is bound today
 
