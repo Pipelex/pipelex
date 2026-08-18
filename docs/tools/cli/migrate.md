@@ -32,6 +32,8 @@ Within a file it repairs, it only ever undoes a change *we* made. A key you adde
 
 Every file it changes is copied first, beside itself, as `<file>.bak.<UTC timestamp>` — with the original file's permissions, not your umask. The copy is on disk before the file is replaced, and the replacement is atomic: there is never a moment when your configuration is half-written.
 
+Those copies are ours, not part of your project, so the command keeps them out of your way: it writes a `.gitignore` inside the configuration directory itself, ignoring exactly the timestamped copies it makes. You will see the `.gitignore` — commit it, and your teammates get the same quiet. If you already have one there, it is left alone. A `<file>.rescue.<timestamp>` copy is deliberately *not* ignored: one of those only exists because a write could not be vouched for, and seeing it is how you find out.
+
 Running it twice is the same as running it once. Nothing is skipped on the basis of a version record, because there is no version record; every run replays the whole history and leaves alone whatever is already current. A file that is already up to date comes back byte for byte identical.
 
 ## When it cannot do the whole job

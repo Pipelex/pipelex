@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.46.2] - 2026-08-18
+
+### Fixed
+
+- **Migration backups no longer dirty your repository:** `pipelex migrate` copies every file it rewrites to `<file>.bak.<timestamp>` beside the original, and inside a project's `.pipelex/` those copies showed up as untracked files in `git status` — a dozen of them after a single run. Pipelex now keeps a `.gitignore` inside the configuration directory itself, ignoring exactly the timestamped copies it makes; it is written by `pipelex init` and by any real `pipelex migrate`, so a machine whose `.pipelex/` predates this gets the rule from the run that would otherwise have made the mess. An existing `.gitignore` there is never modified, and a `.rescue.` copy is deliberately left visible because it is the one the report asks you to go and collect.
+
 ## [v0.46.1] - 2026-08-18
 
 ### Changed
