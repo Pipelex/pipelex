@@ -169,16 +169,28 @@ fails, re-check the count and fix the badge file.
 
 ### 8b. Refresh the test-duration map
 
-Run `make store-test-durations`. This runs the full test suite once and rewrites
-`.test_durations`, the per-test timing file `pytest-split` uses to balance the 8
-CI test shards on feature PRs. It drifts as tests are added or removed, and a
-stale file silently unbalances the shards (some finish in seconds, one runs
-long), so a release is the natural point to refresh it.
+Run `make store-test-durations`. This refreshes `.test_durations`, the per-test
+timing file `pytest-split` uses to balance the 8 CI test shards on feature PRs.
 
-- This runs the whole suite, so it takes a few minutes — expected, not a hang.
+The refresh is incremental: it collects the suite, then measures only the tests
+that are missing from the map. That is the part that matters — a map with stale
+values but complete coverage costs about 7% of shard balance, while one missing
+entries for recently added tests costs over 50%, because `pytest-split` imputes
+an unknown test at the suite mean (~0.25s) when the median test is ~0.002s.
+
+- It takes seconds when little has been added, and only re-measures new tests
+  otherwise. Read the coverage line it prints before judging how long it should
+  take: past ~40% of the suite missing it falls back to re-measuring everything,
+  which takes minutes. Treat a long run as a hang only when it reported few
+  tests missing.
 - If it changed the file, `.test_durations` is included in the release commit
-  (step 9). If the suite hasn't changed since the last release it may be a
-  no-op, which is fine — commit it if git shows a diff, skip if not.
+  (step 9). When nothing was missing it writes no diff at all, which is the
+  expected outcome for a quiet release — skip it in that case.
+- `make store-test-durations-force` re-measures everything. It is NOT part of
+  the release flow; use it only when recorded values are no longer comparable
+  to each other (the machine or the suite changed shape).
+
+See `docs/contribute/test-duration-map.md` for the full rationale.
 
 ### 9. Commit and push
 

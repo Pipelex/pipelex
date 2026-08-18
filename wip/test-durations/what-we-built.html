@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Test durations — refreshing the shard map in seconds, not minutes</title>
+<style>
+  :root {
+    --ink: #1f2430;
+    --muted: #5b6472;
+    --line: #d9dee6;
+    --bg: #ffffff;
+    --panel: #f6f8fa;
+    --accent: #0b6bcb;
+    --accent-soft: #e8f1fb;
+    --good: #1a7f37;
+    --good-soft: #e6f4ea;
+    --warn: #9a6700;
+    --warn-soft: #fdf6e3;
+    --bad: #cf222e;
+    --bad-soft: #fbe9ea;
+    --grid: #e6eaef;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #e6e9ef;
+      --muted: #9aa4b2;
+      --line: #303844;
+      --bg: #14171d;
+      --panel: #1b1f27;
+      --accent: #6cb0f5;
+      --accent-soft: #16283c;
+      --good: #57c785;
+      --good-soft: #14291d;
+      --warn: #d9a441;
+      --warn-soft: #2a2213;
+      --bad: #f0777f;
+      --bad-soft: #2c1719;
+      --grid: #2a313c;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    line-height: 1.55;
+    font-size: 16px;
+  }
+  main { max-width: 980px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+  h1 { font-size: 1.9rem; line-height: 1.2; margin: 0 0 .3rem; }
+  .subtitle { color: var(--muted); margin: 0 0 .4rem; font-size: 1.05rem; }
+  .meta { color: var(--muted); font-size: .85rem; margin: 0 0 2rem; }
+  h2 { font-size: 1.4rem; margin: 3rem 0 .8rem; padding-top: .8rem; border-top: 1px solid var(--line); }
+  h3 { font-size: 1.08rem; margin: 1.8rem 0 .5rem; }
+  p { margin: .7rem 0; }
+  a { color: var(--accent); }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .85em;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: .08em .35em;
+    white-space: nowrap;
+  }
+  pre { margin: .9rem 0; }
+  pre code { white-space: pre; display: block; padding: .8em 1em; overflow-x: auto; line-height: 1.5; }
+  .tldr {
+    background: var(--accent-soft);
+    border: 1px solid var(--line);
+    border-left: 5px solid var(--accent);
+    border-radius: 8px;
+    padding: 1.1rem 1.4rem 1.3rem;
+    margin: 1.5rem 0 2rem;
+  }
+  .tldr h2 { border: none; margin: 0 0 .6rem; padding: 0; font-size: 1.05rem; letter-spacing: .05em; text-transform: uppercase; }
+  .tldr ul { margin: .4rem 0 0; padding-left: 1.2rem; }
+  .tldr li { margin: .5rem 0; }
+  .callout {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--muted);
+    border-radius: 6px;
+    padding: .8rem 1.1rem;
+    margin: 1.2rem 0;
+  }
+  .callout.key { border-left-color: var(--accent); background: var(--accent-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout p:first-child { margin-top: 0; }
+  .callout p:last-child { margin-bottom: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 1.1rem 0; font-size: .92rem; }
+  th, td { border: 1px solid var(--line); padding: .5rem .7rem; text-align: left; vertical-align: top; }
+  th { background: var(--panel); font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tbl-wrap { overflow-x: auto; }
+  .bad-txt { color: var(--bad); font-weight: 600; }
+  .good-txt { color: var(--good); font-weight: 600; }
+  .warn-txt { color: var(--warn); font-weight: 600; }
+  figure { margin: 1.6rem 0; }
+  figure svg { display: block; width: 100%; height: auto; }
+  figcaption { color: var(--muted); font-size: .87rem; margin-top: .5rem; }
+  details {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: .6rem .9rem;
+    margin: 1rem 0;
+    background: var(--panel);
+  }
+  details[open] { padding-bottom: .9rem; }
+  summary { cursor: pointer; font-weight: 600; font-size: .95rem; }
+  details > *:not(summary) { font-size: .95rem; }
+  .tabs { margin: 1.4rem 0; }
+  .tabs input { position: absolute; opacity: 0; pointer-events: none; }
+  .tab-labels { display: flex; flex-wrap: wrap; gap: .3rem; border-bottom: 1px solid var(--line); }
+  .tab-labels label {
+    cursor: pointer; padding: .45rem .9rem; font-size: .9rem; font-weight: 600;
+    color: var(--muted); border: 1px solid transparent; border-bottom: none;
+    border-radius: 6px 6px 0 0;
+  }
+  .tabs input:nth-of-type(1):checked ~ .tab-labels label:nth-of-type(1),
+  .tabs input:nth-of-type(2):checked ~ .tab-labels label:nth-of-type(2),
+  .tabs input:nth-of-type(3):checked ~ .tab-labels label:nth-of-type(3) {
+    color: var(--accent); border-color: var(--line); background: var(--bg);
+    margin-bottom: -1px; border-bottom: 1px solid var(--bg);
+  }
+  .tab-panel { display: none; padding: 1rem .2rem 0; }
+  .tabs input:nth-of-type(1):checked ~ .tab-panels > .tab-panel:nth-of-type(1),
+  .tabs input:nth-of-type(2):checked ~ .tab-panels > .tab-panel:nth-of-type(2),
+  .tabs input:nth-of-type(3):checked ~ .tab-panels > .tab-panel:nth-of-type(3) { display: block; }
+  .lede { font-size: 1.05rem; }
+  ul.tight li { margin: .3rem 0; }
+  .legend { display: flex; gap: 1.2rem; flex-wrap: wrap; font-size: .85rem; color: var(--muted); margin-top: .4rem; }
+  .swatch { display: inline-block; width: .8rem; height: .8rem; border-radius: 2px; vertical-align: -1px; margin-right: .35rem; }
+  hr.soft { border: none; border-top: 1px solid var(--line); margin: 2.5rem 0; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Test durations: refreshing the shard map in seconds, not minutes</h1>
+<p class="subtitle">Why <code>.test_durations</code> was costing us a full suite run and a 21,000-line diff at every release — and what we replaced it with.</p>
+<p class="meta">Working notes · 2026-08-18 · shipping in <strong>v0.46.1</strong></p>
+
+<div class="tldr">
+<h2>TL;DR</h2>
+<ul>
+  <li><strong><code>make store-test-durations</code> no longer runs the whole test suite.</strong> It collects the tests (~8s), measures <em>only</em> the ones missing from the map, and leaves recorded values alone. A typical release refresh went from <strong>several minutes to a few seconds</strong>, and from a <strong>21,000-line diff to no diff at all</strong>.</li>
+  <li><strong>The reason is one measurement.</strong> A duration map can be wrong two ways — stale <em>values</em>, or missing <em>entries</em>. We measured both against the real 8-way split. Stale values across 17 days cost about <span class="good-txt">7%</span> of shard balance. Missing coverage over the same period cost over <span class="bad-txt">50%</span>. They are not remotely the same problem, and only the second one is worth paying for.</li>
+  <li><strong>So the refresh is triggered by coverage, not by calendar age.</strong> An age-based rule (&ldquo;skip if newer than a week&rdquo;) measures the wrong variable: a quiet week wastes a full run, and a week that lands a 500-test branch reports &ldquo;fresh, skip&rdquo; while the map is already 50% out.</li>
+  <li><strong>Three new things:</strong> the incremental refresh (default), <code>make store-test-durations-force</code> (<code>stdf</code>) for a full re-measure, and a stabilisation pass that keeps any value which has not meaningfully moved — cutting the file&rsquo;s diff by ~95%. Plus a fourth we needed anyway: the refresh now <strong>prunes dead entries</strong>, making the existing <code>test_test_durations_paths</code> gate self-healing.</li>
+  <li><strong>Nothing about CI changed.</strong> Same map, same eight shards, same <code>gha-tests</code>. Only how the map gets maintained.</li>
+</ul>
+</div>
+
+<h2>1. What the map actually does</h2>
+
+<p class="lede"><code>.test_durations</code> is a committed JSON map of <code>pytest node id &rarr; seconds</code> — currently 10,633 entries covering about 2,740 seconds of test time. Its only consumer is <a href="https://github.com/jerry-git/pytest-split">pytest-split</a>, which uses it to divide the suite across eight free GitHub runners instead of one large paid machine.</p>
+
+<p>Two workflows do this: <code>tests-check.yml</code> on PRs to <code>dev</code> (floor Python only) and <code>tests-full-check.yml</code> on PRs to <code>main</code> (four versions &times; eight shards = 32 jobs). Both call the same target with <code>SPLITS=8 GROUP=&lt;n&gt;</code>. Locally those variables are unset, the flags expand to nothing, and the map is ignored entirely.</p>
+
+<p>The detail that makes the rest of this document make sense: pytest-split&rsquo;s default algorithm is <code>duration_based_chunks</code>, and it is <strong>contiguous</strong>. It walks the tests in collection order and cuts whenever accumulated duration crosses one eighth of the total. Each shard is a consecutive slice of the collection — not a cherry-picked set. So a wrong duration does not just mis-size one test; it moves every cut after it.</p>
+
+<div class="callout">
+<p>Within a shard, <code>-n auto --dist=worksteal</code> rebalances across the runner&rsquo;s own cores. So intra-shard distribution is self-correcting and the map only ever buys us <em>inter</em>-shard balance.</p>
+</div>
+
+<h2>2. The measurement that changed the design</h2>
+
+<p>We simulated the real eight-way split over the actual collection order (10,568 node ids), using the freshest durations as ground truth, and compared what a 17-day-old map does against a current one.</p>
+
+<figure>
+<svg viewBox="0 0 900 350" role="img" aria-label="Bar chart of per-shard test time under a fresh map versus a 17-day-old map. The fresh map produces eight shards all near 340 seconds. The stale map produces one shard of 560 seconds and another of 262 seconds.">
+  <line x1="70" y1="280" x2="880" y2="280" stroke="var(--line)" stroke-width="1"/>
+  <line x1="70" y1="20" x2="70" y2="280" stroke="var(--line)" stroke-width="1"/>
+
+  <g font-size="11" fill="var(--muted)" font-family="ui-sans-serif, system-ui, sans-serif">
+    <line x1="70" y1="280" x2="880" y2="280" stroke="var(--grid)"/>
+    <text x="62" y="284" text-anchor="end">0</text>
+    <line x1="70" y1="193.3" x2="880" y2="193.3" stroke="var(--grid)" stroke-dasharray="2 3"/>
+    <text x="62" y="197" text-anchor="end">200s</text>
+    <line x1="70" y1="106.7" x2="880" y2="106.7" stroke="var(--grid)" stroke-dasharray="2 3"/>
+    <text x="62" y="110" text-anchor="end">400s</text>
+    <line x1="70" y1="20" x2="880" y2="20" stroke="var(--grid)" stroke-dasharray="2 3"/>
+    <text x="62" y="24" text-anchor="end">600s</text>
+  </g>
+
+  <line x1="70" y1="132.9" x2="880" y2="132.9" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="876" y="128" text-anchor="end" font-size="11" fill="var(--accent)" font-family="ui-sans-serif, system-ui, sans-serif">perfect balance — 339.5s</text>
+
+  <g>
+    <rect x="88"  y="131.5" width="34" height="148.5" fill="var(--good)" opacity="0.85" rx="2"/>
+    <rect x="189" y="132.8" width="34" height="147.2" fill="var(--good)" opacity="0.85" rx="2"/>
+    <rect x="290" y="132.2" width="34" height="147.8" fill="var(--good)" opacity="0.85" rx="2"/>
+    <rect x="391" y="132.7" width="34" height="147.3" fill="var(--good)" opacity="0.85" rx="2"/>
+    <rect x="492" y="132.4" width="34" height="147.6" fill="var(--good)" opacity="0.85" rx="2"/>
+    <rect x="593" y="132.5" width="34" height="147.5" fill="var(--good)" opacity="0.85" rx="2"/>
+    <rect x="694" y="132.8" width="34" height="147.2" fill="var(--good)" opacity="0.85" rx="2"/>
+    <rect x="795" y="136.2" width="34" height="143.8" fill="var(--good)" opacity="0.85" rx="2"/>
+  </g>
+  <g>
+    <rect x="124" y="37.2"  width="34" height="242.8" fill="var(--bad)" opacity="0.85" rx="2"/>
+    <rect x="225" y="136.5" width="34" height="143.5" fill="var(--bad)" opacity="0.85" rx="2"/>
+    <rect x="326" y="148.1" width="34" height="131.9" fill="var(--bad)" opacity="0.85" rx="2"/>
+    <rect x="427" y="139.9" width="34" height="140.1" fill="var(--bad)" opacity="0.85" rx="2"/>
+    <rect x="528" y="143.8" width="34" height="136.2" fill="var(--bad)" opacity="0.85" rx="2"/>
+    <rect x="629" y="149.6" width="34" height="130.4" fill="var(--bad)" opacity="0.85" rx="2"/>
+    <rect x="730" y="166.6" width="34" height="113.4" fill="var(--bad)" opacity="0.85" rx="2"/>
+    <rect x="831" y="141.4" width="34" height="138.6" fill="var(--bad)" opacity="0.85" rx="2"/>
+  </g>
+
+  <text x="141" y="30" text-anchor="middle" font-size="12" font-weight="700" fill="var(--bad)" font-family="ui-sans-serif, system-ui, sans-serif">560s</text>
+  <text x="747" y="159" text-anchor="middle" font-size="12" font-weight="700" fill="var(--bad)" font-family="ui-sans-serif, system-ui, sans-serif">262s</text>
+
+  <g font-size="11" fill="var(--muted)" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif">
+    <text x="123" y="298">shard 1</text>
+    <text x="224" y="298">2</text>
+    <text x="325" y="298">3</text>
+    <text x="426" y="298">4</text>
+    <text x="527" y="298">5</text>
+    <text x="628" y="298">6</text>
+    <text x="729" y="298">7</text>
+    <text x="830" y="298">8</text>
+  </g>
+
+  <g font-size="12" font-family="ui-sans-serif, system-ui, sans-serif">
+    <rect x="70" y="322" width="12" height="12" fill="var(--good)" opacity="0.85" rx="2"/>
+    <text x="88" y="332" fill="var(--ink)">fresh map — every shard within 1% of ideal</text>
+    <rect x="420" y="322" width="12" height="12" fill="var(--bad)" opacity="0.85" rx="2"/>
+    <text x="438" y="332" fill="var(--ink)">17-day-old map — shard 1 runs 65% long, everyone waits for it</text>
+  </g>
+</svg>
+<figcaption>Real per-shard test time, simulated over the actual collection order. CI wall clock is set by the <em>slowest</em> shard, so the tall red bar is the whole cost — the seven short bars are runners sitting idle.</figcaption>
+</figure>
+
+<p>That is the symptom. The interesting part is the cause, which we isolated by decomposing the stale map into its two independent failure modes:</p>
+
+<div class="tbl-wrap">
+<table>
+<thead><tr><th>Scenario</th><th class="num">Slowest shard</th><th class="num">Overshoot</th></tr></thead>
+<tbody>
+<tr><td>Fresh map, exact values</td><td class="num">342.6s</td><td class="num good-txt">0.9%</td></tr>
+<tr><td>17-day-old map, as-is</td><td class="num">560.3s</td><td class="num bad-txt">65.0%</td></tr>
+<tr><td>17-day-old <em>values</em>, but coverage complete</td><td class="num">365.2s</td><td class="num good-txt">7.6%</td></tr>
+<tr><td>Current <em>values</em>, but the same entries missing</td><td class="num">524.6s</td><td class="num bad-txt">54.5%</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="callout key">
+<p><strong>Stale values are nearly free. Missing coverage is ruinous.</strong> Essentially all the damage from an old map comes from tests it has never heard of — not from the tests it has, whose timings drifted.</p>
+</div>
+
+<p>The staleness curve is also sharply non-linear, which is why &ldquo;refresh every release&rdquo; felt like it was working right up until it wasn&rsquo;t:</p>
+
+<div class="tbl-wrap">
+<table>
+<thead><tr><th>Map age</th><th class="num">Entries missing</th><th class="num">Overshoot</th></tr></thead>
+<tbody>
+<tr><td>1 release (1 day)</td><td class="num">36</td><td class="num good-txt">2.7%</td></tr>
+<tr><td>4 releases (17 days)</td><td class="num">1,208</td><td class="num bad-txt">65.0%</td></tr>
+<tr><td>6 releases (30 days)</td><td class="num">2,488</td><td class="num bad-txt">50.2%</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>3. Why the mean is the villain</h2>
+
+<p>When pytest-split meets a node id it has never seen, it imputes the <strong>mean</strong> of the durations it does know. Our suite&rsquo;s distribution makes that a catastrophic default:</p>
+
+<figure>
+<svg viewBox="0 0 900 190" role="img" aria-label="Logarithmic number line of test durations. The median sits at 0.0022 seconds while the mean sits at 0.248 seconds, about a hundred times higher, because a small number of very slow tests drag the mean up.">
+  <g font-size="11" fill="var(--muted)" font-family="ui-sans-serif, system-ui, sans-serif" text-anchor="middle">
+    <line x1="80" y1="110" x2="872" y2="110" stroke="var(--line)" stroke-width="1.5"/>
+    <line x1="80"  y1="105" x2="80"  y2="115" stroke="var(--line)"/><text x="80"  y="132">0.1ms</text>
+    <line x1="212" y1="105" x2="212" y2="115" stroke="var(--line)"/><text x="212" y="132">1ms</text>
+    <line x1="343" y1="105" x2="343" y2="115" stroke="var(--line)"/><text x="343" y="132">10ms</text>
+    <line x1="475" y1="105" x2="475" y2="115" stroke="var(--line)"/><text x="475" y="132">100ms</text>
+    <line x1="607" y1="105" x2="607" y2="115" stroke="var(--line)"/><text x="607" y="132">1s</text>
+    <line x1="738" y1="105" x2="738" y2="115" stroke="var(--line)"/><text x="738" y="132">10s</text>
+    <line x1="870" y1="105" x2="870" y2="115" stroke="var(--line)"/><text x="870" y="132">100s</text>
+  </g>
+
+  <rect x="198" y="98" width="278" height="24" fill="var(--accent)" opacity="0.14" rx="3"/>
+  <text x="337" y="152" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="ui-sans-serif, system-ui, sans-serif">middle 50% of all tests (p25&ndash;p75)</text>
+
+  <g font-family="ui-sans-serif, system-ui, sans-serif">
+    <circle cx="257" cy="110" r="5.5" fill="var(--good)"/>
+    <line x1="257" y1="104" x2="257" y2="72" stroke="var(--good)" stroke-width="1.5"/>
+    <text x="257" y="64" text-anchor="middle" font-size="12" font-weight="700" fill="var(--good)">median 0.0022s</text>
+    <text x="257" y="48" text-anchor="middle" font-size="11" fill="var(--muted)">what a typical new test really costs</text>
+
+    <circle cx="527" cy="110" r="5.5" fill="var(--bad)"/>
+    <line x1="527" y1="104" x2="527" y2="72" stroke="var(--bad)" stroke-width="1.5"/>
+    <text x="527" y="64" text-anchor="middle" font-size="12" font-weight="700" fill="var(--bad)">mean 0.248s</text>
+    <text x="527" y="48" text-anchor="middle" font-size="11" fill="var(--muted)">what pytest-split charges an unknown test</text>
+  </g>
+
+  <path d="M 268 92 Q 392 74 516 92" stroke="var(--muted)" stroke-width="1.2" fill="none" stroke-dasharray="3 3"/>
+  <text x="392" y="176" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)" font-family="ui-sans-serif, system-ui, sans-serif">&asymp; 100&times; over-charged</text>
+</svg>
+<figcaption>The distribution is dominated by a handful of very slow tests, so the mean sits roughly a hundred times above the typical test. Every unknown test is billed at the red marker.</figcaption>
+</figure>
+
+<p>A block of newly added fast tests is therefore charged about a hundred times its real cost — and because the chunks are contiguous, that phantom weight shoves every boundary after it. Genuinely slow new tests break it from the other direction: they are billed at 0.248s while really costing seconds, and land somewhere the balancer thinks is cheap.</p>
+
+<details>
+<summary>We tried to dodge the measurement entirely. It doesn&rsquo;t work.</summary>
+<p>If the fallback value is the problem, the obvious fix is to top up unknown entries with something saner than the mean before pytest-split sees them — no test run required. We tried the median, the 25th percentile, and a value between. All three stayed above <strong>56% overshoot</strong> on the 17-day map, against 65% for doing nothing.</p>
+<p>The reason is that the missing tests carried about <strong>401 seconds</strong> of real time — 15% of the whole suite — spread unevenly across the collection. No single fill value can put that time in the right <em>places</em>. Coverage genuinely has to be measured. That negative result is what forced the incremental design rather than a pure post-processing trick.</p>
+</details>
+
+<h2>4. What we shipped</h2>
+
+<div class="tabs">
+  <input type="radio" name="shipped" id="ship1" checked>
+  <input type="radio" name="shipped" id="ship2">
+  <input type="radio" name="shipped" id="ship3">
+  <div class="tab-labels">
+    <label for="ship1">Incremental refresh</label>
+    <label for="ship2">Stabilisation</label>
+    <label for="ship3">Pruning</label>
+  </div>
+  <div class="tab-panels">
+    <div class="tab-panel">
+      <p><strong>The default target now measures only what is missing.</strong> It collects the suite, diffs the collected node ids against the map, and runs pytest over the difference. When nothing is missing it measures nothing at all and exits after the collection.</p>
+      <p>This is legitimate rather than a partial overwrite because <code>--store-durations</code> <strong>merges</strong> into the existing file — only <code>--clean-durations</code>, which we do not use, replaces wholesale. That single fact in pytest-split&rsquo;s <code>plugin.py</code> is what makes the whole approach possible.</p>
+      <p>Guard rail: if more than 40% of the suite is missing, it re-measures everything instead. At that point the incremental path buys little and the node-id argument vector gets unwieldy.</p>
+    </div>
+    <div class="tab-panel">
+      <p><strong>Every duration is rounded to 4 decimals, and a recorded value is kept whenever the new measurement is within <code>max(30% &times; stored, 0.05s)</code> of it.</strong></p>
+      <p>Both terms earn their place. The relative term spares slow tests, where a fixed floor would be far too tight — a 1s swing on a 10s test is noise. The absolute floor spares the thousands of sub-millisecond tests, whose relative jitter between runs is enormous and meaningless.</p>
+      <p>Rounding happens on <em>both</em> sides of the comparison, and the rounded stored value is what gets kept. Keeping the raw spelling instead would be self-defeating: an in-tolerance entry would preserve its original long float forever and the file would never converge.</p>
+    </div>
+    <div class="tab-panel">
+      <p><strong>Entries whose test <em>file</em> no longer exists are dropped.</strong> We needed this because <code>--store-durations</code> only ever merges — before this change, nothing could clear a dead entry, so the existing <code>test_test_durations_paths</code> gate could fail with no command able to fix it. Its error message even said &ldquo;regenerate&rdquo;, which would not have worked.</p>
+      <p>The criterion is deliberately the filesystem and never the collected set. A marker-filtered collection legitimately hides a large slice of the suite (most of <code>tests/e2e</code>), so pruning against it would delete live entries. A vanished file, by contrast, cannot come back under any marker.</p>
+    </div>
+  </div>
+</div>
+
+<h2>5. The refresh pipeline</h2>
+
+<figure>
+<svg viewBox="0 0 900 300" role="img" aria-label="Flow diagram of the refresh. Collect the suite, then branch: if nothing is missing, skip straight to post-processing and write a zero-line diff; otherwise measure the missing tests and let pytest-split merge them, then post-process.">
+  <defs>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="7.5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="var(--muted)"/>
+    </marker>
+  </defs>
+  <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="12.5">
+
+    <rect x="20" y="118" width="130" height="52" rx="7" fill="var(--panel)" stroke="var(--line)"/>
+    <text x="85" y="139" text-anchor="middle" fill="var(--ink)" font-weight="600">collect</text>
+    <text x="85" y="156" text-anchor="middle" fill="var(--muted)" font-size="11">~8 seconds</text>
+
+    <path d="M150 144 L 186 144" stroke="var(--muted)" marker-end="url(#ar)"/>
+
+    <polygon points="270,110 340,144 270,178 200,144" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="270" y="140" text-anchor="middle" fill="var(--ink)" font-weight="600" font-size="11.5">anything</text>
+    <text x="270" y="154" text-anchor="middle" fill="var(--ink)" font-weight="600" font-size="11.5">missing?</text>
+
+    <path d="M270 110 L 270 66 L 606 66" stroke="var(--muted)" marker-end="url(#ar)" fill="none"/>
+    <text x="300" y="58" fill="var(--good)" font-size="11.5" font-weight="600">no &mdash; measure nothing</text>
+
+    <path d="M340 144 L 386 144" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <text x="363" y="136" text-anchor="middle" fill="var(--warn)" font-size="11.5" font-weight="600">yes</text>
+
+    <rect x="390" y="118" width="150" height="52" rx="7" fill="var(--warn-soft)" stroke="var(--line)"/>
+    <text x="465" y="139" text-anchor="middle" fill="var(--ink)" font-weight="600">measure the gap</text>
+    <text x="465" y="156" text-anchor="middle" fill="var(--muted)" font-size="11">pytest merges results in</text>
+
+    <path d="M540 144 L 600 144 L 600 108" stroke="var(--muted)" marker-end="url(#ar)" fill="none"/>
+
+    <rect x="606" y="44" width="272" height="130" rx="7" fill="var(--panel)" stroke="var(--line)" stroke-dasharray="4 3"/>
+    <text x="742" y="64" text-anchor="middle" fill="var(--muted)" font-size="11" font-weight="600">POST-PROCESSING</text>
+    <rect x="622" y="74" width="240" height="30" rx="5" fill="var(--bg)" stroke="var(--line)"/>
+    <text x="742" y="93" text-anchor="middle" fill="var(--ink)">prune entries whose file is gone</text>
+    <rect x="622" y="116" width="240" height="30" rx="5" fill="var(--bg)" stroke="var(--line)"/>
+    <text x="742" y="135" text-anchor="middle" fill="var(--ink)">keep values that barely moved</text>
+    <path d="M742 104 L 742 112" stroke="var(--muted)" marker-end="url(#ar)"/>
+
+    <path d="M742 174 L 742 208" stroke="var(--muted)" marker-end="url(#ar)"/>
+    <rect x="620" y="212" width="244" height="52" rx="7" fill="var(--good-soft)" stroke="var(--good)"/>
+    <text x="742" y="233" text-anchor="middle" fill="var(--ink)" font-weight="600">write .test_durations</text>
+    <text x="742" y="250" text-anchor="middle" fill="var(--muted)" font-size="11">zero-line diff when nothing was missing</text>
+
+  </g>
+</svg>
+<figcaption>The common case is the top path: collect, find nothing missing, prune and stabilise, write a file identical to the one already committed.</figcaption>
+</figure>
+
+<h2>6. What you actually run</h2>
+
+<pre><code>make store-test-durations        # alias: std   — incremental, the one you want
+make store-test-durations-force  # alias: stdf  — re-measure everything</code></pre>
+
+<div class="tbl-wrap">
+<table>
+<thead><tr><th>Situation</th><th>Command</th><th class="num">Roughly costs</th></tr></thead>
+<tbody>
+<tr><td>Release time, nothing much added</td><td><code>make std</code></td><td class="num">~8s, no diff</td></tr>
+<tr><td>After a branch that added tests</td><td><code>make std</code></td><td class="num">seconds</td></tr>
+<tr><td>Recorded values no longer comparable<br><span style="color:var(--muted);font-size:.9em">(machine changed, suite reshaped)</span></td><td><code>make stdf</code></td><td class="num">full suite</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="callout good">
+<p><strong>Run it more often than you used to.</strong> The incremental refresh is nearly free when nothing is missing, so there is no reason to save it for release day. Running it right after a branch that adds a lot of tests is now the cheap, correct move — and that is exactly the moment the map degrades.</p>
+</div>
+
+<p>Both targets regenerate the CI-profile test-model fixtures first, then hand off to <code>pipelex-dev store-test-durations</code>. While wiring that up we also hoisted the CI marker expression into a single <code>GHA_PYTEST_MARKERS</code> variable shared with <code>gha-tests</code>; it had been duplicated, which meant the map could in principle have been measured against a different selection than CI runs.</p>
+
+<h2>7. Stabilisation, and why the diff mattered</h2>
+
+<p>Re-measuring the suite rewrites essentially every line, because timings never repeat exactly. The old full refresh produced a diff of over <strong>21,000 changed lines</strong> — and that is not merely noisy. On release PR #1117 it helped push the branch past the size limits of two automated reviewers: Greptile declined on file count, Cubic on reviewable changed lines, most of them this file. <em>Neither posted a single comment.</em> The near-silence on that PR was evidence of a diff too large to read, not of clean code.</p>
+
+<p>Here is what the options cost, measured the same way as everything else:</p>
+
+<div class="tbl-wrap">
+<table>
+<thead><tr><th>Policy</th><th class="num">Lines changed</th><th class="num">Overshoot</th></tr></thead>
+<tbody>
+<tr><td>Raw values (what we had)</td><td class="num bad-txt">10,532</td><td class="num">0.9%</td></tr>
+<tr><td>Round to 0.05</td><td class="num">2,204</td><td class="num">1.0%</td></tr>
+<tr><td>Round to 0.1</td><td class="num">1,711</td><td class="num">0.9%</td></tr>
+<tr><td>Round to 0.25</td><td class="num">1,218</td><td class="num warn-txt">4.3%</td></tr>
+<tr><td><strong>Keep unless moved &gt;30% or &gt;0.05s</strong></td><td class="num good-txt">470</td><td class="num">1.7%</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>Plain rounding plateaus around 1,700 lines — the residue is genuinely noisy slow tests whose timing moves more than any sane grid. The stateful policy gets to 470 for eight tenths of a point of balance. And in practice it does better than that, because with complete coverage the incremental refresh re-measures nothing at all, so the steady-state diff is <strong>zero lines</strong>.</p>
+
+<div class="callout warn">
+<p><strong>One-time cost, already paid in this branch.</strong> The first run normalised all 10,633 entries onto the rounded grid — a single large diff, visible in the staged changes, which also shrank the file from 1.87 MB to 1.73 MB. Every refresh after it is small. Don&rsquo;t be alarmed by the diff size on this particular commit; that is the last one.</p>
+</div>
+
+<h2>8. How we verified it</h2>
+
+<p>Every claim above is measured rather than reasoned about. The behavioural ones were checked end to end:</p>
+
+<ul class="tight">
+  <li><strong>Steady state really is a zero-line diff.</strong> Two consecutive runs on a complete map: <code>0 added, 0 rewritten, 0 pruned</code>, and <code>git diff</code> empty.</li>
+  <li><strong>Incremental cost is real.</strong> The run that measured our own 21 new tests took <strong>15 seconds</strong> end to end, against several minutes for the full suite.</li>
+  <li><strong>Self-healing works.</strong> We injected a dead entry, watched <code>test_test_durations_paths</code> go red, ran the refresh, watched it prune the entry by name and the gate go green.</li>
+  <li><strong>The force path was exercised</strong> on a narrow marker selection, confirming it runs the whole selection rather than a node-id list.</li>
+  <li><strong>The new tests were mutation-tested.</strong> Five mutations of the implementation — dropping the relative term, dropping the absolute floor, removing rounding, a naive node-id split, disabling pruning — each reddened the intended test. One test turned out too weak to catch the missing-rounding mutation and was replaced with a grid invariant that does.</li>
+</ul>
+
+<p>Gates: <code>make agent-check</code> fully green (pyright, mypy over 2,564 files, ledgers, keyword-only, hub-layering, drift), full <code>make agent-test</code> passed, <code>make docs-check</code> builds with only the pre-existing anchor INFO in <code>orchestrator-plugins.md</code>.</p>
+
+<h2>9. Things worth knowing</h2>
+
+<details>
+<summary>Incremental measurements are taken under different conditions</summary>
+<p>Tests measured incrementally run in a smaller batch, under less parallel contention, than they would in a full-suite run. So their recorded values are not measured under conditions identical to the rest of the map.</p>
+<p>Given how little precision is worth — stale values across weeks cost about 7% — this is a good trade for turning a multi-minute step into a multi-second one. <code>make stdf</code> is the remedy if the accumulated inconsistency ever looks like it matters. This is written down in the docs page too, not just here.</p>
+</details>
+
+<details>
+<summary>Stabilisation introduces a small one-directional bias</summary>
+<p>Keeping a value that moved slightly means the stored number lags reality. Across the whole map that showed up as a total of 2,654s against a true 2,719s — about 2.4% low. It is bounded per test by the tolerance and self-corrects whenever a test crosses it, so it does not compound. Worth knowing it exists.</p>
+</details>
+
+<details>
+<summary>Dead node ids still accumulate; dead file paths do not</summary>
+<p>Pruning is on the file path. If a test is renamed but its file survives, the old node id stays in the map. That is deliberate and benign — pytest-split simply imputes any id it does not recognise, and pinning node ids would need a full unfiltered collection plus a tolerance policy for legitimate parametrization drift. The cost is a little file size, not balance.</p>
+</details>
+
+<details>
+<summary>How much is all of this actually worth in CI wall clock?</summary>
+<p>Less than you might think, and that is an argument <em>for</em> the design rather than against it. The gap between a perfectly fresh map and a one-release-stale one is about 6 seconds of shard time — and since each shard runs <code>-n auto</code> on a 4-vCPU runner, we estimate roughly 1.5s of actual wall clock.</p>
+<p>At release cadence the old full-suite regeneration was buying almost nothing. It is the multi-week gaps that bite, hard and non-linearly. So the right move was never &ldquo;refresh more thoroughly&rdquo; — it was to make the refresh cheap enough and correctly-triggered enough that the gap never opens.</p>
+</details>
+
+<h2>10. Where the code lives</h2>
+
+<div class="tbl-wrap">
+<table>
+<thead><tr><th>File</th><th>What it holds</th></tr></thead>
+<tbody>
+<tr><td><code>pipelex/cli/dev_cli/commands/duration_map.py</code></td><td><strong>New.</strong> Pure logic — load/write, coverage diff, pruning, stabilisation, and the policy constants with their rationale.</td></tr>
+<tr><td><code>pipelex/cli/dev_cli/commands/store_test_durations_cmd.py</code></td><td><strong>New.</strong> Orchestration — collect, decide, shell out to pytest, post-process, report.</td></tr>
+<tr><td><code>tests/unit/pipelex/cli/dev/test_duration_map.py</code></td><td><strong>New.</strong> Unit tests for the pure logic, mutation-checked.</td></tr>
+<tr><td><code>docs/contribute/test-duration-map.md</code></td><td><strong>New.</strong> The contributor-facing page, in the MkDocs nav.</td></tr>
+<tr><td><code>Makefile</code></td><td>Both targets, plus the hoisted <code>GHA_PYTEST_MARKERS</code>.</td></tr>
+<tr><td><code>tests/unit/repo/test_test_durations_paths.py</code></td><td>Prose and remediation message updated — the gate is self-healing now.</td></tr>
+<tr><td><code>.claude/skills/release/SKILL.md</code></td><td>Step 8b rewritten: it is no longer a full suite run, and a no-op is the expected outcome.</td></tr>
+<tr><td><code>.github/workflows/tests-check.yml</code></td><td>Comment corrected — it advised regenerating &ldquo;every few months&rdquo;, which is precisely the cadence that breaks the map.</td></tr>
+</tbody>
+</table>
+</div>
+
+<hr class="soft">
+<p style="color:var(--muted);font-size:.9rem;">Status: implemented and gated green, landing in <strong>v0.46.1</strong> via a PR stacked on <code>release/v0.46.1</code>. The changelog entry is part of that release&rsquo;s notes.</p>
+
+</main>
+</body>
+</html>
