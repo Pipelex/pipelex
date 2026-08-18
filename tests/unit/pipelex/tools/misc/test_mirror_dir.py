@@ -149,6 +149,58 @@ class TestMirrorDir:
             assert result.copied_files == []
             assert not (target / "telemetry.toml").exists()
 
+    def test_pattern_excluded_file_is_not_copied(self):
+        """A file matching an exclude pattern in the source is not copied into the target."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "source"
+            target = Path(temp_dir) / "target"
+            _write(source / "pipelex.toml.bak.20260818T084913Z", "pre-migration copy")
+            target.mkdir()
+
+            result = mirror_dir(source_dir=source, target_dir=target, exclude_patterns=frozenset({"*.bak.*"}))
+
+            assert result.copied_files == []
+            assert not (target / "pipelex.toml.bak.20260818T084913Z").exists()
+
+    def test_pattern_excluded_file_target_only_is_preserved(self):
+        """A file matching an exclude pattern present only in the target is not deleted."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "source"
+            target = Path(temp_dir) / "target"
+            source.mkdir()
+            _write(target / "pipelex.toml.bak.20260818T084913Z", "pre-migration copy")
+
+            result = mirror_dir(source_dir=source, target_dir=target, exclude_patterns=frozenset({"*.bak.*"}))
+
+            assert result.deleted_files == []
+            assert (target / "pipelex.toml.bak.20260818T084913Z").exists()
+
+    def test_pattern_exclusion_reaches_nested_directories(self):
+        """An exclude pattern applies at every depth of the walk, not just the top level."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "source"
+            target = Path(temp_dir) / "target"
+            _write(source / "inference" / "backends.toml", "backends")
+            _write(source / "inference" / "backends.toml.bak.20260818T084913Z", "pre-migration copy")
+            target.mkdir()
+
+            result = mirror_dir(source_dir=source, target_dir=target, exclude_patterns=frozenset({"*.bak.*"}))
+
+            assert result.copied_files == ["inference/backends.toml"]
+            assert not (target / "inference" / "backends.toml.bak.20260818T084913Z").exists()
+
+    def test_pattern_exclusion_is_case_sensitive(self):
+        """Matching does not fold case, so the same pattern answers alike on every filesystem."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "source"
+            target = Path(temp_dir) / "target"
+            _write(source / "PIPELEX.BAK.file", "not one of ours")
+            target.mkdir()
+
+            result = mirror_dir(source_dir=source, target_dir=target, exclude_patterns=frozenset({"*.bak.*"}))
+
+            assert result.copied_files == ["PIPELEX.BAK.file"]
+
     def test_excluded_dir_target_only_is_preserved(self):
         """An excluded directory present only in the target is left untouched."""
         with tempfile.TemporaryDirectory() as temp_dir:

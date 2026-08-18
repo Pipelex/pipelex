@@ -53,6 +53,24 @@ _BACKUP_STAMP_PATTERN = re.compile(r"\d{8}T\d{6}Z")
 """The stamp, as the shape `BACKUP_STAMP_FORMAT` renders — what tells one of our backups from a
 file the user named `<file>.bak.notes` themselves."""
 
+BACKUP_STAMP_GLOB = f"{'[0-9]' * 8}T{'[0-9]' * 6}Z"
+"""The same shape again, in the only vocabulary a `.gitignore` rule or an `fnmatch` filter has.
+
+It lives beside the regex rather than wherever a glob happens to be needed, so the two spellings
+of one stamp cannot drift apart, and so a change to `BACKUP_STAMP_FORMAT` has one obvious list of
+things to change with it.
+
+A glob has no repetition count, so the eight-digit date and the six-digit time are spelled out
+rather than abbreviated to a `[0-9]*` run. The run looks equivalent and is not: its `*` accepts
+anything at all, so it also matches `pipelex.toml.bak.1-notesZ` — a name `existing_backups_of`
+reads as the user's own and refuses to prune. Anything that declines to manage a file should not
+be hiding it either.
+
+Nothing translates the strftime string into this, on purpose: a parser for format directives is
+more machinery than one constant is worth. What holds the two together is the test matching this
+pattern against a name `backup_path_for` actually produced, which goes red if the stamp restamps.
+"""
+
 
 class WrittenBackup(NamedTuple):
     """Where this file's backup is, and whether this run is the one that put it there.

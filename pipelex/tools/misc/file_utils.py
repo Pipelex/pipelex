@@ -1,4 +1,5 @@
 import filecmp
+import fnmatch
 import importlib.resources
 import os
 import shutil
@@ -245,6 +246,30 @@ def remove_folder(folder_path: Path) -> None:
         shutil.rmtree(folder_path)
 
 
+def is_excluded_by_name(*, name: str, exclude_files: frozenset[str], exclude_patterns: frozenset[str]) -> bool:
+    """Whether a directory entry is one the caller asked a directory walk to look past.
+
+    Two vocabularies, because two kinds of entry need excluding. A fixed name covers a file that is
+    always called the same thing; a glob covers the ones whose name carries a timestamp or another
+    part that varies per run, which no fixed name can ever match.
+
+    Matching is case-sensitive (`fnmatchcase`) rather than `fnmatch`, whose case-folding follows the
+    host filesystem — the same pattern would otherwise exclude on macOS what it keeps on Linux, and
+    a rule that answers differently per developer is worse than one that answers strictly.
+
+    Args:
+        name: The basename of the entry being considered.
+        exclude_files: Basenames excluded outright.
+        exclude_patterns: Glob patterns whose matching basenames are excluded (e.g. "*.bak.*").
+
+    Returns:
+        True when the entry should be skipped.
+    """
+    if name in exclude_files:
+        return True
+    return any(fnmatch.fnmatchcase(name, pattern) for pattern in exclude_patterns)
+
+
 class MirrorDirResult(BaseModel):
     """Outcome of a mirror_dir operation.
 
@@ -281,6 +306,7 @@ def mirror_dir(
     target_dir: Path,
     exclude_files: frozenset[str] | None = None,
     exclude_dirs: frozenset[str] | None = None,
+    exclude_patterns: frozenset[str] | None = None,
     dry_run: bool = False,
 ) -> MirrorDirResult:
     """Mirrors a source directory onto a target directory (recursive copy + delete).
@@ -297,6 +323,8 @@ def mirror_dir(
         target_dir (Path): The directory brought in sync. Created if missing.
         exclude_files (frozenset[str] | None): File basenames to skip entirely.
         exclude_dirs (frozenset[str] | None): Directory basenames to skip entirely.
+        exclude_patterns (frozenset[str] | None): Glob patterns whose matching file basenames are
+            skipped entirely, for the entries whose name varies per run and so cannot be named.
         dry_run (bool): If True, report changes without touching the filesystem.
 
     Returns:
@@ -312,6 +340,7 @@ def mirror_dir(
     target_root = Path(target_dir)
     excluded_files = exclude_files or frozenset()
     excluded_dirs = exclude_dirs or frozenset()
+    excluded_patterns = exclude_patterns or frozenset()
 
     # Validate the source before Pass 1: an invalid source makes every
     # is_dir()/is_file() probe return false, which would delete the entire
@@ -350,7 +379,7 @@ def mirror_dir(
                         remove_folder(dir_to_remove)
             dir_names[:] = kept_dir_names
             for file_name in sorted(file_names):
-                if file_name in excluded_files:
+                if is_excluded_by_name(name=file_name, exclude_files=excluded_files, exclude_patterns=excluded_patterns):
                     continue
                 if (source_root / relative_root / file_name).is_file():
                     continue
@@ -373,7 +402,7 @@ def mirror_dir(
         if not dry_run:
             ensure_directory_exists(target_subdir)
         for file_name in sorted(file_names):
-            if file_name in excluded_files:
+            if is_excluded_by_name(name=file_name, exclude_files=excluded_files, exclude_patterns=excluded_patterns):
                 continue
             source_file = Path(current_root) / file_name
             target_file = target_root / relative_root / file_name

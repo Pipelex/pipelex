@@ -8,6 +8,10 @@ from importlib.resources.abc import Traversable
 # - telemetry_override.toml: Personal telemetry settings
 # - telemetry.project.toml: Kit-internal commented-out template used by project init
 #   only; must never be propagated into ~/.pipelex/ or a project's .pipelex/ as-is
+# The config-sync check and the kit mirror extend this set with the files that intentionally
+# differ between the two sides; that declaration lives in
+# `pipelex/cli/dev_cli/config_sync_exclusions.py`, which is above the kernel boot closure this
+# module sits inside and so may derive its patterns from `pipelex.migration`.
 GIT_IGNORED_CONFIG_FILES: frozenset[str] = frozenset(
     {
         ".DS_Store",
@@ -23,16 +27,6 @@ GIT_IGNORED_CONFIG_FILES: frozenset[str] = frozenset(
         "x_custom_extract_deck.toml",
     }
 )
-
-# Files excluded from config sync checks but still copied during `pipelex init config`.
-# Extends GIT_IGNORED_CONFIG_FILES with files that intentionally differ between the two sides:
-# - telemetry.toml: the kit's holds the active global template, while the pipelex repo's
-#   `.pipelex/telemetry.toml` dogfoods the commented-out project template.
-# - plxt.toml: the repo's `.pipelex/plxt.toml` adds a `[rule.schema]` override pointing at the
-#   locally generated `derived/mthds_schema.json` (this repo is the source of truth for the MTHDS
-#   language); the kit template must not reference that repo-internal artifact — plxt hard-fails
-#   on every .mthds file when the configured schema path does not exist.
-CONFIG_SYNC_EXCLUDED_FILES: frozenset[str] = GIT_IGNORED_CONFIG_FILES | {"telemetry.toml", "plxt.toml"}
 
 # Directories that should not be synced between .pipelex and kit/configs.
 # These are runtime directories created locally:
