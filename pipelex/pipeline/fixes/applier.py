@@ -339,14 +339,17 @@ def _last_container(*, item: Item) -> Container | None:
     return None
 
 
-def _renders_header(*, table: Table) -> bool:
-    """Whether tomlkit writes a ``[header]`` line for ``table`` — mirrors ``Container._render_table``.
+def _renders_header(*, table: Table, key: Key | None) -> bool:
+    """Whether tomlkit writes a ``[header]`` line for ``table``, stored under ``key`` — mirrors ``Container._render_table``.
 
-    An implicit super table (``[a.b]`` written without ``[a]``) has none, so trivia sitting above
-    its first entry is, to a reader, above the first entry's own header.
+    An implicit super table has none: ``[a.b]`` written without ``[a]``, or a dotted assignment
+    ``a.b = 1`` whose owning key is dotted, so its scalars render on their own lines. Trivia sitting
+    above such a table's first entry is, to a reader, above the first entry's own header.
     """
     if not table.is_super_table():
         return True
+    if key is not None and key.is_dotted():
+        return False
     body = table.value.body
     if any(not isinstance(item, (Table, AoT, Whitespace, Null)) for _, item in body):
         return True
@@ -506,6 +509,14 @@ def _owner_position(*, chain: list[_Slot]) -> int | None:
     return None
 
 
+def _owner_key(*, chain: list[_Slot]) -> Key | None:
+    """The key the last link's owner is stored under in its parent — ``None`` at the root, or once it is gone."""
+    position = _owner_position(chain=chain)
+    if position is None:
+        return None
+    return chain[-2].container.body[position][0]
+
+
 def _implicit_owner_position(*, chain: list[_Slot]) -> int | None:
     """Where the last link's owner sits in its own parent's container, when that owner renders no header.
 
@@ -517,7 +528,7 @@ def _implicit_owner_position(*, chain: list[_Slot]) -> int | None:
     if len(chain) < 2:
         return None
     owner = chain[-1].owner
-    if owner is None or _renders_header(table=owner):
+    if owner is None or _renders_header(table=owner, key=_owner_key(chain=chain)):
         return None
     position = _owner_position(chain=chain)
     if position is None:
@@ -630,7 +641,7 @@ def _lift_out(*, toml_doc: TOMLDocument, parent_table: dict[str, Any], table_pat
     chain = _slot_chain(toml_doc=toml_doc, path=[*table_path, key])
     resting = chain[-1].last
     owner_position = _owner_position(chain=chain)
-    opened_the_file = len(chain) == 1 and _is_first_entry(container=chain[0].container, index=chain[0].first)
+    opened_the_file = _opens_the_document(chain=chain)
     del parent_table[key]  # ``Container.remove`` leaves a ``Null`` in each slot, so positions hold.
     if owner_position is not None and _owner_position(chain=chain) is None:
         # The key was the last one of a chunk of an out-of-order table, and tomlkit dropped the
@@ -643,27 +654,60 @@ def _lift_out(*, toml_doc: TOMLDocument, parent_table: dict[str, Any], table_pat
     return moved_value, introduction
 
 
+def _opens_the_document(*, chain: list[_Slot]) -> bool:
+    """Whether the key at the end of ``chain`` is the first thing in the file, in document order.
+
+    It is when it comes first in its container and every parent on the way is itself first in
+    its own, rendering no header — ``[runtime.storage]`` at the top of a file that never writes
+    ``[runtime]``, or a dotted assignment opening the file.
+    """
+    for depth, link in enumerate(chain):
+        if not _is_first_entry(container=link.container, index=link.first):
+            return False
+        if depth > 0 and _implicit_owner_position(chain=chain[: depth + 1]) is None:
+            return False
+    return True
+
+
 def _drop_leading_blank_line(*, toml_doc: TOMLDocument) -> None:
     """A file does not open on a blank line: the one that separated the removed first entry from the next goes."""
-    for position, (_, item) in enumerate(toml_doc.body):
+    _drop_leading_blank_line_in(container=toml_doc)
+
+
+def _drop_leading_blank_line_in(*, container: Container) -> bool:
+    """Walk ``container`` in document order to its first rendered line, dropping it when it is blank.
+
+    A table that renders no header — an implicit parent emptied by the removal, or one whose first
+    entry is next — is walked through, since what opens the file is inside it. Returns whether the
+    walk met anything that renders; ``False`` means the container renders nothing at all.
+    """
+    for position, (body_key, item) in enumerate(container.body):
         if isinstance(item, Null):
             continue
         if isinstance(item, Whitespace):
-            _detach_run(run=_TriviaRun(container=toml_doc, positions=[position]))
-        return
+            _detach_run(run=_TriviaRun(container=container, positions=[position]))
+            return True
+        if isinstance(item, Table) and not _renders_header(table=item, key=body_key):
+            if _drop_leading_blank_line_in(container=item.value):
+                return True
+            continue
+        return True
+    return False
 
 
 def _settle_inserted(*, toml_doc: TOMLDocument, table_path: list[str], key: str, introduction: Sequence[Item]) -> None:
     """Give a just-inserted ``key`` its introduction, and the trivia around it back to what it introduces.
 
-    tomlkit appends a table after everything, including the trailing run that introduced whatever
-    came after the container in the file — so that run is moved past the new item, to become the new
-    item's own trailing run. A key it inserts *before the first table* of a container can land in the
-    middle of a run — between a file's preamble and the blank line under it — so the run on both
-    sides is read as one: what introduces the next item goes below the key, what does not (the
-    preamble) goes back above it. The introduction is then inserted right above the item. A carried
-    introduction brings the blank line the source had with it, so the newline tomlkit puts before an
-    appended table's header is dropped in its favour.
+    Every insertion goes through here — a moved item, a key ``set_key`` adds, a table ``ensure_table``
+    creates — with an empty introduction when there is nothing to carry. tomlkit appends a table
+    after everything, including the trailing run that introduced whatever came after the container
+    in the file — so that run is moved past the new item, to become the new item's own trailing run.
+    A key it inserts *before the first table* of a container can land in the middle of a run —
+    between a file's preamble and the blank line under it — so the run on both sides is read as
+    one: what introduces the next item goes below the key, what does not (the preamble) goes back
+    above it. The introduction is then inserted right above the item. A carried introduction brings
+    the blank line the source had with it, so the newline tomlkit puts before an appended table's
+    header is dropped in its favour.
     """
     chain = _slot_chain(toml_doc=toml_doc, path=[*table_path, key])
     if len(chain) < len(table_path) + 1:
@@ -696,8 +740,9 @@ def _settle_inserted(*, toml_doc: TOMLDocument, table_path: list[str], key: str,
             # tomlkit gives the table that now follows an inserted key a newline of indent; that blank
             # line belongs above the run going back under the key, not between the run and the header.
             following = _first_entry_after(container=slot.container, index=slot.last)
-            if isinstance(following, Table) and following.trivia.indent and not isinstance(down_items[0], Whitespace):
-                down_items = [Whitespace(following.trivia.indent), *down_items]
+            if isinstance(following, Table) and following.trivia.indent:
+                if not isinstance(down_items[0], Whitespace):
+                    down_items = [Whitespace(following.trivia.indent), *down_items]
                 following.trivia.indent = ""
             _insert_trivia_at(container=slot.container, index=slot.last + 1, items=down_items)
         else:
@@ -872,7 +917,11 @@ def _apply_at_table_path(*, toml_doc: TOMLDocument, fix_op: FixOp, table_path: l
             target_table = _resolve_table(toml_doc=toml_doc, table_path=table_path)
             if target_table is None:
                 return _OpResult(FixOpOutcome.SKIPPED, f"table '{table_path_str}' not found in document")
+            was_absent = fix_op.key not in target_table
             target_table[fix_op.key] = _as_tomlkit_value(fix_op.value)
+            if was_absent:
+                # A new key lands before the table's trailing run — the next section's banner — not after it.
+                _settle_inserted(toml_doc=toml_doc, table_path=table_path, key=fix_op.key, introduction=[])
             return _OpResult(FixOpOutcome.APPLIED)
         case EnsureTableOp():
             existing_table = _resolve_table(toml_doc=toml_doc, table_path=table_path)
@@ -889,6 +938,7 @@ def _apply_at_table_path(*, toml_doc: TOMLDocument, fix_op: FixOp, table_path: l
                 # found" this branch used to report.
                 return _OpResult(FixOpOutcome.CONFLICT, f"'{table_key}' is already present in '{'.'.join(table_path[:-1])}' and is not a table")
             parent_table[table_key] = tomlkit.inline_table()
+            _settle_inserted(toml_doc=toml_doc, table_path=table_path[:-1], key=table_key, introduction=[])
             return _OpResult(FixOpOutcome.APPLIED)
         case DeleteKeyOp():
             target_table = _resolve_table(toml_doc=toml_doc, table_path=table_path)

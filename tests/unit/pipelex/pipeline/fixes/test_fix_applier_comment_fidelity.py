@@ -22,7 +22,7 @@ from tomlkit import TOMLDocument
 from pipelex.migration.engine import replay_ledger_over_text
 from pipelex.migration.ledger import load_ledger, packaged_migration_dir
 from pipelex.pipeline.fixes.applier import FixOpOutcome, apply_fix_ops
-from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, FixOp, MoveKeyOp
+from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, EnsureTableOp, FixOp, MoveKeyOp, SetKeyOp
 
 _KIT_TEMPLATE = Path("pipelex/kit/configs/pipelex.toml")
 _PRE_RESHAPE_DEFAULTS = Path("pipelex/migration/goldens/pipelex-config/defaults@2.toml")
@@ -257,6 +257,66 @@ class TestFixApplierCommentFidelity:
                 "[a]\nx = 1\n",
                 id="deleting the last table of the file takes its banner and the blank line above it",
             ),
+            pytest.param(
+                "# ---- Storage ----\n[runtime.storage]\nm = 1\n\n# ---- Secrets ----\n[runtime.secrets]\ns = 1\n",
+                [MoveKeyOp(table_path=["runtime"], key="storage", new_table_path=["relocated"], new_key="storage")],
+                "# ---- Secrets ----\n[runtime.secrets]\ns = 1\n\n# ---- Storage ----\n[relocated.storage]\nm = 1\n",
+                id="removing the file's first table from under an implicit parent leaves no blank line at the top",
+            ),
+            pytest.param(
+                "# preamble\n\n# ---- Storage ----\npipelex.storage_config = { x = 1 }\n\n# ---- Other ----\n[other]\nk = 1\n",
+                [MoveKeyOp(table_path=["pipelex"], key="storage_config", new_table_path=["runtime"], new_key="storage_config")],
+                "# preamble\n\n# ---- Other ----\n[other]\nk = 1\n\n# ---- Storage ----\n[runtime]\nstorage_config = { x = 1 }\n",
+                id="a dotted assignment at the root is introduced by what sits above it, since its implicit parent renders no header",
+            ),
+            pytest.param(
+                "# ---- Log ----\npipelex.log_config.level = 'INFO'\n\n# ---- Other ----\n[other]\nk = 1\n",
+                [MoveKeyOp(table_path=["pipelex"], key="log_config", new_table_path=["runtime"], new_key="log_config")],
+                "# ---- Other ----\n[other]\nk = 1\n\n# ---- Log ----\n[runtime.log_config]\nlevel = 'INFO'\n",
+                id="a deeper dotted assignment climbs through every header-less parent to its banner",
+            ),
+            pytest.param(
+                "# ---- Storage ----\npipelex.storage_config = { x = 1 }\n\n# ---- Other ----\n[other]\nk = 1\n",
+                [DeleteKeyOp(table_path=["pipelex"], key="storage_config")],
+                "# ---- Other ----\n[other]\nk = 1\n",
+                id="deleting a dotted-assignment key drops the banner above it",
+            ),
+            pytest.param(
+                "[a]\nx = 1\n\n# B banner\n[b]\ny = 2\n",
+                [SetKeyOp(table_path=["a"], key="z", value=3)],
+                "[a]\nx = 1\nz = 3\n\n# B banner\n[b]\ny = 2\n",
+                id="a key set into a table lands before the table's trailing banner, not after it",
+            ),
+            pytest.param(
+                "[a]\nx = 1\n\n# B banner\n[b]\ny = 2\n",
+                [EnsureTableOp(table_path=["a", "sub"])],
+                "[a]\nx = 1\nsub = {}\n\n# B banner\n[b]\ny = 2\n",
+                id="a table ensured under a table lands before the table's trailing banner, not after it",
+            ),
+            pytest.param(
+                "[a]\n# about x\nx = 1\n\n# B banner\n[b]\ny = 2\n",
+                [SetKeyOp(table_path=["a"], key="x", value=2)],
+                "[a]\n# about x\nx = 2\n\n# B banner\n[b]\ny = 2\n",
+                id="setting an existing key rewrites it in place and moves no comment",
+            ),
+            pytest.param(
+                "# A banner\n[a]\nx = 1\n",
+                [SetKeyOp(table_path=[], key="main_pipe", value="p")],
+                'main_pipe = "p"\n\n# A banner\n[a]\nx = 1\n',
+                id="a root key set into a file whose first header carries a banner lands above the banner",
+            ),
+            pytest.param(
+                "[pipe.first]\na = 1\n\n# concepts\n[concept]\nIdea = 'x'\n\n[pipe.first.inputs]\nt = 'Text'\n",
+                [SetKeyOp(table_path=["pipe", "first"], key="output", value="Text")],
+                "[pipe.first]\na = 1\noutput = \"Text\"\n\n# concepts\n[concept]\nIdea = 'x'\n\n[pipe.first.inputs]\nt = 'Text'\n",
+                id="a key set into an out-of-order chunk lands in that chunk, before the next section's banner",
+            ),
+            pytest.param(
+                "[t]\nz = 0\n\n# note on sub\n[t.sub]\nq = 1\n\n[a]\n# about x\nx = 1\n",
+                [MoveKeyOp(table_path=["a"], key="x", new_table_path=["t"], new_key="x")],
+                "[t]\nz = 0\n# about x\nx = 1\n\n# note on sub\n[t.sub]\nq = 1\n\n[a]\n",
+                id="a trailing run that already opens on a blank line does not gain a second one from tomlkit's indent",
+            ),
         ],
     )
     def test_edge_shapes(self, source: str, ops: list[FixOp], expected: str) -> None:
@@ -308,4 +368,6 @@ class TestFixApplierCommentFidelity:
         lines = replay.text.splitlines()
         for index, line in enumerate(lines):
             if line == rule and index + 2 < len(lines) and lines[index + 2] == rule and lines[index + 1] != "#":
-                assert lines[index + 4].startswith("["), f"banner {lines[index + 1]!r} is followed by {lines[index + 4]!r}"
+                # A banner in the last lines of the file introduces nothing: that is a failure, not a skip.
+                following = lines[index + 4] if index + 4 < len(lines) else "<end of file>"
+                assert following.startswith("["), f"banner {lines[index + 1]!r} is followed by {following!r}"

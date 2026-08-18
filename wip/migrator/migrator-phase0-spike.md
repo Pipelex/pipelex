@@ -61,7 +61,7 @@ All three are stable under replay.
 
 ### Comment attachment on moved nodes — the one thing that does not work
 
-> **Superseded.** This section's conclusion was wrong and the behaviour was fixed after a field bug report following v0.46.0 — see `migrator-comment-fidelity.md`. The measurement below is accurate; the "cannot be fixed" reading of it is not: the trivia are discrete body entries, not part of a serialized string.
+> **Superseded.** This section's conclusion was wrong and the behaviour was fixed after a field bug report following v0.46.0 — see `migrator-comment-fidelity.md`. The observed placement below is accurate, but its "inside that sibling's serialized string" explanation and its "cannot be fixed" reading are not: the trivia are discrete body entries — `(None, Comment)` and `(None, Whitespace)` — not part of a serialized string.
 
 **A comment block preceding a table does not travel when the table moves, and this cannot be fixed by being cleverer with the move.** tomlkit does not attach such a block to the table it appears to introduce; it stores it as trailing trivia of the *previous sibling*, inside that sibling's serialized string. Measured directly: in the kit template, the `# Storage Config` banner is part of `tracing_config`'s rendering, not of `storage_config`'s. Carrying it would mean string surgery on a neighbour's tail plus a heuristic for which comments "belong" to what follows.
 
