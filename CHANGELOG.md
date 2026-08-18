@@ -1,10 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [v0.46.1] - 2026-08-18
 
 ### Fixed
 
-- **A migrated section keeps its comment banner:** `pipelex migrate` moved tables and keys but not the own-line comments written above them, so a file seeded from the commented kit template came out with every section banner labelling the wrong section — the banner stayed behind while its section moved to the end of the file, and the moved section carried the *next* section's banner away with it. The applier now reads a run of own-line comments and blank lines as introducing whatever follows: a moved key or table takes its introduction along, a deleted one drops it, the introduction of whatever came next stays put, and an item appended under an existing table — moved there, or newly written by a fix — lands before that table's trailing banner rather than after it. A key written as a dotted assignment (`pipelex.storage_config = { … }`) is introduced by the comment above it, the same as one written under a header. A file preamble at the top stays where it is. The same rule applies to the `.mthds` fix path, where a comment above a stripped native-concept redeclaration used to dangle onto the next table and now goes with it. Files already migrated by v0.46.0 are not rewritten — the comments in them are a matter of hand-tidying, or of restoring the `.bak` beside each file and running `pipelex migrate` again.
+- **Migrator comment fidelity:** Fixed `pipelex migrate` so structural operations no longer leave comment banners behind or attach them to the wrong sections. Moved keys and tables now carry their introducing comment block with them; deleted keys and tables now drop their introducing comment block; items appended under an existing table now land *before* that table's trailing banner; and the `.mthds` fix path now drops comments above stripped native-concept redeclarations. Note: files already migrated by v0.46.0 are not rewritten automatically—tidy the comments by hand or restore the `.bak` files and re-run `pipelex migrate`.
 
 ## [v0.46.0] - 2026-08-17
 
