@@ -83,4 +83,4 @@ The branch is pushed as two commits on top of the fourth join — the work, then
 
 - The runbook: [`wip/migrator-3/sequencing.md`](../../../wip/migrator-3/sequencing.md) § S7, and ⏸ C above it for the four corrections it folded in.
 - The #1111 review deferrals: [`pr-1111-review-notes.md`](./pr-1111-review-notes.md) — items 1 and 2 are the ones S7 owns and both are now done; 3, 4, 5, 6 and 7 have their own homes.
-- The #1114 review deferrals: `wip/migrator-pr-1114-review-followups.md` on `dev` — §1 is the one S7 owns, and it is done.
+- The #1114 review deferrals: `wip/migrator/migrator-pr-1114-review-followups.md` on `dev` — §1 is the one S7 owns, and it is done.

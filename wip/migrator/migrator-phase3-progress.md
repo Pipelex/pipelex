@@ -1,6 +1,6 @@
 # S6 — Migrator Phase 3: working tracker
 
-The charter is [`wip/migrator-3/sequencing.md` § S6](../../wip/migrator-3/sequencing.md) at the **workspace root** (from this repo: `../wip/migrator-3/sequencing.md`), with the phase content in `plan.md § Phase 3`. This file is the session-crossing record of what S6 has built, what it decided, and what is still open. Open the charter first, then this.
+The charter is [`wip/migrator-3/sequencing.md` § S6](../../../wip/migrator-3/sequencing.md) at the **workspace root** (from this repo: `../wip/migrator-3/sequencing.md`), with the phase content in `plan.md § Phase 3`. This file is the session-crossing record of what S6 has built, what it decided, and what is still open. Open the charter first, then this.
 
 **Venue.** S6 lands as **two** PRs, not the one the charter assumes.
 
@@ -208,7 +208,7 @@ Every new runner test was mutation-tested: dropping the resolve, clobbering the 
 
 ## Still open, in the charter's own words
 
-Everything in [§ S6](../../wip/migrator-3/sequencing.md#s6--migrator-phase-3) not listed under Milestone 1 above. The ones that must be settled *here* rather than at S7:
+Everything in [§ S6](../../../wip/migrator-3/sequencing.md#s6--migrator-phase-3) not listed under Milestone 1 above. The ones that must be settled *here* rather than at S7:
 
 - ~~**The dotted-key rename policy**~~ — done, see Milestone 3(a).
 - ~~**The backup and replace semantics pass**~~ — done, see Milestone 3(b).
@@ -607,7 +607,7 @@ Three contracts were acked at milestone 7: `hub-layering-convention`, `cli-docs`
 
 ## What is actually left
 
-Measured against the charter's own **Done when** list ([§ S6](../../wip/migrator-3/sequencing.md#s6--migrator-phase-3)), verified against the tree rather than against this file:
+Measured against the charter's own **Done when** list ([§ S6](../../../wip/migrator-3/sequencing.md#s6--migrator-phase-3)), verified against the tree rather than against this file:
 
 | Done when | State |
 |---|---|
@@ -663,7 +663,7 @@ The last parked #1114 item. `display_health_report` printed nearly every dynamic
 
 ### Deferred from the #1114 review
 
-The items the review-bot pass on PR #1114 raised and this branch parked rather than fixed are in [`migrator-pr-1114-review-followups.md`](./migrator-pr-1114-review-followups.md), each verified against the code and each with its trigger, and their owners are recorded in the charter's [S6 Session 4](../../wip/migrator-3/sequencing.md#s6-session-4--milestones-6-to-10-pr-1114-and-the-two-review-rounds):
+The items the review-bot pass on PR #1114 raised and this branch parked rather than fixed are in [`migrator-pr-1114-review-followups.md`](./migrator-pr-1114-review-followups.md), each verified against the code and each with its trigger, and their owners are recorded in the charter's [S6 Session 4](../../../wip/migrator-3/sequencing.md#s6-session-4--milestones-6-to-10-pr-1114-and-the-two-review-rounds):
 
 - **§1, the out-of-walk warning text** → S7's final join, because the reshape's `pipelex-config@2` is the first `pipelex-config` entry and is what makes it live (no consumer in the workspace passes `config_dir=` outside tests, so it is an embedder wording fix, not a blocker).
 - **§2, what a `migration` block's *presence* means for an unexplained-only plan** (agent hint, `_migration_prose`, the doctor's telemetry row, and the contract's own sentence — one ruling over four surfaces) → **part 3**, as a wording ruling the session may take on its own authority; not blocking S7, but S7's first machine is where a real user first meets it.

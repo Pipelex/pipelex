@@ -1,6 +1,6 @@
 # Comment fidelity across a move — the bug report after v0.46.0, and what closed it
 
-**Status: fixed on `fix/Migrator`, unreleased.** The applier now keeps a comment on the item it introduces through `move_key`, `delete_key` and `delete_table`, and settles what `set_key` and `ensure_table` insert before a table's trailing banner rather than after it. This note records why the phase-0 spike wrote the behaviour off as unfixable, why that was wrong, the rule that was chosen and where it is a reading rather than a fact, and what it does not do for files already migrated by v0.46.0.
+**Status: fixed on `fix/Migrator` (PR #1118, merged to `dev`), shipped in v0.46.1.** The applier now keeps a comment on the item it introduces through `move_key`, `delete_key` and `delete_table`, and settles what `set_key` and `ensure_table` insert before a table's trailing banner rather than after it. This note records why the phase-0 spike wrote the behaviour off as unfixable, why that was wrong, the rule that was chosen and where it is a reading rather than a fact, and what it does not do for files already migrated by v0.46.0.
 
 ## The report
 
