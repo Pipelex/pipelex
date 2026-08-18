@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:c9397a992e49ffb14028f68fde3587b3127f88f7928519a75c0f0f9eabc7312f"
-reviewed_by = "Claude (Opus 5 (1M context))"
-reviewed_at = "2026-08-18T14:03:11Z"
-rationale = "pipelex migrate now ensures the config-directory .gitignore on its clean early-return path, so the reach of that file changed and the account in docs/tools/cli/migrate.md was stale by omission: it read as any real migrate, when the write pass was in fact the only site, which excluded exactly the machines that have nothing to migrate. Extended that paragraph to say the rule lands on a run that finds nothing to carry forward, and that a declined migration still writes nothing. init.md needed no edit since the pipelex init path is untouched. Re-derived the agent-CLI claims from the code rather than from the previous ack: agent_migrate_cmd passes dry_run = not yes into migrate_config_directories and the ensure sits under if not dry_run, so the migrate row claim that it writes only with --yes still holds, and the new write is neither reported nor rendered, so the migrate report-contract line is unchanged. Also re-checked the claim that doctor --fix runs the same run: doctor reaches migrate_config_directories with dry_run False through apply_pending_migrations, so that stays true for the pending-migration case the sentence describes."
+digest = "sha256:75a2007c7886c8f2afa15bfa27aca73e6963371f23eb12f6a463620c9da6d609"
+reviewed_by = "Louis Choquel"
+reviewed_at = "2026-08-18T14:31:50Z"
+rationale = "pipelex migrate now ensures the config-directory .gitignore on its nothing-to-migrate return as well as its clean one, so the reach of that file changed again. Reviewed docs/tools/cli/migrate.md and found its gitignore paragraph needs no edit -- but not because nothing moved: the sentence 'you get it from any run that is allowed to write, including one that finds nothing to migrate' was already written as a universal, and it was false in exactly one reachable case that this same page devotes a section to, namely a run whose files are all blocked (When it cannot do the whole job). The code moved to meet the claim rather than the claim being weakened, so the page and the command now agree where they previously contradicted each other. Enumerated the real runs to check the universal is now exhaustive: clean writes it, all-blocked writes it, a migration you decline deliberately does not because 'nothing was written' has to stay true of the whole directory, and a run that applies writes it through migrate_config_directories. init.md needed no edit since the pipelex init path is untouched and its create-if-absent sentence still holds. Re-derived the agent-CLI claims from the code rather than from my own previous ack: agent_migrate_cmd has no early return at all, it calls migrate_config_directories with dry_run = not yes, so the new call site is unreachable from that command and the migrate row claim that it writes only with --yes is unaffected; the new write is neither reported nor rendered, so the migrate report-contract line at the top of that file is unchanged too. The doctor row reaches the dry-run scan only, so it is unaffected as well."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -105,7 +105,7 @@ rationale = "pipelex migrate now ensures the config-directory .gitignore on its 
 "pipelex/cli/commands/init/ui/types.py" = "blob:1361f29ca95bacc90bca90ea6c0e39f44b6734ab"
 "pipelex/cli/commands/login/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/login/command.py" = "blob:ace1db9879626cc1722adaac12761aadaa6b24ed"
-"pipelex/cli/commands/migrate_cmd.py" = "blob:da0a6e4d2f4f730ec27a084f0a013debe10217b0"
+"pipelex/cli/commands/migrate_cmd.py" = "blob:897f9cbf93acace8f61091a9924895f0fda76443"
 "pipelex/cli/commands/plugins_cmd.py" = "blob:9657b713c3650ff4a929e92ae68af453d896393e"
 "pipelex/cli/commands/resolve_cmd.py" = "blob:2928a0e26eab7983367a59a78533f6618817feba"
 "pipelex/cli/commands/run/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"

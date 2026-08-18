@@ -92,6 +92,11 @@ def migrate_cmd(*, dry_run: bool = False, yes: bool = False) -> None:
         return
 
     if not rehearsal.changed_plans:
+        # The clean return's twin, and it needs the rule for the same reason: `--dry-run` has
+        # already returned above, so this run is authorized to write, and nothing was declined
+        # because nothing was asked. Unguarded on purpose — the guard would be dead code, and it
+        # is that ordering rather than a condition that a test downstairs pins.
+        ensure_config_dir_gitignores(config_dirs=config_dirs)
         # Nothing this tool can do, and something for the user to do. Asking "apply these changes?"
         # when there are none to apply is a prompt with one honest answer.
         console.print(_panel(message="Nothing here can be migrated automatically — see the notes above.", style="yellow"))

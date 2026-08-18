@@ -46,6 +46,21 @@ def clean_machine(tmp_path: Path, mocker: MockerFixture) -> Path:
     return config_dir
 
 
+@pytest.fixture
+def blocked_machine(tmp_path: Path, mocker: MockerFixture) -> Path:
+    """One configuration directory the ledger cannot act on at all.
+
+    An unparseable file is blocked as a whole, so its plan carries a `blocked_reason` and no steps:
+    the report is *not* clean, and yet nothing changed, which is the pair of conditions that sends
+    the command down its second early return.
+    """
+    config_dir = tmp_path / ".pipelex"
+    config_dir.mkdir()
+    (config_dir / "telemetry.toml").write_text("this is = = not toml\n", encoding="utf-8")
+    mocker.patch.object(migrate_cmd_module, "config_directories_to_migrate", return_value=[config_dir])
+    return config_dir
+
+
 class TestTheCommandEnsuresTheGitignore:
     def test_a_machine_with_nothing_to_migrate_still_gets_the_rule(self, clean_machine: Path, console: Console) -> None:
         migrate_cmd(yes=True)
@@ -80,3 +95,32 @@ class TestTheCommandEnsuresTheGitignore:
 
         assert "cancelled" in console.export_text().lower()
         assert not (config_dir / CONFIG_DIR_GITIGNORE_NAME).exists()
+
+    def test_a_machine_where_nothing_can_be_migrated_still_gets_the_rule(self, blocked_machine: Path, console: Console) -> None:
+        """The clean path's twin: no question was put to the user, and the run is allowed to write.
+
+        A file the tool cannot process leaves the rehearsal not clean and yet with nothing to carry
+        forward, so the run returns before the write pass exactly as a clean one does. Nothing was
+        declined here — there was nothing to decline — so the directory gets its rule.
+        """
+        with pytest.raises(SystemExit) as exit_info:
+            migrate_cmd()
+
+        assert exit_info.value.code == 1
+        # Pins that this went down the nothing-to-migrate return and not the clean one above it.
+        assert "migrated automatically" in console.export_text()
+        assert (blocked_machine / CONFIG_DIR_GITIGNORE_NAME).is_file()
+
+    def test_a_dry_run_over_a_blocked_machine_writes_nothing(self, blocked_machine: Path, console: Console) -> None:
+        """What earns the absence of a `not dry_run` guard on the return above.
+
+        The rule is ensured there unguarded because `--dry-run` has already returned by then. That
+        is an ordering, not a condition, and an ordering is only as safe as the test that pins it:
+        this one reddens the moment the call is hoisted above the dry-run return.
+        """
+        with pytest.raises(SystemExit) as exit_info:
+            migrate_cmd(dry_run=True)
+
+        assert exit_info.value.code == 1
+        assert "nothing was written" in console.export_text().lower()
+        assert not (blocked_machine / CONFIG_DIR_GITIGNORE_NAME).exists()
