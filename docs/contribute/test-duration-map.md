@@ -47,6 +47,8 @@ make store-test-durations     # alias: make std
 
 This is the default and it is incremental. It collects the suite (a few seconds), compares the collected node ids against the map, and measures **only** the tests that are missing. When coverage is already complete it measures nothing at all and exits having done a collection — the common case, and it costs seconds rather than the several minutes a full suite run takes.
 
+There is one threshold. When more than 40% of the collected suite is missing from the map (`FULL_RUN_RATIO` in `duration_map.py`), measuring the missing tests individually stops being worth its own bookkeeping, and the incremental target re-measures everything instead — a full run, with the wall clock that implies. So the cheap-refresh promise holds for the ordinary case of a branch or two of new tests, and deliberately does not hold when the map has fallen far behind the suite. Expect it after a very large merge, or on a first run against an empty map.
+
 ```bash
 make store-test-durations-force   # alias: make stdf
 ```

@@ -23,6 +23,7 @@ from rich.panel import Panel
 
 from pipelex.cli.dev_cli.commands.duration_map import (
     FULL_RUN_RATIO,
+    count_changes,
     load_duration_map,
     missing_node_ids,
     prune_dead_paths,
@@ -59,7 +60,7 @@ def _collect_node_ids(*, markers: str) -> list[str]:
         text=True,
         check=False,
     )
-    if completed.returncode != 0:
+    if completed.returncode not in {0, PYTEST_EXIT_NO_TESTS_COLLECTED}:
         console = get_console()
         console.print("[red]✗ Test collection failed — cannot tell which durations are missing.[/red]")
         console.print(escape(completed.stdout[-4000:] or completed.stderr[-4000:]))
@@ -112,8 +113,15 @@ def store_test_durations_cmd(*, markers: str, force: bool = False, quiet: bool =
     else:
         console.print("[cyan]Collecting tests to find durations that are missing…[/cyan]")
         collected = _collect_node_ids(markers=markers)
+        if not collected:
+            # Reported rather than folded into "coverage complete": an empty selection is usually a
+            # mistyped marker expression, and calling that 100% covered would hide the mistake behind
+            # a rewrite of the map.
+            console.print("  [yellow]No tests matched the marker expression — nothing to measure.[/yellow]")
+            return
+
         missing = missing_node_ids(collected=collected, durations=previous)
-        coverage = 100.0 * (len(collected) - len(missing)) / len(collected) if collected else 100.0
+        coverage = 100.0 * (len(collected) - len(missing)) / len(collected)
         console.print(f"  {len(collected)} tests collected, {len(missing)} missing from the map ([bold]{coverage:.1f}%[/bold] covered)")
 
         if not missing:
@@ -146,8 +154,7 @@ def _finalize(*, previous: dict[str, float], quiet: bool, measured: str) -> None
     stabilized = stabilize(previous=previous, current=pruned)
     write_duration_map(path=DURATIONS_PATH, durations=stabilized)
 
-    changed = sum(1 for node_id, value in stabilized.items() if previous.get(node_id) != value)
-    added = sum(1 for node_id in stabilized if node_id not in previous)
+    added, changed = count_changes(previous=previous, stabilized=stabilized)
 
     if quiet:
         console.print(f"[green]✓ Test durations: {len(stabilized)} entries[/green] ({added} added, {changed} rewritten, {len(dropped)} pruned)")

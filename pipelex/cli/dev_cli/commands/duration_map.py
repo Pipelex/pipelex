@@ -79,6 +79,18 @@ def missing_node_ids(*, collected: list[str], durations: dict[str, float]) -> li
     return [node_id for node_id in collected if node_id not in durations]
 
 
+def count_changes(*, previous: dict[str, float], stabilized: dict[str, float]) -> tuple[int, int]:
+    """How many entries are new, and how many previously recorded ones were rewritten.
+
+    The two figures are disjoint, which is the whole point: an entry absent from ``previous`` was not
+    *re*-written, so counting it in both makes a first-ever refresh report the entire map twice.
+    Together they are the number of lines the refresh actually moved in the committed file.
+    """
+    added = sum(1 for node_id in stabilized if node_id not in previous)
+    rewritten = sum(1 for node_id, value in stabilized.items() if node_id in previous and previous[node_id] != value)
+    return added, rewritten
+
+
 def prune_dead_paths(*, durations: dict[str, float], repo_root: Path) -> tuple[dict[str, float], list[str]]:
     """Drop entries whose test *file* no longer exists, returning the survivors and the dropped ids.
 

@@ -179,8 +179,10 @@ entries for recently added tests costs over 50%, because `pytest-split` imputes
 an unknown test at the suite mean (~0.25s) when the median test is ~0.002s.
 
 - It takes seconds when little has been added, and only re-measures new tests
-  otherwise. It is not a full suite run — if it seems to be hanging, something
-  is wrong.
+  otherwise. Read the coverage line it prints before judging how long it should
+  take: past ~40% of the suite missing it falls back to re-measuring everything,
+  which takes minutes. Treat a long run as a hang only when it reported few
+  tests missing.
 - If it changed the file, `.test_durations` is included in the release commit
   (step 9). When nothing was missing it writes no diff at all, which is the
   expected outcome for a quiet release — skip it in that case.
