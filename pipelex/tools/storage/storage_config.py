@@ -25,7 +25,16 @@ class StorageMethodConfig(ConfigModel):
 
     # The exact keyword arguments GeneratedContentFactory._build_storage_key supplies to uri_format.format();
     # any other placeholder would raise KeyError/IndexError at content-store time, so reject it at config time.
-    URI_FORMAT_SUPPORTED_FIELDS: ClassVar[frozenset[str]] = frozenset({"primary_id", "secondary_id", "hash", "extension"})
+    #
+    # `secondary_id` is GONE. It was always `pipeline_run_id`, paired with a
+    # `primary_id` that was always `user_id` — a two-part key meaning
+    # "who ran it" then "which run". `primary_id` is now the whole opaque
+    # `storage_scope` the host supplies, which already identifies the run. A
+    # config still naming `{secondary_id}` is rejected at BOOT rather than
+    # KeyError-ing at content-store time, which is the point of validating the
+    # format string here: the failure lands on the operator who wrote the
+    # config, not on the first run that happens to generate an image.
+    URI_FORMAT_SUPPORTED_FIELDS: ClassVar[frozenset[str]] = frozenset({"primary_id", "hash", "extension"})
 
     provider_label: ClassVar[str]
 

@@ -79,6 +79,8 @@ class TestPipelineRunSetupEmitGates:
         set_event_log_spy = mocker.spy(get_report_delegate(), "set_event_log")
 
         pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
+            storage_scope="test/scope",
+            user_id="test-user",
             execution_config=_config(generate_graph=False, generate_usage=True),
             mthds_contents=[_GATE_MTHDS],
             pipe_code="echo_topic",
@@ -101,6 +103,8 @@ class TestPipelineRunSetupEmitGates:
         set_event_log_spy = mocker.spy(get_report_delegate(), "set_event_log")
 
         pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
+            storage_scope="test/scope",
+            user_id="test-user",
             execution_config=_config(generate_graph=True, generate_usage=False),
             mthds_contents=[_GATE_MTHDS],
             pipe_code="echo_topic",

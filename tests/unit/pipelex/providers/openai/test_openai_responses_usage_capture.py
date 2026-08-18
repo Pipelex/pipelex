@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
 
 def _make_llm_job_with_empty_usage() -> LLMJob:
-    job_metadata = JobMetadata(user_id="test-user", pipeline_run_id="test-run")
+    job_metadata = JobMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="test-run")
     tokens_usage = LLMTokensUsage(
         job_metadata=job_metadata,
         inference_model_name="test-model",

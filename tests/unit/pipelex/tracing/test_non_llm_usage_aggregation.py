@@ -26,7 +26,7 @@ from pipelex.tracing.usage_aggregator import UsageAggregator
 
 
 def _job_metadata() -> JobMetadata:
-    return JobMetadata(user_id="test-user", pipeline_run_id="run-non-llm")
+    return JobMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="run-non-llm")
 
 
 def _usage_event(tokens_usage: AnyTokensUsage, sequence: int) -> UsageReportEvent:

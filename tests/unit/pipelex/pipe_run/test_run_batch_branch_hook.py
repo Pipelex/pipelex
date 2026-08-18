@@ -52,7 +52,7 @@ def _make_pipe_job() -> PipeJob:
         working_memory=None,
         working_memory_raw=None,
         pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE),
-        job_metadata=JobMetadata(user_id="test-user", pipeline_run_id="test-run"),
+        job_metadata=JobMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="test-run"),
         output_name=None,
         library_crate=None,
     )

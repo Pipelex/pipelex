@@ -295,6 +295,7 @@ class TestLiftSkipTrichotomy:
             return_value=mock_manager,
         )
         traced_metadata = JobMetadata(
+            storage_scope="test/scope",
             user_id="pytest",
             pipeline_run_id=job_metadata.pipeline_run_id,
             trace_context=make_trace_context(graph_id=job_metadata.pipeline_run_id),

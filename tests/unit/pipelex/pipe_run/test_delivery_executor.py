@@ -69,7 +69,7 @@ class TestDeliveryExecutor:
 
         await executor.execute(
             pipe_output=mock_output,
-            user_id="test-user",
+            storage_scope="tenant/plr-123",
             pipeline_run_id="plr-123",
             delivery_assignment=assignment,
             status=DeliveryStatus.COMPLETED,
@@ -77,12 +77,12 @@ class TestDeliveryExecutor:
 
         mock_storage.store.assert_called()
         stored_keys = [call.kwargs["key"] for call in mock_storage.store.call_args_list]
-        assert any("test-user/plr-123/working_memory.json" in key for key in stored_keys)
+        assert any("tenant/plr-123/results/working_memory.json" in key for key in stored_keys)
         # A completed run always delivers a main stuff, so the main_stuff artifact files are always written.
-        assert any("test-user/plr-123/main_stuff.json" in key for key in stored_keys)
-        assert any("test-user/plr-123/main_stuff.md" in key for key in stored_keys)
-        assert any("test-user/plr-123/main_stuff.html" in key for key in stored_keys)
-        assert any("test-user/plr-123/tokens_usages.json" in key for key in stored_keys)
+        assert any("tenant/plr-123/results/main_stuff.json" in key for key in stored_keys)
+        assert any("tenant/plr-123/results/main_stuff.md" in key for key in stored_keys)
+        assert any("tenant/plr-123/results/main_stuff.html" in key for key in stored_keys)
+        assert any("tenant/plr-123/results/tokens_usages.json" in key for key in stored_keys)
 
     async def test_execute_webhook_only(self, mocker: MockerFixture) -> None:
         mock_client = mocker.AsyncMock()
@@ -100,7 +100,7 @@ class TestDeliveryExecutor:
 
         await executor.execute(
             pipe_output=None,
-            user_id="test-user",
+            storage_scope="test-user",
             pipeline_run_id="plr-456",
             delivery_assignment=assignment,
             status=DeliveryStatus.COMPLETED,
@@ -131,7 +131,7 @@ class TestDeliveryExecutor:
 
         await executor.execute(
             pipe_output=None,
-            user_id="test-user",
+            storage_scope="test-user",
             pipeline_run_id="plr-789",
             delivery_assignment=assignment,
             status=DeliveryStatus.FAILED,
@@ -151,7 +151,7 @@ class TestDeliveryExecutor:
 
         await executor.execute(
             pipe_output=None,
-            user_id="test-user",
+            storage_scope="test-user",
             pipeline_run_id="plr-fail",
             delivery_assignment=assignment,
             status=DeliveryStatus.FAILED,
@@ -166,7 +166,7 @@ class TestDeliveryExecutor:
 
         await executor.execute(
             pipe_output=None,
-            user_id="test-user",
+            storage_scope="test-user",
             pipeline_run_id="plr-noop",
             delivery_assignment=assignment,
             status=DeliveryStatus.COMPLETED,
@@ -189,7 +189,7 @@ class TestDeliveryExecutor:
         with pytest.raises(StorageDeliveryError):
             await executor.execute(
                 pipe_output=mock_output,
-                user_id="test-user",
+                storage_scope="test-user",
                 pipeline_run_id="plr-err",
                 delivery_assignment=assignment,
                 status=DeliveryStatus.COMPLETED,
@@ -288,7 +288,7 @@ class TestDeliveryExecutor:
         mock_output.tokens_usages = [
             LLMTokensUsage(
                 model_type="llm",
-                job_metadata=JobMetadata(user_id="test-user", pipeline_run_id="plr-usage"),
+                job_metadata=JobMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="plr-usage"),
                 inference_model_name="test-model",
                 inference_model_id="test-model-id",
                 nb_tokens_by_category={TokenCategory.INPUT: 15, TokenCategory.OUTPUT: 4},
@@ -528,7 +528,7 @@ class TestDeliveryExecutor:
 
         await executor.execute(
             pipe_output=None,
-            user_id="test-user",
+            storage_scope="test-user",
             pipeline_run_id="plr-failed",
             delivery_assignment=assignment,
             status=DeliveryStatus.FAILED,
@@ -556,7 +556,7 @@ class TestDeliveryExecutor:
 
         await executor.execute(
             pipe_output=None,
-            user_id="test-user",
+            storage_scope="test-user",
             pipeline_run_id="plr-success",
             delivery_assignment=assignment,
             status=DeliveryStatus.COMPLETED,
@@ -587,7 +587,7 @@ class TestDeliveryExecutor:
 
         await executor.execute(
             pipe_output=None,
-            user_id="test-user",
+            storage_scope="test-user",
             pipeline_run_id="plr-failed-no-report",
             delivery_assignment=assignment,
             status=DeliveryStatus.FAILED,
@@ -619,7 +619,7 @@ class TestDeliveryExecutor:
 
         await executor.execute(
             pipe_output=mock_output,
-            user_id="test-user",
+            storage_scope="test-user",
             pipeline_run_id="plr-storage-req",
             delivery_assignment=assignment,
             status=DeliveryStatus.COMPLETED,
@@ -650,7 +650,7 @@ class TestDeliveryExecutor:
 
         await executor.execute(
             pipe_output=None,
-            user_id="test-user",
+            storage_scope="test-user",
             pipeline_run_id="plr-webhook-req",
             delivery_assignment=assignment,
             status=DeliveryStatus.COMPLETED,
@@ -707,7 +707,7 @@ class TestDeliveryExecutor:
 
         await executor.execute(
             pipe_output=None,
-            user_id="test-user",
+            storage_scope="test-user",
             pipeline_run_id="plr-webhook-failed-req",
             delivery_assignment=assignment,
             status=DeliveryStatus.FAILED,
@@ -739,7 +739,7 @@ class TestDeliveryExecutor:
 
         await executor.execute(
             pipe_output=None,
-            user_id="test-user",
+            storage_scope="test-user",
             pipeline_run_id="plr-no-req",
             delivery_assignment=assignment,
             status=DeliveryStatus.COMPLETED,
@@ -769,7 +769,7 @@ class TestDeliveryExecutor:
         with pytest.raises(SsrfBlockedError):
             await executor.execute(
                 pipe_output=None,
-                user_id="test-user",
+                storage_scope="test-user",
                 pipeline_run_id="plr-ssrf",
                 delivery_assignment=assignment,
                 status=DeliveryStatus.COMPLETED,
@@ -792,7 +792,7 @@ class TestDeliveryExecutor:
         with pytest.raises(WebhookDeliveryError):
             await executor.execute(
                 pipe_output=None,
-                user_id="test-user",
+                storage_scope="test-user",
                 pipeline_run_id="plr-err",
                 delivery_assignment=assignment,
                 status=DeliveryStatus.COMPLETED,

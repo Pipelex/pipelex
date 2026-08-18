@@ -23,7 +23,7 @@ _MODULE = "pipelex.pipe_run.tracing_assembly"
 
 def _make_usage_event(pipeline_run_id: str, node_id: str) -> UsageReportEvent:
     """A UsageReportEvent carrying a real LLMTokensUsage (so the aggregator returns it)."""
-    metadata = JobMetadata(user_id="tracing-assembly-test", pipeline_run_id=pipeline_run_id)
+    metadata = JobMetadata(storage_scope="test/scope", user_id="tracing-assembly-test", pipeline_run_id=pipeline_run_id)
     tokens_usage = LLMTokensUsage(
         job_metadata=metadata,
         inference_model_name="fake_model",

@@ -59,8 +59,7 @@ class TestGeneratedImageStorage:
 
         # Generate ImageContent via factory
         image_content = await generated_content_factory.make_image_content(
-            primary_id="test_pipeline",
-            secondary_id="test_step",
+            storage_scope="test/scope",
             raw_details=raw_details,
         )
 
@@ -102,8 +101,7 @@ class TestGeneratedImageStorage:
 
         # Generate ImageContent via factory
         image_content = await generated_content_factory.make_image_content(
-            primary_id="test_pipeline",
-            secondary_id="test_step",
+            storage_scope="test/scope",
             raw_details=raw_details,
         )
 
@@ -138,8 +136,7 @@ class TestGeneratedImageStorage:
 
         # Generate ImageContent
         image_content = await generated_content_factory.make_image_content(
-            primary_id="pipeline_abc",
-            secondary_id="step_xyz",
+            storage_scope="test/scope",
             raw_details=raw_details,
         )
 

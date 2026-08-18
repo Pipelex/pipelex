@@ -54,7 +54,8 @@ async def pipeline_run_setup(
     dynamic_output_concept_ref: str | None = None,
     pipe_run_mode: PipeRunMode | None = None,
     is_mock_usage: bool = False,
-    user_id: str | None = None,
+    user_id: str,
+    storage_scope: str,
     pipeline_run_id: str | None = None,
     request_id: str | None = None,
     inputs_base_dir: Path | None = None,
@@ -115,7 +116,12 @@ async def pipeline_run_setup(
         :attr:`CogtRunParams.is_mock_usage`, which rides every assignment to the leaf in both
         direct and Temporal modes. Requires a DRY run; setting it on a LIVE run fails validation.
     user_id:
-        Unique identifier for the user (optional).
+        Unique identifier for the caller. REQUIRED — see the note below on why
+        it no longer defaults.
+    storage_scope:
+        Opaque prefix under which every byte this run writes must land. REQUIRED,
+        validated at ``JobMetadata`` construction. See
+        :mod:`pipelex.system.storage_scope`.
     pipeline_run_id:
         Pre-generated pipeline run ID. If provided, this ID is used instead of
         generating a new one. Use this when the run record has already been created
@@ -139,7 +145,19 @@ async def pipeline_run_setup(
         and the library ID.
 
     """
-    user_id = user_id or OTelConstants.DEFAULT_USER_ID
+    # NO `user_id or DEFAULT_USER_ID` HERE, DELIBERATELY.
+    #
+    # `OTelConstants.DEFAULT_USER_ID` is the string "anonymous", and it is a
+    # TRACING placeholder — a label for a span with no known caller. It leaked
+    # into the identity path and became a storage key prefix, so every run
+    # without an authenticated caller wrote into one shared `anonymous/`
+    # namespace where each tenant could read the others' outputs. The failure
+    # was silent by construction: the fallback made a missing identity look
+    # like a present one.
+    #
+    # Both fields are now required parameters, so the same mistake is a
+    # TypeError at the call site instead of a shared bucket prefix in
+    # production. The constant survives for telemetry only.
     if not mthds_contents and not pipe_code:
         msg = "Either pipe_code or mthds_contents must be provided to the pipeline API."
         raise ValueError(msg)
@@ -283,6 +301,7 @@ async def pipeline_run_setup(
             is_mock_usage=is_mock_usage,
             pipeline_run_id=pipeline_run_id,
             user_id=user_id,
+            storage_scope=storage_scope,
             inputs=inputs,
             search_scope=search_scope,
             trace_context=trace_context,

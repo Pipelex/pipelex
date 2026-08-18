@@ -1413,20 +1413,20 @@ param = "extract_assignment"
 rationale = "Extracts from the extract_assignment; single operand."
 
 ["pipelex/cogt/content_generation/generated_content_factory.py::GeneratedContentFactory._build_storage_key"]
-param = "primary_id"
-rationale = "Builds the storage key from the primary id; single operand."
+param = "storage_scope"
+rationale = "Builds the storage key under the run's storage scope; single operand."
 
 ["pipelex/cogt/content_generation/generated_content_factory.py::GeneratedContentFactory._fetch_remote_content"]
 param = "url"
 rationale = "Fetches the remote content at the URL; single operand."
 
 ["pipelex/cogt/content_generation/generated_content_factory.py::GeneratedContentFactory.make_image_content"]
-param = "primary_id"
-rationale = "Factory from source: builds the result from the primary_id; single operand."
+param = "storage_scope"
+rationale = "Factory from source: builds the result under the storage scope; single operand."
 
 ["pipelex/cogt/content_generation/generated_content_factory.py::GeneratedContentFactory.make_page_contents"]
-param = "primary_id"
-rationale = "Factory from source: builds the result from the primary_id; single operand."
+param = "storage_scope"
+rationale = "Factory from source: builds the result under the storage scope; single operand."
 
 ["pipelex/cogt/content_generation/img_gen_generate.py::img_gen_image_list"]
 param = "img_gen_assignment"

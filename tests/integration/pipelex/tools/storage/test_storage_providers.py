@@ -31,8 +31,7 @@ class TestStorageProviders:
         extension = "png"
 
         key = uri_format.format(
-            primary_id=primary_id,
-            secondary_id=secondary_id,
+            storage_scope="test/scope",
             hash=hash_value,
             extension=extension,
         )

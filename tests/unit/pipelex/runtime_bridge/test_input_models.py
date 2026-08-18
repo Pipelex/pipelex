@@ -7,12 +7,17 @@ from pipelex.runtime_bridge.payloads import PipelexPipeDispatchAck, PipelexPipeR
 
 class TestInputOutputModels:
     def test_input_defaults_match_design(self):
-        payload = PipelexPipeRunInput(pipe_code="some_pipe")
+        payload = PipelexPipeRunInput(storage_scope="test/scope", user_id="test-user", pipe_code="some_pipe")
         assert payload.pipe_code == "some_pipe"
         assert payload.inputs == {}
         assert payload.output_name is None
         assert payload.pipeline_run_id is None
-        assert payload.user_id is None
+        # `user_id` and `storage_scope` are REQUIRED and non-nullable — this is
+        # the wire boundary where a missing identity used to become "anonymous"
+        # and a missing scope used to be derived from it, pointing every such run
+        # at one shared namespace.
+        assert payload.user_id == "test-user"
+        assert payload.storage_scope == "test/scope"
         assert payload.library_crate_dump is None
         assert payload.orchestration_mode == "direct"
         assert payload.delivery is DeliveryMode.BLOCKING
@@ -33,6 +38,7 @@ class TestInputOutputModels:
 
     def test_input_round_trip_via_json(self):
         original = PipelexPipeRunInput(
+            storage_scope="test/scope",
             pipe_code="some_pipe",
             inputs={"foo": "bar"},
             orchestration_mode="temporal",

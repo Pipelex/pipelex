@@ -56,10 +56,15 @@ class TestStorageS3Config:
                 id="uri-field-huge-width",
             ),
             pytest.param(
-                "assets/{hash}/{secondary_id!r}",
+                # `{primary_id!r}` rather than the retired `{secondary_id!r}`:
+                # this case is about a CONVERSION on a supported placeholder, so
+                # it must use a name the supported set still contains — an
+                # unsupported name is refused by a different check first, and
+                # this case would then pass for the wrong reason.
+                "assets/{hash}/{primary_id!r}",
                 "my-bucket",
                 "eu-west-1",
-                "- uri_format placeholder '{secondary_id}' must be plain",
+                "- uri_format placeholder '{primary_id}' must be plain",
                 id="uri-field-conversion",
             ),
             pytest.param(

@@ -25,7 +25,14 @@ class PipelexPipeRunInput(BaseModel):
     inputs: dict[str, Any] = Field(default_factory=dict)
     output_name: str | None = None
     pipeline_run_id: str | None = None
-    user_id: str | None = None
+    # Both REQUIRED, and neither nullable — this is the wire boundary where a
+    # missing identity used to become the string "anonymous" and a missing
+    # scope used to be derived from it. A host that cannot say who is calling
+    # and where the bytes go must fail here, at the edge, rather than have the
+    # runtime invent an answer that silently shares one namespace across
+    # tenants. See `pipelex.system.storage_scope`.
+    user_id: str
+    storage_scope: str
     library_crate_dump: dict[str, Any] | None = None
     # Two orthogonal axes: which orchestrator runs the pipe (open token, defaults to the
     # core in-process orchestrator) and whether the caller waits (endpoint-set; defaults

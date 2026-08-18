@@ -29,7 +29,7 @@ from pipelex.tools.uri.uri_resolver import resolve_uri
 NormalizableContent = ImageContent | DocumentContent
 
 
-async def normalize_data_urls_to_storage(working_memory: WorkingMemory) -> WorkingMemory:
+async def normalize_data_urls_to_storage(working_memory: WorkingMemory, *, storage_scope: str) -> WorkingMemory:
     """Convert all data URLs in ImageContent and DocumentContent to pipelex-storage:// URIs.
 
     Scans all stuffs in working memory and for any ImageContent or DocumentContent with
@@ -43,6 +43,10 @@ async def normalize_data_urls_to_storage(working_memory: WorkingMemory) -> Worki
 
     Args:
         working_memory: The working memory to normalize.
+        storage_scope: The run's opaque storage prefix. Normalized bytes land
+            under `{storage_scope}/assets/`, inside the run's own namespace —
+            they used to go to a flat top-level `normalized/` prefix shared by
+            every run of every tenant.
 
     Returns:
         The same WorkingMemory instance with normalized URLs.
@@ -51,7 +55,7 @@ async def normalize_data_urls_to_storage(working_memory: WorkingMemory) -> Worki
 
     for stuff in working_memory.root.values():
         content = stuff.content
-        normalized_content, changed = await _normalize_value(value=content, storage=storage)
+        normalized_content, changed = await _normalize_value(value=content, storage=storage, storage_scope=storage_scope)
         if changed:
             stuff.content = normalized_content
 
@@ -62,32 +66,35 @@ async def _normalize_value(
     value: Any,
     *,
     storage: StorageProviderAbstract,
+    storage_scope: str,
 ) -> tuple[Any, bool]:
     """Recursively normalize a value, converting data URLs in ImageContent/DocumentContent to storage URIs.
 
     Args:
         value: The value to normalize (can be ImageContent, DocumentContent, StructuredContent, list, or any other type).
         storage: The storage provider to use.
+        storage_scope: The run's opaque storage prefix; normalized bytes land
+            under `{storage_scope}/assets/`.
 
     Returns:
         A tuple of (normalized_value, has_changed).
     """
     # Handle ImageContent and DocumentContent
     if isinstance(value, (ImageContent, DocumentContent)):
-        normalized = await _normalize_url_content(content=value, storage=storage)
+        normalized = await _normalize_url_content(content=value, storage=storage, storage_scope=storage_scope)
         return normalized, normalized is not value
 
     # Handle StructuredContent (recursively process all fields)
     if isinstance(value, StructuredContent):
-        return await _normalize_structured_content(structured_content=value, storage=storage)
+        return await _normalize_structured_content(structured_content=value, storage=storage, storage_scope=storage_scope)
 
     # Handle ListContent
     if isinstance(value, ListContent):
-        return await _normalize_list_content(list_content=value, storage=storage)  # pyright: ignore[reportUnknownArgumentType]
+        return await _normalize_list_content(list_content=value, storage=storage, storage_scope=storage_scope)  # pyright: ignore[reportUnknownArgumentType]
 
     # Handle plain lists (might contain ImageContent, DocumentContent, or StructuredContent)
     if isinstance(value, list):
-        return await _normalize_list(items=value, storage=storage)  # pyright: ignore[reportUnknownArgumentType]
+        return await _normalize_list(items=value, storage=storage, storage_scope=storage_scope)  # pyright: ignore[reportUnknownArgumentType]
 
     # Other types don't need normalization
     return value, False
@@ -97,12 +104,15 @@ async def _normalize_structured_content(
     structured_content: StructuredContent,
     *,
     storage: StorageProviderAbstract,
+    storage_scope: str,
 ) -> tuple[StructuredContent, bool]:
     """Normalize a StructuredContent by recursively processing all its fields.
 
     Args:
         structured_content: The structured content to normalize.
         storage: The storage provider to use.
+        storage_scope: The run's opaque storage prefix; normalized bytes land
+            under `{storage_scope}/assets/`.
 
     Returns:
         A tuple of (normalized_content, has_changed).
@@ -111,7 +121,7 @@ async def _normalize_structured_content(
     has_changes = False
 
     for field_name, field_value in structured_content:
-        normalized_value, changed = await _normalize_value(value=field_value, storage=storage)
+        normalized_value, changed = await _normalize_value(value=field_value, storage=storage, storage_scope=storage_scope)
         if changed:
             updates[field_name] = normalized_value
             has_changes = True
@@ -128,12 +138,15 @@ async def _normalize_list_content(
     list_content: ListContent[Any],
     *,
     storage: StorageProviderAbstract,
+    storage_scope: str,
 ) -> tuple[ListContent[Any], bool]:
     """Normalize a ListContent by processing all its items.
 
     Args:
         list_content: The list content to normalize.
         storage: The storage provider to use.
+        storage_scope: The run's opaque storage prefix; normalized bytes land
+            under `{storage_scope}/assets/`.
 
     Returns:
         A tuple of (normalized_list_content, has_changed).
@@ -142,7 +155,7 @@ async def _normalize_list_content(
     if not raw_items:
         return list_content, False
 
-    normalized_items, has_changes = await _normalize_list(items=raw_items, storage=storage)  # pyright: ignore[reportUnknownArgumentType]
+    normalized_items, has_changes = await _normalize_list(items=raw_items, storage=storage, storage_scope=storage_scope)  # pyright: ignore[reportUnknownArgumentType]
 
     if not has_changes:
         return list_content, False
@@ -162,12 +175,15 @@ async def _normalize_list(
     items: list[Any],
     *,
     storage: StorageProviderAbstract,
+    storage_scope: str,
 ) -> tuple[list[Any], bool]:
     """Normalize a list by processing all its items.
 
     Args:
         items: The list items to normalize.
         storage: The storage provider to use.
+        storage_scope: The run's opaque storage prefix; normalized bytes land
+            under `{storage_scope}/assets/`.
 
     Returns:
         A tuple of (normalized_items, has_changed).
@@ -176,7 +192,7 @@ async def _normalize_list(
     has_changes = False
 
     for item in items:
-        normalized_item, changed = await _normalize_value(value=item, storage=storage)
+        normalized_item, changed = await _normalize_value(value=item, storage=storage, storage_scope=storage_scope)
         normalized_items.append(normalized_item)
         if changed:
             has_changes = True
@@ -188,12 +204,15 @@ async def _normalize_url_content(
     content: NormalizableContent,
     *,
     storage: StorageProviderAbstract,
+    storage_scope: str,
 ) -> NormalizableContent:
     """Normalize ImageContent or DocumentContent by converting data URLs to storage URIs.
 
     Args:
         content: The image or document content to normalize.
         storage: The storage provider to use.
+        storage_scope: The run's opaque storage prefix; normalized bytes land
+            under `{storage_scope}/assets/`.
 
     Returns:
         The original content if no normalization needed, or a new instance
@@ -210,7 +229,12 @@ async def _normalize_url_content(
         raw_bytes = base64.b64decode(resolved_uri.base64_data)
         file_type = detect_file_type_from_bytes(raw_bytes)
         mime_type = resolved_uri.mime_type or content.mime_type
-        key = f"normalized/{shortuuid.uuid()}.{file_type.extension}"
+        # `{scope}/assets/`, NOT the old flat `normalized/`. That top-level
+        # prefix was shared by every run of every tenant: the bytes of an input
+        # someone pasted as a data: URL landed beside everyone else's, keyed
+        # only by a random id. Under the run's own scope they are inside the
+        # tenant's namespace and go away with the run.
+        key = f"{storage_scope}/assets/{shortuuid.uuid()}.{file_type.extension}"
         storage_uri = await storage.store(data=raw_bytes, key=key, content_type=mime_type)
         public_url = await storage.public_url(uri=storage_uri)
 
@@ -236,7 +260,7 @@ async def _normalize_url_content(
             msg = f"Input file cannot be read: '{resolved_uri.path}' ({type(exc).__name__})"
             raise PipelineInputContentError(msg) from exc
         file_type = detect_file_type_from_bytes(raw_bytes)
-        key = f"normalized/{shortuuid.uuid()}.{file_type.extension}"
+        key = f"{storage_scope}/assets/{shortuuid.uuid()}.{file_type.extension}"
         storage_uri = await storage.store(data=raw_bytes, key=key, content_type=file_type.mime)
         public_url = await storage.public_url(uri=storage_uri)
 

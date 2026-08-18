@@ -21,7 +21,7 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 class TestImgGenGenerateDryBranch:
     def _assignment(self, *, run_mode: PipeRunMode, nb_images: int = 1) -> ImgGenAssignment:
         return ImgGenAssignment(
-            job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_img_dry"),
+            job_metadata=JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_img_dry"),
             cogt_run_params=CogtRunParams(run_mode=run_mode),
             img_gen_handle="mock-img-handle",
             img_gen_prompt=ImgGenPrompt(positive_text="a red apple", negative_text="no worms"),

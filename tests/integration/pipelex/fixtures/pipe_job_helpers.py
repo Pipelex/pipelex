@@ -49,7 +49,7 @@ def build_pipe_job(
     return PipeJobFactory.make_pipe_job(
         pipe=pipe,
         pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-        job_metadata=JobMetadata(user_id=OTelConstants.DEFAULT_USER_ID, pipeline_run_id=resolved_pipeline_run_id),
+        job_metadata=JobMetadata(storage_scope="test/scope", user_id=OTelConstants.DEFAULT_USER_ID, pipeline_run_id=resolved_pipeline_run_id),
         working_memory=WorkingMemoryFactory.make_empty(),
         library_crate=library_crate,
     )

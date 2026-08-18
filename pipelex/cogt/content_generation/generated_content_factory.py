@@ -24,9 +24,8 @@ class GeneratedContentFactory:
 
     def _build_storage_key(
         self,
-        primary_id: str,
+        storage_scope: str,
         *,
-        secondary_id: str,
         data: bytes,
         mime_type: str | None,
         image_format: ImageFormat | None,
@@ -34,14 +33,21 @@ class GeneratedContentFactory:
         """Build a storage key using a SHA-256 hash of the data.
 
         Args:
-            primary_id: The principal ID
-            secondary_id: The secondary ID
+            storage_scope: The run's opaque storage prefix — see
+                `pipelex.system.storage_scope`. It replaced a
+                `primary_id` / `secondary_id` pair that was always
+                `(user_id, pipeline_run_id)`, i.e. WHO ran the pipe followed by
+                WHICH run. Collapsing them into one host-supplied string is what
+                lets a host key generated content by tenant instead of by
+                uploader, without the runtime learning what a tenant is.
             data: The binary data to hash
             mime_type: Optional MIME type to determine file extension
             image_format: Optional output format to determine file extension
 
         Returns:
-            A storage key in the format "{primary_id}/{secondary_id}/{hash}.{extension}"
+            A storage key rendered from the configured `uri_format`, whose
+            placeholders are now `{primary_id}` (the scope), `{hash}` and
+            `{extension}`.
         """
         hash_digest = hashlib.sha256(data).hexdigest()[:16]
 
@@ -60,16 +66,15 @@ class GeneratedContentFactory:
         else:
             extension = "jpg"
         uri_format = get_config().runtime.storage.uri_format
-        return uri_format.format(primary_id=primary_id, secondary_id=secondary_id, hash=hash_digest, extension=extension)
+        return uri_format.format(primary_id=storage_scope, hash=hash_digest, extension=extension)
 
     async def _fetch_remote_content(self, url: str) -> bytes:
         return await fetch_file_from_url_httpx(url=url)
 
     async def make_image_content(
         self,
-        primary_id: str,
+        storage_scope: str,
         *,
-        secondary_id: str,
         raw_details: GeneratedImageRawDetails,
     ) -> ImageContent:
         image_format: ImageFormat | None = None
@@ -106,8 +111,7 @@ class GeneratedContentFactory:
                 is_remote_url = True
             elif actual_bytes:
                 storage_key = self._build_storage_key(
-                    primary_id=primary_id,
-                    secondary_id=secondary_id,
+                    storage_scope=storage_scope,
                     data=actual_bytes,
                     mime_type=raw_details.mime_type or base64_extracted_mime_type,
                     image_format=image_format,
@@ -137,8 +141,7 @@ class GeneratedContentFactory:
                 public_url = url
             else:
                 storage_key = self._build_storage_key(
-                    primary_id=primary_id,
-                    secondary_id=secondary_id,
+                    storage_scope=storage_scope,
                     data=actual_bytes,
                     mime_type=mime_type,
                     image_format=image_format,
@@ -161,9 +164,8 @@ class GeneratedContentFactory:
 
     async def make_page_contents(
         self,
-        primary_id: str,
+        storage_scope: str,
         *,
-        secondary_id: str,
         extract_output: ExtractOutput,
     ) -> list[PageContent]:
         page_contents: list[PageContent] = []
@@ -172,8 +174,7 @@ class GeneratedContentFactory:
             page_images: list[ImageContent] = []
             for extracted_image in page.extracted_images:
                 image_content = await self.make_image_content(
-                    primary_id=primary_id,
-                    secondary_id=secondary_id,
+                    storage_scope=storage_scope,
                     raw_details=extracted_image,
                 )
                 page_images.append(image_content)

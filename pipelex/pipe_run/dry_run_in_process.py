@@ -27,6 +27,7 @@ from pipelex.pipeline.execution_seams import prepare_pipe_job
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.runtime_hub import scoped_content_generator, scoped_event_log
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.system.storage_scope import DRY_RUN_STORAGE_SCOPE
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 
@@ -143,6 +144,14 @@ async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str) -> Gra
                 pipe_run_mode=PipeRunMode.DRY,
                 pipeline_run_id=pipeline_run_id,
                 user_id=OTelConstants.DEFAULT_USER_ID,
+                # A dry run provably stores nothing, but `storage_scope` is
+                # required — so it says so, loudly and greppably, instead of
+                # inheriting a default. A silent default on this field is
+                # exactly how the shared `anonymous/` namespace grew: a
+                # placeholder never meant to reach storage became the key
+                # prefix for every run. If `dry-run-no-storage` ever appears as
+                # an S3 prefix, a dry run stored something and that is the bug.
+                storage_scope=DRY_RUN_STORAGE_SCOPE,
                 trace_context=trace_context,
             )
             # PipeRun.run's finally closes the tracer by pipeline_run_id and assembles the

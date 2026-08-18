@@ -66,6 +66,7 @@ class TestRunPipeForwardsTracerMetadata:
         )
 
         job_metadata = JobMetadata(
+            storage_scope="test/scope",
             user_id="pytest",
             pipeline_run_id="test-run-meta",
             trace_context=make_trace_context(graph_id="test-run-meta"),

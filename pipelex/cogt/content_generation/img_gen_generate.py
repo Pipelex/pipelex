@@ -54,8 +54,7 @@ async def img_gen_single_image_and_store(
         return dry_img_gen_image_contents(img_gen_assignment.model_copy(update={"nb_images": 1}))[0]
     generated_image = await img_gen_single_image(img_gen_assignment)
     image_content = await generated_content_factory.make_image_content(
-        primary_id=img_gen_assignment.job_metadata.user_id,
-        secondary_id=img_gen_assignment.job_metadata.pipeline_run_id,
+        storage_scope=img_gen_assignment.job_metadata.storage_scope,
         raw_details=generated_image,
     )
     image_content.source_prompt = img_gen_assignment.img_gen_prompt.positive_text
@@ -78,8 +77,7 @@ async def img_gen_image_list_and_store(
     image_contents: list[ImageContent] = []
     for raw_details in generated_image_list:
         image_content = await generated_content_factory.make_image_content(
-            primary_id=img_gen_assignment.job_metadata.user_id,
-            secondary_id=img_gen_assignment.job_metadata.pipeline_run_id,
+            storage_scope=img_gen_assignment.job_metadata.storage_scope,
             raw_details=raw_details,
         )
         image_content.source_prompt = img_gen_assignment.img_gen_prompt.positive_text

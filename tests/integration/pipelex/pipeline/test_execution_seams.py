@@ -143,12 +143,13 @@ class TestExecutionSeams:
             assert qualified_main_pipe is not None
             pipe = get_required_entry_pipe(pipe_code=qualified_main_pipe)
             pipe_job = await prepare_pipe_job(
+                storage_scope="test/scope",
+                user_id="test-user",
                 pipe=pipe,
                 library_id=library_id,
                 execution_config=_dry_mock_config(),
                 pipe_run_mode=PipeRunMode.DRY,
                 pipeline_run_id="seams-prepare-run-id",
-                user_id=OTelConstants.DEFAULT_USER_ID,
             )
             assert pipe_job.pipe.code == "echo_topic"
             assert pipe_job.pipe_run_params.run_mode.is_dry
@@ -185,6 +186,7 @@ class TestExecutionSeams:
             )
 
             pipe_job = await prepare_pipe_job(
+                storage_scope="test/scope",
                 pipe=pipe,
                 library_id=library_id,
                 execution_config=normalize_config,
