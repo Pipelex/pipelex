@@ -65,6 +65,7 @@ This command creates or resets a Pipelex config directory with:
     - `backends/` - Individual backend configuration files
     - `deck/` - AI model aliases and presets
 - **telemetry.toml** - Telemetry and observability settings
+- **.gitignore** - Keeps Pipelex's own transient copies out of your `git status` — the timestamped `.bak` files [`pipelex migrate`](migrate.md) leaves beside each file it rewrites. Commit it so your teammates get the same. It is written only when the directory has no `.gitignore`; one already there is never modified.
 
 !!! warning "Init writes a fresh file — it does not update one"
     Every `init` target replaces the file with the template, so whatever was in it is gone. If a configuration file has simply fallen behind the current schema, [`pipelex migrate`](migrate.md) is the command: it rewrites the file in place and keeps every setting — your PostHog key, your Langfuse credentials, your exporters. `pipelex doctor` tells you which of the two you have.

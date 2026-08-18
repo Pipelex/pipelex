@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:ef75f1a9eff0100feb5e38e6e522fd22e4363680c3bd9487734f38bd6acb7c39"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-17T19:54:27Z"
-rationale = "Reviewed docs/tools/cli/ and the agent-CLI contract doc against a docstring-only correction in migrate_cmd.py. No surface moved - no flag, format, stream, structured field or exit code - so nothing in either target went stale by omission. Checked them for the specific claim the correction removes: the module docstring had said the transaction refuses where the rehearsal and the write pass disagree, which conflated two windows of very different widths. The agent CLI cannot be affected at all, since it is single-pass (dry_run = not yes) and has no confirmation window to edit a file during, and its contract doc makes no two-pass claim. migrate.md is likewise not falsified: it documents the backup and the atomic replace, both accurate, and never promises that the previewed report is what gets applied. What migrate.md could gain is a new sentence telling the user the files are re-read after they answer, and that is deliberately held rather than written now: whether the rehearsal should bind the write is an open design question recorded in wip/migrator-pr-1117-review-followups.md, and documenting behavior that may change is how a doc goes stale on purpose."
+digest = "sha256:530a92f6f7fc70d71971da1903871a8504ee180563edca29af83118ba74f6cfe"
+reviewed_by = "Claude (Opus 5 (1M context))"
+reviewed_at = "2026-08-18T12:29:11Z"
+rationale = "init_config now writes a .pipelex/.gitignore, so pipelex init has a new user-visible artifact. Found one stale target and fixed it: the What Gets Initialized list in docs/tools/cli/init.md is a set claim about what the command creates, and it rots by omission - the new file appears nowhere in it - so I added the entry rather than leaving the list quietly incomplete. Also extended the backup section of docs/tools/cli/migrate.md, since migrate ensures the same file for a directory that predates it. Re-derived the reach and the guard from the code rather than from any docstring: both pipelex init and pipelex-agent init call init_config, and both migrate commands call migrate_config_directories, so the write is on every path; each call site guards it with 'if not dry_run', and agent_migrate_cmd passes dry_run = not yes while the bare command's first pass is dry_run=True, which is what keeps the agent-CLI contract's claim that migrate writes only with --yes true. No flag, format, stream, structured field, verdict or exit code moved, so pipelex/cli/agent_cli/CLAUDE.md needed no edit - I checked its migrate report contract line and its migrate command-table row specifically."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -92,7 +92,7 @@ rationale = "Reviewed docs/tools/cli/ and the agent-CLI contract doc against a d
 "pipelex/cli/commands/init/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/init/backends.py" = "blob:1618d4f7f16c6d5a814680b17185501fade9f3fd"
 "pipelex/cli/commands/init/command.py" = "blob:21c700c66b9c608e14e6bb373c40d37c241ea509"
-"pipelex/cli/commands/init/config_files.py" = "blob:6e926eb3beb3c12a38d25f34c10e7b5ab6a7a99a"
+"pipelex/cli/commands/init/config_files.py" = "blob:c13be6b8d2a8b211ce9ef0f4889ee131ffc3d2d8"
 "pipelex/cli/commands/init/credentials.py" = "blob:7475c3082b8ee7530a76a52a8ab8bf18a7e21209"
 "pipelex/cli/commands/init/ide_extension.py" = "blob:b1ff7341253a56a8cbccfccce7b14d9053cd5b16"
 "pipelex/cli/commands/init/routing.py" = "blob:e8206196776ae43c12804ac74f770e72a681e1b6"

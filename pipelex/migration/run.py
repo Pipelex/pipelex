@@ -32,6 +32,7 @@ See `docs/migration-ledger.md` → "Surfaces" and "Applying".
 
 from pathlib import Path
 
+from pipelex.migration.gitignore import ensure_config_dir_gitignore
 from pipelex.migration.ledger import packaged_migration_dir
 from pipelex.migration.plan import MigrationReport
 from pipelex.migration.runner import migrate_directories
@@ -57,7 +58,17 @@ def migrate_config_directories(*, config_dirs: list[Path], dry_run: bool) -> Mig
 
     The registry and the ledger directory are the package's own, which is what makes this the
     real run rather than a gate's rehearsal over synthetic models.
+
+    A real run is also where each walked directory gets the `.gitignore` that keeps the backups
+    it is about to write out of the user's `git status` — here rather than in `migrate_directories`
+    on purpose, because that function is replayed by the gates over documents that are never
+    written anywhere, and a filesystem side effect there would follow them. A user who already had
+    a `.pipelex/` before this shipped therefore gets the rule from the very run that would
+    otherwise dirty their repository, and not only from a fresh `init`.
     """
+    if not dry_run:
+        for directory in config_dirs:
+            ensure_config_dir_gitignore(directory=directory)
     return migrate_directories(
         registry=build_config_surface_registry(),
         migration_dir=packaged_migration_dir(),

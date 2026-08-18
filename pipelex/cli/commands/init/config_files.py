@@ -5,6 +5,7 @@ from pathlib import Path
 
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.kit.paths import GIT_IGNORED_CONFIG_FILES, get_kit_configs_dir
+from pipelex.migration.gitignore import ensure_config_dir_gitignore
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 
@@ -32,6 +33,11 @@ def init_config(*, reset: bool = False, dry_run: bool = False, target_dir: Path 
     target_config_dir = target_dir or config_manager.pipelex_config_dir
 
     target_config_dir.mkdir(parents=True, exist_ok=True)
+
+    if not dry_run:
+        # Before anything is copied in, so the directory is never briefly a source of untracked
+        # noise. `pipelex migrate` ensures the same rule for a directory that predates it.
+        ensure_config_dir_gitignore(directory=target_config_dir)
 
     try:
         copied_files: list[str] = []
