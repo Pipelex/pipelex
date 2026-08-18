@@ -19,9 +19,9 @@ is migrated through to the file it names, and its backup lands beside *that* fil
 deliberately does not follow it there: writing into the `.gitignore` of somebody's whole dotfiles
 repository is a larger liberty than the one untracked copy it would hide.
 
-**The pattern is derived from the namer, not retyped.** `BACKUP_INFIX` is what
-`backup_path_for` actually writes; spelling `*.bak.…` again here would let a rename of the infix
-leave a rule that silently matches nothing.
+**The pattern is derived from the namer, not retyped.** `BACKUP_INFIX` and
+`BACKUP_STAMP_GLOB` are what `backup_path_for` actually writes; spelling `*.bak.…` again here would
+let a rename of the infix — or a restamp — leave a rule that silently matches nothing.
 
 Two omissions are deliberate:
 
@@ -38,26 +38,12 @@ See `docs/migration-ledger.md` → "Backups".
 import os
 from pathlib import Path
 
-from pipelex.migration.backup import BACKUP_INFIX
+from pipelex.migration.backup import BACKUP_INFIX, BACKUP_STAMP_GLOB
 
 CONFIG_DIR_GITIGNORE_NAME = ".gitignore"
 """What the file is called inside `~/.pipelex/` or a project's `.pipelex/`."""
 
-_STAMP_GLOB = f"{'[0-9]' * 8}T{'[0-9]' * 6}Z"
-"""The shape `BACKUP_STAMP_FORMAT` renders, written in the only vocabulary a `.gitignore` has.
-
-A glob has no repetition count, so the eight-digit date and the six-digit time are spelled out
-rather than abbreviated to a `[0-9]*` run. The run looks equivalent and is not: its `*` accepts
-anything at all, so it also matches `pipelex.toml.bak.1-notesZ` — a name `existing_backups_of`
-reads as the user's own and refuses to prune. Hiding a file we have just declined to manage is the
-worse half of both answers.
-
-Nothing translates the strftime string into this, on purpose: a parser for format directives is
-more machinery than one constant is worth. What holds the two together is the test matching this
-pattern against a name `backup_path_for` actually produced, which goes red if the stamp restamps.
-"""
-
-BACKUP_IGNORE_PATTERN = f"*{BACKUP_INFIX}{_STAMP_GLOB}"
+BACKUP_IGNORE_PATTERN = f"*{BACKUP_INFIX}{BACKUP_STAMP_GLOB}"
 """The one rule the file carries: any name ending in the infix followed by exactly the stamp.
 
 Exactly the stamp, rather than something stamp-shaped, is what keeps `pipelex.toml.bak.notes` — and

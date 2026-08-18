@@ -10,6 +10,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
+from pipelex.tools.misc.file_utils import is_excluded_by_name
 from pipelex.tools.misc.pretty import PrettyPrinter
 
 if TYPE_CHECKING:
@@ -24,6 +25,7 @@ def has_diff_dirs(
     dir2: str | Path,
     exclude_files: AbstractSet[str] | None = None,
     exclude_dirs: AbstractSet[str] | None = None,
+    exclude_patterns: AbstractSet[str] | None = None,
 ) -> bool:
     """Check if there are any differences between two directories.
 
@@ -32,17 +34,21 @@ def has_diff_dirs(
         dir2: Second directory path.
         exclude_files: Set of file names to exclude from comparison (e.g., {"pipelex_service.toml"}).
         exclude_dirs: Set of directory names to exclude from comparison (e.g., {"storage"}).
+        exclude_patterns: Set of glob patterns whose matching file names are excluded from
+            comparison (e.g., {"*.bak.*"}). For artifacts whose names carry a timestamp or another
+            varying part, so no fixed name can name them.
 
     Returns:
         True if there are any files only in left, only in right, or different files.
     """
     dir1 = Path(dir1)
     dir2 = Path(dir2)
-    exclude_files = exclude_files or set()
     exclude_dirs = exclude_dirs or set()
+    excluded_files = frozenset(exclude_files or set())
+    excluded_patterns = frozenset(exclude_patterns or set())
 
     def _filter_excluded_files(file_list: list[str]) -> list[str]:
-        return [file for file in file_list if file not in exclude_files]
+        return [file for file in file_list if not is_excluded_by_name(name=file, exclude_files=excluded_files, exclude_patterns=excluded_patterns)]
 
     def _has_diff(dir_comparison: filecmp.dircmp[str]) -> bool:
         # Filter out excluded directories from left_only and right_only
@@ -214,6 +220,7 @@ def make_diff_dirs_pretty(
     dir2: str | Path,
     exclude_files: AbstractSet[str] | None = None,
     exclude_dirs: AbstractSet[str] | None = None,
+    exclude_patterns: AbstractSet[str] | None = None,
 ) -> PrettyPrintable:
     """Generate a PrettyPrintable representation of directory differences.
 
@@ -222,6 +229,9 @@ def make_diff_dirs_pretty(
         dir2: Second directory path.
         exclude_files: Set of file names to exclude from comparison (e.g., {"pipelex_service.toml"}).
         exclude_dirs: Set of directory names to exclude from comparison (e.g., {"storage"}).
+        exclude_patterns: Set of glob patterns whose matching file names are excluded from
+            comparison (e.g., {"*.bak.*"}). Keep it equal to what the matching `has_diff_dirs` call
+            passes, or the report contradicts the verdict that produced it.
 
     Returns:
         A Rich renderable showing files only in left, only in right,
@@ -230,13 +240,14 @@ def make_diff_dirs_pretty(
     """
     dir1 = Path(dir1)
     dir2 = Path(dir2)
-    exclude_files = exclude_files or set()
     exclude_dirs = exclude_dirs or set()
+    excluded_files = frozenset(exclude_files or set())
+    excluded_patterns = frozenset(exclude_patterns or set())
 
     sections: list[PrettyPrintable] = []
 
     def _filter_excluded_files(file_list: list[str]) -> list[str]:
-        return [file for file in file_list if file not in exclude_files]
+        return [file for file in file_list if not is_excluded_by_name(name=file, exclude_files=excluded_files, exclude_patterns=excluded_patterns)]
 
     def _collect_diffs(dir_comparison: filecmp.dircmp[str], *, relative_path: str = "") -> None:
         # Files only in left directory (excluding excluded files and directories)

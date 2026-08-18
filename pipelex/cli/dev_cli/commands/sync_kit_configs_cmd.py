@@ -9,7 +9,8 @@ from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
-from pipelex.kit.paths import CONFIG_SYNC_EXCLUDED_FILES, GIT_IGNORED_CONFIG_DIRS
+from pipelex.cli.dev_cli.config_sync_exclusions import CONFIG_SYNC_EXCLUDED_FILES, CONFIG_SYNC_EXCLUDED_PATTERNS
+from pipelex.kit.paths import GIT_IGNORED_CONFIG_DIRS
 from pipelex.runtime_hub import get_console
 from pipelex.tools.misc.file_utils import MirrorDirResult, mirror_dir
 
@@ -112,6 +113,7 @@ def sync_kit_configs_cmd(*, quiet: bool = False, dry_run: bool = False) -> None:
             target_dir=Path(KIT_CONFIGS_DIR),
             exclude_files=CONFIG_SYNC_EXCLUDED_FILES,
             exclude_dirs=GIT_IGNORED_CONFIG_DIRS,
+            exclude_patterns=CONFIG_SYNC_EXCLUDED_PATTERNS,
             dry_run=dry_run,
         )
     except OSError as exc:
