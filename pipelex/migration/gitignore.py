@@ -8,11 +8,16 @@ them writes a slightly different one, or forgets, and a tool that dirties a repo
 it runs stops getting run.
 
 **Why the rule lives here and not in the user's root `.gitignore`.** The walk is the global
-`~/.pipelex/` and the project `.pipelex/`, and nothing else (see `run.py`), so every backup a
-migration can ever write inside a repository is under a directory pipelex already owns. That makes
-a `.gitignore` *in* that directory a complete answer — it needs no knowledge of where the
-repository root is, survives the directory being moved or vendored, and never reaches into a file
-the user maintains for their whole project.
+`~/.pipelex/` and the project `.pipelex/`, and nothing else (see `run.py`), so a backup written
+under a directory pipelex already owns is answered by a `.gitignore` *in* that directory — one that
+needs no knowledge of where the repository root is, survives the directory being moved or vendored,
+and never reaches into a file the user maintains for their whole project.
+
+**The one backup this does not reach, and why it is left.** A configuration file that is a symlink
+is migrated through to the file it names, and its backup lands beside *that* file (see
+`runner.migrate_file`) — in a dotfiles directory, which is the user's and not ours. The rule
+deliberately does not follow it there: writing into the `.gitignore` of somebody's whole dotfiles
+repository is a larger liberty than the one untracked copy it would hide.
 
 **The pattern is derived from the namer, not retyped.** `BACKUP_INFIX` is what
 `backup_path_for` actually writes; spelling `*.bak.…` again here would let a rename of the infix
@@ -38,11 +43,25 @@ from pipelex.migration.backup import BACKUP_INFIX
 CONFIG_DIR_GITIGNORE_NAME = ".gitignore"
 """What the file is called inside `~/.pipelex/` or a project's `.pipelex/`."""
 
-BACKUP_IGNORE_PATTERN = f"*{BACKUP_INFIX}[0-9]*Z"
-"""The one rule the file carries: any name ending in the infix, a digit-led run, and the UTC `Z`.
+_STAMP_GLOB = f"{'[0-9]' * 8}T{'[0-9]' * 6}Z"
+"""The shape `BACKUP_STAMP_FORMAT` renders, written in the only vocabulary a `.gitignore` has.
 
-The digit and the trailing `Z` are what `BACKUP_STAMP_FORMAT` renders and what a name the user
-chose does not, which is how `pipelex.toml.bak.notes` stays visible.
+A glob has no repetition count, so the eight-digit date and the six-digit time are spelled out
+rather than abbreviated to a `[0-9]*` run. The run looks equivalent and is not: its `*` accepts
+anything at all, so it also matches `pipelex.toml.bak.1-notesZ` — a name `existing_backups_of`
+reads as the user's own and refuses to prune. Hiding a file we have just declined to manage is the
+worse half of both answers.
+
+Nothing translates the strftime string into this, on purpose: a parser for format directives is
+more machinery than one constant is worth. What holds the two together is the test matching this
+pattern against a name `backup_path_for` actually produced, which goes red if the stamp restamps.
+"""
+
+BACKUP_IGNORE_PATTERN = f"*{BACKUP_INFIX}{_STAMP_GLOB}"
+"""The one rule the file carries: any name ending in the infix followed by exactly the stamp.
+
+Exactly the stamp, rather than something stamp-shaped, is what keeps `pipelex.toml.bak.notes` — and
+every other copy the user named themselves — visible in their own `git status`.
 """
 
 _GITIGNORE_CONTENT = f"""\
@@ -90,6 +109,13 @@ def ensure_config_dir_gitignore(*, directory: Path) -> bool:
             handle.flush()
             os.fsync(handle.fileno())
     except OSError:
-        path.unlink(missing_ok=True)
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            # `missing_ok` covers a file that is gone, not a filesystem that says no — and the one
+            # that just refused the write is exactly the one that can refuse the removal. Letting
+            # that escape would turn a missing convenience rule into a failed migration, which is
+            # the outcome every other branch of this function exists to avoid.
+            pass
         return False
     return True

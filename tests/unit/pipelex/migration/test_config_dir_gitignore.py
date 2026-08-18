@@ -38,6 +38,20 @@ class TestBackupIgnorePattern:
         """`existing_backups_of` refuses to prune one of these; the ignore rule must not hide it."""
         assert not fnmatch("pipelex.toml.bak.notes", BACKUP_IGNORE_PATTERN)
 
+    def test_a_user_named_copy_is_still_theirs_when_it_happens_to_start_with_a_digit(self) -> None:
+        """The near-miss the rule has to survive, since a user name is not required to avoid our shape.
+
+        Pruning reads each of these as the user's file and leaves it standing. A rule loose enough
+        to hide one would take the file out of the `git status` it is then never going to manage.
+        """
+        for name in ("pipelex.toml.bak.1-notesZ", "pipelex.toml.bak.2026notesZ", "pipelex.toml.bak.0Z"):
+            assert not fnmatch(name, BACKUP_IGNORE_PATTERN), name
+
+    def test_a_stamp_of_the_wrong_shape_is_not_one_of_ours(self) -> None:
+        """The whole stamp is the evidence, so a name carrying only part of it is somebody else's."""
+        for name in ("pipelex.toml.bak.2026T121441Z", "pipelex.toml.bak.20260818T1214410Z", "pipelex.toml.bak.20260818121441Z"):
+            assert not fnmatch(name, BACKUP_IGNORE_PATTERN), name
+
     def test_a_rescue_copy_stays_visible(self, tmp_path: Path) -> None:
         """It is the one file the report tells the user to go and get — hiding it defeats the point."""
         rescue = rescue_path_for(path=tmp_path / "pipelex.toml", moment=MOMENT)
@@ -57,7 +71,11 @@ class TestEnsureConfigDirGitignore:
         assert (tmp_path / CONFIG_DIR_GITIGNORE_NAME).read_text().splitlines()[-1] == BACKUP_IGNORE_PATTERN
 
     def test_the_file_it_writes_actually_ignores_a_backup(self, tmp_path: Path) -> None:
-        """The end the whole change exists for, asserted against git itself rather than by eye."""
+        """The end the whole change exists for: a real backup name, matched against the file's own rules.
+
+        Read out of the written file and matched line by line, rather than against the constant, so
+        a rule that never reached the file — or reached it commented out — is caught here.
+        """
         ensure_config_dir_gitignore(directory=tmp_path)
         written = (tmp_path / CONFIG_DIR_GITIGNORE_NAME).read_text()
 

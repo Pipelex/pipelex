@@ -6265,6 +6265,8 @@
     "tests/unit/pipelex/migration/test_config_dir_gitignore.py::TestARealRunEnsuresIt::test_initializing_a_config_directory_writes_it": 1.1641,
     "tests/unit/pipelex/migration/test_config_dir_gitignore.py::TestARealRunEnsuresIt::test_migrating_a_directory_leaves_the_rule_behind": 1.2049,
     "tests/unit/pipelex/migration/test_config_dir_gitignore.py::TestBackupIgnorePattern::test_a_rescue_copy_stays_visible": 1.1969,
+    "tests/unit/pipelex/migration/test_config_dir_gitignore.py::TestBackupIgnorePattern::test_a_stamp_of_the_wrong_shape_is_not_one_of_ours": 0.5799,
+    "tests/unit/pipelex/migration/test_config_dir_gitignore.py::TestBackupIgnorePattern::test_a_user_named_copy_is_still_theirs_when_it_happens_to_start_with_a_digit": 0.5758,
     "tests/unit/pipelex/migration/test_config_dir_gitignore.py::TestBackupIgnorePattern::test_it_does_not_hide_a_real_configuration_file": 1.1945,
     "tests/unit/pipelex/migration/test_config_dir_gitignore.py::TestBackupIgnorePattern::test_it_leaves_a_copy_the_user_named_themselves_alone": 1.2,
     "tests/unit/pipelex/migration/test_config_dir_gitignore.py::TestBackupIgnorePattern::test_it_matches_a_name_the_backup_module_actually_writes": 1.1902,
