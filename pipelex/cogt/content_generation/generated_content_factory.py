@@ -36,18 +36,17 @@ class GeneratedContentFactory:
             storage_scope: The run's opaque storage prefix — see
                 `pipelex.system.storage_scope`. It replaced a
                 `primary_id` / `secondary_id` pair that was always
-                `(user_id, pipeline_run_id)`, i.e. WHO ran the pipe followed by
-                WHICH run. Collapsing them into one host-supplied string is what
-                lets a host key generated content by tenant instead of by
-                uploader, without the runtime learning what a tenant is.
+                `(user_id, pipeline_run_id)` — WHO ran the pipe, then WHICH run.
+                Collapsing them into one host-supplied string is what lets a host
+                key generated content by tenant instead of by uploader, without
+                the runtime learning what a tenant is.
             data: The binary data to hash
             mime_type: Optional MIME type to determine file extension
             image_format: Optional output format to determine file extension
 
         Returns:
             A storage key rendered from the configured `uri_format`, whose
-            placeholders are now `{primary_id}` (the scope), `{hash}` and
-            `{extension}`.
+            placeholders are `{storage_scope}`, `{hash}` and `{extension}`.
         """
         hash_digest = hashlib.sha256(data).hexdigest()[:16]
 
@@ -66,7 +65,7 @@ class GeneratedContentFactory:
         else:
             extension = "jpg"
         uri_format = get_config().runtime.storage.uri_format
-        return uri_format.format(primary_id=storage_scope, hash=hash_digest, extension=extension)
+        return uri_format.format(storage_scope=storage_scope, hash=hash_digest, extension=extension)
 
     async def _fetch_remote_content(self, url: str) -> bytes:
         return await fetch_file_from_url_httpx(url=url)

@@ -144,7 +144,7 @@ class TestGeneratedImageStorage:
         storage_key = image_content.url.removeprefix(PIPELEX_STORAGE_SCHEME)
 
         # Verify the key follows the uri_format pattern
-        # The format is "{primary_id}/{secondary_id}/{hash}.{extension}"
+        # The format is "{storage_scope}/{hash}.{extension}"
         assert "pipeline_abc" in storage_key
         assert "step_xyz" in storage_key
         assert storage_key.endswith(".png")

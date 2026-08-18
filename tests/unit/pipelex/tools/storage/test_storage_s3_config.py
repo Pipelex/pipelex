@@ -38,40 +38,40 @@ class TestStorageS3Config:
                 "assets/{hash}/{tenant}", "my-bucket", "eu-west-1", "- uri_format placeholder '{tenant}' is not supported", id="uri-unsupported"
             ),
             pytest.param("assets/{hash:.0}", "my-bucket", "eu-west-1", "- the {hash} placeholder must be plain", id="uri-hash-format-spec"),
-            # A format spec on a non-hash field is just as dangerous: {primary_id:.0} truncates to "" (collisions),
-            # and a huge width like {primary_id:1000000000} would allocate a ~1GB string if it ever reached a
+            # A format spec on a non-hash field is just as dangerous: {storage_scope:.0} truncates to "" (collisions),
+            # and a huge width like {storage_scope:1000000000} would allocate a ~1GB string if it ever reached a
             # test rendering — so it must be rejected at parse time, before any format() call.
             pytest.param(
-                "assets/{hash}/{primary_id:.0}",
+                "assets/{hash}/{storage_scope:.0}",
                 "my-bucket",
                 "eu-west-1",
-                "- uri_format placeholder '{primary_id}' must be plain",
+                "- uri_format placeholder '{storage_scope}' must be plain",
                 id="uri-field-truncate-spec",
             ),
             pytest.param(
-                "assets/{hash}/{primary_id:1000000000}",
+                "assets/{hash}/{storage_scope:1000000000}",
                 "my-bucket",
                 "eu-west-1",
-                "- uri_format placeholder '{primary_id}' must be plain",
+                "- uri_format placeholder '{storage_scope}' must be plain",
                 id="uri-field-huge-width",
             ),
             pytest.param(
-                # `{primary_id!r}` rather than the retired `{secondary_id!r}`:
-                # this case is about a CONVERSION on a supported placeholder, so
-                # it must use a name the supported set still contains — an
-                # unsupported name is refused by a different check first, and
-                # this case would then pass for the wrong reason.
-                "assets/{hash}/{primary_id!r}",
+                # A CONVERSION on a SUPPORTED placeholder. It must use a name
+                # the supported set still contains (it was `{secondary_id!r}`,
+                # which is retired): an unsupported name is refused by a
+                # different check first, and this case would then pass for the
+                # wrong reason.
+                "assets/{hash}/{storage_scope!r}",
                 "my-bucket",
                 "eu-west-1",
-                "- uri_format placeholder '{primary_id}' must be plain",
+                "- uri_format placeholder '{storage_scope}' must be plain",
                 id="uri-field-conversion",
             ),
             pytest.param(
-                "assets/{hash}/{primary_id.foo}",
+                "assets/{hash}/{storage_scope.foo}",
                 "my-bucket",
                 "eu-west-1",
-                "- uri_format placeholder '{primary_id.foo}' must be plain",
+                "- uri_format placeholder '{storage_scope.foo}' must be plain",
                 id="uri-field-attr-access",
             ),
             pytest.param(

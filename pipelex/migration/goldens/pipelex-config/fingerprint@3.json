@@ -1313,7 +1313,7 @@
     "runtime.storage.gcp.uri_format": {
       "value_type": "str",
       "required": true,
-      "default": "{primary_id}/{hash}.{extension}",
+      "default": "{storage_scope}/{hash}.{extension}",
       "open_node": false
     },
     "runtime.storage.in_memory": {
@@ -1324,7 +1324,7 @@
     "runtime.storage.in_memory.uri_format": {
       "value_type": "str",
       "required": true,
-      "default": "{primary_id}/{hash}.{extension}",
+      "default": "{storage_scope}/{hash}.{extension}",
       "open_node": false
     },
     "runtime.storage.is_fetch_remote_content_enabled": {
@@ -1353,7 +1353,7 @@
     "runtime.storage.local.uri_format": {
       "value_type": "str",
       "required": true,
-      "default": "{primary_id}/{hash}.{extension}",
+      "default": "{storage_scope}/{hash}.{extension}",
       "open_node": false
     },
     "runtime.storage.method": {
@@ -1391,7 +1391,7 @@
     "runtime.storage.s3.uri_format": {
       "value_type": "str",
       "required": true,
-      "default": "{primary_id}/{hash}.{extension}",
+      "default": "{storage_scope}/{hash}.{extension}",
       "open_node": false
     },
     "runtime.tracing": {

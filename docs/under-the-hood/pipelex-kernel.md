@@ -25,10 +25,12 @@ from pipelex.runtime_boot import RuntimeBoot
 from pipelex.kernel.pipelex_kernel import PipelexKernel
 
 RuntimeBoot.make()
-kernel = PipelexKernel.make(user_id="my-service")
+kernel = PipelexKernel.make(user_id="my-service", storage_scope="my-service")
 ```
 
 That boot stands up the model deck, the content generator, the class registry, the reporting delegate and the plugin registries — the machinery inference needs. It does **not** stand up the library manager, the pipe router or the pipeline manager, because a kernel caller has no method to load.
+
+**`user_id` and `storage_scope` are both required, with no default.** `user_id` is who the run is attributed to; `storage_scope` is the opaque prefix every byte the run writes lands under, composed by *you* from whatever your tenancy model is (`"<org>/<run>"`, `"<customer>/<job>"`, or a flat name for a single-tenant service). The kernel composes `assets/`, `results/` and `payloads/` onto it and never parses it, so it never learns what a tenant is. It is validated at construction — one to three path-safe segments — because the value becomes a storage key prefix and a `..` in it would escape the namespace. Neither field defaults, deliberately: a missing identity used to fall back to the tracing placeholder `"anonymous"`, which then became the key prefix, pointing every unauthenticated run at one shared namespace.
 
 `needs_inference=False` boots keyless (no credentials, no model-deck validation) and sets the forced-DRY flag: every run the process initiates is coerced to `run_mode=DRY`, so the leaves mock instead of calling a provider. `PipelexKernel.make` applies that rule through the same `runtime_hub.resolve_run_mode_for_boot` the pipe tier uses — a second copy of the rule at a second factory is how the two would drift apart.
 
@@ -143,7 +145,7 @@ event_log = InMemoryEventLog()
 trace_context = TraceContext(graph_id=run_id, data_inclusion=data_inclusion, emit_graph_events=False, emit_usage_events=True)
 get_report_delegate().set_event_log(context_key=trace_context.lookup_key, event_log=event_log, workflow_id="direct", pipeline_run_id=run_id)
 try:
-    kernel = PipelexKernel.make(user_id="my-service", trace_context=trace_context)
+    kernel = PipelexKernel.make(user_id="my-service", storage_scope="my-service", trace_context=trace_context)
     ...
     tokens_usages = UsageAggregator.aggregate(event_log.read_events(run_id))
 finally:

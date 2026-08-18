@@ -10,20 +10,20 @@ is_upload_local_content_enabled = true
 method = "local"                       # local, in_memory, s3, gcp
 
 [runtime.storage.local]
-uri_format = "{primary_id}/{hash}.{extension}"
+uri_format = "{storage_scope}/{hash}.{extension}"
 local_storage_path = ".pipelex/storage"
 
 [runtime.storage.in_memory]
-uri_format = "{primary_id}/{hash}.{extension}"
+uri_format = "{storage_scope}/{hash}.{extension}"
 
 [runtime.storage.s3]
-uri_format = "{primary_id}/{hash}.{extension}"
+uri_format = "{storage_scope}/{hash}.{extension}"
 bucket_name = ""
 region = ""
 signed_urls_lifespan_seconds = 3600
 
 [runtime.storage.gcp]
-uri_format = "{primary_id}/{hash}.{extension}"
+uri_format = "{storage_scope}/{hash}.{extension}"
 bucket_name = ""
 project_id = ""
 signed_urls_lifespan_seconds = 3600

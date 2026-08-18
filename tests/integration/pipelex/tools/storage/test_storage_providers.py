@@ -25,7 +25,7 @@ class TestStorageProviders:
     ) -> None:
         """Test that the URI format from config works correctly for building storage keys."""
         test_data = b"config format test"
-        primary_id = "pipeline_123"
+        storage_scope = "pipeline_123"
         secondary_id = "step_456"
         hash_value = "abc123def456"
         extension = "png"
@@ -40,7 +40,7 @@ class TestStorageProviders:
         loaded_data = await storage_provider.load(uri=returned_uri)
 
         assert loaded_data == test_data
-        assert primary_id in key
+        assert storage_scope in key
         assert secondary_id in key
         assert hash_value in key
         assert extension in key

@@ -26,15 +26,24 @@ class StorageMethodConfig(ConfigModel):
     # The exact keyword arguments GeneratedContentFactory._build_storage_key supplies to uri_format.format();
     # any other placeholder would raise KeyError/IndexError at content-store time, so reject it at config time.
     #
-    # `secondary_id` is GONE. It was always `pipeline_run_id`, paired with a
-    # `primary_id` that was always `user_id` — a two-part key meaning
-    # "who ran it" then "which run". `primary_id` is now the whole opaque
-    # `storage_scope` the host supplies, which already identifies the run. A
-    # config still naming `{secondary_id}` is rejected at BOOT rather than
-    # KeyError-ing at content-store time, which is the point of validating the
-    # format string here: the failure lands on the operator who wrote the
+    # `{primary_id}` and `{secondary_id}` are BOTH gone, replaced by one
+    # `{storage_scope}`. They were always `user_id` then `pipeline_run_id` — a
+    # two-part key meaning "who ran it" then "which run" — and the first half is
+    # the bug the storage change exists to remove: keying by the uploader makes
+    # a run's output unreadable by anyone else on the same team.
+    #
+    # The replacement is NOT a rename of `primary_id`. `storage_scope` is one
+    # opaque prefix the host composes from its own tenancy model, and it is
+    # named for what it is: keeping the old name would have left the config
+    # saying "primary" with no "secondary" to be primary to, and given an
+    # operator no way to tell that the placeholder means "the whole tenant
+    # prefix" rather than "some id".
+    #
+    # A config naming either retired placeholder is rejected at BOOT rather than
+    # KeyError-ing at content-store time — the point of validating the format
+    # string here is that the failure lands on the operator who wrote the
     # config, not on the first run that happens to generate an image.
-    URI_FORMAT_SUPPORTED_FIELDS: ClassVar[frozenset[str]] = frozenset({"primary_id", "hash", "extension"})
+    URI_FORMAT_SUPPORTED_FIELDS: ClassVar[frozenset[str]] = frozenset({"storage_scope", "hash", "extension"})
 
     provider_label: ClassVar[str]
 
@@ -70,8 +79,8 @@ class StorageMethodConfig(ConfigModel):
                     plain_hash_found = True
             elif field_name != base_name or format_spec or conversion:
                 # Every supported field is a str path component, so a format spec, conversion, or
-                # attribute/index access renders a constant, colliding, or oversized key ({primary_id:.0}
-                # truncates to "" → every object shares one URI; {primary_id:1000000000} would allocate a
+                # attribute/index access renders a constant, colliding, or oversized key ({storage_scope:.0}
+                # truncates to "" → every object shares one URI; {storage_scope:1000000000} would allocate a
                 # ~1GB string at render time) — the same silent-overwrite/OOM hazard we reject on {hash}.
                 nonplain_names.add(field_name)
         supported_list = ", ".join("{" + name + "}" for name in sorted(self.URI_FORMAT_SUPPORTED_FIELDS))

@@ -53,26 +53,26 @@ class TestAcceptedScopes:
 
 class TestRefusedScopes:
     @pytest.mark.parametrize(
-        ("scope", "why"),
+        "scope",
         [
-            ("", "empty"),
-            ("/tenant/run", "leading slash — an absolute key"),
-            ("tenant/run/", "trailing slash — an empty final segment"),
-            ("tenant//run", "empty interior segment"),
-            ("..", "traversal, alone"),
-            ("tenant/../other", "traversal, interior"),
-            ("../other/run", "traversal, leading"),
-            (".", "current-dir segment"),
-            ("tenant/./run", "current-dir segment, interior"),
-            ("a/b/c/d", "four segments would swallow the leaf the runtime appends"),
-            ("tenant run", "space"),
-            ("tenant?x=1", "query string"),
-            ("tenant#frag", "fragment"),
-            ("tenant\\run", "backslash"),
-            ("tenant%2f..%2f", "percent-encoded traversal"),
+            pytest.param("", id="empty"),
+            pytest.param("/tenant/run", id="leading-slash-absolute-key"),
+            pytest.param("tenant/run/", id="trailing-slash-empty-final-segment"),
+            pytest.param("tenant//run", id="empty-interior-segment"),
+            pytest.param("..", id="traversal-alone"),
+            pytest.param("tenant/../other", id="traversal-interior"),
+            pytest.param("../other/run", id="traversal-leading"),
+            pytest.param(".", id="current-dir-segment"),
+            pytest.param("tenant/./run", id="current-dir-interior"),
+            pytest.param("a/b/c/d", id="four-segments-would-swallow-the-leaf"),
+            pytest.param("tenant run", id="space"),
+            pytest.param("tenant?x=1", id="query-string"),
+            pytest.param("tenant#frag", id="fragment"),
+            pytest.param("tenant\\run", id="backslash"),
+            pytest.param("tenant%2f..%2f", id="percent-encoded-traversal"),
         ],
     )
-    def test_unsafe_scopes_raise_at_construction(self, scope: str, why: str) -> None:
+    def test_unsafe_scopes_raise_at_construction(self, scope: str) -> None:
         """Refused when the object is BUILT, not when the key is written.
 
         The distinction is the whole design: a `JobMetadata` that exists is a
@@ -103,4 +103,7 @@ class TestScopeIsRequired:
         at the call site, not a quiet shared prefix in production.
         """
         with pytest.raises(ValidationError):
-            JobMetadata(user_id="u1", pipeline_run_id="run_1")  # pyright: ignore[reportCallIssue]
+            # Both type checkers reject this call, which is the point being
+            # tested: the omission is caught statically AND at runtime. The
+            # ignores are what let the runtime half be asserted at all.
+            JobMetadata(user_id="u1", pipeline_run_id="run_1")  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
