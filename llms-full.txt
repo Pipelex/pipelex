@@ -21118,6 +21118,94 @@ Named so this document stays honest.
 `pipelex.hub` is gone; there is no shim. Every external importer must choose a layer. The symbols that crossed the repo boundary are split as follows — kernel-layer ones now come from `pipelex.runtime_hub`, interpreter-layer ones from `pipelex.interpreter_hub`, per the tables above. `get_pipelex_hub` splits into `get_runtime_hub` and `get_interpreter_hub`, so each call site must pick the container it actually meant.
 
 
+## Test Duration Map
+
+# The Test Duration Map
+
+`.test_durations` is a committed JSON map of `pytest node id -> seconds`. Its only consumer is [`pytest-split`](https://github.com/jerry-git/pytest-split), which reads it to divide the suite into balanced CI shards. Nothing in the runtime touches it, and nobody edits it by hand.
+
+This page explains what the map is for, why it is refreshed the way it is, and what to run.
+
+## What it is used for
+
+The CPU-bound test suite is split across eight free GitHub-hosted runners rather than one large paid machine. Two workflows do this — `tests-check.yml` on pull requests to `dev` (the floor Python version only) and `tests-full-check.yml` on pull requests to `main` (every supported version, so four versions times eight shards). Both invoke the same target:
+
+```bash
+SPLITS=8 GROUP=<n> make gha-tests
+```
+
+`SPLITS`/`GROUP` are what activate `pytest-split`. Without them — which is every local run — the flags expand to nothing, the map is ignored entirely, and the whole suite runs as usual.
+
+The splitting algorithm is `pytest-split`'s default, `duration_based_chunks`: it walks the tests in collection order and cuts at boundaries where the accumulated duration crosses one eighth of the total. Each shard is therefore a *contiguous* slice of the collection, and the map decides where the cuts fall.
+
+## Coverage matters; precision does not
+
+This is the single fact that shapes everything below, and it is worth stating plainly because the intuitive assumption is the opposite one.
+
+A duration map can be wrong in two independent ways. Its recorded **values** can be out of date, or it can be **missing entries** for tests that exist. Measured against the real eight-way split, these cost wildly different amounts:
+
+| What is wrong with the map | Cost in shard balance |
+| --- | --- |
+| Values weeks out of date, coverage complete | about 7% |
+| Values current, weeks of entries missing | over 50% |
+| Both (an untouched map, weeks later) | about 65% |
+
+Stale values are nearly free. Missing coverage is ruinous.
+
+The reason is `pytest-split`'s fallback for a node id it has never seen: it imputes the **mean** of the durations it does know. This suite's mean is around 0.25s while its median is around 0.002s — the distribution is dominated by a small number of slow tests, so the mean sits roughly a hundred times above the typical test. A block of newly added fast tests is therefore charged about a hundred times its real cost, and because the chunks are contiguous, that phantom weight shifts every boundary after it. Genuinely slow new tests hit the same problem from the other direction.
+
+There is no cheap way to impute around this. Filling unknown entries with the median, the 25th percentile, or anything else in that range does not recover the balance, because the missing tests carry real time that is unevenly distributed across the collection — no single fill value can put it in the right places. Coverage has to be measured.
+
+Two consequences follow, and they are the design:
+
+- **Refresh on missing coverage, not on elapsed time.** Calendar age is a poor proxy: a quiet fortnight needs no refresh at all, while a single branch that lands five hundred tests breaks the map the day it merges.
+- **Re-measuring an already-covered test buys almost nothing.** So the default refresh does not do it.
+
+## What to run
+
+```bash
+make store-test-durations     # alias: make std
+```
+
+This is the default and it is incremental. It collects the suite (a few seconds), compares the collected node ids against the map, and measures **only** the tests that are missing. When coverage is already complete it measures nothing at all and exits having done a collection — the common case, and it costs seconds rather than the several minutes a full suite run takes.
+
+There is one threshold. When more than 40% of the collected suite is missing from the map (`FULL_RUN_RATIO` in `duration_map.py`), measuring the missing tests individually stops being worth its own bookkeeping, and the incremental target re-measures everything instead — a full run, with the wall clock that implies. So the cheap-refresh promise holds for the ordinary case of a branch or two of new tests, and deliberately does not hold when the map has fallen far behind the suite. Expect it after a very large merge, or on a first run against an empty map.
+
+```bash
+make store-test-durations-force   # alias: make stdf
+```
+
+This re-measures every test in the CI selection. Reach for it when recorded values are no longer comparable to each other — the machine changed, or the suite changed shape enough that the accumulated values came from meaningfully different conditions. It is not what you want for routine maintenance.
+
+Both targets regenerate the CI-profile test-model fixtures first, then hand off to `pipelex-dev store-test-durations`. The marker expression that selects the tests is `GHA_PYTEST_MARKERS` in the `Makefile`, shared with `gha-tests` so the map can never be balanced against a different set of tests than the one it was measured from.
+
+### When to run it
+
+At release time is the natural cadence, and the release skill does it as a step. Because the incremental refresh is nearly free when nothing is missing, running it more often costs little. Run it explicitly after a branch that adds a large number of tests, rather than waiting for the release.
+
+## What the refresh does to the file
+
+`--store-durations` **merges** into the existing file rather than replacing it — only `--clean-durations`, which we do not use, replaces wholesale. That merge is what makes measuring a subset a legitimate refresh instead of a partial overwrite. Two post-processing passes then run over the merged result.
+
+**Pruning.** Entries whose test *file* no longer exists are dropped. The criterion is deliberately the filesystem and never the collected set: a marker-filtered collection legitimately hides a large slice of the suite (most of `tests/e2e`), so pruning against it would delete live entries. A vanished file, by contrast, cannot come back under any marker. This is the condition `tests/unit/repo/test_test_durations_paths.py` fails on, so that gate is normally self-healing — running the refresh clears it.
+
+**Stabilisation.** Every duration is rounded, and a previously recorded value is kept whenever the new measurement lands within tolerance of it. A value is rewritten only when it moved by more than 30% or more than 0.05s, whichever is larger. The relative term is what spares slow tests, where a fixed floor would be far too tight; the absolute floor is what spares the thousands of sub-millisecond tests, whose relative jitter between runs is enormous and meaningless.
+
+The point of stabilisation is the diff. Re-measuring the suite rewrites essentially every line, because timings never repeat exactly — a full refresh used to produce a diff of over twenty thousand changed lines. That is not merely noisy: it once pushed a release pull request past the size limits of two automated reviewers, both of which declined to review the branch at all. Stabilisation cuts the changed lines by about 95%, for well under a point of shard balance. Rounding happens on both sides of the comparison so the file converges to short values instead of drifting between spellings of the same measurement.
+
+The policy constants live in `pipelex/cli/dev_cli/commands/duration_map.py`, which holds the pure logic and its rationale; `store_test_durations_cmd.py` is the orchestration around it.
+
+## The committed artifact is gated
+
+`tests/unit/repo/test_test_durations_paths.py` checks three things: the file is present and non-empty, every key is a well-formed `<path.py>::<test>` node id, and every recorded test file still exists on disk.
+
+That last check exists because a bulk rewrite of test paths — a package move, a `sed` over `tests/` — walks straight past the map. The file still parses and the shards still run; they simply balance against tests that can never match again. The gate is on the file path rather than the node id on purpose. Path rewrites break paths; parametrization churn breaks node ids and is benign, since an unknown id is only ever imputed. Pinning node ids would require a full unfiltered collection plus a tolerance policy for legitimate drift, where pinning paths is a filesystem check with no policy at all.
+
+## A caveat worth knowing
+
+Tests measured incrementally run in a smaller batch than a full-suite run, under less parallel contention, so their recorded durations are not measured under identical conditions to the rest of the map. Given how little value precision carries — stale values across weeks cost about 7% — this is an acceptable trade for turning a multi-minute step into a multi-second one. `make store-test-durations-force` is the remedy if the accumulated inconsistency ever seems to matter.
+
+
 ## Registration Surface
 
 # Registration surface
@@ -21908,6 +21996,14 @@ Stated more strongly than the library can promise on its own: **a replay in whic
 
 Refusing the layout with a `CONFLICT` was the alternative and it is the wrong trade: a rename has exactly one correct answer on a dotted key, the layout is ordinary TOML that no formatter rewrites, and refusing would strand a reshape's table renames on any file that happens to be written that way. So the applier renames the document's body entries where they sit — every chunk of a key written on several dotted lines, carrying the flag forward — which also stops the library from injecting a cosmetic blank line after a table it renamed in place.
 
+### A comment goes with what it introduces
+
+> **A run of own-line comments and blank lines introduces whatever comes next in the file, and a structural operation keeps it there: a moved key or table takes its introduction along, a deleted one takes its introduction away, and the introduction of whatever came *after* stays where it was.**
+
+The TOML library ties neither of them to the item a reader sees them on. A comment written above a key sits before that key in the same table; a banner written above a `[table]` header sits at the *tail of the previous table in document order*, inside its deepest last container, because everything up to the next header belongs to the table being parsed. So a plain delete-and-re-add of a table left its banner behind — now labelling whatever followed — and carried the *next* section's banner away inside the moved body; appending under an existing table landed *after* that table's trailing banner and stole it the same way. A file seeded from the heavily-commented kit template and migrated by the configuration reshape came out with `# Log Config` above the storage section and `# Plugins` above something else entirely.
+
+The applier now applies the rule a reader applies. What travels or is dropped with an item is **the last block of own-line comments before it, with the blank line above that block and anything below it**; an earlier block in the same run — a file preamble above the first section's banner, a closing note under the previous section — stays where it was, and a run holding no comment at all is spacing and moves whole. At the very top of the document, a *lone* comment block that a blank line separates from what follows is the file's preamble and stays too. An item inserted at the end of a table lands before that table's trailing run, never after it, and everything is put back where the parser would have put it — a previous table's deepest tail rather than an implicit parent's own body — so no `[parent]` header that the file never wrote starts rendering because a comment now sits inside it. The cost of the rule is the rare own-line comment written *below* a key to annotate it, which reads as introducing whatever comes next. Comments *inside* a moved table travel with it as before, and inline tables are left alone.
+
 ### The document is re-read between operations that applied
 
 > **Operations are applied one at a time, and the document is parsed afresh after each one that changed it.**
@@ -21934,7 +22030,7 @@ Three further rules make that safety net worth the name.
 
 What a backup carries across is the file's **permission bits**, and that is the one deliberate exception to "no value read from a user's file is ever rendered" — a backup contains the user's values by definition, so a `0600` configuration must not acquire a world-readable copy beside it. Ownership, ACLs and extended attributes are **not** carried across the replace, on either the backup or the migrated file: an atomic same-directory replace cannot preserve what the running process has no right to set, and re-attaching an attribute blindly (a quarantine flag, a security label) is a worse guess than leaving it off. The security-relevant bit of a configuration file is its mode.
 
-A configuration file that is a **symlink** is followed: the file the user means is the one at the end of the link, so the run reads, backs up and replaces *that* file, and the link survives. Replacing the link path instead would put a regular file where the link was and leave the real file unmigrated. The plan keeps naming the path the directory walk found; the backup path shows where the bytes actually went. This is what the `.mthds` fix loop already does with its own targets. The two callers differ on one half, and the difference is deliberate: **a migration's write scope is the resolved target of any file the walk claims**, not the walked directories themselves. The `.mthds` fix loop pairs its resolution with a write-scope check because it is handed a bundle directory and must not write outside it; a configuration directory is a place a user keeps links to files they own, and a dotfiles repository is the ordinary reason one is there. Refusing it would mean the tool declines to migrate exactly the machines whose owner was most deliberate about their configuration. The plan names the walked path and the backup names the resolved one, so a run that followed a link out of the directory says so. The reasoning behind both readings is in `wip/migrator-write-scope-and-rename-fidelity.md`.
+A configuration file that is a **symlink** is followed: the file the user means is the one at the end of the link, so the run reads, backs up and replaces *that* file, and the link survives. Replacing the link path instead would put a regular file where the link was and leave the real file unmigrated. The plan keeps naming the path the directory walk found; the backup path shows where the bytes actually went. This is what the `.mthds` fix loop already does with its own targets. The two callers differ on one half, and the difference is deliberate: **a migration's write scope is the resolved target of any file the walk claims**, not the walked directories themselves. The `.mthds` fix loop pairs its resolution with a write-scope check because it is handed a bundle directory and must not write outside it; a configuration directory is a place a user keeps links to files they own, and a dotfiles repository is the ordinary reason one is there. Refusing it would mean the tool declines to migrate exactly the machines whose owner was most deliberate about their configuration. The plan names the walked path and the backup names the resolved one, so a run that followed a link out of the directory says so. The reasoning behind both readings is in `wip/migrator/migrator-write-scope-and-rename-fidelity.md`.
 
 ### Per-file transactions
 
@@ -21945,7 +22041,7 @@ Each file is written transactionally and independently: snapshot, stage, atomic 
 These are measured properties of the TOML library the engine uses, not aspirations. They are stated here because a user or an author will run into them, and being surprised by them is worse than being told.
 
 - **Arrays of tables are unaddressable, and reserved.** An `[[entry]]` node is a list, and no `table_path` segment syntax reaches it or anything under it; the `*` wildcard has no array form. One surface carries one today — the telemetry configuration's `otlp` list of exporters — and the fingerprint records it as a terminal `list[table]`: what happens *inside* an exporter entry (a renamed field, a tightened bound, a new required member) is invisible to the coverage gate, so a change there is the author's to account for by hand, exactly as validator-expressed narrowing is. Addressing what lies beneath one needs a new segment kind and a decision on the day — until then, an operation pointed at one resolves nothing and is reported as a guarded skip rather than raising.
-- **A moved table loses its introducing comment.** A comment block written above a table is stored as trailing trivia of the *previous* sibling, not as part of the table it appears to introduce, so it does not travel with a move. Comments *inside* a moved table travel intact, including trailing comments on individual keys. The consequence is real: a file seeded from a heavily-commented template and then migrated ends up with banner comments labelling sections that have moved away. Nothing in the engine may rely on comment fidelity across a move, and the package's own files are corrected by hand rather than by migration.
+- **Comment ownership is a reading, not a fact.** The TOML library records where a comment *sits*, never what it is *about*, and the applier reads a run of own-line comments as introducing whatever follows it (see [A comment goes with what it introduces](#a-comment-goes-with-what-it-introduces)). That reading is right for a banner above a section, for the kit's per-key comments, and for a preamble at the top of a file; it is wrong for a comment written on its own line *below* a key to annotate it, which will follow the next item instead. A migration keeps a file's comments on the sections and keys they introduce — it does not, and cannot, know what any comment means.
 - **A migration is not byte-minimal.** A rename normalizes the spacing around its own `=`, and a renamed table that was written out of order across several chunks loses its own bare header while a plain table keeps it. Both forms are semantically identical, both are stable under replay, and neither accumulates — but a migration diff is not always the minimal diff a human would have written.
 - **A guarded skip is never an error.** Every operation whose target does not resolve reports itself skipped rather than raising. That guard is what makes always-replay possible, and it is why a misdirected operation is caught by the checks rather than by a crash on a user's machine.
 - **A renamed key cannot be addressed again in the same in-memory document.** The position-preserving rename updates the body the document renders from but leaves the node's raw `dict` storage stale, for any value that is not a table. Nothing the library renders or looks up is affected — which is why a single rename is correct, and why the `.mthds` fix path, whose renames target tables, never meets it. The engine [re-reads the document between operations that applied](#the-document-is-re-read-between-operations-that-applied), so nothing downstream has to know about this; it is recorded here because it explains a piece of the engine that would otherwise look like superstition.
