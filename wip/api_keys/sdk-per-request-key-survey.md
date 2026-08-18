@@ -28,7 +28,7 @@ Every worker call receives an `InferenceJobAbstract`, which carries `job_metadat
 
 So the decision seam is: **the caller stamps a credential reference onto the job payload; the worker resolves it in `make_extras`-time and emits it as an auth header or a per-request client option.** This is payload-first and needs no ContextVars.
 
-The one thing that must not happen: putting the secret *itself* on `JobMetadata`. `JobMetadata` is explicitly designed to cross the Temporal serialization boundary (its own comments say so), which means anything on it lands in workflow history in plaintext. Carry a **reference** (an org id, a profile id, a key id) and resolve it to a secret inside the worker process; never carry the material.
+The one thing that must not happen: putting the secret *itself* on `JobMetadata`. `JobMetadata` is explicitly designed to cross the Temporal serialization boundary (its own comments say so), which means anything on it lands in workflow history in plaintext. Carry a **reference** (an org id, a profile id, a key id) and resolve it to a secret inside the worker process; never carry the material. The payload codec does not soften this: `StoragePayloadCodec` is a size-threshold *offload*, not encryption — payloads below `size_threshold` (1 MB by default) pass through untouched, and it ships disabled (`is_enabled = false`). A short credential string sits far below that threshold, so it would ride into workflow history in cleartext even with the codec switched on.
 
 ## 3. How do we get it?
 
@@ -37,7 +37,19 @@ The one thing that must not happen: putting the secret *itself* on `JobMetadata`
 - a provider whose `get_secret` is given the caller scope alongside the secret id; or
 - a per-request resolver object built once per request from the payload reference and handed to the workers.
 
-Either way, the resolution result should be cached for the life of one run — the workers make several SDK calls per pipe, and a KMS/Secrets-Manager round trip per LLM call is not acceptable.
+### The resolution has to be cached, and the cache scope is the process, not the run
+
+A KMS or Secrets-Manager round trip per LLM call is not acceptable, so the resolution result must be cached somewhere. The intuitive scope — "for the life of one run" — is the wrong one, because under distributed execution that scope does not exist in any process.
+
+Under our Temporal plugin the activity granularity is **one LLM call**, not one run: `act_llm_gen_text(llm_assignment: LLMAssignment)` is the entire activity body (`act_llm_generate.py`), and so are `act_llm_gen_object` and `act_llm_gen_object_list`. Each call is an independent activity task, taken off a single shared queue (`default_task_queue`, with `activity_queues` empty) by whichever worker in the pool polls it first. Retries are configured at `maximum_attempts = 3`, and a second attempt may well execute on a different worker than the first. The worker itself boots Pipelex once at process start and then polls forever (`worker_cmd.py`), which is why the three caches named in §1 are already process-lifetime and shared across tenants there.
+
+A run-scoped credential cache under those conditions can only be one of two things, and neither is what we want. Built per activity invocation, it is a fresh empty dictionary every time, which is precisely the per-call round trip it was introduced to prevent. Held instead in a process-wide `dict[run_id, secret]`, it becomes N independent copies across N workers, and nothing ever evicts a finished run's entry, because no single worker is guaranteed to observe that run's last activity. The second form accumulates tenant secrets in worker memory indefinitely while presenting itself as run-bounded.
+
+The scope that genuinely exists is the **process**, and moving to it is an improvement rather than a concession:
+
+- Key the cache on the **credential reference** (org id, profile id, key id) and never on the run. It then hits across every run of the same tenant that lands on that worker, which is a considerably better hit rate than run scoping could have reached.
+- Bound it and give it a TTL. Because the process outlives every run, revocation latency turns into an explicit design parameter: with no TTL, a rotated or revoked credential stays usable until the worker restarts. Run scoping concealed that question; process scoping forces us to answer it.
+- Direct in-process execution gets exactly the same cache with the same semantics, so this is one mechanism rather than one per orchestrator.
 
 ## 4. SDK survey — can the key be overridden per request?
 
@@ -76,7 +88,7 @@ Either way, the resolution result should be cached for the life of one run — t
 Two mechanisms cover everything, and the split is not per-SDK, it is per-*capability*:
 
 - **Header/option override on the request** for openai, Azure OpenAI, anthropic, mistral, portkey, gateway, fal, azure_rest. Nothing is cached per credential; the existing single client stays. For the Gateway path specifically this is close to a one-line change, since `make_extras` already returns the header dict that gets sent.
-- **A credential-scoped client cache** for HuggingFace, Linkup, Bedrock, and the Google structured-output path. Concretely: extend `ModelHandle.sdk_handle` (or the registry key) with a credential fingerprint, so `get_or_create` builds one client per (model handle, credential) pair. Fingerprint, never the key itself, so the cache key is not a secret.
+- **A credential-scoped client cache** for HuggingFace, Linkup, Bedrock, and the Google structured-output path. Concretely: extend `ModelHandle.sdk_handle` (or the registry key) with a credential fingerprint, so `get_or_create` builds one client per (model handle, credential) pair. Fingerprint, never the key itself, so the cache key is not a secret. This cache inherits the lifetime argument from §3, with heavier objects at stake: on a Temporal worker the `SdkClientRegistry` lives for the life of the process, so adding a credential dimension multiplies a long-lived cache of boto3 clients, `aioboto3` sessions and httpx pools by the number of tenants that worker has served. It needs a bound and idle eviction, not merely a wider key.
 
 Whichever seam a given provider uses, the *decision* is the same and stays payload-first: reference on the job → resolved to material in-process → handed to the worker.
 
@@ -84,5 +96,6 @@ Whichever seam a given provider uses, the *decision* is the same and stays paylo
 
 1. **What is the reference we put on the payload?** An org id (server resolves to that org's stored key), a profile id (the BYOK inference-profile design), or a key id? This determines the shape of the secrets-provider scope change.
 2. **Do we support per-request keys for all backends or only the Gateway?** Gateway-only is dramatically cheaper — one header, no cache changes, no per-SDK work — and covers the hosted product. All-backends is what BYOK-with-your-own-provider-keys requires.
-3. **Where does resolution happen relative to Temporal?** If the worker resolves the reference, the secret never enters workflow history. If the dispatcher resolves it, it does. The first is the only safe answer, and it constrains where the secrets provider must be reachable.
-4. **Does `InferenceBackend` stay a boot-time singleton?** If a per-request key can also imply a per-request *endpoint* (self-hosted, regional, Azure resource), then the override is a backend override, not a key override, and the design is meaningfully larger.
+3. **Where does resolution happen relative to Temporal?** If the worker resolves the reference, the secret never enters workflow history. If the dispatcher resolves it, it does. The first is the only safe answer, and the seam already supports it: `job_metadata` is a field of `LLMAssignment`, so the reference reaches the activity intact. The constraint it imposes is worth stating plainly, because it is a blast-radius one — the worker fleet polls a single shared queue on behalf of every tenant, so every worker needs secrets-read reachability for every tenant it might serve.
+4. **What revocation latency do we accept?** §3 makes the credential cache process-scoped, which turns its TTL into the revocation SLA. A short TTL costs one secrets-provider round trip per tenant per TTL window per worker; a long one keeps a revoked credential usable for that long. This needs an agreed number rather than a default.
+5. **Does `InferenceBackend` stay a boot-time singleton?** If a per-request key can also imply a per-request *endpoint* (self-hosted, regional, Azure resource), then the override is a backend override, not a key override, and the design is meaningfully larger.
