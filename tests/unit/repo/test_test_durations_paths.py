@@ -1,10 +1,16 @@
 """Guards the committed `.test_durations` bookkeeping artifact against a bulk path rewrite.
 
 `.test_durations` maps every test node id to how long it took, and pytest-split reads it to balance the
-CI shards (`make gha-tests` with `SPLITS`/`GROUP`; regenerate with `make store-test-durations`). It is
-generated, committed, and touched by nobody — which is exactly why a bulk rewrite of test paths (a
-package move, a sed over `tests/`) walks straight past it: the file still parses, the shards still run,
-and they silently unbalance because entries for files that no longer exist can never match a test again.
+CI shards (`make gha-tests` with `SPLITS`/`GROUP`; refresh with `make store-test-durations`). It is
+generated, committed, and edited by hand by nobody — which is exactly why a bulk rewrite of test paths
+(a package move, a sed over `tests/`) walks straight past it: the file still parses, the shards still
+run, and they silently unbalance because entries for files that no longer exist can never match a test
+again.
+
+The refresh prunes these entries itself (`duration_map.prune_dead_paths`), so this gate is normally
+self-healing — running `make store-test-durations` clears it, and on a complete map that costs only a
+collection rather than a suite run. The gate stays because the pruning happens when someone *runs* the
+refresh, which may be many merges after the rewrite that orphaned the entries.
 
 The gate is on the **file path**, not the node id. A path rewrite breaks paths; parametrization churn
 breaks node ids and is benign — a parametrization keyed on a generated fixture legitimately drifts
@@ -48,6 +54,6 @@ class TestTestDurationsPaths:
         dead = sorted(path for path in recorded_paths if not (REPO_ROOT / path).is_file())
         assert not dead, (
             f"{len(dead)} test file path(s) in {DURATIONS_PATH.name} no longer exist, so the CI shards are "
-            f"balanced against tests that cannot run: {dead[:10]}. Regenerate with `make store-test-durations` "
-            "(alias `make std`), or drop the stale entries."
+            f"balanced against tests that cannot run: {dead[:10]}. Run `make store-test-durations` "
+            "(alias `make std`), which prunes them."
         )

@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:e0ae9abafd983c542d19e338a7b7f6cefa720d8c668872efa08d324ff417b13b"
+digest = "sha256:ef75f1a9eff0100feb5e38e6e522fd22e4363680c3bd9487734f38bd6acb7c39"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-17T13:45:26Z"
-rationale = "Reviewed docs/tools/cli/ and the agent-CLI contract doc against the two CLI changes in this commit. One target was genuinely stale and is now false rather than merely incomplete: migrate.md said the command does not descend into subdirectories and that inference backends are never rewritten by it, which stopped being true when the walk learned to enter a directory a surface owns. Rewritten to say what it now does and, just as importantly, what it still does not - one level, only into a directory some configuration family owns, so inference/deck/ and the inference/backends.toml beside the directory stay out, and the model deck keeps its own update command. The other change is the wording of one rendered operation, which turns a literal wildcard segment into English: it renders ledger material only, so the agent-CLI doc's standing claim that paths, operation kinds and ledger-supplied values are all that appear is unaffected, and no flag, stream, format, structured field or exit code moved. docs/tools/cli/index.md still has no doctor page."
+reviewed_at = "2026-08-17T19:54:27Z"
+rationale = "Reviewed docs/tools/cli/ and the agent-CLI contract doc against a docstring-only correction in migrate_cmd.py. No surface moved - no flag, format, stream, structured field or exit code - so nothing in either target went stale by omission. Checked them for the specific claim the correction removes: the module docstring had said the transaction refuses where the rehearsal and the write pass disagree, which conflated two windows of very different widths. The agent CLI cannot be affected at all, since it is single-pass (dry_run = not yes) and has no confirmation window to edit a file during, and its contract doc makes no two-pass claim. migrate.md is likewise not falsified: it documents the backup and the atomic replace, both accurate, and never promises that the previewed report is what gets applied. What migrate.md could gain is a new sentence telling the user the files are re-read after they answer, and that is deliberately held rather than written now: whether the rehearsal should bind the write is an open design question recorded in wip/migrator-pr-1117-review-followups.md, and documenting behavior that may change is how a doc goes stale on purpose."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -105,7 +105,7 @@ rationale = "Reviewed docs/tools/cli/ and the agent-CLI contract doc against the
 "pipelex/cli/commands/init/ui/types.py" = "blob:1361f29ca95bacc90bca90ea6c0e39f44b6734ab"
 "pipelex/cli/commands/login/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/login/command.py" = "blob:ace1db9879626cc1722adaac12761aadaa6b24ed"
-"pipelex/cli/commands/migrate_cmd.py" = "blob:fa352e722f238b4785e83e37e413d8728a820c0c"
+"pipelex/cli/commands/migrate_cmd.py" = "blob:ffd3b0ff4fb8448bd03204b4381fb4f214a88271"
 "pipelex/cli/commands/plugins_cmd.py" = "blob:9657b713c3650ff4a929e92ae68af453d896393e"
 "pipelex/cli/commands/resolve_cmd.py" = "blob:2928a0e26eab7983367a59a78533f6618817feba"
 "pipelex/cli/commands/run/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"

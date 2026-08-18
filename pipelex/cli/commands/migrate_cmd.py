@@ -11,10 +11,16 @@ deck, no credentials, no network. That is a property to preserve, not an acciden
 a test that hands the command a configuration that cannot load.
 
 Two passes, and they are not the same pass twice for the sake of it. The first is a dry run whose
-report is what the user is shown and asked about; the second is the one that writes. Under
-always-replay the two agree, and where they do not — because the user edited a file in between, or
-another process did — the second is the authoritative one and the transaction refuses rather than
-writing over work it never saw.
+report is what the user is shown and asked about; the second is the one that writes, and it reads
+each file again rather than carrying the rehearsal's reading forward. Under always-replay the two
+agree. Where they do not — because the user edited a file while the question was on screen, or
+another process did — the second is the authoritative one: what lands is a correct migration of the
+file as it now stands, the copy taken beside it holds the exact bytes replaced, and the report
+printed afterwards is that pass's rather than the rehearsal's.
+
+What the per-file transaction refuses over is narrower than that, and worth not reading as more: it
+compares against the reading *that pass* took, so what it catches is a writer landing between this
+run's own read and its replace, and not an edit made while the confirmation was pending.
 
 See `docs/migration-ledger.md`.
 """

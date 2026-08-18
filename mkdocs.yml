@@ -339,6 +339,7 @@ plugins:
         - contribute/configuration-defaults-and-overrides.md: "Configuration Internals"
         - contribute/keyword-only-arguments.md: "Keyword-Only Arguments"
         - contribute/hub-layering.md: "Hub Layering"
+        - contribute/test-duration-map.md: "Test Duration Map"
         - contribute/registration-surface.md: "Registration Surface"
         - contribute/drift-contracts.md: "Drift Contracts"
         - migration-ledger.md: "Migration Ledger"
@@ -583,6 +584,7 @@ nav:
     - Configuration Internals: contribute/configuration-defaults-and-overrides.md
     - Keyword-Only Arguments: contribute/keyword-only-arguments.md
     - Hub Layering: contribute/hub-layering.md
+    - Test Duration Map: contribute/test-duration-map.md
     - Registration Surface: contribute/registration-surface.md
     - Drift Contracts: contribute/drift-contracts.md
     - Migration Ledger: migration-ledger.md

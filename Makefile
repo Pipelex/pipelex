@@ -29,6 +29,9 @@ HEARTBEAT_INTERVAL ?= 20
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
 USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api"
+# The selection the sharded CI job runs. Shared by gha-tests and store-test-durations so the map
+# can never be balanced against a different set of tests than the one it is measured from.
+GHA_PYTEST_MARKERS := "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)"
 
 define PRINT_TITLE
     $(eval PROJECT_PART := [$(PROJECT_NAME)])
@@ -212,6 +215,7 @@ export HELP
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
 	test-llm tl test-img-gen tg test-extract te codex-tests gha-tests \
+	store-test-durations std store-test-durations-force stdf \
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
 	validate v check c cc agent-check agent-test agent-test-debug atd \
 	test-durations td test-durations-serial tds test-time tt test-time-serial tts \
@@ -572,29 +576,42 @@ codex-tests: env
 # GROUP of the tests, balanced by the committed .test_durations file, and still
 # uses -n auto within the shard. Both unset (local runs) => the $(if ...) expands
 # to nothing and the whole suite runs as before.
-# Regenerate .test_durations: the per-test timing map pytest-split uses to
-# balance the 8 CI shards. Runs the same selection as gha-tests but records how
-# long each test takes instead of sharding. Run at release time (see the release
-# skill) so the shards stay balanced; a stale file silently unbalances them.
-# tests/unit/repo/test_test_durations_paths.py gates the one kind of staleness
-# that is never benign: an entry whose test FILE no longer exists (a bulk path
-# rewrite). Drifting parametrization ids are left alone — pytest-split treats an
-# unknown id as average duration.
+# Refresh .test_durations: the per-test timing map pytest-split uses to balance
+# the 8 CI shards. The default is incremental — it collects (a few seconds),
+# measures ONLY the tests missing from the map, and leaves recorded values alone.
+# That is the whole game: measured against the real split, a map with stale
+# VALUES but complete coverage costs ~7% of shard balance, while one with current
+# values and weeks of missing entries costs >50%, because pytest-split imputes an
+# unknown node id at the suite MEAN (~0.25s) when the median test is ~0.002s.
+# A post-pass prunes entries whose test file is gone (making the
+# tests/unit/repo/test_test_durations_paths.py gate self-healing) and keeps any
+# stored value that has not meaningfully moved, so the release diff stays small
+# enough for automated reviewers to read. See docs/contribute/test-duration-map.md.
 store-test-durations: env
-	$(call PRINT_TITLE,"Storing test durations for pytest-split shard balancing")
+	$(call PRINT_TITLE,"Refreshing test durations for pytest-split shard balancing")
 	@echo "• Regenerating test model fixtures with ci profile"
 	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
-	@echo "• Running full suite with --store-durations (rewrites .test_durations)"
-	$(VENV_PYTEST) -n auto --dist=worksteal --store-durations --timeout=180 --timeout-method=thread --tb=line -p no:cacheprovider --no-header -m "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)" || [ $$? = 5 ]
+	$(VENV_PIPELEX_DEV) store-test-durations --markers $(GHA_PYTEST_MARKERS)
 
 std: store-test-durations
+
+# Re-measure every test rather than only the missing ones. Worth it when the
+# machine or the suite changed enough that recorded values are no longer
+# comparable to each other; otherwise the incremental target is the one to use.
+store-test-durations-force: env
+	$(call PRINT_TITLE,"Re-measuring ALL test durations for pytest-split shard balancing")
+	@echo "• Regenerating test model fixtures with ci profile"
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
+	$(VENV_PIPELEX_DEV) store-test-durations --markers $(GHA_PYTEST_MARKERS) --force
+
+stdf: store-test-durations-force
 
 gha-tests: env
 	$(call PRINT_TITLE,"Unit testing for github actions")
 	@echo "• Regenerating test model fixtures with ci profile"
 	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
 	@echo "• Running unit tests for github actions (excluding inference and gha_disabled)"
-	$(VENV_PYTEST) -n auto --dist=worksteal $(if $(SPLITS),--splits $(SPLITS) --group $(GROUP)) --max-worker-restart=2 --timeout=180 --timeout-method=thread --tb=line -p no:cacheprovider --no-header -m "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)" || [ $$? = 5 ]
+	$(VENV_PYTEST) -n auto --dist=worksteal $(if $(SPLITS),--splits $(SPLITS) --group $(GROUP)) --max-worker-restart=2 --timeout=180 --timeout-method=thread --tb=line -p no:cacheprovider --no-header -m $(GHA_PYTEST_MARKERS) || [ $$? = 5 ]
 
 run-all-tests: env
 	$(call PRINT_TITLE,"Running all unit tests")
