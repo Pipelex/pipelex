@@ -65,13 +65,12 @@ class TestFixApplierNativeConcept:
         assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED]
         assert _dumps(toml_doc) == once
 
-    def test_leading_comment_on_deleted_table_reflows_onto_successor(self) -> None:
-        """Known artifact (pinned): a standalone comment sitting directly above a deleted
-        ``[concept.X]`` table reflows onto the next element (tomlkit trivia behavior;
-        ``format_mthds`` does not reposition it). The guarantee is that comments on *untouched*
-        content survive — a comment sitting on the deleted concept is the only thing that can
-        dangle. Pinned so the behavior is explicit rather than a silent surprise; see
-        ``wip/autofix/deferred-checkpoint-b-review-items.md``.
+    def test_leading_comment_on_deleted_table_goes_with_it(self) -> None:
+        """A standalone comment sitting directly above a deleted ``[concept.X]`` table is dropped
+        with the table, rather than dangling onto the next element. tomlkit stores such a comment
+        as trailing trivia of the *previous* table, so a plain delete used to leave it there, now
+        annotating whatever followed; the applier reads it as introducing the deleted table and
+        removes it, and the successor keeps its own blank line.
         """
         source = (
             "[concept.Report]\n"
@@ -86,10 +85,7 @@ class TestFixApplierNativeConcept:
         )
         toml_doc = tomlkit.loads(source)
         apply_fix_ops(toml_doc=toml_doc, ops=[_delete_concept_op(key="Text")])
-        dumped = _dumps(toml_doc)
-        assert "[concept.Text]" not in dumped
-        # The comment reflowed onto the successor table — it no longer annotates the deleted concept.
-        assert "# describes the redeclared concept below\n[pipe.make_report]" in dumped
+        assert _dumps(toml_doc) == '[concept.Report]\ndescription = "A report."\n\n[pipe.make_report]\ntype = "PipeLLM"\n'
 
     def test_delete_missing_concept_is_skipped(self) -> None:
         """Stripping a concept absent from the document is reported as skipped, not raised."""

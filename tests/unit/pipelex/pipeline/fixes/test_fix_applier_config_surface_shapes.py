@@ -14,9 +14,10 @@ the public ``apply_fix_ops`` — a ``delete_key`` for an absent key reports "tab
 path model cannot reach the table and "key not found" when it can — so it characterizes the contract
 rather than the private resolver.
 
-Where a behaviour is a hazard rather than a guarantee, the test says so in its name and docstring:
-``test_moved_table_leaves_its_banner_comment_behind`` pins a *limitation* that the migration contract
-has to state, not something to rely on.
+Where a behaviour is a hazard rather than a guarantee, the test says so in its name and docstring.
+``test_moved_table_takes_its_banner_comment_along`` pins the one comment-fidelity guarantee the
+applier makes on top of tomlkit — a banner travels with the table it introduces — and the byte-level
+cases behind it live in ``test_fix_applier_comment_fidelity.py``.
 """
 
 from pathlib import Path
@@ -98,9 +99,10 @@ def _table_paths(node: object, prefix: list[str]) -> list[list[str]]:
 def _move_storage_under_a_fresh_root(toml_doc: TOMLDocument) -> None:
     """Move ``runtime.storage`` to ``relocated.storage``, creating the destination root as it goes.
 
-    The two placement tests need a move whose destination parent does *not* already exist, which is
-    the case that makes tomlkit append at the end of the document. ``relocated`` is a name no
-    configuration surface uses, so it can never collide with a real section.
+    The placement test needs a move whose destination parent does *not* already exist, which is
+    the case that makes tomlkit append at the end of the document; this is the raw library move,
+    without the applier's comment handling. ``relocated`` is a name no configuration surface uses,
+    so it can never collide with a real section.
     """
     runtime_table = _as_mapping(toml_doc["runtime"])
     moved = runtime_table["storage"]
@@ -430,13 +432,14 @@ class TestFixApplierConfigSurfaceShapes:
         remaining_headers = [line for line in rendered_lines[header_indexes[0] :] if line.startswith("[") and not line.startswith("[relocated")]
         assert remaining_headers == []
 
-    def test_moved_table_leaves_its_banner_comment_behind(self) -> None:
-        """A comment block *preceding* a table does not travel with it — a documented limitation.
+    def test_moved_table_takes_its_banner_comment_along(self) -> None:
+        """A comment block *preceding* a table travels with it through the applier's ``move_key``.
 
         tomlkit stores such a block as trailing trivia of the *previous* sibling, not as anything
-        attached to the table, so a moved table arrives bare and the banner stays put, now labelling
-        whatever followed it. The migration contract states this; nothing in the engine relies on
-        comment fidelity across a move.
+        attached to the table — so the raw ``del`` + re-add in ``_move_storage_under_a_fresh_root``
+        leaves the banner behind, labelling whatever followed. The applier reads the block as the
+        table's introduction and re-homes it: that is the guarantee the migration contract states,
+        and this test measures it on the real template rather than on a synthetic document.
         """
         toml_doc = _parse(_KIT_TEMPLATE)
         banner = "# Storage Config"
@@ -444,10 +447,12 @@ class TestFixApplierConfigSurfaceShapes:
         banner_index = source_lines.index(banner)
         assert source_lines[banner_index + 2 : banner_index + 4] == ["", "[runtime.storage]"]
 
-        _move_storage_under_a_fresh_root(toml_doc)
+        applications = apply_fix_ops(
+            toml_doc=toml_doc,
+            ops=[MoveKeyOp(table_path=["runtime"], key="storage", new_table_path=["relocated"], new_key="storage")],
+        )
+        assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
 
         migrated_lines = _dumps(toml_doc).splitlines()
         migrated_banner_index = migrated_lines.index(banner)
-        assert migrated_lines[migrated_banner_index + 2] != "[relocated.storage]"
-        destination_index = migrated_lines.index("[relocated.storage]")
-        assert banner not in migrated_lines[destination_index - 3 : destination_index]
+        assert migrated_lines[migrated_banner_index + 2 : migrated_banner_index + 4] == ["", "[relocated.storage]"]
