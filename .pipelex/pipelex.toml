@@ -46,26 +46,26 @@ method = "local"
 
 [runtime.storage.local]
 # Local storage settings
-uri_format = "{storage_scope}/{hash}.{extension}"
+uri_format = "{hash}.{extension}"
 local_storage_path = ".pipelex/storage"
 
 [runtime.storage.in_memory]
 # In-memory storage settings
-uri_format = "{storage_scope}/{hash}.{extension}"
+uri_format = "{hash}.{extension}"
 
 [runtime.storage.s3]
 # AWS S3 storage settings (requires boto3: `uv pip install "pipelex[s3]"`)
-uri_format = "{storage_scope}/{hash}.{extension}"
+uri_format = "{hash}.{extension}"
 bucket_name = ""
 region = ""
-signed_urls_lifespan_seconds = 3600               # Set to "disabled" for public URLs
+signed_urls_lifespan_seconds = 3600 # Set to "disabled" for public URLs
 
 [runtime.storage.gcp]
 # Google Cloud Storage settings (requires google-cloud-storage: `uv pip install "pipelex[gcp-storage]"`)
-uri_format = "{storage_scope}/{hash}.{extension}"
+uri_format = "{hash}.{extension}"
 bucket_name = ""
 project_id = ""
-signed_urls_lifespan_seconds = 3600               # Set to "disabled" for public URLs
+signed_urls_lifespan_seconds = 3600 # Set to "disabled" for public URLs
 
 ####################################################################################################
 # Secrets Config

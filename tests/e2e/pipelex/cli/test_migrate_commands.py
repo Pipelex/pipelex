@@ -140,7 +140,7 @@ def _old_shape_telemetry_document() -> str:
 # placeholder set narrowed without any path moving, so no ledger entry describes it — see the
 # note inside the function below.
 _STORAGE_URI_FORMAT_AT_SCHEMA_1 = '"{primary_id}/{secondary_id}/{hash}.{extension}"'
-_STORAGE_URI_FORMAT_TODAY = '"{storage_scope}/{hash}.{extension}"'
+_STORAGE_URI_FORMAT_TODAY = '"{hash}.{extension}"'
 
 
 def _pre_reshape_pipelex_config_document() -> str:
