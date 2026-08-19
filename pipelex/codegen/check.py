@@ -77,7 +77,13 @@ class CodegenCheckReport(BaseModel):
 
 
 def run_codegen_check(*, root: Path) -> CodegenCheckReport:
-    """Run the offline drift check over `root` (the directory holding `codegen.lock`)."""
+    """Run the offline drift check over `root` (the directory holding `codegen.lock`).
+
+    The report's drift order is part of the contract, so a second implementation can mirror it exactly:
+    every locked-artifact drift comes first, in ascending order of the full relative path compared as a
+    plain string, then every orphan, ordered by that same rule. A locked path yields at most one drift,
+    and `hand-edited` outranks `modified` when a file is both self-inconsistent and off the locked hash.
+    """
     try:
         lock_path = resolve_output_path(root=root, relative_path=Path(CODEGEN_LOCK_FILENAME))
         safe_root = lock_path.parent
@@ -140,7 +146,7 @@ def _find_orphans(*, root: Path, lock: CodegenLock) -> list[CodegenDrift]:
                     detail="Stamped generated file not tracked by the lock — stale; remove or regenerate.",
                 )
             )
-    return orphans
+    return sorted(orphans, key=lambda drift: drift.path)
 
 
 def _iter_stampable_files(*, directory: Path) -> Iterator[Path]:
