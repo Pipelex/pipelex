@@ -19,6 +19,7 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 
 def _make_stub_job_metadata() -> JobMetadata:
     return JobMetadata(
+        storage_scope="test/scope",
         user_id="test-user",
         pipeline_run_id="test-run",
     )

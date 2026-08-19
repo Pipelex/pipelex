@@ -25,26 +25,22 @@ class TestStorageProviders:
     ) -> None:
         """Test that the URI format from config works correctly for building storage keys."""
         test_data = b"config format test"
-        primary_id = "pipeline_123"
-        secondary_id = "step_456"
         hash_value = "abc123def456"
         extension = "png"
 
-        key = uri_format.format(
-            primary_id=primary_id,
-            secondary_id=secondary_id,
-            hash=hash_value,
-            extension=extension,
-        )
+        # `uri_format` renders the FILENAME only. The prefix — the scope and the
+        # `generated/` leaf — is composed in code by `GeneratedContentFactory`,
+        # precisely so a config cannot omit it; asserting a scope segment here
+        # would be asserting against a string this format no longer produces.
+        filename = uri_format.format(hash=hash_value, extension=extension)
 
-        returned_uri = await storage_provider.store(data=test_data, key=key)
+        returned_uri = await storage_provider.store(data=test_data, key=filename)
         loaded_data = await storage_provider.load(uri=returned_uri)
 
         assert loaded_data == test_data
-        assert primary_id in key
-        assert secondary_id in key
-        assert hash_value in key
-        assert extension in key
+        assert hash_value in filename
+        assert extension in filename
+        assert not filename.startswith("/")
 
     async def test_store_binary_image_data(self, storage_provider: StorageProviderAbstract) -> None:
         """Test storing and retrieving binary image data (PNG header)."""

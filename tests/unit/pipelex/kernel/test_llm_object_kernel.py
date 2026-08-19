@@ -45,7 +45,7 @@ RESULT_NAME = "character"
 
 
 def _make_dry_kernel() -> PipelexKernel:
-    return PipelexKernel.make(run_mode=PipeRunMode.DRY, user_id="kernel-unit-test")
+    return PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="kernel-unit-test")
 
 
 class TestLlmObjectKernel:

@@ -62,5 +62,5 @@ def make_img_gen_job(
         ),
         job_config=ImgGenJobConfig(is_sync_mode=False),
         job_report=ImgGenJobReport(),
-        job_metadata=JobMetadata(user_id="test-user", pipeline_run_id="test-run"),
+        job_metadata=JobMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="test-run"),
     )

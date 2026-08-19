@@ -129,6 +129,8 @@ class TestPipelineRunIdResubmission:
         # id on this path, so setup must remove its own registration.
         with pytest.raises(PipeNotFoundError):
             await pipeline_run_setup(
+                storage_scope="test/scope",
+                user_id="test-user",
                 execution_config=_dry_mock_config(),
                 mthds_contents=[_RESUBMISSION_MTHDS],
                 pipe_code="absent_pipe",
@@ -140,6 +142,8 @@ class TestPipelineRunIdResubmission:
         # Resubmission of the SAME explicit id now succeeds (before the fix: process-permanent
         # PipelineManagerAlreadyExistsError).
         pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
+            storage_scope="test/scope",
+            user_id="test-user",
             execution_config=_dry_mock_config(),
             mthds_contents=[_RESUBMISSION_MTHDS],
             pipe_code="echo_topic",
@@ -193,6 +197,8 @@ class TestPipelineRunIdResubmission:
         # The ORIGINAL setup failure propagates — the flush error must not replace it.
         with pytest.raises(RuntimeError, match=prepare_failure_msg):
             await pipeline_run_setup(
+                storage_scope="test/scope",
+                user_id="test-user",
                 execution_config=graph_config,
                 mthds_contents=[_RESUBMISSION_MTHDS],
                 pipe_code="echo_topic",
@@ -211,6 +217,8 @@ class TestPipelineRunIdResubmission:
         mocker.stop(prepare_mock)
         mocker.stop(teardown_mock)
         pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
+            storage_scope="test/scope",
+            user_id="test-user",
             execution_config=_dry_mock_config(),
             mthds_contents=[_RESUBMISSION_MTHDS],
             pipe_code="echo_topic",

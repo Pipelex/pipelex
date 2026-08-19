@@ -43,8 +43,7 @@ async def render_page_views_and_store(
         # otherwise holds every page bitmap in memory until the whole store loop finishes.
         page_view_image.close()
         image_content = await generated_content_factory.make_image_content(
-            primary_id=render_assignment.job_metadata.user_id,
-            secondary_id=render_assignment.job_metadata.pipeline_run_id,
+            storage_scope=render_assignment.job_metadata.storage_scope,
             raw_details=raw_details,
         )
         image_contents.append(image_content)

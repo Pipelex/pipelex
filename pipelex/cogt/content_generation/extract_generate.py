@@ -33,7 +33,6 @@ async def extract_gen_pages_and_store(
         return dry_extract_page_contents(extract_assignment)
     extract_output = await extract_gen_pages(extract_assignment)
     return await generated_content_factory.make_page_contents(
-        primary_id=extract_assignment.job_metadata.user_id,
-        secondary_id=extract_assignment.job_metadata.pipeline_run_id,
+        storage_scope=extract_assignment.job_metadata.storage_scope,
         extract_output=extract_output,
     )

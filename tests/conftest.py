@@ -199,6 +199,7 @@ def job_metadata(request: pytest.FixtureRequest) -> JobMetadata:
     pipeline_run_id: str = f"{test_id}-{random_code}"
 
     return JobMetadata(
+        storage_scope="test/scope",
         user_id="pytest",
         pipeline_run_id=pipeline_run_id,
     )

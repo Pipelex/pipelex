@@ -41,6 +41,7 @@ def _make_test_llm_job(
     """Create a minimal LLMJob for testing event emission."""
     now = datetime.now(UTC)
     job_metadata = JobMetadata(
+        storage_scope="test/scope",
         user_id="test_user",
         pipeline_run_id=pipeline_run_id,
         trace_context=trace_context,

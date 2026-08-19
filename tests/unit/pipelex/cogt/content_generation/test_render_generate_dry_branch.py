@@ -18,7 +18,7 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 class TestRenderGenerateDryBranch:
     def _assignment(self, *, run_mode: PipeRunMode) -> RenderPageViewsAssignment:
         return RenderPageViewsAssignment(
-            job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_render_dry"),
+            job_metadata=JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_render_dry"),
             cogt_run_params=CogtRunParams(run_mode=run_mode),
             document_uri="file:///tmp/doc.pdf",
             page_views_dpi=72,

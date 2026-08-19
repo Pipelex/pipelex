@@ -41,8 +41,7 @@ class TestExtract:
         extract_output = await extract_worker.extract_pages(extract_job=extract_job)
         assert extract_output.pages
         page_contents = await generated_content_factory.make_page_contents(
-            primary_id=job_metadata.user_id,
-            secondary_id=job_metadata.pipeline_run_id,
+            storage_scope=job_metadata.storage_scope,
             extract_output=extract_output,
         )
         assert page_contents
@@ -157,8 +156,7 @@ class TestExtract:
         if page.raw_html:
             pretty_print(page.raw_html[:500], title="Raw HTML (first 500 chars)")
         page_contents = await generated_content_factory.make_page_contents(
-            primary_id=job_metadata.user_id,
-            secondary_id=job_metadata.pipeline_run_id,
+            storage_scope=job_metadata.storage_scope,
             extract_output=extract_output,
         )
         assert page_contents

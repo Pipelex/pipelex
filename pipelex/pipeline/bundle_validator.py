@@ -57,8 +57,8 @@ from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.runtime_hub import get_telemetry_manager, scoped_content_generator
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.system.storage_scope import DRY_RUN_STORAGE_SCOPE, DRY_RUN_USER_ID
 from pipelex.system.telemetry.events import EventName, EventProperty
-from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 if TYPE_CHECKING:
@@ -279,7 +279,15 @@ class BundleValidator:
                 execution_config=execution_config,
                 pipe_run_mode=PipeRunMode.DRY,
                 pipeline_run_id=dry_run_pipeline_id,
-                user_id=OTelConstants.DEFAULT_USER_ID,
+                user_id=DRY_RUN_USER_ID,
+                # A dry run provably stores nothing, but `storage_scope` is
+                # required — so it says so, loudly and greppably, instead of
+                # inheriting a default. A silent default on this field is
+                # exactly how the shared `anonymous/` namespace grew: a
+                # placeholder never meant to reach storage became the key
+                # prefix for every run. If `dry-run-no-storage` ever appears as
+                # an S3 prefix, a dry run stored something and that is the bug.
+                storage_scope=DRY_RUN_STORAGE_SCOPE,
             )
             await self._pipe_run.run(pipe_job)
         except (PipelexError, ValidationError, FactoryException) as exc:

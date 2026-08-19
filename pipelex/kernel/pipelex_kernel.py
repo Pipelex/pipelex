@@ -85,6 +85,7 @@ class PipelexKernel:
         *,
         run_mode: PipeRunMode = PipeRunMode.LIVE,
         user_id: str,
+        storage_scope: str,
         is_mock_usage: bool = False,
         trace_context: TraceContext | None = None,
         step_id_source: Callable[[], str] | None = None,
@@ -118,6 +119,7 @@ class PipelexKernel:
         return cls(
             job_metadata=JobMetadata(
                 user_id=user_id,
+                storage_scope=storage_scope,
                 pipeline_run_id=trace_context.graph_id if trace_context is not None else str(uuid4()),
                 trace_context=trace_context,
             ),

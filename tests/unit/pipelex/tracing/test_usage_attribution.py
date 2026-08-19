@@ -29,6 +29,7 @@ def _make_usage(
 ) -> AnyTokensUsage:
     return LLMTokensUsage(
         job_metadata=JobMetadata(
+            storage_scope="test/scope",
             user_id="user_test",
             pipeline_run_id="run_001",
             pipe_code="test_pipe",
