@@ -58,10 +58,16 @@ def save_bytes_to_binary_file(byte_data: bytes, *, file_path: Path, create_direc
 
 
 def save_text_to_path(text: str, *, path: Path, create_directory: bool = False):
-    """Writes text content to a file at the specified path.
+    r"""Writes text content to a file at the specified path, as UTF-8 with LF line endings.
 
     This function opens a file in write mode and writes the provided text to it.
     If the file already exists, it will be overwritten.
+
+    Newline translation is disabled, so the bytes on disk are the string verbatim on every platform.
+    Without that, Python rewrites each ``\n`` as ``os.linesep``, and the same text saved on Windows and
+    on Linux produces different files: a hash taken over the in-memory string stops describing what is
+    on disk, and a mixed-platform team sees generated trees churn in version control with no change of
+    content. Every caller here writes a product text artifact meant to be platform-independent.
 
     Args:
         text (str): The text content to write to the file.
@@ -77,7 +83,7 @@ def save_text_to_path(text: str, *, path: Path, create_directory: bool = False):
         directory = path.parent
         ensure_directory_exists(directory)
 
-    path.write_text(text, encoding="utf-8")
+    path.write_text(text, encoding="utf-8", newline="\n")
 
 
 def load_text_from_path(path: Path) -> str:

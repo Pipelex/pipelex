@@ -10,6 +10,23 @@ the set was generated against, so the offline check can spot a file on disk that
 dependency versions): different owner, location, content, and lifecycle — see
 the codegen spec → "Lock format". It is encoded as human-diffable TOML, artifacts
 sorted by path so version-control diffs stay minimal.
+
+## Evolution policy
+
+The lock is a cross-language interchange format — this CLI writes it, and other implementations of the
+offline check (an SDK, a CI script) read it — so its shape is a contract, and `extra="forbid"` makes any
+unknown key a hard no-verdict error rather than a drift. That strictness is correct *within* a known
+version and unworkable across versions, so the format carries `lock_version`:
+
+- Any change to the lock's key set or to the meaning of an existing key bumps `CODEGEN_LOCK_VERSION`.
+- A reader refuses a version it does not know, before validating the key set, and says which side to
+  upgrade — never an opaque shape complaint about a key the writer had every right to add.
+- A lock with no `lock_version` key is version 1 by definition: the field was introduced with version 1,
+  so every lock written before it existed is already conformant and nothing on disk needs migrating.
+
+The **stamp header** deliberately needs no equivalent, because it is additive in the other direction: an
+unrecognised *commented* `key: value` line is ignored rather than rejected, so it can gain a field
+without a version at all (`pipelex/codegen/stamp.py`).
 """
 # tomlkit is not fully typed (`tomlkit.dumps`), so its member access reads as unknown here.
 # pyright: reportUnknownMemberType=false
@@ -17,7 +34,7 @@ sorted by path so version-control diffs stay minimal.
 import os
 from collections.abc import Iterable
 from pathlib import Path, PurePosixPath, PureWindowsPath
-from typing import NoReturn
+from typing import Any, NoReturn
 from unicodedata import category
 
 import tomlkit
@@ -31,6 +48,9 @@ from pipelex.tools.misc.toml_utils import load_toml_from_content
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 CODEGEN_LOCK_FILENAME = "codegen.lock"
+
+CODEGEN_LOCK_VERSION = 1
+"""The lock format version this build writes and is able to read — bumped by any change to the key set."""
 
 _LOCK_HEADER = "# codegen.lock — generated artifact set (Pipelex codegen). Do not edit by hand.\n\n"
 
@@ -48,6 +68,14 @@ class CodegenLock(BaseModel):
     """The generated artifact set for one output root, keyed to the crate + engine it was built against."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
+
+    lock_version: int = 1
+    """The format version this lock was written in — see the module's evolution policy.
+
+    The default is the literal `1`, deliberately *not* `CODEGEN_LOCK_VERSION`: it states that a lock
+    written before the field existed is version 1, which stays true forever. New locks take their
+    version from `build_lock`, so bumping the constant is all a future format change has to do.
+    """
 
     crate_fingerprint: str
     engine_version: str
@@ -145,13 +173,19 @@ def build_lock(*, crate_fingerprint: str, engine_version: str, artifacts: dict[s
     """Assemble a lock from a `{path: content_hash}` map, artifacts sorted by path for a stable diff."""
     validate_artifact_paths(artifacts)
     entries = [CodegenLockEntry(path=path, content_hash=content_hash) for path, content_hash in sorted(artifacts.items())]
-    return CodegenLock(crate_fingerprint=crate_fingerprint, engine_version=engine_version, artifacts=entries)
+    return CodegenLock(
+        lock_version=CODEGEN_LOCK_VERSION,
+        crate_fingerprint=crate_fingerprint,
+        engine_version=engine_version,
+        artifacts=entries,
+    )
 
 
 def encode_lock(lock: CodegenLock) -> str:
     """Encode the lock as canonical, human-diffable TOML (artifacts already sorted by path)."""
     validate_artifact_paths(entry.path for entry in lock.artifacts)
     payload = {
+        "lock_version": lock.lock_version,
         "crate_fingerprint": lock.crate_fingerprint,
         "engine_version": lock.engine_version,
         "artifacts": [{"path": entry.path, "content_hash": entry.content_hash} for entry in lock.artifacts],
@@ -166,12 +200,43 @@ def load_lock(lock_path: Path) -> CodegenLock | None:
     try:
         content = load_text_from_path(lock_path)
         data = load_toml_from_content(content)
+        _reject_unknown_lock_version(data=data, lock_path=lock_path)
         lock = CodegenLock.model_validate(data)
         validate_artifact_paths(entry.path for entry in lock.artifacts)
         return lock
+    except CodegenLockError:
+        # The version verdict is already precise and actionable — re-wrapping it as "malformed" would
+        # bury the one thing the reader needs to know.
+        raise
     except (CodegenError, TomlError, OSError, ValueError, TypeError) as exc:
         # TomlError = malformed TOML; UnicodeDecodeError/ValueError = non-UTF-8 bytes or a pydantic
         # ValidationError on a shape mismatch (UnicodeDecodeError is a ValueError subclass);
         # OSError = the lock exists but cannot be read.
         msg = f"Malformed or unsafe codegen lock at '{lock_path}': {exc}"
         raise CodegenLockError(msg) from exc
+
+
+def _reject_unknown_lock_version(*, data: dict[str, Any], lock_path: Path) -> None:
+    """Refuse a lock whose format version this build cannot read, before its key set is validated.
+
+    The ordering is the whole point: `extra="forbid"` would otherwise reject a future lock as a shape
+    error over a key the writer was entitled to add, so the reader would report an opaque complaint
+    instead of naming the version and saying which side to upgrade.
+    """
+    raw_version = data.get("lock_version")
+    if raw_version is None:
+        # No key at all: written before the field existed, which is version 1 by definition. It still goes
+        # through the comparison below rather than returning here, or the day the constant moves every
+        # legacy lock would skip the gate and be validated against a schema it was never written for.
+        raw_version = 1
+    # `bool` is an `int` subclass, and `True == 1`, so a boolean would otherwise read as version 1.
+    is_version_number = isinstance(raw_version, int) and not isinstance(raw_version, bool)
+    if is_version_number and raw_version == CODEGEN_LOCK_VERSION:
+        return
+
+    if is_version_number and raw_version > CODEGEN_LOCK_VERSION:
+        reason = f"it declares lock_version {raw_version} — upgrade pipelex (or your SDK) to a build that reads it"
+    else:
+        reason = f"lock_version {raw_version!r} is not a known codegen lock format version"
+    msg = f"Unsupported codegen lock version at '{lock_path}': this build reads lock_version {CODEGEN_LOCK_VERSION}, but {reason}."
+    raise CodegenLockError(msg)

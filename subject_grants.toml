@@ -1220,6 +1220,10 @@ rationale = "Parser: the raw options string is the single operand."
 param = "projection"
 rationale = "Parser: the projection string is the single operand."
 
+["pipelex/codegen/stamp.py::_reject_json_constant"]
+param = "value"
+rationale = "Callback invoked positionally by json.loads parse_constant; the constant literal is the single operand."
+
 ["pipelex/codegen/stamp.py::_target_from_value"]
 param = "value"
 rationale = "Single-operand parse of the value."

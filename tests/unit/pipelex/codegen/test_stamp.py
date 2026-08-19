@@ -73,3 +73,40 @@ class TestStamp:
     def test_unstampable_file_type_raises(self) -> None:
         with pytest.raises(CodegenStampError):
             comment_prefix_for("data.json")
+
+    def test_uncommented_line_inside_the_header_is_rejected(self) -> None:
+        # An executable line hiding between the markers leaves the body — and its hash — untouched,
+        # so only the header gate can catch it.
+        stamped = self._stamp("# a\nclass A:\n    pass\n", comment_prefix="#")
+        injected = stamped.replace("# options: {}", 'raise RuntimeError("edited")\n# options: {}')
+        assert parse_stamped(injected, comment_prefix="#") is None
+
+    def test_blank_line_inside_the_header_is_rejected(self) -> None:
+        stamped = self._stamp("# a\nclass A:\n    pass\n", comment_prefix="#")
+        injected = stamped.replace("# options: {}", "\n# options: {}")
+        assert parse_stamped(injected, comment_prefix="#") is None
+
+    def test_commented_unknown_field_still_parses(self) -> None:
+        # Additive tolerance, pinned: a stamp gaining a field stays readable by today's parser, which
+        # is why the stamp header carries no version of its own. Over-tightening the gate would break it.
+        stamped = self._stamp("# a\nclass A:\n    pass\n", comment_prefix="#")
+        extended = stamped.replace("# options: {}", "# future_field: value\n# options: {}")
+        parsed = parse_stamped(extended, comment_prefix="#")
+        assert parsed is not None
+        assert parsed.stamp.crate_fingerprint == "fp-123"
+
+    @pytest.mark.parametrize("options_value", ['{"x": NaN}', '{"x": Infinity}', '{"x": -Infinity}', "Infinity"])
+    def test_non_standard_json_constants_in_options_are_rejected(self, options_value: str) -> None:
+        # Python's `json` accepts these; no conformant JSON parser does. The stamp header is a
+        # cross-language interchange format, so a stamp only Python can read is not a valid stamp.
+        stamped = self._stamp("# a\nclass A:\n    pass\n", comment_prefix="#")
+        tampered = stamped.replace("# options: {}", f"# options: {options_value}")
+        assert parse_stamped(tampered, comment_prefix="#") is None
+
+    def test_standard_options_json_still_parses(self) -> None:
+        empty = parse_stamped(self._stamp("# a\n", comment_prefix="#"), comment_prefix="#")
+        assert empty is not None
+        assert empty.stamp.options == {}
+        populated = parse_stamped(self._stamp("# a\n", comment_prefix="#", options={"explicit": "true", "flavor": "strict"}), comment_prefix="#")
+        assert populated is not None
+        assert populated.stamp.options == {"explicit": "true", "flavor": "strict"}
