@@ -22,7 +22,7 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 class TestSearchGenerateDryBranch:
     def _assignment(self, *, run_mode: PipeRunMode) -> SearchAssignment:
         return SearchAssignment(
-            job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_search_dry"),
+            job_metadata=JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_search_dry"),
             cogt_run_params=CogtRunParams(run_mode=run_mode),
             query="what is pipelex?",
             search_setting=SearchSetting(model="mock-search-handle"),

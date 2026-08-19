@@ -36,6 +36,7 @@ class UsageFixtures:
     def full_job_metadata(*, unit_job_id: UnitJobId, job_category: JobCategory) -> JobMetadata:
         """A JobMetadata with EVERY optional field populated, so leak tests prove the trim."""
         return JobMetadata(
+            storage_scope="test/scope",
             user_id="user-42",
             pipeline_run_id="plr-fixture",
             pipe_code="analyze_contract",

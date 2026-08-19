@@ -249,12 +249,13 @@ class TestLiftSequence:
         sequence = _build_lift_sequence()
 
         pipe_job = await prepare_pipe_job(
+            storage_scope="test/scope",
+            user_id="test-user",
             pipe=sequence,
             library_id=library_id,
             execution_config=get_config().interpreter.pipeline_execution,
             pipe_run_mode=PipeRunMode.LIVE,
             pipeline_run_id="test-optional-boundary-seeding",
-            user_id="pytest",
             inputs=PipelineInputs({"topic": "penalties"}),
         )
 

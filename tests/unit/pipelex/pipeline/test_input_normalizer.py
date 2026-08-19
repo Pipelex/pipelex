@@ -50,7 +50,7 @@ class TestInputNormalizerUrlGuards:
         _patch_storage_and_config(mocker)
 
         with pytest.raises(PipelineInputContentError, match="blank url"):
-            await normalize_data_urls_to_storage(_memory_with_document(blank_url))
+            await normalize_data_urls_to_storage(_memory_with_document(blank_url), storage_scope="test/scope")
 
     async def test_directory_path_raises_input_error(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """A local path that IS a directory must be an input error, not an
@@ -59,10 +59,10 @@ class TestInputNormalizerUrlGuards:
         _patch_storage_and_config(mocker)
 
         with pytest.raises(PipelineInputContentError, match="cannot be read"):
-            await normalize_data_urls_to_storage(_memory_with_document(str(tmp_path)))
+            await normalize_data_urls_to_storage(_memory_with_document(str(tmp_path)), storage_scope="test/scope")
 
     async def test_missing_file_raises_input_error(self, mocker: MockerFixture, tmp_path: Path) -> None:
         _patch_storage_and_config(mocker)
 
         with pytest.raises(PipelineInputContentError, match="cannot be read"):
-            await normalize_data_urls_to_storage(_memory_with_document(str(tmp_path / "nope.pdf")))
+            await normalize_data_urls_to_storage(_memory_with_document(str(tmp_path / "nope.pdf")), storage_scope="test/scope")

@@ -20,7 +20,7 @@ from pipelex.tools.jinja2.template_category import TemplateCategory
 class TestTemplatingGenerateDryBranch:
     def _assignment(self, *, run_mode: PipeRunMode, template: str) -> TemplatingAssignment:
         return TemplatingAssignment(
-            job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_templating_dry"),
+            job_metadata=JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_templating_dry"),
             cogt_run_params=CogtRunParams(run_mode=run_mode),
             context={"the_answer": "42"},
             template=template,

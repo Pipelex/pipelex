@@ -113,6 +113,8 @@ class TestPipelineRunSetupCharacterization:
         teardown_before = teardown_spy.call_count
 
         pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
+            storage_scope="test/scope",
+            user_id="test-user",
             execution_config=_dry_mock_config(),
             mthds_contents=[_CHAR_MTHDS],
             pipe_code="echo_topic",
@@ -151,6 +153,8 @@ class TestPipelineRunSetupCharacterization:
             wraps=pipeline_run_setup_module.prepare_pipe_job,
         )
         _, _, library_id = await pipeline_run_setup(
+            storage_scope="test/scope",
+            user_id="test-user",
             execution_config=_dry_mock_config(),
             mthds_contents=[_CHAR_MTHDS],
             pipe_code="echo_topic",
@@ -165,6 +169,8 @@ class TestPipelineRunSetupCharacterization:
 
     async def test_empty_inputs_behave_like_no_inputs(self) -> None:
         pipe_job, _, library_id = await pipeline_run_setup(
+            storage_scope="test/scope",
+            user_id="test-user",
             execution_config=_no_mock_config(),
             mthds_contents=[_CHAR_MTHDS],
             pipe_code="echo_topic",
@@ -206,6 +212,8 @@ class TestPipelineRunSetupCharacterization:
 
         with pytest.raises(PipeNotFoundError):
             await pipeline_run_setup(
+                storage_scope="test/scope",
+                user_id="test-user",
                 execution_config=_dry_mock_config(),
                 mthds_contents=[_CHAR_MTHDS],
                 pipe_code="absent_pipe",
@@ -257,6 +265,8 @@ class TestPipelineRunSetupCharacterization:
         try:
             with pytest.raises(PipeNotFoundError):
                 await pipeline_run_setup(
+                    storage_scope="test/scope",
+                    user_id="test-user",
                     execution_config=_dry_mock_config(),
                     mthds_contents=[_CHAR_MTHDS],
                     pipe_code="absent_pipe",
@@ -282,6 +292,8 @@ class TestPipelineRunSetupCharacterization:
         try:
             with pytest.raises(PipeNotFoundError):
                 await pipeline_run_setup(
+                    storage_scope="test/scope",
+                    user_id="test-user",
                     execution_config=_dry_mock_config(),
                     library_id=collide_library_id,
                     mthds_contents=[_CHAR_MTHDS],

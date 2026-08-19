@@ -97,7 +97,7 @@ class TestStorageProviderContract:
     ) -> None:
         """Contract: store() must handle nested key paths with forward slashes.
 
-        The uri_format uses paths like "{primary_id}/{secondary_id}/{hash}.{extension}"
+        The uri_format uses paths like "{storage_scope}/{hash}.{extension}"
         which creates nested directories/paths. Storage providers must support this.
         """
         test_data = b"nested path test"

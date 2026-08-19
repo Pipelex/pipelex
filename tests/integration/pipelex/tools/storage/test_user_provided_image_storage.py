@@ -54,7 +54,7 @@ class TestUserProvidedImageStorage:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         # Normalize to storage
-        normalized_memory = await normalize_data_urls_to_storage(working_memory)
+        normalized_memory = await normalize_data_urls_to_storage(working_memory, storage_scope="test/scope")
 
         # Verify the URL was converted to pipelex-storage://
         normalized_stuff = normalized_memory.get_stuff("user_image")
@@ -115,7 +115,7 @@ class TestUserProvidedImageStorage:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         # Normalize (should not change HTTP URLs when fetch is disabled)
-        normalized_memory = await normalize_data_urls_to_storage(working_memory)
+        normalized_memory = await normalize_data_urls_to_storage(working_memory, storage_scope="test/scope")
 
         # Verify URL was NOT changed
         normalized_stuff = normalized_memory.get_stuff("remote_image")
@@ -139,7 +139,7 @@ class TestUserProvidedImageStorage:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         # Normalize - should upload the local file to storage
-        normalized_memory = await normalize_data_urls_to_storage(working_memory)
+        normalized_memory = await normalize_data_urls_to_storage(working_memory, storage_scope="test/scope")
 
         # Verify the URL was converted to pipelex-storage://
         normalized_stuff = normalized_memory.get_stuff("local_image")
@@ -178,7 +178,7 @@ class TestUserProvidedImageStorage:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         # Normalize (should not change local paths when upload is disabled)
-        normalized_memory = await normalize_data_urls_to_storage(working_memory)
+        normalized_memory = await normalize_data_urls_to_storage(working_memory, storage_scope="test/scope")
 
         # Verify URL was NOT changed
         normalized_stuff = normalized_memory.get_stuff("local_image")

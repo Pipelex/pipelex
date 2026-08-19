@@ -56,7 +56,7 @@ class TestPipeFuncTransportedRef:
         mocker.patch("pipelex.pipe_operators.func.pipe_func.get_pipe_func_executor", return_value=executor)
 
         await the_pipe_func._live_run_operator_pipe(  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
-            job_metadata=JobMetadata(user_id="user", pipeline_run_id="run"),
+            job_metadata=JobMetadata(storage_scope="test/scope", user_id="user", pipeline_run_id="run"),
             working_memory=WorkingMemoryFactory.make_empty(),
             pipe_run_params=PipeRunParams(run_mode=PipeRunMode.LIVE, pipe_stack_limit=10, batch_max_concurrency=None),
         )

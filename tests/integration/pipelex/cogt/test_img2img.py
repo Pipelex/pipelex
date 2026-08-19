@@ -106,8 +106,7 @@ class TestImageToImageGeneration:
         pretty_print(generated_image_raw_details, title="Generated image raw details")
 
         image_content = await generated_content_factory.make_image_content(
-            primary_id=PRIMARY_ID,
-            secondary_id=SECONDARY_ID,
+            storage_scope="test/scope",
             raw_details=generated_image_raw_details,
         )
         pretty_print(image_content, title="Image content")
@@ -163,8 +162,7 @@ class TestImageToImageGeneration:
         pretty_print(generated_image_raw_details, title="Generated image raw details (style transfer)")
 
         image_content = await generated_content_factory.make_image_content(
-            primary_id=PRIMARY_ID,
-            secondary_id=SECONDARY_ID,
+            storage_scope="test/scope",
             raw_details=generated_image_raw_details,
         )
         pretty_print(image_content, title="Image content (style transfer)")
@@ -224,8 +222,7 @@ class TestImageToImageGeneration:
         pretty_print(generated_image_raw_details, title="Generated image raw details (multi-input)")
 
         image_content = await generated_content_factory.make_image_content(
-            primary_id=PRIMARY_ID,
-            secondary_id=SECONDARY_ID,
+            storage_scope="test/scope",
             raw_details=generated_image_raw_details,
         )
         pretty_print(image_content, title="Image content (multi-input)")
@@ -281,8 +278,7 @@ class TestImageToImageGeneration:
         pretty_print(generated_image_raw_details, title="Generated image raw details (remote URL)")
 
         image_content = await generated_content_factory.make_image_content(
-            primary_id=PRIMARY_ID,
-            secondary_id=SECONDARY_ID,
+            storage_scope="test/scope",
             raw_details=generated_image_raw_details,
         )
         pretty_print(image_content, title="Image content (remote URL)")

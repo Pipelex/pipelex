@@ -23,6 +23,7 @@ from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.runtime_hub import get_report_delegate
 from pipelex.system.configuration.configs import NdjsonTracingConfig, PipelineExecutionConfig, TracingBackend
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE, LOCAL_USER_ID
 
 _GATE_DOMAIN = "prs_emit_gates"
 _GATE_MTHDS = f"""
@@ -79,6 +80,8 @@ class TestPipelineRunSetupEmitGates:
         set_event_log_spy = mocker.spy(get_report_delegate(), "set_event_log")
 
         pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
+            storage_scope="test/scope",
+            user_id="test-user",
             execution_config=_config(generate_graph=False, generate_usage=True),
             mthds_contents=[_GATE_MTHDS],
             pipe_code="echo_topic",
@@ -101,6 +104,8 @@ class TestPipelineRunSetupEmitGates:
         set_event_log_spy = mocker.spy(get_report_delegate(), "set_event_log")
 
         pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
+            storage_scope="test/scope",
+            user_id="test-user",
             execution_config=_config(generate_graph=True, generate_usage=False),
             mthds_contents=[_GATE_MTHDS],
             pipe_code="echo_topic",
@@ -114,5 +119,63 @@ class TestPipelineRunSetupEmitGates:
             # No usage event-log context registered for this run (costs off) -> usage events suppressed.
             registered_keys = [call.kwargs.get("context_key") for call in set_event_log_spy.call_args_list]
             assert pipeline_run_id not in registered_keys
+        finally:
+            _cleanup(pipeline_run_id, library_id)
+
+
+@pytest.mark.asyncio(loop_scope="class")
+class TestTheLocalScopeIsPerRun:
+    """A local run's scope IS its run id, so two local runs cannot share a key.
+
+    The run id used to be IN the storage key
+    (`{user_id}/{key_prefix}{pipeline_run_id}`). Collapsing the key onto the
+    scope removed it, which is right for a host — a hosted scope already
+    identifies the run, `<org>/<method>/<run>` — but left the local default
+    naming a tenant and no run. Every local run with storage delivery then wrote
+    `local/results/<filename>`: the same key each time, so each run silently
+    destroyed the previous one's output, with nothing failing to say so.
+    """
+
+    async def test_two_local_runs_get_distinct_scopes(self) -> None:
+        seen: list[str] = []
+        for _ in range(2):
+            pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
+                storage_scope=LOCAL_STORAGE_SCOPE,
+                user_id=LOCAL_USER_ID,
+                execution_config=_config(generate_graph=False, generate_usage=False),
+                mthds_contents=[_GATE_MTHDS],
+                pipe_code="echo_topic",
+                pipe_run_mode=PipeRunMode.DRY,
+            )
+            try:
+                scope = pipe_job.job_metadata.storage_scope
+                # The sentinel must NOT survive onto the job — it is "no host
+                # supplied a scope", not a prefix, and a scope shared by every
+                # run is the shared-key state this repairs.
+                assert scope != LOCAL_STORAGE_SCOPE
+                assert scope == pipeline_run_id
+                seen.append(scope)
+            finally:
+                _cleanup(pipeline_run_id, library_id)
+
+        assert seen[0] != seen[1], "two local runs shared a storage scope, so their results overwrite each other"
+
+    async def test_a_host_supplied_scope_is_left_alone(self) -> None:
+        """Keyed on the sentinel exactly — a real tenancy is never rewritten.
+
+        `local` is our own constant. A host that serves tenants passes its own
+        scope and must come out the other side with precisely that, or the
+        per-run suffix would be corrupting the tenant boundary it computed.
+        """
+        pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
+            storage_scope="org_a/mt_b/run_c",
+            user_id="test-user",
+            execution_config=_config(generate_graph=False, generate_usage=False),
+            mthds_contents=[_GATE_MTHDS],
+            pipe_code="echo_topic",
+            pipe_run_mode=PipeRunMode.DRY,
+        )
+        try:
+            assert pipe_job.job_metadata.storage_scope == "org_a/mt_b/run_c"
         finally:
             _cleanup(pipeline_run_id, library_id)

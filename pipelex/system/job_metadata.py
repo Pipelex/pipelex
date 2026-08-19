@@ -2,8 +2,9 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from pipelex.system.storage_scope import validate_storage_scope
 from pipelex.system.telemetry.otel_context import OtelContext
 from pipelex.system.trace_context import TraceContext
 
@@ -52,6 +53,20 @@ class UnitJobId(StrEnum):
 class JobMetadata(BaseModel):
     user_id: str
     pipeline_run_id: str
+
+    # Where every byte this run writes must land. Opaque to the runtime, which
+    # composes `assets/`, `results/` and `payloads/` onto it and never parses it
+    # — see `pipelex.system.storage_scope` for why the host's own concepts
+    # (tenant, organization, method) deliberately do not cross this boundary.
+    #
+    # REQUIRED, with no default. It used to be derived from `user_id`, which
+    # tied where the bytes live to who uploaded them — fine until two people
+    # share the work, at which point the second one cannot read the first one's
+    # files. A default here would let that coupling grow back silently, so a
+    # caller with nothing to store must say so explicitly with
+    # `DRY_RUN_STORAGE_SCOPE`.
+    storage_scope: str
+
     pipe_code: str | None = None
 
     # Per-process Pipelex session id (``Config.session_id``) captured at the
@@ -90,6 +105,21 @@ class JobMetadata(BaseModel):
 
     started_at: datetime | None = Field(default_factory=datetime.now)
     completed_at: datetime | None = None
+
+    @field_validator("storage_scope")
+    @classmethod
+    def _validate_storage_scope(cls, value: str) -> str:
+        """Refuse a scope that would escape its namespace, at construction.
+
+        On the TYPE rather than at the call sites: the value becomes a storage
+        key prefix, so a `..` or a leading slash in it is a traversal into
+        another tenant's data. Validating here means every key the runtime
+        derives is safe by construction. `model_copy` does NOT re-run
+        validators, which is fine — `copy_with_update` only ever carries an
+        already-validated scope forward, and nothing constructs a scope from
+        request data after this point.
+        """
+        return validate_storage_scope(value=value)
 
     @property
     def duration(self) -> float | None:

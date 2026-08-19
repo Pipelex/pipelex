@@ -7,12 +7,17 @@ from pipelex.runtime_bridge.payloads import PipelexPipeDispatchAck, PipelexPipeR
 
 class TestInputOutputModels:
     def test_input_defaults_match_design(self):
-        payload = PipelexPipeRunInput(pipe_code="some_pipe")
+        payload = PipelexPipeRunInput(storage_scope="test/scope", user_id="test-user", pipe_code="some_pipe")
         assert payload.pipe_code == "some_pipe"
         assert payload.inputs == {}
         assert payload.output_name is None
         assert payload.pipeline_run_id is None
-        assert payload.user_id is None
+        # `user_id` and `storage_scope` are REQUIRED and non-nullable — this is
+        # the wire boundary where a missing identity used to become "anonymous"
+        # and a missing scope used to be derived from it, pointing every such run
+        # at one shared namespace.
+        assert payload.user_id == "test-user"
+        assert payload.storage_scope == "test/scope"
         assert payload.library_crate_dump is None
         assert payload.orchestration_mode == "direct"
         assert payload.delivery is DeliveryMode.BLOCKING
@@ -33,6 +38,7 @@ class TestInputOutputModels:
 
     def test_input_round_trip_via_json(self):
         original = PipelexPipeRunInput(
+            storage_scope="test/scope",
             pipe_code="some_pipe",
             inputs={"foo": "bar"},
             orchestration_mode="temporal",
@@ -111,3 +117,34 @@ class TestInputOutputModels:
                     "output_dict": {},
                 }
             )
+
+
+class TestTheWireRefusesAnUnusableScope:
+    """A bridge payload crosses a process boundary, so its scope is whatever the other side sent.
+
+    Requiring the field is not the same as validating it: `storage_scope: str`
+    accepted `../other/run` happily, and the value then travelled until
+    something pasted it into a storage key. Validating at construction makes a
+    traversal a payload-decoding error naming the field, at the edge, before any
+    storage call — which is the same reason `user_id` is required here.
+    """
+
+    @pytest.mark.parametrize(
+        "bad_scope",
+        [
+            pytest.param("../other/run", id="traversal-leading"),
+            pytest.param("tenant/../other", id="traversal-interior"),
+            pytest.param("/tenant/run", id="leading-slash-absolute-key"),
+            pytest.param("tenant/run/", id="trailing-slash-empty-final-segment"),
+            pytest.param("", id="empty"),
+            pytest.param("a/b/c/d", id="four-segments-would-swallow-the-leaf"),
+            pytest.param("tenant/run\n", id="trailing-newline"),
+        ],
+    )
+    def test_an_unsafe_scope_is_refused_at_construction(self, bad_scope: str):
+        with pytest.raises(ValidationError):
+            PipelexPipeRunInput(storage_scope=bad_scope, user_id="test-user", pipe_code="some_pipe")
+
+    def test_a_usable_scope_still_passes(self):
+        payload = PipelexPipeRunInput(storage_scope="org_a/mt_b/run_c", user_id="test-user", pipe_code="some_pipe")
+        assert payload.storage_scope == "org_a/mt_b/run_c"

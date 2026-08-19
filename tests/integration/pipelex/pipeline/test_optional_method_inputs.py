@@ -64,6 +64,7 @@ class TestOptionalMethodInputs:
         execution_config = get_config().interpreter.pipeline_execution
 
         pipe_job = await prepare_pipe_job(
+            storage_scope="test/scope",
             pipe=pipe,
             library_id=library_id,
             execution_config=execution_config,
@@ -94,6 +95,7 @@ class TestOptionalMethodInputs:
         execution_config = get_config().interpreter.pipeline_execution
 
         pipe_job = await prepare_pipe_job(
+            storage_scope="test/scope",
             pipe=pipe,
             library_id=library_id,
             execution_config=execution_config,
@@ -127,6 +129,7 @@ class TestOptionalMethodInputs:
         chained_memory.record_absence(upstream_record)
 
         pipe_job = await prepare_pipe_job(
+            storage_scope="test/scope",
             pipe=pipe,
             library_id=library_id,
             execution_config=execution_config,
@@ -173,6 +176,7 @@ class TestOptionalMethodInputs:
         )
 
         pipe_job = await prepare_pipe_job(
+            storage_scope="test/scope",
             pipe=pipe,
             library_id=library_id,
             execution_config=execution_config,

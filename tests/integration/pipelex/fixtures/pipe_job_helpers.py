@@ -14,7 +14,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata, SpecialPipelineId
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.telemetry.otel_constants import OTelConstants
+from pipelex.system.storage_scope import DRY_RUN_USER_ID
 
 PIPE_JOB_HELPERS_PIPELINE_RUN_ID_PREFIX = "pipe_job_helpers_test"
 
@@ -49,7 +49,7 @@ def build_pipe_job(
     return PipeJobFactory.make_pipe_job(
         pipe=pipe,
         pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-        job_metadata=JobMetadata(user_id=OTelConstants.DEFAULT_USER_ID, pipeline_run_id=resolved_pipeline_run_id),
+        job_metadata=JobMetadata(storage_scope="test/scope", user_id=DRY_RUN_USER_ID, pipeline_run_id=resolved_pipeline_run_id),
         working_memory=WorkingMemoryFactory.make_empty(),
         library_crate=library_crate,
     )

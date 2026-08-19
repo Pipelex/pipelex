@@ -19,6 +19,7 @@ _WORKFLOW_ID = "wf_abc"
 def _make_llm_tokens_usage(model_name: str = "claude-sonnet") -> LLMTokensUsage:
     return LLMTokensUsage(
         job_metadata=JobMetadata(
+            storage_scope="test/scope",
             user_id="user_test",
             pipeline_run_id=_PIPELINE_RUN_ID,
             pipe_code="test_pipe",
