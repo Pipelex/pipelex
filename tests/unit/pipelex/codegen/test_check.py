@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from pipelex.codegen.check import DriftCategory, run_codegen_check
-from pipelex.codegen.emission import write_stamped_projection
+from pipelex.codegen.emission import build_stamped_projection, write_stamped_projection
 from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget, EmittedFile
 
 if TYPE_CHECKING:
@@ -109,6 +109,17 @@ class TestCheck:
         report = run_codegen_check(root=tmp_path)
         assert any(d.path == "sub/deep/stray.py" and d.category == DriftCategory.ORPHAN for d in report.drifts)
 
+    def _restamp_without_relocking(self, root: Path, *, filename: str, content: str) -> None:
+        """Write a stamped, self-consistent artifact while leaving the lock alone — i.e. a `modified` drift."""
+        projection = build_stamped_projection(
+            [EmittedFile(filename=filename, content=content)],
+            crate_fingerprint="fp1",
+            engine_version="0.1.0",
+            kind=CodegenKind.TYPES,
+            target=CodegenTarget.PYTHON_PYDANTIC,
+        )
+        (root / filename).write_text(projection.files[0].content, encoding="utf-8")
+
     def test_uncommented_line_injected_into_the_header_is_hand_edited_drift(self, tmp_path: Path) -> None:
         self._generate(tmp_path)
         target = tmp_path / "models.py"
@@ -117,3 +128,26 @@ class TestCheck:
         target.write_text(target.read_text(encoding="utf-8").replace("# options: {}", "sneaky = 1\n# options: {}"), encoding="utf-8")
         report = run_codegen_check(root=tmp_path)
         assert [(d.path, d.category) for d in report.drifts] == [("models.py", DriftCategory.HAND_EDITED)]
+
+    def test_drifts_are_ordered_locked_first_then_orphans_each_by_path(self, tmp_path: Path) -> None:
+        self._generate(tmp_path)
+        # Two locked drifts: a body that no longer matches the lock, and a deleted artifact.
+        self._restamp_without_relocking(tmp_path, filename="models.py", content="# h\nclass B:\n    pass\n")
+        (tmp_path / "types.ts").unlink()
+        # Two orphans forming the adversarial pair: component-wise `sub/` precedes `sub.py`, string-wise
+        # `sub.py` precedes `sub/foo.py` because '.' sorts before '/'.
+        stamped = (tmp_path / "models.py").read_text(encoding="utf-8")
+        (tmp_path / "sub").mkdir()
+        (tmp_path / "sub" / "foo.py").write_text(stamped, encoding="utf-8")
+        (tmp_path / "sub.py").write_text(stamped, encoding="utf-8")
+
+        report = run_codegen_check(root=tmp_path)
+
+        # `types.ts` sorts after both orphans yet comes first: the locked loop is reported before the
+        # orphan loop, and each loop is ordered by the plain full-string path sort.
+        assert [(d.path, d.category) for d in report.drifts] == [
+            ("models.py", DriftCategory.MODIFIED),
+            ("types.ts", DriftCategory.MISSING),
+            ("sub.py", DriftCategory.ORPHAN),
+            ("sub/foo.py", DriftCategory.ORPHAN),
+        ]

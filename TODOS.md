@@ -19,9 +19,9 @@ Cross-repo sequencing constraint, stated once: `src/codegen-check.ts` in `pipele
 
 ## Cold start — read this first
 
-**Status: Phase 1 done and committed. Next action is Phase 2.**
+**Status: Phases 1–3 done and committed (Checkpoint 2 reached). Next action is Phase 4 — the only design-bearing one.**
 
-**Where the work is.** Branch `feature/Codegen-followups` in `pipelex/`, cut from `d28e703e3` (v0.46.4). Phase 1 is one commit on that branch; Phases 2–5 are untouched. Nothing is pushed. When this eventually becomes a PR it targets `dev`, never `main`.
+**Where the work is.** Branch `feature/Codegen-followups` in `pipelex/`, cut from `d28e703e3` (v0.46.4). Phase 1 is one commit, Phases 2–3 a second; Phases 4–5 are untouched. Nothing is pushed. When this eventually becomes a PR it targets `dev`, never `main`.
 
 **Verify the tree is green before touching anything** (about a minute):
 
@@ -30,7 +30,7 @@ git add -A && make agent-check
 .venv/bin/pytest -n auto -m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api" -o log_level=WARNING --tb=short -q tests/unit/pipelex/codegen/ tests/integration/pipelex/codegen/
 ```
 
-**What Phase 1 already changed — do not redo any of it:**
+**What Phases 1–3 already changed — do not redo any of it:**
 
 | File | What is in it now |
 |---|---|
@@ -40,7 +40,10 @@ git add -A && make agent-check
 | `subject_grants.toml` | the grant for `pipelex/codegen/stamp.py::_reject_json_constant` |
 | `docs/under-the-hood/codegen-projections.md` | two paragraphs under § Stamps — the header-strictness rules and the forward tolerance |
 | `CHANGELOG.md` | one `## [Unreleased]` → `### Fixed` entry — **extend it, do not add a second bullet per phase** |
-| `.badges/tests.json` | refreshed to the new collected-test count |
+| `pipelex/codegen/check.py` | `_find_orphans` returns `sorted(orphans, key=…path)`, and `run_codegen_check`'s docstring states the ordering contract |
+| `pipelex/tools/misc/file_utils.py` | `save_text_to_path` writes `newline="\n"`, with the rationale in its (now raw) docstring |
+| `tests/unit/pipelex/tools/misc/test_save_text_to_path.py` | new module — the LF tripwire, the CRLF-verbatim case, and a reader round-trip |
+| `.badges/tests.json` | refreshed to the new collected-test count (repeat after every test-adding phase) |
 
 **Five traps this repo sets, every one of them hit during Phase 1:**
 
@@ -49,6 +52,7 @@ git add -A && make agent-check
 3. **`make check-test-badge` is in no local aggregate.** Any commit that adds tests passes both local gates and fails CI until `.badges/tests.json` is set to what `make test-count` prints.
 4. **Write the tests red first and watch them fail against current code.** Phase 2's ordering test proves nothing unless its fixture holds the adversarial `models/` -beside- `models.py` pair; mutation-test it by reverting the sort.
 5. **Each phase carries its own doc edit and extends the same `## [Unreleased]` entry.** Phase 5 is the sweep that verifies nothing was missed — not the place to write all of it for the first time.
+6. **Ruff `D301` rejects a docstring containing a backslash unless it is raw.** Phase 3's newline docstrings tripped it; prefix them `r"""` and write single backslashes rather than doubling them.
 
 **Line references below were re-verified on 2026-08-19 and are accurate:** `check.py:101` (the locked-loop sort), `file_utils.py:80` (the `write_text` call inside `save_text_to_path`, which itself starts at line 60), `lock.py:41` and `lock.py:50` (the two `extra="forbid"`), `lock.py:151` and `lock.py:162` (`encode_lock` / `load_lock`). The two references inside Phase 1 (`stamp.py:169`, `stamp.py:196`) describe the code **before** the fix and are now stale — ignore them, that work is done.
 
@@ -110,7 +114,7 @@ Phases 2–4 remain independent of Phase 1 and of each other.
 
 ---
 
-## Phase 2 — Unify drift ordering across the check's two loops (U2) — **not started**
+## Phase 2 — Unify drift ordering across the check's two loops (U2) — **DONE**
 
 Confirmed: `_check_locked_artifacts` (`pipelex/codegen/check.py:101`) iterates `sorted(lock.hash_by_path().items())` — a plain `str` sort over the whole relative path — while `_find_orphans` iterates `_iter_stampable_files`, a pre-order DFS doing `sorted(directory.iterdir())` per level, which is a path-*component* sort. For a tree holding `models/` beside `models.py`, the two halves of one report order paths by different rules (`models/foo.py` before `models.py` component-wise; the reverse string-wise). The reference is internally inconsistent, and the SDK cannot mirror both rules with one comparator.
 
@@ -118,19 +122,32 @@ Decision (ours to make, as the reference): **unify on the plain full-string sort
 
 Implementation: keep `_iter_stampable_files` exactly as is (its DFS order is a *traversal* concern — deterministic pruning and filesystem walking — not a *report* concern); in `_find_orphans`, return `sorted(orphans, key=lambda drift: drift.path)` instead of the raw accumulation order. One line. Then state the now-real guarantee where the SDK had to reverse-engineer it: extend the `run_codegen_check` docstring with the ordering contract — locked-artifact drifts first in path order, then orphans in path order, at most one drift per locked path with `hand-edited` outranking `modified`. (That last property is already structural in `_check_present_artifact`; writing it down is S1 support, zero behavior change.)
 
-Tests (`tests/unit/pipelex/codegen/test_check.py`): a tree with a locked `models.py` (modified) plus stamped orphans at `models/foo.py` and `a.py` → assert the full `[(path, category), ...]` sequence, pinning both the loop boundary and the string sort. Written red first: the current DFS order puts `models/foo.py` before `models.py` among orphans, so the fixture must include that adversarial pair or the test proves nothing (mutation-test it by reverting the sort).
+Tests (`tests/unit/pipelex/codegen/test_check.py`): `test_drifts_are_ordered_locked_first_then_orphans_each_by_path` asserts the full `[(path, category), ...]` sequence.
+
+⚠ **The fixture this plan originally proposed could not go red**, and the correction is worth keeping. Orphans at `models/foo.py` and `a.py` sort identically under both rules (`a.py` precedes `models/foo.py` either way), so that tree proves nothing. The two rules only diverge on a **directory sitting beside a file whose name extends it**: the DFS descends into `sub/` before reaching `sub.py` because `"sub" < "sub.py"`, while a full-string sort puts `sub.py` first because `.` (0x2E) precedes `/` (0x2F). The adversarial pair must therefore be **two orphans**, `sub.py` and `sub/foo.py` — the locked `models.py` cannot play that role, since a locked path is never an orphan.
+
+The fixture as landed: locked `models.py` restamped-but-not-relocked (a `modified` drift — `_restamp_without_relocking`, a new helper, builds a self-consistent stamp via `build_stamped_projection` and writes the artifact only), locked `types.ts` deleted (`missing`), and the two orphans. `types.ts` sorts *after* both orphans yet is asserted first, so the test pins the loop boundary as well as the sort. Verified red before the fix, failing at exactly index 2 (`sub/foo.py` where `sub.py` belonged) with indices 0–1 already passing.
+
+Worth noting for Phase 5: `modified` had no test coverage at all before this — every prior drift test exercised `missing`, `hand-edited` or `orphan`.
 
 ---
 
-## Phase 3 — Emit LF artifacts on every platform (U4) — **not started**
+## Phase 3 — Emit LF artifacts on every platform (U4) — **DONE**
 
 Confirmed: `save_text_to_path` (`pipelex/tools/misc/file_utils.py:80`) is `path.write_text(text, encoding="utf-8")`; with the default `newline=None`, Python translates `\n` to `os.linesep`, so on Windows every emitted artifact is CRLF on disk while `compute_content_hash` hashed the in-memory LF string. The *verdict* survives (reads come back through universal-newline translation, and `_write_if_changed` compares translated text on both sides), but `apply_stamp`'s own docstring claim — regeneration "writes byte-identical output" — holds only per-platform: a mixed Windows/Linux team sees the generated tree churn in git when nothing changed. Reasoned from documented `write_text` behavior, not reproduced (macOS `os.linesep` is `\n` and we have no Windows CI); the reasoning is airtight enough to act on.
 
 Decision: fix it **globally in `save_text_to_path`** — `path.write_text(text, encoding="utf-8", newline="\n")` — rather than only at codegen's write site. Every caller (JSON via `json_utils`, the `build` command outputs, codegen inputs templates, codegen artifacts + lock) writes product text artifacts meant to be platform-independent; none wants `os.linesep`. One site, one behavior, no divergent write paths to remember. Update the function's docstring to state the LF guarantee.
 
-Tests: in the file-utils tests, write text containing `\n` and assert `path.read_bytes()` contains no `b"\r"`. Trivially green on POSIX; it exists to pin intent and to go red immediately if Windows CI ever appears or the `newline` argument is dropped. Also verify no existing test asserts platform newlines (none expected).
+Tests: new module `tests/unit/pipelex/tools/misc/test_save_text_to_path.py` (there were none for this function). Three cases — no `\r` reaches the disk; text that deliberately carries `\r\n` round-trips byte-for-byte rather than being doubled to `\r\r\n` (the failure mode of the *default* write, which translates only the `\n`); and a round-trip through `load_text_from_path`.
 
-**Checkpoint 2.** Phases 2–3 are small and mechanical; after them run the full `make agent-test` once before starting Phase 4, which is the only design-bearing phase.
+Stated honestly in the docstrings: **these are tripwires, not discriminating tests.** On POSIX `os.linesep` is already `\n` and CPython's C `TextIOWrapper` has no write-translation path at all, so they pass with or without the fix and cannot be mutation-tested here. They go red the day a Windows runner appears or the `newline` argument is dropped. Swept for platform-newline assumptions elsewhere: no `os.linesep` anywhere in `pipelex/` or `tests/`, and no existing test asserts platform newlines.
+
+**Checkpoint 2 — REACHED (2026-08-19), committed on `feature/Codegen-followups`.** Both phases landed with the ordering test written red first. `make agent-check` clean, `make check-test-badge` refreshed to the new count, and the full `make agent-test` green.
+
+Two things found along the way that the plan did not anticipate:
+
+- **The proposed Phase 2 fixture was not discriminating** — see the ⚠ note in Phase 2 above. Trap 4 in the cold-start section was right that the fixture is where this test lives or dies; it just named the wrong pair.
+- **A sibling of U4 exists outside codegen and is deliberately NOT fixed here** (a pre-existing bug, reported to Louis rather than folded into this diff). `fix_all_violations` in `pipelex/cli/dev_cli/commands/keyword_only_guard.py` reads each source file with `path.read_text(encoding="utf-8")` and writes it back with `path.write_text(...)`, neither passing `newline`. The read translates `\r\n` to `\n`, so the CRLF-preservation logic in `fix_source` — which `test_crlf_line_endings_preserved_and_fixed` pins byte-for-byte, and whose docstring says a regression "would corrupt every Windows-authored file the fixer touches" — is unreachable through the only caller that touches the filesystem: a CRLF file is silently normalized to LF on POSIX, and the write would emit `\r\r\n` on Windows. It is left alone because it is dev-only tooling outside this plan's scope and the fix carries a real design question (genuinely preserve CRLF by reading and writing with `newline=""`, or delete the now-pointless CRLF branch and declare the fixer LF-only). Decide that on its own terms, not inside a codegen change.
 
 ---
 
@@ -165,7 +182,7 @@ Tests (`tests/unit/pipelex/codegen/test_lock.py`, plus emission round-trip in `t
 
 ---
 
-## Phase 5 — Docs, changelog, and closure — **not started** (Phase 1's own doc + changelog edits are already in)
+## Phase 5 — Docs, changelog, and closure — **not started** (Phases 1–3 each carried their own doc + changelog edits already)
 
 - `docs/under-the-hood/codegen-projections.md`: document the lock's `lock_version` and the evolution policy; state the drift-ordering guarantee and the header-strictness rule alongside the existing check description. Same-change discipline: each phase above should actually carry its own doc edit; this phase is the sweep that verifies nothing was missed.
 - `CHANGELOG.md` under `## [Unreleased]`: one condensed entry covering the stamp-parser tightenings (uncommented header lines and non-standard JSON constants now report `hand-edited` instead of verifying), the unified drift ordering, LF-everywhere writes, and the `lock_version` field with its coordination note. Mark the lock change as the one consumers can observe.

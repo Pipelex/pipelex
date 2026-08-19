@@ -85,6 +85,8 @@ In the other direction the header is deliberately tolerant: a *commented* `key: 
 - **hand-edited** — a file's stamp is stripped or its recorded content hash no longer matches the body;
 - **orphan** — a stamped generated file on disk that the lock does not track.
 
+The order of that report is part of the contract, not an implementation detail, so a second implementation can be compared to this one line by line: every locked-artifact drift comes first, ordered by the full relative path compared as a plain string, and then every orphan, ordered by that same rule. One locked path yields at most one drift, and **hand-edited** outranks **modified** when a file is both self-inconsistent and off its locked hash.
+
 The verdict rides the exit code (mirroring `resolve` / `validate`): `0` current, `1` drift present, `2` no lock found. Regeneration against the engine is a **dev action**; the offline check is the **CI action** — so template improvements never redden a consumer's CI.
 
 ### Idempotent emission
