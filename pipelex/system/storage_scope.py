@@ -8,7 +8,7 @@ something: an opaque, host-supplied prefix that the runtime treats as a unit.
 
 The hosted Pipelex platform fills it with `<org_id>/<method_id>/<run_id>`, but
 nothing here knows or checks that — a single-user deployment can pass
-`<user_id>/<run_id>` and a local one can pass `local/<run_id>`. Threading the
+`<user_id>/<run_id>` and a local one passes just `<run_id>`. Threading the
 host's own concepts through the transport instead was considered and rejected:
 `method_id` is a hosted catalog concept with no meaning in an MIT-licensed
 runtime, and `uri_format`'s placeholder set is closed by design.
@@ -73,6 +73,15 @@ DRY_RUN_USER_ID = "dry-run-no-user"
 # So: a host that serves more than one tenant must pass its own values. It
 # cannot reach these by omission — the seam it calls, `pipeline_run_setup`,
 # requires both explicitly.
+#
+# `LOCAL_STORAGE_SCOPE` is a SENTINEL and never reaches a storage key.
+# `pipeline_run_setup` swaps it for the run id the moment that id exists, so a
+# local run is scoped `<run_id>`, not `local/<run_id>`. A tenancy segment on a
+# laptop separates nothing — there is exactly one tenant — while the run id is
+# the only thing that has to be distinct, because anything stored under a fixed
+# name (`results/main_stuff.json`) would otherwise be overwritten by the next
+# run. `LOCAL_USER_ID` is not a sentinel: it is an identity, it is true, and it
+# is reported as-is.
 LOCAL_USER_ID = "local"
 LOCAL_STORAGE_SCOPE = "local"
 

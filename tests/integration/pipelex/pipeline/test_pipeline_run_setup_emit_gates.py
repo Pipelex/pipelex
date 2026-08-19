@@ -125,7 +125,7 @@ class TestPipelineRunSetupEmitGates:
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestTheLocalScopeIsPerRun:
-    """A local run's scope is `local/<run_id>`, so two local runs cannot share a key.
+    """A local run's scope IS its run id, so two local runs cannot share a key.
 
     The run id used to be IN the storage key
     (`{user_id}/{key_prefix}{pipeline_run_id}`). Collapsing the key onto the
@@ -149,10 +149,11 @@ class TestTheLocalScopeIsPerRun:
             )
             try:
                 scope = pipe_job.job_metadata.storage_scope
-                # The bare sentinel must NOT survive onto the job: that is the
-                # shared-key state this repairs.
+                # The sentinel must NOT survive onto the job — it is "no host
+                # supplied a scope", not a prefix, and a scope shared by every
+                # run is the shared-key state this repairs.
                 assert scope != LOCAL_STORAGE_SCOPE
-                assert scope == f"{LOCAL_STORAGE_SCOPE}/{pipeline_run_id}"
+                assert scope == pipeline_run_id
                 seen.append(scope)
             finally:
                 _cleanup(pipeline_run_id, library_id)

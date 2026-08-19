@@ -173,24 +173,23 @@ async def pipeline_run_setup(
     pipeline = get_pipeline_manager().add_new_pipeline(pipe_code=pipe_code, pipeline_run_id=pipeline_run_id)
     pipeline_run_id = pipeline.pipeline_run_id
 
-    # A local run's scope becomes `local/<run_id>`, and this is the only place it
-    # can: the runner's constructor default cannot name a run that does not exist
-    # yet, and the run id is minted on the line above.
+    # A local run's scope IS its run id, and this is the only place it can be
+    # decided: the runner's constructor default cannot name a run that does not
+    # exist yet, and the id is minted on the line above.
     #
-    # Without this, every local run with storage delivery wrote
-    # `local/results/<filename>` — the same key each time, so each run silently
-    # destroyed the previous one's output. The run id used to be IN the key
-    # (`{user_id}/{key_prefix}{pipeline_run_id}`); collapsing the key onto the
-    # scope removed it, and for a host that is correct because a hosted scope
-    # already identifies the run (`<org>/<method>/<run>`). Only the local default
-    # was left naming a tenant and no run.
+    # `LOCAL_STORAGE_SCOPE` is therefore a SENTINEL, not a prefix — it means "no
+    # host supplied a scope", and it never reaches a storage key. A tenancy
+    # segment would be ceremony on a laptop: there is exactly one tenant, so the
+    # only thing the key has to separate is one run from the next.
+    #
+    # Without this, every local run wrote under the same scope, so anything
+    # stored under a fixed name — `results/main_stuff.json`, `results/working_memory.json`
+    # — was overwritten by the following run, with nothing failing to say so.
     #
     # Keyed on the sentinel EXACTLY, never a prefix test: a host that serves more
-    # than one tenant passes its own scope and is untouched here. `local` is our
-    # own constant, and a caller passing it literally has one namespace for every
-    # run — which is the bug this repairs, not a choice to preserve.
+    # than one tenant passes its own scope and is untouched here.
     if storage_scope == LOCAL_STORAGE_SCOPE:
-        storage_scope = f"{LOCAL_STORAGE_SCOPE}/{pipeline_run_id}"
+        storage_scope = pipeline_run_id
 
     if not library_id:
         library_id = pipeline_run_id
