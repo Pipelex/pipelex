@@ -25,10 +25,8 @@ class TestStorageInMemoryConfig:
             pytest.param("assets/{hash[0]}", "- the {hash} placeholder must be plain", id="uri-hash-index-access"),
             # A format spec, conversion, or attribute/index access on any supported field is rejected uniformly
             # as "must be plain" (a str path component carrying one of these renders a constant/colliding key).
-            pytest.param("assets/{storage_scope!x}/{hash}", "- uri_format placeholder '{storage_scope}' must be plain", id="uri-conversion-on-field"),
-            pytest.param(
-                "assets/{storage_scope.foo}/{hash}", "- uri_format placeholder '{storage_scope.foo}' must be plain", id="uri-attr-access-on-field"
-            ),
+            pytest.param("assets/{extension!x}/{hash}", "- uri_format placeholder '{extension}' must be plain", id="uri-conversion-on-field"),
+            pytest.param("assets/{extension.foo}/{hash}", "- uri_format placeholder '{extension.foo}' must be plain", id="uri-attr-access-on-field"),
             pytest.param("assets/{extension[0]}/{hash}", "- uri_format placeholder '{extension[0]}' must be plain", id="uri-index-access-on-field"),
         ],
     )
