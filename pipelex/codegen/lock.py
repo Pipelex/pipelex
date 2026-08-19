@@ -225,8 +225,10 @@ def _reject_unknown_lock_version(*, data: dict[str, Any], lock_path: Path) -> No
     """
     raw_version = data.get("lock_version")
     if raw_version is None:
-        # No key at all: written before the field existed, which is version 1 by definition.
-        return
+        # No key at all: written before the field existed, which is version 1 by definition. It still goes
+        # through the comparison below rather than returning here, or the day the constant moves every
+        # legacy lock would skip the gate and be validated against a schema it was never written for.
+        raw_version = 1
     # `bool` is an `int` subclass, and `True == 1`, so a boolean would otherwise read as version 1.
     is_version_number = isinstance(raw_version, int) and not isinstance(raw_version, bool)
     if is_version_number and raw_version == CODEGEN_LOCK_VERSION:

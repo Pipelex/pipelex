@@ -127,3 +127,18 @@ class TestLock:
 
         with pytest.raises(CodegenLockError):
             load_lock(lock_path)
+
+    def test_a_legacy_unversioned_lock_is_refused_once_the_format_moves_on(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """An absent key means version 1, so it must face the same gate as a written one.
+
+        Returning early instead would let every legacy lock skip the gate the day `CODEGEN_LOCK_VERSION`
+        moves: it would be validated against the new schema and either silently accepted as current, or
+        reported as a generic malformed lock — the opaque no-verdict failure the version field exists to
+        prevent. Bumping the constant has to stay the one-line change the evolution policy promises.
+        """
+        mocker.patch("pipelex.codegen.lock.CODEGEN_LOCK_VERSION", 2)
+        lock_path = tmp_path / CODEGEN_LOCK_FILENAME
+        lock_path.write_text(_LEGACY_LOCK_WITHOUT_VERSION, encoding="utf-8")
+
+        with pytest.raises(CodegenLockError, match="lock_version"):
+            load_lock(lock_path)

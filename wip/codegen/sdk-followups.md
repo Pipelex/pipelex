@@ -1,5 +1,9 @@
 # Codegen follow-ups from the `@pipelex/sdk` `runCodegenCheck` port (PR #31 review triage)
 
+> **ARCHIVED from the repo-root `TODOS.md` on 2026-08-19 — the code work is complete, the release gate is not.** Phases 1 through 5 shipped on `feature/Codegen-followups` (PR #1127): U1–U5 are implemented, tested, documented and swept. What remains open is not code but the `@pipelex/sdk` release gate — until an SDK that tolerates `lock_version` is *published*, the very release that fixes U3 triggers the failure U3 describes in every pinned consumer's CI, because their `rejectUnknownKeys` hard-throws on the new key. Pick that up from the "Cross-repo" and checkpoint sections below rather than re-deriving it. Moved off the repo root because the root tracker belongs to whatever work is currently in flight, and this work is waiting on a publish rather than on a keyboard.
+>
+> **Paths below are relative to the repository root, not to this file's own directory** — they were written while this document sat at the root and are deliberately left as they were.
+
 Source: `../pipelex-sdk-js/wip/pr-31-review-notes.md` → "Upstream follow-ups". The SDK team built a second implementation of the offline codegen check and surfaced five upstream items (U1–U5) plus one spec item (S1). All five upstream claims were **verified against this repo's code on `feature/Codegen-followups` (base `d28e703e3`, v0.46.4) and confirmed accurate** — file/line references, reasoning, and proposed fixes all check out. Every U-item is work in **this repo**; S1 is not (see the cross-repo section at the end).
 
 Triage verdict per item:
@@ -57,7 +61,7 @@ git add -A && make agent-check
 5. **Each phase carries its own doc edit and extends the same `## [Unreleased]` entry.** Phase 5 is the sweep that verifies nothing was missed — not the place to write all of it for the first time.
 6. **Ruff `D301` rejects a docstring containing a backslash unless it is raw.** Phase 3's newline docstrings tripped it; prefix them `r"""` and write single backslashes rather than doubling them.
 
-**Line references below were re-verified on 2026-08-19 and are accurate:** `check.py:101` (the locked-loop sort), `file_utils.py:80` (the `write_text` call inside `save_text_to_path`, which itself starts at line 60), `lock.py:41` and `lock.py:50` (the two `extra="forbid"`), `lock.py:151` and `lock.py:162` (`encode_lock` / `load_lock`). The two references inside Phase 1 (`stamp.py:169`, `stamp.py:196`) describe the code **before** the fix and are now stale — ignore them, that work is done.
+**Pointers below name symbols rather than line numbers, which drift with every edit to these files** (the numbers this document originally carried were all taken against the branch base `d28e703e3`, and this work's own diff moved every one of them): `check.py` → the `sorted(lock.hash_by_path().items())` loop in `_check_locked_artifacts`; `file_utils.py` → the `write_text(..., newline="\n")` call inside `save_text_to_path`; `lock.py` → the two `extra="forbid"` model configs (`CodegenLockEntry` and `CodegenLock`) and the `encode_lock` / `load_lock` pair; `stamp.py` → `_parse_fields` and `_parse_options`. The `stamp.py` pair is cited inside Phase 1 as the code **before** the fix — kept for the record, since that work is done.
 
 ---
 
@@ -67,7 +71,7 @@ Both are strictness fixes in `pipelex/codegen/stamp.py`, both turn a malformed s
 
 ### U1 — reject uncommented lines inside the stamp header
 
-Confirmed: `_parse_fields` (`pipelex/codegen/stamp.py:169`) has an `else raw_line.strip()` fallback that silently swallows any header line not starting with the comment prefix, and nothing in `parse_stamped` or `check.py` compensates. An artifact with `throw new Error("edited");` injected between the stamp markers parses fine and reports CURRENT, because the body is sliced below the end marker so its hash is untouched. The SDK notes are also right that this is *not* a security boundary (no signature/MAC anywhere; the defence is diff review) — this is a correctness tidy-up, but a cheap and worthwhile one: an executable line hiding inside a `DO NOT EDIT` block should not verify as pristine.
+Confirmed: `_parse_fields` (`pipelex/codegen/stamp.py`) has an `else raw_line.strip()` fallback that silently swallows any header line not starting with the comment prefix, and nothing in `parse_stamped` or `check.py` compensates. An artifact with `throw new Error("edited");` injected between the stamp markers parses fine and reports CURRENT, because the body is sliced below the end marker so its hash is untouched. The SDK notes are also right that this is *not* a security boundary (no signature/MAC anywhere; the defence is diff review) — this is a correctness tidy-up, but a cheap and worthwhile one: an executable line hiding inside a `DO NOT EDIT` block should not verify as pristine.
 
 Implementation, in `parse_stamped` immediately after the `header_region` slice:
 
@@ -89,7 +93,7 @@ Tests (`tests/unit/pipelex/codegen/test_stamp.py`, plus one check-level test in 
 
 ### U5 — reject `NaN` / `Infinity` in the stamp's `options` JSON
 
-Confirmed: `_parse_options` (`pipelex/codegen/stamp.py:196`) uses a bare `json.loads`, which accepts Python's non-standard `NaN` / `Infinity` / `-Infinity` literals. No conformant JSON parser (JavaScript included) does, so a stamp carrying one is CURRENT to us and `hand-edited` to the SDK — the one differential where the SDK is the stricter side. Unreachable with today's emitter (`options` is `dict[str, str]` and `json.dumps` never emits those literals for string values), but the stamp header is a cross-language interchange format and should not be able to contain something only Python can read. Costs one argument.
+Confirmed: `_parse_options` (`pipelex/codegen/stamp.py`) uses a bare `json.loads`, which accepts Python's non-standard `NaN` / `Infinity` / `-Infinity` literals. No conformant JSON parser (JavaScript included) does, so a stamp carrying one is CURRENT to us and `hand-edited` to the SDK — the one differential where the SDK is the stricter side. Unreachable with today's emitter (`options` is `dict[str, str]` and `json.dumps` never emits those literals for string values), but the stamp header is a cross-language interchange format and should not be able to contain something only Python can read. Costs one argument.
 
 Implementation:
 
@@ -119,7 +123,7 @@ Phases 2–4 remain independent of Phase 1 and of each other.
 
 ## Phase 2 — Unify drift ordering across the check's two loops (U2) — **DONE**
 
-Confirmed: `_check_locked_artifacts` (`pipelex/codegen/check.py:101`) iterates `sorted(lock.hash_by_path().items())` — a plain `str` sort over the whole relative path — while `_find_orphans` iterates `_iter_stampable_files`, a pre-order DFS doing `sorted(directory.iterdir())` per level, which is a path-*component* sort. For a tree holding `models/` beside `models.py`, the two halves of one report order paths by different rules (`models/foo.py` before `models.py` component-wise; the reverse string-wise). The reference is internally inconsistent, and the SDK cannot mirror both rules with one comparator.
+Confirmed: `_check_locked_artifacts` (`pipelex/codegen/check.py`) iterates `sorted(lock.hash_by_path().items())` — a plain `str` sort over the whole relative path — while `_find_orphans` iterates `_iter_stampable_files`, a pre-order DFS doing `sorted(directory.iterdir())` per level, which is a path-*component* sort. For a tree holding `models/` beside `models.py`, the two halves of one report order paths by different rules (`models/foo.py` before `models.py` component-wise; the reverse string-wise). The reference is internally inconsistent, and the SDK cannot mirror both rules with one comparator.
 
 Decision (ours to make, as the reference): **unify on the plain full-string sort**, the rule the locked-artifact loop already uses. Rationale: it matches `build_lock`'s "artifacts sorted by path" ordering in the lock file itself, it is the rule the SDK already implements for both of its loops (so upstream converges toward the mirror instead of forcing a component-wise comparator on every future client), and it is the cheaper spec sentence for S1 to eventually pin.
 
@@ -137,7 +141,7 @@ Worth noting for Phase 5: `modified` had no test coverage at all before this —
 
 ## Phase 3 — Emit LF artifacts on every platform (U4) — **DONE**
 
-Confirmed: `save_text_to_path` (`pipelex/tools/misc/file_utils.py:80`) is `path.write_text(text, encoding="utf-8")`; with the default `newline=None`, Python translates `\n` to `os.linesep`, so on Windows every emitted artifact is CRLF on disk while `compute_content_hash` hashed the in-memory LF string. The *verdict* survives (reads come back through universal-newline translation, and `_write_if_changed` compares translated text on both sides), but `apply_stamp`'s own docstring claim — regeneration "writes byte-identical output" — holds only per-platform: a mixed Windows/Linux team sees the generated tree churn in git when nothing changed. Reasoned from documented `write_text` behavior, not reproduced (macOS `os.linesep` is `\n` and we have no Windows CI); the reasoning is airtight enough to act on.
+Confirmed: `save_text_to_path` (`pipelex/tools/misc/file_utils.py`) is `path.write_text(text, encoding="utf-8")`; with the default `newline=None`, Python translates `\n` to `os.linesep`, so on Windows every emitted artifact is CRLF on disk while `compute_content_hash` hashed the in-memory LF string. The *verdict* survives (reads come back through universal-newline translation, and `_write_if_changed` compares translated text on both sides), but `apply_stamp`'s own docstring claim — regeneration "writes byte-identical output" — holds only per-platform: a mixed Windows/Linux team sees the generated tree churn in git when nothing changed. Reasoned from documented `write_text` behavior, not reproduced (macOS `os.linesep` is `\n` and we have no Windows CI); the reasoning is airtight enough to act on.
 
 Decision: fix it **globally in `save_text_to_path`** — `path.write_text(text, encoding="utf-8", newline="\n")` — rather than only at codegen's write site. Every caller (JSON via `json_utils`, the `build` command outputs, codegen inputs templates, codegen artifacts + lock) writes product text artifacts meant to be platform-independent; none wants `os.linesep`. One site, one behavior, no divergent write paths to remember. Update the function's docstring to state the LF guarantee.
 
