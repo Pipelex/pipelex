@@ -151,3 +151,31 @@ class TestEmission:
         assert lock.paths() == {"models.py"}
         # types.ts survived unpruned and is now reported, rather than silently lingering.
         assert [(drift.path, drift.category) for drift in run_codegen_check(root=tmp_path).drifts] == [("types.ts", DriftCategory.ORPHAN)]
+
+    def test_a_stamped_file_whose_header_was_tampered_is_an_orphan_the_regenerator_refuses_to_reclaim(self, tmp_path: Path) -> None:
+        """The one seam the strict header gate opens: the check's "remove or regenerate" advice is half true.
+
+        A stamped file the lock does not track is an orphan, and regenerating reclaims an ordinary one by
+        overwriting it. But a file whose header carries an injected uncommented line no longer *parses* as
+        stamped, so the writer cannot prove it owns it and refuses rather than clobbering something that may
+        hold real work — the same conservatism that protects a hand-authored module sharing the output
+        directory. `remove` is the half of the advice that always applies. Refusing is the deliberate
+        direction; this pins it so it stays a decision rather than an accident.
+        """
+        source = tmp_path / "source"
+        source.mkdir()
+        self._write(source)
+        stamped = (source / "models.py").read_text(encoding="utf-8")
+        begin_marker, below = stamped.split("\n", 1)
+        tampered = f'{begin_marker}\nraise SystemExit("injected")\n{below}'
+
+        root = tmp_path / "root"
+        root.mkdir()
+        self._write(root, files=[_FILES[1]])
+        (root / "models.py").write_text(tampered, encoding="utf-8")
+
+        assert [(drift.path, drift.category) for drift in run_codegen_check(root=root).drifts] == [("models.py", DriftCategory.ORPHAN)]
+
+        with pytest.raises(CodegenError, match="Refusing to overwrite unowned file"):
+            self._write(root)
+        assert (root / "models.py").read_text(encoding="utf-8") == tampered

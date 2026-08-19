@@ -19,9 +19,9 @@ Cross-repo sequencing constraint, stated once: `src/codegen-check.ts` in `pipele
 
 ## Cold start — read this first
 
-**Status: Phases 1–4 done and committed (Checkpoint 3 reached). Next action is Phase 5 — the closure sweep, plus filing the SDK follow-up that gates the release.**
+**Status: Phases 1–5 done and committed (Checkpoint 4 reached). All five upstream items are implemented, tested, documented and swept. What is left is not code: the SDK follow-up must be triaged into `pipelex-sdk-js` and released before this branch's release, and two PR #31 threads want a reply. See the end of Phase 5.**
 
-**Where the work is.** Branch `feature/Codegen-followups` in `pipelex/`, cut from `d28e703e3` (v0.46.4). Phase 1 is one commit, Phases 2–3 a second, Phase 4 a third; Phase 5 is untouched. Nothing is pushed. When this eventually becomes a PR it targets `dev`, never `main`.
+**Where the work is.** Branch `feature/Codegen-followups` in `pipelex/`, cut from `d28e703e3` (v0.46.4). Phase 1 is one commit, Phases 2–3 a second, Phase 4 a third, Phase 5 a fourth. Nothing is pushed. When this eventually becomes a PR it targets `dev`, never `main`.
 
 **Verify the tree is green before touching anything** (about a minute):
 
@@ -111,7 +111,7 @@ Three things the plan above did not anticipate, all now folded into the cold-sta
 - Phase 1 carried its own doc edit and its own `## [Unreleased]` changelog entry — later phases extend that entry rather than adding one each (trap 5).
 - `.badges/tests.json` needed refreshing for the added tests (trap 3).
 
-One behavior verified and deliberately left alone: `_preflight_destinations` in `emission.py` also calls `parse_stamped`, so an **untracked** file whose header now fails the gate is treated as unowned and refuses to be overwritten. That is the conservative direction, and the same behavior class already existed for other unparseable stamps, so it is not a regression — but it does mean a tampered orphan is reported by the check as "remove or regenerate" while regeneration itself declines to clobber it. Noted here in case Phase 5's sweep wants to say something about it.
+One behavior verified and deliberately left alone: `_preflight_destinations` in `emission.py` also calls `parse_stamped`, so an **untracked** file whose header now fails the gate is treated as unowned and refuses to be overwritten. That is the conservative direction, and the same behavior class already existed for other unparseable stamps, so it is not a regression — but it does mean a tampered orphan is reported by the check as "remove or regenerate" while regeneration itself declines to clobber it. Noted here in case Phase 5's sweep wants to say something about it. **It did** — Phase 5 pinned it with a test and named the seam in the docs and the changelog; see there.
 
 Phases 2–4 remain independent of Phase 1 and of each other.
 
@@ -194,14 +194,22 @@ One test in the plan turned out to be untestable and is documented rather than w
 
 ---
 
-## Phase 5 — Docs, changelog, and closure — **not started** (Phases 1–4 each carried their own doc + changelog edits already)
+## Phase 5 — Docs, changelog, and closure — **DONE**
 
-- `docs/under-the-hood/codegen-projections.md`: document the lock's `lock_version` and the evolution policy; state the drift-ordering guarantee and the header-strictness rule alongside the existing check description. Same-change discipline: each phase above should actually carry its own doc edit; this phase is the sweep that verifies nothing was missed.
-- `CHANGELOG.md` under `## [Unreleased]`: one condensed entry covering the stamp-parser tightenings (uncommented header lines and non-standard JSON constants now report `hand-edited` instead of verifying), the unified drift ordering, LF-everywhere writes, and the `lock_version` field with its coordination note. Mark the lock change as the one consumers can observe.
-- Reply on the two open PR #31 threads (`chatgpt-codex-connector`, `cubic-dev-ai`) once U1 lands here — the SDK notes keep them open pending exactly that.
-- Full `make agent-check` + `make agent-test` (the stamp/check/lock fixtures and the CLI check tests all touch these paths).
+The sweep found one real gap and one loose end, which is what a sweep is for; the rest of the pass confirmed Phases 1–4 had each carried their own doc and changelog edit as intended.
 
----
+**The gap: Phase 3's LF guarantee never reached `docs/`.** It was written into `save_text_to_path`'s docstring and nowhere else — a grep for line-ending vocabulary across `docs/` returned only unrelated hits in `migration-ledger.md` and `plxt.md`. That mattered because the codegen page is where byte-identical regeneration is *promised* to a reader, and the promise was platform-conditional without saying so. § Idempotent emission now states that every artifact is written LF on every platform, and why: the same projection emitted on Windows and on Linux would otherwise land as different bytes while both recorded the same content hash, so a mixed-platform team would watch the generated tree churn with no change of content.
+
+**The loose end: the `_preflight_destinations` seam Phase 1 flagged for this sweep, now pinned rather than merely noted.** Verified by running it, not by reading it: a stamped file whose header carries an injected uncommented line has `has_stamp() == True` but `parse_stamped() == None`, so the check reports it as an **orphan** advising "remove or regenerate" while `write_stamped_projection` raises `CodegenError: Refusing to overwrite unowned file` and leaves it byte-for-byte intact. Half the advice is wrong. This is a behavior U1 *changed* — before the strict gate such a file parsed, so regeneration silently overwrote it — and nothing guarded it, so `test_a_stamped_file_whose_header_was_tampered_is_an_orphan_the_regenerator_refuses_to_reclaim` in `test_emission.py` now does. It is discriminating: mutating the U1 gate to `if False` leaves the orphan assertion green and turns the refusal assertion red (`DID NOT RAISE`), so the test fails for the reason it exists. The refusal itself is left alone — declining to clobber a file we cannot prove we own is the same conservatism that protects a hand-authored module sharing the output directory — but § Idempotent emission now names the seam, and the changelog's stamp bullet tells a user hitting it to remove the file before regenerating.
+
+Everything else was confirmed already in place: § Stamps carries the header-strictness rules and the forward tolerance, § Offline check carries the drift-ordering contract, § Lock carries `lock_version` and the evolution policy, and `## [Unreleased]` carries one `### Added` entry for the lock version plus three `### Fixed` entries for the stamp tightenings, the unified ordering and the LF writes. Swept the codegen write path too: `emission.py` reaches the disk only through `save_text_to_path`, so the LF fix covers the whole trust chain with no bypass.
+
+`make agent-check` clean, `.badges/tests.json` refreshed to the count the added test produced, and the full `make agent-test` green.
+
+**Checkpoint 4 — REACHED (2026-08-19), committed on `feature/Codegen-followups`.** The code work for U1–U5 is complete. Two items remain, neither of them code, and the first one gates the release:
+
+1. ⚠ **The SDK follow-up is filed but not triaged, and it blocks releasing this branch.** It sits at `../wip/inbox/2026-08-19-pipelex-sdk-js-codegen-lock-version.md` carrying the four rules to mirror, the read-the-version-before-the-key-set ordering trap, and the fixture refresh. No `pipelex-sdk-js` issue or PR exists yet. Until an `@pipelex/sdk` that tolerates `lock_version` is *published*, the very release that fixes U3 causes the failure U3 describes in every consumer's CI, because their `rejectUnknownKeys` hard-throws on the new key. Record the SDK PR link and its release status here before cutting a pipelex release.
+2. **The two open PR #31 threads want a reply** (`chatgpt-codex-connector` and `cubic-dev-ai`, both on item 1 of `../pipelex-sdk-js/wip/pr-31-review-notes.md`, which says explicitly that they stay open until U1 lands upstream). U1 has landed *on this branch* — but the branch is unpushed and unreleased, so a reply today can only say "fixed upstream, pending release", not "shipped". Worth waiting for the push at least; posting to a public PR is the user's call either way.
 
 ## Cross-repo follow-ups (recorded here, **not** work in this repo)
 
