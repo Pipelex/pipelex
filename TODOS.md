@@ -19,9 +19,9 @@ Cross-repo sequencing constraint, stated once: `src/codegen-check.ts` in `pipele
 
 ## Cold start — read this first
 
-**Status: Phases 1–3 done and committed (Checkpoint 2 reached). Next action is Phase 4 — the only design-bearing one.**
+**Status: Phases 1–4 done and committed (Checkpoint 3 reached). Next action is Phase 5 — the closure sweep, plus filing the SDK follow-up that gates the release.**
 
-**Where the work is.** Branch `feature/Codegen-followups` in `pipelex/`, cut from `d28e703e3` (v0.46.4). Phase 1 is one commit, Phases 2–3 a second; Phases 4–5 are untouched. Nothing is pushed. When this eventually becomes a PR it targets `dev`, never `main`.
+**Where the work is.** Branch `feature/Codegen-followups` in `pipelex/`, cut from `d28e703e3` (v0.46.4). Phase 1 is one commit, Phases 2–3 a second, Phase 4 a third; Phase 5 is untouched. Nothing is pushed. When this eventually becomes a PR it targets `dev`, never `main`.
 
 **Verify the tree is green before touching anything** (about a minute):
 
@@ -43,6 +43,9 @@ git add -A && make agent-check
 | `pipelex/codegen/check.py` | `_find_orphans` returns `sorted(orphans, key=…path)`, and `run_codegen_check`'s docstring states the ordering contract |
 | `pipelex/tools/misc/file_utils.py` | `save_text_to_path` writes `newline="\n"`, with the rationale in its (now raw) docstring |
 | `tests/unit/pipelex/tools/misc/test_save_text_to_path.py` | new module — the LF tripwire, the CRLF-verbatim case, and a reader round-trip |
+| `pipelex/codegen/lock.py` | `CODEGEN_LOCK_VERSION`, the `lock_version` field, `_reject_unknown_lock_version` called **before** `model_validate`, the `except CodegenLockError: raise` passthrough, and the evolution policy in the module docstring |
+| `tests/unit/pipelex/codegen/test_lock.py` | the `_LEGACY_LOCK_WITHOUT_VERSION` fixture and the version tests at the end of `TestLock` |
+| `tests/unit/pipelex/codegen/test_emission.py` | the two regeneration tests (legacy lock relocked; newer-version lock replaced) |
 | `.badges/tests.json` | refreshed to the new collected-test count (repeat after every test-adding phase) |
 
 **Five traps this repo sets, every one of them hit during Phase 1:**
@@ -151,7 +154,7 @@ Two things found along the way that the plan did not anticipate:
 
 ---
 
-## Phase 4 — Version the lock format (U3) — the one with real blast radius — **not started**
+## Phase 4 — Version the lock format (U3) — the one with real blast radius — **DONE**
 
 Confirmed: `CodegenLock` and `CodegenLockEntry` both carry `extra="forbid"` (`pipelex/codegen/lock.py`), the SDK mirrors that deliberately, and the format has no version field and no written evolution policy. Consequence, correctly identified by the SDK notes: the day we add *any* key to `codegen.lock`, every consumer pinned to an older `@pipelex/sdk` (and every older `pipelex` reading a newer lock) gets a hard `CodegenLockError` no-verdict in CI — not a drift, not a warning. Nothing today makes an additive change safe, and nobody has decided whether that is policy or accident.
 
@@ -178,11 +181,20 @@ Tests (`tests/unit/pipelex/codegen/test_lock.py`, plus emission round-trip in `t
 - A lock with `lock_version = 2` → `CodegenLockError` whose message names the found version and says to upgrade. Same for a non-integer value (pydantic shape error path, already wrapped).
 - `write_stamped_projection` over a tree locked by the old format rewrites the lock once and reports current on the next check.
 
-**Checkpoint 3.** The format change is landed but release-gated on the SDK reader. Record in this file, before releasing: the SDK follow-up issue/PR link and its release status.
+**Checkpoint 3 — REACHED (2026-08-19), committed on `feature/Codegen-followups`.** The version field landed with its tests written red first, both load-bearing ones mutation-tested. `make agent-check` clean, badge refreshed, full `make agent-test` green.
+
+⚠ **Still open, and it gates the release:** the SDK follow-up is **filed** at the workspace inbox — `../wip/inbox/2026-08-19-pipelex-sdk-js-codegen-lock-version.md` (it carries the four rules to mirror, the ordering trap, and the fixture refresh). It is *not yet triaged into `pipelex-sdk-js`*, and no SDK PR exists. Record here, before releasing: the `pipelex-sdk-js` issue/PR link and its release status. Until an `@pipelex/sdk` that tolerates `lock_version` is published, a pipelex release carrying this change hard-breaks every consumer pinned to the current SDK — the exact failure U3 exists to eliminate.
+
+**Two corrections to the plan above, both found while implementing:**
+
+- **The version gate must run BEFORE `model_validate`, not after it.** The plan put the check after validation, which is unreachable for the case that matters: `extra="forbid"` rejects a v2 lock that *adds a key* as a pydantic shape error before the version is ever read, so the reader emits an opaque "Extra inputs are not permitted" complaint instead of "upgrade pipelex" — precisely the unactionable no-verdict U3 exists to eliminate. `load_lock` now reads `lock_version` out of the parsed TOML first. Pinned by `test_a_newer_lock_version_is_refused_even_when_it_carries_unknown_keys`, and mutation-tested by moving the call back after `model_validate` (goes red with the pydantic message). The `except CodegenLockError: raise` passthrough (mirroring `run_codegen_check`) keeps the verdict from being re-wrapped as "Malformed or unsafe" — also mutation-tested.
+- **The plan's "reuse `CodegenLockError`, no new error class" has a consequence worth stating explicitly, and it was a real decision.** `_previous_tracked_paths` in `emission.py` discriminates on `exc.__cause__`, so a bare `raise` makes an unreadable-version lock **replaceable prior state during regeneration**, exactly like a corrupt one — `codegen types` overwrites it rather than failing. Deliberate: the run has already rewritten every artifact with this engine, the lock is purely derived, and refusing would strand a developer on a generated file. The cost is that pruning is skipped, so anything the newer engine emitted lingers — but it surfaces loudly as an orphan on the very next check rather than silently. Pinned by `test_regeneration_replaces_a_lock_written_by_a_newer_codegen`. The alternative (a `CodegenLockVersionError` subclass that propagates through regeneration) was rejected as buying little for a derived artifact, at the cost of a new error class plus its `gei`/`gep` runs.
+
+One test in the plan turned out to be untestable and is documented rather than written: `build_lock` passes `lock_version=CODEGEN_LOCK_VERSION` while the field default is the literal `1`. The split is what makes a future bump a one-line change (bump the constant; the "absent key means version 1" statement stays true forever), but with only one version in existence the two values coincide, so no test can distinguish them. The reasoning is in the field's docstring.
 
 ---
 
-## Phase 5 — Docs, changelog, and closure — **not started** (Phases 1–3 each carried their own doc + changelog edits already)
+## Phase 5 — Docs, changelog, and closure — **not started** (Phases 1–4 each carried their own doc + changelog edits already)
 
 - `docs/under-the-hood/codegen-projections.md`: document the lock's `lock_version` and the evolution policy; state the drift-ordering guarantee and the header-strictness rule alongside the existing check description. Same-change discipline: each phase above should actually carry its own doc edit; this phase is the sweep that verifies nothing was missed.
 - `CHANGELOG.md` under `## [Unreleased]`: one condensed entry covering the stamp-parser tightenings (uncommented header lines and non-standard JSON constants now report `hand-edited` instead of verifying), the unified drift ordering, LF-everywhere writes, and the `lock_version` field with its coordination note. Mark the lock change as the one consumers can observe.
