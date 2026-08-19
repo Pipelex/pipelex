@@ -27,8 +27,7 @@ from pipelex.pipeline.execution_seams import prepare_pipe_job
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.runtime_hub import scoped_content_generator, scoped_event_log
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.storage_scope import DRY_RUN_STORAGE_SCOPE
-from pipelex.system.telemetry.otel_constants import OTelConstants
+from pipelex.system.storage_scope import DRY_RUN_STORAGE_SCOPE, DRY_RUN_USER_ID
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 
 
@@ -143,7 +142,7 @@ async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str) -> Gra
                 execution_config=execution_config,
                 pipe_run_mode=PipeRunMode.DRY,
                 pipeline_run_id=pipeline_run_id,
-                user_id=OTelConstants.DEFAULT_USER_ID,
+                user_id=DRY_RUN_USER_ID,
                 # A dry run provably stores nothing, but `storage_scope` is
                 # required — so it says so, loudly and greppably, instead of
                 # inheriting a default. A silent default on this field is

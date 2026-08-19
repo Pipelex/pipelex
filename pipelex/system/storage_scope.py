@@ -49,6 +49,16 @@ STORAGE_SCOPE_PATTERN = re.compile(r"^[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+){0,2}$")
 # something stored during a dry run and that is the bug to chase.
 DRY_RUN_STORAGE_SCOPE = "dry-run-no-storage"
 
+# The caller a dry run is attributed to.
+#
+# It used to be `OTelConstants.DEFAULT_USER_ID` — the string "anonymous", which
+# is a TELEMETRY placeholder meaning "a span with no known caller". Reusing it
+# as an *identity* is how that string reached the storage path in the first
+# place, and the whole point of this module is that it must not. A dry run has
+# no caller in the identity sense either, so it says so in its own word instead
+# of borrowing telemetry's.
+DRY_RUN_USER_ID = "dry-run-no-user"
+
 # The identity and scope of a run on somebody's own machine.
 #
 # These are DEFAULTS ON A CONSTRUCTOR, which is a different thing from the

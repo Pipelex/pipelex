@@ -10,15 +10,21 @@ these checks the change would have silently deleted a traversal control.
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.storage_scope import (
     DRY_RUN_STORAGE_SCOPE,
+    DRY_RUN_USER_ID,
     LOCAL_STORAGE_SCOPE,
+    LOCAL_USER_ID,
     validate_storage_scope,
 )
+from pipelex.system.telemetry.otel_constants import OTelConstants
 
 
 def _metadata(storage_scope: str) -> JobMetadata:
@@ -107,3 +113,46 @@ class TestScopeIsRequired:
             # tested: the omission is caught statically AND at runtime. The
             # ignores are what let the runtime half be asserted at all.
             JobMetadata(user_id="u1", pipeline_run_id="run_1")  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
+
+
+class TestTheTelemetryPlaceholderStaysOutOfIdentity:
+    """`OTelConstants.DEFAULT_USER_ID` is `"anonymous"`, and it is TELEMETRY.
+
+    It means "a span with no known caller". It leaked into the identity path,
+    became the first segment of every storage key a run without an authenticated
+    caller wrote, and put every such tenant into one namespace where each could
+    read the others' outputs. The failure was silent by construction: a missing
+    identity looked exactly like a present one.
+
+    The constant survives because tracing genuinely has that concept. These tests
+    are what keep it there — a future `user_id or DEFAULT_USER_ID` is the exact
+    regression they exist to catch, and it would otherwise be invisible until
+    someone read an S3 bucket listing.
+    """
+
+    def test_no_module_uses_it_as_an_identity_or_a_scope(self) -> None:
+        source_root = Path(__file__).resolve().parents[4] / "pipelex"
+        assert source_root.is_dir(), source_root
+
+        offenders: list[str] = []
+        for path in source_root.rglob("*.py"):
+            for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+                if line.lstrip().startswith("#"):
+                    continue
+                # The optional `: <annotation>` matters: a parameter default is written
+                # `user_id: str = OTelConstants.DEFAULT_USER_ID`, and a pattern
+                # without it passes a real regression while looking like a guard.
+                if re.search(r"\b(user_id|storage_scope)\b\s*(?::[^=]+)?=\s*[\w.]*DEFAULT_USER_ID", line):
+                    offenders.append(f"{path.relative_to(source_root)}:{line_number}")
+
+        assert not offenders, (
+            "The telemetry placeholder is being bound as an identity or a storage scope at "
+            f"{offenders}. It is the string 'anonymous'; using it here is how every "
+            "unauthenticated run ended up sharing one storage namespace. Use DRY_RUN_USER_ID "
+            "or LOCAL_USER_ID, or require the caller to supply one."
+        )
+
+    def test_the_dry_run_identity_is_not_the_telemetry_placeholder(self) -> None:
+        """They mean different things and must not converge back onto one string."""
+        assert DRY_RUN_USER_ID != OTelConstants.DEFAULT_USER_ID
+        assert LOCAL_USER_ID != OTelConstants.DEFAULT_USER_ID

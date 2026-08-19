@@ -16,7 +16,7 @@ from pipelex.pipeline import execution_seams as execution_seams_module
 from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.telemetry.otel_constants import OTelConstants
+from pipelex.system.storage_scope import DRY_RUN_USER_ID
 
 _SEAMS_DOMAIN = "seams_test"
 _SEAMS_MTHDS = f"""
@@ -192,7 +192,7 @@ class TestExecutionSeams:
                 execution_config=normalize_config,
                 pipe_run_mode=PipeRunMode.DRY,
                 pipeline_run_id="seams-normalize-run-id",
-                user_id=OTelConstants.DEFAULT_USER_ID,
+                user_id=DRY_RUN_USER_ID,
                 inputs=PipelineInputs(),
             )
 
