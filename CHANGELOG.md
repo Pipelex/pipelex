@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **The codegen stamp header is now read strictly:** `pipelex codegen check` verified a generated file as pristine even when a line had been injected between the stamp's fence markers, because the content hash covers only the body *below* the fence — so an executable statement could sit inside a header that says `DO NOT EDIT` and the tree would still report as current. Any line inside the header that does not carry the file's comment prefix now makes the stamp unparseable, which the check already reports as `hand-edited`. The `options` value must also be conformant JSON: Python's non-standard `NaN` / `Infinity` / `-Infinity` literals are refused, so a stamp cannot hold something only a Python reader accepts — the header is a cross-language interchange format, and the second implementation of the offline check (in `@pipelex/sdk`) already rejected them. Commented `key: value` lines a reader does not recognise are still ignored, so the header can gain fields without breaking older readers.
+
 ## [v0.46.4] - 2026-08-18
 
 ### Changed

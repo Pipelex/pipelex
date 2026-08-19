@@ -68,6 +68,10 @@ Drift — generated code that no longer matches the method it was generated from
 
 The `crate_fingerprint` is the crate's semantic hash, so reformatting or commenting a `.mthds` file never changes a stamp — only a change to the method's effective type surface does. The `content_hash` is a SHA-256 over the body **below** the stamp, so a lone file can testify that it has not been hand-edited, without the engine, the network, or the lock.
 
+The header itself is read strictly, because the content hash covers only what is *below* it. Every line between the fences must carry the file's comment prefix, so a line injected into the block — an uncommented statement sitting inside a header that says `DO NOT EDIT`, or a blank line — makes the stamp unparseable, which the offline check reports as **hand-edited**. The `options` value must be conformant JSON: Python's non-standard `NaN` / `Infinity` / `-Infinity` literals are refused, since the stamp header is a cross-language interchange format and a stamp only one language can read is not a valid stamp. None of this is a signature — there is no MAC anywhere, and the real defence against a malicious edit is diff review; the rule exists so a file that claims to be pristine cannot quietly carry code that was edited in.
+
+In the other direction the header is deliberately tolerant: a *commented* `key: value` line the reader does not recognise is ignored rather than rejected, so the stamp can gain a field without breaking readers built against an earlier shape.
+
 ### Lock
 
 `pipelex/codegen/lock.py` writes `codegen.lock` (human-diffable TOML) recording each generated artifact's path and body hash, plus the crate fingerprint and engine version the set was built against. The lock catches the one drift class per-file stamps cannot: a deleted concept whose stale generated file lingers on disk. It is a Pipelex-owned artifact, distinct from the standard's `methods.lock` (which pins remote dependency versions).

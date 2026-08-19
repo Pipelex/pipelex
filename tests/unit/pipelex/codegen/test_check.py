@@ -108,3 +108,12 @@ class TestCheck:
         (nested / "stray.py").write_text((tmp_path / "models.py").read_text(encoding="utf-8"), encoding="utf-8")
         report = run_codegen_check(root=tmp_path)
         assert any(d.path == "sub/deep/stray.py" and d.category == DriftCategory.ORPHAN for d in report.drifts)
+
+    def test_uncommented_line_injected_into_the_header_is_hand_edited_drift(self, tmp_path: Path) -> None:
+        self._generate(tmp_path)
+        target = tmp_path / "models.py"
+        # The injected line sits above the end marker, so the body below it — and its hash — are
+        # untouched: without the header gate the file verifies as pristine.
+        target.write_text(target.read_text(encoding="utf-8").replace("# options: {}", "sneaky = 1\n# options: {}"), encoding="utf-8")
+        report = run_codegen_check(root=tmp_path)
+        assert [(d.path, d.category) for d in report.drifts] == [("models.py", DriftCategory.HAND_EDITED)]
