@@ -140,13 +140,18 @@ def parse_stamped(text: str, *, comment_prefix: str) -> ParsedStamp | None:
     # was injected by hand — and it would otherwise verify as pristine, since the hash covers only the
     # body below the fence. An executable line hiding inside a "DO NOT EDIT" block is not a valid stamp.
     #
-    # Split on `"\n"` and nothing else, because that is exactly what `apply_stamp` joins on: `splitlines`
-    # would additionally break on U+2028, U+2029 and U+0085, which `apply_stamp` writes through verbatim
-    # inside `pipe_ref` (and inside an `options` value, since `json.dumps` leaves them unescaped under
-    # `ensure_ascii=False`). Splitting there would make the parser reject a header the emitter itself had
-    # just written, so a freshly generated file would report as hand-edited and no regeneration could
-    # clear it. Making this the exact inverse of the emitter also matches the SDK, which splits on /\r?\n/.
-    if any(not line.startswith(comment_prefix) for line in header_region.split("\n")):
+    # `splitlines` is the deliberate choice over splitting on `"\n"` alone: it also breaks on U+2028,
+    # U+2029 and U+0085, and the first two terminate a `//` comment in ECMAScript. Split narrowly, a `.ts`
+    # header carrying a raw U+2028 followed by a statement is one prefixed line to this gate and two lines
+    # to the JavaScript engine — so `codegen check` would report the file current while it executes the
+    # injected code, since the header itself is not hashed. The SDK's mirror of this parser splits on the
+    # same set for the same reason (`PYTHON_LINE_BOUNDARY` in `@pipelex/sdk`'s `codegen-check.ts`).
+    #
+    # Nothing legitimate is rejected, because the emitter cannot write such a header: no caller supplies
+    # `pipe_ref` or `options`, and the four fields that are written are two hex digests, a package version
+    # and two enum members. If either field ever carries real data, escape the line terminators *at the
+    # emitter* then — this gate stays correct, because the emitter will never write a raw one.
+    if any(not line.startswith(comment_prefix) for line in header_region.splitlines()):
         return None
 
     fields = _parse_fields(header_region, comment_prefix=comment_prefix)
@@ -181,10 +186,10 @@ def has_stamp(text: str, *, comment_prefix: str) -> bool:
 
 def _parse_fields(header_region: str, *, comment_prefix: str) -> dict[str, str]:
     fields: dict[str, str] = {}
-    # Same split rule as the gate in `parse_stamped`, and it has to stay the same one: on `splitlines`
-    # a value carrying U+2028 would be cut in two here, silently truncating the field the gate had just
-    # accepted whole.
-    for raw_line in header_region.split("\n"):
+    # Same split rule as the gate in `parse_stamped`, and it has to stay the same one: a narrower split
+    # here would rejoin a line the gate had already split, so a field value would swallow the injected
+    # text the gate exists to catch.
+    for raw_line in header_region.splitlines():
         # `parse_stamped` has already rejected any line without the prefix, so stripping it is unconditional.
         stripped = raw_line[len(comment_prefix) :].strip()
         key, separator, value = stripped.partition(":")

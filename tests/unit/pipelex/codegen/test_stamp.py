@@ -87,25 +87,23 @@ class TestStamp:
         assert parse_stamped(injected, comment_prefix="#") is None
 
     @pytest.mark.parametrize("line_boundary", ["\u2028", "\u2029", "\u0085"])
-    def test_a_field_value_carrying_a_unicode_line_boundary_still_round_trips(self, line_boundary: str) -> None:
-        r"""What the emitter writes, the parser must read back — the header gate splits on `\n` and nothing else.
+    def test_a_header_value_carrying_a_unicode_line_boundary_is_rejected(self, line_boundary: str) -> None:
+        r"""A raw line boundary inside a header value makes the stamp unparseable — why both header splits use `splitlines`.
 
-        `str.splitlines` also breaks on U+2028, U+2029 and U+0085, and `apply_stamp` passes all three through
-        verbatim (`pipe_ref` is not encoded at all, and `json.dumps` leaves them unescaped under
-        `ensure_ascii=False`). Splitting on them would make the gate reject a header the emitter had just
-        written, so `codegen check` would report a freshly generated file as hand-edited for good — no
-        regeneration could clear it, because regeneration writes the same bytes again.
+        U+2028 and U+2029 terminate a `//` comment in ECMAScript. Under a `"\n"`-only split, a `.ts` header
+        carrying one is a single prefixed line to this gate and two lines to the JavaScript engine: the
+        injected statement executes while `codegen check` still calls the file current, because the header
+        is not covered by the content hash. U+0085 is inert to a JS engine but breaks a line to `splitlines`
+        just the same, and one gate covers all three.
+
+        Nothing legitimate is rejected — no caller supplies `pipe_ref` or `options`, so the emitter cannot
+        write a header this refuses.
         """
-        pipe_ref = f"my_domain.my{line_boundary}pipe"
-        options = {"note": f"a{line_boundary}b"}
-        stamped = self._stamp("# a\nclass A:\n    pass\n", comment_prefix="#", pipe_ref=pipe_ref, options=options)
+        # The payload must not itself open with `//`, or it would be a comment on the JS side too.
+        options = {"note": f"before{line_boundary}globalThis.pwned = 1;//"}
+        stamped = self._stamp("export const x = 1;\n", comment_prefix="//", options=options)
 
-        parsed = parse_stamped(stamped, comment_prefix="#")
-
-        assert parsed is not None
-        # Not merely accepted — the value survives whole. A `splitlines` field parser would truncate it here.
-        assert parsed.stamp.pipe_ref == pipe_ref
-        assert parsed.stamp.options == options
+        assert parse_stamped(stamped, comment_prefix="//") is None
 
     def test_commented_unknown_field_still_parses(self) -> None:
         # Additive tolerance, pinned: a stamp gaining a field stays readable by today's parser, which
