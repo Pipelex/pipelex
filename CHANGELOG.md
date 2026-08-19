@@ -1,10 +1,12 @@
 # Changelog
 
-## [Unreleased]
+## [v0.47.0] - 2026-08-19
 
 ### Added
 
 - **`codegen.lock` now declares its format version, so the format can grow without breaking every reader:** the lock is a cross-language interchange format — this CLI writes it, other implementations of the offline check read it — and it validated strictly with no version field at all, so the day it gained any key every consumer pinned to an older reader would have failed CI with an opaque "unknown key" error instead of a drift verdict. Each lock now opens with `lock_version = 1`; a reader refuses a version it does not know and names which side to upgrade, and it reads the version *before* the key set, so a future lock is diagnosed by its version rather than by whichever new key it happens to carry first. A lock written before the field existed is version 1 by definition and needs no migration, but every regeneration rewrites the lock once to add the key — that one-line diff is the change consumers will see. The stamp header stays deliberately unversioned, since it already ignores commented fields it does not recognise.
+- **Line endings are pinned to LF in the git index and on checkout, on every platform:** this repo carries a lot of generated-but-committed text — `CLAUDE.md` and `AGENTS.md`, `subject_grants.toml`, the drift acks, `.test_durations`, the error-identity snapshot, the generated error pages, the migration goldens, the gateway model references — and each is produced by a writer that passes no explicit `newline`, so on Windows Python translated every `\n` to CRLF and the whole set churned in version control with no change of content. No gate would have caught it: they all compare with universal-newline reads, which fold CRLF back to LF before the comparison. A `.gitattributes` carrying `* text=auto eol=lf` closes that class for tracked files whichever writer produced them. `text=auto` leaves git to tell text from binary, so images and other binaries are untouched, and no tracked file held CRLF when this landed — it introduces no renormalisation diff, it pins the invariant. The complementary writer-by-writer fix is the structural half and is tracked separately.
+- **Documentation:** `docs/under-the-hood/codegen-projections.md` now covers the strict stamp-header rules, the JSON conformance the `options` payload must meet, the policy for evolving the lock format under `lock_version`, and the cross-platform line-ending guarantee.
 
 ### Fixed
 
