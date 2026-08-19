@@ -473,6 +473,7 @@ def _usage_events_for(*, assembled_child_node_id: str, event_log: InMemoryEventL
             node_id=assembled_child_node_id,
             tokens_usage=LLMTokensUsage(
                 job_metadata=JobMetadata(
+                    storage_scope="test/scope",
                     user_id="user_test",
                     pipeline_run_id=_PIPELINE_RUN_ID,
                     pipe_code="gen_text",

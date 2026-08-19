@@ -80,7 +80,7 @@ class _StubListResponse(BaseModel):
 
 def _live_object_assignment() -> ObjectAssignment:
     llm_assignment = LLMAssignment(
-        job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_object_class_passthrough"),
+        job_metadata=JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_object_class_passthrough"),
         cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
         llm_setting=LLMSetting(model="test-model", temperature=0.5),
         llm_prompt=LLMPrompt(user_text="make a name"),
@@ -90,7 +90,7 @@ def _live_object_assignment() -> ObjectAssignment:
 
 def _dry_object_assignment() -> ObjectAssignment:
     llm_assignment = LLMAssignment(
-        job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_object_class_passthrough_dry"),
+        job_metadata=JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_object_class_passthrough_dry"),
         cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
         llm_setting=LLMSetting(model="test-model", temperature=0.5),
         llm_prompt=LLMPrompt(user_text="make a name"),
@@ -100,7 +100,7 @@ def _dry_object_assignment() -> ObjectAssignment:
 
 def _live_search_assignment() -> SearchAssignment:
     return SearchAssignment(
-        job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_search_class_passthrough"),
+        job_metadata=JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_search_class_passthrough"),
         cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
         query="make a name",
         search_setting=SearchSetting(model="mock-search-handle"),
@@ -236,7 +236,7 @@ class TestObjectClassPassthrough:
             ObjectAssignment.make_for_class(
                 object_class=NormalizedReference,
                 llm_assignment=LLMAssignment(
-                    job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_wrapped"),
+                    job_metadata=JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_wrapped"),
                     cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
                     llm_setting=LLMSetting(model="test-model", temperature=0.5),
                     llm_prompt=LLMPrompt(user_text="make a reference"),

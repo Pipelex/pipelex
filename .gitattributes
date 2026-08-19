@@ -1,0 +1,14 @@
+# Line endings are normalised to LF in the index and on checkout, on every platform.
+#
+# The repo carries a lot of *generated but committed* text — CLAUDE.md and AGENTS.md, subject_grants.toml,
+# .drift/acks/*.toml, .test_durations, tests/data/errors/error_identity.txt, docs/errors/*.md, the migration
+# goldens, the gateway model references — and each is produced by a writer that does not pass an explicit
+# `newline` argument, so on Windows Python translates every "\n" to CRLF and the whole set churns in version
+# control with no change of content. The gates would not notice: they all compare with universal-newline
+# reads, which fold CRLF back to LF before the comparison. This file closes that class for tracked files
+# regardless of which writer produced them; see wip/line-endings-writer-sweep.md for the writer-by-writer
+# half, which is the structural fix and is tracked separately.
+#
+# `text=auto` leaves git to detect text from binary, so images and other binaries are untouched. No tracked
+# file contained CRLF when this landed, so it introduces no renormalisation diff — it pins the invariant.
+* text=auto eol=lf

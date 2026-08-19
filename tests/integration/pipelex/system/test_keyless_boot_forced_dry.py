@@ -73,12 +73,13 @@ class TestKeylessBootForcedDry:
                 ),
             )
             pipe_job = await prepare_pipe_job(
+                storage_scope="test/scope",
+                user_id="test-user",
                 pipe=pipe,
                 library_id=library_id,
                 execution_config=get_config().interpreter.pipeline_execution,
                 pipe_run_mode=PipeRunMode.LIVE,
                 pipeline_run_id="keyless_forced_dry_run",
-                user_id="test-user",
             )
             assert pipe_job.pipe_run_params.run_mode.is_dry
         finally:
@@ -88,7 +89,7 @@ class TestKeylessBootForcedDry:
         """The kernel tier's run-params factory honours the same flag — and its default is LIVE.
 
         Asserted on the default rather than on an explicit ``run_mode=LIVE`` because the default is
-        the reachable hazard: a programmatic caller writes ``PipelexKernel.make(user_id=...)``,
+        the reachable hazard: a programmatic caller writes ``PipelexKernel.make(storage_scope="test/scope", user_id=...)``,
         names no mode, and without the coercion gets a LIVE ``CogtRunParams`` that walks straight
         past the leaf's DRY branch into a real provider call.
         """
@@ -96,7 +97,7 @@ class TestKeylessBootForcedDry:
             self._boot_keyless()
             assert is_dry_run_forced()
 
-            kernel = PipelexKernel.make(user_id="test-user")
+            kernel = PipelexKernel.make(storage_scope="test/scope", user_id="test-user")
 
             assert kernel.cogt_run_params.run_mode.is_dry
         finally:
@@ -114,7 +115,7 @@ class TestKeylessBootForcedDry:
             assert is_dry_run_forced()
 
             with pytest.raises(ValueError, match="is_mock_usage"):
-                PipelexKernel.make(run_mode=PipeRunMode.LIVE, user_id="test-user", is_mock_usage=True)
+                PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.LIVE, user_id="test-user", is_mock_usage=True)
         finally:
             Pipelex.teardown_if_needed()
 

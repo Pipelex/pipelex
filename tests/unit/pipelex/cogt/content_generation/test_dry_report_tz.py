@@ -47,6 +47,7 @@ class TestDryReportTimezone:
         )
 
         job_metadata = JobMetadata(
+            storage_scope="test/scope",
             user_id="test_user",
             pipeline_run_id="run_dry_tz",
             started_at=started_at,

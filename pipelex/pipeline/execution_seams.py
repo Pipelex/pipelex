@@ -48,6 +48,7 @@ from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.job_metadata import JobMetadata, OtelContext
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.system.storage_scope import validate_storage_scope
 from pipelex.tools.misc.file_utils import reject_bare_str_or_path
 
 if TYPE_CHECKING:
@@ -162,6 +163,7 @@ async def prepare_pipe_job(
     pipe_run_mode: PipeRunMode,
     pipeline_run_id: str,
     user_id: str,
+    storage_scope: str,
     inputs: PipelineInputs | WorkingMemory | None = None,
     search_scope: str | None = None,
     trace_context: "TraceContext | None" = None,
@@ -191,6 +193,18 @@ async def prepare_pipe_job(
     ``PipeRunParamsFactory.make_run_params`` (the single writer of ``run_mode``), so it covers
     every entry point that builds run params, not just this one.
     """
+    # Validate the scope HERE, before anything composes a storage key from it.
+    #
+    # `JobMetadata` validates it too, and that is where the invariant is
+    # documented — but it is constructed BELOW the data-url normalization, which
+    # writes `{storage_scope}/assets/...` to real storage. So an unvalidated
+    # scope carrying `..` reached the storage provider and escaped the tenant,
+    # and the validator that was supposed to prevent it ran afterwards on a
+    # value whose damage was already done. Ordering, not absence, was the defect.
+    #
+    # This is deliberately not a "second gate": it is the FIRST one on this path.
+    storage_scope = validate_storage_scope(value=storage_scope)
+
     working_memory: WorkingMemory | None = None
 
     # First, process user-provided inputs. Empty PipelineInputs is falsy and behaves like no inputs.
@@ -261,10 +275,11 @@ async def prepare_pipe_job(
 
     # Normalize data URLs to pipelex-storage:// URIs if configured.
     if working_memory and execution_config.is_normalize_data_urls_to_storage and not execution_config.is_mock_inputs:
-        working_memory = await normalize_data_urls_to_storage(working_memory)
+        working_memory = await normalize_data_urls_to_storage(working_memory, storage_scope=storage_scope)
 
     job_metadata = JobMetadata(
         user_id=user_id,
+        storage_scope=storage_scope,
         pipeline_run_id=pipeline_run_id,
         otel_context=otel_context,
         trace_context=trace_context,

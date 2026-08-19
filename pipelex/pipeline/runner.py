@@ -32,6 +32,7 @@ from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexR
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.runtime_hub import get_report_delegate, get_telemetry_manager
+from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE, LOCAL_USER_ID
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
@@ -112,7 +113,12 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         bundle_uris: list[str] | None = None,
         pipe_run_mode: PipeRunMode | None = None,
         is_mock_usage: bool = False,
-        user_id: str | None = None,
+        # A local run has exactly one user and no tenancy, so these say "local"
+        # rather than being derived from each other or defaulted deep in the
+        # call stack. A multi-tenant host passes its own; it cannot reach these
+        # by omission, because `pipeline_run_setup` requires both explicitly.
+        user_id: str = LOCAL_USER_ID,
+        storage_scope: str = LOCAL_STORAGE_SCOPE,
         execution_config: PipelineExecutionConfig | None = None,
         pipe_run: PipeRunProtocol | None = None,
         inputs_base_dir: Path | None = None,
@@ -123,6 +129,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         self.pipe_run_mode = pipe_run_mode
         self.is_mock_usage = is_mock_usage
         self.user_id = user_id
+        self.storage_scope = storage_scope
         self.execution_config = execution_config
         self._pipe_run = pipe_run
         # Directory that bare relative local file paths in `inputs` resolve against (Smart Inputs
@@ -222,6 +229,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 pipe_run_mode=self.pipe_run_mode,
                 is_mock_usage=self.is_mock_usage,
                 user_id=self.user_id,
+                storage_scope=self.storage_scope,
                 inputs_base_dir=self.inputs_base_dir,
             )
             effective_pipe_run = self._pipe_run or get_pipe_run()

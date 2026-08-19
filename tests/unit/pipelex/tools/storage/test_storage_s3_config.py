@@ -38,35 +38,43 @@ class TestStorageS3Config:
                 "assets/{hash}/{tenant}", "my-bucket", "eu-west-1", "- uri_format placeholder '{tenant}' is not supported", id="uri-unsupported"
             ),
             pytest.param("assets/{hash:.0}", "my-bucket", "eu-west-1", "- the {hash} placeholder must be plain", id="uri-hash-format-spec"),
-            # A format spec on a non-hash field is just as dangerous: {primary_id:.0} truncates to "" (collisions),
-            # and a huge width like {primary_id:1000000000} would allocate a ~1GB string if it ever reached a
-            # test rendering — so it must be rejected at parse time, before any format() call.
+            # A format spec on a non-hash field is just as dangerous: {extension:.0} truncates to "" (every
+            # object loses its extension), and a huge width like {extension:1000000000} would allocate a ~1GB
+            # string if it ever reached a test rendering — so it must be rejected at parse time, before any
+            # format() call.
             pytest.param(
-                "assets/{hash}/{primary_id:.0}",
+                "assets/{hash}/{extension:.0}",
                 "my-bucket",
                 "eu-west-1",
-                "- uri_format placeholder '{primary_id}' must be plain",
+                "- uri_format placeholder '{extension}' must be plain",
                 id="uri-field-truncate-spec",
             ),
             pytest.param(
-                "assets/{hash}/{primary_id:1000000000}",
+                "assets/{hash}/{extension:1000000000}",
                 "my-bucket",
                 "eu-west-1",
-                "- uri_format placeholder '{primary_id}' must be plain",
+                "- uri_format placeholder '{extension}' must be plain",
                 id="uri-field-huge-width",
             ),
             pytest.param(
-                "assets/{hash}/{secondary_id!r}",
+                # A CONVERSION on a SUPPORTED placeholder. It must use a name
+                # the supported set still contains — it was `{secondary_id!r}`,
+                # then `{extension!r}`, and BOTH were retired in turn: an
+                # unsupported name is refused by a different check first, so the
+                # case would go on passing for the wrong reason. Only `{hash}`
+                # and `{extension}` remain, and `{hash}` has its own dedicated
+                # plainness check, which leaves exactly one valid vehicle here.
+                "assets/{hash}/{extension!r}",
                 "my-bucket",
                 "eu-west-1",
-                "- uri_format placeholder '{secondary_id}' must be plain",
+                "- uri_format placeholder '{extension}' must be plain",
                 id="uri-field-conversion",
             ),
             pytest.param(
-                "assets/{hash}/{primary_id.foo}",
+                "assets/{hash}/{extension.foo}",
                 "my-bucket",
                 "eu-west-1",
-                "- uri_format placeholder '{primary_id.foo}' must be plain",
+                "- uri_format placeholder '{extension.foo}' must be plain",
                 id="uri-field-attr-access",
             ),
             pytest.param(

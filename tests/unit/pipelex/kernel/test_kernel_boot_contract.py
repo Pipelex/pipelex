@@ -169,7 +169,7 @@ _KERNEL_CALL_SCRIPT = textwrap.dedent(
 
     RuntimeBoot.make(integration_mode=IntegrationMode.PYTEST, needs_inference=False)
 
-    kernel = PipelexKernel.make(run_mode=PipeRunMode.DRY, user_id="kernel-boot-contract")
+    kernel = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="kernel-boot-contract")
     model = LLMSetting(model="kernel-boot-contract-model", temperature=0.5)
     text_concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT)
 

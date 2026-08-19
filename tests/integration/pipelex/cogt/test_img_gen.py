@@ -45,8 +45,7 @@ class TestImageGeneration:
         )
         pretty_print(generated_image_raw_details, title=f"Generated image raw details for topic '{topic}'")
         image_content = await generated_content_factory.make_image_content(
-            primary_id=PRIMARY_ID,
-            secondary_id=SECONDARY_ID,
+            storage_scope="test/scope",
             raw_details=generated_image_raw_details,
         )
         pretty_print(image_content, title=f"Image content for topic '{topic}'")
@@ -82,8 +81,7 @@ class TestImageGeneration:
         )
         pretty_print(generated_image_raw_details, title=f"Generated image raw details for topic '{topic}'")
         image_content = await generated_content_factory.make_image_content(
-            primary_id=PRIMARY_ID,
-            secondary_id=SECONDARY_ID,
+            storage_scope="test/scope",
             raw_details=generated_image_raw_details,
         )
         pretty_print(image_content, title=f"Image content for topic '{topic}'")
@@ -117,8 +115,7 @@ class TestImageGeneration:
         image_content_list = [
             (
                 await generated_content_factory.make_image_content(
-                    primary_id=PRIMARY_ID,
-                    secondary_id=SECONDARY_ID,
+                    storage_scope="test/scope",
                     raw_details=generated_image_raw_details,
                 )
             )

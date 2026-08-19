@@ -44,7 +44,7 @@ class DeliveryExecutor:
         self,
         pipe_output: PipeOutput | None,
         *,
-        user_id: str,
+        storage_scope: str,
         pipeline_run_id: str,
         delivery_assignment: DeliveryAssignment,
         status: DeliveryStatus,
@@ -61,7 +61,11 @@ class DeliveryExecutor:
         result_url: str | None = None
         if delivery_assignment.storage is not None and pipe_output is not None:
             result_url = await self._store_results(
-                pipe_output, user_id=user_id, pipeline_run_id=pipeline_run_id, storage=delivery_assignment.storage, request_id=request_id
+                pipe_output,
+                storage_scope=storage_scope,
+                pipeline_run_id=pipeline_run_id,
+                storage=delivery_assignment.storage,
+                request_id=request_id,
             )
 
         # Step 2: Notify webhooks with status + result_url (always, even on failure)
@@ -315,16 +319,25 @@ class DeliveryExecutor:
         self,
         pipe_output: PipeOutput,
         *,
-        user_id: str,
+        storage_scope: str,
         pipeline_run_id: str,
         storage: StorageTarget,
         request_id: str | None = None,
     ) -> str:
-        """Generate all result files and store them. Returns the base result URL."""
+        """Generate all result files and store them. Returns the base result URL.
+
+        The key is `{storage_scope}/{key_prefix}results/`. It was
+        `{user_id}/{key_prefix}{pipeline_run_id}` — keyed by WHO ran the pipe,
+        which is what made a run's outputs unreadable by anyone else on the same
+        team. `storage_scope` already identifies the run (the host composes it
+        from whatever its tenancy model is), so `pipeline_run_id` no longer
+        appears in the key; it stays a parameter because the log line below
+        correlates on it.
+        """
         try:
             storage_provider = get_storage_provider()
             prefix: str = storage.key_prefix or ""
-            base_key: str = f"{user_id}/{prefix}{pipeline_run_id}"
+            base_key: str = f"{storage_scope}/{prefix}results"
 
             result_files = await self.generate_result_files(pipe_output)
 

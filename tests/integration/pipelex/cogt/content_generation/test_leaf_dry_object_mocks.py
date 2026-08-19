@@ -89,7 +89,7 @@ class SpecWithPipeCode(StructuredContent):
 
 def _dry_object_assignment(object_class: type[StructuredContent], nb_items: int | None = None) -> ObjectAssignment:
     llm_assignment = LLMAssignment(
-        job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_dry_objects"),
+        job_metadata=JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_dry_objects"),
         cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
         llm_setting=LLMSetting(model="gpt-4o", temperature=0.5),
         llm_prompt=LLMPrompt(user_text="make objects"),
@@ -130,7 +130,7 @@ class TestLeafDryObjectMocks:
     async def test_dry_object_list_stamps_regardless_of_mock_usage(self) -> None:
         """The stamp is unconditional on the is_mock_usage sub-flag — it only changes reporting (D3)."""
         llm_assignment = LLMAssignment(
-            job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_mock_usage_stamp"),
+            job_metadata=JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_mock_usage_stamp"),
             cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY, is_mock_usage=True),
             llm_setting=LLMSetting(model="gpt-4o", temperature=0.5),
             llm_prompt=LLMPrompt(user_text="make specs"),
@@ -232,7 +232,7 @@ class TestLeafDryObjectMocks:
     async def test_boundary_dry_search_structured_dict_validates_against_original_class(self) -> None:
         """The structured-search dry boundary leaf returns a dict the original output class accepts."""
         search_assignment = SearchAssignment(
-            job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_dry_search_structured"),
+            job_metadata=JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_dry_search_structured"),
             cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
             query="what is pipelex?",
             search_setting=SearchSetting(model="mock-search-handle"),

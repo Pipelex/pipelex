@@ -89,7 +89,7 @@ class PipeRun(PipeRunProtocol):
                 try:
                     await self._delivery_executor.execute(
                         pipe_output=pipe_output,
-                        user_id=pipe_job.job_metadata.user_id,
+                        storage_scope=pipe_job.job_metadata.storage_scope,
                         pipeline_run_id=pipeline_run_id,
                         delivery_assignment=delivery_assignment,
                         status=status,

@@ -45,6 +45,7 @@ def _base(sequence: int) -> dict[str, Any]:
 def _make_usage(*, unit_costs: CostsByCategoryDict, model_name: str = "test-model") -> AnyTokensUsage:
     return LLMTokensUsage(
         job_metadata=JobMetadata(
+            storage_scope="test/scope",
             user_id="user_test",
             pipeline_run_id=_PIPELINE_RUN_ID,
             pipe_code="test_pipe",

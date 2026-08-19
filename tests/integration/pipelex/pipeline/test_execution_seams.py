@@ -16,7 +16,7 @@ from pipelex.pipeline import execution_seams as execution_seams_module
 from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.system.telemetry.otel_constants import OTelConstants
+from pipelex.system.storage_scope import DRY_RUN_USER_ID
 
 _SEAMS_DOMAIN = "seams_test"
 _SEAMS_MTHDS = f"""
@@ -143,12 +143,13 @@ class TestExecutionSeams:
             assert qualified_main_pipe is not None
             pipe = get_required_entry_pipe(pipe_code=qualified_main_pipe)
             pipe_job = await prepare_pipe_job(
+                storage_scope="test/scope",
+                user_id="test-user",
                 pipe=pipe,
                 library_id=library_id,
                 execution_config=_dry_mock_config(),
                 pipe_run_mode=PipeRunMode.DRY,
                 pipeline_run_id="seams-prepare-run-id",
-                user_id=OTelConstants.DEFAULT_USER_ID,
             )
             assert pipe_job.pipe.code == "echo_topic"
             assert pipe_job.pipe_run_params.run_mode.is_dry
@@ -156,6 +157,65 @@ class TestExecutionSeams:
             assert pipe_job.library_crate is not None
             # Mock input materialized for the pipe's needed input.
             assert "subject" in pipe_job.get_working_memory().root
+        finally:
+            library_manager.teardown(library_id=library_id)
+            clear_current_library()
+
+    @pytest.mark.parametrize(
+        "bad_scope",
+        [
+            pytest.param("../other/run", id="traversal-leading"),
+            pytest.param("tenant/../other", id="traversal-interior"),
+            pytest.param("/tenant/run", id="leading-slash-absolute-key"),
+            pytest.param("", id="empty"),
+            pytest.param("tenant/run\n", id="trailing-newline"),
+        ],
+    )
+    async def test_an_unsafe_scope_is_refused_before_anything_is_written(self, mocker: MockerFixture, bad_scope: str) -> None:
+        """The validator must run BEFORE the normalizer, not after it.
+
+        `JobMetadata` validates the scope, and that is where the invariant is
+        documented — but it was constructed *below* the data-url normalization,
+        which writes `{storage_scope}/assets/...` to real storage. So a scope
+        carrying `..` escaped the tenant's namespace and the guard meant to stop
+        it ran afterwards, on damage already done. The defect was ordering, not
+        absence, which is why asserting the raise is not enough: the spy is what
+        proves nothing was written on the way to it.
+        """
+        library_manager = get_library_manager()
+        library_id = "seams_scope_guard_lib"
+        _, qualified_main_pipe = acquire_library(library_id=library_id, mthds_contents=[_SEAMS_MTHDS])
+        try:
+            assert qualified_main_pipe is not None
+            pipe = get_required_entry_pipe(pipe_code=qualified_main_pipe)
+            normalize_spy = mocker.spy(execution_seams_module, "normalize_data_urls_to_storage")
+            normalize_config = (
+                get_config()
+                .interpreter.pipeline_execution.with_execution_overrides(
+                    generate_graph=False,
+                    mock_inputs=False,
+                )
+                .model_copy(update={"is_normalize_data_urls_to_storage": True})
+            )
+
+            with pytest.raises(ValueError, match="Invalid storage_scope"):
+                await prepare_pipe_job(
+                    storage_scope=bad_scope,
+                    pipe=pipe,
+                    library_id=library_id,
+                    execution_config=normalize_config,
+                    pipe_run_mode=PipeRunMode.DRY,
+                    pipeline_run_id="seams-scope-guard-run-id",
+                    user_id=DRY_RUN_USER_ID,
+                    # NON-EMPTY on purpose. With `PipelineInputs()` the falsy-inputs
+                    # gate skips normalize on its own, so the spy assertion below
+                    # would hold no matter where the validator sits — a test that
+                    # passes with the guard deleted. Real inputs are what put the
+                    # normalizer on the path this test is about.
+                    inputs=PipelineInputs(root={"subject": "a topic"}),
+                )
+
+            assert normalize_spy.call_count == 0
         finally:
             library_manager.teardown(library_id=library_id)
             clear_current_library()
@@ -185,12 +245,13 @@ class TestExecutionSeams:
             )
 
             pipe_job = await prepare_pipe_job(
+                storage_scope="test/scope",
                 pipe=pipe,
                 library_id=library_id,
                 execution_config=normalize_config,
                 pipe_run_mode=PipeRunMode.DRY,
                 pipeline_run_id="seams-normalize-run-id",
-                user_id=OTelConstants.DEFAULT_USER_ID,
+                user_id=DRY_RUN_USER_ID,
                 inputs=PipelineInputs(),
             )
 

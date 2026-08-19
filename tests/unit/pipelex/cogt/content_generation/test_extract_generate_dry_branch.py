@@ -22,7 +22,7 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 class TestExtractGenerateDryBranch:
     def _assignment(self, *, run_mode: PipeRunMode, extract_input: ExtractInput) -> ExtractAssignment:
         return ExtractAssignment(
-            job_metadata=JobMetadata(user_id="u", pipeline_run_id="run_extract_dry"),
+            job_metadata=JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_extract_dry"),
             cogt_run_params=CogtRunParams(run_mode=run_mode),
             extract_handle="mock-extract-handle",
             extract_input=extract_input,

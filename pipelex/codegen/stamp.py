@@ -16,7 +16,7 @@ body byte-exactly and recompute the hash.
 import hashlib
 import json
 from pathlib import Path
-from typing import cast
+from typing import NoReturn, cast
 
 from pydantic import BaseModel, ConfigDict
 
@@ -136,6 +136,24 @@ def parse_stamped(text: str, *, comment_prefix: str) -> ParsedStamp | None:
     header_region = text[len(begin_line) + 1 : end_index]
     body = text[end_index + len(end_line) + 2 :]
 
+    # Every line we ever write inside the fence carries the comment prefix, so anything else in there
+    # was injected by hand — and it would otherwise verify as pristine, since the hash covers only the
+    # body below the fence. An executable line hiding inside a "DO NOT EDIT" block is not a valid stamp.
+    #
+    # `splitlines` is the deliberate choice over splitting on `"\n"` alone: it also breaks on U+2028,
+    # U+2029 and U+0085, and the first two terminate a `//` comment in ECMAScript. Split narrowly, a `.ts`
+    # header carrying a raw U+2028 followed by a statement is one prefixed line to this gate and two lines
+    # to the JavaScript engine — so `codegen check` would report the file current while it executes the
+    # injected code, since the header itself is not hashed. The SDK's mirror of this parser splits on the
+    # same set for the same reason (`PYTHON_LINE_BOUNDARY` in `@pipelex/sdk`'s `codegen-check.ts`).
+    #
+    # Nothing legitimate is rejected, because the emitter cannot write such a header: no caller supplies
+    # `pipe_ref` or `options`, and the four fields that are written are two hex digests, a package version
+    # and two enum members. If either field ever carries real data, escape the line terminators *at the
+    # emitter* then — this gate stays correct, because the emitter will never write a raw one.
+    if any(not line.startswith(comment_prefix) for line in header_region.splitlines()):
+        return None
+
     fields = _parse_fields(header_region, comment_prefix=comment_prefix)
     projection = fields.get("projection")
     if projection is None:
@@ -168,8 +186,12 @@ def has_stamp(text: str, *, comment_prefix: str) -> bool:
 
 def _parse_fields(header_region: str, *, comment_prefix: str) -> dict[str, str]:
     fields: dict[str, str] = {}
+    # Same split rule as the gate in `parse_stamped`, and it has to stay the same one: a narrower split
+    # here would rejoin a line the gate had already split, so a field value would swallow the injected
+    # text the gate exists to catch.
     for raw_line in header_region.splitlines():
-        stripped = raw_line[len(comment_prefix) :].strip() if raw_line.startswith(comment_prefix) else raw_line.strip()
+        # `parse_stamped` has already rejected any line without the prefix, so stripping it is unconditional.
+        stripped = raw_line[len(comment_prefix) :].strip()
         key, separator, value = stripped.partition(":")
         if separator:
             fields[key.strip()] = value.strip()
@@ -196,10 +218,18 @@ def _target_from_value(value: str) -> CodegenTarget | None:
     return next((member for member in CodegenTarget if member == value), None)
 
 
+def _reject_json_constant(value: str) -> NoReturn:
+    """Refuse `NaN` / `Infinity` / `-Infinity`: Python's `json` accepts them, conformant parsers do not."""
+    msg = f"Non-standard JSON constant in stamp options: {value}"
+    raise ValueError(msg)
+
+
 def _parse_options(options_raw: str) -> dict[str, str] | None:
     try:
-        loaded = json.loads(options_raw)
-    except json.JSONDecodeError:
+        # The stamp header is a cross-language interchange format, so a stamp only Python can read is
+        # not a valid stamp: `parse_constant` turns those literals into the `ValueError` below.
+        loaded = json.loads(options_raw, parse_constant=_reject_json_constant)
+    except ValueError:  # JSONDecodeError is a subclass, so this one clause covers malformed JSON too
         return None
     if not isinstance(loaded, dict):
         return None
