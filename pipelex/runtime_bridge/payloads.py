@@ -10,10 +10,14 @@ import cycle: pydantic, the orchestration/delivery types, stdlib typing only.
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from pipelex.runtime_bridge.delivery_mode import DeliveryMode
 from pipelex.runtime_bridge.orchestration_mode import DIRECT_ORCHESTRATION_MODE
+
+# Import-light by design (see module docstring): `storage_scope` pulls in `re`
+# and nothing else, so validating here costs the boundary nothing.
+from pipelex.system.storage_scope import validate_storage_scope
 
 
 class PipelexPipeRunInput(BaseModel):
@@ -33,6 +37,19 @@ class PipelexPipeRunInput(BaseModel):
     # tenants. See `pipelex.system.storage_scope`.
     user_id: str
     storage_scope: str
+
+    @field_validator("storage_scope")
+    @classmethod
+    def _validate_storage_scope(cls, value: str) -> str:
+        """Refuse an unusable scope at the WIRE, not three frames into the run.
+
+        A bridge payload crosses a process boundary, so its scope arrives as
+        whatever the other side put there. Validating it at construction means a
+        traversal is a payload-decoding error naming the field, rather than a
+        failure inside whichever call first pastes the value into a storage key.
+        """
+        return validate_storage_scope(value=value)
+
     library_crate_dump: dict[str, Any] | None = None
     # Two orthogonal axes: which orchestrator runs the pipe (open token, defaults to the
     # core in-process orchestrator) and whether the caller waits (endpoint-set; defaults

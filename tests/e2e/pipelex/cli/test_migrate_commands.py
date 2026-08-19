@@ -136,6 +136,13 @@ def _old_shape_telemetry_document() -> str:
     return path.read_text(encoding="utf-8")
 
 
+# The storage `uri_format` as schema 1 spelled it, and as the current models require it. The
+# placeholder set narrowed without any path moving, so no ledger entry describes it — see the
+# note inside the function below.
+_STORAGE_URI_FORMAT_AT_SCHEMA_1 = '"{primary_id}/{secondary_id}/{hash}.{extension}"'
+_STORAGE_URI_FORMAT_TODAY = '"{storage_scope}/{hash}.{extension}"'
+
+
 def _pre_reshape_pipelex_config_document() -> str:
     """The whole main configuration in its pre-reshape shape, read from the package.
 
@@ -149,9 +156,28 @@ def _pre_reshape_pipelex_config_document() -> str:
     higher: the pre-history entry inserted below the reshape changed nothing in the models, so its
     reference document is a byte copy of this one. Naming the version where the document's shape was
     actually cut is the spelling that says what this is, rather than one inherited from a copy.
+
+    One value is modernized on the way out, and it is not a shape change, which is why the ledger
+    is silent about it and right to be. `uri_format`'s PLACEHOLDER SET narrowed —
+    `{primary_id}`/`{secondary_id}` gave way to `{storage_scope}` — and a value domain narrowing
+    with no path added, removed or moved is a *content* change, out of scope for a structural
+    vocabulary (see `docs/migration-ledger.md`). The golden stays a true record of schema 1; what
+    this fixture needs is a document that is pre-reshape in SHAPE, since the reshape is what it
+    exercises, while still being one the current models will load. Left as-is, the planted machine
+    fails `_assert_boots` before `migrate` is ever reached, and the reshape goes untested.
     """
     path = defaults_golden_path(migration_dir=packaged_migration_dir(), surface_id=PIPELEX_CONFIG_SURFACE_ID, schema_version=1)
-    return path.read_text(encoding="utf-8")
+    document = path.read_text(encoding="utf-8")
+    modernized = document.replace(_STORAGE_URI_FORMAT_AT_SCHEMA_1, _STORAGE_URI_FORMAT_TODAY)
+    if modernized == document:
+        msg = (
+            "the schema-1 storage uri_format is no longer spelled the way this fixture modernizes:\n"
+            f"{_STORAGE_URI_FORMAT_AT_SCHEMA_1}\n"
+            "If the placeholder set changed again, update the two constants above — a silent no-op here "
+            "plants a document that cannot boot, and the reshape stops being tested."
+        )
+        raise AssertionError(msg)
+    return modernized
 
 
 def _todays_pipelex_config_document() -> dict[str, Any]:

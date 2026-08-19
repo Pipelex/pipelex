@@ -25,13 +25,12 @@ class TestStorageProviders:
     ) -> None:
         """Test that the URI format from config works correctly for building storage keys."""
         test_data = b"config format test"
-        storage_scope = "pipeline_123"
-        secondary_id = "step_456"
+        storage_scope = "test/scope"
         hash_value = "abc123def456"
         extension = "png"
 
         key = uri_format.format(
-            storage_scope="test/scope",
+            storage_scope=storage_scope,
             hash=hash_value,
             extension=extension,
         )
@@ -40,8 +39,10 @@ class TestStorageProviders:
         loaded_data = await storage_provider.load(uri=returned_uri)
 
         assert loaded_data == test_data
+        # The scope is the ONLY caller-supplied segment now: `{primary_id}` and
+        # `{secondary_id}` were the run's pipeline/step ids, and keying storage by
+        # them is what this change removed.
         assert storage_scope in key
-        assert secondary_id in key
         assert hash_value in key
         assert extension in key
 

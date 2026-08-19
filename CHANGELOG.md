@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **The scope was validated *after* the first thing that wrote with it.** `prepare_pipe_job` ran the data-url normalizer — which stores bytes at `{storage_scope}/assets/…` — and only then constructed the `JobMetadata` whose validator is supposed to make that key safe. A scope carrying `..` therefore escaped the tenant's namespace, and the guard meant to stop it ran afterwards, on damage already done. The defect was ordering, not absence: this file's own "safe by construction" claim did not hold on the one path that mattered. The scope is now validated at the top of the seam, before anything composes a key from it. Pinned by a test that asserts the normalizer was never called, with real inputs — the empty-inputs harness skips the normalizer on its own, so the same test written that way passes with the guard deleted.
+
+- **Every local run with storage delivery overwrote the previous one.** The run id used to be part of the storage key (`{user_id}/{key_prefix}{pipeline_run_id}`); collapsing the key onto the scope removed it, which is correct for a host — a hosted scope already identifies the run, `<org>/<method>/<run>` — but left the local default naming a tenant and no run. So every local run wrote `local/results/<filename>`, the same key each time, each one silently destroying the last. A local run's scope is now `local/<run_id>`, composed in `pipeline_run_setup` because that is where the run id is minted and the constructor default cannot name a run that does not exist yet. Keyed on the sentinel exactly, never a prefix test, so a host-supplied scope is never rewritten.
+
+- **A scope ending in a newline passed validation.** `validate_storage_scope` used `re.match` with a `$` anchor, which admits one trailing newline, so `"org/mt/run\n"` was accepted and the newline travelled into every storage key and log line built from the scope — an unaddressable key and a log-forging primitive. Now `fullmatch`.
+
+- **The bridge payload required the scope but never validated it.** `PipelexPipeRunInput.storage_scope` was a bare `str`, so a payload arriving from another process could carry a traversal that was only refused frames later, wherever a key was first composed. It is validated at construction now, making a malformed payload a decoding error that names the field.
+
 ### Changed
 
 - **Breaking: where a run's bytes go is now told to the runtime, not derived from who is running (`JobMetadata.storage_scope`)**: Storage keys were built from `user_id` — `{user_id}/results/{run_id}/` for delivery, `{primary_id}/{secondary_id}/…` (always `{user_id}/{pipeline_run_id}/…`) for generated content, a flat top-level `normalized/` for inputs pulled off a `data:` URL. That ties _where the bytes live_ to _who uploaded them_, which is fine until two people share the work: the second one asks for a file the first one attached and is refused, because the only thing standing between them is a string comparison on the first path segment. A host that serves teams cannot express "these two people may read the same file" in that layout at all.

@@ -11,7 +11,6 @@ class TestStorageConfigIntegration:
         assert storage_config.local is not None
         assert storage_config.local.uri_format is not None
         assert "{storage_scope}" in storage_config.local.uri_format
-        assert "{secondary_id}" in storage_config.local.uri_format
         assert "{hash}" in storage_config.local.uri_format
         assert "{extension}" in storage_config.local.uri_format
 
@@ -21,7 +20,6 @@ class TestStorageConfigIntegration:
         assert storage_config.in_memory is not None
         assert storage_config.in_memory.uri_format is not None
         assert "{storage_scope}" in storage_config.in_memory.uri_format
-        assert "{secondary_id}" in storage_config.in_memory.uri_format
         assert "{hash}" in storage_config.in_memory.uri_format
         assert "{extension}" in storage_config.in_memory.uri_format
 

@@ -48,6 +48,7 @@ from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.job_metadata import JobMetadata, OtelContext
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.system.storage_scope import validate_storage_scope
 from pipelex.tools.misc.file_utils import reject_bare_str_or_path
 
 if TYPE_CHECKING:
@@ -192,6 +193,18 @@ async def prepare_pipe_job(
     ``PipeRunParamsFactory.make_run_params`` (the single writer of ``run_mode``), so it covers
     every entry point that builds run params, not just this one.
     """
+    # Validate the scope HERE, before anything composes a storage key from it.
+    #
+    # `JobMetadata` validates it too, and that is where the invariant is
+    # documented — but it is constructed BELOW the data-url normalization, which
+    # writes `{storage_scope}/assets/...` to real storage. So an unvalidated
+    # scope carrying `..` reached the storage provider and escaped the tenant,
+    # and the validator that was supposed to prevent it ran afterwards on a
+    # value whose damage was already done. Ordering, not absence, was the defect.
+    #
+    # This is deliberately not a "second gate": it is the FIRST one on this path.
+    storage_scope = validate_storage_scope(value=storage_scope)
+
     working_memory: WorkingMemory | None = None
 
     # First, process user-provided inputs. Empty PipelineInputs is falsy and behaves like no inputs.

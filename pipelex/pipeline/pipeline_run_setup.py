@@ -29,6 +29,7 @@ from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.environment import get_optional_env
 from pipelex.system.job_metadata import OtelContext
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.otel_factory import OtelFactory
@@ -171,6 +172,25 @@ async def pipeline_run_setup(
 
     pipeline = get_pipeline_manager().add_new_pipeline(pipe_code=pipe_code, pipeline_run_id=pipeline_run_id)
     pipeline_run_id = pipeline.pipeline_run_id
+
+    # A local run's scope becomes `local/<run_id>`, and this is the only place it
+    # can: the runner's constructor default cannot name a run that does not exist
+    # yet, and the run id is minted on the line above.
+    #
+    # Without this, every local run with storage delivery wrote
+    # `local/results/<filename>` — the same key each time, so each run silently
+    # destroyed the previous one's output. The run id used to be IN the key
+    # (`{user_id}/{key_prefix}{pipeline_run_id}`); collapsing the key onto the
+    # scope removed it, and for a host that is correct because a hosted scope
+    # already identifies the run (`<org>/<method>/<run>`). Only the local default
+    # was left naming a tenant and no run.
+    #
+    # Keyed on the sentinel EXACTLY, never a prefix test: a host that serves more
+    # than one tenant passes its own scope and is untouched here. `local` is our
+    # own constant, and a caller passing it literally has one namespace for every
+    # run — which is the bug this repairs, not a choice to preserve.
+    if storage_scope == LOCAL_STORAGE_SCOPE:
+        storage_scope = f"{LOCAL_STORAGE_SCOPE}/{pipeline_run_id}"
 
     if not library_id:
         library_id = pipeline_run_id

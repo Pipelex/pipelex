@@ -30,7 +30,8 @@ import re
 
 # One to three `[A-Za-z0-9_-]` segments joined by single slashes.
 #
-# Rejects, in one rule: the empty string, a leading or trailing slash, an empty
+# Applied with `fullmatch` (see below), it rejects in one rule: the empty string,
+# a leading or trailing slash, an empty
 # interior segment (`a//b`), `.` and `..` in any position, and any character
 # that could re-open a traversal or a query string once the value is pasted into
 # a URI. The upper bound of three segments is not cosmetic — it is what keeps a
@@ -84,7 +85,13 @@ def validate_storage_scope(*, value: str) -> str:
             contains a segment that is not `[A-Za-z0-9_-]+` — which covers
             traversal (`..`), absolute paths, and empty segments.
     """
-    if not STORAGE_SCOPE_PATTERN.match(value):
+    # `fullmatch`, NOT `match`. A trailing `$` in a `match` still admits one
+    # final newline, so `"org/mt/run\n"` passed this guard and the newline then
+    # travelled into every storage key and log line built from the scope — a log
+    # forging primitive, and a key nobody can address. `fullmatch` has no such
+    # concession, which is why the anchors below are redundant but kept: the
+    # pattern is also read on its own by the wire-level validators.
+    if not STORAGE_SCOPE_PATTERN.fullmatch(value):
         msg = (
             f"Invalid storage_scope {value!r}: expected one to three path-safe segments "
             "separated by single slashes (e.g. 'tenant/run' or 'tenant/method/run'). "

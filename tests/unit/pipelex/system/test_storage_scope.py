@@ -76,6 +76,16 @@ class TestRefusedScopes:
             pytest.param("tenant#frag", id="fragment"),
             pytest.param("tenant\\run", id="backslash"),
             pytest.param("tenant%2f..%2f", id="percent-encoded-traversal"),
+            # A `$`-anchored `re.match` admits ONE trailing newline, so these
+            # passed the guard and the newline travelled into every storage key
+            # and log line built from the scope — an unaddressable key and a log
+            # forging primitive. `fullmatch` is what closes it; these pin it shut.
+            pytest.param("tenant/run\n", id="trailing-newline"),
+            pytest.param("tenant\n", id="single-segment-trailing-newline"),
+            pytest.param("tenant\nrun", id="interior-newline"),
+            pytest.param("tenant/run\r", id="trailing-carriage-return"),
+            pytest.param("tenant/run\r\n", id="trailing-crlf"),
+            pytest.param("\n", id="newline-alone"),
         ],
     )
     def test_unsafe_scopes_raise_at_construction(self, scope: str) -> None:
