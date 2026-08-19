@@ -139,7 +139,14 @@ def parse_stamped(text: str, *, comment_prefix: str) -> ParsedStamp | None:
     # Every line we ever write inside the fence carries the comment prefix, so anything else in there
     # was injected by hand — and it would otherwise verify as pristine, since the hash covers only the
     # body below the fence. An executable line hiding inside a "DO NOT EDIT" block is not a valid stamp.
-    if any(not line.startswith(comment_prefix) for line in header_region.splitlines()):
+    #
+    # Split on `"\n"` and nothing else, because that is exactly what `apply_stamp` joins on: `splitlines`
+    # would additionally break on U+2028, U+2029 and U+0085, which `apply_stamp` writes through verbatim
+    # inside `pipe_ref` (and inside an `options` value, since `json.dumps` leaves them unescaped under
+    # `ensure_ascii=False`). Splitting there would make the parser reject a header the emitter itself had
+    # just written, so a freshly generated file would report as hand-edited and no regeneration could
+    # clear it. Making this the exact inverse of the emitter also matches the SDK, which splits on /\r?\n/.
+    if any(not line.startswith(comment_prefix) for line in header_region.split("\n")):
         return None
 
     fields = _parse_fields(header_region, comment_prefix=comment_prefix)
@@ -174,7 +181,10 @@ def has_stamp(text: str, *, comment_prefix: str) -> bool:
 
 def _parse_fields(header_region: str, *, comment_prefix: str) -> dict[str, str]:
     fields: dict[str, str] = {}
-    for raw_line in header_region.splitlines():
+    # Same split rule as the gate in `parse_stamped`, and it has to stay the same one: on `splitlines`
+    # a value carrying U+2028 would be cut in two here, silently truncating the field the gate had just
+    # accepted whole.
+    for raw_line in header_region.split("\n"):
         # `parse_stamped` has already rejected any line without the prefix, so stripping it is unconditional.
         stripped = raw_line[len(comment_prefix) :].strip()
         key, separator, value = stripped.partition(":")
