@@ -86,6 +86,25 @@ class TestStamp:
         injected = stamped.replace("# options: {}", "\n# options: {}")
         assert parse_stamped(injected, comment_prefix="#") is None
 
+    @pytest.mark.parametrize("line_boundary", ["\u2028", "\u2029", "\u0085"])
+    def test_a_header_value_carrying_a_unicode_line_boundary_is_rejected(self, line_boundary: str) -> None:
+        r"""A raw line boundary inside a header value makes the stamp unparseable — why both header splits use `splitlines`.
+
+        U+2028 and U+2029 terminate a `//` comment in ECMAScript. Under a `"\n"`-only split, a `.ts` header
+        carrying one is a single prefixed line to this gate and two lines to the JavaScript engine: the
+        injected statement executes while `codegen check` still calls the file current, because the header
+        is not covered by the content hash. U+0085 is inert to a JS engine but breaks a line to `splitlines`
+        just the same, and one gate covers all three.
+
+        Nothing legitimate is rejected — no caller supplies `pipe_ref` or `options`, so the emitter cannot
+        write a header this refuses.
+        """
+        # The payload must not itself open with `//`, or it would be a comment on the JS side too.
+        options = {"note": f"before{line_boundary}globalThis.pwned = 1;//"}
+        stamped = self._stamp("export const x = 1;\n", comment_prefix="//", options=options)
+
+        assert parse_stamped(stamped, comment_prefix="//") is None
+
     def test_commented_unknown_field_still_parses(self) -> None:
         # Additive tolerance, pinned: a stamp gaining a field stays readable by today's parser, which
         # is why the stamp header carries no version of its own. Over-tightening the gate would break it.
@@ -95,7 +114,10 @@ class TestStamp:
         assert parsed is not None
         assert parsed.stamp.crate_fingerprint == "fp-123"
 
-    @pytest.mark.parametrize("options_value", ['{"x": NaN}', '{"x": Infinity}', '{"x": -Infinity}', "Infinity"])
+    # A bare top-level constant is deliberately not in this list: `_parse_options` already rejects any
+    # non-object payload, so that case stays green with the `parse_constant` guard removed and would
+    # pin nothing. Every case here must be one the guard alone catches.
+    @pytest.mark.parametrize("options_value", ['{"x": NaN}', '{"x": Infinity}', '{"x": -Infinity}', '{"a": 1, "b": NaN}'])
     def test_non_standard_json_constants_in_options_are_rejected(self, options_value: str) -> None:
         # Python's `json` accepts these; no conformant JSON parser does. The stamp header is a
         # cross-language interchange format, so a stamp only Python can read is not a valid stamp.
