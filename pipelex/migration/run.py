@@ -32,6 +32,7 @@ See `docs/migration-ledger.md` → "Surfaces" and "Applying".
 
 from pathlib import Path
 
+from pipelex.migration.gitignore import ensure_config_dir_gitignore
 from pipelex.migration.ledger import packaged_migration_dir
 from pipelex.migration.plan import MigrationReport
 from pipelex.migration.runner import migrate_directories
@@ -52,12 +53,42 @@ def config_directories_to_migrate() -> list[Path]:
     return config_manager.existing_config_dirs
 
 
+def ensure_config_dir_gitignores(*, config_dirs: list[Path]) -> None:
+    """Give each walked directory the `.gitignore` that keeps our backups out of `git status`.
+
+    Named and separate because the rule is not a migration. It belongs to any write-authorized run
+    over these directories, and a run that finds every file already at the current schema is still
+    one of those — it is in fact the common one, since a machine is in that state from the moment
+    it has migrated once until the next schema change. Tying the rule to the write pass alone meant
+    it reached only the machines that happened to have something pending, which is close to nobody.
+
+    A user who already had a `.pipelex/` before the rule shipped therefore gets it from the very
+    run that would otherwise dirty their repository, and not only from a fresh `init`.
+
+    Never called on a dry run, in any caller: `--dry-run` promises the disk is untouched, and a
+    convenience file is still a write.
+    """
+    for directory in config_dirs:
+        ensure_config_dir_gitignore(directory=directory)
+
+
 def migrate_config_directories(*, config_dirs: list[Path], dry_run: bool) -> MigrationReport:
     """Replay every surface's shipped ledger over every claimed file in the given directories.
 
     The registry and the ledger directory are the package's own, which is what makes this the
     real run rather than a gate's rehearsal over synthetic models.
+
+    A real run is also where each walked directory gets the `.gitignore` that keeps the backups
+    it is about to write out of the user's `git status` — here rather than in `migrate_directories`
+    on purpose, because that function is replayed by the gates over documents that are never
+    written anywhere, and a filesystem side effect there would follow them.
+
+    This covers the run that *writes*. It is deliberately not the only place the rule is ensured:
+    a run with nothing to carry forward never reaches this function at all, and that is the state
+    most machines are in. See `ensure_config_dir_gitignores`.
     """
+    if not dry_run:
+        ensure_config_dir_gitignores(config_dirs=config_dirs)
     return migrate_directories(
         registry=build_config_surface_registry(),
         migration_dir=packaged_migration_dir(),

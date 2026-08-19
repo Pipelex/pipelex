@@ -65,6 +65,63 @@ class TestDiff:
 
             assert has_diff_dirs(dir1=dir1, dir2=dir2) is True
 
+    def test_has_diff_dirs_pattern_excluded_file_only_in_left(self):
+        """A left-only file matching an exclude pattern does not count as a difference."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dir1 = Path(temp_dir) / "dir1"
+            dir2 = Path(temp_dir) / "dir2"
+            dir1.mkdir()
+            dir2.mkdir()
+
+            (dir1 / "common.txt").write_text("content")
+            (dir2 / "common.txt").write_text("content")
+            (dir1 / "common.txt.bak.20260818T084913Z").write_text("pre-migration copy")
+
+            assert has_diff_dirs(dir1=dir1, dir2=dir2) is True
+            assert has_diff_dirs(dir1=dir1, dir2=dir2, exclude_patterns={"*.bak.*"}) is False
+
+    def test_has_diff_dirs_pattern_exclusion_reaches_subdirectories(self):
+        """An exclude pattern applies at every depth of the comparison."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dir1 = Path(temp_dir) / "dir1"
+            dir2 = Path(temp_dir) / "dir2"
+            (dir1 / "sub").mkdir(parents=True)
+            (dir2 / "sub").mkdir(parents=True)
+
+            (dir1 / "sub" / "common.txt").write_text("content")
+            (dir2 / "sub" / "common.txt").write_text("content")
+            (dir1 / "sub" / "common.txt.bak.20260818T084913Z").write_text("pre-migration copy")
+
+            assert has_diff_dirs(dir1=dir1, dir2=dir2, exclude_patterns={"*.bak.*"}) is False
+
+    def test_has_diff_dirs_pattern_leaves_unmatched_file_visible(self):
+        """A pattern excludes only what it matches — a neighbouring extra file still differs."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dir1 = Path(temp_dir) / "dir1"
+            dir2 = Path(temp_dir) / "dir2"
+            dir1.mkdir()
+            dir2.mkdir()
+
+            (dir1 / "common.txt.bak.20260818T084913Z").write_text("pre-migration copy")
+            (dir1 / "common.txt.bak.notes").write_text("a copy the user named")
+
+            assert has_diff_dirs(dir1=dir1, dir2=dir2, exclude_patterns={"*.bak.[0-9]*Z"}) is True
+
+    def test_make_diff_dirs_pretty_omits_pattern_excluded_file(self):
+        """The report leaves out what the verdict looked past, so the two cannot contradict."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dir1 = Path(temp_dir) / "dir1"
+            dir2 = Path(temp_dir) / "dir2"
+            dir1.mkdir()
+            dir2.mkdir()
+
+            (dir1 / "common.txt.bak.20260818T084913Z").write_text("pre-migration copy")
+
+            result = make_diff_dirs_pretty(dir1=dir1, dir2=dir2, exclude_patterns={"*.bak.*"})
+
+            assert isinstance(result, Text)
+            assert "No differences found" in result.plain
+
     def test_has_diff_dirs_recursive(self):
         """Test that subdirectory differences are detected."""
         with tempfile.TemporaryDirectory() as temp_dir:

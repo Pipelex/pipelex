@@ -46,6 +46,28 @@
 - **Replay neutrality is now a property rather than an assertion**: The guarantee a user's machine depends on — replaying a surface's whole ledger over a file already valid at the current schema changes not one byte — is checked over generated documents, not only over the two reference documents. A reference document carries exactly one value per key, so it cannot see an operation that misbehaves on the _other_ legal spelling of an enumerated field; a sampler that reaches those spellings can. The sampler proposes each mutation from the surface's fingerprint and lets the models decide whether it lands, because schema membership is settled by validators no type projection can see: a legal enum member can still be rejected for what it requires elsewhere in the document, and a mapping typed with arbitrary string keys can still refuse a key outside a fixed set. Idempotence — replaying twice equals replaying once — and prefix coherence — a file caught halfway lands where a replay from zero lands — are checked alongside it, and each generator carries its own vacuity check, since every one of these properties is trivially true over documents nothing acts on. `hypothesis` joins the development dependencies.
 - **`pipelex doctor` reports pending configuration migrations, and `--fix` runs them**: A configuration the migration history explains now boots with a warning rather than an error — and `pipelex-agent` silences logging process-wide as its first act, so a machine consumer never learns from a boot that its configuration is stale. Asking was the only channel left and there was nothing to ask. The health report gains a **Configuration Migrations** row that is `pipelex migrate`'s own dry run: a structured `finding` (`up_to_date`, `pending`, `needs_attention`, `unavailable`), the files a migration would rewrite, and separately the files it will not repair on its own — both sets, because a drifted machine usually has some of each and a reader who heard only the first would stop with a broken file still in place. `pipelex doctor --fix` then offers to run the migration, reaching the command's own write pass rather than a second implementation of it. The row is deliberately not scoped by `--global`: it answers for a command that walks both configuration directories, and a row naming fewer files than the command touches would be a surprise write. A failure inside the scan is reported as a failure to check rather than as health, and never as an exception — an exception there would replace every row of the report with a single line.
 
+## [v0.46.4] - 2026-08-18
+
+### Changed
+
+- **This repo now dogfoods its own migration `.gitignore` convention:** the project-local `.pipelex/` directory picked up the `.gitignore` that `pipelex migrate`/`pipelex init` write to keep timestamped backup copies (`*.bak.<timestamp>`) out of `git status` — the same file every consumer project has received automatically since v0.46.2.
+
+### Fixed
+
+- **The config-sync gate no longer goes red on what the migrator leaves behind:** `make check` compares the repository's own `.pipelex/` against the `pipelex/kit/configs/` templates by contents, and it had never been taught about the two things pipelex itself writes into a configuration directory — the `.gitignore` added in v0.46.2 (which has no kit counterpart by design) and the timestamped `*.bak.<stamp>` copies a real `pipelex migrate` leaves beside every file it rewrites. Dogfooding the `.gitignore` in v0.46.4 broke `make check` outright, and any developer who ran `pipelex migrate` in a checkout broke it again — putting the dirtied-repository problem that `.gitignore` exists to solve straight back, one gate over. Both the check and `make up-kit-configs` now look past those artifacts, matching backups and `.rescue.` copies by a glob built from the same infixes and stamp shape the backup namer writes, so a rename there cannot orphan the rule. This also closes a latent hole in `make up-kit-configs`, which would have mirrored a developer's backup copy into the shipped kit.
+
+## [v0.46.3] - 2026-08-18
+
+### Fixed
+
+- **The configuration-directory `.gitignore` now reaches machines with nothing to migrate:** v0.46.2 added a `.gitignore` inside `.pipelex/` to keep migration backups out of `git status`, but `pipelex migrate` only wrote it on a run that actually had a file to carry forward. A machine already at the current schema was reported clean and returned before the write pass, so it never got the rule — and that is the state every user is in between schema changes, which meant in practice almost nobody received it. Any real (non-`--dry-run`) `pipelex migrate` now writes it whether or not there is anything to migrate; a run whose migration you decline still writes nothing at all.
+
+## [v0.46.2] - 2026-08-18
+
+### Fixed
+
+- **Migration backups no longer dirty your repository:** `pipelex migrate` copies every file it rewrites to `<file>.bak.<timestamp>` beside the original, and inside a project's `.pipelex/` those copies showed up as untracked files in `git status` — a dozen of them after a single run. Pipelex now keeps a `.gitignore` inside the configuration directory itself, ignoring exactly the timestamped copies it makes; it is written by `pipelex init` and by any real `pipelex migrate`, so a machine whose `.pipelex/` predates this gets the rule from the run that would otherwise have made the mess. An existing `.gitignore` there is never modified, and a `.rescue.` copy is deliberately left visible because it is the one the report asks you to go and collect.
+
 ## [v0.46.1] - 2026-08-18
 
 ### Changed

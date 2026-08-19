@@ -1,0 +1,9 @@
+# Written by pipelex when it set this directory up. Yours from here on — pipelex reads this file
+# never, and rewrites it never. Delete a line and it stays deleted.
+#
+# The timestamped copy `pipelex migrate` takes of every file before it rewrites it. It is our own
+# transient artifact; the durable history of these files is your commits.
+#
+# A `<file>.rescue.<stamp>` copy is deliberately NOT listed. One of those exists only because a
+# write could not be vouched for, and seeing it in `git status` is how you find out.
+*.bak.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9]Z

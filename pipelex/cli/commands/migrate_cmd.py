@@ -34,7 +34,7 @@ from rich.markup import escape
 from rich.panel import Panel
 from rich.prompt import Confirm
 
-from pipelex.migration.run import config_directories_to_migrate, migrate_config_directories
+from pipelex.migration.run import config_directories_to_migrate, ensure_config_dir_gitignores, migrate_config_directories
 from pipelex.runtime_hub import get_console
 from pipelex.suggested_fix import WILDCARD_SEGMENT, DeleteKeyOp, DeleteTableOp, MoveKeyOp, RemapValueOp, RenameTableKeyOp
 
@@ -75,6 +75,12 @@ def migrate_cmd(*, dry_run: bool = False, yes: bool = False) -> None:
     _print_report(report=rehearsal, wrote=False)
 
     if rehearsal.is_clean:
+        if not dry_run:
+            # The write pass is what normally leaves the config-directory `.gitignore` behind, and
+            # this return means it is never going to run. A machine with nothing to carry forward
+            # still owns the directory pipelex writes backups into, so the rule is ensured here —
+            # otherwise it would reach only the machines that happened to have a migration pending.
+            ensure_config_dir_gitignores(config_dirs=config_dirs)
         console.print(_panel(message=_NOTHING_TO_DO, style="green"))
         console.print()
         return
@@ -86,6 +92,11 @@ def migrate_cmd(*, dry_run: bool = False, yes: bool = False) -> None:
         return
 
     if not rehearsal.changed_plans:
+        # The clean return's twin, and it needs the rule for the same reason: `--dry-run` has
+        # already returned above, so this run is authorized to write, and nothing was declined
+        # because nothing was asked. Unguarded on purpose — the guard would be dead code, and it
+        # is that ordering rather than a condition that a test downstairs pins.
+        ensure_config_dir_gitignores(config_dirs=config_dirs)
         # Nothing this tool can do, and something for the user to do. Asking "apply these changes?"
         # when there are none to apply is a prompt with one honest answer.
         console.print(_panel(message="Nothing here can be migrated automatically — see the notes above.", style="yellow"))
