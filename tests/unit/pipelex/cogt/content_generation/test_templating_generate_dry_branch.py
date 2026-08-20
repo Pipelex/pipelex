@@ -11,7 +11,7 @@ from pytest_mock import MockerFixture
 from pipelex.cogt.content_generation.assignment_models import TemplatingAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.templating_generate import templating_gen_text
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.template_category import TemplateCategory
@@ -20,7 +20,7 @@ from pipelex.tools.jinja2.template_category import TemplateCategory
 class TestTemplatingGenerateDryBranch:
     def _assignment(self, *, run_mode: PipeRunMode, template: str) -> TemplatingAssignment:
         return TemplatingAssignment(
-            job_metadata=JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_templating_dry"),
+            job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_templating_dry")),
             cogt_run_params=CogtRunParams(run_mode=run_mode),
             context={"the_answer": "42"},
             template=template,

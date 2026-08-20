@@ -118,7 +118,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         if not pipe_code:
             msg = "pipe_code is required for LLM span"
             raise JobMetadataError(msg)
-        pipeline_run_id = job_metadata.pipeline_run_id
+        pipeline_run_id = job_metadata.run_metadata.pipeline_run_id
 
         # Build output description for span name (full values - exporter handles redaction)
         output_desc: str
@@ -243,7 +243,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         log.verbose(
             f"[OTel] LLM SPAN ENDING:\n"
             f"  pipe_code='{job_metadata.pipe_code}'\n"
-            f"  pipeline_run_id='{job_metadata.pipeline_run_id}'\n"
+            f"  pipeline_run_id='{job_metadata.run_metadata.pipeline_run_id}'\n"
             f"  trace_id={span_ctx.trace_id:032x}\n"
             f"  span_id={span_ctx.span_id:016x}"
         )
@@ -274,7 +274,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         log.verbose(
             f"[OTel] LLM SPAN ENDING:\n"
             f"  pipe_code='{job_metadata.pipe_code}'\n"
-            f"  pipeline_run_id='{job_metadata.pipeline_run_id}'\n"
+            f"  pipeline_run_id='{job_metadata.run_metadata.pipeline_run_id}'\n"
             f"  trace_id={span_ctx.trace_id:032x}\n"
             f"  span_id={span_ctx.span_id:016x}"
         )
@@ -306,7 +306,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         log.verbose(
             f"[OTel] LLM SPAN ENDING WITH ERROR:\n"
             f"  pipe_code='{job_metadata.pipe_code}'\n"
-            f"  pipeline_run_id='{job_metadata.pipeline_run_id}'\n"
+            f"  pipeline_run_id='{job_metadata.run_metadata.pipeline_run_id}'\n"
             f"  trace_id={span_ctx.trace_id:032x}\n"
             f"  span_id={span_ctx.span_id:016x}"
         )

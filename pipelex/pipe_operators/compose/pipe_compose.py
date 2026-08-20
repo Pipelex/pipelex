@@ -222,7 +222,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
         return PipeComposeOutput(
             working_memory=working_memory,
-            pipeline_run_id=job_metadata.pipeline_run_id,
+            pipeline_run_id=job_metadata.run_metadata.pipeline_run_id,
         )
 
     async def _run_construct_mode(
@@ -275,7 +275,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
         return PipeComposeOutput(
             working_memory=working_memory,
-            pipeline_run_id=job_metadata.pipeline_run_id,
+            pipeline_run_id=job_metadata.run_metadata.pipeline_run_id,
         )
 
     @override
@@ -337,7 +337,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         working_memory.set_new_main_stuff(stuff=output_stuff, name=output_name)
         return PipeComposeOutput(
             working_memory=working_memory,
-            pipeline_run_id=job_metadata.pipeline_run_id,
+            pipeline_run_id=job_metadata.run_metadata.pipeline_run_id,
         )
 
     @override

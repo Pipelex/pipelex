@@ -9,7 +9,7 @@ from pytest_mock import MockerFixture
 from pipelex import log
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipelex import Pipelex
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipelex_service.pipelex_service_config import (
     PipelexServiceConfig,
 )
@@ -198,8 +198,4 @@ def job_metadata(request: pytest.FixtureRequest) -> JobMetadata:
     random_code: str = shortuuid.uuid()[:5]
     pipeline_run_id: str = f"{test_id}-{random_code}"
 
-    return JobMetadata(
-        storage_scope="test/scope",
-        user_id="pytest",
-        pipeline_run_id=pipeline_run_id,
-    )
+    return JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="pytest", pipeline_run_id=pipeline_run_id))

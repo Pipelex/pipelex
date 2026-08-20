@@ -32,7 +32,7 @@ from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
@@ -142,7 +142,9 @@ class TestPromptRenderingPurity:
         snapshot = pipe_llm.model_dump()
 
         await pipe_llm._dry_run_operator_pipe(  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
-            job_metadata=JobMetadata(storage_scope="test/scope", user_id="pytest", pipeline_run_id="test_prompt_rendering_purity"),
+            job_metadata=JobMetadata(
+                run_metadata=RunMetadata(storage_scope="test/scope", user_id="pytest", pipeline_run_id="test_prompt_rendering_purity")
+            ),
             working_memory=_make_working_memory(),
             pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10, batch_max_concurrency=None),
         )

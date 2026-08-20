@@ -15,14 +15,14 @@ from pipelex.cogt.content_generation.extract_generate import extract_gen_pages_a
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.config import get_config
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 class TestExtractGenerateDryBranch:
     def _assignment(self, *, run_mode: PipeRunMode, extract_input: ExtractInput) -> ExtractAssignment:
         return ExtractAssignment(
-            job_metadata=JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_extract_dry"),
+            job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_extract_dry")),
             cogt_run_params=CogtRunParams(run_mode=run_mode),
             extract_handle="mock-extract-handle",
             extract_input=extract_input,

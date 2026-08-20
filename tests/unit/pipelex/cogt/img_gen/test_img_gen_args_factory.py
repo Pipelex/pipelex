@@ -46,7 +46,7 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.providers.openai.openai_img_gen_worker import OpenAIImgGenWorker
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.tools.misc.filetype_utils import FileType
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.uri.prepared_file import PreparedFileBase64
@@ -81,7 +81,7 @@ class TestImgGenArgsFactory:
             ),
             job_config=ImgGenJobConfig(is_sync_mode=False),
             job_report=ImgGenJobReport(),
-            job_metadata=JobMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="test-run"),
+            job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="test-run")),
         )
 
     @staticmethod

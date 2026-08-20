@@ -2,7 +2,7 @@
 onto :class:`JobMetadata`.
 
 The ``X-Request-ID`` reaches the worker by riding the workflow input
-(``arg.pipe_job.job_metadata.request_id``); there is no ContextVar layer. This
+(``arg.pipe_job.job_metadata.run_metadata.request_id``); there is no ContextVar layer. This
 test pins the dispatcher-side contract: passing ``request_id`` to
 ``pipeline_run_setup`` produces a :class:`PipeJob` whose ``job_metadata``
 carries it.
@@ -35,7 +35,7 @@ prompt = "Echo the $subject as a topic"
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipelineRunSetupRequestId:
     async def test_request_id_threads_onto_job_metadata(self) -> None:
-        """``pipeline_run_setup(..., request_id=...)`` puts the value on ``job_metadata.request_id``."""
+        """``pipeline_run_setup(..., request_id=...)`` puts the value on ``job_metadata.run_metadata.request_id``."""
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
             generate_graph=False,
         )
@@ -47,10 +47,10 @@ class TestPipelineRunSetupRequestId:
             pipe_code="echo_topic",
             request_id="r-pipeline-setup-abc-123",
         )
-        assert pipe_job.job_metadata.request_id == "r-pipeline-setup-abc-123"
+        assert pipe_job.job_metadata.run_metadata.request_id == "r-pipeline-setup-abc-123"
 
     async def test_request_id_absent_defaults_to_none(self) -> None:
-        """Omitting ``request_id`` leaves ``job_metadata.request_id`` as ``None``."""
+        """Omitting ``request_id`` leaves ``job_metadata.run_metadata.request_id`` as ``None``."""
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
             generate_graph=False,
         )
@@ -61,4 +61,4 @@ class TestPipelineRunSetupRequestId:
             mthds_contents=[_MINIMAL_MTHDS],
             pipe_code="echo_topic",
         )
-        assert pipe_job.job_metadata.request_id is None
+        assert pipe_job.job_metadata.run_metadata.request_id is None

@@ -22,14 +22,14 @@ from pipelex.cogt.content_generation.llm_generate import llm_gen_text
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.usage.cost_registry import CostRegistry
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 class TestLlmGenerateDryBranch:
     def _assignment(self, *, run_mode: PipeRunMode, is_mock_usage: bool = False) -> LLMAssignment:
         return LLMAssignment(
-            job_metadata=JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_dry_branch"),
+            job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_dry_branch")),
             cogt_run_params=CogtRunParams(run_mode=run_mode, is_mock_usage=is_mock_usage),
             llm_setting=LLMSetting(model="gpt-4o", temperature=0.5),
             llm_prompt=LLMPrompt(),

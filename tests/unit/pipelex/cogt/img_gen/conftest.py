@@ -15,7 +15,7 @@ from pipelex.cogt.img_gen.img_gen_job_components import (
     Quality,
 )
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.tools.misc.image_utils import ImageFormat
 
 if TYPE_CHECKING:
@@ -62,5 +62,5 @@ def make_img_gen_job(
         ),
         job_config=ImgGenJobConfig(is_sync_mode=False),
         job_report=ImgGenJobReport(),
-        job_metadata=JobMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="test-run"),
+        job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="test-run")),
     )

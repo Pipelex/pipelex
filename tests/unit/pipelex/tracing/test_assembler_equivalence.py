@@ -19,7 +19,7 @@ from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import EdgeKind, EdgeSpec, GraphSpec, IOSpec, NodeKind, NodeSpec
-from pipelex.system.job_metadata import JobCategory, JobMetadata, UnitJobId
+from pipelex.system.job_metadata import JobCategory, JobMetadata, RunMetadata, UnitJobId
 from pipelex.system.trace_context import TraceContext
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
@@ -473,9 +473,7 @@ def _usage_events_for(*, assembled_child_node_id: str, event_log: InMemoryEventL
             node_id=assembled_child_node_id,
             tokens_usage=LLMTokensUsage(
                 job_metadata=JobMetadata(
-                    storage_scope="test/scope",
-                    user_id="user_test",
-                    pipeline_run_id=_PIPELINE_RUN_ID,
+                    run_metadata=RunMetadata(storage_scope="test/scope", user_id="user_test", pipeline_run_id=_PIPELINE_RUN_ID),
                     pipe_code="gen_text",
                     unit_job_id=UnitJobId.LLM_GEN_TEXT,
                     job_category=JobCategory.LLM_JOB,

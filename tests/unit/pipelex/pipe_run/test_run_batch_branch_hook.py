@@ -17,7 +17,7 @@ from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 if TYPE_CHECKING:
@@ -42,7 +42,7 @@ class _RecordingRouter(PipeRouterProtocol):
         self.dispatched_jobs.append(pipe_job)
         return PipeOutput(
             working_memory=WorkingMemoryFactory.make_empty(),
-            pipeline_run_id=pipe_job.job_metadata.pipeline_run_id,
+            pipeline_run_id=pipe_job.job_metadata.run_metadata.pipeline_run_id,
         )
 
 
@@ -52,7 +52,7 @@ def _make_pipe_job() -> PipeJob:
         working_memory=None,
         working_memory_raw=None,
         pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE),
-        job_metadata=JobMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="test-run"),
+        job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="test-run")),
         output_name=None,
         library_crate=None,
     )

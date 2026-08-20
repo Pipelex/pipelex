@@ -14,7 +14,7 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from tests.unit.pipelex.graph.conftest import make_trace_context
 
 
@@ -66,9 +66,7 @@ class TestRunPipeForwardsTracerMetadata:
         )
 
         job_metadata = JobMetadata(
-            storage_scope="test/scope",
-            user_id="pytest",
-            pipeline_run_id="test-run-meta",
+            run_metadata=RunMetadata(storage_scope="test/scope", user_id="pytest", pipeline_run_id="test-run-meta"),
             trace_context=make_trace_context(graph_id="test-run-meta"),
         )
 

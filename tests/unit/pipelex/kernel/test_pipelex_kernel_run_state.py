@@ -57,7 +57,7 @@ class TestPipelexKernelRunState:
 
         kernel = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user", trace_context=trace_context)
 
-        assert kernel.job_metadata.pipeline_run_id == _GRAPH_ID
+        assert kernel.job_metadata.run_metadata.pipeline_run_id == _GRAPH_ID
         assert kernel.job_metadata.trace_context == trace_context
 
     def test_without_a_trace_context_the_run_mints_its_own_id_and_traces_nothing(self) -> None:
@@ -66,7 +66,7 @@ class TestPipelexKernelRunState:
         second = PipelexKernel.make(storage_scope="test/scope", run_mode=PipeRunMode.DRY, user_id="test-user")
 
         assert first.job_metadata.trace_context is None
-        assert first.job_metadata.pipeline_run_id != second.job_metadata.pipeline_run_id
+        assert first.job_metadata.run_metadata.pipeline_run_id != second.job_metadata.run_metadata.pipeline_run_id
 
     def test_each_step_inherits_the_trace_context_and_carries_its_own_run_id(self) -> None:
         """The per-step copy: same trace context (so every step attributes to it), distinct pipe_run_id."""
@@ -77,7 +77,7 @@ class TestPipelexKernelRunState:
 
         assert first_step.trace_context == kernel.job_metadata.trace_context
         assert second_step.trace_context == kernel.job_metadata.trace_context
-        assert first_step.pipeline_run_id == second_step.pipeline_run_id == _GRAPH_ID
+        assert first_step.run_metadata.pipeline_run_id == second_step.run_metadata.pipeline_run_id == _GRAPH_ID
         assert first_step.pipe_run_id != second_step.pipe_run_id
         # Computed fresh per step by whoever opens the span, and a kernel call opens none.
         assert first_step.otel_context is None

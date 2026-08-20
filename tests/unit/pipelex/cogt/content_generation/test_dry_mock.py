@@ -25,13 +25,13 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 def _dry_object_assignment() -> ObjectAssignment:
     llm_assignment = LLMAssignment(
-        job_metadata=JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_dry_mock"),
+        job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_dry_mock")),
         cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
         llm_setting=LLMSetting(model="gpt-4o", temperature=0.5),
         llm_prompt=LLMPrompt(),
@@ -56,7 +56,7 @@ class TestDryMock:
         """report_mock_usage_llm_job emits non-zero usage under the mock_usage sentinel -> reportable."""
         captured = self._capture_reported_job(mocker)
         report_mock_usage_llm_job(
-            job_metadata=JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_mock"),
+            job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_mock")),
             llm_setting=LLMSetting(model="gpt-4o", temperature=0.5),
             llm_prompt=LLMPrompt(),
         )
@@ -73,7 +73,7 @@ class TestDryMock:
         """report_dry_llm_job stays zero-token under the dry_run sentinel -> NOT reportable (suppressed)."""
         captured = self._capture_reported_job(mocker)
         report_dry_llm_job(
-            job_metadata=JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_dry"),
+            job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_dry")),
             llm_setting=LLMSetting(model="gpt-4o", temperature=0.5),
             llm_prompt=LLMPrompt(),
         )
