@@ -8,7 +8,7 @@
 
   There is deliberately no read-through accessor on `JobMetadata`: one spelling for one fact. Every call site reads the nested path.
 
-- **A pipe's result now carries the job it was produced under.** `PipeOutput.job_metadata` and `TracingAssembly.run_metadata` are set once at the run boundary, so a transport that offloads an oversized result to storage can key it inside the run's own namespace.
+- **A pipe's result now carries the job it was produced under.** `PipeOutput.job_metadata` and `TracingAssembly.run_metadata` are set once at the run boundary, so a transport that offloads an oversized result to storage can key it inside the run's own namespace. Both are **private attributes behind properties, not model fields**: `PipeOutput` is on the wire — `pipelex-api` returns it and publishes its schema — so as a field this would have put `user_id`, `request_id` and `otel_context` into a public API's response body and its documented OpenAPI artifact. A transport reads the value by attribute on the live object before serializing, so it never needed to be on the wire at all.
 
   The gap was one-directional and easy to miss: every payload a run sends *in* carries a `job_metadata` to resolve a scope through, and nothing it sent *back* did. Under a hosted orchestrator that meant the two largest payloads an ordinary run produces — the pipe output and the tracing assembly, both around 350 KB — were stored outside every prefix the host's erasure cascade deletes, and survived deletion of the run that produced them. The same bytes were also stored a second time, correctly scoped, inside the delivery argument that carries them.
 

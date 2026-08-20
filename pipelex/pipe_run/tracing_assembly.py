@@ -12,7 +12,7 @@ that crosses the Temporal activity boundary (returned by ``act_assemble_tracing`
 
 import json
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, PrivateAttr, ValidationError
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexConfigError
@@ -50,13 +50,27 @@ class TracingAssembly(BaseModel):
     usage_assembly_error: str | None = None
 
     # The run this assembly belongs to. Same purpose as `PipeOutput.job_metadata`
-    # and for the same reason: this crosses a transport boundary on its own (~335 KB
-    # in an ordinary hosted run) and, without a scope to resolve, an offloaded copy
-    # keys outside the run's namespace and outlives it.
+    # and, for the same reason, the same shape: a private attribute behind a
+    # property rather than a model field, so it is readable by a transport
+    # resolving a storage scope and absent from every serialization and schema.
     #
     # `RunMetadata` rather than the whole `JobMetadata`: an assembly belongs to the
     # RUN, not to any one job within it, and the per-job half would be a lie here.
-    run_metadata: RunMetadata | None = None
+    _run_metadata: RunMetadata | None = PrivateAttr(default=None)
+
+    @property
+    def run_metadata(self) -> RunMetadata | None:
+        return self._run_metadata
+
+    def set_run_metadata(self, *, run_metadata: RunMetadata | None) -> None:
+        """Set the run_metadata a transport reads to place this result's bytes.
+
+        A METHOD, not a `@run_metadata.setter`: this repo's keyword-only convention
+        rewrites a positional setter parameter into a keyword-only one, which is not
+        a valid property-setter signature. A named method takes the keyword happily
+        and says what it does at the call site.
+        """
+        self._run_metadata = run_metadata
 
 
 def assemble_tracing(
@@ -97,7 +111,8 @@ def assemble_tracing(
     Returns:
         A TracingAssembly carrying whichever artifacts were requested and succeeded.
     """
-    result = TracingAssembly(run_metadata=run_metadata)
+    result = TracingAssembly()
+    result.set_run_metadata(run_metadata=run_metadata)
     tracing_config = get_config().runtime.tracing
     # A scoped override (see hub.scoped_event_log) is the run's transport and implies
     # tracing-enabled (D1) — it must not be skipped by the is_enabled early-return.

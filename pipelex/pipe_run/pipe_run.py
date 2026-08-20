@@ -45,7 +45,7 @@ class PipeRun(PipeRunProtocol):
             # Only the top-level output crosses a transport boundary; a sub-pipe's
             # output stays in-process, so stamping at every `PipeOutput(...)` site
             # would be noise on ~17 constructors to serve one of them.
-            pipe_output.job_metadata = pipe_job.job_metadata
+            pipe_output.set_job_metadata(job_metadata=pipe_job.job_metadata)
         except Exception as exc:  # noqa: BLE001
             # Observe-and-reraise: records FAILED status so the finally delivery sees it, then re-raises the original error below.
             status = DeliveryStatus.FAILED
