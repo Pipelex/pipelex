@@ -6,15 +6,16 @@ Two shapes, both keyless (dry mode mocks only the cogt leaf and rides the live r
   bool flows through the factory's YesNo arm and renders inline in the downstream prompt.
 """
 
-from pathlib import Path
-
 import pytest
 
 from pipelex.pipeline.pipeline_response import RunState
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.test_extras.mthds_corpus.loader import get_entry
 
-_FIXTURE_DIR = Path(__file__).parent / "yes_no_judgment"
+# The bundle is a corpus entry, not a fixture local to this test: the corpus is the single source
+# for language-level `.mthds` methods, and covering `native.yes_no` is exactly why the entry exists.
+_FIXTURE_DIR = get_entry(name="native_yes_no_urgent_message").directory
 
 
 @pytest.mark.asyncio(loop_scope="class")

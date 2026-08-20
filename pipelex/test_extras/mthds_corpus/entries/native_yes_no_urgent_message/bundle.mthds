@@ -1,5 +1,5 @@
-domain      = "yes_no_demo"
-description = "Native YesNo as a PipeLLM output (a judgment) and as a pipeline input"
+domain      = "support_inbox"
+description = "Judge whether an inbox message is urgent, and justify the verdict"
 main_pipe   = "judge_is_urgent"
 
 [pipe.judge_is_urgent]

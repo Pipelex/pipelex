@@ -1,0 +1,14 @@
+domain      = "train_delays"
+description = "Turn a delay report into the short notice shown on a platform board"
+main_pipe   = "write_notice"
+
+[pipe.write_notice]
+type = "PipeLLM"
+description = "Write the one-line platform notice for a delay"
+inputs = { report = "Text" }
+output = "Text"
+prompt = """
+Write a one-line platform notice announcing this delay.
+
+@report
+"""

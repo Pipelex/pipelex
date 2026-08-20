@@ -1,0 +1,10 @@
+name = "native_page_catalog_leaf"
+description = "The titles listed on one page of a bookshop catalog"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "native.page",
+]

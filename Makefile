@@ -105,6 +105,7 @@ make generate-mthds-schema    - Generate JSON Schema for .mthds files
 make gms                      - Shorthand -> generate-mthds-schema
 make check-mthds-schema       - Check MTHDS JSON Schema is up-to-date
 make cms                      - Shorthand -> check-mthds-schema
+make generate-corpus-vocabulary - Regenerate the MTHDS Test Corpus tag vocabulary
 make check-ledger             - Check migration ledgers are legal and replay harmlessly
 make cl                       - Shorthand -> check-ledger
 make check-migration-schemas  - Check configuration surfaces have accounted for their schema changes
@@ -223,6 +224,7 @@ export HELP
 	li check-unused-imports fix-unused-imports check-TODOs check-uv \
 	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-specific-version docs-delete \
 	generate-mthds-schema generate-mthds-schema-quiet gms check-mthds-schema cms \
+	generate-corpus-vocabulary generate-corpus-vocabulary-quiet \
 	check-ledger cl check-migration-schemas cmig up-migration-schemas up-migration-schemas-force umig umigf \
 	generate-error-pages generate-error-pages-quiet gep \
 	generate-error-identity generate-error-identity-quiet gei \
@@ -421,6 +423,15 @@ check-mthds-schema: env
 
 cms: check-mthds-schema
 	@echo "> done: cms = check-mthds-schema"
+
+# The corpus vocabulary is committed and ships in the wheel, so its freshness is gated by a unit
+# test that regenerates it in memory and compares byte for byte — there is no `check-` twin here.
+generate-corpus-vocabulary: env
+	$(call PRINT_TITLE,"Generating MTHDS Test Corpus vocabulary")
+	$(VENV_PIPELEX_DEV) generate-corpus-vocabulary
+
+generate-corpus-vocabulary-quiet: env
+	$(VENV_PIPELEX_DEV) generate-corpus-vocabulary --quiet
 
 check-ledger: env
 	$(call PRINT_TITLE,"Checking migration ledgers are legal and converge")
@@ -1207,15 +1218,15 @@ vg: view-graph
 c: check-keyword-only format lint pyright mypy
 	@echo "> done: c = check"
 
-cc: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet c
-	@echo "> done: cc = cleanderived regenerate-test-models generate-mthds-schema update-gateway-models format lint pyright mypy"
+cc: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet generate-corpus-vocabulary-quiet update-gateway-models-quiet c
+	@echo "> done: cc = cleanderived regenerate-test-models generate-mthds-schema generate-corpus-vocabulary update-gateway-models format lint pyright mypy"
 
 # `up-migration-schemas` is deliberately NOT part of this aggregate. Every other regenerator here
 # rewrites a derived artifact from a live source; the migration head golden is a *proof obligation*
 # the coverage gate reads, so folding it into a habitual bulk regeneration would let a removal be
 # erased by muscle memory. Run `make umig` on purpose, and read its diff.
-up: generate-mthds-schema-quiet update-gateway-models-quiet up-kit-configs rules
-	@echo "> done: up = generate-mthds-schema update-gateway-models up-kit-configs rules"
+up: generate-mthds-schema-quiet generate-corpus-vocabulary-quiet update-gateway-models-quiet up-kit-configs rules
+	@echo "> done: up = generate-mthds-schema generate-corpus-vocabulary update-gateway-models up-kit-configs rules"
 
 check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema check-ledger check-migration-schemas check-keyword-only check-hub-layering drift-check format lint pyright mypy pylint
 	@echo "> done: check"

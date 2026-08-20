@@ -1,0 +1,10 @@
+name = "native_text_and_images_recipe_card"
+description = "A recipe summary paired with the photographs that would illustrate it"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "native.text_and_images",
+]

@@ -1,0 +1,10 @@
+name = "native_yes_no_urgent_message"
+description = "A yes/no verdict on whether an inbox message is urgent"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "native.yes_no",
+]

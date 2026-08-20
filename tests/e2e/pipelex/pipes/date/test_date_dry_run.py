@@ -7,7 +7,6 @@ Two shapes, both keyless (dry mode mocks only the cogt leaf and rides the live r
 """
 
 import datetime
-from pathlib import Path
 
 import pytest
 
@@ -15,8 +14,11 @@ from pipelex.core.stuffs.date_content import DateContent
 from pipelex.pipeline.pipeline_response import RunState
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.test_extras.mthds_corpus.loader import get_entry
 
-_FIXTURE_DIR = Path(__file__).parent / "date_departure"
+# The bundle is a corpus entry, not a fixture local to this test: the corpus is the single source
+# for language-level `.mthds` methods, and covering `native.date` is exactly why the entry exists.
+_FIXTURE_DIR = get_entry(name="native_date_departure").directory
 
 
 @pytest.mark.asyncio(loop_scope="class")

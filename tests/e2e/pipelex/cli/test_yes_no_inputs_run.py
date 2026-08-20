@@ -19,9 +19,14 @@ from pathlib import Path
 
 import pytest
 
+from pipelex.test_extras.mthds_corpus.loader import get_entry
+
 REPO_ROOT = Path(__file__).resolve().parents[4]
 PIPELEX_BIN = REPO_ROOT / ".venv" / "bin" / "pipelex"
-BUNDLE_SRC = REPO_ROOT / "tests" / "e2e" / "pipelex" / "pipes" / "yes_no" / "yes_no_judgment"
+# The bundle is a corpus entry: the corpus is the single source for language-level `.mthds`
+# methods. Only the bundle file is staged — the entry's manifest and canonical inputs are
+# corpus metadata, and this test supplies its own `inputs.toml`.
+BUNDLE_SRC = get_entry(name="native_yes_no_urgent_message").bundle_path
 
 INPUTS_TOML = """[verdict]
 concept = "YesNo"
@@ -33,7 +38,8 @@ class TestYesNoInputsRun:
     @pytest.mark.gha_disabled
     def test_yes_no_envelope_input_dry_run(self, tmp_path: Path) -> None:
         staged = tmp_path / "yes_no_judgment"
-        shutil.copytree(BUNDLE_SRC, staged)
+        staged.mkdir()
+        shutil.copy2(BUNDLE_SRC, staged / BUNDLE_SRC.name)
         inputs_toml = staged / "inputs.toml"
         inputs_toml.write_text(INPUTS_TOML, encoding="utf-8")
 

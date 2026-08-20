@@ -1,0 +1,14 @@
+domain      = "supplier_lookup"
+description = "Write a buyer's shortlist from the results of a supplier lookup"
+main_pipe   = "write_shortlist"
+
+[pipe.write_shortlist]
+type = "PipeLLM"
+description = "Write a shortlist of suppliers from the lookup results"
+inputs = { lookup = "SearchResult" }
+output = "Text"
+prompt = """
+Write a shortlist of three suppliers from these lookup results, one line each, naming the source for every one.
+
+@lookup
+"""

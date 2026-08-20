@@ -1,0 +1,14 @@
+{
+  "tracking_record": {
+    "concept": "native.Text",
+    "content": {
+      "text": "Parcel RB884120: collected 3 March, sorted at Rennes 4 March, out for delivery 5 March, signed for by M. Fabre."
+    }
+  },
+  "wanted_field": {
+    "concept": "native.Text",
+    "content": {
+      "text": "who signed for the parcel"
+    }
+  }
+}

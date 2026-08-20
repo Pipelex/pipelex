@@ -1,5 +1,5 @@
-domain      = "date_demo"
-description = "Native Date as a pipeline input fed by TOML date/datetime literals"
+domain      = "ticket_desk"
+description = "Read a departure date off a ticket, and write a note about it"
 main_pipe   = "describe_departure"
 
 [pipe.describe_departure]

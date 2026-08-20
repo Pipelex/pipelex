@@ -1,0 +1,14 @@
+domain      = "lost_property"
+description = "Write a counter description for whatever was handed in to lost property"
+main_pipe   = "describe_handed_in_item"
+
+[pipe.describe_handed_in_item]
+type = "PipeLLM"
+description = "Write a short counter description of a handed-in item, whatever it turns out to be"
+inputs = { handed_in_item = "Anything" }
+output = "Text"
+prompt = """
+Write two sentences describing this handed-in item for the lost property counter.
+
+@handed_in_item
+"""
