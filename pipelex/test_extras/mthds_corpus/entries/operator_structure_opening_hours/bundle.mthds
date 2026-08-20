@@ -1,6 +1,6 @@
 domain      = "shop_hours"
 description = "Turning the opening hours written on a shop door into fields"
-main_pipe   = "structure_opening_hours"
+main_pipe   = "read_opening_hours"
 
 [concept.OpeningHours]
 description = "The hours a shop is open on a given day"
@@ -10,7 +10,7 @@ day    = { type = "text", description = "The day of the week the hours apply to"
 opens  = { type = "text", description = "The time the shop opens, as written on the door", required = true }
 closes = { type = "text", description = "The time the shop closes, as written on the door", required = true }
 
-[pipe.structure_opening_hours]
+[pipe.read_opening_hours]
 type        = "PipeStructure"
 description = "Reads a line of opening hours off a shop door and fills in the fields"
 inputs      = { door_notice = "Text" }
