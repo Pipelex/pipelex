@@ -73,6 +73,14 @@ _PIPE_TYPE_PREFIX = "Pipe"
 # coverage the corpus does not have is worse than a short vocabulary. Rendered in alphabetical order,
 # there being no registry order to follow.
 _FEATURE_TAGS: dict[str, str] = {
+    "optionals": (
+        "An input declared optional with the `?` suffix, guarded in the prompt so that an absent value "
+        "renders nothing rather than failing the run, and recorded as absent in the working memory."
+    ),
+    "smart_inputs": (
+        "Bare caller values — a string, a number, a dict, a list — interpreted top-down against the entry "
+        "pipe's declared signature, so a caller need not wrap each one in its concept envelope."
+    ),
     "multi_file_library": (
         "A method split across several `.mthds` files in one directory and merged additively behind a "
         "`bundle.mthds` entry point, so a pipe can be forward-declared as a signature in one file and "

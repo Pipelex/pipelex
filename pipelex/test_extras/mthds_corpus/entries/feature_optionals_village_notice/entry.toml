@@ -1,0 +1,10 @@
+name = "feature_optionals_village_notice"
+description = "A noticeboard line whose house-style hint is optional, guarded in the prompt so an absent one renders nothing"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "feature.optionals",
+]

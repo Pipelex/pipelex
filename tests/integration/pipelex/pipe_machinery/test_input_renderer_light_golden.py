@@ -30,6 +30,7 @@ from pipelex.interpreter_hub import (
 )
 from pipelex.pipe_machinery.rendering.input_renderer import render_inputs, render_inputs_toml
 from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.test_extras.mthds_corpus.loader import get_entry
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -39,7 +40,9 @@ if TYPE_CHECKING:
 #: test followed `input_renderer` out of `core/pipes/` into the `pipe_machinery/` mirror.
 _TESTS_ROOT = next(parent for parent in Path(__file__).parents if parent.name == "tests")
 _SMART_INPUTS = _TESTS_ROOT / "e2e" / "pipelex" / "pipes" / "smart_inputs"
-_TRIAGE = _SMART_INPUTS / "smart_inputs_triage" / "smart_inputs_triage.mthds"
+#: The triage bundle is a corpus entry now — the corpus is the single source for language-level
+#: `.mthds` methods, and `feature.smart_inputs` is exactly what this golden renders against.
+_TRIAGE = get_entry(name="feature_smart_inputs_claims_triage").bundle_path
 _FILES = _SMART_INPUTS / "smart_inputs_files" / "smart_inputs_files.mthds"
 
 
@@ -62,7 +65,7 @@ class TestInputRendererLightGolden:
 
     async def test_triage_light_json_default(self, load_empty_library: Callable[[], str]) -> None:
         """The default JSON template is the light shape: bare string/number, structured dict, list of bare strings."""
-        the_pipe, outer_library_id = await self._load_pipe(_TRIAGE, pipe_ref="smart_inputs_demo.triage_case", load_empty_library=load_empty_library)
+        the_pipe, outer_library_id = await self._load_pipe(_TRIAGE, pipe_ref="claims_desk.triage_case", load_empty_library=load_empty_library)
         try:
             light = json.loads(render_inputs(the_pipe))
         finally:
@@ -77,15 +80,15 @@ class TestInputRendererLightGolden:
 
     async def test_triage_light_toml_carries_concept_comments(self, load_empty_library: Callable[[], str]) -> None:
         """The default TOML template carries the declared concept as a comment and loads back to the light dict."""
-        the_pipe, outer_library_id = await self._load_pipe(_TRIAGE, pipe_ref="smart_inputs_demo.triage_case", load_empty_library=load_empty_library)
+        the_pipe, outer_library_id = await self._load_pipe(_TRIAGE, pipe_ref="claims_desk.triage_case", load_empty_library=load_empty_library)
         try:
             toml_str = render_inputs_toml(the_pipe)
         finally:
             _teardown_validation_library(outer_library_id)
 
-        assert "# concept: smart_inputs_demo.Question" in toml_str
-        assert "# concept: smart_inputs_demo.Priority" in toml_str
-        assert "# concept: smart_inputs_demo.Tag[]" in toml_str
+        assert "# concept: claims_desk.Question" in toml_str
+        assert "# concept: claims_desk.Priority" in toml_str
+        assert "# concept: claims_desk.Tag[]" in toml_str
         assert tomli.loads(toml_str) == {
             "question": "text_value",
             "priority": 1,
@@ -95,16 +98,16 @@ class TestInputRendererLightGolden:
 
     async def test_triage_explicit_reproduces_envelope(self, load_empty_library: Callable[[], str]) -> None:
         """--explicit reproduces the ceremonial {concept, content} envelope, in both JSON and TOML."""
-        the_pipe, outer_library_id = await self._load_pipe(_TRIAGE, pipe_ref="smart_inputs_demo.triage_case", load_empty_library=load_empty_library)
+        the_pipe, outer_library_id = await self._load_pipe(_TRIAGE, pipe_ref="claims_desk.triage_case", load_empty_library=load_empty_library)
         try:
             envelope = json.loads(render_inputs(the_pipe, explicit=True))
             envelope_toml = tomli.loads(render_inputs_toml(the_pipe, explicit=True))
         finally:
             _teardown_validation_library(outer_library_id)
 
-        assert envelope["question"] == {"concept": "smart_inputs_demo.Question", "content": {"text": "text_value"}}
-        assert envelope["priority"] == {"concept": "smart_inputs_demo.Priority", "content": {"number": 1}}
-        assert envelope["tags"] == {"concept": "smart_inputs_demo.Tag", "content": [{"text": "text_value"}]}
+        assert envelope["question"] == {"concept": "claims_desk.Question", "content": {"text": "text_value"}}
+        assert envelope["priority"] == {"concept": "claims_desk.Priority", "content": {"number": 1}}
+        assert envelope["tags"] == {"concept": "claims_desk.Tag", "content": [{"text": "text_value"}]}
         assert envelope_toml == envelope
 
     async def test_files_light_json_file_ish_and_structured_list(self, load_empty_library: Callable[[], str]) -> None:
