@@ -25,6 +25,12 @@ class VocabularyTag(BaseModel):
     one-line statement of the language feature it names, which is the only place that meaning
     can live. ``excluded`` carries the reason a tag is not required to have a focused entry,
     and is present only on excluded tags.
+
+    All three fields are optional here, and no validator enforces the ``code``-or-``description``
+    split, deliberately. This model only *reads*: the generator is the single writer, and the
+    drift gate regenerates the committed file in memory and compares it byte for byte, so a tag
+    carrying neither cannot reach a reader through the channel this model serves. A validator
+    would guard a state the pipeline cannot produce.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)

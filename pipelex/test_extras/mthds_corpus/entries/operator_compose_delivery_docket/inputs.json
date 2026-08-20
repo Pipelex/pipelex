@@ -1,6 +1,6 @@
 {
   "parcel": {
-    "concept": "WeighedParcel",
+    "concept": "deliveries.WeighedParcel",
     "content": {
       "weight_kg": 3.4,
       "destination": "Quimper"
