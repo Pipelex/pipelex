@@ -1,0 +1,12 @@
+name = "invalid_unresolved_concept_owned"
+description = "A bicycle repair note described as a narrower kind of a workshop entry that the method never describes"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.unresolved_concept",
+]
+
+expected_error = "unresolved_concept"

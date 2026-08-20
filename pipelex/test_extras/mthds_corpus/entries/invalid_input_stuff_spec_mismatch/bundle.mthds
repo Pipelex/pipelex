@@ -1,0 +1,13 @@
+domain      = "opening_hours"
+description = "Set out a shop's opening hours as a filled-in table"
+main_pipe   = "set_out_opening_hours"
+
+[concept.OpeningHours]
+description = "The days a shop is open and the hours it keeps"
+structure   = { weekday = "text", hours = "text" }
+
+[pipe.set_out_opening_hours]
+type        = "PipeStructure"
+description = "Set out the opening hours as a table"
+inputs      = { shop_front = "Image" }
+output      = "OpeningHours"

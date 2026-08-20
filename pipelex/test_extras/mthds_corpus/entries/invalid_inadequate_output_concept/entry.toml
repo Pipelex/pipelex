@@ -1,0 +1,12 @@
+name = "invalid_inadequate_output_concept"
+description = "A garden sign that is painted, and then asked for back as written words rather than as a picture"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.inadequate_output_concept",
+]
+
+expected_error = "inadequate_output_concept"

@@ -1,0 +1,10 @@
+domain      = "delay_notices"
+description = "Write the notice announcing that a service is running late"
+main_pipe   = "write_delay_notice"
+
+[pipe.write_delay_notice]
+type        = "PipeLLM"
+description = "Write the delay notice for a service"
+inputs      = { service = "Text", platform = "Text" }
+output      = "Text"
+prompt      = "Write the notice announcing that the $service is running late."

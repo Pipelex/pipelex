@@ -1,0 +1,12 @@
+name = "invalid_optional_output_required"
+description = "A campsite booking answered when the warden approves and left to lie when they do not, while the answer is promised either way"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.optional_output_required",
+]
+
+expected_error = "optional_output_required"

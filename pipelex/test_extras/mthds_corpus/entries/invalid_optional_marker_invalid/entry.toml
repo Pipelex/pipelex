@@ -1,0 +1,12 @@
+name = "invalid_optional_marker_invalid"
+description = "A set of meeting minutes drawn from notes that are marked both as several and as possibly absent"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.optional_marker_invalid",
+]
+
+expected_error = "optional_marker_invalid"

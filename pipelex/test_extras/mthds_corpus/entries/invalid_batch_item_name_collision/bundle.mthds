@@ -1,0 +1,25 @@
+domain      = "crate_labels"
+description = "Write a label for every crate in a shipment"
+main_pipe   = "label_crates"
+
+[concept]
+Crate      = "One crate in a shipment"
+CrateLabel = "The label to stick on a crate"
+
+[pipe.label_crates]
+type             = "PipeBatch"
+description      = "Write a label for each crate in turn"
+inputs           = { crates = "Crate[]" }
+output           = "CrateLabel[]"
+branch_pipe_code = "label_one_crate"
+input_list_name  = "crates"
+input_item_name  = "crates"
+
+# The branch pipe is well-formed and its input matches `input_item_name`, so the collision above
+# is the only fault whatever order validation runs in.
+[pipe.label_one_crate]
+type        = "PipeLLM"
+description = "Write the label for one crate"
+inputs      = { crates = "Crate" }
+output      = "CrateLabel"
+prompt      = "Write the label for this crate: $crates"

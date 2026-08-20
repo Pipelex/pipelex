@@ -1,0 +1,10 @@
+domain      = "garden_signs"
+description = "Paint the sign that stands at the end of a flower bed"
+main_pipe   = "paint_garden_sign"
+
+[pipe.paint_garden_sign]
+type        = "PipeImgGen"
+description = "Paint the sign for a flower bed"
+inputs      = { bed_note = "Text" }
+output      = "Text"
+prompt      = "A painted wooden garden sign for $bed_note"

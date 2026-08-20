@@ -1,0 +1,12 @@
+name = "invalid_unresolved_pipe_dependency"
+description = "A ferry sailing notice drafted and then checked by a second step the method never writes down"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.unresolved_pipe_dependency",
+]
+
+expected_error = "unresolved_pipe_dependency"

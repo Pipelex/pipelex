@@ -1,0 +1,12 @@
+name = "invalid_native_concept_redeclaration"
+description = "An allotment gate notice whose bundle gives its own meaning to a name the language already reserves"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.native_concept_redeclaration",
+]
+
+expected_error = "native_concept_redeclaration"
