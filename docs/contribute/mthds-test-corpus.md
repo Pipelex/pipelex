@@ -70,7 +70,7 @@ Two rules shape an invalid entry beyond that. Its **`covers` list is its `error.
 
     The `pipelex` plugin's `PostToolUse` hook lints, formats and **blocks on an invalid verdict** for every `Write`/`Edit` of a `.mthds` file, and has no skip mechanism. Author valid entries with the editing tools to collect the free lint; write an invalid entry's bundle through a shell heredoc, which the hook's matcher does not intercept.
 
-    An invalid entry's bundle is outside `make lint` and `make format` as well — `.pipelex/plxt.toml` excludes the whole `invalid_*` population, for the reason recorded beside that glob. So nothing formats it for you: match the layout of the entry next door by hand. Its `entry.toml` is still linted normally.
+    `make lint` and `make format` cover an invalid entry's bundle like any other `.mthds` file in the tree, with one carve-out: `.pipelex/plxt.toml` excludes the corpus's **schema-fault** entries — those whose tag says `fails_at = "schema"` — because a linter reporting them would be reporting the very defect the entry exists to carry, and that list is gated against the vocabulary rather than hand-maintained (see [`fails_at`](#fails_at-which-layer-catches-a-fault-first)). Nothing formats those, so match the layout of the entry next door by hand; every other invalid bundle is formatted for you. Its `entry.toml` is linted normally either way.
 
 ## The tag vocabulary
 

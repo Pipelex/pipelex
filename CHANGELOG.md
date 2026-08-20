@@ -18,7 +18,7 @@
 
   That also makes this repo the first consumer of its own signal, and it is what keeps the signal *measured* rather than merely asserted: the exclusion list is gated against the vocabulary by `test_mthds_corpus_plxt_exclusions.py`, so declaring a fault `runtime` when the schema in fact rejects it leaves its entry linted and turns `make plxt-lint` red naming it. The config is gated rather than generated because `plxt` is a static binary reading a static file, with nothing to hook a generation step onto.
 
-- **Documentation**: `docs/contribute/mthds-test-corpus.md` gains a `fails_at` section covering the consumer rule, why the field sits on the tag, and how the linter config closes the measurement loop.
+- **Documentation**: `docs/contribute/mthds-test-corpus.md` gains a `fails_at` section covering the consumer rule, why the field sits on the tag, and how the linter config closes the measurement loop. Its invalid-entry authoring warning is corrected to match the narrowed exclusion: only a schema-fault bundle has to be laid out by hand now, since `make lint` and `make format` cover every other invalid entry.
 
 ## [v0.50.0] - 2026-08-20
 
