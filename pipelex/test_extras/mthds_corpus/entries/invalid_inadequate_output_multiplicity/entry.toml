@@ -1,0 +1,12 @@
+name = "invalid_inadequate_output_multiplicity"
+description = "A menu card promised in two copies and written in one"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.inadequate_output_multiplicity",
+]
+
+expected_error = "inadequate_output_multiplicity"

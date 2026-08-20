@@ -1,0 +1,12 @@
+name = "invalid_batch_item_name_collision"
+description = "A label written for every crate in a shipment, where the crate list and the single crate are given one and the same name"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.batch_item_name_collision",
+]
+
+expected_error = "batch_item_name_collision"

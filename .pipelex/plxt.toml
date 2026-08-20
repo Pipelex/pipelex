@@ -24,6 +24,14 @@ exclude = [
   "node_modules/**",
   ".git/**",
   "*.lock",
+  # The MTHDS Test Corpus's deliberately invalid entries — the one .mthds population this repo does
+  # not lint, because each one exists to be rejected. Their fault is sometimes structural (a typeless
+  # pipe section, an unknown pipe `type`), which the schema catches as the error the entry was written
+  # to trigger. What guards them instead is strictly stronger: the corpus's entry-validation gate runs
+  # the real validation engine over every entry in CI and is red both when an invalid entry fails
+  # differently and when it accidentally validates. Excluded rather than schema-exempted because a
+  # per-rule `exclude` does not lift the schema, only narrows which rule applies.
+  "**/mthds_corpus/entries/invalid_*/*.mthds",
 ] # Glob patterns for files to ignore.
 # These are evaluated relative to the config file location.
 

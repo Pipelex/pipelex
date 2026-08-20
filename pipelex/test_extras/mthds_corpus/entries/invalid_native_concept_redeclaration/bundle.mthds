@@ -1,0 +1,13 @@
+domain      = "allotment_plots"
+description = "Write the notice that goes up on an allotment gate"
+main_pipe   = "write_gate_notice"
+
+[concept]
+Text = "A line of writing on an allotment notice"
+
+[pipe.write_gate_notice]
+type        = "PipeLLM"
+description = "Write the notice for the allotment gate"
+inputs      = { plot_note = "Text" }
+output      = "Text"
+prompt      = "Write the gate notice from this plot note: $plot_note"

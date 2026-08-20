@@ -44,6 +44,7 @@ from pipelex.libraries.library_utils import (
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.libraries.visibility_utils import check_visibility_for_blueprints, make_visibility_checker
 from pipelex.mthds_parsing.exceptions import MthdsParserError
+from pipelex.mthds_parsing.handle_pipe_errors import categorize_pipe_validation_error
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
@@ -773,18 +774,36 @@ class LibraryManager(LibraryManagerAbstract):
         try:
             return self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
         except ValidationError as validation_error:
-            validation_error_msg = report_validation_error(validation_error=validation_error).message
-            msg = f"Could not load blueprints from {[str(pth) for pth in valid_mthds_paths]} because of: {validation_error_msg}"
-            raise LibraryError(
-                message=msg,
+            # Categorize before wrapping. `translate_to_validate_bundle_error` has its own
+            # `except ValidationError` arm that categorizes, but it never sees this error: wrapping it
+            # in a bare `LibraryError` here routed it to the `except LibraryError` arm instead, which
+            # forwards structured data and has none to forward — so every pipe/concept error a
+            # pydantic validator raises during the merge arrived on the wire as one untyped residual.
+            # That is the whole reason `optional_input_unguarded` and `optional_output_required` were
+            # reachable through `resolve_crate_from_contents` but not through a library directory.
+            raise LibraryLoadingError(
+                message=(
+                    f"Could not load blueprints from {[str(pth) for pth in valid_mthds_paths]} because of: "
+                    f"{report_validation_error(validation_error=validation_error).message}"
+                ),
+                pipe_concept_validation_errors=categorize_pipe_validation_error(validation_error=validation_error),
             ) from validation_error
         except (ConceptLibraryError, PipeLibraryError) as ref_error:
             # Merge-time reference errors (undeclared cross-file concept refs, signature/concrete
-            # contract mismatches, duplicate refs) carry no structured validation payload — unlike
-            # LibraryLoadingError, which must propagate intact so its aggregated errors survive.
-            # Add the batch's file list as context, then let the outer
-            # translate_to_validate_bundle_error LibraryError arm shape it into a ValidateBundleError.
+            # contract mismatches, duplicate refs). Add the batch's file list as context, then let the
+            # outer translate_to_validate_bundle_error LibraryError arm shape it into a
+            # ValidateBundleError. Re-raising rather than mutating keeps the message immutable, and
+            # carrying the payload across is what keeps the re-raise from being lossy:
+            # `ConceptLibraryError` is a `LibraryLoadingError` and reaches here holding the per-reference
+            # items that make an unresolved concept a categorized `unresolved_concept` rather than a
+            # bare residual. Reconstructing it message-only silently dropped them.
             msg = f"Could not load blueprints from {[str(pth) for pth in valid_mthds_paths]} because of: {ref_error}"
+            if isinstance(ref_error, LibraryLoadingError):
+                raise type(ref_error)(
+                    msg,
+                    blueprint_validation_errors=ref_error.blueprint_validation_errors,
+                    pipe_concept_validation_errors=ref_error.pipe_concept_validation_errors,
+                ) from ref_error
             raise type(ref_error)(msg) from ref_error
 
     def _warn_if_mthds_version_unsatisfied(
