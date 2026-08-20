@@ -153,7 +153,7 @@ class TestExecutionSeams:
             )
             assert pipe_job.pipe.code == "echo_topic"
             assert pipe_job.pipe_run_params.run_mode.is_dry
-            assert pipe_job.job_metadata.pipeline_run_id == "seams-prepare-run-id"
+            assert pipe_job.job_metadata.run_metadata.pipeline_run_id == "seams-prepare-run-id"
             assert pipe_job.library_crate is not None
             # Mock input materialized for the pipe's needed input.
             assert "subject" in pipe_job.get_working_memory().root

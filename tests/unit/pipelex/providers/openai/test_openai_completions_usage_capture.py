@@ -22,7 +22,7 @@ from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.providers.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.providers.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 
 if TYPE_CHECKING:
     from typing import Any
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
 def _make_llm_job_with_empty_usage() -> LLMJob:
     """Build an LLMJob whose tokens_usage is seeded empty, mirroring ``llm_job_before_start``."""
-    job_metadata = JobMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="test-run")
+    job_metadata = JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="test-run"))
     tokens_usage = LLMTokensUsage(
         job_metadata=job_metadata,
         inference_model_name="test-model",

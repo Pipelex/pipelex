@@ -12,7 +12,7 @@ that crosses the Temporal activity boundary (returned by ``act_assemble_tracing`
 
 import json
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, PrivateAttr, ValidationError
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexConfigError
@@ -22,6 +22,7 @@ from pipelex.graph.graphspec import GraphSpec, PipelineRef
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.runtime_hub import get_event_log_override
 from pipelex.system.exceptions import MissingDependencyError
+from pipelex.system.job_metadata import RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.event_log_factory import make_event_log
 from pipelex.tracing.exceptions import EventLogError
@@ -48,6 +49,29 @@ class TracingAssembly(BaseModel):
     tokens_usages: list[AnyTokensUsage] | None = None
     usage_assembly_error: str | None = None
 
+    # The run this assembly belongs to. Same purpose as `PipeOutput.job_metadata`
+    # and, for the same reason, the same shape: a private attribute behind a
+    # property rather than a model field, so it is readable by a transport
+    # resolving a storage scope and absent from every serialization and schema.
+    #
+    # `RunMetadata` rather than the whole `JobMetadata`: an assembly belongs to the
+    # RUN, not to any one job within it, and the per-job half would be a lie here.
+    _run_metadata: RunMetadata | None = PrivateAttr(default=None)
+
+    @property
+    def run_metadata(self) -> RunMetadata | None:
+        return self._run_metadata
+
+    def set_run_metadata(self, *, run_metadata: RunMetadata | None) -> None:
+        """Set the run_metadata a transport reads to place this result's bytes.
+
+        A METHOD, not a `@run_metadata.setter`: this repo's keyword-only convention
+        rewrites a positional setter parameter into a keyword-only one, which is not
+        a valid property-setter signature. A named method takes the keyword happily
+        and says what it does at the call site.
+        """
+        self._run_metadata = run_metadata
+
 
 def assemble_tracing(
     pipeline_run_id: str,
@@ -57,6 +81,7 @@ def assemble_tracing(
     domain_code: str | None = None,
     main_pipe_code: str | None = None,
     run_mode: PipeRunMode = PipeRunMode.LIVE,
+    run_metadata: RunMetadata | None = None,
 ) -> TracingAssembly:
     """Read the trace events for ``pipeline_run_id`` once and assemble the requested artifacts.
 
@@ -79,11 +104,15 @@ def assemble_tracing(
         domain_code: Domain code for the graph's pipeline ref.
         main_pipe_code: Main pipe code for the graph's pipeline ref.
         run_mode: Final pipe run mode used to stamp GraphSpec provenance.
+        run_metadata: The run this assembly belongs to, stamped onto the result so a
+            transport that offloads it keys it inside the run's namespace. None for a
+            run with no host-supplied scope.
 
     Returns:
         A TracingAssembly carrying whichever artifacts were requested and succeeded.
     """
     result = TracingAssembly()
+    result.set_run_metadata(run_metadata=run_metadata)
     tracing_config = get_config().runtime.tracing
     # A scoped override (see hub.scoped_event_log) is the run's transport and implies
     # tracing-enabled (D1) — it must not be skipped by the is_enabled early-return.
@@ -175,6 +204,8 @@ def assemble_tracing_on_output(
         domain_code=domain_code,
         main_pipe_code=main_pipe_code,
         run_mode=run_mode,
+        # Inherited from the output this assembly decorates, so both key together.
+        run_metadata=pipe_output.job_metadata.run_metadata if pipe_output.job_metadata else None,
     )
     if result.graph_spec is not None:
         pipe_output.graph_spec = result.graph_spec

@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:c87b2054eef43e624731aed0ac71cf54ca4f7dfbc011e4e72f14b54493ae3a23"
+digest = "sha256:ba88545c68191606d49339b145a8ed109fda948f3b16e4a4ed31d6a783e420a2"
 reviewed_by = "thomashebrard"
-reviewed_at = "2026-08-18T11:19:04Z"
-rationale = "PipelexKernel.make gained a required storage_scope beside a user_id that is now also required (both had a fallback path before: user_id coalesced to the tracing placeholder 'anonymous' deep in pipeline_run_setup, and the storage prefix was derived from it). Both code examples on the page called make(user_id=...) and would now be a TypeError, so both are corrected. Added a paragraph on the two fields to the boot section: what storage_scope is (an opaque prefix the caller composes from its own tenancy model, which the kernel composes leaves onto and never parses), that it is validated at construction because it becomes a storage key prefix, and why neither field defaults. Checked the module table at line 69 still lists the kernel's public surface - make/.llm_text/.llm_object/.make_step_metadata are unchanged in name and the only signature that moved is make's. The step_id_source paragraph is untouched by this change."
+reviewed_at = "2026-08-20T16:42:26Z"
+rationale = "PipelexKernel.make's signature is unchanged: user_id, storage_scope and trace_context are still flat keyword arguments, so both code examples on the page (lines 28 and 148) remain correct as written, and the paragraph at line 33 describing the two fields and why neither defaults is untouched by this change. What did change is internal to make(): it now builds JobMetadata(run_metadata=RunMetadata(...)) because JobMetadata split its run-constant half (user_id, pipeline_run_id, storage_scope, request_id) into a nested RunMetadata. That is invisible at the call site but NOT to a programmatic caller reading a field off kernel.job_metadata, and this page is the kernel's specification for exactly those callers - so the job_metadata bullet now states which half a field lives in, that the path is job_metadata.run_metadata.pipeline_run_id rather than job_metadata.pipeline_run_id, and that there is no read-through accessor. The split also formalises the run-level-vs-per-step distinction that bullet already drew informally, which is noted. Checked the rest: make_step_metadata still mints a per-step copy with a fresh pipe_run_id (pipe_run_id stays on JobMetadata, not RunMetadata), so that half of the bullet is unchanged; the trace_context paragraph at line 155 still holds because graph_id is still adopted as the run's pipeline_run_id, only nested; and the module table's public surface (make / llm_text / llm_object / make_step_metadata) is unchanged in both name and signature."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -20,7 +20,7 @@ rationale = "PipelexKernel.make gained a required storage_scope beside a user_id
 "pipelex/kernel/llm_prompt_content.py" = "blob:82c34283dacd2bfd9a2c263915e744736d399875"
 "pipelex/kernel/llm_results.py" = "blob:6e3b8a2878b5bb284ece5fac10262fb59ac2029d"
 "pipelex/kernel/memory_ops.py" = "blob:f6a5745e804ac08f19c70f1beb1f78baf50d51cd"
-"pipelex/kernel/pipelex_kernel.py" = "blob:47009beeb3cef974eb2b738cca0aaa853cccddde"
+"pipelex/kernel/pipelex_kernel.py" = "blob:93b02410886a1f81d4a32c135bcbc35896417af3"
 "pipelex/kernel/prompt_references.py" = "blob:03ec9ef67ae84f141d072ca2d2c3ef888549ccc0"
 "pipelex/kernel/search_ops.py" = "blob:ed0a8c7953aca1e38de852d0ddef11731b819539"
 "pipelex/kernel/search_results.py" = "blob:101b70dc96cc5ee1721c9f6b1cb725a5ca78ff70"

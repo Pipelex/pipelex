@@ -1,7 +1,7 @@
 from typing import Any, TypeVar
 
 from mthds.protocol.pipe_output import PipeOutputAbstract
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.date_content import DateContent
@@ -17,7 +17,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.reporting.reporting_types import AnyTokensUsage
-from pipelex.system.job_metadata import SpecialPipelineId
+from pipelex.system.job_metadata import JobMetadata, SpecialPipelineId
 
 
 class PipeOutput(PipeOutputAbstract[WorkingMemory]):
@@ -32,6 +32,43 @@ class PipeOutput(PipeOutputAbstract[WorkingMemory]):
     # usage_assembly_error mirrors graph_assembly_error.
     tokens_usages: list[AnyTokensUsage] | None = None
     usage_assembly_error: str | None = None
+
+    # The job this output was produced under, when there was one.
+    #
+    # Carried so a transport that offloads an oversized result to storage can key
+    # it inside the run's own namespace instead of at the root of a bucket. Every
+    # payload a run sends IN carries a `job_metadata` for a transport to resolve a
+    # scope through; the results did not, so the two largest payloads an ordinary
+    # run produces landed outside every prefix a host's erasure cascade deletes
+    # and survived deletion of their own run.
+    #
+    # **A private attribute behind a property, NOT a model field, and that is the
+    # whole point.** `PipeOutput` is on the wire: `pipelex-api` returns it inside
+    # `PipelexApiExecuteResponse` and publishes its schema in a committed OpenAPI
+    # artifact. As a field, this would put `user_id`, `request_id`, `otel_context`
+    # and `trace_context` into a public API's response body and its documented
+    # schema — which `test_openapi_contract.py` exists to prevent, and which it
+    # caught. As a private attribute it is readable by a transport resolving a
+    # scope (attribute access on the live object, before serialization) and absent
+    # from `model_dump`, from `model_json_schema`, and therefore from the wire.
+    #
+    # It does not survive serialization, and does not need to: a transport reads it
+    # on the object it is about to serialize, in the process that produced it.
+    _job_metadata: JobMetadata | None = PrivateAttr(default=None)
+
+    @property
+    def job_metadata(self) -> JobMetadata | None:
+        return self._job_metadata
+
+    def set_job_metadata(self, *, job_metadata: JobMetadata | None) -> None:
+        """Set the job_metadata a transport reads to place this result's bytes.
+
+        A METHOD, not a `@job_metadata.setter`: this repo's keyword-only convention
+        rewrites a positional setter parameter into a keyword-only one, which is not
+        a valid property-setter signature. A named method takes the keyword happily
+        and says what it does at the call site.
+        """
+        self._job_metadata = job_metadata
 
     @property
     def main_stuff(self) -> Stuff:

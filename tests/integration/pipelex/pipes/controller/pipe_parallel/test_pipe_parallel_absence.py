@@ -186,7 +186,7 @@ class TestPipeParallelAbsence:
         assert note.kind == AbsenceKind.SKIPPED
         assert note.producing_pipe == "opt_par_find"
         assert note.origin().producing_pipe == "extract_penalty_clause"
-        assert pipe_output.pipeline_run_id == job_metadata.pipeline_run_id
+        assert pipe_output.pipeline_run_id == job_metadata.run_metadata.pipeline_run_id
 
     async def test_structured_output_optional_field_absorbs_as_none(self, job_metadata: JobMetadata, load_empty_library: Callable[[], str]):
         """Structured output: a non-required field absorbs the absent branch as field-level None."""

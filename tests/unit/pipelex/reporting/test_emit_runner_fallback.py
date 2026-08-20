@@ -29,7 +29,7 @@ from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.system.configuration.configs import NdjsonTracingConfig, TracingBackend
 from pipelex.system.data_inclusion_config import DataInclusionConfig
 from pipelex.system.exceptions import MissingDependencyError
-from pipelex.system.job_metadata import JobMetadata, UnitJobId
+from pipelex.system.job_metadata import JobMetadata, RunMetadata, UnitJobId
 from pipelex.system.trace_context import TraceContext
 from pipelex.tracing import activity_event_log
 from pipelex.tracing.activity_event_log import ActivityEventLogCache
@@ -55,9 +55,7 @@ def _make_llm_job(
 ) -> LLMJob:
     now = datetime.now(UTC)
     job_metadata = JobMetadata(
-        storage_scope="test/scope",
-        user_id="test_user",
-        pipeline_run_id=pipeline_run_id,
+        run_metadata=RunMetadata(storage_scope="test/scope", user_id="test_user", pipeline_run_id=pipeline_run_id),
         trace_context=trace_context,
         started_at=now,
         completed_at=now + timedelta(seconds=1),

@@ -914,7 +914,7 @@ class PipeAbstract(ABC, BaseModel):
             else:
                 working_memory.record_resolved_absence(companion_record)
 
-        return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.pipeline_run_id)
+        return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.run_metadata.pipeline_run_id)
 
     @final
     async def live_run_pipe(
@@ -944,7 +944,7 @@ class PipeAbstract(ABC, BaseModel):
             # Start OTel span first
             span, is_root_span = self._start_pipe_span(
                 parent_otel_context=parent_otel_context,
-                pipeline_run_id=job_metadata.pipeline_run_id,
+                pipeline_run_id=job_metadata.run_metadata.pipeline_run_id,
                 working_memory=working_memory,
             )
             # Get the actual span_id from OTel (OTel generates its own span_id)

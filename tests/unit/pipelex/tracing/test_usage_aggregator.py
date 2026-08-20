@@ -7,7 +7,7 @@ from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.graph.graphspec import NodeKind
-from pipelex.system.job_metadata import JobCategory, JobMetadata, UnitJobId
+from pipelex.system.job_metadata import JobCategory, JobMetadata, RunMetadata, UnitJobId
 from pipelex.tracing.trace_events import PipeStartEvent, TraceEvent, UsageReportEvent
 from pipelex.tracing.usage_aggregator import UsageAggregator
 
@@ -19,9 +19,7 @@ _WORKFLOW_ID = "wf_abc"
 def _make_llm_tokens_usage(model_name: str = "claude-sonnet") -> LLMTokensUsage:
     return LLMTokensUsage(
         job_metadata=JobMetadata(
-            storage_scope="test/scope",
-            user_id="user_test",
-            pipeline_run_id=_PIPELINE_RUN_ID,
+            run_metadata=RunMetadata(storage_scope="test/scope", user_id="user_test", pipeline_run_id=_PIPELINE_RUN_ID),
             pipe_code="test_pipe",
             unit_job_id=UnitJobId.LLM_GEN_TEXT,
             job_category=JobCategory.LLM_JOB,

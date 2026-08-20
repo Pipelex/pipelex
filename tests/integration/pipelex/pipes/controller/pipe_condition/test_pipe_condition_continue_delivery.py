@@ -88,7 +88,7 @@ class TestPipeConditionContinueDelivery:
         # Run identity must survive the absence path: the continue arm builds its own PipeOutput,
         # so it must stamp pipeline_run_id like every other controller — otherwise the blocking
         # bridge serializes SpecialPipelineId.UNTITLED and callers track the wrong run.
-        assert pipe_output.pipeline_run_id == job_metadata.pipeline_run_id
+        assert pipe_output.pipeline_run_id == job_metadata.run_metadata.pipeline_run_id
 
     async def test_continue_supersedes_previous_main_stuff(self, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]):
         """A previous main stuff no longer passes through: it stays under its own name while the
@@ -114,7 +114,7 @@ class TestPipeConditionContinueDelivery:
         previous = result_memory.get_optional_stuff("input_text")
         assert previous is not None
         assert previous.stuff_code == input_text_stuff.stuff_code
-        assert pipe_output.pipeline_run_id == job_metadata.pipeline_run_id
+        assert pipe_output.pipeline_run_id == job_metadata.run_metadata.pipeline_run_id
 
     async def test_dry_run_all_special_outcomes_records_absence(self, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]):
         """Dry-run parity: an all-special-outcomes condition records the declared output absent
@@ -135,7 +135,7 @@ class TestPipeConditionContinueDelivery:
         assert isinstance(resolved_main, AbsenceRecord)
         assert resolved_main.kind == AbsenceKind.DECLARED_ABSENT
         assert resolved_main.producing_pipe == "continue_gate"
-        assert pipe_output.pipeline_run_id == job_metadata.pipeline_run_id
+        assert pipe_output.pipeline_run_id == job_metadata.run_metadata.pipeline_run_id
 
     async def test_dry_run_fail_only_condition_raises(self, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]):
         """A fail-only condition has no absent arm — every live path raises — so dry-run must
@@ -188,4 +188,4 @@ class TestPipeConditionContinueDelivery:
         result_memory = pipe_output.working_memory
         assert isinstance(result_memory.resolve_main_stuff(), AbsenceRecord)
         assert result_memory.get_optional_stuff("input_text") is not None
-        assert pipe_output.pipeline_run_id == job_metadata.pipeline_run_id
+        assert pipe_output.pipeline_run_id == job_metadata.run_metadata.pipeline_run_id

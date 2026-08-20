@@ -13,16 +13,12 @@ from pipelex.cogt.content_generation.exceptions import UnsafeSchemaError
 from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 def _make_stub_job_metadata() -> JobMetadata:
-    return JobMetadata(
-        storage_scope="test/scope",
-        user_id="test-user",
-        pipeline_run_id="test-run",
-    )
+    return JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="test-run"))
 
 
 def _make_stub_llm_assignment() -> LLMAssignment:

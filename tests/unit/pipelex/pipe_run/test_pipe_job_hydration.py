@@ -7,7 +7,7 @@ from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_run.exceptions import PipeJobError
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 
 if TYPE_CHECKING:
     from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
@@ -23,7 +23,7 @@ def _make_pipe_job(
         working_memory=working_memory,
         working_memory_raw=None,
         pipe_run_params=PipeRunParamsFactory.make_run_params(),
-        job_metadata=JobMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="test-run"),
+        job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="test-run")),
         output_name=None,
         library_crate=library_crate,
     )

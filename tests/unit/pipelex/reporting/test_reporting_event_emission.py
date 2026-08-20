@@ -20,7 +20,7 @@ from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.config import get_config
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.system.data_inclusion_config import DataInclusionConfig
-from pipelex.system.job_metadata import JobMetadata, UnitJobId
+from pipelex.system.job_metadata import JobMetadata, RunMetadata, UnitJobId
 from pipelex.system.trace_context import TraceContext
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 from pipelex.tracing.trace_events import UsageReportEvent
@@ -41,9 +41,7 @@ def _make_test_llm_job(
     """Create a minimal LLMJob for testing event emission."""
     now = datetime.now(UTC)
     job_metadata = JobMetadata(
-        storage_scope="test/scope",
-        user_id="test_user",
-        pipeline_run_id=pipeline_run_id,
+        run_metadata=RunMetadata(storage_scope="test/scope", user_id="test_user", pipeline_run_id=pipeline_run_id),
         trace_context=trace_context,
         started_at=now,
         completed_at=now + timedelta(seconds=1),

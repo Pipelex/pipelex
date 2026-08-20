@@ -50,7 +50,23 @@ class UnitJobId(StrEnum):
                 return "Search"
 
 
-class JobMetadata(BaseModel):
+class RunMetadata(BaseModel):
+    """Who is running, which run it is, and where its bytes go.
+
+    **The four facts that are constant for a whole run**, split out from
+    :class:`JobMetadata` — which mixes them with per-job facts that change at
+    every step (``pipe_code``, ``pipe_run_id``, ``otel_context``,
+    ``content_generation_job_id``). Grouping them says which is which: a copy
+    made for a nested pipe replaces the job half and carries this half through
+    unchanged.
+
+    It also gives the run identity somewhere to live on a RESULT. A
+    :class:`~pipelex.core.pipes.pipe_output.PipeOutput` carries the
+    ``JobMetadata`` it was produced under, so a transport that offloads an
+    oversized result to storage can key it inside the run's own namespace
+    instead of at the root of a bucket.
+    """
+
     user_id: str
     pipeline_run_id: str
 
@@ -67,6 +83,40 @@ class JobMetadata(BaseModel):
     # `DRY_RUN_STORAGE_SCOPE`.
     storage_scope: str
 
+    # The API-inbound ``X-Request-ID`` (set by the dispatcher when an external
+    # HTTP request enters Pipelex). Rides here so it crosses the Temporal
+    # serialization boundary — every activity / workflow can correlate logs and
+    # the resulting ``ErrorReport`` back to the originating request. Distinct
+    # from :class:`pipelex.cogt.inference.error_classification.ProviderErrorMetadata.request_id`,
+    # which is the *provider*-side request id (OpenAI ``x-request-id`` etc.) —
+    # both can appear together when the API surfaces a provider failure.
+    # Constrained at the wire-format boundary (printable ASCII only, max 128
+    # chars) so an unsanitized upstream value cannot inject newlines or control
+    # characters into the log lines or ``ErrorReport`` envelopes that quote it.
+    request_id: str | None = Field(default=None, max_length=128, pattern=r"^[\x20-\x7E]+$")
+
+    @field_validator("storage_scope")
+    @classmethod
+    def _validate_storage_scope(cls, value: str) -> str:
+        """Refuse a scope that would escape its namespace, at construction.
+
+        On the TYPE rather than at the call sites: the value becomes a storage
+        key prefix, so a `..` or a leading slash in it is a traversal into
+        another tenant's data. Validating here means every key the runtime
+        derives is safe by construction. `model_copy` does NOT re-run
+        validators, which is fine — `copy_with_update` only ever carries an
+        already-validated scope forward, and nothing constructs a scope from
+        request data after this point.
+        """
+        return validate_storage_scope(value=value)
+
+
+class JobMetadata(BaseModel):
+    # The run-constant half: who, which run, where its bytes go, which request
+    # started it. Nested rather than flattened so a copy for a nested pipe can
+    # carry it through untouched while replacing the per-job fields below.
+    run_metadata: RunMetadata
+
     pipe_code: str | None = None
 
     # Per-process Pipelex session id (``Config.session_id``) captured at the
@@ -75,18 +125,6 @@ class JobMetadata(BaseModel):
     # input — replay on a different worker no longer changes the value and
     # so cannot cause a non-determinism mismatch on child-workflow starts.
     session_id: str | None = None
-
-    # The API-inbound ``X-Request-ID`` (set by the dispatcher when an external
-    # HTTP request enters Pipelex). Rides on ``JobMetadata`` so it crosses the
-    # Temporal serialization boundary — every activity / workflow can correlate
-    # logs and the resulting ``ErrorReport`` back to the originating request.
-    # Distinct from :class:`pipelex.cogt.inference.error_classification.ProviderErrorMetadata.request_id`,
-    # which is the *provider*-side request id (OpenAI ``x-request-id`` etc.) —
-    # both can appear together when the API surfaces a provider failure.
-    # Constrained at the wire-format boundary (printable ASCII only, max 128
-    # chars) so an unsanitized upstream value cannot inject newlines or control
-    # characters into the log lines or ``ErrorReport`` envelopes that quote it.
-    request_id: str | None = Field(default=None, max_length=128, pattern=r"^[\x20-\x7E]+$")
 
     # Business ID for the current pipe execution (16-char hex string).
     # Always set during pipe runs for tracking purposes.
@@ -105,21 +143,6 @@ class JobMetadata(BaseModel):
 
     started_at: datetime | None = Field(default_factory=datetime.now)
     completed_at: datetime | None = None
-
-    @field_validator("storage_scope")
-    @classmethod
-    def _validate_storage_scope(cls, value: str) -> str:
-        """Refuse a scope that would escape its namespace, at construction.
-
-        On the TYPE rather than at the call sites: the value becomes a storage
-        key prefix, so a `..` or a leading slash in it is a traversal into
-        another tenant's data. Validating here means every key the runtime
-        derives is safe by construction. `model_copy` does NOT re-run
-        validators, which is fine — `copy_with_update` only ever carries an
-        already-validated scope forward, and nothing constructs a scope from
-        request data after this point.
-        """
-        return validate_storage_scope(value=value)
 
     @property
     def duration(self) -> float | None:

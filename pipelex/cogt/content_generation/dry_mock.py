@@ -293,7 +293,7 @@ def _dry_text_gen_truncate_length() -> int:
 def dry_llm_gen_text(llm_assignment: LLMAssignment) -> str:
     """Dry leaf for ``llm_gen_text``: synthetic job report + a ``DRY RUN:`` marker string."""
     job_metadata = llm_assignment.job_metadata
-    log.verbose(f"🤡 DRY RUN: llm_gen_text for '{job_metadata.pipeline_run_id}'")
+    log.verbose(f"🤡 DRY RUN: llm_gen_text for '{job_metadata.run_metadata.pipeline_run_id}'")
     report_func = _dry_report_func(llm_assignment.cogt_run_params)
     report_func(job_metadata, llm_setting=llm_assignment.llm_setting, llm_prompt=llm_assignment.llm_prompt)
     prompt_truncated = llm_assignment.llm_prompt.desc(truncate_text_length=_dry_text_gen_truncate_length())
@@ -402,7 +402,7 @@ def dry_render_page_views(render_assignment: RenderPageViewsAssignment) -> list[
     Fake URLs come from ``inference.dry_run.image_urls`` (validated non-empty) — the single configured
     source of truth for dry fake images, same as the img-gen mock.
     """
-    log.verbose(f"🤡 DRY RUN: render_page_views for '{render_assignment.job_metadata.pipeline_run_id}'")
+    log.verbose(f"🤡 DRY RUN: render_page_views for '{render_assignment.job_metadata.run_metadata.pipeline_run_id}'")
     nb_pages = get_config().inference.dry_run.nb_extract_pages
     image_urls = get_config().inference.dry_run.image_urls
     return [_dry_image_content(image_url=image_urls[page_index % len(image_urls)]) for page_index in range(nb_pages)]

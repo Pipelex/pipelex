@@ -4,6 +4,7 @@ from pytest_mock import MockerFixture
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, StorageTarget
 from pipelex.pipe_run.exceptions import PipeRouterError, WebhookDeliveryError
 from pipelex.pipe_run.pipe_run import PipeRun
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 
@@ -21,7 +22,10 @@ class TestPipeRun:
         mock_executor_instance.execute = mocker.AsyncMock()
 
         mock_job = mocker.MagicMock()
-        mock_job.job_metadata.pipeline_run_id = "plr-123"
+        # A real JobMetadata, not a MagicMock attribute: `PipeRun.run` copies it
+        # onto the output, and `assemble_tracing_on_output` then feeds its
+        # `run_metadata` into `TracingAssembly`, which is a typed field.
+        mock_job.job_metadata = JobMetadata(run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-123", storage_scope="test/scope"))
 
         pipe_run = PipeRun(pipe_router=mock_router)
         assignment = DeliveryAssignment(storage=StorageTarget())
@@ -33,7 +37,7 @@ class TestPipeRun:
         mock_executor_instance.execute.assert_called_once()
 
     async def test_run_forwards_request_id_to_delivery_executor(self, mocker: MockerFixture) -> None:
-        """Direct-mode PipeRun must forward pipe_job.job_metadata.request_id to DeliveryExecutor.execute.
+        """Direct-mode PipeRun must forward pipe_job.job_metadata.run_metadata.request_id to DeliveryExecutor.execute.
 
         Parallel to the Temporal path (wf_pipe_run.py:108 → DeliveryActivityArg.request_id):
         without this forward, the storage/webhook completion logs lose correlation with the
@@ -50,8 +54,11 @@ class TestPipeRun:
         mock_executor_instance.execute = mocker.AsyncMock()
 
         mock_job = mocker.MagicMock()
-        mock_job.job_metadata.pipeline_run_id = "plr-req"
-        mock_job.job_metadata.request_id = "req-direct-mode"
+        # A real JobMetadata, not a MagicMock attribute: `PipeRun.run` copies it
+        # onto the output, and `assemble_tracing_on_output` then feeds its
+        # `run_metadata` into `TracingAssembly`, which is a typed field.
+        mock_job.job_metadata = JobMetadata(run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-req", storage_scope="test/scope"))
+        mock_job.job_metadata.run_metadata.request_id = "req-direct-mode"
 
         pipe_run = PipeRun(pipe_router=mock_router)
         assignment = DeliveryAssignment(storage=StorageTarget())
@@ -75,7 +82,10 @@ class TestPipeRun:
         mock_executor_instance.execute = mocker.AsyncMock()
 
         mock_job = mocker.MagicMock()
-        mock_job.job_metadata.pipeline_run_id = "plr-no-delivery"
+        # A real JobMetadata, not a MagicMock attribute: `PipeRun.run` copies it
+        # onto the output, and `assemble_tracing_on_output` then feeds its
+        # `run_metadata` into `TracingAssembly`, which is a typed field.
+        mock_job.job_metadata = JobMetadata(run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-no-delivery", storage_scope="test/scope"))
 
         pipe_run = PipeRun(pipe_router=mock_router)
 
@@ -104,7 +114,10 @@ class TestPipeRun:
         mock_executor_instance.execute = mocker.AsyncMock()
 
         mock_job = mocker.MagicMock()
-        mock_job.job_metadata.pipeline_run_id = "plr-fail"
+        # A real JobMetadata, not a MagicMock attribute: `PipeRun.run` copies it
+        # onto the output, and `assemble_tracing_on_output` then feeds its
+        # `run_metadata` into `TracingAssembly`, which is a typed field.
+        mock_job.job_metadata = JobMetadata(run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-fail", storage_scope="test/scope"))
 
         pipe_run = PipeRun(pipe_router=mock_router)
         assignment = DeliveryAssignment(storage=StorageTarget())
@@ -135,7 +148,10 @@ class TestPipeRun:
         mock_executor_instance.execute = mocker.AsyncMock()
 
         mock_job = mocker.MagicMock()
-        mock_job.job_metadata.pipeline_run_id = "plr-bare"
+        # A real JobMetadata, not a MagicMock attribute: `PipeRun.run` copies it
+        # onto the output, and `assemble_tracing_on_output` then feeds its
+        # `run_metadata` into `TracingAssembly`, which is a typed field.
+        mock_job.job_metadata = JobMetadata(run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-bare", storage_scope="test/scope"))
 
         pipe_run = PipeRun(pipe_router=mock_router)
         assignment = DeliveryAssignment(storage=StorageTarget())
@@ -177,7 +193,10 @@ class TestPipeRun:
         mock_executor.return_value.execute = mock_execute
 
         mock_job = mocker.MagicMock()
-        mock_job.job_metadata.pipeline_run_id = "plr-order"
+        # A real JobMetadata, not a MagicMock attribute: `PipeRun.run` copies it
+        # onto the output, and `assemble_tracing_on_output` then feeds its
+        # `run_metadata` into `TracingAssembly`, which is a typed field.
+        mock_job.job_metadata = JobMetadata(run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-order", storage_scope="test/scope"))
 
         pipe_run = PipeRun(pipe_router=mock_router)
         assignment = DeliveryAssignment(storage=StorageTarget())
@@ -210,7 +229,10 @@ class TestPipeRun:
         mock_executor.return_value.execute = mocker.AsyncMock()
 
         mock_job = mocker.MagicMock()
-        mock_job.job_metadata.pipeline_run_id = "plr-mask-tracer"
+        # A real JobMetadata, not a MagicMock attribute: `PipeRun.run` copies it
+        # onto the output, and `assemble_tracing_on_output` then feeds its
+        # `run_metadata` into `TracingAssembly`, which is a typed field.
+        mock_job.job_metadata = JobMetadata(run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-mask-tracer", storage_scope="test/scope"))
 
         pipe_run = PipeRun(pipe_router=mock_router)
 
@@ -238,7 +260,10 @@ class TestPipeRun:
         mock_executor.return_value.execute = mocker.AsyncMock()
 
         mock_job = mocker.MagicMock()
-        mock_job.job_metadata.pipeline_run_id = "plr-tracer-only"
+        # A real JobMetadata, not a MagicMock attribute: `PipeRun.run` copies it
+        # onto the output, and `assemble_tracing_on_output` then feeds its
+        # `run_metadata` into `TracingAssembly`, which is a typed field.
+        mock_job.job_metadata = JobMetadata(run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-tracer-only", storage_scope="test/scope"))
 
         pipe_run = PipeRun(pipe_router=mock_router)
 
@@ -272,7 +297,10 @@ class TestPipeRun:
         )
 
         mock_job = mocker.MagicMock()
-        mock_job.job_metadata.pipeline_run_id = "plr-triple-fail"
+        # A real JobMetadata, not a MagicMock attribute: `PipeRun.run` copies it
+        # onto the output, and `assemble_tracing_on_output` then feeds its
+        # `run_metadata` into `TracingAssembly`, which is a typed field.
+        mock_job.job_metadata = JobMetadata(run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-triple-fail", storage_scope="test/scope"))
 
         pipe_run = PipeRun(pipe_router=mock_router)
         assignment = DeliveryAssignment(storage=StorageTarget())

@@ -11,14 +11,14 @@ from pipelex.cogt.content_generation.assignment_models import RenderPageViewsAss
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.render_generate import render_page_views_and_store
 from pipelex.config import get_config
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 class TestRenderGenerateDryBranch:
     def _assignment(self, *, run_mode: PipeRunMode) -> RenderPageViewsAssignment:
         return RenderPageViewsAssignment(
-            job_metadata=JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_render_dry"),
+            job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_render_dry")),
             cogt_run_params=CogtRunParams(run_mode=run_mode),
             document_uri="file:///tmp/doc.pdf",
             page_views_dpi=72,

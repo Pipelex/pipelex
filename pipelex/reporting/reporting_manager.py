@@ -296,7 +296,7 @@ class ReportingManager(ReportingProtocol):
 
         seq = process_event_log.next_sequence()
         event = UsageReportEvent(
-            pipeline_run_id=inference_job.job_metadata.pipeline_run_id,
+            pipeline_run_id=inference_job.job_metadata.run_metadata.pipeline_run_id,
             workflow_id=workflow_id,
             writer_id=process_event_log.writer_id,
             timestamp=datetime.now(UTC),

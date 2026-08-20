@@ -390,7 +390,7 @@ class PipeSequence(PipeController):
 
         return PipeOutput(
             working_memory=evolving_memory,
-            pipeline_run_id=job_metadata.pipeline_run_id,
+            pipeline_run_id=job_metadata.run_metadata.pipeline_run_id,
         )
 
     @override
