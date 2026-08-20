@@ -5,6 +5,11 @@
 # `feature.*` is hand-maintained in the generator because no registry describes a language feature,
 # and every exclusion reason is declared in the generator's source alongside them.
 #
+# An `error.*` tag that is not excluded also carries `fails_at`, the earliest layer of checking that
+# rejects a bundle carrying the fault: `schema` when a check of the document's shape alone already
+# catches it, `runtime` when the document has to be interpreted to notice. A structural consumer
+# expects a diagnostic on exactly the `schema` entries and none on the others.
+#
 # This file ships in the pipelex wheel, so it names a document its readers can reach:
 # https://docs.pipelex.com/contribute/mthds-test-corpus/ — which in turn points at the
 # cross-repo contract, `docs/specs/mthds-test-corpus.md` in the Pipelex workspace repo.
@@ -90,18 +95,23 @@ code = "PipeSequence"
 
 [error.missing_input_variable]
 code = "missing_input_variable"
+fails_at = "runtime"
 
 [error.extraneous_input_variable]
 code = "extraneous_input_variable"
+fails_at = "runtime"
 
 [error.input_stuff_spec_mismatch]
 code = "input_stuff_spec_mismatch"
+fails_at = "runtime"
 
 [error.inadequate_output_concept]
 code = "inadequate_output_concept"
+fails_at = "runtime"
 
 [error.inadequate_output_multiplicity]
 code = "inadequate_output_multiplicity"
+fails_at = "runtime"
 
 [error.circular_dependency_error]
 code = "circular_dependency_error"
@@ -109,33 +119,43 @@ excluded = "Raised only from the pipe sorter, and the pipe sorter runs only on `
 
 [error.llm_output_cannot_be_image]
 code = "llm_output_cannot_be_image"
+fails_at = "runtime"
 
 [error.invalid_pipe_code_syntax]
 code = "invalid_pipe_code_syntax"
+fails_at = "runtime"
 
 [error.unknown_pipe_type]
 code = "unknown_pipe_type"
+fails_at = "schema"
 
 [error.missing_pipe_type]
 code = "missing_pipe_type"
+fails_at = "schema"
 
 [error.batch_item_name_collision]
 code = "batch_item_name_collision"
+fails_at = "runtime"
 
 [error.optional_marker_invalid]
 code = "optional_marker_invalid"
+fails_at = "runtime"
 
 [error.optional_not_handled]
 code = "optional_not_handled"
+fails_at = "runtime"
 
 [error.optional_output_required]
 code = "optional_output_required"
+fails_at = "runtime"
 
 [error.optional_input_unguarded]
 code = "optional_input_unguarded"
+fails_at = "runtime"
 
 [error.optional_branch_required_field]
 code = "optional_branch_required_field"
+fails_at = "runtime"
 
 [error.optional_force_redundant]
 code = "optional_force_redundant"
@@ -143,12 +163,15 @@ excluded = "Advisory-only: it rides the validation report's `warnings` array and
 
 [error.native_concept_redeclaration]
 code = "native_concept_redeclaration"
+fails_at = "runtime"
 
 [error.unresolved_concept]
 code = "unresolved_concept"
+fails_at = "runtime"
 
 [error.unresolved_pipe_dependency]
 code = "unresolved_pipe_dependency"
+fails_at = "runtime"
 
 [error.unknown_validation_error]
 code = "unknown_validation_error"
@@ -164,6 +187,7 @@ excluded = "The generic fallback for a pipe-construction failure that matched no
 
 [error.dry_run_error]
 code = "DryRunError"
+fails_at = "runtime"
 
 [feature.multi_file_library]
 description = "A method split across several `.mthds` files in one directory and merged additively behind a `bundle.mthds` entry point, so a pipe can be forward-declared as a signature in one file and satisfied by a concrete definition in another."
