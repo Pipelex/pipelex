@@ -70,7 +70,9 @@ An **invalid** entry additionally declares the exact wire `error_type` it must p
 
 ## The tag vocabulary
 
-Tags are namespaced and the vocabulary is closed: an entry covering a tag the vocabulary does not declare fails the gate. `native.*` is generated from `NativeConceptCode`. `operator.*` and `controller.*` are generated from `PipeType` — one registry, split by its own `category` property, so a pipe kind added tomorrow lands in the right namespace with nothing to update here. Their local names drop the `Pipe` prefix every code carries, since the namespace already says which half it is: `PipeLLM` becomes `operator.llm`, `PipeSequence` becomes `controller.sequence`. `feature.*` is reserved for hand-maintained language features and `error.*` arrives with its registry.
+Tags are namespaced and the vocabulary is closed: an entry covering a tag the vocabulary does not declare fails the gate. `native.*` is generated from `NativeConceptCode`. `operator.*` and `controller.*` are generated from `PipeType` — one registry, split by its own `category` property, so a pipe kind added tomorrow lands in the right namespace with nothing to update here. Their local names drop the `Pipe` prefix every code carries, since the namespace already says which half it is: `PipeLLM` becomes `operator.llm`, `PipeSequence` becomes `controller.sequence`. `error.*` arrives with its registry.
+
+`feature.*` is the one hand-maintained namespace, because a language feature is a human-named cluster of behaviour rather than a registry entry — some span several blueprint fields (optionals show up as `?` in a concept spec), some none at all (a multi-file library is a property of the entry *directory*), and there is no feature registry in `pipelex` to walk. A tag there carries a `description` where a generated one carries `code`, since that sentence is the only place its meaning can live. **Add a feature tag in the same commit that lands its first covering entry, never ahead of it** — declaring one reds the exhaustivity gate until an entry covers it.
 
 `vocabulary.toml` is generated in full, so it is never edited by hand:
 

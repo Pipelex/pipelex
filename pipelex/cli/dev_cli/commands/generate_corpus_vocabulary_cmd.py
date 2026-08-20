@@ -61,6 +61,25 @@ _PIPE_TYPE_PREFIX = "Pipe"
 
 # Same contract as `_NATIVE_EXCLUSIONS`, keyed on `PipeType` for the same reason: an exclusion whose
 # code leaves the registry breaks this module at import instead of rotting in the generated file.
+# `feature.*` is the one hand-maintained namespace: a language feature is a human-named cluster of
+# behaviour, not a registry entry. Some span several blueprint fields (optionals show up as `?` in a
+# concept spec), some none at all (a multi-file library is a property of the entry *directory*), and
+# `pipelex` has no feature registry to walk — so there is nothing to generate from. A tag here
+# carries a `description` where a generated one carries `code`, because that sentence is the only
+# place the tag's meaning can live.
+#
+# A tag is added here in the SAME commit that lands its first covering entry, never ahead of it:
+# declaring one reds the exhaustivity gate until an entry covers it, and a vocabulary advertising
+# coverage the corpus does not have is worse than a short vocabulary. Rendered in alphabetical order,
+# there being no registry order to follow.
+_FEATURE_TAGS: dict[str, str] = {
+    "multi_file_library": (
+        "A method split across several `.mthds` files in one directory and merged additively behind a "
+        "`bundle.mthds` entry point, so a pipe can be forward-declared as a signature in one file and "
+        "satisfied by a concrete definition in another."
+    ),
+}
+
 _PIPE_TYPE_EXCLUSIONS: dict[PipeType, str] = {
     PipeType.PIPE_FUNC: (
         "A PipeFunc names a Python function that is resolved against the runtime's function registry "
@@ -97,6 +116,13 @@ def _render_native_namespace() -> str:
         if exclusion_reason is not None:
             lines.append(f"excluded = {_toml_string(value=exclusion_reason)}")
         blocks.append("\n".join(lines))
+    return "\n\n".join(blocks)
+
+
+def _render_feature_namespace() -> str:
+    blocks: list[str] = []
+    for local_name in sorted(_FEATURE_TAGS):
+        blocks.append("\n".join([f"[feature.{local_name}]", f"description = {_toml_string(value=_FEATURE_TAGS[local_name])}"]))
     return "\n\n".join(blocks)
 
 
@@ -137,7 +163,7 @@ def generate_corpus_vocabulary_content() -> str:
     entry's `covers`, and grouping should not depend on where a future pipe kind is inserted into
     the enum.
     """
-    namespaces = [_render_native_namespace(), *_render_pipe_type_namespaces()]
+    namespaces = [_render_native_namespace(), *_render_pipe_type_namespaces(), _render_feature_namespace()]
     return f"{_HEADER}\n" + "\n\n".join(namespaces) + "\n"
 
 

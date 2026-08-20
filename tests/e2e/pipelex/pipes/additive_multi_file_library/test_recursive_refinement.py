@@ -15,15 +15,18 @@ likewise. After the additive merge the concretes win at every level and the bund
 """
 
 from collections.abc import Callable
-from pathlib import Path
 
 import pytest
 
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipeline.validate_bundle import validate_bundles_from_directory
+from pipelex.test_extras.mthds_corpus.loader import get_entry
 
-_BUNDLE_DIR = Path(__file__).parent / "recursive_refinement"
+# The library is a corpus entry, not a fixture local to this test: the corpus is the single source
+# for language-level `.mthds` methods, and covering `feature.multi_file_library` is exactly why the
+# entry exists. The whole directory is the subject here — that is what a multi-file library means.
+_BUNDLE_DIR = get_entry(name="feature_multi_file_library_research_brief").directory
 
 
 @pytest.mark.asyncio(loop_scope="class")

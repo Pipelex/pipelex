@@ -19,13 +19,18 @@ VOCABULARY_FILE_NAME = "vocabulary.toml"
 class VocabularyTag(BaseModel):
     """One tag in the vocabulary.
 
-    ``code`` is the registry code the tag was generated from. ``excluded`` carries the reason a
-    tag is not required to have a focused entry, and is present only on excluded tags.
+    A tag says where it came from, and the two kinds of namespace answer that differently.
+    A **generated** tag carries ``code``, the registry code it was derived from. A
+    **hand-maintained** tag has no registry to point at, so it carries ``description`` — a
+    one-line statement of the language feature it names, which is the only place that meaning
+    can live. ``excluded`` carries the reason a tag is not required to have a focused entry,
+    and is present only on excluded tags.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    code: str
+    code: str | None = None
+    description: str | None = None
     excluded: str | None = None
 
 
