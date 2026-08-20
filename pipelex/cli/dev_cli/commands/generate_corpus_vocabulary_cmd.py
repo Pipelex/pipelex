@@ -18,7 +18,7 @@ from rich.markup import escape
 from rich.panel import Panel
 
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.pipe_machinery.pipe_blueprint import PipeType
+from pipelex.pipe_machinery.pipe_blueprint import PipeCategory, PipeType
 from pipelex.runtime_hub import get_console
 from pipelex.test_extras.mthds_corpus.vocabulary import vocabulary_path
 
@@ -118,10 +118,14 @@ def _render_pipe_type_namespaces() -> list[str]:
     operators: list[str] = []
     controllers: list[str] = []
     for pipe_type in PipeType:
-        if pipe_type.category.is_controller:
-            controllers.append(_pipe_type_block(pipe_type=pipe_type, namespace="controller"))
-        else:
-            operators.append(_pipe_type_block(pipe_type=pipe_type, namespace="operator"))
+        # Exhaustive, with no default arm, so the guarantee holds in both directions: a new
+        # `PipeType` reds `PipeType.category`'s own match, and a new `PipeCategory` reds this one
+        # rather than falling silently into whichever half happened to be the `else`.
+        match pipe_type.category:
+            case PipeCategory.PIPE_OPERATOR:
+                operators.append(_pipe_type_block(pipe_type=pipe_type, namespace="operator"))
+            case PipeCategory.PIPE_CONTROLLER:
+                controllers.append(_pipe_type_block(pipe_type=pipe_type, namespace="controller"))
     return ["\n\n".join(operators), "\n\n".join(controllers)]
 
 

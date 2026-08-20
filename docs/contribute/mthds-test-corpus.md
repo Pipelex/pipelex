@@ -82,7 +82,7 @@ Everything the file says is decided in the generator, `pipelex/cli/dev_cli/comma
 
 An **exclusion** marks a registry code that no standalone focused entry could meaningfully exercise. It stays in the vocabulary and stays usable by an entry; it is simply not owed a focused entry. The exclusion map is keyed on the registry enum rather than on strings, which is what keeps an exclusion from outliving the code it names: a removed code breaks the generator at import, naming itself.
 
-No native concept is excluded — every one of them turned out to support a real entry. One pipe kind is: `PipeFunc` names a Python function that the runtime resolves against its function registry *at validation time*, so an entry declaring one fails with `Function '<name>' not found in registry` in every consumer that has not registered that exact function — and a cross-language consumer cannot register a Python function at all. Exercise `PipeFunc` in a consumer's own fixtures, where the function exists.
+No native concept is excluded — every one of them turned out to support a real entry. `PipeFunc` is excluded: it names a Python function that the runtime resolves against its function registry *at validation time*, so an entry declaring one fails with `Function '<name>' not found in registry` in every consumer that has not registered that exact function — and a cross-language consumer cannot register a Python function at all. Exercise `PipeFunc` in a consumer's own fixtures, where the function exists.
 
 ## The gates, and what a red one means
 
