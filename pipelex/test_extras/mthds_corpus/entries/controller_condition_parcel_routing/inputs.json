@@ -1,6 +1,6 @@
 {
   "parcel": {
-    "concept": "Parcel",
+    "concept": "parcel_routing.Parcel",
     "content": {
       "size": "medium",
       "address": "14 Rue des Lilas, Rennes"

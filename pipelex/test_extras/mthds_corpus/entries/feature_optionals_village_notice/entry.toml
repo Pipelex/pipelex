@@ -1,5 +1,5 @@
 name = "feature_optionals_village_notice"
-description = "A noticeboard line whose house-style hint is optional, guarded in the prompt so an absent one renders nothing"
+description = "A village noticeboard entry written up, in a house style when one is given"
 
 validity = "valid"
 tier = "dry"

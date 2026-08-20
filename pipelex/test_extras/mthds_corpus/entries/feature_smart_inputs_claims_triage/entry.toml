@@ -1,5 +1,5 @@
 name = "feature_smart_inputs_claims_triage"
-description = "A claims summary whose caller passes bare values — a string, a number, a dict, a list — shaped against the declared signature"
+description = "An insurance claim sorted by its amount, its description and the notes filed with it"
 
 validity = "valid"
 tier = "dry"
