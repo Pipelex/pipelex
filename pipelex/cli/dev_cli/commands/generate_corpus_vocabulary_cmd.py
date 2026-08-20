@@ -77,6 +77,10 @@ _FEATURE_TAGS: dict[str, str] = {
         "An input declared optional with the `?` suffix, guarded in the prompt so that an absent value "
         "renders nothing rather than failing the run, and recorded as absent in the working memory."
     ),
+    "structured_output": (
+        "A concept declaring a `structure` table of typed fields, and a pipe producing that shape rather "
+        "than free text, so the runtime validates the output against the declared fields."
+    ),
     "smart_inputs": (
         "Bare caller values — a string, a number, a dict, a list — interpreted top-down against the entry "
         "pipe's declared signature, so a caller need not wrap each one in its concept envelope."

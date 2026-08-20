@@ -7,4 +7,5 @@ granularity = "focused"
 
 covers = [
   "operator.structure",
+  "feature.structured_output",
 ]
