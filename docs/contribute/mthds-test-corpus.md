@@ -108,7 +108,7 @@ for entry in iter_entries(tier=EntryTier.DRY):
 
 `iter_entries()` filters compose conjunctively and each is optional: `tags` (the entry covers **all** of them), `tier` (a ceiling — the entry's tier is that one or cheaper), `validity`, `granularity`. Ordering is entry-name lexicographic and stable, so parametrized test ids do not churn.
 
-The same two calls are how a **consumer outside this repo** reaches the corpus: it ships as package data in the wheel, so anything that already depends on `pipelex` — the `pipelex-server` members, most immediately — reads it with no vendored copy and no drift, in lockstep with its pinned version. Paths handed out are real filesystem paths, resolved through `importlib.resources.files`; wheels install unzipped, and a zip-imported distribution is not supported.
+The same two calls are how a **consumer outside this repo** reaches the corpus: it ships as package data in the wheel, so anything that already depends on `pipelex` — our own hosted services, most immediately — reads it with no vendored copy and no drift, in lockstep with its pinned version. Paths handed out are real filesystem paths, resolved through `importlib.resources.files`; wheels install unzipped, and a zip-imported distribution is not supported.
 
 The corpus is the single source for language-level `.mthds` methods in this repo: `tests/e2e/pipelex/pipes/date/` and `tests/e2e/pipelex/pipes/yes_no/` already reach for their bundles this way rather than keeping local copies.
 

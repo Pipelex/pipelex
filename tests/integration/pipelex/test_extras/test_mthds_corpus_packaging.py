@@ -9,6 +9,12 @@ already ship — but precedent is not a gate, so this builds the real wheel and 
 
 The expected set is derived from the corpus tree rather than listed here: a new entry, a new file
 kind, or a new namespace is covered the moment it lands, with nothing to remember.
+
+Marked ``codex_disabled``: building a wheel resolves the PEP 517 backend through uv's default
+index, which the air-gapped Codex sandbox cannot reach. The alternatives both cost more than the
+marker — ``--offline`` would make the gate depend on a warm uv cache in every environment that
+*does* run it, and skipping on a build failure would turn the one packaging gate we have into a
+silent pass. It runs in GitHub Actions, which is where a packaging regression has to be caught.
 """
 
 import shutil
@@ -25,12 +31,14 @@ _REPO_ROOT = Path(pipelex.__file__).resolve().parent.parent
 _UNSHIPPED_GENERATOR = "pipelex/cli/dev_cli/commands/generate_corpus_vocabulary_cmd.py"
 
 
+@pytest.mark.codex_disabled
 class TestMthdsCorpusPackaging:
     def test_the_corpus_ships_and_its_generator_does_not(self, tmp_path: Path) -> None:
         """Both halves of the split, against one built wheel: the generated data ships, the generator stays out."""
         uv_path = shutil.which("uv")
-        if uv_path is None:
-            pytest.skip("uv not on PATH")
+        # Not a skip: uv is how this repo is installed, so its absence is a broken environment, and a
+        # packaging gate that quietly passes when it could not build anything is worse than no gate.
+        assert uv_path is not None, "uv is not on PATH, so the wheel cannot be built and the packaging gate cannot run"
 
         build = subprocess.run(  # noqa: S603
             [uv_path, "build", "--wheel", "--out-dir", str(tmp_path)],
