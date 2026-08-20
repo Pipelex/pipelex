@@ -38,7 +38,12 @@ class TestMthdsCorpusExhaustivity:
         assert not unknown, f"Corpus entries cover tags that are not in the vocabulary: {', '.join(sorted(unknown))}"
 
     def test_every_invalid_entry_covers_the_tag_its_expected_error_names(self) -> None:
-        """The two spellings of one fault must agree.
+        """The two spellings of one fault must agree, and the fault is all the entry covers.
+
+        Equality rather than membership, because the arm above counts every focused entry's
+        ``covers`` regardless of validity — it has to, since the ``error.*`` tags are covered by
+        nothing else. A broken bundle that also tagged the pipe kind carrying its fault would
+        therefore satisfy that tag, and the working feature would silently lose its own fixture.
 
         The join runs through the vocabulary's own ``code`` field rather than by re-normalizing
         ``expected_error`` here: ``code`` records the registry spelling verbatim, so looking the
@@ -59,6 +64,12 @@ class TestMthdsCorpusExhaustivity:
             owed_tag = tag_by_error_code.get(expected_error)
             if owed_tag is None:
                 disagreements.append(f"{entry.name}: expected_error '{expected_error}' is in no error.* tag's `code`")
-            elif owed_tag not in entry.manifest.covers:
-                disagreements.append(f"{entry.name}: expected_error '{expected_error}' means it must cover '{owed_tag}'")
-        assert not disagreements, "Invalid entries disagree with themselves: " + "; ".join(sorted(disagreements))
+            elif entry.manifest.covers != [owed_tag]:
+                disagreements.append(f"{entry.name}: expected_error '{expected_error}' means `covers` must be exactly ['{owed_tag}']")
+        assert not disagreements, (
+            "Invalid entries disagree with themselves: "
+            + "; ".join(sorted(disagreements))
+            + ". An invalid entry's `covers` is its error.* tag and nothing else: the arm above reads `covers` as the "
+            "claim that a tag has a focused entry, and a deliberately broken bundle must never be what satisfies that "
+            "claim for a working feature."
+        )
