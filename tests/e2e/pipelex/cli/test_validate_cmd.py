@@ -23,7 +23,12 @@ from pipelex.test_extras.mthds_corpus.manifest import EntryValidity
 
 class TestValidateCommand:
     def test_validate_all(self, tmp_path: Path):
+        copied = 0
         for entry in iter_entries(validity=EntryValidity.VALID):
             shutil.copytree(entry.directory, tmp_path / entry.name)
+            copied += 1
+        # An empty directory validates vacuously, so the assembly is pinned rather than assumed:
+        # a selection that silently returned nothing would leave this test green over no bundles.
+        assert copied, "The corpus yielded no valid entries, so this test would validate an empty directory"
 
         do_validate_all_libraries_and_dry_run(library_dirs=[tmp_path])

@@ -4,7 +4,7 @@
 ``/validate`` layer uses) and a ``mthds_file_path`` resolved against ``library_dirs`` (what the
 CLI, and therefore the MTHDS Test Corpus entry-validation gate, uses). They are meant to be the
 same check. They were not: the library-directory path ran through
-``LibraryManager.load_library_from_mthds_paths``, whose two exception arms both destroyed
+``LibraryManager._load_mthds_files_into_library``, whose two exception arms both destroyed
 structured error data on the way out, so a pipe/concept fault that the contents path reported as
 a categorized item with an ``error_type`` came back as one untyped residual.
 

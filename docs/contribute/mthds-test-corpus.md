@@ -64,7 +64,7 @@ An **invalid** entry additionally declares the exact wire `error_type` it must p
 .venv/bin/pipelex-agent validate bundle <path> -L <entry_dir>/ --format json --error-format json
 ```
 
-Two rules shape an invalid entry beyond that. Its **`covers` list is its `error.*` tag and nothing else** — it is tempting to also tag the pipe kind that carries the fault, but the exhaustivity gate reads `covers` as the claim that a tag has a focused entry, and a deliberately broken bundle must never be what satisfies that claim for a working feature. And the two ways it names its fault have to agree: `expected_error` carries the wire string, `covers` carries the normalized tag, and the exhaustivity gate requires the entry to cover the tag whose `code` is its `expected_error`, so an entry cannot advertise coverage it does not produce.
+Two rules shape an invalid entry beyond that. Its **`covers` list is its `error.*` tag and nothing else** — it is tempting to also tag the pipe kind that carries the fault, but the exhaustivity gate reads `covers` as the claim that a tag has a focused entry, and a deliberately broken bundle must never be what satisfies that claim for a working feature. And the two ways it names its fault have to agree: `expected_error` carries the wire string, `covers` carries the normalized tag, and the exhaustivity gate requires the entry to cover the tag whose `code` is its `expected_error`, so an entry cannot advertise coverage it does not produce. The rule has a second half, gated alongside it: a **valid** entry may not carry an `error.*` tag at all, because its bundle produces no diagnostic and the claim would go unhonoured in exactly the same way.
 
 !!! warning "The `.mthds` editor hook fights invalid entries"
 
@@ -99,7 +99,7 @@ No native concept is excluded — every one of them turned out to support a real
 | Gate | Where | Red means |
 |---|---|---|
 | Vocabulary drift | `tests/unit/pipelex/test_extras/test_mthds_corpus_vocabulary.py` | A registry changed and the committed vocabulary was not regenerated. Run `make generate-corpus-vocabulary`. |
-| Exhaustivity | `tests/unit/pipelex/test_extras/test_mthds_corpus_exhaustivity.py` | A vocabulary tag has no `focused` entry covering it — write the entry, or record an exclusion with a reason. Also fires when an entry covers a tag that is not in the vocabulary, and when an invalid entry's `covers` is not exactly the tag its `expected_error` names. |
+| Exhaustivity | `tests/unit/pipelex/test_extras/test_mthds_corpus_exhaustivity.py` | A vocabulary tag has no `focused` entry covering it — write the entry, or record an exclusion with a reason. Also fires when an entry covers a tag that is not in the vocabulary, when an invalid entry's `covers` is not exactly the tag its `expected_error` names, and when a valid entry covers an `error.*` tag it cannot produce. |
 | Manifest | `tests/unit/pipelex/test_extras/test_mthds_corpus_manifest.py` | The strict `entry.toml` model rejected something. |
 | Layout and filters | `tests/unit/pipelex/test_extras/test_mthds_corpus_loader.py` | An entry's name does not match its directory, its bundle does not resolve, or the loader's filter semantics changed. |
 | Entry validation | `tests/integration/pipelex/test_extras/test_mthds_corpus_entries.py` | A valid entry stopped validating, or an invalid one stopped failing with exactly its declared error. Runs over every entry regardless of tier, so an `inference`-tier entry that broke is caught without spending a token. |

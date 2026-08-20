@@ -73,3 +73,28 @@ class TestMthdsCorpusExhaustivity:
             "claim that a tag has a focused entry, and a deliberately broken bundle must never be what satisfies that "
             "claim for a working feature."
         )
+
+    def test_no_valid_entry_claims_an_error_tag(self) -> None:
+        """The other half of the same hole: a bundle that validates cannot cover a fault.
+
+        The arm above stops an invalid entry from claiming a tag it does not produce. Nothing
+        stopped a *valid* one from doing it, and the first arm counts every focused entry's
+        ``covers`` regardless of validity — so a valid entry carrying an ``error.*`` tag would
+        satisfy that tag's exhaustivity claim while its bundle, by definition, produces no error
+        at all. The fault would then have no entry exercising it and the gate would stay green.
+
+        An ``error.*`` tag is a claim about a diagnostic, and only an entry that declares an
+        ``expected_error`` can honour one.
+        """
+        error_namespace_prefix = "error."
+        offenders = [
+            f"{entry.name}: {tag}"
+            for entry in iter_entries(validity=EntryValidity.VALID)
+            for tag in entry.manifest.covers
+            if tag.startswith(error_namespace_prefix)
+        ]
+        assert not offenders, (
+            "Valid entries cover error.* tags they cannot produce: "
+            + "; ".join(sorted(offenders))
+            + ". Only an invalid entry, which declares the `expected_error` it must fail with, can cover an error.* tag."
+        )
