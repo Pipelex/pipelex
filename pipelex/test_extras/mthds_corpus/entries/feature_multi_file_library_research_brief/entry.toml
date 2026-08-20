@@ -1,0 +1,10 @@
+name = "feature_multi_file_library_research_brief"
+description = "A research brief built top-down across several files, each forward-declared before it is written"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.multi_file_library",
+]
