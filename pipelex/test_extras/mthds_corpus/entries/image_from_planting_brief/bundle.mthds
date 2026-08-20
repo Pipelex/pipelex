@@ -1,0 +1,33 @@
+domain      = "seed_catalog"
+description = "Write the planting scene a seed packet should show, then draw it"
+main_pipe   = "make_packet_illustration"
+
+[concept.PlantingScene]
+description = """
+A description of the scene a seed packet illustration should show: the plant at maturity, the bed it grows in, the season, and the light.
+"""
+refines = "Text"
+
+[pipe.write_planting_scene]
+type = "PipeLLM"
+description = "Write the planting scene the seed packet should show"
+output = "PlantingScene"
+prompt = """
+Describe, in two or three vivid sentences, the scene a seed packet for climbing beans should show: the plant at maturity, the bed it grows in, the season, and the light.
+"""
+
+[pipe.draw_packet_illustration]
+type        = "PipeImgGen"
+description = "Draw the seed packet illustration from the planting scene"
+inputs      = { planting_scene = "PlantingScene" }
+output      = "Image"
+prompt      = "$planting_scene"
+
+[pipe.make_packet_illustration]
+type = "PipeSequence"
+description = "Write the planting scene, then draw the seed packet illustration from it"
+output = "Image"
+steps = [
+  { pipe = "write_planting_scene", result = "planting_scene" },
+  { pipe = "draw_packet_illustration", result = "packet_illustration" },
+]

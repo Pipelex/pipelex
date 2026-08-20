@@ -48,13 +48,15 @@ An entry directory holds either exactly one `.mthds` file, or several with a `bu
     ]
     ```
 
-4. **Validate it locally** — against the local runtime, never the hosted API, which lags it:
+4. **Name no model.** Presets and aliases are resolved by the validation engine, not only at run time, so an entry pinning one fails validation outright on any consumer whose deck does not define it — which turns an entry about a language feature into an entry about model selection. Leave the choice to each consumer's deck.
+
+5. **Validate it locally** — against the local runtime, never the hosted API, which lags it:
 
     ```bash
     .venv/bin/pipelex validate bundle pipelex/test_extras/mthds_corpus/entries/native_time_departure/
     ```
 
-5. **Run the gates**: `.venv/bin/pytest tests/unit/pipelex/test_extras tests/integration/pipelex/test_extras`.
+6. **Run the gates**: `.venv/bin/pytest tests/unit/pipelex/test_extras tests/integration/pipelex/test_extras`.
 
 An **invalid** entry additionally declares the exact wire `error_type` it must produce. Read that string off the runtime rather than inferring it from the source:
 
@@ -89,6 +91,7 @@ An **exclusion** marks a registry code that no standalone focused entry could me
 | Manifest | `tests/unit/pipelex/test_extras/test_mthds_corpus_manifest.py` | The strict `entry.toml` model rejected something. |
 | Layout and filters | `tests/unit/pipelex/test_extras/test_mthds_corpus_loader.py` | An entry's name does not match its directory, its bundle does not resolve, or the loader's filter semantics changed. |
 | Entry validation | `tests/integration/pipelex/test_extras/test_mthds_corpus_entries.py` | A valid entry stopped validating, or an invalid one stopped failing with exactly its declared error. Runs over every entry regardless of tier, so an `inference`-tier entry that broke is caught without spending a token. |
+| Packaging | `tests/integration/pipelex/test_extras/test_mthds_corpus_packaging.py` | A corpus file stopped shipping in the wheel, or the generator started shipping. It builds a real wheel and derives what it expects from the corpus tree, so a new entry is covered with no wiring. |
 
 ## Consuming the corpus from a test
 
@@ -104,6 +107,8 @@ for entry in iter_entries(tier=EntryTier.DRY):
 ```
 
 `iter_entries()` filters compose conjunctively and each is optional: `tags` (the entry covers **all** of them), `tier` (a ceiling — the entry's tier is that one or cheaper), `validity`, `granularity`. Ordering is entry-name lexicographic and stable, so parametrized test ids do not churn.
+
+The same two calls are how a **consumer outside this repo** reaches the corpus: it ships as package data in the wheel, so anything that already depends on `pipelex` — our own hosted services, most immediately — reads it with no vendored copy and no drift, in lockstep with its pinned version. Paths handed out are real filesystem paths, resolved through `importlib.resources.files`; wheels install unzipped, and a zip-imported distribution is not supported.
 
 The corpus is the single source for language-level `.mthds` methods in this repo: `tests/e2e/pipelex/pipes/date/` and `tests/e2e/pipelex/pipes/yes_no/` already reach for their bundles this way rather than keeping local copies.
 

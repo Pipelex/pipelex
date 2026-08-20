@@ -113,7 +113,7 @@
             "args": [
                 "run",
                 "bundle",
-                "tests/integration/pipelex/pipes/pipelines/test_image_out_in.mthds",
+                "tests/integration/pipelex/pipes/pipelines/test_image_inputs.mthds",
                 "--pipe",
                 "describe_image",
                 "--inputs",
