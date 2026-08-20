@@ -1,0 +1,10 @@
+name = "image_from_planting_brief"
+description = "A seed packet illustration drawn from a planting scene the method writes first"
+
+validity = "valid"
+tier = "inference"
+granularity = "composite"
+
+covers = [
+  "native.image",
+]
