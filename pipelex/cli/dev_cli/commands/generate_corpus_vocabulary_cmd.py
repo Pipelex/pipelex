@@ -20,7 +20,7 @@ from rich.panel import Panel
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.pipe_machinery.pipe_blueprint import PipeCategory, PipeType
 from pipelex.runtime_hub import get_console
-from pipelex.test_extras.mthds_corpus.vocabulary import vocabulary_path
+from pipelex.test_extras.mthds_corpus.vocabulary import ValidationLayer, vocabulary_path
 from pipelex.validation_error_types import VALIDATION_ERROR_TYPES, PipeFactoryErrorType, PipeValidationErrorType, ValidationErrorType
 
 _ACRONYM_BOUNDARY_RE = re.compile(r"(?<=[A-Z0-9])(?=[A-Z][a-z])")
@@ -32,6 +32,11 @@ _HEADER = """# The MTHDS Test Corpus tag vocabulary — the closed set an entry'
 # `operator.*`, `controller.*` and `error.*` are derived from the runtime's own registries,
 # `feature.*` is hand-maintained in the generator because no registry describes a language feature,
 # and every exclusion reason is declared in the generator's source alongside them.
+#
+# An `error.*` tag that is not excluded also carries `fails_at`, the earliest layer of checking that
+# rejects a bundle carrying the fault: `schema` when a check of the document's shape alone already
+# catches it, `runtime` when the document has to be interpreted to notice. A structural consumer
+# expects a diagnostic on exactly the `schema` entries and none on the others.
 #
 # This file ships in the pipelex wheel, so it names a document its readers can reach:
 # https://docs.pipelex.com/contribute/mthds-test-corpus/ — which in turn points at the
@@ -156,6 +161,41 @@ _ERROR_TYPE_EXCLUSIONS: dict[ValidationErrorType, str] = {
 }
 
 
+# `fails_at` says, for a fault a corpus entry can produce, which layer of checking rejects it FIRST.
+# The two layers are the two ways a `.mthds` document gets read: a JSON-Schema pass over the raw
+# document, which sees only shape, and the runtime, which interprets what the shape means. A schema
+# check catches a section missing a required key or holding a value outside a closed set; everything
+# else — an unresolved reference, an input the flow never supplies, an output whose concept does not
+# fit — needs interpretation and belongs to the runtime.
+#
+# The set below is the `schema` half, and it is short by nature: only a fault visible in the shape
+# alone can land in it. Every other non-excluded error type is `runtime`, so this set is the whole
+# declaration and there is no second list to keep in step with it. An excluded type gets no
+# `fails_at` at all — it has no entry, so there is nothing to have measured, and a value invented for
+# one would be an argument dressed as a measurement.
+#
+# **This is measured, not argued, and CI is what keeps it measured.** The list was established by
+# linting every invalid entry against the generated MTHDS JSON Schema: exactly the members below
+# produce a diagnostic, every other invalid entry passes. That measurement is then held in place by
+# `.pipelex/plxt.toml`, whose corpus exclusions are gated against this set — so the invalid entries
+# NOT listed here are linted on every `make plxt-lint` run. Declare a fault `runtime` when the schema
+# in fact rejects it and the lint goes red naming the entry; the loop closes without anyone
+# remembering to re-measure.
+#
+# Keyed on the enums for the same reason the exclusion maps are: a code that leaves the registry
+# breaks this module at import instead of leaving a stale value behind in the generated file.
+_ERROR_TYPE_SCHEMA_FAULTS: frozenset[ValidationErrorType] = frozenset(
+    {
+        # A `[pipe.x]` section carrying implementation fields but no `type` key, which the schema
+        # requires on any pipe that is not a bare signature.
+        PipeValidationErrorType.MISSING_PIPE_TYPE,
+        # A `type` naming a pipe kind that does not exist, which the schema's closed enum of pipe
+        # kinds rejects on sight.
+        PipeValidationErrorType.UNKNOWN_PIPE_TYPE,
+    }
+)
+
+
 def normalize_registry_code(*, code: str) -> str:
     """Turn a CamelCase registry code into a snake_case tag local name.
 
@@ -192,12 +232,30 @@ def _render_feature_namespace() -> str:
 
 
 def _render_error_namespace() -> str:
+    """The `error.*` namespace: every registry code, each either excluded or carrying a `fails_at`.
+
+    The two are mutually exclusive by construction, and a type in both maps is a contradiction rather
+    than a precedence question — an exclusion says no entry exists to measure, while a `fails_at`
+    claims a measurement was taken on one. Raising routes it through the command's own failure path
+    instead of quietly emitting whichever branch happens to come first.
+    """
+    contradictions = sorted(error_type.value for error_type in _ERROR_TYPE_SCHEMA_FAULTS if error_type in _ERROR_TYPE_EXCLUSIONS)
+    if contradictions:
+        msg = (
+            f"Error types are declared both excluded and schema faults: {', '.join(contradictions)}. "
+            "An excluded type has no corpus entry, so no schema measurement exists for it."
+        )
+        raise ValueError(msg)
+
     blocks: list[str] = []
     for error_type in VALIDATION_ERROR_TYPES:
         lines = [f"[error.{normalize_registry_code(code=error_type.value)}]", f"code = {_toml_string(value=error_type.value)}"]
         exclusion_reason = _ERROR_TYPE_EXCLUSIONS.get(error_type)
         if exclusion_reason is not None:
             lines.append(f"excluded = {_toml_string(value=exclusion_reason)}")
+        else:
+            fails_at = ValidationLayer.SCHEMA if error_type in _ERROR_TYPE_SCHEMA_FAULTS else ValidationLayer.RUNTIME
+            lines.append(f"fails_at = {_toml_string(value=fails_at)}")
         blocks.append("\n".join(lines))
     return "\n\n".join(blocks)
 

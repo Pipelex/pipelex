@@ -24,14 +24,24 @@ exclude = [
   "node_modules/**",
   ".git/**",
   "*.lock",
-  # The MTHDS Test Corpus's deliberately invalid entries — the one .mthds population this repo does
-  # not lint, because each one exists to be rejected. Their fault is sometimes structural (a typeless
-  # pipe section, an unknown pipe `type`), which the schema catches as the error the entry was written
-  # to trigger. What guards them instead is strictly stronger: the corpus's entry-validation gate runs
-  # the real validation engine over every entry in CI and is red both when an invalid entry fails
-  # differently and when it accidentally validates. Excluded rather than schema-exempted because a
-  # per-rule `exclude` does not lift the schema, only narrows which rule applies.
-  "**/mthds_corpus/entries/invalid_*/*.mthds",
+  # The MTHDS Test Corpus's schema-fault entries, and ONLY those. Every other deliberately invalid
+  # entry is linted like any other .mthds file in this repo: its fault needs the runtime to notice,
+  # so the schema has nothing to say about it and a clean lint is the correct outcome. The two below
+  # are the exceptions — their fault is structural, so the schema rejects them as the very error they
+  # were written to trigger, and linting them would report a defect that is the entry's whole point.
+  #
+  # This list is not hand-maintained: it is gated against the corpus vocabulary's `fails_at` signal by
+  # tests/unit/pipelex/test_extras/test_mthds_corpus_plxt_exclusions.py, which fails if the two
+  # disagree. That is also what makes pipelex the signal's first consumer, and it closes the loop in
+  # the direction that matters — an error type mis-declared `runtime` leaves its entry linted, and
+  # `make plxt-lint` goes red naming it.
+  #
+  # Excluded rather than schema-exempted because a per-rule `exclude` does not lift the schema, only
+  # narrows which rule applies. What guards these two instead is strictly stronger: the corpus's
+  # entry-validation gate runs the real validation engine over every entry in CI and is red both when
+  # an invalid entry fails differently and when it accidentally validates.
+  "**/mthds_corpus/entries/invalid_missing_pipe_type/*.mthds",
+  "**/mthds_corpus/entries/invalid_unknown_pipe_type/*.mthds",
 ] # Glob patterns for files to ignore.
 # These are evaluated relative to the config file location.
 

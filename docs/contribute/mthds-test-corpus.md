@@ -94,12 +94,25 @@ No native concept is excluded — every one of them turned out to support a real
 
 **Measure an exclusion, do not reason your way to one.** Every `error.*` exclusion reason above was established by writing the bundle that ought to trigger it and reading what the runtime actually said — which is how the first two turned out to be shadowed rather than merely awkward, and how the two the registry made look unreachable (`missing_pipe_type`, `native_concept_redeclaration`) turned out to have entries after all.
 
+### `fails_at` — which layer catches a fault first
+
+An `error.*` tag that is *not* excluded carries one more field: `fails_at`, either `schema` or `runtime`. It names the earliest layer of checking that rejects a bundle carrying the fault. `schema` means a pass over the raw document's shape already catches it — a section missing a required key, a value outside a closed set — so a JSON-Schema validator, an editor diagnostic, or `plxt lint` reports it without ever interpreting the document. `runtime` means the document has to be *interpreted* to notice: an unresolved reference, an input the flow never supplies, an output whose concept does not fit.
+
+**The consumer rule is one sentence: a structural sweep expects a diagnostic on an entry exactly when its tag says `fails_at = "schema"`, and expects silence on every other entry.** That is what the field exists for. Before it, a consumer running a schema checker over the corpus had to hardcode which faults it thought were structural — a second, downstream reading of `pipelex`'s own registry, guaranteed to drift from it. Now the corpus being swept carries the answer.
+
+A `schema` fault is still rejected by the runtime; the field names where a fault is caught *first*, not who is allowed to catch it. That is why a schema-fault entry declares the same `expected_error` as any other invalid entry — the runtime's diagnostic is what the entry pins. The two spellings line up on purpose, too: `schema` is also `plxt`'s own `error[schema]` diagnostic category, so a consumer branching on the field and a human reading a linter's output use one word for one thing.
+
+Only non-excluded tags carry it, for the same reason exclusion reasons are measured: an excluded tag has no entry, so there is nothing to have measured on, and a value invented for one would be an argument dressed as a measurement.
+
+**And it stays measured, because this repo consumes it first.** `.pipelex/plxt.toml` excludes the corpus's schema-fault entries from `plxt lint` — they *should* produce a diagnostic, which is the entry's whole point — and lints every other invalid entry like any ordinary `.mthds` file. That exclusion list is not hand-maintained: `tests/unit/pipelex/test_extras/test_mthds_corpus_plxt_exclusions.py` fails when it disagrees with the vocabulary. The config is gated rather than generated because `plxt` is a static binary reading a static file, with nothing to hook a generation step onto — but the loop still closes in the direction that matters. Declare a fault `runtime` when the schema in fact rejects it, and its entry stays linted, so `make plxt-lint` goes red naming it.
+
 ## The gates, and what a red one means
 
 | Gate | Where | Red means |
 |---|---|---|
 | Vocabulary drift | `tests/unit/pipelex/test_extras/test_mthds_corpus_vocabulary.py` | A registry changed and the committed vocabulary was not regenerated. Run `make generate-corpus-vocabulary`. |
-| Exhaustivity | `tests/unit/pipelex/test_extras/test_mthds_corpus_exhaustivity.py` | A vocabulary tag has no `focused` entry covering it — write the entry, or record an exclusion with a reason. Also fires when an entry covers a tag that is not in the vocabulary, when an invalid entry's `covers` is not exactly the tag its `expected_error` names, and when a valid entry covers an `error.*` tag it cannot produce. |
+| Exhaustivity | `tests/unit/pipelex/test_extras/test_mthds_corpus_exhaustivity.py` | A vocabulary tag has no `focused` entry covering it — write the entry, or record an exclusion with a reason. Also fires when an entry covers a tag that is not in the vocabulary, when an invalid entry's `covers` is not exactly the tag its `expected_error` names, when a valid entry covers an `error.*` tag it cannot produce, and when a required `error.*` tag declares no `fails_at`. |
+| Linter exclusions | `tests/unit/pipelex/test_extras/test_mthds_corpus_plxt_exclusions.py` | `.pipelex/plxt.toml`'s corpus exclusions disagree with the vocabulary's `fails_at` signal — an entry whose fault the schema rejects must be excluded, every other invalid entry must be linted. |
 | Manifest | `tests/unit/pipelex/test_extras/test_mthds_corpus_manifest.py` | The strict `entry.toml` model rejected something. |
 | Layout and filters | `tests/unit/pipelex/test_extras/test_mthds_corpus_loader.py` | An entry's name does not match its directory, its bundle does not resolve, or the loader's filter semantics changed. |
 | Entry validation | `tests/integration/pipelex/test_extras/test_mthds_corpus_entries.py` | A valid entry stopped validating, or an invalid one stopped failing with exactly its declared error. Runs over every entry regardless of tier, so an `inference`-tier entry that broke is caught without spending a token. |
