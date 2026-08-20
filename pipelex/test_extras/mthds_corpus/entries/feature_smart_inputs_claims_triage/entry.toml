@@ -1,0 +1,10 @@
+name = "feature_smart_inputs_claims_triage"
+description = "An insurance claim sorted by its amount, its description and the notes filed with it"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "feature.smart_inputs",
+]

@@ -1,0 +1,10 @@
+name = "native_date_departure"
+description = "A departure date read off a ticket, and a note written from it"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "native.date",
+]

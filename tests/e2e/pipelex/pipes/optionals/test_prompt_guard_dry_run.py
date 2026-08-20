@@ -3,16 +3,17 @@ the live render path (only the cogt leaf mocks), so completing the run proves th
 rendered correctly with the optional input genuinely absent — no API key involved.
 """
 
-from pathlib import Path
-
 import pytest
 
 from pipelex.core.memory.absence import AbsenceKind
 from pipelex.pipeline.pipeline_response import RunState
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.test_extras.mthds_corpus.loader import get_entry
 
-_FIXTURE_DIR = Path(__file__).parent / "prompt_guard"
+# The bundle is a corpus entry, not a fixture local to this test: the corpus is the single source for
+# language-level `.mthds` methods, and covering `feature.optionals` is exactly why the entry exists.
+_FIXTURE_DIR = get_entry(name="feature_optionals_village_notice").directory
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -24,7 +25,7 @@ class TestPromptGuardDryRun:
         """
         runner = PipelexMTHDSProtocol(library_dirs=[str(_FIXTURE_DIR)], pipe_run_mode=PipeRunMode.DRY)
 
-        response = await runner.execute(pipe_code="opg_draft_note", inputs={"topic": "quantum computing"})
+        response = await runner.execute(pipe_code="draft_notice", inputs={"subject": "the bus timetable change"})
 
         assert response.state == RunState.COMPLETED
         assert response.pipe_output.main_stuff.as_text.text
@@ -41,7 +42,7 @@ class TestPromptGuardDryRun:
         """
         runner = PipelexMTHDSProtocol(library_dirs=[str(_FIXTURE_DIR)], pipe_run_mode=PipeRunMode.DRY)
 
-        response = await runner.execute(pipe_code="opg_draft_note", inputs={"topic": "quantum computing", "style_hint": "keep it formal"})
+        response = await runner.execute(pipe_code="draft_notice", inputs={"subject": "the bus timetable change", "style_hint": "keep it formal"})
 
         assert response.state == RunState.COMPLETED
         memory = response.pipe_output.working_memory

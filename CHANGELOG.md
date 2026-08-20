@@ -1,5 +1,23 @@
 # Changelog
 
+## [v0.48.0] - 2026-08-20
+
+### Added
+
+- **MTHDS Test Corpus:** Introduced a canonical, tagged set of `.mthds` methods at `pipelex/test_extras/mthds_corpus/`, replacing scattered per-repo fixtures with a single source of truth that ships in the wheel for synchronized cross-repo consumption. Each entry is a directory holding the method, an optional `inputs.json`, and an `entry.toml` declaring what it exercises — `covers`, `tier`, `granularity`, `validity`, and for a deliberately invalid entry the exact wire `error_type` it must produce. The cross-repo contract is the workspace spec `docs/specs/mthds-test-corpus.md`.
+- **Corpus Loader API:** Added `iter_entries()` and `get_entry()` in `pipelex.test_extras.mthds_corpus.loader` to fetch fixtures programmatically by tag, execution tier, validity, and granularity instead of by file path.
+- **Tag Vocabulary Generation:** Added the `pipelex-dev generate-corpus-vocabulary` CLI command and `Makefile` targets to generate the corpus tag vocabulary (`native.*`, `operator.*`, `controller.*`) directly from runtime registries (`NativeConceptCode`, `PipeType`). The two pipe namespaces come from one registry walk, split by `PipeType.category`, so a pipe kind added later lands in the right namespace with nothing to update. `PipeFunc` is the corpus's first recorded exclusion: it names a Python function the runtime resolves against its function registry at validation time, so no portable entry can declare one.
+- **Feature Tag Axis:** Added a hand-maintained `feature.*` tag namespace for language features spanning multiple blueprint fields or lacking a registry (e.g. `feature.multi_file_library`, `feature.optionals`, `feature.smart_inputs`, `feature.structured_output`). Each feature tag is declared in the same change that lands its first covering entry, so the vocabulary never advertises coverage the corpus does not have.
+- **Strict Corpus CI Gates:** Added test suites enforcing corpus integrity: exhaustivity (every registry code has a focused entry), vocabulary drift (committed `vocabulary.toml` matches registries), manifest validation (strict Pydantic model per `entry.toml`), entry validation (valid entries compile, invalid entries fail with their declared `error_type`), and packaging (builds a real wheel to confirm corpus files ship while excluding the generator script).
+- **New Corpus Entries:** Added inference-tier image payload entries (`image_from_planting_brief`, `image_round_trip_room_photo`), a nested structured-output entry (`feature_structured_output_delivery_round`) for lists of structured objects with optional fields, and focused entries covering batching, conditions, sequences, parallel execution, composition, extraction, and search. No entry names a model: presets are resolved by the validation engine, so an entry pinning one would fail validation on any consumer whose deck does not define it.
+- **Documentation:** Added a contributor guide for the corpus at `docs/contribute/mthds-test-corpus.md`.
+
+### Changed
+
+- **Centralized Test Fixtures:** Migrated end-to-end and integration tests (Date, YesNo, Smart Inputs, Optionals, Multi-file libraries, Image round-trips) to source their `.mthds` bundles dynamically from the new corpus via `get_entry()`, removing all local duplicated copies previously scattered across `tests/e2e/` and `tests/integration/`. Nothing in this repo holds a second copy of a language-level `.mthds` method any more.
+- **Makefile Targets:** Added `generate-corpus-vocabulary-quiet` to the `cc` (check) and `up` (update) targets to keep the vocabulary current during local development.
+- **VS Code Launch Config:** Updated the integration test target in `.vscode/launch.json` from `test_image_out_in.mthds` to `test_image_inputs.mthds` to match the refactored test structure.
+
 ## [v0.47.0] - 2026-08-19
 
 ### Added

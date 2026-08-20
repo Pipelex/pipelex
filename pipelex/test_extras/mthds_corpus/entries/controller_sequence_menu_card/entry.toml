@@ -1,0 +1,10 @@
+name = "controller_sequence_menu_card"
+description = "A menu card written in two steps from the kitchen's note of what it has in"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "controller.sequence",
+]

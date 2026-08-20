@@ -1,0 +1,14 @@
+domain      = "supplier_records"
+description = "Name the supplier that issued a scanned purchase invoice"
+main_pipe   = "name_supplier"
+
+[pipe.name_supplier]
+type = "PipeLLM"
+description = "Name the supplier that issued the scanned invoice"
+inputs = { invoice_scan = "Document" }
+output = "Text"
+prompt = """
+Which supplier issued this invoice? Answer with the supplier name alone.
+
+@invoice_scan
+"""

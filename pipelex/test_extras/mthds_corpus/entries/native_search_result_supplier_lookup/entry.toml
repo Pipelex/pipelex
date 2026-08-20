@@ -1,0 +1,10 @@
+name = "native_search_result_supplier_lookup"
+description = "A shortlist written from the results of a supplier lookup"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "native.search_result",
+]

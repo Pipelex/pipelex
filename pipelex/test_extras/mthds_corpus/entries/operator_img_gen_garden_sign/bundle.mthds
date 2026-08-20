@@ -1,0 +1,9 @@
+domain      = "garden_signage"
+description = "Drawing the little painted signs that mark the beds in a kitchen garden"
+main_pipe   = "draw_bed_sign"
+
+[pipe.draw_bed_sign]
+type        = "PipeImgGen"
+description = "Draws a weathered wooden sign for a vegetable bed"
+output      = "Image"
+prompt      = "A small weathered wooden sign staked in dark garden soil, hand-painted with the word RHUBARB, morning light"

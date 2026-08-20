@@ -13,7 +13,6 @@ The TOML twin of this round trip (through the real binary) lives in
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -30,12 +29,16 @@ from pipelex.pipeline.pipeline_response import RunState
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.test_extras.mthds_corpus.loader import get_entry
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-_FIXTURE_DIR = Path(__file__).parent / "smart_inputs_triage"
-_BUNDLE = _FIXTURE_DIR / "smart_inputs_triage.mthds"
+# The bundle is a corpus entry, not a fixture local to this test: the corpus is the single source for
+# language-level `.mthds` methods, and covering `feature.smart_inputs` is exactly why the entry exists.
+_ENTRY = get_entry(name="feature_smart_inputs_claims_triage")
+_FIXTURE_DIR = _ENTRY.directory
+_BUNDLE = _ENTRY.bundle_path
 
 
 def _teardown_validation_library(outer_library_id: str) -> None:
@@ -53,7 +56,7 @@ class TestSmartInputsLightRoundTrip:
         outer_library_id = load_empty_library()
         try:
             await validate_bundle(mthds_file_path=_BUNDLE)
-            the_pipe = get_required_entry_pipe(pipe_code="smart_inputs_demo.triage_case")
+            the_pipe = get_required_entry_pipe(pipe_code="claims_desk.triage_case")
             light_inputs: dict[str, Any] = json.loads(render_inputs(the_pipe))
         finally:
             _teardown_validation_library(outer_library_id)
@@ -64,7 +67,7 @@ class TestSmartInputsLightRoundTrip:
 
         assert response.state == RunState.COMPLETED
         working_memory = response.pipe_output.working_memory
-        assert working_memory.get_stuff("question").concept.concept_ref == "smart_inputs_demo.Question"
-        assert working_memory.get_stuff("priority").concept.concept_ref == "smart_inputs_demo.Priority"
-        assert working_memory.get_stuff("invoice").concept.concept_ref == "smart_inputs_demo.Invoice"
-        assert working_memory.get_stuff("tags").concept.concept_ref == "smart_inputs_demo.Tag"
+        assert working_memory.get_stuff("question").concept.concept_ref == "claims_desk.Question"
+        assert working_memory.get_stuff("priority").concept.concept_ref == "claims_desk.Priority"
+        assert working_memory.get_stuff("invoice").concept.concept_ref == "claims_desk.Invoice"
+        assert working_memory.get_stuff("tags").concept.concept_ref == "claims_desk.Tag"

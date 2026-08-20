@@ -1,0 +1,10 @@
+name = "native_dynamic_tracking_field"
+description = "A field of a parcel tracking record, whose concept the caller picks at run time"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "native.dynamic",
+]

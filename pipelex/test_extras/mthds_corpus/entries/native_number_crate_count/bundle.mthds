@@ -1,0 +1,14 @@
+domain      = "warehouse_intake"
+description = "Count the crates listed on a delivery intake slip"
+main_pipe   = "count_crates"
+
+[pipe.count_crates]
+type = "PipeLLM"
+description = "Count how many crates the intake slip lists"
+inputs = { intake_slip = "Text" }
+output = "Number"
+prompt = """
+How many crates does this intake slip list? Answer with the number alone.
+
+@intake_slip
+"""

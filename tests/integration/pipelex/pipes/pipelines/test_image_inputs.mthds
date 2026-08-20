@@ -34,3 +34,17 @@ Extract the year and title.
 Also, add this to the description:
 $page.text_and_images.text.text
 """
+
+# Fed a data-URL image by test_image_inputs_inference.py. It used to borrow `describe_image` from
+# the image round-trip bundle that now lives in the corpus; the pipe belongs here, beside the other
+# image-input pipes that test drives.
+[pipe.describe_image]
+type = "PipeLLM"
+description = "Describe what is in the image"
+inputs = { image = "Image" }
+output = "Text"
+model = "$vision-cheap"
+prompt = """
+Describe what you see in this image in 1-2 sentences, be concise.
+$image
+"""

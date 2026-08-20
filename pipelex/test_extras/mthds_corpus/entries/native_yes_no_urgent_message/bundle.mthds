@@ -1,0 +1,25 @@
+domain      = "support_inbox"
+description = "Judge whether an inbox message is urgent, and read a verdict back to explain it"
+main_pipe   = "judge_is_urgent"
+
+[pipe.judge_is_urgent]
+type = "PipeLLM"
+description = "Decides whether a message is urgent, answering yes or no"
+inputs = { message = "Text" }
+output = "YesNo"
+prompt = """
+Is the following message urgent? Answer yes or no.
+
+$message
+"""
+
+[pipe.explain_verdict]
+type = "PipeLLM"
+description = "Writes a one-line justification for a yes/no verdict"
+inputs = { verdict = "YesNo" }
+output = "Text"
+prompt = """
+The verdict is: $verdict
+
+Explain in one sentence why that verdict makes sense.
+"""

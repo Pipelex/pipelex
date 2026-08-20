@@ -1,0 +1,17 @@
+domain      = "village_noticeboard"
+description = "Writing a short notice for the board, where the house-style hint may or may not have been given"
+main_pipe   = "draft_notice"
+
+[pipe.draft_notice]
+type = "PipeLLM"
+description = "Drafts the notice, following the house-style hint only when one was given"
+inputs = { subject = "Text", style_hint = "Text?" }
+output = "Text"
+prompt = """
+Write one short sentence about $subject for the village noticeboard.
+
+@?style_hint
+{% if style_hint is defined %}
+Follow the style hint above.
+{% endif %}
+"""

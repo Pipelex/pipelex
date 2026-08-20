@@ -1,0 +1,29 @@
+domain      = "holiday_lettings"
+description = "Produce a room photograph for a holiday listing, then read it back to caption it"
+main_pipe   = "illustrate_and_caption_room"
+
+[pipe.render_room_photo]
+type        = "PipeImgGen"
+description = "Produce the photograph of the room"
+output      = "Image"
+prompt      = "A sunlit corner bedroom with a wooden bed frame, linen curtains and a view over rooftops"
+
+[pipe.caption_room_photo]
+type = "PipeLLM"
+description = "Write the listing caption from the room photograph"
+inputs = { room_photo = "Image" }
+output = "Text"
+prompt = """
+Write the caption for this holiday listing photograph in one or two sentences, naming what a guest would notice first.
+
+$room_photo
+"""
+
+[pipe.illustrate_and_caption_room]
+type = "PipeSequence"
+description = "Produce the room photograph and caption it"
+output = "Text"
+steps = [
+  { pipe = "render_room_photo", result = "room_photo" },
+  { pipe = "caption_room_photo", result = "caption" },
+]

@@ -1,0 +1,37 @@
+domain      = "claims_desk"
+description = "Summarising a claim from the bare values the desk clerk typed in"
+main_pipe   = "triage_case"
+
+[concept.Question]
+description = "A question put to the claims desk"
+refines     = "Text"
+
+[concept.Priority]
+description = "How urgently the claim needs answering, as a score"
+refines     = "Number"
+
+[concept.Tag]
+description = "A short routing label written on the claim"
+refines     = "Text"
+
+[concept.Invoice]
+description = "The invoice attached to the claim"
+
+[concept.Invoice.structure]
+invoice_number = { type = "text", description = "The invoice number", required = true }
+amount         = { type = "number", description = "The invoice amount", required = true }
+
+[pipe.triage_case]
+type = "PipeLLM"
+description = "Writes the one-line triage summary from the question, priority, invoice and tags"
+inputs = { question = "Question", priority = "Priority", invoice = "Invoice", tags = "Tag[]" }
+output = "Text"
+prompt = """
+Question: $question
+Priority: $priority
+Invoice number: {{ invoice.invoice_number }} for {{ invoice.amount }}
+Tags:
+@tags
+
+Write a one-line triage summary.
+"""

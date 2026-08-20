@@ -1,0 +1,11 @@
+name = "native_text_delay_notice"
+description = "A platform notice written from a train delay report"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "native.text",
+  "operator.llm",
+]

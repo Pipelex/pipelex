@@ -1,0 +1,10 @@
+name = "native_anything_lost_item"
+description = "A description written for a lost item of any kind"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "native.anything",
+]

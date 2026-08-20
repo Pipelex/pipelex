@@ -1,0 +1,10 @@
+name = "operator_extract_invoice_pages"
+description = "The pages read out of a scanned supplier invoice"
+
+validity = "valid"
+tier = "inference"
+granularity = "focused"
+
+covers = [
+  "operator.extract",
+]

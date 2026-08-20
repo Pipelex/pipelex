@@ -1,0 +1,23 @@
+domain      = "warehouse_labelling"
+description = "Writing one crate label for each crate on a pallet"
+main_pipe   = "label_every_crate"
+
+[concept]
+Crate      = "A crate standing on a pallet, described by what is in it."
+CrateLabel = "The line of text stuck on the outside of a crate."
+
+[pipe.label_every_crate]
+type             = "PipeBatch"
+description      = "Writes a label for each crate on the pallet"
+inputs           = { crates = "Crate[]" }
+output           = "CrateLabel[]"
+branch_pipe_code = "label_one_crate"
+input_list_name  = "crates"
+input_item_name  = "crate"
+
+[pipe.label_one_crate]
+type        = "PipeLLM"
+description = "Writes the label for a single crate"
+inputs      = { crate = "Crate" }
+output      = "CrateLabel"
+prompt      = "Write the label that goes on this crate: $crate. One line, no more than eight words."

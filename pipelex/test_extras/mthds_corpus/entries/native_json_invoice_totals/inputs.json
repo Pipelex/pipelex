@@ -1,0 +1,8 @@
+{
+  "invoice_text": {
+    "concept": "native.Text",
+    "content": {
+      "text": "Invoice 4471. Net 240.00 EUR. VAT 20% 48.00 EUR. Gross 288.00 EUR. Due 30 days."
+    }
+  }
+}

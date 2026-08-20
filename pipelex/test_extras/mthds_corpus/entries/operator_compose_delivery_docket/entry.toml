@@ -1,0 +1,10 @@
+name = "operator_compose_delivery_docket"
+description = "A delivery docket built from a weighed parcel and the carrier's name"
+
+validity = "valid"
+tier = "offline"
+granularity = "focused"
+
+covers = [
+  "operator.compose",
+]

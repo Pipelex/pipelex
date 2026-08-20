@@ -1,0 +1,14 @@
+domain      = "restaurant_menus"
+description = "Render a handwritten daily menu as a small HTML card"
+main_pipe   = "render_menu_card"
+
+[pipe.render_menu_card]
+type = "PipeLLM"
+description = "Render the daily menu as an HTML fragment"
+inputs = { menu = "Text" }
+output = "Html"
+prompt = """
+Render this daily menu as a small HTML card.
+
+@menu
+"""
