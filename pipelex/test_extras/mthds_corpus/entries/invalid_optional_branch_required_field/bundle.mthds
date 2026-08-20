@@ -1,0 +1,41 @@
+domain      = "weather_reports"
+description = "Put the morning weather report together from the rain-gauge readings and, when it comes in, the coastal station's word"
+main_pipe   = "write_weather_report"
+
+[concept]
+GaugeReading = "The readings taken off the rain gauge"
+CoastalWord  = "What the coastal station sent over, when it sent anything"
+
+[concept.WeatherReport]
+description = "The morning weather report"
+
+[concept.WeatherReport.structure]
+inland  = { type = "text", description = "What the gauge readings say", required = true }
+coastal = { type = "text", description = "What the coastal station says", required = true }
+
+# `coastal_word` may not arrive, the branch that reads it takes it plainly, and the report
+# insists on a coastal line all the same.
+[pipe.write_weather_report]
+type = "PipeParallel"
+description = "Write both halves of the report at once"
+inputs = { gauge = "GaugeReading", coastal_word = "CoastalWord?" }
+output = "WeatherReport"
+add_each_output = false
+branches = [
+  { pipe = "read_gauge", result = "inland" },
+  { pipe = "read_coastal_word", result = "coastal" },
+]
+
+[pipe.read_gauge]
+type        = "PipeLLM"
+description = "Write up what the gauge readings say"
+inputs      = { gauge = "GaugeReading" }
+output      = "Text"
+prompt      = "Write up what these gauge readings say: $gauge"
+
+[pipe.read_coastal_word]
+type        = "PipeLLM"
+description = "Write up what the coastal station sent"
+inputs      = { coastal_word = "CoastalWord" }
+output      = "Text"
+prompt      = "Write up what the coastal station sent: $coastal_word"

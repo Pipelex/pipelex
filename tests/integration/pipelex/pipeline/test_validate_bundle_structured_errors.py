@@ -24,9 +24,9 @@ from collections.abc import Callable
 import pytest
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.validation_error_types import PipeValidationErrorType
 
 _UNKNOWN_CONCEPT_MTHDS = """
 domain = "structured_unknown_concept"

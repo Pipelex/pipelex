@@ -9,7 +9,6 @@ from typing import Callable
 import pytest
 from pydantic import ValidationError
 
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.mthds_parsing.handle_pipe_errors import extract_wrapped_pipe_validation_error
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
@@ -22,6 +21,7 @@ from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.search.pipe_search import PipeSearch
 from pipelex.pipe_operators.search.pipe_search_blueprint import PipeSearchBlueprint
+from pipelex.validation_error_types import PipeValidationErrorType
 
 _DOMAIN_CODE = "test_optionals_guard_lint"
 

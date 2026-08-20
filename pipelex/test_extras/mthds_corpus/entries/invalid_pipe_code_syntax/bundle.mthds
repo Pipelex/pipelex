@@ -1,0 +1,14 @@
+domain      = "laundry_tickets"
+description = "Write the ticket that goes with a bag of laundry left at the counter"
+main_pipe   = "Not A Valid Step Name!"
+
+[concept]
+LaundryBag = "A bag of laundry left at the counter"
+Ticket     = "The ticket that goes with a bag of laundry"
+
+[pipe.write_laundry_ticket]
+type        = "PipeLLM"
+description = "Write the ticket for a bag of laundry"
+inputs      = { laundry_bag = "LaundryBag" }
+output      = "Ticket"
+prompt      = "Write the ticket for this bag: $laundry_bag"

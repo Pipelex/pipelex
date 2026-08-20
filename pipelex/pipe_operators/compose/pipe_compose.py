@@ -9,7 +9,7 @@ from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigil
 from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -31,6 +31,7 @@ from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_require
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.tools.templating.templating_style import TemplatingStyle
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 class PipeComposeOutput(PipeOutput):

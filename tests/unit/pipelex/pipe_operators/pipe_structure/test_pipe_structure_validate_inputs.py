@@ -3,11 +3,12 @@ from typing import Callable
 
 import pytest
 
-from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.structure.pipe_structure import PipeStructure
 from pipelex.pipe_operators.structure.pipe_structure_blueprint import PipeStructureBlueprint
+from pipelex.validation_error_types import PipeValidationErrorType
 
 # Bundle that declares a domain concept refining native.Text. Used to verify that
 # `validate_inputs_with_library` accepts Text-refining concepts at the strict=False level.

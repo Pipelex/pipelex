@@ -1,0 +1,12 @@
+name = "invalid_unknown_pipe_type"
+description = "A hardware catalog line written by a kind of step the language does not have"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.unknown_pipe_type",
+]
+
+expected_error = "unknown_pipe_type"

@@ -1,0 +1,9 @@
+domain      = "postal_rounds"
+description = "Write the round sheet a postal walker carries out with them"
+main_pipe   = "write_round_sheet"
+
+[pipe.write_round_sheet]
+description = "Write the round sheet for a walker"
+inputs      = { walk_note = "Text" }
+output      = "Text"
+prompt      = "Write the round sheet from this walk note: $walk_note"

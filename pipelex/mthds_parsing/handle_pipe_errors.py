@@ -5,7 +5,8 @@ from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
 from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
-from pipelex.core.pipes.exceptions import PipeFactoryError, PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeFactoryError, PipeValidationError
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 class ModelScope(StrEnum):

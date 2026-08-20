@@ -1,0 +1,21 @@
+domain      = "bakery_orders"
+description = "Write the docket that goes to the bakery bench, from the flavour a customer named when they named one"
+main_pipe   = "write_order_docket"
+
+[concept]
+Flavour = "The flavour a customer named, when they named one"
+Docket  = "The docket that goes to the bakery bench"
+
+[pipe.write_order_docket]
+type        = "PipeSequence"
+description = "Write the bakery docket"
+inputs      = { flavour = "Flavour?" }
+output      = "Docket"
+steps       = [{ pipe = "draft_docket", result = "docket" }]
+
+[pipe.draft_docket]
+type        = "PipeLLM"
+description = "Draft the docket for the bench"
+inputs      = { flavour = "Flavour" }
+output      = "Docket"
+prompt      = "Write the bakery docket for a $flavour order."

@@ -1,0 +1,12 @@
+name = "invalid_missing_input_variable"
+description = "A berth note whose wording reaches for a tide the note never asks anyone for"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.missing_input_variable",
+]
+
+expected_error = "missing_input_variable"

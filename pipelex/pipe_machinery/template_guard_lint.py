@@ -5,11 +5,12 @@ validation fails with `OPTIONAL_INPUT_UNGUARDED` and the precise fix.
 """
 
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
-from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_optional_guards import detect_unguarded_optional_references
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 def lint_optional_input_guards(

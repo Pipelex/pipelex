@@ -1,0 +1,10 @@
+domain      = "hardware_catalog"
+description = "Write the catalog line for an item on the hardware shelf"
+main_pipe   = "write_catalog_line"
+
+[pipe.write_catalog_line]
+type        = "PipeWondrous"
+description = "Write the catalog line for a shelf item"
+inputs      = { shelf_item = "Text" }
+output      = "Text"
+prompt      = "Write the catalog line for $shelf_item"

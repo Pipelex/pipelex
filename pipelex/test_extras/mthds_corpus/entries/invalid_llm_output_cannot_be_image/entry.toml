@@ -1,0 +1,12 @@
+name = "invalid_llm_output_cannot_be_image"
+description = "A parcel label read out in writing, with a photograph expected back instead of the words"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.llm_output_cannot_be_image",
+]
+
+expected_error = "llm_output_cannot_be_image"

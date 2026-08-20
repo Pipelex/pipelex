@@ -1,0 +1,25 @@
+domain      = "campsite_bookings"
+description = "Answer a campsite booking once the warden has approved it, and let it lie when they have not"
+main_pipe   = "answer_booking"
+
+[concept]
+Verdict = "What the warden decided about a booking"
+Answer  = "The answer sent back to the camper"
+
+[pipe.answer_booking]
+type                = "PipeCondition"
+description         = "Answer the booking, or let it lie"
+inputs              = { verdict = "Verdict" }
+output              = "Answer"
+expression_template = "{{ verdict.text }}"
+default_outcome     = "continue"
+
+[pipe.answer_booking.outcomes]
+approved = "write_answer"
+
+[pipe.write_answer]
+type        = "PipeLLM"
+description = "Write the answer that goes back to the camper"
+inputs      = { verdict = "Verdict" }
+output      = "Answer"
+prompt      = "Write the answer to the camper for: $verdict"

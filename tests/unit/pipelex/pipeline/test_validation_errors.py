@@ -13,10 +13,10 @@ import json
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.cli.agent_cli.commands.agent_output import extract_validation_errors
 from pipelex.core.exceptions import PipeFactoryErrorData, PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
-from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validation_errors import build_validation_error_items
 from pipelex.suggested_fix import DeleteKeyOp, RenameTableKeyOp, SetKeyOp
+from pipelex.validation_error_types import PipeFactoryErrorType, PipeValidationErrorType
 
 
 def _build_items(exc: ValidateBundleError) -> list[ValidationErrorItem]:

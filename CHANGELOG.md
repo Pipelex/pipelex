@@ -1,5 +1,25 @@
 # Changelog
 
+## [v0.49.0] - 2026-08-20
+
+### Added
+
+- **Closed registry for validation error types**: `VALIDATION_ERROR_TYPES`, in the new `pipelex/validation_error_types.py`, is an enumerable, closed registry of every `error_type` a validation verdict can carry. It is a union of the enums the runtime already raises — `PipeValidationErrorType`, `PipeFactoryErrorType`, and a new `ValidationResidualErrorType` naming the one residual channel that had no enum of its own — so a member added to any of them is in the registry the moment it is declared. A consumer building coverage over the language surface now reads the registry instead of collecting strings from whichever diagnostics it happened to have seen. No wire value changed.
+- **The corpus's invalid axis**: the MTHDS Test Corpus now carries an `error.*` tag namespace generated from `VALIDATION_ERROR_TYPES`, plus a focused invalid entry for every tag in it that a `.mthds` bundle can actually produce — each authored to trigger exactly one error, and gated on doing so. Five codes are excluded, each with the measurement behind it: `circular_dependency_error` and `unknown_concept` are unreachable through bundle validation, `optional_force_redundant` is advisory-only and rides the `warnings` array, and the two `unknown_*` fallbacks name the absence of a diagnosis rather than a language fault.
+- **The exhaustivity gate now requires an invalid entry to agree with itself**: such an entry states its fault twice — as `expected_error`, the wire string, and as an `error.*` tag in `covers`, the normalized form — and nothing checked that the two matched. The check joins through the vocabulary's own `code` field rather than re-normalizing, so it carries no second copy of the normalization rule. A valid entry may no longer carry an `error.*` tag, since its bundle produces no diagnostic for the exhaustivity arm to count.
+- **Validation parity test**: `test_validate_bundle_entry_shape_parity.py` validates the same bundle through both entry shapes — in-memory contents and a library directory — and requires the two to produce identical structured diagnostics.
+
+### Fixed
+
+- **The same bundle produced different diagnostics depending on how it reached the validator**, and the library-directory route — the one the CLI and every local tool take — was the lossy one. Two arms in `LibraryManager._load_mthds_files_into_library` destroyed the structured data on the way out: a pydantic `ValidationError` was rewrapped as a bare `LibraryError`, which routes to the error cascade's structured-forwarding arm rather than its categorizing arm; and a `ConceptLibraryError` was re-raised message-only, dropping the per-reference items it now carries. In practice `unresolved_concept`, `optional_input_unguarded` and `optional_output_required` were simply unreachable from a file on disk. Both arms now preserve what they were discarding.
+
+### Changed
+
+- **`ValidationErrorItem.error_type` is typed against the closed registry union** instead of an open string (breaking). This is what makes the registry closed rather than merely documented — an unregistered string can no longer be constructed or parsed onto an item — and it publishes the exact vocabulary into the OpenAPI schema served for `/validate`, where the field was previously an open `string`. As part of this, `PipeValidationErrorType` and `PipeFactoryErrorType` moved from `pipelex/core/pipes/exceptions.py` to `pipelex/validation_error_types.py`: the vocabulary is a wire contract rather than pipe machinery, and it has to sit below `base_exceptions` for the wire item to be typed against it at all.
+- **Two test fixtures were naming faults that do not exist**, and typing `error_type` against the registry is what surfaced them: one claimed `MISSING_CONCEPT`, a code no enum has ever defined, and others used member names (`INADEQUATE_OUTPUT_CONCEPT`) where the wire carries values (`inadequate_output_concept`). Each was accepted silently while the field was an open string. They now name registry members.
+- **The corpus's `invalid_*` entries are excluded from `plxt` linting and formatting** in `.pipelex/plxt.toml`: their structural faults are deliberate, and what guards them instead is strictly stronger — the corpus's entry-validation gate runs the real validation engine over every entry in CI, and is red both when an invalid entry fails differently and when it accidentally validates.
+- **Documentation**: `docs/under-the-hood/error-model.md` now describes the closed `error_type` registry, and `docs/contribute/mthds-test-corpus.md` explains the rules for authoring an invalid corpus entry.
+
 ## [v0.48.0] - 2026-08-20
 
 ### Added

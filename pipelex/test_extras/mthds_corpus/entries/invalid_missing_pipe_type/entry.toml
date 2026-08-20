@@ -1,0 +1,12 @@
+name = "invalid_missing_pipe_type"
+description = "A postal round sheet written by a step that says what it does and never says what kind of step it is"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.missing_pipe_type",
+]
+
+expected_error = "missing_pipe_type"

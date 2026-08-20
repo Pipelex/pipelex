@@ -1,0 +1,10 @@
+domain      = "parcel_labels"
+description = "Say in writing what is printed on a parcel label"
+main_pipe   = "describe_parcel_label"
+
+[pipe.describe_parcel_label]
+type        = "PipeLLM"
+description = "Say what a parcel label reads"
+inputs      = { label_note = "Text" }
+output      = "Image"
+prompt      = "Say what this parcel label reads: $label_note"

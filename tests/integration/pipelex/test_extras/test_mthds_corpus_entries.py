@@ -52,28 +52,29 @@ class TestMthdsCorpusEntries:
             f"Corpus entry '{entry.name}' declares expected_error={entry.manifest.expected_error!r} but produced {observed!r}"
         )
 
-    async def test_the_invalid_arm_bites_on_a_deliberately_broken_bundle(self, tmp_path: Path) -> None:
-        """No corpus entry is invalid yet, so the invalid arm is proven here instead.
+    async def test_the_invalid_arm_bites_when_a_declared_error_stops_being_produced(self, tmp_path: Path) -> None:
+        """The arm above is red when an invalid entry stops meaning what it claims — shown, not assumed.
 
-        The `error.*` namespace an invalid entry's `covers` would draw on does not exist until
-        the error-type registry lands, and an invalid entry tagged with a native it does not
-        exist for would be a lie in the manifest. The machinery the arm above depends on — that
-        a broken bundle raises, and that the raised error projects the exact wire `error_type`
-        an `expected_error` is compared against — is exercised against a bundle built for the
-        purpose, so the arm is not dead code waiting on Phase 3.
+        Every corpus entry passes that arm, which is exactly what makes its failure mode
+        unobservable in the suite: nothing in a green run demonstrates that a *wrong* declaration
+        would be caught. So the arm's comparison is run here in both directions over a bundle whose
+        single fault is known — equal to the declaration a correct entry would carry, unequal to the
+        one a drifted entry would. It also pins the machinery the arm rests on: that a broken bundle
+        raises, and that the raised error projects the exact wire `error_type` an `expected_error`
+        is compared against.
         """
         bundle_path = tmp_path / "bundle.mthds"
         bundle_path.write_text(
-            """domain = "harbour_moorings"
-description = "A berth note whose prompt reaches for a variable the pipe never declares"
-main_pipe = "write_berth_note"
+            """domain      = "harbour_moorings"
+description = "Write the note telling a vessel where and when to moor"
+main_pipe   = "write_berth_note"
 
 [pipe.write_berth_note]
-type = "PipeLLM"
-description = "Write a berth note"
-inputs = { vessel = "Text" }
-output = "Text"
-prompt = "Write a berth note for $vessel arriving on $tide."
+type        = "PipeLLM"
+description = "Write the berth note for a vessel"
+inputs      = { vessel = "Text" }
+output      = "Text"
+prompt      = "Write the berth note for $vessel arriving on the $tide tide."
 """,
             encoding="utf-8",
         )
@@ -81,5 +82,9 @@ prompt = "Write a berth note for $vessel arriving on $tide."
         with pytest.raises(ValidateBundleError) as raised:
             await validate_bundle(mthds_file_path=bundle_path, library_dirs=[tmp_path])
 
+        declared_by_a_correct_entry = "missing_input_variable"
+        declared_by_a_drifted_entry = "unknown_pipe_type"
+
         observed = [item.error_type for item in raised.value.to_error_report().validation_errors or []]
-        assert observed == ["missing_input_variable"]
+        assert observed == [declared_by_a_correct_entry]
+        assert observed != [declared_by_a_drifted_entry]

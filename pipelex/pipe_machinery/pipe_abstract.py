@@ -13,7 +13,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
-from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.inputs.exceptions import OptionalValueAbsentError, PipeRunInputsError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, NamedStuffSpec
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -43,6 +43,7 @@ from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.misc.string_utils import is_snake_case
+from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
     from pipelex.system.trace_context import TraceContext

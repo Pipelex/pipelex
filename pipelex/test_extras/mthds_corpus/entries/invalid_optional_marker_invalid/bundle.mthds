@@ -1,0 +1,14 @@
+domain      = "meeting_minutes"
+description = "Boil the notes taken at a meeting down into its minutes"
+main_pipe   = "write_minutes"
+
+[concept]
+MeetingNote = "One note taken during a meeting"
+Minutes     = "The minutes of a meeting"
+
+[pipe.write_minutes]
+type        = "PipeLLM"
+description = "Write the minutes from the notes taken"
+inputs      = { notes = "MeetingNote[]?" }
+output      = "Minutes"
+prompt      = "Write the minutes from these notes: $notes"

@@ -1,0 +1,30 @@
+domain      = "parcel_routing"
+description = "Send a parcel down the express lane or the standard lane"
+main_pipe   = "route_parcel"
+
+[concept]
+Parcel = "A parcel waiting at the sorting bench"
+
+# The rule renders to nothing at all, so the round has no lane to take and fails on the way through.
+[pipe.route_parcel]
+type            = "PipeCondition"
+description     = "Choose the lane a parcel goes down"
+inputs          = { parcel = "Parcel" }
+output          = "Parcel"
+expression      = "''"
+outcomes        = { express = "send_express", standard = "send_standard" }
+default_outcome = "send_standard"
+
+[pipe.send_express]
+type        = "PipeLLM"
+description = "Note the parcel onto the express lane"
+inputs      = { parcel = "Parcel" }
+output      = "Parcel"
+prompt      = "Note this parcel onto the express lane: $parcel"
+
+[pipe.send_standard]
+type        = "PipeLLM"
+description = "Note the parcel onto the standard lane"
+inputs      = { parcel = "Parcel" }
+output      = "Parcel"
+prompt      = "Note this parcel onto the standard lane: $parcel"

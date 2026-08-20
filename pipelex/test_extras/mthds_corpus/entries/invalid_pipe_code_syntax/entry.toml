@@ -1,0 +1,12 @@
+name = "invalid_pipe_code_syntax"
+description = "A laundry ticket whose method names its first step in words no step can be called"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.invalid_pipe_code_syntax",
+]
+
+expected_error = "invalid_pipe_code_syntax"

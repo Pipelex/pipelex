@@ -1,0 +1,12 @@
+name = "invalid_dry_run_residual"
+description = "A parcel routed on a rule that decides nothing, so the round reaches the sorting bench with no lane to take"
+
+validity = "invalid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "error.dry_run_error",
+]
+
+expected_error = "DryRunError"
