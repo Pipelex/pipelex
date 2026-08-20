@@ -1,0 +1,18 @@
+domain      = "library_loans"
+description = "Write the reminder that a borrowed book is due back, naming the shelf it belongs on when the desk noted one"
+main_pipe   = "write_loan_reminder"
+
+[concept]
+BookTitle = "The title of a borrowed book"
+Shelf     = "The shelf a book came off, when the desk noted one"
+Reminder  = "The reminder sent to a borrower"
+
+[pipe.write_loan_reminder]
+type = "PipeLLM"
+description = "Write the reminder for a borrowed book"
+inputs = { book_title = "BookTitle", shelf = "Shelf?" }
+output = "Reminder"
+prompt = """
+Write a reminder that $book_title is due back.
+Say which shelf it belongs on: $shelf.
+"""

@@ -1,0 +1,10 @@
+domain      = "orchard_yields"
+description = "Count the crates of fruit a row of trees gave this season"
+main_pipe   = "count_orchard_crates"
+
+[pipe.count_orchard_crates]
+type        = "PipeLLM"
+description = "Count the crates a row of trees gave"
+inputs      = { picking_note = "Text" }
+output      = "CrateTally"
+prompt      = "Count the crates recorded on this picking note: $picking_note"

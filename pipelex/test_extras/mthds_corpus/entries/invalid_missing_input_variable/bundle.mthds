@@ -1,0 +1,10 @@
+domain      = "berth_notes"
+description = "Write the note telling a vessel where and when to moor"
+main_pipe   = "write_berth_note"
+
+[pipe.write_berth_note]
+type        = "PipeLLM"
+description = "Write the berth note for a vessel"
+inputs      = { vessel = "Text" }
+output      = "Text"
+prompt      = "Write the berth note for $vessel arriving on the $tide tide."

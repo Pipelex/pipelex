@@ -1,0 +1,12 @@
+name = "invalid_optional_not_handled"
+description = "A bakery docket promised outright, drawn from a flavour the customer may never have named"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.optional_not_handled",
+]
+
+expected_error = "optional_not_handled"

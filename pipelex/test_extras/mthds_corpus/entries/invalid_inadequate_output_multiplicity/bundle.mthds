@@ -1,0 +1,17 @@
+domain      = "menu_cards"
+description = "Write the menu card from the kitchen's note of what it has in"
+main_pipe   = "write_menu_card"
+
+[pipe.write_menu_card]
+type        = "PipeSequence"
+description = "Write the menu card, promising two of them"
+inputs      = { kitchen_note = "Text" }
+output      = "Text[2]"
+steps       = [{ pipe = "write_card", result = "card" }]
+
+[pipe.write_card]
+type        = "PipeLLM"
+description = "Write one menu card"
+inputs      = { kitchen_note = "Text" }
+output      = "Text"
+prompt      = "Write the menu card from this kitchen note: $kitchen_note"

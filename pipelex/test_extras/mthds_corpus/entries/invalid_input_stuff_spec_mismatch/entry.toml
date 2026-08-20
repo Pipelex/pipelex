@@ -1,0 +1,12 @@
+name = "invalid_input_stuff_spec_mismatch"
+description = "A shop's opening hours set out from a photograph of the shop front, handed to a step that reads only writing"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.input_stuff_spec_mismatch",
+]
+
+expected_error = "input_stuff_spec_mismatch"

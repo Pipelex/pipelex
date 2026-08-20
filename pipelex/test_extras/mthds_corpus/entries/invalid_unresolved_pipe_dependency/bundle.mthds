@@ -1,0 +1,20 @@
+domain      = "ferry_crossings"
+description = "Draw up the sailing notice for a ferry crossing in two passes"
+main_pipe   = "write_sailing_notice"
+
+[pipe.write_sailing_notice]
+type = "PipeSequence"
+description = "Draw up the sailing notice"
+inputs = { crossing = "Text" }
+output = "Text"
+steps = [
+  { pipe = "draft_notice", result = "draft" },
+  { pipe = "check_against_tide_table", result = "notice" },
+]
+
+[pipe.draft_notice]
+type        = "PipeLLM"
+description = "Draft the sailing notice"
+inputs      = { crossing = "Text" }
+output      = "Text"
+prompt      = "Draft the sailing notice for this crossing: $crossing"

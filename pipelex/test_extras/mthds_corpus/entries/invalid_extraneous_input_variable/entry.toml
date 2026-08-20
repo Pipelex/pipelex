@@ -1,0 +1,12 @@
+name = "invalid_extraneous_input_variable"
+description = "A delay notice that asks for the platform number and then never mentions it"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.extraneous_input_variable",
+]
+
+expected_error = "extraneous_input_variable"

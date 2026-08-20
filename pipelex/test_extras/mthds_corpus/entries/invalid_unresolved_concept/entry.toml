@@ -1,0 +1,12 @@
+name = "invalid_unresolved_concept"
+description = "A count of orchard crates handed back as a tally nobody in the method has described"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.unresolved_concept",
+]
+
+expected_error = "unresolved_concept"

@@ -1,0 +1,12 @@
+name = "invalid_optional_branch_required_field"
+description = "A weather report whose coastal line is insisted upon, and whose coastal station may send nothing"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.optional_branch_required_field",
+]
+
+expected_error = "optional_branch_required_field"

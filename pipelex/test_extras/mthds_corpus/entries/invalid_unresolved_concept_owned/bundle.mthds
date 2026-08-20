@@ -1,0 +1,13 @@
+domain      = "bike_repairs"
+description = "Write up the repair a bicycle needs, in the shop's own words"
+main_pipe   = "write_repair_note"
+
+[concept]
+RepairNote = { description = "The shop's write-up of a repair", refines = "WorkshopEntry" }
+
+[pipe.write_repair_note]
+type        = "PipeLLM"
+description = "Write up the repair a bicycle needs"
+inputs      = { fault_report = "Text" }
+output      = "RepairNote"
+prompt      = "Write up the repair this bicycle needs: $fault_report"

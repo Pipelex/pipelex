@@ -1,0 +1,12 @@
+name = "invalid_optional_input_unguarded"
+description = "A library loan reminder that names the shelf a book belongs on without allowing for the desk having noted none"
+
+validity = "invalid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "error.optional_input_unguarded",
+]
+
+expected_error = "optional_input_unguarded"
