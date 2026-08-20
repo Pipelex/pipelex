@@ -5,6 +5,7 @@ A consumer selects entries by the axes it declares rather than by path conventio
 reorganizing storage never breaks it.
 """
 
+import re
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME
 from pipelex.cli.bundle_target_resolution import BundleTargetResolutionError, resolve_bundle_target_core
 from pipelex.test_extras.mthds_corpus.exceptions import CorpusEntryError
 from pipelex.test_extras.mthds_corpus.manifest import (
+    ENTRY_NAME_PATTERN,
     MANIFEST_FILE_NAME,
     CorpusEntryManifest,
     EntryGranularity,
@@ -78,6 +80,11 @@ def load_entry(*, directory: Path) -> CorpusEntry:
 
 def get_entry(*, name: str) -> CorpusEntry:
     """Load the one entry with this name — what a consumer that wants a specific method calls."""
+    # A name is a name. Checking it against the pattern the contract already pins for entry names
+    # is what keeps a path from being joined onto the entries root and resolving somewhere else.
+    if not re.match(ENTRY_NAME_PATTERN, name):
+        msg = f"'{name}' is not a corpus entry name; entry names are lowercase snake_case"
+        raise CorpusEntryError(msg)
     directory = entries_root() / name
     if not directory.is_dir():
         msg = f"There is no corpus entry named '{name}'"

@@ -44,17 +44,39 @@ class TestMthdsCorpusLoader:
             assert "native.text" in entry.manifest.covers
         assert not list(iter_entries(tags=frozenset({"native.no_such_tag"})))
 
-    def test_tier_filter_is_a_ceiling_not_an_equality(self) -> None:
-        """A consumer running at a tier runs everything it can afford, not only what costs exactly that."""
-        for entry in iter_entries(tier=EntryTier.DRY):
-            assert entry.manifest.tier.rank <= EntryTier.DRY.rank
-        assert len(list(iter_entries(tier=EntryTier.INFERENCE))) == len(list(iter_entries()))
+    def test_tier_filter_is_a_ceiling_and_really_excludes(self) -> None:
+        """A consumer running at a tier runs everything it can afford, not only what costs exactly that.
 
-    def test_validity_and_granularity_filter_exactly(self) -> None:
-        for entry in iter_entries(validity=EntryValidity.VALID):
-            assert entry.manifest.validity is EntryValidity.VALID
-        for entry in iter_entries(granularity=EntryGranularity.FOCUSED):
-            assert entry.manifest.granularity is EntryGranularity.FOCUSED
+        Each arm is compared against the set the manifests independently say it should hold, so a
+        filter that ignored its argument — returning the whole corpus at every tier — fails here
+        instead of passing because the corpus happens to sit at one tier.
+        """
+        all_names = {entry.name for entry in iter_entries()}
+        for tier in EntryTier:
+            selected = {entry.name for entry in iter_entries(tier=tier)}
+            affordable = {entry.name for entry in iter_entries() if entry.manifest.tier.rank <= tier.rank}
+            assert selected == affordable
+        assert {entry.name for entry in iter_entries(tier=EntryTier.INFERENCE)} == all_names
+
+    def test_validity_arms_partition_the_corpus(self) -> None:
+        """Disjoint and exhaustive, which a filter that ignored its argument could not be.
+
+        Stated as a partition rather than as "every selected entry matches", because that weaker
+        form passes for a no-op filter whenever the corpus happens to sit on one side of the axis —
+        and today every entry is valid, so the weaker form would assert nothing at all.
+        """
+        all_names = {entry.name for entry in iter_entries()}
+        valid_names = {entry.name for entry in iter_entries(validity=EntryValidity.VALID)}
+        invalid_names = {entry.name for entry in iter_entries(validity=EntryValidity.INVALID)}
+        assert valid_names | invalid_names == all_names
+        assert not valid_names & invalid_names
+
+    def test_granularity_arms_partition_the_corpus(self) -> None:
+        all_names = {entry.name for entry in iter_entries()}
+        focused_names = {entry.name for entry in iter_entries(granularity=EntryGranularity.FOCUSED)}
+        composite_names = {entry.name for entry in iter_entries(granularity=EntryGranularity.COMPOSITE)}
+        assert focused_names | composite_names == all_names
+        assert not focused_names & composite_names
 
     def test_filters_compose_conjunctively(self) -> None:
         selected = list(iter_entries(validity=EntryValidity.VALID, granularity=EntryGranularity.FOCUSED, tier=EntryTier.DRY))

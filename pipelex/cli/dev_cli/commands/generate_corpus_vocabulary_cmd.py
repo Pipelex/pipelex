@@ -14,6 +14,7 @@ from __future__ import annotations
 import re
 import sys
 
+from rich.markup import escape
 from rich.panel import Panel
 
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -91,11 +92,11 @@ def generate_corpus_vocabulary_cmd(*, quiet: bool = False) -> None:
         content = generate_corpus_vocabulary_content()
     except ValueError as exc:
         if quiet:
-            console.print(f"[red]✗ Corpus vocabulary generation: FAILED[/red] - {exc}")
+            console.print(f"[red]✗ Corpus vocabulary generation: FAILED[/red] - {escape(str(exc))}")
         else:
             console.print(
                 Panel(
-                    f"[red]✗[/red] Failed to generate the corpus vocabulary\n\n[dim]{exc}[/dim]",
+                    f"[red]✗[/red] Failed to generate the corpus vocabulary\n\n[dim]{escape(str(exc))}[/dim]",
                     title="[bold red]Corpus Vocabulary Generation: FAILED[/bold red]",
                     border_style="red",
                     padding=(1, 2),
@@ -111,7 +112,7 @@ def generate_corpus_vocabulary_cmd(*, quiet: bool = False) -> None:
     else:
         console.print(
             Panel(
-                f"[green]✓[/green] Vocabulary generated successfully!\n\n[dim]Output: {output_path}[/dim]",
+                f"[green]✓[/green] Vocabulary generated successfully!\n\n[dim]Output: {escape(str(output_path))}[/dim]",
                 title="[bold green]Corpus Vocabulary Generation: PASSED[/bold green]",
                 border_style="green",
                 padding=(1, 2),
