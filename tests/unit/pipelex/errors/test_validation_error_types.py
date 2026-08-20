@@ -1,8 +1,8 @@
 """Gates on the closed registry of bundle-validation ``error_type`` values.
 
 ``pipelex.validation_error_types.VALIDATION_ERROR_TYPES`` is the enumeration consumers read to
-learn which faults the language surface can report — the MTHDS Test Corpus generates its
-``error.*`` tag namespace from it, and the ``/validate`` contract publishes it. These tests hold
+learn which faults the language surface can report — the ``/validate`` contract publishes it, and
+the MTHDS Test Corpus will generate its ``error.*`` tag namespace from it. These tests hold
 the two properties that enumeration depends on: that it is derived from the enums the runtime
 actually raises (so it cannot fall behind them), and that those enums do not collide on a wire
 value (so an ``error_type`` still identifies exactly one fault).
@@ -47,14 +47,11 @@ class TestValidationErrorTypeRegistry:
         assert tuple(VALIDATION_ERROR_TYPES) == VALIDATION_ERROR_TYPES
         assert list(VALIDATION_ERROR_TYPES) == [*PipeValidationErrorType, *PipeFactoryErrorType, *ValidationResidualErrorType]
 
-
-class TestValidationErrorItemVocabularyIsClosed:
-    """The registry is enforced when an item is parsed, not merely documented.
-
-    These go through ``model_validate`` rather than the constructor on purpose: the closure that
-    matters is the one a *consumer* meets, reading a plain JSON string off the wire and turning it
-    back into a diagnostic. A typed constructor call proves only that the type checker agrees.
-    """
+    # The three tests below hold that the registry is enforced when an item is parsed, not merely
+    # documented. They go through ``model_validate`` rather than the constructor on purpose: the
+    # closure that matters is the one a *consumer* meets, reading a plain JSON string off the wire
+    # and turning it back into a diagnostic. A typed constructor call proves only that the type
+    # checker agrees.
 
     @pytest.mark.parametrize("error_type", VALIDATION_ERROR_TYPES)
     def test_every_registered_type_is_accepted_by_its_wire_value(self, error_type: ValidationErrorType) -> None:
