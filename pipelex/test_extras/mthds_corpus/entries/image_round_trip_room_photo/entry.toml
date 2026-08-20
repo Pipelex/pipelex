@@ -1,0 +1,11 @@
+name = "image_round_trip_room_photo"
+description = "A room photograph produced and then read back to write the listing caption"
+
+validity = "valid"
+tier = "inference"
+granularity = "composite"
+
+covers = [
+  "native.image",
+  "native.text",
+]
