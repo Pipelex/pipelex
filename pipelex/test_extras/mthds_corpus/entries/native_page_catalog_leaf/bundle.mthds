@@ -1,0 +1,14 @@
+domain      = "bookshop_catalog"
+description = "List the titles printed on one page of a bookshop catalog"
+main_pipe   = "list_titles_on_page"
+
+[pipe.list_titles_on_page]
+type = "PipeLLM"
+description = "List the titles printed on a catalog page"
+inputs = { catalog_page = "Page" }
+output = "Text"
+prompt = """
+List every title printed on this catalog page, one per line.
+
+@catalog_page
+"""

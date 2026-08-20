@@ -1,0 +1,36 @@
+domain      = "weather_observations"
+description = "Summarize a weather observation and read its temperature at the same time"
+main_pipe   = "read_observation"
+
+[pipe.read_observation]
+type = "PipeParallel"
+description = "Summarize the observation and read its temperature side by side"
+inputs = { observation = "Text" }
+output = "Composite"
+add_each_output = true
+branches = [
+  { pipe = "summarize_observation", result = "summary" },
+  { pipe = "read_temperature", result = "temperature" },
+]
+
+[pipe.summarize_observation]
+type = "PipeLLM"
+description = "Summarize the weather observation in one sentence"
+inputs = { observation = "Text" }
+output = "Text"
+prompt = """
+Summarize this weather observation in one sentence.
+
+@observation
+"""
+
+[pipe.read_temperature]
+type = "PipeLLM"
+description = "Read the temperature the observation records"
+inputs = { observation = "Text" }
+output = "Number"
+prompt = """
+What temperature in degrees Celsius does this observation record? Answer with the number alone.
+
+@observation
+"""

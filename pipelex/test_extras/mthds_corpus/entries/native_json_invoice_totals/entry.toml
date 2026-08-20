@@ -1,0 +1,10 @@
+name = "native_json_invoice_totals"
+description = "The totals of a purchase invoice, as a JSON object"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "native.json",
+]

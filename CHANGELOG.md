@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **The MTHDS Test Corpus: one canonical, tagged set of `.mthds` methods, with coverage of the language surface turned into a gate instead of a thing somebody has to remember**: Every repo in the workspace had grown its own pile of `.mthds` fixtures, each shaped by its own consumer, and coverage of the MTHDS language surface — a cross-repo invariant — was asserted locally in each of them against a private pile. The result was exactly what that arrangement predicts: the `Time` native concept had no pipelex fixture at all, while another repo had independently patched the same gap in its own corpus without either side knowing. The corpus lives at `pipelex/test_extras/mthds_corpus/` and ships in the wheel, so a consumer that already depends on `pipelex` reads it through `iter_entries()` / `get_entry()` with no copy and no drift — lockstep by construction via the pinned version. Each entry is a directory holding the method, an optional `inputs.json`, and an `entry.toml` declaring what it exercises: `covers` (the axes, drawn from a closed vocabulary), `tier` (the cheapest conformance tier at which it is meaningful), `granularity`, and `validity` — plus, for a deliberately invalid entry, the exact wire `error_type` it must produce. Metadata lives beside the bundle and never inside it, so a bundle stays a pure language artifact. The `native.*` tag vocabulary is **generated** from `NativeConceptCode` by `make generate-corpus-vocabulary` and committed, so a consumer reads the closed tag set without a registry walk; the generator itself stays unshipped dev tooling. Three gates hold it: regeneration must reproduce the committed vocabulary byte for byte, every non-excluded tag must have a `focused` entry covering it, and every entry must mean what its manifest claims — a valid one validating, an invalid one failing with exactly its declared error, both checked against the local runtime rather than a deployed API that lags it, and both run over every entry regardless of tier so an `inference`-tier entry that broke is caught without spending a token. The exhaustivity gate is the one that closes the hole: the moment a registry grows a code, regeneration adds its tag and the build stays red until an entry covers it. The corpus is seeded with a focused entry for every native concept, and no code needed excluding — each one turned out to support a real entry. Entry subject matter is ordinary-world by rule, never AI and never MTHDS's own vocabulary, because an entry exists so a red gate can be narrated in one sentence and *"the model output the model"* is not one. The cross-repo contract is the workspace spec `docs/specs/mthds-test-corpus.md`; the working guide is `docs/contribute/mthds-test-corpus.md`.
+
+### Changed
+
+- **The `Date` and `YesNo` dry-run e2e tests now source their bundles from the corpus** rather than from copies sitting beside them, and those copies are deleted. Nothing in this repo holds a second copy of a language-level `.mthds` method any more.
+
 ## [v0.47.0] - 2026-08-19
 
 ### Added

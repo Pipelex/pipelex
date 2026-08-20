@@ -1,0 +1,14 @@
+domain      = "recipes"
+description = "Summarize a recipe and describe the photographs that would illustrate it"
+main_pipe   = "make_recipe_card"
+
+[pipe.make_recipe_card]
+type = "PipeLLM"
+description = "Summarize the recipe and describe its illustrating photographs"
+inputs = { recipe = "Text" }
+output = "TextAndImages"
+prompt = """
+Summarize this recipe in two sentences and describe the photographs that would illustrate it.
+
+@recipe
+"""

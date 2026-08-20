@@ -342,6 +342,7 @@ plugins:
         - contribute/test-duration-map.md: "Test Duration Map"
         - contribute/registration-surface.md: "Registration Surface"
         - contribute/drift-contracts.md: "Drift Contracts"
+        - contribute/mthds-test-corpus.md: "MTHDS Test Corpus"
         - migration-ledger.md: "Migration Ledger"
         - changelog.md: "Changelog"
 
@@ -587,6 +588,7 @@ nav:
     - Test Duration Map: contribute/test-duration-map.md
     - Registration Surface: contribute/registration-surface.md
     - Drift Contracts: contribute/drift-contracts.md
+    - MTHDS Test Corpus: contribute/mthds-test-corpus.md
     - Migration Ledger: migration-ledger.md
     - Code of Conduct: CODE_OF_CONDUCT.md
     - License: license.md

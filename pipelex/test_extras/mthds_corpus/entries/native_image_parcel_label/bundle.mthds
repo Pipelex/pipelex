@@ -1,0 +1,14 @@
+domain      = "parcel_intake"
+description = "Read the delivery address off a photograph of a parcel label"
+main_pipe   = "read_label_address"
+
+[pipe.read_label_address]
+type = "PipeLLM"
+description = "Read the delivery address printed on a photographed parcel label"
+inputs = { label_photo = "Image" }
+output = "Text"
+prompt = """
+Read the delivery address printed on this parcel label.
+
+@label_photo
+"""

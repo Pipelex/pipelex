@@ -1,0 +1,14 @@
+domain      = "timetables"
+description = "Read the departure time of day printed on a timetable line"
+main_pipe   = "read_departure_time"
+
+[pipe.read_departure_time]
+type = "PipeLLM"
+description = "Read the departure time of day from a timetable line"
+inputs = { timetable_line = "Text" }
+output = "Time"
+prompt = """
+Read the departure time of day printed on this timetable line.
+
+@timetable_line
+"""

@@ -1,0 +1,14 @@
+domain      = "invoice_intake"
+description = "Pull the totals off a purchase invoice into a JSON object"
+main_pipe   = "read_totals"
+
+[pipe.read_totals]
+type = "PipeLLM"
+description = "Read the invoice totals into a JSON object"
+inputs = { invoice_text = "Text" }
+output = "JSON"
+prompt = """
+Read the net total, the tax and the gross total from this invoice into a JSON object.
+
+@invoice_text
+"""

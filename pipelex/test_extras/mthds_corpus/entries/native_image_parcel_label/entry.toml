@@ -1,0 +1,10 @@
+name = "native_image_parcel_label"
+description = "A parcel's address read off a photograph of its label"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "native.image",
+]

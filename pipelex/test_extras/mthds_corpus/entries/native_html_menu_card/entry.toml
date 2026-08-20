@@ -1,0 +1,10 @@
+name = "native_html_menu_card"
+description = "A restaurant menu rendered as an HTML card"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "native.html",
+]

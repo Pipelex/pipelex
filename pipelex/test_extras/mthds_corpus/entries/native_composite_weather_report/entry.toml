@@ -1,0 +1,10 @@
+name = "native_composite_weather_report"
+description = "A weather observation summarized and scored in one go"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "native.composite",
+]

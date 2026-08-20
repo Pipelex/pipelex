@@ -1,0 +1,20 @@
+domain      = "parcel_tracking"
+description = "Read one requested field out of a parcel tracking record, leaving the field's concept for the caller to pick"
+main_pipe   = "read_requested_field"
+
+[pipe.read_requested_field]
+type = "PipeLLM"
+description = "Read whichever field of the tracking record the caller asked for"
+inputs = { tracking_record = "Text", wanted_field = "Text" }
+output = "Dynamic"
+prompt = """
+Read the field named below out of this parcel tracking record.
+
+## Field
+
+@wanted_field
+
+## Record
+
+@tracking_record
+"""
