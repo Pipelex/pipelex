@@ -16,7 +16,7 @@ from pipelex.cogt.content_generation.dry_mock import report_dry_llm_job
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 
 
 class TestDryReportTimezone:
@@ -47,10 +47,7 @@ class TestDryReportTimezone:
         )
 
         job_metadata = JobMetadata(
-            storage_scope="test/scope",
-            user_id="test_user",
-            pipeline_run_id="run_dry_tz",
-            started_at=started_at,
+            run_metadata=RunMetadata(storage_scope="test/scope", user_id="test_user", pipeline_run_id="run_dry_tz"), started_at=started_at
         )
 
         report_dry_llm_job(

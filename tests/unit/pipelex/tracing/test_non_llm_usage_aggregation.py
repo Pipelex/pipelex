@@ -20,13 +20,13 @@ from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.reporting.reporting_types import AnyTokensUsage
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.tracing.trace_events import UsageReportEvent
 from pipelex.tracing.usage_aggregator import UsageAggregator
 
 
 def _job_metadata() -> JobMetadata:
-    return JobMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="run-non-llm")
+    return JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="run-non-llm"))
 
 
 def _usage_event(tokens_usage: AnyTokensUsage, sequence: int) -> UsageReportEvent:

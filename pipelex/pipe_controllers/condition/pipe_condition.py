@@ -309,7 +309,7 @@ class PipeCondition(PipeController):
                 output_name=output_name,
                 reason=f"PipeCondition '{self.code}' resolved to 'continue' for evaluated expression '{evaluated_expression}'",
             )
-            return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.pipeline_run_id)
+            return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.run_metadata.pipeline_run_id)
 
         if SpecialOutcome.is_fail(outcome):
             self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
@@ -433,7 +433,7 @@ class PipeCondition(PipeController):
                 output_name=output_name,
                 reason=f"dry run of PipeCondition '{self.code}': all outcomes are special, the declared output resolves absent",
             )
-        return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.pipeline_run_id)
+        return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.run_metadata.pipeline_run_id)
 
     def _record_declared_absent_output(self, *, working_memory: WorkingMemory, output_name: str | None, reason: str) -> None:
         """Resolve this pipe's declared output as a declared-absent record (the `continue` arm)."""

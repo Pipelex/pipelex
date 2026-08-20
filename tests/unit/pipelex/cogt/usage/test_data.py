@@ -7,7 +7,7 @@ from pipelex.cogt.search.search_report import SearchTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.reporting.reporting_types import AnyTokensUsage
-from pipelex.system.job_metadata import JobCategory, JobMetadata, UnitJobId
+from pipelex.system.job_metadata import JobCategory, JobMetadata, RunMetadata, UnitJobId
 
 RATED_NB_TOKENS: NbTokensByCategoryDict = {
     TokenCategory.INPUT: 1000,
@@ -36,12 +36,9 @@ class UsageFixtures:
     def full_job_metadata(*, unit_job_id: UnitJobId, job_category: JobCategory) -> JobMetadata:
         """A JobMetadata with EVERY optional field populated, so leak tests prove the trim."""
         return JobMetadata(
-            storage_scope="test/scope",
-            user_id="user-42",
-            pipeline_run_id="plr-fixture",
+            run_metadata=RunMetadata(storage_scope="test/scope", user_id="user-42", pipeline_run_id="plr-fixture", request_id="req-123"),
             pipe_code="analyze_contract",
             session_id="session-abc",
-            request_id="req-123",
             pipe_run_id="a1b2c3d4e5f60718",
             content_generation_job_id="cgj-9",
             unit_job_id=unit_job_id,

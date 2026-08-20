@@ -14,14 +14,14 @@ from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.img_gen_generate import img_gen_image_list_and_store, img_gen_single_image_and_store
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 class TestImgGenGenerateDryBranch:
     def _assignment(self, *, run_mode: PipeRunMode, nb_images: int = 1) -> ImgGenAssignment:
         return ImgGenAssignment(
-            job_metadata=JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_img_dry"),
+            job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="run_img_dry")),
             cogt_run_params=CogtRunParams(run_mode=run_mode),
             img_gen_handle="mock-img-handle",
             img_gen_prompt=ImgGenPrompt(positive_text="a red apple", negative_text="no worms"),

@@ -22,6 +22,7 @@ from pipelex.graph.graphspec import GraphSpec, PipelineRef
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.runtime_hub import get_event_log_override
 from pipelex.system.exceptions import MissingDependencyError
+from pipelex.system.job_metadata import RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.event_log_factory import make_event_log
 from pipelex.tracing.exceptions import EventLogError
@@ -48,6 +49,15 @@ class TracingAssembly(BaseModel):
     tokens_usages: list[AnyTokensUsage] | None = None
     usage_assembly_error: str | None = None
 
+    # The run this assembly belongs to. Same purpose as `PipeOutput.job_metadata`
+    # and for the same reason: this crosses a transport boundary on its own (~335 KB
+    # in an ordinary hosted run) and, without a scope to resolve, an offloaded copy
+    # keys outside the run's namespace and outlives it.
+    #
+    # `RunMetadata` rather than the whole `JobMetadata`: an assembly belongs to the
+    # RUN, not to any one job within it, and the per-job half would be a lie here.
+    run_metadata: RunMetadata | None = None
+
 
 def assemble_tracing(
     pipeline_run_id: str,
@@ -57,6 +67,7 @@ def assemble_tracing(
     domain_code: str | None = None,
     main_pipe_code: str | None = None,
     run_mode: PipeRunMode = PipeRunMode.LIVE,
+    run_metadata: RunMetadata | None = None,
 ) -> TracingAssembly:
     """Read the trace events for ``pipeline_run_id`` once and assemble the requested artifacts.
 
@@ -79,11 +90,14 @@ def assemble_tracing(
         domain_code: Domain code for the graph's pipeline ref.
         main_pipe_code: Main pipe code for the graph's pipeline ref.
         run_mode: Final pipe run mode used to stamp GraphSpec provenance.
+        run_metadata: The run this assembly belongs to, stamped onto the result so a
+            transport that offloads it keys it inside the run's namespace. None for a
+            run with no host-supplied scope.
 
     Returns:
         A TracingAssembly carrying whichever artifacts were requested and succeeded.
     """
-    result = TracingAssembly()
+    result = TracingAssembly(run_metadata=run_metadata)
     tracing_config = get_config().runtime.tracing
     # A scoped override (see hub.scoped_event_log) is the run's transport and implies
     # tracing-enabled (D1) — it must not be skipped by the is_enabled early-return.
@@ -175,6 +189,8 @@ def assemble_tracing_on_output(
         domain_code=domain_code,
         main_pipe_code=main_pipe_code,
         run_mode=run_mode,
+        # Inherited from the output this assembly decorates, so both key together.
+        run_metadata=pipe_output.job_metadata.run_metadata if pipe_output.job_metadata else None,
     )
     if result.graph_spec is not None:
         pipe_output.graph_spec = result.graph_spec

@@ -36,7 +36,7 @@ from pipelex.config import get_config
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.system.configuration.configs import NdjsonTracingConfig, TracingBackend
 from pipelex.system.data_inclusion_config import DataInclusionConfig
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.trace_context import TraceContext
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tracing.activity_event_log import ActivityEventLogCache
@@ -80,9 +80,7 @@ def _trace_context(run_id: str, tracer_key: str) -> TraceContext:
 def _job_metadata(run_id: str, tracer_key: str) -> JobMetadata:
     now = datetime.now(UTC)
     return JobMetadata(
-        storage_scope="test/scope",
-        user_id="test-user",
-        pipeline_run_id=run_id,
+        run_metadata=RunMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id=run_id),
         trace_context=_trace_context(run_id, tracer_key),
         started_at=now,
         completed_at=now + timedelta(seconds=1),

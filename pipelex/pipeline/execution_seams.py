@@ -46,7 +46,7 @@ from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
 from pipelex.system.configuration.configs import PipelineExecutionConfig
-from pipelex.system.job_metadata import JobMetadata, OtelContext
+from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.storage_scope import validate_storage_scope
 from pipelex.tools.misc.file_utils import reject_bare_str_or_path
@@ -278,12 +278,9 @@ async def prepare_pipe_job(
         working_memory = await normalize_data_urls_to_storage(working_memory, storage_scope=storage_scope)
 
     job_metadata = JobMetadata(
-        user_id=user_id,
-        storage_scope=storage_scope,
-        pipeline_run_id=pipeline_run_id,
+        run_metadata=RunMetadata(user_id=user_id, storage_scope=storage_scope, pipeline_run_id=pipeline_run_id, request_id=request_id),
         otel_context=otel_context,
         trace_context=trace_context,
-        request_id=request_id,
     )
 
     pipe_run_params = PipeRunParamsFactory.make_run_params(

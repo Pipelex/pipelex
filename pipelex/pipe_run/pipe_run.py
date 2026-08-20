@@ -33,7 +33,7 @@ class PipeRun(PipeRunProtocol):
         *,
         delivery_assignment: DeliveryAssignment | None = None,
     ) -> PipeOutput:
-        pipeline_run_id: str = pipe_job.job_metadata.pipeline_run_id
+        pipeline_run_id: str = pipe_job.job_metadata.run_metadata.pipeline_run_id
         status: DeliveryStatus = DeliveryStatus.COMPLETED
         pipe_output: PipeOutput | None = None
         execution_error: Exception | None = None
@@ -41,6 +41,11 @@ class PipeRun(PipeRunProtocol):
 
         try:
             pipe_output = await self._pipe_router.run(pipe_job)
+            # Stamp the job onto the run's OWN output, here and nowhere else.
+            # Only the top-level output crosses a transport boundary; a sub-pipe's
+            # output stays in-process, so stamping at every `PipeOutput(...)` site
+            # would be noise on ~17 constructors to serve one of them.
+            pipe_output.job_metadata = pipe_job.job_metadata
         except Exception as exc:  # noqa: BLE001
             # Observe-and-reraise: records FAILED status so the finally delivery sees it, then re-raises the original error below.
             status = DeliveryStatus.FAILED
@@ -89,12 +94,12 @@ class PipeRun(PipeRunProtocol):
                 try:
                     await self._delivery_executor.execute(
                         pipe_output=pipe_output,
-                        storage_scope=pipe_job.job_metadata.storage_scope,
+                        storage_scope=pipe_job.job_metadata.run_metadata.storage_scope,
                         pipeline_run_id=pipeline_run_id,
                         delivery_assignment=delivery_assignment,
                         status=status,
                         error_report=error_report,
-                        request_id=pipe_job.job_metadata.request_id,
+                        request_id=pipe_job.job_metadata.run_metadata.request_id,
                     )
                 except DeliveryError as delivery_error:
                     if execution_error is None:

@@ -17,7 +17,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.reporting.reporting_types import AnyTokensUsage
-from pipelex.system.job_metadata import SpecialPipelineId
+from pipelex.system.job_metadata import JobMetadata, SpecialPipelineId
 
 
 class PipeOutput(PipeOutputAbstract[WorkingMemory]):
@@ -32,6 +32,28 @@ class PipeOutput(PipeOutputAbstract[WorkingMemory]):
     # usage_assembly_error mirrors graph_assembly_error.
     tokens_usages: list[AnyTokensUsage] | None = None
     usage_assembly_error: str | None = None
+
+    # The job this output was produced under, when there was one.
+    #
+    # Carried so a transport that offloads an oversized result to storage can key
+    # it inside the run's own namespace instead of at the root of a bucket. The
+    # Temporal payload codec resolves a payload's scope by attribute, and every
+    # payload a run sends IN carries a `job_metadata` to resolve through — the
+    # results did not, so the two largest payloads an ordinary run produces (this
+    # one and `TracingAssembly`, both ~350 KB) landed outside every prefix the
+    # host's erasure cascade deletes and survived deletion of their own run.
+    #
+    # `run_metadata` is the half that matters here: it is constant for the whole
+    # run and holds `storage_scope`. Nothing in the runtime reads this field —
+    # it exists to be read by the transport layer that stores the bytes, and the
+    # wire DTO (`serialize_completed_output`) names its fields explicitly, so
+    # this does not reach an API consumer.
+    #
+    # Optional: dry runs, signature stubs and tests build outputs with no job in
+    # hand. Set once at the run boundary rather than at every `PipeOutput(...)`
+    # site — only the top-level output crosses a transport boundary; a sub-pipe's
+    # output stays in-process.
+    job_metadata: JobMetadata | None = None
 
     @property
     def main_stuff(self) -> Stuff:

@@ -107,4 +107,4 @@ class PipeSignature(PipeAbstract):
         typed_named = WorkingMemoryFactory.convert_stuff_spec_to_typed_named(stuff_spec=self.output, name=mock_name)
         mock_stuff = WorkingMemoryFactory.make_mock_stuff(typed_named_stuff_spec=typed_named)
         working_memory.set_new_main_stuff(stuff=mock_stuff, name=mock_name)
-        return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.pipeline_run_id)
+        return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.run_metadata.pipeline_run_id)

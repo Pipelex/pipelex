@@ -54,7 +54,7 @@ from pipelex.kernel.llm_prompt_content import LlmPromptContent
 from pipelex.kernel.llm_results import LlmObjectResult, LlmTextResult
 from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.runtime_hub import resolve_run_mode_for_boot
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
 from pipelex.tools.templating.templating_style import TemplatingStyle
@@ -118,9 +118,11 @@ class PipelexKernel:
         check_mock_usage_requires_dry(run_mode=run_mode, is_mock_usage=is_mock_usage)
         return cls(
             job_metadata=JobMetadata(
-                user_id=user_id,
-                storage_scope=storage_scope,
-                pipeline_run_id=trace_context.graph_id if trace_context is not None else str(uuid4()),
+                run_metadata=RunMetadata(
+                    user_id=user_id,
+                    storage_scope=storage_scope,
+                    pipeline_run_id=trace_context.graph_id if trace_context is not None else str(uuid4()),
+                ),
                 trace_context=trace_context,
             ),
             cogt_run_params=CogtRunParams(run_mode=resolve_run_mode_for_boot(requested=run_mode), is_mock_usage=is_mock_usage),

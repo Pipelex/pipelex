@@ -7,7 +7,7 @@ from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.graph.graphspec import NodeUsageSpec
 from pipelex.reporting.reporting_types import AnyTokensUsage
-from pipelex.system.job_metadata import JobCategory, JobMetadata, UnitJobId
+from pipelex.system.job_metadata import JobCategory, JobMetadata, RunMetadata, UnitJobId
 from pipelex.tracing.usage_attribution import attribute_usage, make_node_usage_spec, roll_up
 
 # Per-million-token USD, so 100 input + 50 output tokens cost 0.0003 + 0.00075.
@@ -29,9 +29,7 @@ def _make_usage(
 ) -> AnyTokensUsage:
     return LLMTokensUsage(
         job_metadata=JobMetadata(
-            storage_scope="test/scope",
-            user_id="user_test",
-            pipeline_run_id="run_001",
+            run_metadata=RunMetadata(storage_scope="test/scope", user_id="user_test", pipeline_run_id="run_001"),
             pipe_code="test_pipe",
             unit_job_id=UnitJobId.LLM_GEN_TEXT,
             job_category=JobCategory.LLM_JOB,

@@ -23,7 +23,7 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 
 _PER_PAGE_TOKENS = 1_000_000
 
@@ -65,7 +65,7 @@ def _make_extract_job() -> ExtractJob:
         job_params=ExtractJobParams.make_default_extract_job_params(),
         job_config=ExtractJobConfig(),
         job_report=ExtractJobReport(),
-        job_metadata=JobMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="test-run"),
+        job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="test-run")),
     )
 
 

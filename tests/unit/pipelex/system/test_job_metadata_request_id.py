@@ -5,14 +5,14 @@ that rides the workflow input across the Temporal serialization boundary.
 import pytest
 from pydantic import ValidationError
 
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 
 
 class TestJobMetadataRequestId:
     def test_request_id_defaults_to_none(self) -> None:
         """``JobMetadata`` constructed without ``request_id`` carries ``None``."""
-        meta = JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="r")
-        assert meta.request_id is None
+        meta = JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="r"))
+        assert meta.run_metadata.request_id is None
 
     def test_request_id_round_trips_through_json(self) -> None:
         """``request_id`` survives ``model_dump_json`` / ``model_validate_json`` round-trip.
@@ -20,16 +20,16 @@ class TestJobMetadataRequestId:
         Temporal's data converter serializes activity args as JSON; this pins
         the contract that ``request_id`` reaches the worker intact.
         """
-        meta = JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="r", request_id="r-abc-123")
+        meta = JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="r", request_id="r-abc-123"))
         recovered = JobMetadata.model_validate_json(meta.model_dump_json())
-        assert recovered.request_id == "r-abc-123"
+        assert recovered.run_metadata.request_id == "r-abc-123"
         assert recovered == meta
 
     def test_copy_with_update_preserves_request_id(self) -> None:
         """``copy_with_update`` inherits ``request_id`` from the parent metadata."""
-        parent = JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="r", request_id="r-1")
+        parent = JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="r", request_id="r-1"))
         child = parent.copy_with_update(otel_context=None)
-        assert child.request_id == "r-1"
+        assert child.run_metadata.request_id == "r-1"
 
     @pytest.mark.parametrize(
         "bad_request_id",
@@ -52,7 +52,7 @@ class TestJobMetadataRequestId:
         ``ErrorReport`` envelopes that quote it.
         """
         with pytest.raises(ValidationError):
-            JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="r", request_id=bad_request_id)
+            JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="r", request_id=bad_request_id))
 
     @pytest.mark.parametrize(
         "good_request_id",
@@ -65,5 +65,5 @@ class TestJobMetadataRequestId:
     )
     def test_request_id_accepts_well_formed_input(self, good_request_id: str) -> None:
         """Common ``X-Request-ID`` shapes (UUID, hyphenated, dot-separated) round-trip cleanly."""
-        meta = JobMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="r", request_id=good_request_id)
-        assert meta.request_id == good_request_id
+        meta = JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="u", pipeline_run_id="r", request_id=good_request_id))
+        assert meta.run_metadata.request_id == good_request_id

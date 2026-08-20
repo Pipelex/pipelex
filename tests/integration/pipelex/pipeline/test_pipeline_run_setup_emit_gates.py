@@ -148,7 +148,7 @@ class TestTheLocalScopeIsPerRun:
                 pipe_run_mode=PipeRunMode.DRY,
             )
             try:
-                scope = pipe_job.job_metadata.storage_scope
+                scope = pipe_job.job_metadata.run_metadata.storage_scope
                 # The sentinel must NOT survive onto the job — it is "no host
                 # supplied a scope", not a prefix, and a scope shared by every
                 # run is the shared-key state this repairs.
@@ -176,6 +176,6 @@ class TestTheLocalScopeIsPerRun:
             pipe_run_mode=PipeRunMode.DRY,
         )
         try:
-            assert pipe_job.job_metadata.storage_scope == "org_a/mt_b/run_c"
+            assert pipe_job.job_metadata.run_metadata.storage_scope == "org_a/mt_b/run_c"
         finally:
             _cleanup(pipeline_run_id, library_id)

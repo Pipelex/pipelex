@@ -24,7 +24,7 @@ from pipelex.pipe_run.delivery_assignment import (
 )
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
 from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, WebhookDeliveryError
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.tools.network.exceptions import SsrfBlockedError
 
 
@@ -325,7 +325,7 @@ class TestDeliveryExecutor:
         mock_output.tokens_usages = [
             LLMTokensUsage(
                 model_type="llm",
-                job_metadata=JobMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="plr-usage"),
+                job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="test-user", pipeline_run_id="plr-usage")),
                 inference_model_name="test-model",
                 inference_model_id="test-model-id",
                 nb_tokens_by_category={TokenCategory.INPUT: 15, TokenCategory.OUTPUT: 4},

@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.storage_scope import (
     DRY_RUN_STORAGE_SCOPE,
     DRY_RUN_USER_ID,
@@ -28,7 +28,7 @@ from pipelex.system.telemetry.otel_constants import OTelConstants
 
 
 def _metadata(storage_scope: str) -> JobMetadata:
-    return JobMetadata(user_id="u1", pipeline_run_id="run_1", storage_scope=storage_scope)
+    return JobMetadata(run_metadata=RunMetadata(user_id="u1", pipeline_run_id="run_1", storage_scope=storage_scope))
 
 
 class TestAcceptedScopes:
@@ -44,7 +44,7 @@ class TestAcceptedScopes:
         ],
     )
     def test_one_to_three_path_safe_segments_are_accepted(self, scope: str) -> None:
-        assert _metadata(scope).storage_scope == scope
+        assert _metadata(scope).run_metadata.storage_scope == scope
 
     def test_the_two_named_constants_are_valid_scopes(self) -> None:
         """They are used as real field values, so they must satisfy the field.
@@ -105,7 +105,7 @@ class TestRefusedScopes:
         perfectly valid scope even when the caller is `tenant`; refusing it
         requires knowing who is calling, which this layer deliberately does not.
         """
-        assert _metadata("tenant2/run_1").storage_scope == "tenant2/run_1"
+        assert _metadata("tenant2/run_1").run_metadata.storage_scope == "tenant2/run_1"
 
 
 class TestScopeIsRequired:
@@ -122,7 +122,7 @@ class TestScopeIsRequired:
             # Both type checkers reject this call, which is the point being
             # tested: the omission is caught statically AND at runtime. The
             # ignores are what let the runtime half be asserted at all.
-            JobMetadata(user_id="u1", pipeline_run_id="run_1")  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
+            JobMetadata(run_metadata=RunMetadata(user_id="u1", pipeline_run_id="run_1"))  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
 
 
 class TestTheTelemetryPlaceholderStaysOutOfIdentity:

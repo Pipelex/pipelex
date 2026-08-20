@@ -24,7 +24,7 @@ from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.func_registry import func_registry
 from tests.integration.pipelex.fixtures.pipe_job_helpers import make_mode_guarded_run_params
@@ -127,7 +127,7 @@ class TestLiftSkipTrichotomy:
         assert isinstance(resolved_main, AbsenceRecord)
         assert result_memory.get_optional_main_stuff() is None
         # Run identity is stamped like on every other path.
-        assert pipe_output.pipeline_run_id == job_metadata.pipeline_run_id
+        assert pipe_output.pipeline_run_id == job_metadata.run_metadata.pipeline_run_id
 
     async def test_lift_chain_provenance(self, job_metadata: JobMetadata, load_empty_library: Callable[[], str]):
         """Two lifted pipes in a row chain their skipped-absence records back to the origin."""
@@ -295,10 +295,8 @@ class TestLiftSkipTrichotomy:
             return_value=mock_manager,
         )
         traced_metadata = JobMetadata(
-            storage_scope="test/scope",
-            user_id="pytest",
-            pipeline_run_id=job_metadata.pipeline_run_id,
-            trace_context=make_trace_context(graph_id=job_metadata.pipeline_run_id),
+            run_metadata=RunMetadata(storage_scope="test/scope", user_id="pytest", pipeline_run_id=job_metadata.run_metadata.pipeline_run_id),
+            trace_context=make_trace_context(graph_id=job_metadata.run_metadata.pipeline_run_id),
         )
 
         pipe_output = await pipe.run_pipe(

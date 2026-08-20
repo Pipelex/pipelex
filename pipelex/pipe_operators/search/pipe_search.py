@@ -137,7 +137,7 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
         self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
         return PipeSearchOutput(
             working_memory=working_memory,
-            pipeline_run_id=job_metadata.pipeline_run_id,
+            pipeline_run_id=job_metadata.run_metadata.pipeline_run_id,
         )
 
     @override

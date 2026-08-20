@@ -15,7 +15,7 @@ from pipelex.pipe_operators.func import direct_pipe_func_executor
 from pipelex.pipe_operators.func.direct_pipe_func_executor import DirectPipeFuncExecutor
 from pipelex.pipe_operators.func.pipe_func_execution_dtos import PipeFuncExecutionRequest
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 # A method whose ONLY custom source is the PipeFunc — its output structure (Greeting) is a concept
@@ -63,7 +63,7 @@ class TestDirectExecutorWorkdir:
             working_memory_raw={},
             pipe_code="missing_pipe",
             function_name="missing_func",
-            job_metadata=JobMetadata(storage_scope="test/scope", user_id="user", pipeline_run_id="run"),
+            job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="user", pipeline_run_id="run")),
             pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10, batch_max_concurrency=None),
         )
 
@@ -88,7 +88,7 @@ class TestDirectExecutorWorkdir:
             working_memory_raw={},
             pipe_code="missing_pipe",
             function_name="missing_func",
-            job_metadata=JobMetadata(storage_scope="test/scope", user_id="user", pipeline_run_id="run"),
+            job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="user", pipeline_run_id="run")),
             pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10, batch_max_concurrency=None),
         )
 
@@ -140,7 +140,7 @@ class TestDirectExecutorWorkdir:
             # its lookup is strict, so a bare code would not resolve on the far side.
             pipe_code="greet_demo.greet",
             function_name="greet_it",
-            job_metadata=JobMetadata(storage_scope="test/scope", user_id="user", pipeline_run_id="run"),
+            job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="user", pipeline_run_id="run")),
             pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10, batch_max_concurrency=None),
         )
 
