@@ -1,0 +1,32 @@
+domain      = "delivery_rounds"
+description = "Reading a driver's handwritten round sheet into the shape the depot files it in"
+main_pipe   = "read_round_sheet"
+
+[concept.Stop]
+description = "One address on the round, and what is being left there"
+
+[concept.Stop.structure]
+address     = { type = "text", description = "The address the driver stops at", required = true }
+parcels     = { type = "list", item_type = "text", description = "The parcel numbers left at this address", required = true }
+access_note = { type = "text", description = "How to get in, when the driver wrote something down", required = false }
+
+[concept.DeliveryRound]
+description = "A day's round as the depot files it"
+
+[concept.DeliveryRound.structure]
+round_date = { type = "text", description = "The day the round was driven, as written on the sheet", required = true }
+driver     = { type = "text", description = "Who drove the round", required = true }
+stops      = { type = "list", item_type = "Stop", description = "Every stop on the round, in the order they were driven", required = true }
+depot_note = { type = "text", description = "Anything the depot added afterwards", required = false }
+
+[pipe.read_round_sheet]
+type = "PipeLLM"
+description = "Reads the handwritten round sheet into the filed shape, stop by stop"
+inputs = { round_sheet = "Text" }
+output = "DeliveryRound"
+prompt = """
+Read this round sheet and file it. List every stop in the order it was driven, with the parcel
+numbers left there, and copy any access note the driver wrote. Leave a note out when there is none.
+
+$round_sheet
+"""

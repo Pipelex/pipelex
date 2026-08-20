@@ -1,0 +1,10 @@
+name = "feature_structured_output_delivery_round"
+description = "A driver's round sheet filed into a nested shape: stops as a list of structured objects, each with its own list and an optional field"
+
+validity = "valid"
+tier = "dry"
+granularity = "composite"
+
+covers = [
+  "feature.structured_output",
+]
