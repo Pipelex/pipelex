@@ -1,8 +1,8 @@
 import pytest
 
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.parser import MthdsParser
+from pipelex.validation_error_types import PipeValidationErrorType
 
 # A PipeBatch whose ``input_item_name`` equals its ``input_list_name`` — the collision
 # ``PipeBatchBlueprint.validate_inputs`` raises as a ``PipeValidationError`` from inside a pydantic

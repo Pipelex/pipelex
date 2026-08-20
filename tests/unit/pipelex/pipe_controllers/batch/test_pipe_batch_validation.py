@@ -1,8 +1,9 @@
 import pytest
 from pydantic import ValidationError
 
-from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 class TestPipeBatchValidation:

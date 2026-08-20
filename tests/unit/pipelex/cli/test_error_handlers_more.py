@@ -32,7 +32,6 @@ from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelDeckPresetVal
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.core.validation import MIGRATE_COMMAND
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.system.pipelex_service.exceptions import (
@@ -44,6 +43,7 @@ from pipelex.system.pipelex_service.exceptions import (
 )
 from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
+from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture

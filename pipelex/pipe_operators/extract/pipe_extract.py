@@ -9,7 +9,7 @@ from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 from pipelex.cogt.models.model_deck_check import check_extract_choice_with_deck
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.interpreter_hub import get_concept_library, get_native_concept
@@ -17,6 +17,7 @@ from pipelex.kernel.extract_ops import build_extract_job_params, resolve_extract
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 class PipeExtractOutput(PipeOutput):

@@ -10,6 +10,7 @@ from pipelex.migration.plan import MigrationPlan
 from pipelex.suggested_fix import SuggestedFix
 from pipelex.tools.misc.string_utils import pascal_case_to_kebab, pascal_case_to_sentence
 from pipelex.urls import URLs
+from pipelex.validation_error_types import ValidationErrorType
 
 
 def iter_cause_chain(exc: BaseException) -> Iterator[BaseException]:
@@ -292,10 +293,14 @@ class ValidationErrorItem(BaseModel):
     subset its :attr:`category` produces, and the unset fields drop out of the
     ``exclude_none`` wire projection.
 
-    Built exclusively by ``pipelex.pipeline.validation_errors.build_validation_error_items``,
-    which both the agent CLI (``extract_validation_errors``) and the API path
+    The error channel is built exclusively by
+    ``pipelex.pipeline.validation_errors.build_validation_error_items``, which both the agent
+    CLI (``extract_validation_errors``) and the API path
     (``ValidateBundleError.to_error_report``) call — so the CLI's structured
-    output and the API's 422 ``validation_errors`` can never drift.
+    output and the API's 422 ``validation_errors`` can never drift. The same
+    item type also carries the report's advisory ``warnings``, built by
+    ``pipelex.pipeline.optionality_warnings``: a warning is the same shape of
+    diagnostic, differing only in that it does not make the verdict invalid.
 
     ``source`` is the declaring file path (CLI) or the per-content source the API
     threads onto the in-memory load path — it hands a consumer the owning file
@@ -309,7 +314,13 @@ class ValidationErrorItem(BaseModel):
 
     category: ValidationErrorCategory = Field(strict=False)
     message: str
-    error_type: str | None = None
+    # Typed against the closed registry in ``pipelex.validation_error_types``, so the vocabulary a
+    # consumer can observe here IS that registry — an unregistered string cannot be constructed
+    # onto an item. ``None`` stays legal for the parse-level residual, which reports a message with
+    # no identified fault behind it. No ``strict=False`` here, unlike ``category`` above: pydantic
+    # refuses that constraint on a union field, and the model declares no strict config, so the
+    # union already validates leniently — a plain wire string resolves to its registry member.
+    error_type: ValidationErrorType | None = None
     pipe_code: str | None = None
     concept_code: str | None = None
     domain_code: str | None = None

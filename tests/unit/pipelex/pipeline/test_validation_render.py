@@ -13,6 +13,7 @@ from pipelex.pipeline.validation_render import (
     render_invalid_validation_markdown,
 )
 from pipelex.suggested_fix import FixSafety, SuggestedFix
+from pipelex.validation_error_types import PipeValidationErrorType, ValidationResidualErrorType
 
 
 class TestValidationRender:
@@ -158,7 +159,7 @@ class TestValidationRender:
         items = [
             ValidationErrorItem(
                 category=ValidationErrorCategory.PIPE_VALIDATION,
-                error_type="inadequate_output_multiplicity",
+                error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY,
                 pipe_code="brainstorm",
                 domain_code="story_studio",
                 source="/w/bundle.mthds",
@@ -172,7 +173,7 @@ class TestValidationRender:
             ),
             ValidationErrorItem(
                 category=ValidationErrorCategory.DRY_RUN,
-                error_type="DryRunError",
+                error_type=ValidationResidualErrorType.DRY_RUN_ERROR,
                 message="Dry run failed: boom.",
             ),
         ]

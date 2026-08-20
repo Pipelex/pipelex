@@ -5,13 +5,13 @@ from pydantic_core import ErrorDetails
 
 from pipelex import log
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.mthds_parsing.exceptions import (
     InvalidPipeCodeSyntaxError,
     NativeConceptRedeclarationError,
 )
 from pipelex.mthds_parsing.handle_pipe_errors import extract_wrapped_pipe_validation_error
 from pipelex.mthds_parsing.helpers import ValidationErrorScope, get_error_scope
+from pipelex.validation_error_types import PipeValidationErrorType
 
 PIPELEX_BUNDLE_BLUEPRINT_DOMAIN_FIELD = "domain"
 PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD = "source"

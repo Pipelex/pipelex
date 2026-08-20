@@ -6,6 +6,7 @@ from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.pipeline.fixes.fix_loop import FixBundleResult
 from pipelex.pipeline.fixes.fix_render import format_fix_markdown, format_fix_still_invalid_markdown
 from pipelex.suggested_fix import FixSafety, SuggestedFix
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 class TestFixRender:
@@ -113,7 +114,7 @@ class TestFixRender:
             remaining_errors=[
                 ValidationErrorItem(
                     category=ValidationErrorCategory.PIPE_VALIDATION,
-                    error_type="unresolved_concept",
+                    error_type=PipeValidationErrorType.UNRESOLVED_CONCEPT,
                     pipe_code="b",
                     concept_code="Missing",
                     message="Concept 'Missing' is not defined.",
@@ -152,7 +153,7 @@ class TestFixRender:
             remaining_errors=[
                 ValidationErrorItem(
                     category=ValidationErrorCategory.PIPE_VALIDATION,
-                    error_type="unresolved_concept",
+                    error_type=PipeValidationErrorType.UNRESOLVED_CONCEPT,
                     message="Concept 'Missing' is not defined.",
                 )
             ],

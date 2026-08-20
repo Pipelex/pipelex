@@ -18,6 +18,7 @@ is no import cycle.
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.core.exceptions import PipeFactoryErrorData, PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.pipeline.fixes.planner import plan_fix_for_blueprint_validation_error, plan_fix_for_pipe_validation_error
+from pipelex.validation_error_types import ValidationResidualErrorType
 
 
 def build_validation_error_items(
@@ -131,7 +132,7 @@ def build_validation_error_items(
         items.append(
             ValidationErrorItem(
                 category=ValidationErrorCategory.DRY_RUN,
-                error_type="DryRunError",
+                error_type=ValidationResidualErrorType.DRY_RUN_ERROR,
                 message=dry_run_error_message,
             )
         )

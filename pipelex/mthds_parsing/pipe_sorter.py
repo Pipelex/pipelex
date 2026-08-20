@@ -1,7 +1,8 @@
 """Topological sorting utilities for pipe dependencies."""
 
-from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipeBlueprintUnion
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 def sort_pipes_by_dependencies(

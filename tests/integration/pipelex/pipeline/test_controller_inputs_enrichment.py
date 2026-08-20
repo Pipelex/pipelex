@@ -15,9 +15,9 @@ from collections.abc import Callable
 import pytest
 
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.validation_error_types import PipeValidationErrorType
 
 _MISSING_INPUT_MTHDS = """
 domain = "inputsfix_missing"

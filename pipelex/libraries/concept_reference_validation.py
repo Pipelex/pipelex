@@ -1,10 +1,10 @@
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 def _split_concept_ref_context(context: str) -> tuple[str | None, str | None, str]:
