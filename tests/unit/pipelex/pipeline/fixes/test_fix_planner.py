@@ -11,9 +11,9 @@ raise sites only), ``expected_inputs``/``declared_inputs`` for ``sync-controller
 import pytest
 
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.pipeline.fixes.planner import plan_fix_for_pipe_validation_error
 from pipelex.suggested_fix import DeleteKeyOp, EnsureTableOp, FixSafety, SetKeyOp
+from pipelex.validation_error_types import PipeValidationErrorType
 
 # The inputs table of the pipe every input-drift case below is built around.
 _INPUTS_TABLE_PATH = ["pipe", "make_summary", "inputs"]

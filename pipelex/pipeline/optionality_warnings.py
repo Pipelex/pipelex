@@ -21,8 +21,8 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.pipeline.controller_taint import ControllerTaintAnalysis
+from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
     from pipelex.pipe_controllers.absence_taint import ForceConsumptionInfo

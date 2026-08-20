@@ -11,7 +11,7 @@ from pydantic import Field
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.interpreter_hub import get_concept_library, get_pipe_library
@@ -23,6 +23,7 @@ from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.runtime_hub import get_class_registry
 from pipelex.system.registries.func_registry import func_registry
+from pipelex.validation_error_types import PipeValidationErrorType
 
 _DOMAIN_CODE = "test_optionals_par_static"
 

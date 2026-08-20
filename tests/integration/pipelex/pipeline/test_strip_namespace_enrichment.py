@@ -15,9 +15,9 @@ from collections.abc import Callable
 import pytest
 
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.validation_error_types import PipeValidationErrorType
 
 # A same-domain over-qualified DECLARATION key; main_pipe is a valid bare pipe, so the only error is
 # the dotted declaration. The qualified step ref survives (it resolves) — not an error.

@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field, PrivateAttr
 from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
 from pipelex.libraries.concept.concept_library import ConceptLibrary
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
@@ -18,6 +17,7 @@ from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundErro
 from pipelex.libraries.pipe.pipe_library import PipeLibrary
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
+from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
     from pipelex.core.concepts.concept import Concept

@@ -9,8 +9,8 @@ of only a single ``detail`` string. The cause-chain enrichment from the base
 
 from pipelex.base_exceptions import DisclosureMode, ErrorDomain, ValidationErrorCategory
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 def _error_with_two_categories() -> ValidateBundleError:

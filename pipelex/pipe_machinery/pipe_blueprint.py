@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import validate_concept_ref_or_code
-from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.variable_multiplicity import (
     MULTIPLICITY_PATTERN,
     PipeVariableMultiplicityError,
@@ -15,6 +15,7 @@ from pipelex.core.pipes.variable_multiplicity import (
     parse_concept_with_multiplicity,
 )
 from pipelex.pipe_machinery.validation import validate_input_name
+from pipelex.validation_error_types import PipeValidationErrorType
 
 # A signature is NOT an executable pipe kind: it is deliberately absent from `PipeType` and
 # `PipeCategory`. This is the one extra `type` tag the parse-time allowlists admit beyond the

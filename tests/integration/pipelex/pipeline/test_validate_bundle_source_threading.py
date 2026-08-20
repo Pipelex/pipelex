@@ -23,9 +23,10 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexUnexpectedError, ValidationErrorCategory, ValidationErrorItem
-from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import _backfill_pipe_error_source, validate_bundle  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+from pipelex.validation_error_types import PipeValidationErrorType
 
 _VALID_MTHDS = """
 domain = "testapp"

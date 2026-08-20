@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **The `error_type` values a validation verdict can carry are now an enumerable, closed registry**: a `.mthds` bundle that fails validation reports each fault under an `error_type`, and until now there was no way to ask the runtime which faults exist. The values were reachable only by reading raise sites, and the only curated list of them lived outside this repo, in a hand-maintained conformance suite that could silently fall behind. `pipelex/validation_error_types.py` now holds the vocabulary in full and enumerates it as `VALIDATION_ERROR_TYPES`, so a consumer building coverage over the language surface — a test corpus, a client mapping faults onto its own UI — reads the registry instead of collecting strings from whichever diagnostics it happened to have seen. It is a **union of the enums the runtime already raises**, never a second list beside them: the two stage vocabularies plus a new `ValidationResidualErrorType` naming the one residual channel that had no enum of its own and rode an inline string. A member added to any of them is in the registry the moment it is declared. `ValidationErrorItem.error_type` is typed against their union, which is what makes the registry closed rather than merely documented — an unregistered string can no longer be constructed or parsed onto an item — and which publishes the vocabulary into the OpenAPI schema served for `/validate`, where the field was previously an open `string`. **No wire value changed**, including the dry-run residual's `DryRunError`: it keeps the exception-class spelling it has always had, because normalizing it would break every consumer that pins the string and would buy nothing an enumeration does not already give. Membership means a value is reachable on the wire, not that it is worth exercising — the advisory-only warning type and the two `unknown_*` fallbacks are in the registry and a coverage consumer excludes them on its own side, with a reason, rather than pruning the runtime's truth.
+
+### Changed
+
+- **Two test fixtures were naming faults that do not exist**, and typing `error_type` against the registry is what surfaced them: one item claimed `MISSING_CONCEPT` — a code no enum has ever defined — and others used member names (`INADEQUATE_OUTPUT_CONCEPT`) where the wire carries values (`inadequate_output_concept`). Every one of them was accepted silently while the field was an open string, so the tests asserted on renderings of a fault the runtime cannot produce. They now name registry members.
+- **The two stage error-type enums moved to `pipelex/validation_error_types.py`** from `pipelex/core/pipes/exceptions.py`, where the exceptions that raise them import them back. The vocabulary is a wire contract rather than pipe machinery, and it has to sit below `base_exceptions` for the wire item to be typed against it at all — the same low-level placement, for the same reason, as `pipelex/suggested_fix.py`.
+
 ## [v0.48.0] - 2026-08-20
 
 ### Added
