@@ -1,0 +1,10 @@
+name = "feature_multi_file_library_research_brief"
+description = "A research brief written from a source document, key findings first"
+
+validity = "valid"
+tier = "static"
+granularity = "focused"
+
+covers = [
+  "feature.multi_file_library",
+]

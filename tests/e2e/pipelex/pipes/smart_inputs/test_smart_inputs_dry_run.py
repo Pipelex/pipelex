@@ -12,7 +12,6 @@ narrow `PipelineInputs` alias does not (D10 widening is release-gated), which is
 shape a real caller sends.
 """
 
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
@@ -25,11 +24,14 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipeline.pipeline_response import RunState
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.test_extras.mthds_corpus.loader import get_entry
 
 if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff_content import StuffContent
 
-_FIXTURE_DIR = Path(__file__).parent / "smart_inputs_triage"
+# The bundle is a corpus entry, not a fixture local to this test: the corpus is the single source for
+# language-level `.mthds` methods, and covering `feature.smart_inputs` is exactly why the entry exists.
+_FIXTURE_DIR = get_entry(name="feature_smart_inputs_claims_triage").directory
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -50,22 +52,22 @@ class TestSmartInputsDryRun:
         working_memory = response.pipe_output.working_memory
 
         question_stuff = working_memory.get_stuff("question")
-        assert question_stuff.concept.concept_ref == "smart_inputs_demo.Question"
+        assert question_stuff.concept.concept_ref == "claims_desk.Question"
         assert isinstance(question_stuff.content, TextContent)
         assert question_stuff.content.text == "What are the late fees?"
 
         priority_stuff = working_memory.get_stuff("priority")
-        assert priority_stuff.concept.concept_ref == "smart_inputs_demo.Priority"
+        assert priority_stuff.concept.concept_ref == "claims_desk.Priority"
         assert isinstance(priority_stuff.content, NumberContent)
         assert priority_stuff.content.number == 3
 
         invoice_stuff = working_memory.get_stuff("invoice")
-        assert invoice_stuff.concept.concept_ref == "smart_inputs_demo.Invoice"
+        assert invoice_stuff.concept.concept_ref == "claims_desk.Invoice"
         assert isinstance(invoice_stuff.content, StructuredContent)
         assert invoice_stuff.content.model_dump() == {"invoice_number": "INV-042", "amount": 1250.0}
 
         tags_stuff = working_memory.get_stuff("tags")
-        assert tags_stuff.concept.concept_ref == "smart_inputs_demo.Tag"
+        assert tags_stuff.concept.concept_ref == "claims_desk.Tag"
         tags_content: StuffContent = tags_stuff.content
         assert isinstance(tags_content, ListContent)
         tags_list = cast("ListContent[StuffContent]", tags_content)
@@ -86,7 +88,7 @@ class TestSmartInputsDryRun:
 
         assert response.state == RunState.COMPLETED
         tags_stuff = response.pipe_output.working_memory.get_stuff("tags")
-        assert tags_stuff.concept.concept_ref == "smart_inputs_demo.Tag"
+        assert tags_stuff.concept.concept_ref == "claims_desk.Tag"
         tags_content: StuffContent = tags_stuff.content
         assert isinstance(tags_content, ListContent)
         tags_list = cast("ListContent[StuffContent]", tags_content)

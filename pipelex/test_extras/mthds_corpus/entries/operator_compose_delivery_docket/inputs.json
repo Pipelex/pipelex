@@ -1,0 +1,15 @@
+{
+  "parcel": {
+    "concept": "deliveries.WeighedParcel",
+    "content": {
+      "weight_kg": 3.4,
+      "destination": "Quimper"
+    }
+  },
+  "carrier": {
+    "concept": "native.Text",
+    "content": {
+      "text": "Morvan et Fils"
+    }
+  }
+}

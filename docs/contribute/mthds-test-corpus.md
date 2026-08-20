@@ -70,7 +70,9 @@ An **invalid** entry additionally declares the exact wire `error_type` it must p
 
 ## The tag vocabulary
 
-Tags are namespaced and the vocabulary is closed: an entry covering a tag the vocabulary does not declare fails the gate. `native.*` is generated from `NativeConceptCode`; `feature.*` is reserved for hand-maintained language features; `operator.*`, `controller.*` and `error.*` arrive with their registries.
+Tags are namespaced and the vocabulary is closed: an entry covering a tag the vocabulary does not declare fails the gate. `native.*` is generated from `NativeConceptCode`. `operator.*` and `controller.*` are generated from `PipeType` — one registry, split by its own `category` property, so a pipe kind added tomorrow lands in the right namespace with nothing to update here. Their local names drop the `Pipe` prefix every code carries, since the namespace already says which half it is: `PipeLLM` becomes `operator.llm`, `PipeSequence` becomes `controller.sequence`. `error.*` arrives with its registry.
+
+`feature.*` is the one hand-maintained namespace, because a language feature is a human-named cluster of behaviour rather than a registry entry — some span several blueprint fields (optionals show up as `?` in a concept spec), some none at all (a multi-file library is a property of the entry *directory*), and there is no feature registry in `pipelex` to walk. A tag there carries a `description` where a generated one carries `code`, since that sentence is the only place its meaning can live. **Add a feature tag in the same commit that lands its first covering entry, never ahead of it** — declaring one reds the exhaustivity gate until an entry covers it.
 
 `vocabulary.toml` is generated in full, so it is never edited by hand:
 
@@ -78,9 +80,11 @@ Tags are namespaced and the vocabulary is closed: an entry covering a tag the vo
 make generate-corpus-vocabulary
 ```
 
-Everything the file says is decided in the generator, `pipelex/cli/dev_cli/commands/generate_corpus_vocabulary_cmd.py` — the registries it walks, and every exclusion reason. It is unshipped dev tooling (the wheel excludes `pipelex/cli/dev_cli`) while the file it writes ships, which is what lets a consumer read the closed tag set without a registry walk. A hand-maintained namespace will be declared there too when one first has content; `feature.*` is reserved in the contract but has no tags yet, and adding one before an entry covers it would simply red the exhaustivity gate.
+Everything the file says is decided in the generator, `pipelex/cli/dev_cli/commands/generate_corpus_vocabulary_cmd.py` — the registries it walks, and every exclusion reason. It is unshipped dev tooling (the wheel excludes `pipelex/cli/dev_cli`) while the file it writes ships, which is what lets a consumer read the closed tag set without a registry walk. The hand-maintained `feature.*` tags are declared in that same file, beside the registry walks — see above for how to add one.
 
-An **exclusion** marks a registry code that no standalone focused entry could meaningfully exercise. It stays in the vocabulary and stays usable by an entry; it is simply not owed a focused entry. No native code is excluded today — every one of them turned out to support a real entry. The exclusion map is keyed on the registry enum rather than on strings, which is what keeps an exclusion from outliving the code it names: a removed code breaks the generator at import, naming itself.
+An **exclusion** marks a registry code that no standalone focused entry could meaningfully exercise. It stays in the vocabulary and stays usable by an entry; it is simply not owed a focused entry. The exclusion map is keyed on the registry enum rather than on strings, which is what keeps an exclusion from outliving the code it names: a removed code breaks the generator at import, naming itself.
+
+No native concept is excluded — every one of them turned out to support a real entry. `PipeFunc` is excluded: it names a Python function that the runtime resolves against its function registry *at validation time*, so an entry declaring one fails with `Function '<name>' not found in registry` in every consumer that has not registered that exact function — and a cross-language consumer cannot register a Python function at all. Exercise `PipeFunc` in a consumer's own fixtures, where the function exists.
 
 ## The gates, and what a red one means
 
@@ -110,7 +114,7 @@ for entry in iter_entries(tier=EntryTier.DRY):
 
 The same two calls are how a **consumer outside this repo** reaches the corpus: it ships as package data in the wheel, so anything that already depends on `pipelex` — our own hosted services, most immediately — reads it with no vendored copy and no drift, in lockstep with its pinned version. Paths handed out are real filesystem paths, resolved through `importlib.resources.files`; wheels install unzipped, and a zip-imported distribution is not supported.
 
-The corpus is the single source for language-level `.mthds` methods in this repo: `tests/e2e/pipelex/pipes/date/` and `tests/e2e/pipelex/pipes/yes_no/` already reach for their bundles this way rather than keeping local copies.
+The corpus is the single source for language-level `.mthds` methods in this repo, and this repo's own tests are consumers of it like any other: a growing number of trees under `tests/e2e/pipelex/pipes/` call `get_entry(...)` for their bundle rather than keeping a local copy. `grep -rl mthds_corpus tests/` is the current list — the enumeration is deliberately not written down here, since it moves with every migration.
 
 !!! note "The entries are data, never auto-loaded"
 

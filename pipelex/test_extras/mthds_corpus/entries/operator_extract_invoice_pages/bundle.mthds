@@ -1,0 +1,9 @@
+domain      = "accounts_payable"
+description = "Reading the pages out of a supplier invoice that arrived as a scan"
+main_pipe   = "read_invoice_pages"
+
+[pipe.read_invoice_pages]
+type        = "PipeExtract"
+description = "Reads each page out of a scanned supplier invoice"
+inputs      = { invoice_scan = "Document" }
+output      = "Page[]"
