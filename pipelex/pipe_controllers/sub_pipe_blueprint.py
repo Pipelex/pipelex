@@ -2,8 +2,9 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
-from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_list
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 class SubPipeBlueprint(BaseModel):

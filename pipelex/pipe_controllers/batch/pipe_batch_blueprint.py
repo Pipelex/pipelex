@@ -2,8 +2,9 @@ from typing import Literal
 
 from typing_extensions import override
 
-from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 class PipeBatchBlueprint(PipeBlueprint):

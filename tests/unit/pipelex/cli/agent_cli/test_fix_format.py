@@ -13,6 +13,7 @@ from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.fix.bundle_cmd import fix_bundle_cmd
 from pipelex.pipeline.fixes.fix_loop import FixBundleResult
 from pipelex.suggested_fix import FixSafety, SuggestedFix
+from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -35,7 +36,7 @@ def _applied_fix(source: str) -> SuggestedFix:
 def _invalid_item(source: str) -> ValidationErrorItem:
     return ValidationErrorItem(
         category=ValidationErrorCategory.PIPE_VALIDATION,
-        error_type="INADEQUATE_OUTPUT_CONCEPT",
+        error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
         message="output mismatch",
         source=source,
     )

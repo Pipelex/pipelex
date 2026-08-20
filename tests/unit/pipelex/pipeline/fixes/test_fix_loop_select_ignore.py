@@ -13,9 +13,9 @@ import tomlkit
 from pytest_mock import MockerFixture
 
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.fixes.fix_loop import fix_bundle_file
+from pipelex.validation_error_types import PipeValidationErrorType
 
 _BUNDLE_MTHDS = """domain = "selectfix"
 main_pipe = "list_ideas"

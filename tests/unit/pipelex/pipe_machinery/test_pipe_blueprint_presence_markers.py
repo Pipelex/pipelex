@@ -1,9 +1,10 @@
 import pytest
 from pydantic import ValidationError
 
-from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.mthds_parsing.handle_pipe_errors import extract_wrapped_pipe_validation_error
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 class ConcretePipeBlueprint(PipeBlueprint):

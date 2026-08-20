@@ -11,7 +11,7 @@ from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeRunError, PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeRunError, PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -26,6 +26,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_
 from pipelex.runtime_hub import get_class_registry
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 class PipeStructureOutput(PipeOutput):

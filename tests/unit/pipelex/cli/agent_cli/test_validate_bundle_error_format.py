@@ -21,6 +21,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
 )
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.suggested_fix import FixSafety, SuggestedFix
+from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -30,7 +31,7 @@ if TYPE_CHECKING:
 def _fixable_item(*, source: Path) -> ValidationErrorItem:
     return ValidationErrorItem(
         category=ValidationErrorCategory.PIPE_VALIDATION,
-        error_type="inadequate_output_multiplicity",
+        error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY,
         pipe_code="brainstorm",
         domain_code="story_studio",
         source=str(source),

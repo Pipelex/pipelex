@@ -12,7 +12,7 @@ from pipelex.cogt.models.model_deck_check import check_img_gen_choice_with_deck
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
@@ -31,6 +31,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_
 from pipelex.runtime_hub import get_class_registry, get_model_deck
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.misc.image_utils import ImageFormat
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 class PipeImgGenOutput(PipeOutput):

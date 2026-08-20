@@ -18,8 +18,8 @@ from rich.console import Console
 
 from pipelex.cli.error_handlers import handle_validate_bundle_error
 from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
-from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
 from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.validation_error_types import PipeFactoryErrorType, PipeValidationErrorType
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture

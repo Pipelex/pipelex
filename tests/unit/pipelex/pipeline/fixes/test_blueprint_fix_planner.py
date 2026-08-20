@@ -9,9 +9,9 @@ all normalize to a ``concept.<Code>`` key).
 """
 
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.pipeline.fixes.planner import plan_fix_for_blueprint_validation_error
 from pipelex.suggested_fix import DeleteKeyOp, FixSafety, RenameTableKeyOp, SetKeyOp
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 def _blueprint_error_data(

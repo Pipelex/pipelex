@@ -14,6 +14,7 @@ from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipeline.bundle_validator import DryRunOutput, DryRunStatus
 from pipelex.pipeline.pipe_io_contracts import IOMultiplicity, PipeIOContract, PipeOutputContract
 from pipelex.pipeline.validation_report import build_validation_report
+from pipelex.validation_error_types import PipeValidationErrorType
 
 _NO_MAIN_PIPE_MTHDS = """
 domain = "alpha"
@@ -91,7 +92,7 @@ class TestBuildValidationReport:
         blueprints = [MthdsParser.make_pipelex_bundle_blueprint(mthds_content=_MAIN_PIPE_MTHDS)]
         warning_item = ValidationErrorItem(
             category=ValidationErrorCategory.PIPE_VALIDATION,
-            error_type="optional_force_redundant",
+            error_type=PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT,
             pipe_code="do_it",
             domain_code="beta",
             variable_names=["doc"],

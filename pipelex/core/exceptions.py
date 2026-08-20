@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
+from pipelex.validation_error_types import PipeFactoryErrorType, PipeValidationErrorType
 
 
 class PipeFactoryErrorData(BaseModel):
