@@ -1,0 +1,29 @@
+domain      = "deliveries"
+description = "Writing out the docket that travels with a weighed parcel"
+main_pipe   = "write_docket"
+
+[concept.WeighedParcel]
+description = "A parcel after it has been weighed at the counter"
+
+[concept.WeighedParcel.structure]
+weight_kg   = { type = "number", description = "What the parcel weighs on the counter scale, in kilograms", required = true }
+destination = { type = "text", description = "The town the parcel is going to", required = true }
+
+[concept.DeliveryDocket]
+description = "The docket stapled to a parcel before it leaves the counter"
+
+[concept.DeliveryDocket.structure]
+weight_kg   = { type = "number", description = "What the parcel weighs, copied from the counter scale", required = true }
+destination = { type = "text", description = "The town the parcel is going to", required = true }
+carrier     = { type = "text", description = "Who is taking the parcel out", required = true }
+
+[pipe.write_docket]
+type        = "PipeCompose"
+description = "Puts the weighed parcel and the carrier's name together into the docket"
+inputs      = { parcel = "WeighedParcel", carrier = "Text" }
+output      = "DeliveryDocket"
+
+[pipe.write_docket.construct]
+weight_kg   = { from = "parcel.weight_kg" }
+destination = { from = "parcel.destination" }
+carrier     = { from = "carrier" }

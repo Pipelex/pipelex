@@ -1,0 +1,10 @@
+name = "controller_batch_crate_labels"
+description = "One crate label written for each crate on a pallet"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "controller.batch",
+]

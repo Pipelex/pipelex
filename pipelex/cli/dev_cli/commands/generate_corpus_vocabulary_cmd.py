@@ -18,6 +18,7 @@ from rich.markup import escape
 from rich.panel import Panel
 
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.pipe_machinery.pipe_blueprint import PipeType
 from pipelex.runtime_hub import get_console
 from pipelex.test_extras.mthds_corpus.vocabulary import vocabulary_path
 
@@ -43,6 +44,32 @@ _HEADER = """# The MTHDS Test Corpus tag vocabulary — the closed set an entry'
 # module at import with an AttributeError naming it, before any generation runs. No code needs
 # excluding today; every native concept turned out to support a real focused entry.
 _NATIVE_EXCLUSIONS: dict[NativeConceptCode, str] = {}
+
+# The `operator.*` and `controller.*` namespaces come from ONE registry, not two: `PipeType` is the
+# closed set of executable pipe kinds, and its `category` property is what splits them. Deriving the
+# namespace from that property rather than from a list here is what keeps a newly added pipe kind
+# from landing in the wrong half — or in neither.
+#
+# `PipeSignature` is absent by construction and that is correct: a signature is a contract, not an
+# executable kind, so it is deliberately not a `PipeType` member and an explicit `type =
+# "PipeSignature"` is rejected upstream. There is nothing for a corpus entry to exercise.
+#
+# Every registry code here carries the same `Pipe` prefix, and the namespace already says which half
+# it is in, so `operator.pipe_llm` would stutter. The prefix is stripped before normalization and
+# `code` keeps the registry's own spelling, exactly as `native.yes_no` keeps `code = "YesNo"`.
+_PIPE_TYPE_PREFIX = "Pipe"
+
+# Same contract as `_NATIVE_EXCLUSIONS`, keyed on `PipeType` for the same reason: an exclusion whose
+# code leaves the registry breaks this module at import instead of rotting in the generated file.
+_PIPE_TYPE_EXCLUSIONS: dict[PipeType, str] = {
+    PipeType.PIPE_FUNC: (
+        "A PipeFunc names a Python function that is resolved against the runtime's function registry "
+        "at validation time, so an entry declaring one fails with \"Function '<name>' not found in "
+        'registry" in every consumer that has not registered that exact function. A corpus entry has '
+        "to validate everywhere, and the cross-language consumers cannot register a Python function at "
+        "all, so no portable focused entry exists. Exercise PipeFunc in a consumer's own fixtures."
+    ),
+}
 
 
 def normalize_registry_code(*, code: str) -> str:
@@ -73,9 +100,41 @@ def _render_native_namespace() -> str:
     return "\n\n".join(blocks)
 
 
+def _pipe_type_block(*, pipe_type: PipeType, namespace: str) -> str:
+    local_name = normalize_registry_code(code=pipe_type.value.removeprefix(_PIPE_TYPE_PREFIX))
+    lines = [f"[{namespace}.{local_name}]", f"code = {_toml_string(value=pipe_type.value)}"]
+    exclusion_reason = _PIPE_TYPE_EXCLUSIONS.get(pipe_type)
+    if exclusion_reason is not None:
+        lines.append(f"excluded = {_toml_string(value=exclusion_reason)}")
+    return "\n".join(lines)
+
+
+def _render_pipe_type_namespaces() -> list[str]:
+    """The two pipe namespaces, each in registry declaration order, rendered separately.
+
+    One walk of the registry, split by the category the registry itself declares — so a pipe kind
+    added tomorrow lands in the right namespace with nothing here to update.
+    """
+    operators: list[str] = []
+    controllers: list[str] = []
+    for pipe_type in PipeType:
+        if pipe_type.category.is_controller:
+            controllers.append(_pipe_type_block(pipe_type=pipe_type, namespace="controller"))
+        else:
+            operators.append(_pipe_type_block(pipe_type=pipe_type, namespace="operator"))
+    return ["\n\n".join(operators), "\n\n".join(controllers)]
+
+
 def generate_corpus_vocabulary_content() -> str:
-    """Render the whole vocabulary file, deterministically, in registry declaration order."""
-    return f"{_HEADER}\n{_render_native_namespace()}\n"
+    """Render the whole vocabulary file, deterministically.
+
+    Each namespace follows its registry's declaration order, and the two pipe namespaces are
+    emitted one after the other rather than interleaved — the file is read by humans choosing an
+    entry's `covers`, and grouping should not depend on where a future pipe kind is inserted into
+    the enum.
+    """
+    namespaces = [_render_native_namespace(), *_render_pipe_type_namespaces()]
+    return f"{_HEADER}\n" + "\n\n".join(namespaces) + "\n"
 
 
 def generate_corpus_vocabulary_cmd(*, quiet: bool = False) -> None:

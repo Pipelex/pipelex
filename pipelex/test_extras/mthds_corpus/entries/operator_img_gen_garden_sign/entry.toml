@@ -1,0 +1,10 @@
+name = "operator_img_gen_garden_sign"
+description = "A painted wooden sign for a vegetable bed, drawn from a description"
+
+validity = "valid"
+tier = "inference"
+granularity = "focused"
+
+covers = [
+  "operator.img_gen",
+]

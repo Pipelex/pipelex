@@ -7,4 +7,5 @@ granularity = "focused"
 
 covers = [
   "native.composite",
+  "controller.parallel",
 ]

@@ -1,0 +1,10 @@
+name = "controller_condition_parcel_routing"
+description = "A parcel sent to the belt that takes its size"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "controller.condition",
+]
