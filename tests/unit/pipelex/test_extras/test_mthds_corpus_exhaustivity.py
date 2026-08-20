@@ -13,11 +13,18 @@ fault twice in one file — once as ``expected_error``, the wire string the runt
 as an ``error.*`` tag in ``covers``, the normalized form the vocabulary declares. Nothing else
 checks that the two agree, so without it an entry could claim coverage of a tag it does not
 produce and the exhaustivity arm above would count that claim.
+
+The ``fails_at`` arm extends exhaustivity from tags to what a tag has to *say*. A consumer sweeping the
+corpus with a structural checker branches on ``fails_at``, so a tag that is owed an entry and
+declares no layer leaves that consumer with nothing to branch on — the same hole as a tag with no
+entry, one level down. Keeping it here rather than with the generator's own drift gate is
+deliberate: this reads the loaded vocabulary, which is what a consumer sees, so the requirement
+survives a change in how the file comes to be written.
 """
 
 from pipelex.test_extras.mthds_corpus.loader import iter_entries
 from pipelex.test_extras.mthds_corpus.manifest import EntryGranularity, EntryValidity
-from pipelex.test_extras.mthds_corpus.vocabulary import load_vocabulary
+from pipelex.test_extras.mthds_corpus.vocabulary import ERROR_NAMESPACE, load_vocabulary
 
 
 class TestMthdsCorpusExhaustivity:
@@ -53,7 +60,7 @@ class TestMthdsCorpusExhaustivity:
         tag_by_error_code = {
             tag.code: f"{namespace}.{local_name}"
             for namespace, tags_in_namespace in load_vocabulary().namespaces.items()
-            if namespace == "error"
+            if namespace == ERROR_NAMESPACE
             for local_name, tag in tags_in_namespace.items()
             if tag.code is not None
         }
@@ -74,6 +81,28 @@ class TestMthdsCorpusExhaustivity:
             "claim for a working feature."
         )
 
+    def test_every_required_error_tag_declares_the_layer_it_fails_at(self) -> None:
+        """A fault a consumer is owed an entry for must also say which layer catches it first.
+
+        Required rather than universal: an excluded ``error.*`` tag has no entry, so no measurement
+        of it exists and inventing one would be an argument dressed as a measurement. The other
+        namespaces name language features, not faults, and have no layer to declare at all.
+        """
+        vocabulary = load_vocabulary()
+        error_prefix = f"{ERROR_NAMESPACE}."
+        silent = sorted(
+            f"{ERROR_NAMESPACE}.{local_name}"
+            for local_name, tag in vocabulary.namespaces[ERROR_NAMESPACE].items()
+            if tag.fails_at is None and f"{error_prefix}{local_name}" in vocabulary.required_tags
+        )
+        assert not silent, (
+            "Required error.* tags declare no `fails_at`: "
+            + ", ".join(silent)
+            + ". A structural consumer expects a diagnostic on exactly the `schema` faults and none on the "
+            "`runtime` ones, so a fault that names no layer is one it cannot sweep for. Declare it in the "
+            "vocabulary generator's schema-fault set and regenerate with `make generate-corpus-vocabulary`."
+        )
+
     def test_no_valid_entry_claims_an_error_tag(self) -> None:
         """The other half of the same hole: a bundle that validates cannot cover a fault.
 
@@ -86,7 +115,7 @@ class TestMthdsCorpusExhaustivity:
         An ``error.*`` tag is a claim about a diagnostic, and only an entry that declares an
         ``expected_error`` can honour one.
         """
-        error_namespace_prefix = "error."
+        error_namespace_prefix = f"{ERROR_NAMESPACE}."
         offenders = [
             f"{entry.name}: {tag}"
             for entry in iter_entries(validity=EntryValidity.VALID)

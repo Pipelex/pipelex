@@ -1,5 +1,25 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Every `error.*` tag in the MTHDS Test Corpus vocabulary now says which layer of checking catches its fault first.** A non-excluded tag carries `fails_at = "schema"` when a pass over the raw document's shape already rejects a bundle carrying the fault — a pipe section with no `type` key, a `type` outside the closed set of pipe kinds — and `fails_at = "runtime"` when the document has to be interpreted to notice, which covers every other fault the corpus exercises. The consumer rule is one sentence: **a structural sweep expects a diagnostic on an entry exactly when its tag says `schema`, and silence on every other entry.**
+
+  This closes a hole that had every consumer re-deriving the runtime's own knowledge. A JSON-Schema sweep, an editor diagnostic, or a linter run over the corpus previously had to hardcode which faults it believed were structural — a second, downstream reading of this repo's validation-error registry, guaranteed to drift from it. The corpus being swept now carries the answer, and it ships in the wheel, so a consumer that vendors `vocabulary.toml` gets it with no code of its own.
+
+  The signal lives on the vocabulary tag rather than on each `entry.toml`, because it is a property of the *error type*, not of the entry: per-entry restatement would let two entries covering one fault disagree, with nothing to catch it. A `schema` fault is still rejected by the runtime — the field names where a fault is caught first, not who may catch it — which is why a schema-fault entry declares the same `expected_error` as any other invalid entry. The value `schema` is also `plxt`'s own `error[schema]` diagnostic category, so a consumer branching on the field and a human reading a linter's output use one word for one thing.
+
+- **The exhaustivity gate now requires every `error.*` tag that is owed an entry to declare a `fails_at`**, so a new validation error type cannot land carrying a fault a structural consumer has no way to sweep for. Excluded tags carry no value, deliberately: an excluded tag has no entry, so there is nothing to have measured on.
+
+### Changed
+
+- **The corpus's deliberately invalid entries are linted again — all but the two whose fault the schema is supposed to reject.** `.pipelex/plxt.toml` excluded the whole `invalid_*` population behind one blanket glob, because some of those entries carry a structural fault and the config had no way to say which. `fails_at` is that way, so the exclusion now names exactly the schema-fault entries and every other invalid bundle is linted like any ordinary `.mthds` file in the tree.
+
+  That also makes this repo the first consumer of its own signal, and it is what keeps the signal *measured* rather than merely asserted: the exclusion list is gated against the vocabulary by `test_mthds_corpus_plxt_exclusions.py`, so declaring a fault `runtime` when the schema in fact rejects it leaves its entry linted and turns `make plxt-lint` red naming it. The config is gated rather than generated because `plxt` is a static binary reading a static file, with nothing to hook a generation step onto.
+
+- **Documentation**: `docs/contribute/mthds-test-corpus.md` gains a `fails_at` section covering the consumer rule, why the field sits on the tag, and how the linter config closes the measurement loop. Its invalid-entry authoring warning is corrected to match the narrowed exclusion: only a schema-fault bundle has to be laid out by hand now, since `make lint` and `make format` cover every other invalid entry.
+
 ## [v0.50.0] - 2026-08-20
 
 ### Changed
