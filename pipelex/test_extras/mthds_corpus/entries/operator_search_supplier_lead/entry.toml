@@ -1,0 +1,10 @@
+name = "operator_search_supplier_lead"
+description = "A lookup for suppliers who stock a hard-to-source part"
+
+validity = "valid"
+tier = "inference"
+granularity = "focused"
+
+covers = [
+  "operator.search",
+]

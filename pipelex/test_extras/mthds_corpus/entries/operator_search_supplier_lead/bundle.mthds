@@ -1,0 +1,10 @@
+domain      = "procurement"
+description = "Looking up where a hard-to-source part can be bought"
+main_pipe   = "find_supplier"
+
+[pipe.find_supplier]
+type        = "PipeSearch"
+description = "Looks up suppliers who stock the part"
+inputs      = { part_name = "Text" }
+output      = "SearchResult"
+prompt      = "Which suppliers currently stock $part_name, and what do they charge?"

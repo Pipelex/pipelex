@@ -1,0 +1,10 @@
+name = "operator_structure_opening_hours"
+description = "The opening hours written on a shop door, read into fields"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "operator.structure",
+]

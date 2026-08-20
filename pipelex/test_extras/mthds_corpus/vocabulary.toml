@@ -52,3 +52,37 @@ code = "Anything"
 
 [native.composite]
 code = "Composite"
+
+[operator.func]
+code = "PipeFunc"
+excluded = "A PipeFunc names a Python function that is resolved against the runtime's function registry at validation time, so an entry declaring one fails with \"Function '<name>' not found in registry\" in every consumer that has not registered that exact function. A corpus entry has to validate everywhere, and the cross-language consumers cannot register a Python function at all, so no portable focused entry exists. Exercise PipeFunc in a consumer's own fixtures."
+
+[operator.img_gen]
+code = "PipeImgGen"
+
+[operator.compose]
+code = "PipeCompose"
+
+[operator.llm]
+code = "PipeLLM"
+
+[operator.extract]
+code = "PipeExtract"
+
+[operator.search]
+code = "PipeSearch"
+
+[operator.structure]
+code = "PipeStructure"
+
+[controller.batch]
+code = "PipeBatch"
+
+[controller.condition]
+code = "PipeCondition"
+
+[controller.parallel]
+code = "PipeParallel"
+
+[controller.sequence]
+code = "PipeSequence"

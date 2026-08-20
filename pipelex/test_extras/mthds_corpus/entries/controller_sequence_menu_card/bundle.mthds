@@ -1,0 +1,31 @@
+domain      = "bistro_menus"
+description = "Writing the day's menu card from a note of what the kitchen has in"
+main_pipe   = "write_menu_card"
+
+[concept]
+KitchenNote = "A short note from the kitchen listing what is available today."
+MenuCard    = "The menu as it is written out for the dining room."
+
+[pipe.write_menu_card]
+type = "PipeSequence"
+description = "Turns the kitchen's note into a dish list, then writes the menu card from it"
+inputs = { kitchen_note = "KitchenNote" }
+output = "MenuCard"
+steps = [
+  { pipe = "list_dishes", result = "dishes" },
+  { pipe = "lay_out_card", result = "menu_card" },
+]
+
+[pipe.list_dishes]
+type        = "PipeLLM"
+description = "Names the dishes the kitchen can serve from what it has in"
+inputs      = { kitchen_note = "KitchenNote" }
+output      = "Text[]"
+prompt      = "The kitchen has this in today: $kitchen_note. Name the dishes that can be served from it, one per line."
+
+[pipe.lay_out_card]
+type        = "PipeLLM"
+description = "Writes the dish list out as the menu card the dining room sees"
+inputs      = { dishes = "Text[]" }
+output      = "MenuCard"
+prompt      = "Write these dishes out as a menu card for the dining room: $dishes"

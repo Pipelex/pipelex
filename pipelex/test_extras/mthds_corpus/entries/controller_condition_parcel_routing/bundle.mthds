@@ -1,0 +1,44 @@
+domain      = "parcel_routing"
+description = "Sending a parcel down the belt that matches its size"
+main_pipe   = "route_parcel"
+
+[concept.Parcel]
+description = "A parcel waiting at the sorting belt"
+
+[concept.Parcel.structure]
+size    = { type = "text", description = "How the parcel is sized on the belt: small, medium or large", required = true }
+address = { type = "text", description = "Where the parcel is going", required = true }
+
+[pipe.route_parcel]
+type            = "PipeCondition"
+description     = "Sends the parcel to the belt that takes its size"
+inputs          = { parcel = "Parcel" }
+output          = "Text?"
+expression      = "parcel.size"
+default_outcome = "continue"
+
+[pipe.route_parcel.outcomes]
+small  = "note_small_belt"
+medium = "note_medium_belt"
+large  = "note_large_belt"
+
+[pipe.note_small_belt]
+type        = "PipeLLM"
+description = "Notes that the parcel goes on the small belt"
+inputs      = { parcel = "Parcel" }
+output      = "Text"
+prompt      = "Write one line saying the parcel for $parcel.address goes on the small belt."
+
+[pipe.note_medium_belt]
+type        = "PipeLLM"
+description = "Notes that the parcel goes on the medium belt"
+inputs      = { parcel = "Parcel" }
+output      = "Text"
+prompt      = "Write one line saying the parcel for $parcel.address goes on the medium belt."
+
+[pipe.note_large_belt]
+type        = "PipeLLM"
+description = "Notes that the parcel goes on the large belt"
+inputs      = { parcel = "Parcel" }
+output      = "Text"
+prompt      = "Write one line saying the parcel for $parcel.address goes on the large belt."

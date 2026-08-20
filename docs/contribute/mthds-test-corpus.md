@@ -70,7 +70,7 @@ An **invalid** entry additionally declares the exact wire `error_type` it must p
 
 ## The tag vocabulary
 
-Tags are namespaced and the vocabulary is closed: an entry covering a tag the vocabulary does not declare fails the gate. `native.*` is generated from `NativeConceptCode`; `feature.*` is reserved for hand-maintained language features; `operator.*`, `controller.*` and `error.*` arrive with their registries.
+Tags are namespaced and the vocabulary is closed: an entry covering a tag the vocabulary does not declare fails the gate. `native.*` is generated from `NativeConceptCode`. `operator.*` and `controller.*` are generated from `PipeType` — one registry, split by its own `category` property, so a pipe kind added tomorrow lands in the right namespace with nothing to update here. Their local names drop the `Pipe` prefix every code carries, since the namespace already says which half it is: `PipeLLM` becomes `operator.llm`, `PipeSequence` becomes `controller.sequence`. `feature.*` is reserved for hand-maintained language features and `error.*` arrives with its registry.
 
 `vocabulary.toml` is generated in full, so it is never edited by hand:
 
@@ -80,7 +80,9 @@ make generate-corpus-vocabulary
 
 Everything the file says is decided in the generator, `pipelex/cli/dev_cli/commands/generate_corpus_vocabulary_cmd.py` — the registries it walks, and every exclusion reason. It is unshipped dev tooling (the wheel excludes `pipelex/cli/dev_cli`) while the file it writes ships, which is what lets a consumer read the closed tag set without a registry walk. A hand-maintained namespace will be declared there too when one first has content; `feature.*` is reserved in the contract but has no tags yet, and adding one before an entry covers it would simply red the exhaustivity gate.
 
-An **exclusion** marks a registry code that no standalone focused entry could meaningfully exercise. It stays in the vocabulary and stays usable by an entry; it is simply not owed a focused entry. No native code is excluded today — every one of them turned out to support a real entry. The exclusion map is keyed on the registry enum rather than on strings, which is what keeps an exclusion from outliving the code it names: a removed code breaks the generator at import, naming itself.
+An **exclusion** marks a registry code that no standalone focused entry could meaningfully exercise. It stays in the vocabulary and stays usable by an entry; it is simply not owed a focused entry. The exclusion map is keyed on the registry enum rather than on strings, which is what keeps an exclusion from outliving the code it names: a removed code breaks the generator at import, naming itself.
+
+No native concept is excluded — every one of them turned out to support a real entry. One pipe kind is: `PipeFunc` names a Python function that the runtime resolves against its function registry *at validation time*, so an entry declaring one fails with `Function '<name>' not found in registry` in every consumer that has not registered that exact function — and a cross-language consumer cannot register a Python function at all. Exercise `PipeFunc` in a consumer's own fixtures, where the function exists.
 
 ## The gates, and what a red one means
 
