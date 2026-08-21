@@ -1,7 +1,7 @@
 """Passthrough helper for delegating to the plxt CLI binary."""
 
 import shutil
-import subprocess  # noqa: S404
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 
 import typer
 
@@ -25,7 +25,7 @@ def run_plxt(subcommand: str, *, file_path: str) -> None:
             error_type="BinaryNotFoundError",
         )
 
-    result = subprocess.run(  # noqa: S603
+    result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
         [plxt_path, subcommand, file_path],
         check=False,
     )

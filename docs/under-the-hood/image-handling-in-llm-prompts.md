@@ -137,11 +137,8 @@ Given a `Page` with text and images:
 
 ```python
 PageContent(
-    text_and_images=TextAndImagesContent(
-        text=TextContent(text="Welcome to the guide"),
-        images=[ImageContent(url="...")]
-    ),
-    page_view=ImageContent(url="...")
+    text_and_images=TextAndImagesContent(text=TextContent(text="Welcome to the guide"), images=[ImageContent(url="...")]),
+    page_view=ImageContent(url="..."),
 )
 ```
 
@@ -207,19 +204,9 @@ When a PipeLLM is created from a blueprint, the `TemplateImageAnalyzer` examines
 ```python
 # Stored in PipeLLM after analysis
 user_image_references = [
-    ImageReference(
-        variable_path="page",
-        kind=ImageReferenceKind.NESTED,
-        nested_image_paths=["text_and_images.images", "page_view"]
-    )
+    ImageReference(variable_path="page", kind=ImageReferenceKind.NESTED, nested_image_paths=["text_and_images.images", "page_view"])
 ]
-system_image_references = [
-    ImageReference(
-        variable_path="context_image",
-        kind=ImageReferenceKind.DIRECT,
-        nested_image_paths=None
-    )
-]
+system_image_references = [ImageReference(variable_path="context_image", kind=ImageReferenceKind.DIRECT, nested_image_paths=None)]
 ```
 
 ### Runtime: Image Collection
@@ -333,6 +320,7 @@ The `with_images` filter uses the `ImageRenderable` protocol to handle StuffArte
 # StuffArtefact implements ImageRenderable
 if isinstance(value, ImageRenderable):
     return value.render_with_images(registry=registry, text_format=text_format)
+
 
 # StuffArtefact.render_with_images() delegates to content
 def render_with_images(self, *, registry, text_format) -> str:

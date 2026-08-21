@@ -15,7 +15,7 @@ import typer
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
-    _render_validate_bundle_markdown,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+    _render_validate_bundle_markdown,  # pyright: ignore[reportPrivateUsage]
     agent_error_validate_bundle,
     set_agent_cli_error_format,
 )

@@ -26,9 +26,10 @@ Most structured data needs are covered by inline structures + `pipelex build str
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
 
+
 class Invoice(StructuredContent):
     """A commercial invoice."""
-    
+
     invoice_number: str = Field(description="Unique invoice identifier")
     issue_date: datetime = Field(description="Date the invoice was issued")
     total_amount: float = Field(ge=0, description="Total invoice amount")
@@ -49,20 +50,21 @@ Classes inheriting from `StructuredContent` are automatically discovered and reg
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field, field_validator
 
+
 class Invoice(StructuredContent):
     """A commercial invoice with validation."""
-    
+
     total_amount: float = Field(ge=0, description="Total invoice amount")
     tax_amount: float = Field(ge=0, description="Tax amount")
     net_amount: float = Field(ge=0, description="Net amount before tax")
-    
-    @field_validator('tax_amount')
+
+    @field_validator("tax_amount")
     @classmethod
     def validate_tax(cls, v, info):
         """Ensure tax doesn't exceed total."""
-        total = info.data.get('total_amount', 0)
+        total = info.data.get("total_amount", 0)
         if v > total:
-            raise ValueError('Tax amount cannot exceed total amount')
+            raise ValueError("Tax amount cannot exceed total amount")
         return v
 ```
 
@@ -73,18 +75,19 @@ from datetime import datetime
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
 
+
 class Subscription(StructuredContent):
     """A subscription with computed properties."""
-    
+
     start_date: datetime = Field(description="Subscription start date")
     end_date: datetime = Field(description="Subscription end date")
     monthly_price: float = Field(ge=0, description="Monthly subscription price")
-    
+
     @property
     def duration_days(self) -> int:
         """Calculate subscription duration in days."""
         return (self.end_date - self.start_date).days
-    
+
     @property
     def total_cost(self) -> float:
         """Calculate total subscription cost."""
@@ -145,13 +148,13 @@ from .structures import UserProfile
 class ValidatedUserProfile(UserProfile):
     """A user profile with email validation."""
 
-    @field_validator('email')
+    @field_validator("email")
     @classmethod
     def validate_email(cls, v):
         """Validate email format."""
-        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         if not re.match(pattern, v):
-            raise ValueError('Invalid email format')
+            raise ValueError("Invalid email format")
         return v
 ```
 
@@ -186,6 +189,7 @@ in_stock = { type = "boolean", description = "Stock availability", default_value
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field, field_validator
 
+
 class Product(StructuredContent):
     """A product in the catalog."""
 
@@ -194,14 +198,14 @@ class Product(StructuredContent):
     price: float = Field(ge=0, description="Product price")
     in_stock: bool = Field(default=True, description="Stock availability")
 
-    @field_validator('price')
+    @field_validator("price")
     @classmethod
     def validate_price(cls, v):
         """Ensure price is positive and reasonable."""
         if v < 0:
-            raise ValueError('Price cannot be negative')
+            raise ValueError("Price cannot be negative")
         if v > 1_000_000:
-            raise ValueError('Price seems unreasonably high')
+            raise ValueError("Price seems unreasonably high")
         return v
 
     @property

@@ -11,7 +11,7 @@ message from telling a fiction:
 """
 
 from pipelex.libraries.library import (
-    _describe_unresolved_pipe_dependency,  # noqa: PLC2701 # pyright: ignore[reportPrivateUsage]
+    _describe_unresolved_pipe_dependency,  # pyright: ignore[reportPrivateUsage]
 )
 from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundError
 

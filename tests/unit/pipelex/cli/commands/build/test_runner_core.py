@@ -14,7 +14,9 @@ from typing import TYPE_CHECKING, Any
 import pytest
 import typer
 
-from pipelex.cli.commands.build.runner._runner_core import _prepare_runner_core  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+from pipelex.cli.commands.build.runner._runner_core import (
+    _prepare_runner_core,  # pyright: ignore[reportPrivateUsage]
+)
 from pipelex.pipeline.exceptions import ValidateBundleError
 
 if TYPE_CHECKING:

@@ -96,7 +96,7 @@ class TestBedrockWorkerSemantic:
         )
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_text(llm_job=_make_llm_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_text(llm_job=_make_llm_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.user_action is not None
@@ -123,7 +123,7 @@ class TestBedrockWorkerSemantic:
         )
 
         with pytest.raises(LLMModelNotFoundError) as exc_info:
-            await worker._gen_text(llm_job=_make_llm_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_text(llm_job=_make_llm_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
         assert exc_info.value.user_action is not None

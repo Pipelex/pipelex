@@ -90,7 +90,7 @@ class TestUriResolverErrorHandling:
 
     async def test_pipelex_storage_propagates_storage_errors(self, mocker: MockerFixture) -> None:
         """Test that storage errors are propagated when loading pipelex-storage:// URIs."""
-        from pipelex.tools.storage.exceptions import StorageFileNotFoundError  # noqa: PLC0415
+        from pipelex.tools.storage.exceptions import StorageFileNotFoundError  # ruff: ignore[import-outside-top-level]
 
         mock_storage = mocker.AsyncMock()
         mock_storage.load = mocker.AsyncMock(side_effect=StorageFileNotFoundError("Key not found"))

@@ -114,11 +114,16 @@ def __getattribute__(self, key: str) -> Any:
 
     # 3. Metadata accessors
     match key:
-        case "_stuff_name": return stuff.stuff_name
-        case "_content_class": return content.__class__.__name__
-        case "_concept_code": return stuff.concept.code
-        case "_stuff_code": return stuff.stuff_code
-        case "_content": return content
+        case "_stuff_name":
+            return stuff.stuff_name
+        case "_content_class":
+            return content.__class__.__name__
+        case "_concept_code":
+            return stuff.concept.code
+        case "_stuff_code":
+            return stuff.stuff_code
+        case "_content":
+            return content
 
     # 4. Fallback to normal lookup
     return object.__getattribute__(self, key)
@@ -148,6 +153,7 @@ StuffArtefact supports bracket notation and iteration:
 
 ```python
 from typing import Protocol, runtime_checkable
+
 
 @runtime_checkable
 class ImageRenderable(Protocol):

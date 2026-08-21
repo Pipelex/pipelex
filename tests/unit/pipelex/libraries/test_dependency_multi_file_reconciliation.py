@@ -109,7 +109,7 @@ class TestDependencyMultiFileReconciliation:
         mocker.patch.object(library_manager, "get_current_library", return_value=library)
 
         manager = LibraryManager()
-        manager._load_single_dependency(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             library=library,
             resolved_dep=self._build_resolved_dep(
                 tmp_path=tmp_path,
@@ -137,7 +137,7 @@ class TestDependencyMultiFileReconciliation:
         mocker.patch.object(library_manager, "get_current_library", return_value=library)
 
         manager = LibraryManager()
-        manager._load_single_dependency(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             library=library,
             resolved_dep=self._build_resolved_dep(
                 tmp_path=tmp_path,
@@ -162,7 +162,7 @@ class TestDependencyMultiFileReconciliation:
 
         manager = LibraryManager()
         with pytest.raises(PipeLibraryError):
-            manager._load_single_dependency(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
                 library=library,
                 resolved_dep=self._build_resolved_dep(
                     tmp_path=tmp_path,

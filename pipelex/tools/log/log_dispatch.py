@@ -31,11 +31,11 @@ class LogDispatch:
     def _log_config(self) -> LogConfig:
         """Retrieves the log configuration.
 
-        Raises:
-            RuntimeError: If LogConfig is not set.
-
         Returns:
             LogConfig: The current log configuration.
+
+        Raises:
+            RuntimeError: If LogConfig is not set.
 
         """
         if self._log_config_instance is None:

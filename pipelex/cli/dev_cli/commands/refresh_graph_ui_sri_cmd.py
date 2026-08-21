@@ -108,7 +108,7 @@ def _fetch(url: str, *, timeout: float = 30.0) -> bytes:
     if not any(url.startswith(prefix) and url.endswith(suffix) for prefix, suffix in _ALLOWED_URL_SHAPES):
         msg = f"Refusing to fetch {url}: only the jsDelivr graph viewer URLs are allowed"
         raise PipelexCLIError(msg)
-    with urlopen(url, timeout=timeout) as response:  # noqa: S310  # URL is a known-good https jsDelivr origin (checked above)
+    with urlopen(url, timeout=timeout) as response:  # ruff: ignore[suspicious-url-open-usage]  # URL is a known-good https jsDelivr origin (checked above)
         body: bytes = response.read()
     return body
 

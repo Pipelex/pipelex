@@ -4,7 +4,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.cli.dev_cli.commands.preprocess_test_models_cmd import (
-    _fetch_gateway_models,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+    _fetch_gateway_models,  # pyright: ignore[reportPrivateUsage]
 )
 from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError, RemoteConfigValidationError
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher

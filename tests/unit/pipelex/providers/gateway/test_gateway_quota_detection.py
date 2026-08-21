@@ -125,7 +125,7 @@ class TestGatewayQuotaDetection:
         img_gen_job.job_report.img_gen_tokens_usage = None
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._gen_image_list(img_gen_job=img_gen_job, nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_image_list(img_gen_job=img_gen_job, nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
         assert exc_info.value.user_action is not None
@@ -147,7 +147,7 @@ class TestGatewayQuotaDetection:
         )
 
         with pytest.raises(SearchJobFailureError) as exc_info:
-            await worker._call_relay(model="linkup/standard", content='{"query": "test"}')  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._call_relay(model="linkup/standard", content='{"query": "test"}')  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
         assert exc_info.value.__cause__ is sdk_exc
@@ -177,7 +177,7 @@ class TestGatewayQuotaDetection:
 
         extract_job = mocker.MagicMock()
         extract_job.extract_input.image_uri = None
-        extract_job.extract_input.document_uri = "/tmp/test.pdf"  # noqa: S108
+        extract_job.extract_input.document_uri = "/tmp/test.pdf"  # ruff: ignore[hardcoded-temp-file]
         extract_job.job_params.max_nb_images = 0
         extract_job.job_params.should_caption_images = False
 
@@ -190,7 +190,7 @@ class TestGatewayQuotaDetection:
         )
 
         with pytest.raises(ExtractJobFailureError) as exc_info:
-            await worker._extract_document(extract_job=extract_job)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._extract_document(extract_job=extract_job)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CAPACITY
         assert exc_info.value.__cause__ is sdk_exc

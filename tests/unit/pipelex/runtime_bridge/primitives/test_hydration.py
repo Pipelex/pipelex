@@ -16,7 +16,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.pipe_run.exceptions import PipeJobError
 from pipelex.runtime_bridge.primitives.hydration import (
-    _hydrate_list_item,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+    _hydrate_list_item,  # pyright: ignore[reportPrivateUsage]
     hydrate_working_memory,
 )
 from pipelex.runtime_hub import get_class_registry

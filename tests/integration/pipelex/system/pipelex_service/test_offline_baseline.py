@@ -9,7 +9,7 @@ These tests describe the behaviour that must NOT regress:
 
 from __future__ import annotations
 
-from pathlib import Path  # noqa: TC003 — referenced by pytest fixture type hints at runtime
+from pathlib import Path  # ruff: ignore[typing-only-standard-library-import] — referenced by pytest fixture type hints at runtime
 from typing import TYPE_CHECKING
 
 import httpx

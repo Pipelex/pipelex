@@ -83,7 +83,7 @@ class TestAzureWorkerErrorHandling:
         )
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.user_action is not None
@@ -119,7 +119,7 @@ class TestAzureWorkerErrorHandling:
         )
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.user_action is not None
@@ -157,7 +157,7 @@ class TestAzureWorkerErrorHandling:
         )
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.user_action is not None
@@ -184,7 +184,7 @@ class TestAzureWorkerErrorHandling:
         )
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         report = exc_info.value.to_error_report()
         assert report.error_category == "transient"

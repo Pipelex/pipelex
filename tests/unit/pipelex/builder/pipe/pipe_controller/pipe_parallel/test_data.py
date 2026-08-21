@@ -31,7 +31,7 @@ class PipeParallelTestCases:
                 SubPipeBlueprint(pipe="validate_data", result="validation"),
             ],
             add_each_output=True,
-            source="tests/unit/pipelex/libraries/pipelines/builder/pipe/pipe_controllers/pipe_parallel/test_data.py PipeParallelTestCases.PARALLEL_WITH_EACH_OUTPUT",  # noqa: E501
+            source="tests/unit/pipelex/libraries/pipelines/builder/pipe/pipe_controllers/pipe_parallel/test_data.py PipeParallelTestCases.PARALLEL_WITH_EACH_OUTPUT",  # ruff: ignore[line-too-long]
         ),
     )
 
@@ -57,7 +57,7 @@ class PipeParallelTestCases:
                 SubPipeBlueprint(pipe="pipe2", result="result2"),
             ],
             add_each_output=False,
-            source="tests/unit/pipelex/libraries/pipelines/builder/pipe/pipe_controllers/pipe_parallel/test_data.py PipeParallelTestCases.PARALLEL_WITHOUT_EACH_OUTPUT",  # noqa: E501
+            source="tests/unit/pipelex/libraries/pipelines/builder/pipe/pipe_controllers/pipe_parallel/test_data.py PipeParallelTestCases.PARALLEL_WITHOUT_EACH_OUTPUT",  # ruff: ignore[line-too-long]
         ),
     )
 
@@ -82,7 +82,7 @@ class PipeParallelTestCases:
                 SubPipeBlueprint(pipe="pipe2", result="result2"),
             ],
             add_each_output=False,
-            source="tests/unit/pipelex/libraries/pipelines/builder/pipe/pipe_controllers/pipe_parallel/test_data.py PipeParallelTestCases.PARALLEL_OMITTING_ADD_EACH_OUTPUT",  # noqa: E501
+            source="tests/unit/pipelex/libraries/pipelines/builder/pipe/pipe_controllers/pipe_parallel/test_data.py PipeParallelTestCases.PARALLEL_OMITTING_ADD_EACH_OUTPUT",  # ruff: ignore[line-too-long]
         ),
     )
 

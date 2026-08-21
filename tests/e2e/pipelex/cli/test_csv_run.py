@@ -16,7 +16,7 @@ from __future__ import annotations
 import csv
 import os
 import shutil
-import subprocess  # noqa: S404 — invokes the real pipelex binary for E2E coverage
+import subprocess  # ruff: ignore[suspicious-subprocess-import] — invokes the real pipelex binary for E2E coverage
 from inspect import signature
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -69,7 +69,7 @@ class TestCsvRun:
     @pytest.mark.gha_disabled
     def test_save_csv_writes_file_at_literal_path(self, tmp_path: Path) -> None:
         staged = _stage_bundle(tmp_path)
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             [
                 str(PIPELEX_BIN),
                 "run",
@@ -111,7 +111,7 @@ class TestCsvRun:
         # (not a list), so the run must fail cleanly with the "not a list" guard, framed as a
         # --save-csv failure (not a pipeline failure) and with no raw traceback.
         staged = _stage_bundle(tmp_path)
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             [
                 str(PIPELEX_BIN),
                 "run",
@@ -147,7 +147,7 @@ class TestCsvRun:
             '{ "people": { "concept": "csv_demo.Person", "content": { "url": "nope.csv" } } }',
             encoding="utf-8",
         )
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             [
                 str(PIPELEX_BIN),
                 "run",

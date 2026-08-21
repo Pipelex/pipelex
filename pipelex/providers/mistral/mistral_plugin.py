@@ -25,8 +25,8 @@ def _make_mistral_worker(
 ) -> InferenceWorkerAbstract:
     require_sdk(spec="mistralai", extra="mistral", msg=_MISTRAL_MISSING_MSG)
 
-    from pipelex.providers.mistral.mistral_factory import MistralFactory  # noqa: PLC0415
-    from pipelex.providers.mistral.mistral_llm_worker import MistralLLMWorker  # noqa: PLC0415
+    from pipelex.providers.mistral.mistral_factory import MistralFactory  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.mistral.mistral_llm_worker import MistralLLMWorker  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     sdk_instance = sdk_clients.get_or_create(
@@ -50,8 +50,8 @@ def _make_mistral_extract_worker(
 ) -> InferenceWorkerAbstract:
     require_sdk(spec="mistralai", extra="mistral", msg=_MISTRAL_EXTRACT_MISSING_MSG)
 
-    from pipelex.providers.mistral.mistral_extract_worker import MistralExtractWorker  # noqa: PLC0415
-    from pipelex.providers.mistral.mistral_factory import MistralFactory  # noqa: PLC0415
+    from pipelex.providers.mistral.mistral_extract_worker import MistralExtractWorker  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.mistral.mistral_factory import MistralFactory  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     sdk_instance = sdk_clients.get_or_create(
@@ -67,15 +67,15 @@ def _make_mistral_extract_worker(
 
 
 # Async to satisfy the uniform ListModelsFn contract (the loop awaits it) even though Mistral lists synchronously.
-async def _list_mistral_models(  # noqa: RUF029
+async def _list_mistral_models(  # ruff: ignore[unused-async]
     *,
     sdk: str,
     backend_name: str,
-    backend: InferenceBackend,  # noqa: ARG001 — uniform lister signature; Mistral lists without a backend client
+    backend: InferenceBackend,  # ruff: ignore[unused-function-argument] — uniform lister signature; Mistral lists without a backend client
     flat: bool,
     any_listed: bool,
 ) -> None:
-    from pipelex.providers.mistral.mistral_list import list_mistral_models  # noqa: PLC0415
+    from pipelex.providers.mistral.mistral_list import list_mistral_models  # ruff: ignore[import-outside-top-level]
 
     list_mistral_models(sdk=sdk, backend_name=backend_name, flat=flat, any_listed=any_listed)
 

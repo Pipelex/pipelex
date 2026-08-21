@@ -36,7 +36,7 @@ class GoogleConfig(ConfigModel):
             The Google ThinkingLevel enum, or None if reasoning is disabled.
 
         """
-        from google.genai import types as genai_types  # noqa: PLC0415
+        from google.genai import types as genai_types  # ruff: ignore[import-outside-top-level]
 
         level_str = get_reasoning_level_str(effort_to_level_map=self.effort_to_level_map, effort=effort)
         if level_str is None:

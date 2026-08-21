@@ -158,7 +158,7 @@ class OtelFactory:
             - trace_name: Full version with pipe code (e.g., "my_pipe_abc12345")
             - trace_name_redacted: Just the hash (e.g., "abc12345")
         """
-        hashed_id = hashlib.md5(pipeline_run_id.encode("utf-8")).hexdigest()[:8]  # noqa: S324
+        hashed_id = hashlib.md5(pipeline_run_id.encode("utf-8")).hexdigest()[:8]  # ruff: ignore[hashlib-insecure-hash-function]
         trace_name = f"{pipe_code}_{hashed_id}"
         trace_name_redacted = hashed_id
         return trace_name, trace_name_redacted
@@ -203,7 +203,7 @@ class OtelFactory:
         langfuse_auth = base64.b64encode(f"{public_key}:{secret_key}".encode()).decode()
 
         # Deferred import: avoid pulling heavy SDK at module-load time
-        from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter  # noqa: PLC0415
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter  # ruff: ignore[import-outside-top-level]
 
         return OTLPSpanExporter(
             endpoint=f"{endpoint}/api/public/otel/v1/traces",
@@ -249,14 +249,14 @@ class OtelFactory:
             provider.shutdown() during teardown to flush pending spans.
         """
         # Deferred imports: avoid pulling heavy SDKs at module-load time
-        from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter  # noqa: PLC0415
-        from opentelemetry.sdk.resources import Resource as OTelResource  # noqa: PLC0415
-        from opentelemetry.sdk.trace import TracerProvider as OTelTracerProvider  # noqa: PLC0415
-        from opentelemetry.sdk.trace.export import BatchSpanProcessor as OTelBatchSpanProcessor  # noqa: PLC0415
-        from opentelemetry.semconv._incubating.attributes import deployment_attributes  # noqa: PLC0415, PLC2701
-        from opentelemetry.semconv.attributes import service_attributes  # noqa: PLC0415
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter  # ruff: ignore[import-outside-top-level]
+        from opentelemetry.sdk.resources import Resource as OTelResource  # ruff: ignore[import-outside-top-level]
+        from opentelemetry.sdk.trace import TracerProvider as OTelTracerProvider  # ruff: ignore[import-outside-top-level]
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor as OTelBatchSpanProcessor  # ruff: ignore[import-outside-top-level]
+        from opentelemetry.semconv._incubating.attributes import deployment_attributes  # ruff: ignore[import-outside-top-level, import-private-name]
+        from opentelemetry.semconv.attributes import service_attributes  # ruff: ignore[import-outside-top-level]
 
-        from pipelex.system.telemetry.posthog_span_exporter import PostHogSpanExporter  # noqa: PLC0415
+        from pipelex.system.telemetry.posthog_span_exporter import PostHogSpanExporter  # ruff: ignore[import-outside-top-level]
 
         # Define Resource (Identity)
         resource = OTelResource.create(

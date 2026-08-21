@@ -1,4 +1,4 @@
-# ruff: noqa: INP001 - a standalone probe script, deliberately not a package
+# ruff: file-ignore[implicit-namespace-package] - a standalone probe script, deliberately not a package
 """OQ1: which library does a dependency pipe's bare sub-pipe ref resolve against?
 
 A dependency package is loaded into an isolated *child* library, and its pipes are ALSO registered
@@ -111,7 +111,7 @@ def build_resolved_dep(dep_dir: Path, *, exported_pipe_codes: set[str] | None) -
 def ask(*, label: str, library: Library, pipe_code: str) -> None:
     try:
         found = library.pipe_library.get_optional_pipe(pipe_code=pipe_code)
-    except BaseException as exc:  # noqa: BLE001 - naming *which* error escapes IS the measurement here
+    except BaseException as exc:  # ruff: ignore[blind-except] - naming *which* error escapes IS the measurement here
         print(f"   {label:<58} -> {type(exc).__name__}: {exc}")
     else:
         print(f"   {label:<58} -> {describe(found)}")
@@ -127,7 +127,7 @@ def report(*, title: str, library: Library, library_id: str) -> None:
     try:
         with scoped_current_library(library_id=library_id):
             library.validate_library()
-    except BaseException as exc:  # noqa: BLE001 - naming *which* error escapes IS the measurement here
+    except BaseException as exc:  # ruff: ignore[blind-except] - naming *which* error escapes IS the measurement here
         print(f"   {'':<58} -> {type(exc).__name__}: {exc}")
     else:
         print(f"   {'':<58} -> valid")
@@ -161,14 +161,14 @@ def main() -> None:
 
         bare_library_id, bare_library = manager.open_library()
         with scoped_current_library(library_id=bare_library_id):
-            manager._load_single_dependency(library=bare_library, resolved_dep=resolved_dep)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            manager._load_single_dependency(library=bare_library, resolved_dep=resolved_dep)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         report(title="host declares nothing", library=bare_library, library_id=bare_library_id)
 
         host_file = Path(temp_dir) / "host.mthds"
         host_file.write_text(HOST_COLLIDING_MTHDS, encoding="utf-8")
         colliding_library_id, colliding_library = manager.open_library()
         with scoped_current_library(library_id=colliding_library_id):
-            manager._load_single_dependency(library=colliding_library, resolved_dep=resolved_dep)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            manager._load_single_dependency(library=colliding_library, resolved_dep=resolved_dep)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         # load_from_blueprints validates the whole library, dependency entries included — since the
         # strict lookup landed, that validation raises here. The host pipe is registered before the
         # validation runs, so the shape-2 library is intact; catch and keep measuring.
@@ -177,7 +177,7 @@ def main() -> None:
                 library_id=colliding_library_id,
                 blueprints=[MthdsParser.make_pipelex_bundle_blueprint(bundle_path=host_file)],
             )
-        except BaseException as exc:  # noqa: BLE001 - naming *which* error escapes IS the measurement here
+        except BaseException as exc:  # ruff: ignore[blind-except] - naming *which* error escapes IS the measurement here
             print(f"\n   load_from_blueprints(host) -> {type(exc).__name__}: {exc}")
         report(title="host declares its OWN pipe under the same bare code", library=colliding_library, library_id=colliding_library_id)
 
@@ -185,7 +185,7 @@ def main() -> None:
         exporting_dep = build_resolved_dep(dep_dir, exported_pipe_codes={"probe_entry"})
         exporting_library_id, exporting_library = manager.open_library()
         with scoped_current_library(library_id=exporting_library_id):
-            manager._load_single_dependency(library=exporting_library, resolved_dep=exporting_dep)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            manager._load_single_dependency(library=exporting_library, resolved_dep=exporting_dep)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         report(title="dependency manifest exports only the entry pipe", library=exporting_library, library_id=exporting_library_id)
 
 

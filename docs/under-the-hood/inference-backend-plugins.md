@@ -39,8 +39,9 @@ A plugin is any object satisfying the `@runtime_checkable` `PipelexPlugin` proto
 
 ```python
 class PipelexPlugin(Protocol):
-    name: str            # unique, lowercase identifier (e.g. "openai")
-    targets_api: int     # must equal PLUGIN_API_VERSION
+    name: str  # unique, lowercase identifier (e.g. "openai")
+    targets_api: int  # must equal PLUGIN_API_VERSION
+
     def register(self, registrar: PluginRegistrar) -> None: ...
 ```
 
@@ -56,9 +57,9 @@ A backend plugin's `register` calls one menu method per `(family, sdk)` it serve
 
 ```python
 registrar.add_inference_backend(
-    family=InferenceFamily.LLM,         # LLM | IMG_GEN | EXTRACT | SEARCH
-    sdk="acme",                          # the model's `sdk` string
-    make_worker=_make_acme_worker,       # a MakeWorkerFn (a plain callable)
+    family=InferenceFamily.LLM,  # LLM | IMG_GEN | EXTRACT | SEARCH
+    sdk="acme",  # the model's `sdk` string
+    make_worker=_make_acme_worker,  # a MakeWorkerFn (a plain callable)
 )
 ```
 
@@ -79,8 +80,7 @@ def _make_acme_worker(
     backend: InferenceBackend,
     sdk_clients: SdkClientRegistry,
     reporting_delegate: ReportingProtocol | None,
-) -> InferenceWorkerAbstract:
-    ...
+) -> InferenceWorkerAbstract: ...
 ```
 
 The factory always passes all four keyword arguments. A stateless backend simply ignores the ones it doesn't need (`# noqa: ARG001` on the unused parameter — see the built-in `pypdfium2` and `azure_rest` plugins).

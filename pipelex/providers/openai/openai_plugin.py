@@ -16,9 +16,9 @@ def _make_openai_completions_worker(
     sdk_clients: SdkClientRegistry,
     reporting_delegate: ReportingProtocol | None,
 ) -> InferenceWorkerAbstract:
-    from pipelex.providers.openai.openai_client_factory import OpenAIClientFactory  # noqa: PLC0415
-    from pipelex.providers.openai.openai_completions_factory import OpenAICompletionsFactory  # noqa: PLC0415
-    from pipelex.providers.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker  # noqa: PLC0415
+    from pipelex.providers.openai.openai_client_factory import OpenAIClientFactory  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.openai.openai_completions_factory import OpenAICompletionsFactory  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     sdk_instance = sdk_clients.get_or_create(
@@ -40,9 +40,9 @@ def _make_openai_responses_worker(
     sdk_clients: SdkClientRegistry,
     reporting_delegate: ReportingProtocol | None,
 ) -> InferenceWorkerAbstract:
-    from pipelex.providers.openai.openai_client_factory import OpenAIClientFactory  # noqa: PLC0415
-    from pipelex.providers.openai.openai_responses_factory import OpenAIResponsesFactory  # noqa: PLC0415
-    from pipelex.providers.openai.openai_responses_llm_worker import OpenAIResponsesLLMWorker  # noqa: PLC0415
+    from pipelex.providers.openai.openai_client_factory import OpenAIClientFactory  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.openai.openai_responses_factory import OpenAIResponsesFactory  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.openai.openai_responses_llm_worker import OpenAIResponsesLLMWorker  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     sdk_instance = sdk_clients.get_or_create(
@@ -64,8 +64,8 @@ def _make_openai_img_gen_worker(
     sdk_clients: SdkClientRegistry,
     reporting_delegate: ReportingProtocol | None,
 ) -> InferenceWorkerAbstract:
-    from pipelex.providers.openai.openai_client_factory import OpenAIClientFactory  # noqa: PLC0415
-    from pipelex.providers.openai.openai_img_gen_worker import OpenAIImgGenWorker  # noqa: PLC0415
+    from pipelex.providers.openai.openai_client_factory import OpenAIClientFactory  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.openai.openai_img_gen_worker import OpenAIImgGenWorker  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     sdk_instance = sdk_clients.get_or_create(
@@ -87,7 +87,7 @@ async def _list_openai_models(
     flat: bool,
     any_listed: bool,
 ) -> None:
-    from pipelex.providers.openai.openai_list import list_openai_models  # noqa: PLC0415
+    from pipelex.providers.openai.openai_list import list_openai_models  # ruff: ignore[import-outside-top-level]
 
     await list_openai_models(sdk=sdk, backend_name=backend_name, backend=backend, flat=flat, any_listed=any_listed)
 

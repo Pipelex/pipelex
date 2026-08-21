@@ -9,7 +9,9 @@ from typing import TYPE_CHECKING, Any
 import pytest
 import typer
 
-from pipelex.cli.commands.build.output._output_core import _generate_output_core  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+from pipelex.cli.commands.build.output._output_core import (
+    _generate_output_core,  # pyright: ignore[reportPrivateUsage]
+)
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.pipeline.exceptions import ValidateBundleError
 

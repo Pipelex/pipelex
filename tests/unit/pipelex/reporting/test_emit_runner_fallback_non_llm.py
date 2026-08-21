@@ -115,7 +115,7 @@ def _make_img_gen_job(run_id: str) -> ImgGenJob:
 def _make_extract_job(run_id: str) -> ExtractJob:
     job_metadata = _job_metadata(run_id, "wf_extract")
     return ExtractJob(
-        extract_input=ExtractInput(document_uri="/tmp/test.pdf"),  # noqa: S108
+        extract_input=ExtractInput(document_uri="/tmp/test.pdf"),  # ruff: ignore[hardcoded-temp-file]
         job_params=ExtractJobParams.make_default_extract_job_params(),
         job_config=ExtractJobConfig(),
         job_report=ExtractJobReport(

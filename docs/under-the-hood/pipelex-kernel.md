@@ -115,7 +115,9 @@ summary = extract_main_content(memory=result.memory, content_type=Summary)
 Reach for the list pair whenever the call asked for several — `is_multiple_output=True` or `fixed_nb_output=n`:
 
 ```python
-result = await kernel.llm_object(memory=memory, output_class=Summary, concept=summary_concept, model=model, user="Summarize $topic", result="summaries", is_multiple_output=True)
+result = await kernel.llm_object(
+    memory=memory, output_class=Summary, concept=summary_concept, model=model, user="Summarize $topic", result="summaries", is_multiple_output=True
+)
 summaries = extract_main_content_as_list(memory=result.memory, item_type=Summary).items
 ```
 

@@ -114,7 +114,7 @@ def version_callback(value: bool) -> None:  # kw-only: ignore — click invokes 
 @app.callback(invoke_without_command=True)
 def app_callback(
     ctx: typer.Context,
-    version: Annotated[  # noqa: ARG001
+    version: Annotated[  # ruff: ignore[unused-function-argument]
         bool,
         typer.Option(
             "--version",

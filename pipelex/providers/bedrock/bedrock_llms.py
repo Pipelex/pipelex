@@ -8,9 +8,9 @@ from pipelex.tools.aws.exceptions import AwsCredentialsError
 
 
 def bedrock_list_available_models(
-    model_handle: ModelHandle,  # noqa: ARG001
+    model_handle: ModelHandle,  # ruff: ignore[unused-function-argument]
     *,
-    backend: InferenceBackend,  # noqa: ARG001
+    backend: InferenceBackend,  # ruff: ignore[unused-function-argument]
 ) -> list[dict[str, Any]]:
     """List available Bedrock foundation models.
 
@@ -33,7 +33,7 @@ def bedrock_list_available_models(
         raise AwsCredentialsError(msg) from exc
 
     try:
-        import boto3  # noqa: PLC0415
+        import boto3  # ruff: ignore[import-outside-top-level]
     except ImportError as exc:
         lib_name = "boto3,aioboto3"
         lib_extra_name = "bedrock"

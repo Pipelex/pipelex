@@ -151,10 +151,7 @@ When a pipe's output has multiplicity (returns multiple items), the content is a
 The Python format generates class instantiation code:
 
 ```python
-{
-  "concept": "my_domain.MyOutputConcept",
-  "content": "MyOutputConcept(title=\"title_value\", key_points=\"key_points_value\")"
-}
+{"concept": "my_domain.MyOutputConcept", "content": 'MyOutputConcept(title="title_value", key_points="key_points_value")'}
 ```
 
 ### Schema Format

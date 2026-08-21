@@ -86,8 +86,8 @@ def pipe_job_from_library(
     library_manager = get_library_manager()
     library_id, library = library_manager.open_library()
     if isolated_registry:
-        from kajson.class_registry import ClassRegistry  # noqa: PLC0415
-        from kajson.kajson_manager import KajsonManager  # noqa: PLC0415
+        from kajson.class_registry import ClassRegistry  # ruff: ignore[import-outside-top-level]
+        from kajson.kajson_manager import KajsonManager  # ruff: ignore[import-outside-top-level]
 
         # Pre-seed from global so core framework classes (PipeSequenceFactory, etc.)
         # are available. Dynamic concept classes added during load_fn() will go to

@@ -106,6 +106,7 @@ The first draft of this plan then made the same mistake one level up, by letting
 ```python
 # pipelex/graph/graphspec.py
 
+
 class NodeUsageSpec(BaseModel):
     """Inference usage attributed to one graph node.
 
@@ -184,7 +185,7 @@ The first draft put the run total and the unattributed bucket in `GraphSpec.meta
 class GraphUsageSpec(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    total: NodeUsageSpec         # whole-run rollup
+    total: NodeUsageSpec  # whole-run rollup
     unattributed: NodeUsageSpec  # usage whose node_id was "unknown"
 ```
 

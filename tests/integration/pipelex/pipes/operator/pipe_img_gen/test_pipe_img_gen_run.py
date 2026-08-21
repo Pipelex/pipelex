@@ -28,7 +28,7 @@ class TestPipeImgGenRun:
         job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         img_gen_combo: ModelCombo,
-        topic: str,  # noqa: ARG002
+        topic: str,  # ruff: ignore[unused-method-argument]
         prompt: str,
         negative_prompt: str | None,
         load_empty_library: Callable[[], None],
@@ -61,7 +61,7 @@ class TestPipeImgGenRun:
         job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         img_gen_combo: ModelCombo,
-        topic: str,  # noqa: ARG002
+        topic: str,  # ruff: ignore[unused-method-argument]
         image_desc: str,
         negative_prompt: str | None,
         load_empty_library: Callable[[], None],

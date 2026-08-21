@@ -165,7 +165,7 @@ class TestAStaleBackendFileTheLedgerCannotFullyExplain:
         """Both refusal shapes, because only one of them carries a pydantic error to translate."""
         stale_file, refusal = request.getfixturevalue(fixture_name)
 
-        message = RuntimeBoot._get_validation_error_msg(  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        message = RuntimeBoot._get_validation_error_msg(  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
             component=BootComponent.INFERENCE_BACKEND_LIBRARY,
             validation_exc=refusal,
         )
@@ -183,7 +183,7 @@ class TestAStaleBackendFileTheLedgerCannotFullyExplain:
         """Two remedies, one of which discards the file, is worse advice than either alone."""
         _, refusal = request.getfixturevalue(fixture_name)
 
-        message = RuntimeBoot._get_validation_error_msg(  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        message = RuntimeBoot._get_validation_error_msg(  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
             component=BootComponent.INFERENCE_BACKEND_LIBRARY,
             validation_exc=refusal,
         )
@@ -195,7 +195,7 @@ class TestAStaleBackendFileTheLedgerCannotFullyExplain:
         """The model deck shares this message and is not a surface: no scan, no block, same tail as before."""
         _, refusal = stale_and_unexplained_in_defaults
 
-        message = RuntimeBoot._get_validation_error_msg(  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        message = RuntimeBoot._get_validation_error_msg(  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
             component=BootComponent.MODEL_DECK,
             validation_exc=refusal,
         )
@@ -223,7 +223,7 @@ class TestAStaleBackendFileTheLedgerCannotFullyExplain:
         self._plant(path=stale_file, anchor="[gpt-4o]\n", keys='max_tokens = "lots"\n')
         refusal = self._refusal_from_the_real_loader(machine=machine)
 
-        message = RuntimeBoot._get_validation_error_msg(  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        message = RuntimeBoot._get_validation_error_msg(  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
             component=BootComponent.INFERENCE_BACKEND_LIBRARY,
             validation_exc=refusal,
         )
@@ -246,7 +246,7 @@ class TestAStaleBackendFileTheLedgerCannotFullyExplain:
         (machine / INFERENCE_DIR_NAME / "backends.toml").write_text(BACKENDS_TOML_WITH_A_BAD_VALUE, encoding="utf-8")
         refusal = self._refusal_from_the_real_loader(machine=machine)
 
-        message = RuntimeBoot._get_validation_error_msg(  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        message = RuntimeBoot._get_validation_error_msg(  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
             component=BootComponent.INFERENCE_BACKEND_LIBRARY,
             validation_exc=refusal,
         )
@@ -269,7 +269,7 @@ class TestAStaleBackendFileTheLedgerCannotFullyExplain:
         self._plant(path=stale_file, anchor="[defaults]\n", keys=f"{UNEXPLAINED_KEY} = 1\n")
         refusal = self._refusal_from_the_real_loader(machine=machine)
 
-        message = RuntimeBoot._get_validation_error_msg(  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        message = RuntimeBoot._get_validation_error_msg(  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
             component=BootComponent.INFERENCE_BACKEND_LIBRARY,
             validation_exc=refusal,
         )

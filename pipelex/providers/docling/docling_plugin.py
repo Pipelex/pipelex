@@ -20,8 +20,8 @@ def _make_docling_extract_worker(
 ) -> InferenceWorkerAbstract:
     require_sdk(spec="docling", extra="docling", msg=_DOCLING_MISSING_MSG)
 
-    from pipelex.providers.docling.docling_extract_worker import DoclingExtractWorker  # noqa: PLC0415
-    from pipelex.providers.docling.docling_factory import DoclingFactory  # noqa: PLC0415
+    from pipelex.providers.docling.docling_extract_worker import DoclingExtractWorker  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.docling.docling_factory import DoclingFactory  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     sdk_instance = sdk_clients.get_or_create(

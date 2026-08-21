@@ -25,7 +25,7 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.func_registry import func_registry
 
 
-def transported_ref_probe_func(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001  # pyright: ignore[reportUnusedParameter]
+def transported_ref_probe_func(working_memory: WorkingMemory) -> TextContent:  # ruff: ignore[unused-function-argument]  # pyright: ignore[reportUnusedParameter]
     """Registered in the test so the PipeFunc validators accept the blueprint in local mode."""
     return TextContent(text="probe")
 
@@ -55,7 +55,7 @@ class TestPipeFuncTransportedRef:
         executor.run_pipe_func = mocker.AsyncMock(return_value=PipeFuncExecutionResult(content=TextContent(text="probe")))
         mocker.patch("pipelex.pipe_operators.func.pipe_func.get_pipe_func_executor", return_value=executor)
 
-        await the_pipe_func._live_run_operator_pipe(  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        await the_pipe_func._live_run_operator_pipe(  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
             job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="user", pipeline_run_id="run")),
             working_memory=WorkingMemoryFactory.make_empty(),
             pipe_run_params=PipeRunParams(run_mode=PipeRunMode.LIVE, pipe_stack_limit=10, batch_max_concurrency=None),

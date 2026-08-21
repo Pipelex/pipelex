@@ -117,7 +117,7 @@ class RemoteConfigCache:
         )
         serialised = cached.model_dump_json()
 
-        tmp_file = tempfile.NamedTemporaryFile(  # noqa: SIM115 - we manage the handle manually for atomic replace
+        tmp_file = tempfile.NamedTemporaryFile(  # ruff: ignore[open-file-with-context-handler] - we manage the handle manually for atomic replace
             mode="w",
             encoding="utf-8",
             dir=str(cache_dir),

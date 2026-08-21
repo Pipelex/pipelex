@@ -122,7 +122,7 @@ class StructuredContentComposer:
                 mismatch_marker = "" if actual_type_name == expected_type_name else " <-- MISMATCH"
                 lines.append(f"  {field_name}: {actual_type_name} (expected {expected_type_name}){mismatch_marker}")
             return "\n".join(lines)
-        except Exception:  # noqa: BLE001
+        except Exception:  # ruff: ignore[blind-except]
             # General exception catching tolerated here because the method is purely defensive diagnostic code that builds error messages
             return "Field type summary: unavailable (introspection failed)"
 

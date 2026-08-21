@@ -171,7 +171,7 @@ class TestPipeRun:
 
         mock_router = mocker.AsyncMock()
 
-        async def failing_run(*_args: object, **_kwargs: object) -> None:  # noqa: RUF029
+        async def failing_run(*_args: object, **_kwargs: object) -> None:  # ruff: ignore[unused-async]
             call_order.append("router.run")
             raise PipeRouterError(
                 message="fail",
@@ -187,7 +187,7 @@ class TestPipeRun:
             "pipelex.pipe_run.pipe_run.DeliveryExecutor",
         )
 
-        async def mock_execute(*_args: object, **_kwargs: object) -> None:  # noqa: RUF029
+        async def mock_execute(*_args: object, **_kwargs: object) -> None:  # ruff: ignore[unused-async]
             call_order.append("delivery.execute")
 
         mock_executor.return_value.execute = mock_execute

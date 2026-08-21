@@ -31,7 +31,7 @@ def _make_extract_job(mocker: MockerFixture) -> Any:
     """Create a mock ExtractJob for pypdfium2 worker."""
     job = mocker.MagicMock()
     job.extract_input.image_uri = None
-    job.extract_input.document_uri = "/tmp/test.pdf"  # noqa: S108
+    job.extract_input.document_uri = "/tmp/test.pdf"  # ruff: ignore[hardcoded-temp-file]
     job.job_params.max_nb_images = 0  # No images, simplifies the test
     job.job_report.extract_tokens_usage = None
     return job
@@ -63,7 +63,7 @@ class TestPypdfium2WorkerErrorHandling:
             worker,
             "_resolve_pdf_uri",
             new_callable=mocker.AsyncMock,
-            return_value="/tmp/test.pdf",  # noqa: S108
+            return_value="/tmp/test.pdf",  # ruff: ignore[hardcoded-temp-file]
         )
 
         # Mock pypdfium2_renderer methods to raise the exception
@@ -74,7 +74,7 @@ class TestPypdfium2WorkerErrorHandling:
         )
 
         with pytest.raises(ExtractJobFailureError) as exc_info:
-            await worker._extract_pages(extract_job=_make_extract_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._extract_pages(extract_job=_make_extract_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.__cause__ is sdk_exc
@@ -90,7 +90,7 @@ class TestPypdfium2WorkerErrorHandling:
             worker,
             "_resolve_pdf_uri",
             new_callable=mocker.AsyncMock,
-            return_value="/tmp/missing.pdf",  # noqa: S108
+            return_value="/tmp/missing.pdf",  # ruff: ignore[hardcoded-temp-file]
         )
         mocker.patch(
             "pipelex.providers.pypdfium2.pypdfium2_worker.pypdfium2_renderer.extract_text_from_pdf_pages",
@@ -99,7 +99,7 @@ class TestPypdfium2WorkerErrorHandling:
         )
 
         with pytest.raises(ExtractJobFailureError) as exc_info:
-            await worker._extract_pages(extract_job=_make_extract_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._extract_pages(extract_job=_make_extract_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         report = exc_info.value.to_error_report()
         assert report.error_category == "content"
@@ -115,7 +115,7 @@ class TestPypdfium2WorkerErrorHandling:
             worker,
             "_resolve_pdf_uri",
             new_callable=mocker.AsyncMock,
-            return_value="/tmp/test.pdf",  # noqa: S108
+            return_value="/tmp/test.pdf",  # ruff: ignore[hardcoded-temp-file]
         )
         mocker.patch(
             "pipelex.providers.pypdfium2.pypdfium2_worker.pypdfium2_renderer.extract_text_from_pdf_pages",
@@ -124,7 +124,7 @@ class TestPypdfium2WorkerErrorHandling:
         )
 
         with pytest.raises(ExtractJobFailureError) as exc_info:
-            await worker._extract_pages(extract_job=_make_extract_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._extract_pages(extract_job=_make_extract_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         report = exc_info.value.to_error_report()
         assert report.error_category == "transient"

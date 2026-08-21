@@ -2,7 +2,9 @@ from pydantic import ConfigDict
 
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.runtime_bridge.primitives.hydration import _validate_as_known_class  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+from pipelex.runtime_bridge.primitives.hydration import (
+    _validate_as_known_class,  # pyright: ignore[reportPrivateUsage]
+)
 
 
 class _StuffContentAllowExtra(StuffContent):

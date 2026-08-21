@@ -1,7 +1,7 @@
 """IDE extension detection and installation for Pipelex."""
 
 import shutil
-import subprocess  # noqa: S404
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 
 from rich.console import Console
 from rich.markup import escape
@@ -33,7 +33,7 @@ def _is_extension_installed(cmd: str) -> bool:
         True if the extension is listed by --list-extensions, False otherwise.
     """
     try:
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             [cmd, "--list-extensions"],
             capture_output=True,
             text=True,
@@ -65,7 +65,7 @@ def _install_extension(ide_name: str, *, cmd: str, console: Console) -> bool:
         True if installation succeeded, False otherwise.
     """
     try:
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             [cmd, "--install-extension", EXTENSION_ID],
             capture_output=True,
             text=True,

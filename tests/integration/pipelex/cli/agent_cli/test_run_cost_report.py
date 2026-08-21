@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core  # pyright: ignore[reportPrivateUsage]
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory

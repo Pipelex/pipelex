@@ -25,6 +25,7 @@ from typing import Any, Protocol
 
 PayloadType = dict[str, Any]
 
+
 class ObserverProtocol(Protocol):
     async def observe_before_run(self, payload: PayloadType) -> None:
         """Process and store the payload before the run"""
@@ -55,8 +56,8 @@ payload = {
 ```python
 payload = {
     "pipeline_run_id": str,  # Identifier of the pipeline run
-    "pipe_job": PipeJob,     # Initial job information
-    "pipe_output": PipeOutput, # Results and final working memory
+    "pipe_job": PipeJob,  # Initial job information
+    "pipe_output": PipeOutput,  # Results and final working memory
 }
 ```
 
@@ -65,7 +66,7 @@ payload = {
 payload = {
     "pipeline_run_id": str,  # Identifier of the pipeline run
     "pipe_job": PipeJob,  # Initial job information
-    "error": Exception,   # The exception that caused the failure
+    "error": Exception,  # The exception that caused the failure
 }
 ```
 
@@ -77,6 +78,7 @@ payload = {
 import os
 from typing import Optional
 from pipelex.observer.observer_protocol import ObserverProtocol, PayloadType
+
 
 class MyCustomObserver(ObserverProtocol):
     def __init__(self, config_param: str = "default_value"):
@@ -161,6 +163,7 @@ import asyncio
 import aiohttp
 from pipelex.observer.observer_protocol import ObserverProtocol, PayloadType
 
+
 class DatabaseObserver(ObserverProtocol):
     def __init__(self, db_connection_string: str):
         self.db_connection = db_connection_string
@@ -216,6 +219,7 @@ For automatic observer setup, integrate with your Pipelex initialization:
 from pipelex.pipelex import Pipelex
 
 from my_project.observers import MyCustomObserver
+
 
 def setup_pipelex():
     # Initialize Pipelex with the observer wired in from the start

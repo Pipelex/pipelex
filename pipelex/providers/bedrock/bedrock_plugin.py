@@ -20,8 +20,8 @@ def _make_bedrock_worker(
 ) -> InferenceWorkerAbstract:
     require_sdk(spec=["boto3", "aioboto3"], extra="bedrock", msg=_BEDROCK_MISSING_MSG)
 
-    from pipelex.providers.bedrock.bedrock_factory import BedrockFactory  # noqa: PLC0415
-    from pipelex.providers.bedrock.bedrock_llm_worker import BedrockLLMWorker  # noqa: PLC0415
+    from pipelex.providers.bedrock.bedrock_factory import BedrockFactory  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.bedrock.bedrock_llm_worker import BedrockLLMWorker  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     sdk_instance = sdk_clients.get_or_create(
@@ -36,7 +36,7 @@ def _make_bedrock_worker(
 
 
 # Async to satisfy the uniform ListModelsFn contract (the loop awaits it) even though Bedrock lists synchronously.
-async def _list_bedrock_models(  # noqa: RUF029
+async def _list_bedrock_models(  # ruff: ignore[unused-async]
     *,
     sdk: str,
     backend_name: str,
@@ -44,7 +44,7 @@ async def _list_bedrock_models(  # noqa: RUF029
     flat: bool,
     any_listed: bool,
 ) -> None:
-    from pipelex.providers.bedrock.bedrock_list import list_bedrock_models  # noqa: PLC0415
+    from pipelex.providers.bedrock.bedrock_list import list_bedrock_models  # ruff: ignore[import-outside-top-level]
 
     list_bedrock_models(sdk=sdk, backend_name=backend_name, backend=backend, flat=flat, any_listed=any_listed)
 

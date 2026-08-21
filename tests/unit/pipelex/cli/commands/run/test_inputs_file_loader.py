@@ -8,7 +8,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipelex.cli.commands.run._inputs_file_loader import load_inputs_dict_from_path  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+from pipelex.cli.commands.run._inputs_file_loader import (
+    load_inputs_dict_from_path,  # pyright: ignore[reportPrivateUsage]
+)
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.time_content import TimeContent
 from pipelex.tools.misc.exceptions import JsonTypeError, TomlError

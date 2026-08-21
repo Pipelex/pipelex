@@ -7,8 +7,8 @@ This is the canonical convention for keyword-only function parameters across the
 A function or method must place a bare `*` separator in its signature so that every parameter after the subject is keyword-only. The compliant shapes are:
 
 ```python
-def f(*, opt1, opt2): ...            # fully keyword-only — always compliant, no registry entry needed
-def f(subject, *, opt1, opt2): ...   # positional subject — compliant ONLY under a recorded subject grant
+def f(*, opt1, opt2): ...  # fully keyword-only — always compliant, no registry entry needed
+def f(subject, *, opt1, opt2): ...  # positional subject — compliant ONLY under a recorded subject grant
 ```
 
 The first non-`self`/`cls` parameter — the subject — may stay positional-or-keyword **only when a subject grant for that def is recorded in `subject_grants.toml`** (see the next section). We deliberately do NOT use the positional-only `/` separator anywhere; a granted subject may be passed positionally or by keyword, at the caller's discretion.
@@ -140,19 +140,19 @@ A subject plus options — the canonical shape, legal only with a grant:
 
 ```python
 # subject_grants.toml carries: ["pipelex/builder/build.py::build_pipe"] param = "spec" rationale = "…"
-def build_pipe(spec, *, dry_run, retries, validate): ...   # build_pipe(my_spec, dry_run=True, retries=3, validate=False)
+def build_pipe(spec, *, dry_run, retries, validate): ...  # build_pipe(my_spec, dry_run=True, retries=3, validate=False)
 ```
 
 A single subject and nothing else — needs a grant too (strict-all scope; lone-subject defs are not implicitly exempt):
 
 ```python
-def render(node): ...   # render(my_node) — granted: verb–object, single operand
+def render(node): ...  # render(my_node) — granted: verb–object, single operand
 ```
 
 All parameters named, including the first — always compliant, no registry entry, and often the most readable choice:
 
 ```python
-def copy_payload(*, source, target): ...   # copy_payload(source=a, target=b)
+def copy_payload(*, source, target): ...  # copy_payload(source=a, target=b)
 ```
 
 Even a single defaulted option must be named — this is the common case the convention fixes, not an exception to it:
@@ -176,7 +176,7 @@ def doctor_cmd(*, fix: bool): ...
 A symmetric tuple on the allowlist — exempt entirely, stays positional:
 
 ```python
-def set_env(key: str, value: str) -> None: ...   # set_env("PIPELEX_ENV", "prod")
+def set_env(key: str, value: str) -> None: ...  # set_env("PIPELEX_ENV", "prod")
 ```
 
 A directional pair with a trailing option — neither operand is "the object", and a whole-function allowlist exemption would let the option go positional too, so the whole signature becomes keyword-only:
@@ -194,13 +194,13 @@ An override — skipped because of `@override`; fix (and grant) the base signatu
 
 ```python
 @override
-def _store(self, data, *, key, content_type): ...   # base StorageProviderAbstract._store defines the contract and holds any grant
+def _store(self, data, *, key, content_type): ...  # base StorageProviderAbstract._store defines the contract and holds any grant
 ```
 
 A dunder — skipped by name; the interpreter owns the calling convention:
 
 ```python
-def __format__(self, format_spec: str) -> str: ...   # called positionally by format()/f-strings
+def __format__(self, format_spec: str) -> str: ...  # called positionally by format()/f-strings
 ```
 
 A pydantic validator — skipped by decorator; pydantic owns the positional protocol:

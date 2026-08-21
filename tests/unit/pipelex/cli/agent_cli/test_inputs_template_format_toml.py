@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 import tomli
 
-from pipelex.cli.agent_cli.commands.inputs._inputs_core import emit_inputs_result  # noqa: PLC2701
+from pipelex.cli.agent_cli.commands.inputs._inputs_core import emit_inputs_result
 from pipelex.cli.agent_cli.commands.inputs.pipe_cmd import inputs_pipe_cmd
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
 from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat

@@ -24,7 +24,7 @@ from pipelex.graph.graphspec import (
 )
 from pipelex.system.data_inclusion_config import DataInclusionConfig
 from pipelex.system.trace_context import TraceContext
-from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in __init__ annotations
+from pipelex.tracing.event_log_protocol import EventLogProtocol  # ruff: ignore[typing-only-first-party-import] - used in __init__ annotations
 from pipelex.tracing.trace_events import (
     BatchAggregateEvent,
     BatchItemEvent,

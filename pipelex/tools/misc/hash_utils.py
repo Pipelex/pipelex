@@ -33,4 +33,4 @@ def hash_md5_to_int(string: str) -> int:
     Returns:
         A 128-bit integer derived from the MD5 hash of the input string.
     """
-    return int(hashlib.md5(string.encode("utf-8")).hexdigest(), 16)  # noqa: S324
+    return int(hashlib.md5(string.encode("utf-8")).hexdigest(), 16)  # ruff: ignore[hashlib-insecure-hash-function]

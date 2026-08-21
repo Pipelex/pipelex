@@ -395,7 +395,7 @@ class TestDetectJinja2Variables:
     )
     def test_syntax_errors_raise_exception(
         self,
-        topic: str,  # noqa: ARG002
+        topic: str,  # ruff: ignore[unused-method-argument]
         template_source: str,
     ):
         """Test that invalid templates raise Jinja2DetectVariablesError."""

@@ -27,7 +27,7 @@ class DoclingFactory:
             ExtractOutput with pages dict (0-indexed).
         """
         # Deferred import: avoid pulling heavy SDK at module-load time
-        from docling_core.transforms.serializer.markdown import MarkdownDocSerializer, MarkdownParams  # noqa: PLC0415
+        from docling_core.transforms.serializer.markdown import MarkdownDocSerializer, MarkdownParams  # ruff: ignore[import-outside-top-level]
 
         pages: dict[int, Page] = {}
 

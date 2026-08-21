@@ -46,7 +46,7 @@ class DateContent(StuffContent):
         #    UTC offset — exactly the fidelity loss DT3 forbids ("no silent midnight").
         if isinstance(value, datetime.datetime):
             msg = "A Date takes a calendar date and a separate time of day, not a datetime; put the date in `date` and the time and offset in `time`."
-            raise ValueError(msg)  # noqa: TRY004 — must be ValueError so pydantic wraps it into a ValidationError
+            raise ValueError(msg)  # ruff: ignore[type-check-without-type-error] — must be ValueError so pydantic wraps it into a ValidationError
         if isinstance(value, (int, float)) or (isinstance(value, str) and is_numeric_string(value)):  # bool is an int subclass
             msg = "A Date's date/time must be an ISO 8601 string or a date/time object, never a number (no epoch-seconds)."
             raise ValueError(msg)

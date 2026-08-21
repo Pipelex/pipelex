@@ -381,10 +381,7 @@ from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # Execute a pipe with multiple outputs
 runner = PipelexMTHDSProtocol()
-response = await runner.execute(
-    pipe_code="extract_line_items",
-    inputs={"invoice_text": "Your invoice text here..."}
-)
+response = await runner.execute(pipe_code="extract_line_items", inputs={"invoice_text": "Your invoice text here..."})
 pipe_output = response.pipe_output
 
 # Get the list of line items
@@ -411,7 +408,7 @@ response = await runner.execute(
             TextContent(text="Document 2 content..."),
             TextContent(text="Document 3 content..."),
         ]
-    }
+    },
 )
 pipe_output = response.pipe_output
 ```

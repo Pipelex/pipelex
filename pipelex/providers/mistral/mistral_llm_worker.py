@@ -58,7 +58,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
             raise MistralWorkerConfigurationError(msg)
         self.mistral_client_for_text: Mistral = sdk_instance
         self.mistral_factory = mistral_factory
-        from instructor import from_mistral  # noqa: PLC0415
+        from instructor import from_mistral  # ruff: ignore[import-outside-top-level]
 
         if instructor_mode := self.inference_model.get_instructor_mode():
             self.instructor_for_objects = from_mistral(client=sdk_instance, mode=instructor_mode, use_async=True)
@@ -213,7 +213,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
         self._validate_no_reasoning_for_structured_gen(job_params=job_params)
         messages = await self.mistral_factory.make_simple_messages_openai_typed(llm_job=llm_job)
         # Deferred import: avoid pulling heavy SDK at module-load time
-        from instructor.core import InstructorRetryException  # noqa: PLC0415
+        from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
 
         try:
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(

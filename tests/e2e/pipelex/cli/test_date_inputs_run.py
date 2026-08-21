@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import os
 import shutil
-import subprocess  # noqa: S404 — invokes the real pipelex binary for E2E coverage
+import subprocess  # ruff: ignore[suspicious-subprocess-import] — invokes the real pipelex binary for E2E coverage
 from pathlib import Path
 
 import pytest
@@ -41,7 +41,7 @@ class TestDateInputsRun:
         inputs_toml = staged / "inputs.toml"
         inputs_toml.write_text(INPUTS_TOML, encoding="utf-8")
 
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             [
                 str(PIPELEX_BIN),
                 "run",

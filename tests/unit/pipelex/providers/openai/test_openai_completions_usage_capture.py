@@ -122,7 +122,7 @@ class TestOpenAICompletionsUsageCapture:
         worker = _make_worker(mocker, _make_text_response(mocker, usage=usage))
         llm_job = _make_llm_job_with_empty_usage()
 
-        text = await worker._gen_text(llm_job=llm_job)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        text = await worker._gen_text(llm_job=llm_job)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert text == "pong"
         captured = llm_job.job_report.llm_tokens_usage
@@ -139,7 +139,7 @@ class TestOpenAICompletionsUsageCapture:
         worker = _make_worker(mocker, _make_text_response(mocker, usage=None))
         llm_job = _make_llm_job_with_empty_usage()
 
-        await worker._gen_text(llm_job=llm_job)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        await worker._gen_text(llm_job=llm_job)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         captured = llm_job.job_report.llm_tokens_usage
         assert captured is not None

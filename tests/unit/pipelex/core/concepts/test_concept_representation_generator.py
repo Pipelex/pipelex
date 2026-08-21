@@ -494,7 +494,7 @@ class TestIncludeOptionalParameter:
 
     def test_image_content_only_url_required(self) -> None:
         """ImageContent should only have url when include_optional=False."""
-        from pipelex.core.stuffs.image_content import ImageContent  # noqa: PLC0415
+        from pipelex.core.stuffs.image_content import ImageContent  # ruff: ignore[import-outside-top-level]
 
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
         result = generator.generate_class_representation(ImageContent, include_optional=False)
@@ -602,7 +602,7 @@ class TestNumberContentRepresentation:
 
     def test_number_content_json_representation(self) -> None:
         """NumberContent generates proper numeric value in JSON format."""
-        from pipelex.core.stuffs.number_content import NumberContent  # noqa: PLC0415
+        from pipelex.core.stuffs.number_content import NumberContent  # ruff: ignore[import-outside-top-level]
 
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
         result = generator.generate_class_representation(NumberContent)
@@ -614,7 +614,7 @@ class TestNumberContentRepresentation:
 
     def test_number_content_python_representation(self) -> None:
         """NumberContent generates proper numeric value in Python format."""
-        from pipelex.core.stuffs.number_content import NumberContent  # noqa: PLC0415
+        from pipelex.core.stuffs.number_content import NumberContent  # ruff: ignore[import-outside-top-level]
 
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
         result = generator.generate_class_representation(NumberContent)
@@ -640,7 +640,7 @@ class TestDateContentRepresentation:
 
     def test_date_content_json_representation_round_trips(self) -> None:
         """The JSON template for a Date input parses back into a DateContent."""
-        from pipelex.core.stuffs.date_content import DateContent  # noqa: PLC0415
+        from pipelex.core.stuffs.date_content import DateContent  # ruff: ignore[import-outside-top-level]
 
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
         result = generator.generate_representation("native.Date", structure_class=DateContent, include_optional=False)
@@ -657,7 +657,7 @@ class TestDateContentRepresentation:
 
     def test_date_content_python_representation_has_no_placeholder(self) -> None:
         """The Python template for a Date input carries no 'date_date' placeholder."""
-        from pipelex.core.stuffs.date_content import DateContent  # noqa: PLC0415
+        from pipelex.core.stuffs.date_content import DateContent  # ruff: ignore[import-outside-top-level]
 
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
         result = generator.generate_representation("native.Date", structure_class=DateContent, include_optional=False)

@@ -6,7 +6,7 @@ with OpenTelemetry, following the GenAI semantic conventions.
 
 from enum import StrEnum
 
-from opentelemetry.semconv._incubating.attributes import gen_ai_attributes as otel_gen_ai_attributes  # noqa: PLC2701
+from opentelemetry.semconv._incubating.attributes import gen_ai_attributes as otel_gen_ai_attributes  # ruff: ignore[import-private-name]
 
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 

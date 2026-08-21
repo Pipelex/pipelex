@@ -108,7 +108,7 @@ class NdjsonEventLog(EventLogProtocol):
                     run_dir = self._traces_dir / event.pipeline_run_id
                     run_dir.mkdir(parents=True, exist_ok=True)
                     file_path = run_dir / self._file_name_for(event.workflow_id, writer_id=event.writer_id)
-                    handle = open(file_path, "a", encoding="utf-8")  # noqa: SIM115
+                    handle = open(file_path, "a", encoding="utf-8")  # ruff: ignore[open-file-with-context-handler]
                     self._file_handles[cache_key] = handle
 
         handle.write(event.model_dump_json() + "\n")
@@ -186,6 +186,6 @@ class NdjsonEventLog(EventLogProtocol):
     def __del__(self) -> None:
         try:
             self.close()
-        except Exception:  # noqa: BLE001, S110
+        except Exception:  # ruff: ignore[blind-except, try-except-pass]
             # Safety net during interpreter shutdown — logging may not be available
             pass

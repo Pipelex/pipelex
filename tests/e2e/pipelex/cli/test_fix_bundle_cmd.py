@@ -7,7 +7,7 @@ boot, the fix loop, human rendering, and exit codes.
 
 from __future__ import annotations
 
-import subprocess  # noqa: S404 - invokes the real pipelex binary for E2E coverage
+import subprocess  # ruff: ignore[suspicious-subprocess-import] - invokes the real pipelex binary for E2E coverage
 from typing import TYPE_CHECKING
 
 import pytest
@@ -55,7 +55,7 @@ prompt = "Say hi to $name"
 
 
 def _run_fix_bundle(bundle_path: Path, *, env: dict[str, str], cwd: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(  # noqa: S603
+    return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
         [
             str(PIPELEX_BIN),
             "--no-logo",

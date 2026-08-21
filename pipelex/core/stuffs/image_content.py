@@ -81,7 +81,7 @@ class ImageContent(StuffContent):
         self,
         *,
         registry: ImageRegistry,
-        text_format: TextFormat,  # noqa: ARG002
+        text_format: TextFormat,  # ruff: ignore[unused-method-argument]
     ) -> str:
         """Register this image and return a token."""
         image_index = registry.register_image(self)

@@ -112,7 +112,7 @@ class TestAnthropicWorkerObjectErrorHandling:
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
         assert exc_info.value.user_action is not None
@@ -133,7 +133,7 @@ class TestAnthropicWorkerObjectErrorHandling:
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CAPACITY
         assert exc_info.value.user_action is not None
@@ -151,7 +151,7 @@ class TestAnthropicWorkerObjectErrorHandling:
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
 
@@ -163,7 +163,7 @@ class TestAnthropicWorkerObjectErrorHandling:
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONTENT
         assert exc_info.value.user_action is not None
@@ -181,7 +181,7 @@ class TestAnthropicWorkerObjectErrorHandling:
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
 
@@ -192,7 +192,7 @@ class TestAnthropicWorkerObjectErrorHandling:
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
         assert exc_info.value.user_action is not None
@@ -205,7 +205,7 @@ class TestAnthropicWorkerObjectErrorHandling:
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CAPACITY
         assert exc_info.value.user_action is not None
@@ -219,7 +219,7 @@ class TestAnthropicWorkerObjectErrorHandling:
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
         assert exc_info.value.user_action is not None
@@ -237,7 +237,7 @@ class TestAnthropicWorkerObjectErrorHandling:
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
         assert exc_info.value.user_action is not None
@@ -255,7 +255,7 @@ class TestAnthropicWorkerObjectErrorHandling:
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMModelNotFoundError) as exc_info:
-            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
         assert exc_info.value.user_action is not None
@@ -274,7 +274,7 @@ class TestAnthropicWorkerObjectErrorHandling:
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.UNKNOWN
         assert exc_info.value.__cause__ is wrapped
@@ -290,7 +290,7 @@ class TestAnthropicWorkerObjectErrorHandling:
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         report = exc_info.value.to_error_report()
         report_dict = report.to_dict()
@@ -312,7 +312,7 @@ class TestAnthropicWorkerObjectErrorHandling:
         transport error and does NOT wrap it in ``InstructorRetryException``. It propagates as
         the raw SDK exception, which the worker's ``except`` clause classifies as TRANSIENT.
         """
-        import instructor  # noqa: PLC0415  # imported here to mirror runtime usage
+        import instructor  # ruff: ignore[import-outside-top-level]  # imported here to mirror runtime usage
 
         _patch_gen_object_dependencies(mocker)
         worker = _make_worker(mocker)
@@ -323,7 +323,7 @@ class TestAnthropicWorkerObjectErrorHandling:
         worker.instructor_for_objects = instructor.from_anthropic(anthropic_client)
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
         # The raw SDK exception propagates and chains directly — instructor no longer wraps it.
@@ -353,7 +353,7 @@ class TestAnthropicWorkerObjectErrorHandling:
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.__cause__ is sdk_exc

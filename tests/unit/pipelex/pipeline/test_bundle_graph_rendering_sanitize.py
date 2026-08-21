@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pipelex.pipeline.bundle_graph_rendering import (
-    _sanitize_graph_name,  # noqa: PLC2701 # pyright: ignore[reportPrivateUsage]
+    _sanitize_graph_name,  # pyright: ignore[reportPrivateUsage]
 )
 
 

@@ -10,8 +10,10 @@ import json
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
-from pipelex.cli.agent_cli.commands.run._output_helpers import format_run_markdown  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
-from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+from pipelex.cli.agent_cli.commands.run._output_helpers import (
+    format_run_markdown,  # pyright: ignore[reportPrivateUsage]
+)
+from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core  # pyright: ignore[reportPrivateUsage]
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 

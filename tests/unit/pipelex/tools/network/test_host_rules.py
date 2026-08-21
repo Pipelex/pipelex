@@ -17,7 +17,7 @@ class TestHostRules:
             ("198.18.0.1", True),  # benchmarking range
             ("224.0.0.1", True),  # multicast (is_global=True, caught explicitly)
             ("64:ff9b::1.2.3.4", True),  # NAT64 well-known prefix (is_global=True, is_reserved)
-            ("0.0.0.0", True),  # noqa: S104 # unspecified address — asserting it is disallowed
+            ("0.0.0.0", True),  # ruff: ignore[hardcoded-bind-all-interfaces] # unspecified address — asserting it is disallowed
             ("::1", True),  # IPv6 loopback
             ("fe80::1", True),  # IPv6 link-local
             ("8.8.8.8", False),  # public

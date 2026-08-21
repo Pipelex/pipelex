@@ -16,9 +16,9 @@ def _make_blackboxai_img_gen_worker(
     sdk_clients: SdkClientRegistry,
     reporting_delegate: ReportingProtocol | None,
 ) -> InferenceWorkerAbstract:
-    from pipelex.providers.blackboxai.blackboxai_completions_factory import BlackboxaiCompletionsFactory  # noqa: PLC0415
-    from pipelex.providers.openai.openai_client_factory import OpenAIClientFactory  # noqa: PLC0415
-    from pipelex.providers.openai.openai_completions_img_gen_worker import OpenAICompletionsImgGenWorker  # noqa: PLC0415
+    from pipelex.providers.blackboxai.blackboxai_completions_factory import BlackboxaiCompletionsFactory  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.openai.openai_client_factory import OpenAIClientFactory  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.openai.openai_completions_img_gen_worker import OpenAICompletionsImgGenWorker  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     sdk_instance = sdk_clients.get_or_create(

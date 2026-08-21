@@ -1008,10 +1008,10 @@ class Question(TextContent):
         assert generated_code == expected_code
 
         # Verify the generated class is valid
-        from pipelex.core.stuffs.text_content import TextContent  # noqa: PLC0415
+        from pipelex.core.stuffs.text_content import TextContent  # ruff: ignore[import-outside-top-level]
 
         assert issubclass(generated_class, TextContent)
-        from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
+        from pipelex.core.stuffs.stuff_content import StuffContent  # ruff: ignore[import-outside-top-level]
 
         assert issubclass(generated_class, StuffContent)
 
@@ -1071,10 +1071,10 @@ class TableScreenshot(ImageContent):
         assert generated_code == expected_code
 
         # Verify the generated class is valid
-        from pipelex.core.stuffs.image_content import ImageContent  # noqa: PLC0415
+        from pipelex.core.stuffs.image_content import ImageContent  # ruff: ignore[import-outside-top-level]
 
         assert issubclass(generated_class, ImageContent)
-        from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
+        from pipelex.core.stuffs.stuff_content import StuffContent  # ruff: ignore[import-outside-top-level]
 
         assert issubclass(generated_class, StuffContent)
 
@@ -1124,10 +1124,10 @@ class Temperature(NumberContent):
         assert generated_code == expected_code
 
         # Verify the generated class is valid
-        from pipelex.core.stuffs.number_content import NumberContent  # noqa: PLC0415
+        from pipelex.core.stuffs.number_content import NumberContent  # ruff: ignore[import-outside-top-level]
 
         assert issubclass(generated_class, NumberContent)
-        from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
+        from pipelex.core.stuffs.stuff_content import StuffContent  # ruff: ignore[import-outside-top-level]
 
         assert issubclass(generated_class, StuffContent)
 
@@ -1177,10 +1177,10 @@ class ConfigData(JSONContent):
         assert generated_code == expected_code
 
         # Verify the generated class is valid
-        from pipelex.core.stuffs.json_content import JSONContent  # noqa: PLC0415
+        from pipelex.core.stuffs.json_content import JSONContent  # ruff: ignore[import-outside-top-level]
 
         assert issubclass(generated_class, JSONContent)
-        from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
+        from pipelex.core.stuffs.stuff_content import StuffContent  # ruff: ignore[import-outside-top-level]
 
         assert issubclass(generated_class, StuffContent)
 
@@ -1223,10 +1223,10 @@ class EnhancedText(TextContent):
         assert generated_code == expected_code
 
         # Verify the generated class is valid
-        from pipelex.core.stuffs.text_content import TextContent  # noqa: PLC0415
+        from pipelex.core.stuffs.text_content import TextContent  # ruff: ignore[import-outside-top-level]
 
         assert issubclass(generated_class, TextContent)
-        from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
+        from pipelex.core.stuffs.stuff_content import StuffContent  # ruff: ignore[import-outside-top-level]
 
         assert issubclass(generated_class, StuffContent)
 
@@ -1280,16 +1280,16 @@ class Invoice(DocumentContent):
         assert generated_code == expected_code
 
         # Verify the generated class is valid
-        from pipelex.core.stuffs.document_content import DocumentContent  # noqa: PLC0415
+        from pipelex.core.stuffs.document_content import DocumentContent  # ruff: ignore[import-outside-top-level]
 
         assert issubclass(generated_class, DocumentContent)
-        from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
+        from pipelex.core.stuffs.stuff_content import StuffContent  # ruff: ignore[import-outside-top-level]
 
         assert issubclass(generated_class, StuffContent)
 
     def test_multiple_inheritance_scenarios(self):
         """Test multiple classes with different inheritance scenarios."""
-        from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
+        from pipelex.core.stuffs.stuff_content import StuffContent  # ruff: ignore[import-outside-top-level]
 
         test_cases = [
             ("TextContent", "text_content", "Question", {"source": "The source of the question"}),

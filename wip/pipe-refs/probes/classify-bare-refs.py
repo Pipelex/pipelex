@@ -1,4 +1,4 @@
-# ruff: noqa: INP001 - a standalone probe script, deliberately not a package
+# ruff: file-ignore[implicit-namespace-package] - a standalone probe script, deliberately not a package
 """Classify every bare in-body reference in a corpus of `.mthds` bundles.
 
 Reads TOML and nothing else — no `pipelex` import, no library load — so the classification is a

@@ -465,7 +465,7 @@ def check_backend_credentials(*, config_dir: Path | None = None) -> tuple[bool, 
         backends_with_issues = sum(1 for r in backend_reports.values() if not r.all_credentials_valid)
         return False, backend_reports, f"{backends_with_issues} backend(s) have missing or invalid credentials"
 
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         # Doctor probe: the credential scan spans TOML load, env lookups and placeholder checks; any failure is reported as a finding.
         return False, {}, f"Error checking backend credentials: {exc}"
 
@@ -488,7 +488,7 @@ def check_kit_template_exists(backend_name: str) -> bool:
 
         # For Traversable, we check if it's a file
         return backend_file.is_file()
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Doctor probe: kit-template existence is a best-effort bool check; any lookup failure means "no template".
         return False
 
@@ -530,7 +530,7 @@ def replace_backend_file(backend_name: str, *, dry_run: bool = False, config_dir
         target_file.write_text(template_content, encoding="utf-8")
         return True
 
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Doctor --fix helper: the kit-template copy is best-effort; any failure means "could not replace" (returns False).
         return False
 
@@ -611,7 +611,7 @@ def check_backend_files(*, config_dir: Path | None = None) -> tuple[bool, dict[s
                 is_valid = False
                 error_message = error_str
                 all_valid = False
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # ruff: ignore[blind-except]
             # Doctor probe: a backend load can fail in many ways; any error naming this backend is recorded as its validation failure.
             error_str = str(exc)
             if backend_name in error_str or backend_file_path in error_str:
@@ -1165,7 +1165,7 @@ def doctor_cmd(
     try:
         do_doctor_cmd(fix=fix)
 
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         # Handle unexpected errors gracefully without printing traces
         console.print()
         console.print(f"[red]✗ Unexpected error: {escape(str(exc))}[/red]")
@@ -1295,7 +1295,7 @@ def do_doctor_cmd(
                     console.print()
                     init_cmd(focus=InitFocus.CONFIG, skip_confirmation=True)
                     console.print("[green]✓[/green] Configuration files installed")
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:  # ruff: ignore[blind-except]
                     # Doctor --fix handler: wraps the whole init_cmd sub-command; a fix failure is reported and the doctor run continues.
                     console.print(f"[red]Failed to install configuration files: {escape(str(exc))}[/red]")
                 console.print()
@@ -1314,7 +1314,7 @@ def do_doctor_cmd(
                     # The rows below were measured before this ran, so a file this just repaired can
                     # still be reported as broken further down.
                     console.print("[dim]Re-run[/dim] [cyan]pipelex doctor[/cyan] [dim]for an updated report.[/dim]")
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:  # ruff: ignore[blind-except]
                     # Doctor --fix handler: wraps the whole migration pass; a fix failure is reported and the doctor run continues.
                     console.print(f"[red]Failed to migrate configuration files: {escape(str(exc))}[/red]")
                 console.print()
@@ -1326,7 +1326,7 @@ def do_doctor_cmd(
                     console.print()
                     init_cmd(focus=InitFocus.TELEMETRY, skip_confirmation=True)
                     console.print("[green]✓[/green] Telemetry configured")
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:  # ruff: ignore[blind-except]
                     # Doctor --fix handler: wraps the whole init_cmd sub-command; a fix failure is reported and the doctor run continues.
                     console.print(f"[red]Failed to configure telemetry: {escape(str(exc))}[/red]")
                 console.print()
@@ -1338,7 +1338,7 @@ def do_doctor_cmd(
                     console.print()
                     update_cmd(yes=True)
                     console.print("[green]✓[/green] Model deck updated")
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:  # ruff: ignore[blind-except]
                     # Doctor --fix handler: wraps the whole update_cmd sub-command; a fix failure is reported and the doctor run continues.
                     console.print(f"[red]Failed to update deck: {escape(str(exc))}[/red]")
                 console.print()
@@ -1365,7 +1365,7 @@ def do_doctor_cmd(
                             console.print(f"[green]✓[/green] Replaced {escape(backend_name)} backend configuration")
                         else:
                             console.print(f"[red]Failed to replace {escape(backend_name)}: Template not found or copy failed[/red]")
-                    except Exception as exc:  # noqa: BLE001
+                    except Exception as exc:  # ruff: ignore[blind-except]
                         # Doctor --fix handler: wraps replace_backend_file; a fix failure is reported and the doctor run continues.
                         console.print(f"[red]Failed to replace {escape(backend_name)}: {escape(str(exc))}[/red]")
                     console.print()

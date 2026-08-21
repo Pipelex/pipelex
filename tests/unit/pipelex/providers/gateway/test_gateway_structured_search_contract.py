@@ -86,7 +86,7 @@ class TestGatewayStructuredSearchContract:
         content = json.dumps({"data": payload, "sources": [{"name": "src", "url": "https://example.com", "snippet": "…"}]})
         worker = _make_worker(mocker, content=content)
 
-        result = await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        result = await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert result == payload
         # The payload validates against the caller's output structure class — the envelope never could.
@@ -102,7 +102,7 @@ class TestGatewayStructuredSearchContract:
         payload = {"title": "pipelex", "summary": "a language"}
         worker = _make_worker(mocker, content=json.dumps(payload))
 
-        result = await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        result = await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert result == payload
 
@@ -111,7 +111,7 @@ class TestGatewayStructuredSearchContract:
         payload = {"data": {"nested": "value"}, "sources": ["a"]}
         worker = _make_worker(mocker, content=json.dumps(payload))
 
-        result = await worker._search_structured(search_job=_make_search_job(mocker), schema=DataAndSources)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        result = await worker._search_structured(search_job=_make_search_job(mocker), schema=DataAndSources)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert result == payload, "the caller's own {data, sources} output is its payload, not an envelope around one"
 
@@ -127,7 +127,7 @@ class TestGatewayStructuredSearchContract:
         payload = {"data": {"nested": "value"}, "sources": ["a"]}
         worker = _make_worker(mocker, content=json.dumps(payload))
 
-        result = await worker._search_structured(search_job=_make_search_job(mocker), schema=AliasedDataAndSources)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        result = await worker._search_structured(search_job=_make_search_job(mocker), schema=AliasedDataAndSources)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert result == payload, "an aliased {data, sources} output class owns those names as much as one that spells them out"
         assert AliasedDataAndSources.model_validate(result).body == {"nested": "value"}
@@ -143,7 +143,7 @@ class TestGatewayStructuredSearchContract:
         content = json.dumps({"data": payload, "sources": [{"name": "src", "url": "https://example.com", "snippet": "…"}]})
         worker = _make_worker(mocker, content=content)
 
-        result = await worker._search_structured(search_job=_make_search_job(mocker), schema=SerializationAliasedTopicSummary)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        result = await worker._search_structured(search_job=_make_search_job(mocker), schema=SerializationAliasedTopicSummary)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert result == payload
 
@@ -152,18 +152,18 @@ class TestGatewayStructuredSearchContract:
         worker = _make_worker(mocker, content=json.dumps({"data": None, "sources": []}))
 
         with pytest.raises(GatewaySearchEmptyResultError, match="empty structured result"):
-            await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     async def test_a_non_object_response_raises_a_classified_search_error(self, mocker: MockerFixture) -> None:
         """A response that is not a JSON object at all is malformed, and says so."""
         worker = _make_worker(mocker, content=json.dumps(["not", "an", "object"]))
 
         with pytest.raises(GatewaySearchResponseError, match="non-object payload"):
-            await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     async def test_a_non_json_body_raises_a_classified_search_error(self, mocker: MockerFixture) -> None:
         """The likeliest way the relay contract breaks must not escape as a bare JSONDecodeError."""
         worker = _make_worker(mocker, content="<html>502 Bad Gateway</html>")
 
         with pytest.raises(GatewaySearchResponseError, match="not valid JSON"):
-            await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]

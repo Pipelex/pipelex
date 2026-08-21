@@ -12,7 +12,7 @@ class TestPipeImgGenBlueprintConversion:
     )
     def test_pipe_img_gen_spec_to_blueprint(
         self,
-        test_name: str,  # noqa: ARG002
+        test_name: str,  # ruff: ignore[unused-method-argument]
         pipe_spec: PipeImgGenSpec,
         expected_blueprint: PipeImgGenBlueprint,
     ):

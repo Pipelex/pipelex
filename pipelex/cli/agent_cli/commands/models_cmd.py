@@ -50,7 +50,7 @@ def agent_models_cmd(
         # broad catch below and printed a second envelope after the first — stderr then held two
         # JSON documents and a machine consumer parsing it got "Extra data".
         raise
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
         agent_error(f"Failed to list models: {exc}", error_type=type(exc).__name__, cause=exc)
     finally:

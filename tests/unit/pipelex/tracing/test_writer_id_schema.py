@@ -187,12 +187,12 @@ class TestWriterIdSchema:
         captured_items: list[dict[str, Any]] = []
 
         class _StubTable:
-            def put_item(self, *, Item: dict[str, Any]) -> None:  # noqa: N803  # boto3 kwarg name
+            def put_item(self, *, Item: dict[str, Any]) -> None:  # ruff: ignore[invalid-argument-name]  # boto3 kwarg name
                 captured_items.append(Item)
 
         class _StubResource:
             @staticmethod
-            def Table(_name: str) -> _StubTable:  # noqa: N802  # boto3 method name
+            def Table(_name: str) -> _StubTable:  # ruff: ignore[invalid-function-name]  # boto3 method name
                 return _StubTable()
 
         mocker.patch(

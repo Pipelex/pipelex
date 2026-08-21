@@ -9,7 +9,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.cli.dev_cli.commands.refresh_graph_ui_sri_cmd import (
-    _validate_sri,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+    _validate_sri,  # pyright: ignore[reportPrivateUsage]
     refresh_graph_ui_sri_cmd,
 )
 from pipelex.cli.exceptions import PipelexCLIError
@@ -31,7 +31,7 @@ class TestRefreshGraphUiSri:
             "https://cdn.jsdelivr.net/npm/elkjs@9.9.9/lib/elk.bundled.js": self._ELKJS_BYTES,
         }
 
-        def fake_urlopen(url: str, timeout: float = 30.0):  # noqa: ARG001
+        def fake_urlopen(url: str, timeout: float = 30.0):  # ruff: ignore[unused-function-argument]
             return io.BytesIO(payloads[url])
 
         mocker.patch("pipelex.cli.dev_cli.commands.refresh_graph_ui_sri_cmd.urlopen", side_effect=fake_urlopen)

@@ -71,7 +71,7 @@ class TestAzureImgGenWorkerEditRouting:
         worker = _make_worker(mocker)
         mock_client = _patch_httpx_success(mocker, args_dict={"quality": "medium", "image": [_PNG_FILE_TUPLE]})
 
-        await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         call_args = mock_client.post.call_args
         assert call_args.args[0] == "https://test.azure.com/openai/deployments/gpt-image-1/images/edits?api-version=2025-04-01-preview"
@@ -83,7 +83,7 @@ class TestAzureImgGenWorkerEditRouting:
         worker = _make_worker(mocker)
         mock_client = _patch_httpx_success(mocker, args_dict={"image": [_PNG_FILE_TUPLE, _PNG_FILE_TUPLE_2]})
 
-        await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         files = mock_client.post.call_args.kwargs["files"]
         assert files == [("image[]", _PNG_FILE_TUPLE), ("image[]", _PNG_FILE_TUPLE_2)]
@@ -92,7 +92,7 @@ class TestAzureImgGenWorkerEditRouting:
         worker = _make_worker(mocker)
         mock_client = _patch_httpx_success(mocker, args_dict={"quality": "medium"})
 
-        await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         call_args = mock_client.post.call_args
         assert call_args.args[0] == "https://test.azure.com/openai/deployments/gpt-image-1/images/generations?api-version=2025-04-01-preview"

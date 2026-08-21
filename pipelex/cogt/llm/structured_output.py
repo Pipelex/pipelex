@@ -48,7 +48,7 @@ class StructureMethod(StrEnum):
     INSTRUCTOR_OPENROUTER_STRUCTURED_OUTPUTS = "instructor/openrouter_structured_outputs"
 
     def as_instructor_mode(self) -> "InstructorMode":
-        from instructor import Mode as InstructorMode  # noqa: PLC0415
+        from instructor import Mode as InstructorMode  # ruff: ignore[import-outside-top-level]
 
         match self:
             # generic

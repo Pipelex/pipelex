@@ -91,7 +91,7 @@ class TestGatewaySearchWorkerSemantic:
         )
 
         with pytest.raises(SearchJobFailureError) as exc_info:
-            await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.user_action is not None
@@ -115,7 +115,7 @@ class TestGatewaySearchWorkerSemantic:
         )
 
         with pytest.raises(SearchModelNotFoundError) as exc_info:
-            await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
         assert exc_info.value.user_action is not None

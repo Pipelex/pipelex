@@ -14,7 +14,7 @@ legitimate refresh instead of a partial overwrite.
 
 from __future__ import annotations
 
-import subprocess  # noqa: S404
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
 from pathlib import Path
 
@@ -54,7 +54,7 @@ def _collect_node_ids(*, markers: str) -> list[str]:
     """
     # S603: the argv is built here from this interpreter's path and constants; `markers` comes from the
     # Makefile, and this is a developer-only command that already runs the test suite it is measuring.
-    completed = subprocess.run(  # noqa: S603
+    completed = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
         _pytest_command(extra=["--collect-only", "-q", "-p", "no:cacheprovider", "-m", markers]),
         capture_output=True,
         text=True,
@@ -92,7 +92,7 @@ def _run_and_store(*, markers: str, node_ids: list[str] | None) -> int:
     ]
     if node_ids is not None:
         extra.extend(node_ids)
-    return subprocess.run(_pytest_command(extra=extra), check=False).returncode  # noqa: S603
+    return subprocess.run(_pytest_command(extra=extra), check=False).returncode  # ruff: ignore[subprocess-without-shell-equals-true]
 
 
 def store_test_durations_cmd(*, markers: str, force: bool = False, quiet: bool = False) -> None:

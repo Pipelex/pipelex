@@ -184,7 +184,7 @@ class TestReportingEventEmission:
         manager.report_inference_job(_make_test_llm_job("direct_run", trace_context=None))
 
         manager.teardown()
-        assert len(manager._event_log_contexts) == 0  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        assert len(manager._event_log_contexts) == 0  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     # ------------------------------------------------------------------
     # Per-context isolation regression tests
@@ -289,7 +289,7 @@ class TestReportingEventEmission:
         """teardown() removes all event log contexts."""
         manager, _event_log = self._make_reporting_manager_with_event_log()
         manager.teardown()
-        assert len(manager._event_log_contexts) == 0  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        assert len(manager._event_log_contexts) == 0  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     def test_sequence_counters_are_independent(self) -> None:
         """Each context maintains its own monotonic sequence counter."""
@@ -333,4 +333,4 @@ class TestReportingEventEmission:
         manager.report_inference_job(llm_job)
 
         # No event log was ever set; no event should have been emitted anywhere.
-        assert len(manager._event_log_contexts) == 0  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        assert len(manager._event_log_contexts) == 0  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]

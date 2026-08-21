@@ -72,7 +72,7 @@ class TestDependencyRefQualification:
             mthds_files.append(mthds_file)
 
         manager = LibraryManager()
-        manager._load_single_dependency(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             library=library,
             resolved_dep=ResolvedDependency(
                 alias="charts_dep",

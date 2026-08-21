@@ -11,7 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.cli.commands.build.runner._runner_core import _prepare_runner_core  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+from pipelex.cli.commands.build.runner._runner_core import (
+    _prepare_runner_core,  # pyright: ignore[reportPrivateUsage]
+)
 from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager
 

@@ -119,7 +119,7 @@ The router is selected during `Pipelex.setup()` by resolving the hub's `PIPE_ROU
 # boot_orchestrator == its own name; otherwise this default runs.
 effective_pipe_router = self._resolve_hub_slot(
     slot=HubSlot.PIPE_ROUTER,
-    default=lambda: PipeRouter(observer=multi_observer),   # Direct, in-process
+    default=lambda: PipeRouter(observer=multi_observer),  # Direct, in-process
 )
 ```
 

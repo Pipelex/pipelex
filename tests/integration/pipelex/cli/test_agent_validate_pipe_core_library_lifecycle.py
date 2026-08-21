@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.cli.agent_cli.commands.validate._validate_core import validate_pipe_core  # noqa: PLC2701
+from pipelex.cli.agent_cli.commands.validate._validate_core import validate_pipe_core
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 

@@ -8,7 +8,7 @@ report, `ack` runs verify commands then records the review.
 from __future__ import annotations
 
 import shlex
-import subprocess  # noqa: S404
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Annotated
@@ -175,7 +175,7 @@ def _run_verify_commands(commands: Sequence[str], *, repo_root: Path, console: C
             raise DriftAckError(msg)
         console.print(f"  Running verify command: [cyan]{escape(command)}[/cyan]")
         try:
-            result = subprocess.run(  # noqa: S603
+            result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
                 argv,
                 cwd=repo_root,
                 capture_output=True,

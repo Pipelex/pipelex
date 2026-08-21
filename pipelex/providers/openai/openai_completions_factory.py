@@ -30,7 +30,7 @@ class OpenAICompletionsFactory(BackendExtrasFactory):
     ) -> 'list["ChatCompletionMessageParam"]':
         """Makes a list of messages with a system message (if provided) and followed by a user message."""
         # Deferred imports: avoid pulling heavy SDK at module-load time
-        from openai.types.chat import (  # noqa: PLC0415
+        from openai.types.chat import (  # ruff: ignore[import-outside-top-level]
             ChatCompletionContentPartImageParam,
             ChatCompletionContentPartParam,
             ChatCompletionContentPartTextParam,
@@ -38,8 +38,10 @@ class OpenAICompletionsFactory(BackendExtrasFactory):
             ChatCompletionSystemMessageParam,
             ChatCompletionUserMessageParam,
         )
-        from openai.types.chat.chat_completion_content_part_image_param import ImageURL as OpenAIImageURL  # noqa: PLC0415
-        from openai.types.chat.chat_completion_content_part_param import File as ChatCompletionContentPartFileParam  # noqa: PLC0415
+        from openai.types.chat.chat_completion_content_part_image_param import ImageURL as OpenAIImageURL  # ruff: ignore[import-outside-top-level]
+        from openai.types.chat.chat_completion_content_part_param import (  # ruff: ignore[import-outside-top-level]
+            File as ChatCompletionContentPartFileParam,
+        )
 
         llm_prompt = llm_job.llm_prompt
         messages: list[ChatCompletionMessageParam] = []

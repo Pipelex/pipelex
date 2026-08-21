@@ -291,10 +291,10 @@ TraceContext is a serializable context that flows through pipe execution:
 
 ```python
 class TraceContext(BaseModel):
-    graph_id: str                           # Unique graph identifier
-    parent_node_id: str | None              # Parent pipe's node ID
-    node_sequence: int                      # Counter for generating node IDs
-    data_inclusion: DataInclusionConfig     # What data to capture
+    graph_id: str  # Unique graph identifier
+    parent_node_id: str | None  # Parent pipe's node ID
+    node_sequence: int  # Counter for generating node IDs
+    data_inclusion: DataInclusionConfig  # What data to capture
 
     def copy_for_child(self, child_node_id: str, *, next_sequence: int) -> TraceContext:
         """Create context for nested pipe execution."""
@@ -467,16 +467,16 @@ IOSpec captures input/output data for nodes:
 
 ```python
 class IOSpec(BaseModel):
-    name: str                    # Variable name
-    concept: str | None          # Concept code
-    content_type: str | None     # MIME type
-    preview: str | None          # Truncated preview (max 200 chars)
-    size: int | None             # Content size
-    digest: str | None           # Unique identifier for data flow
+    name: str  # Variable name
+    concept: str | None  # Concept code
+    content_type: str | None  # MIME type
+    preview: str | None  # Truncated preview (max 200 chars)
+    size: int | None  # Content size
+    digest: str | None  # Unique identifier for data flow
     data: str | dict[str, Any] | list[str] | list[dict[str, Any]] | None  # Full serialized content
-    data_text: str | None        # ASCII text representation
-    data_html: str | None        # HTML representation
-    extra: dict[str, Any]        # Extra markers, e.g. `optional` set on a declared-optional (`?`) output
+    data_text: str | None  # ASCII text representation
+    data_html: str | None  # HTML representation
+    extra: dict[str, Any]  # Extra markers, e.g. `optional` set on a declared-optional (`?`) output
 ```
 
 !!! warning "Preview Truncation"

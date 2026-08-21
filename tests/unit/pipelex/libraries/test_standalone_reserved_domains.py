@@ -40,7 +40,7 @@ class TestStandaloneReservedDomains:
 
         manager = LibraryManager()
         with pytest.raises(LibraryLoadingError, match="Reserved domain violations"):
-            manager._check_package_visibility(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            manager._check_package_visibility(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
                 blueprints=[blueprint],
                 mthds_paths=[dummy_path],
             )
@@ -62,7 +62,7 @@ class TestStandaloneReservedDomains:
         dummy_path.touch()
 
         manager = LibraryManager()
-        result = manager._check_package_visibility(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        result = manager._check_package_visibility(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             blueprints=[blueprint],
             mthds_paths=[dummy_path],
         )
@@ -98,7 +98,7 @@ class TestStandaloneReservedDomains:
 
         manager = LibraryManager()
         with pytest.raises(LibraryLoadingError, match="Reserved domain violations"):
-            manager._check_package_visibility(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            manager._check_package_visibility(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
                 blueprints=[blueprint],
                 mthds_paths=[dummy_path],
             )
@@ -123,7 +123,7 @@ class TestStandaloneReservedDomains:
         dummy_path.touch()
 
         manager = LibraryManager()
-        result = manager._check_package_visibility(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        result = manager._check_package_visibility(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             blueprints=[blueprint],
             mthds_paths=[dummy_path],
         )

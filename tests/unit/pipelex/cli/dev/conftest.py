@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import subprocess  # noqa: S404
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 from typing import TYPE_CHECKING
 
 import pytest
@@ -21,8 +21,8 @@ class GitRepo:
         self.root = root
 
     def git(self, *args: str) -> str:
-        result = subprocess.run(  # noqa: S603
-            ["git", *args],  # noqa: S607
+        result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
+            ["git", *args],  # ruff: ignore[start-process-with-partial-path]
             cwd=self.root,
             capture_output=True,
             text=True,

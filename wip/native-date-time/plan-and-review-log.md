@@ -19,8 +19,8 @@ Repro (no network):
 ```python
 DateContent.model_validate_json('{"date": "2025-03-12", "time": "14:00:00+00:00"}', strict=True)
 # 2 validation errors: date_type on 'date', time_type on 'time' — identical to the live-run failure
-TimeContent.model_validate_json('{"time": "14:00:00+00:00"}', strict=True)   # time_type
-DateContent.model_validate({"date": "2025-03-12"})                            # lax: passes (the inputs.json path)
+TimeContent.model_validate_json('{"time": "14:00:00+00:00"}', strict=True)  # time_type
+DateContent.model_validate({"date": "2025-03-12"})  # lax: passes (the inputs.json path)
 ```
 
 ## Chosen fix — make the temporal natives validation-mode-proof (model-side, surgical)

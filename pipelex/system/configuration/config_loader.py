@@ -216,7 +216,7 @@ class ConfigLoader:
         if global_dir.is_dir():
             return
 
-        from pipelex.kit.paths import GIT_IGNORED_CONFIG_FILES, get_kit_configs_dir  # noqa: PLC0415
+        from pipelex.kit.paths import GIT_IGNORED_CONFIG_FILES, get_kit_configs_dir  # ruff: ignore[import-outside-top-level]
 
         config_template_dir = Path(str(get_kit_configs_dir()))
         global_dir.mkdir(parents=True, exist_ok=True)
@@ -237,7 +237,7 @@ class ConfigLoader:
 
         # Stamp the deck manifest so the boot-time staleness check has a baseline.
         # Imported lazily to avoid a circular import — config_loader is loaded very early.
-        from pipelex.cogt.models.deck_manifest import compute_kit_manifest, write_manifest  # noqa: PLC0415
+        from pipelex.cogt.models.deck_manifest import compute_kit_manifest, write_manifest  # ruff: ignore[import-outside-top-level]
 
         write_manifest(compute_kit_manifest(), deck_dir=global_dir / "inference" / "deck")
 

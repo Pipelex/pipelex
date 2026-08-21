@@ -36,9 +36,9 @@ def list_bedrock_models(
             msg,
         )
 
-    from botocore.exceptions import BotoCoreError, ClientError  # noqa: PLC0415 - optional dependency, lazy import
+    from botocore.exceptions import BotoCoreError, ClientError  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
 
-    from pipelex.providers.bedrock.bedrock_llms import bedrock_list_available_models  # noqa: PLC0415
+    from pipelex.providers.bedrock.bedrock_llms import bedrock_list_available_models  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle(sdk=sdk, backend=backend_name)
 

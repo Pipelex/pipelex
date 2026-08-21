@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import ast
 import re
-import subprocess  # noqa: S404
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
 import textwrap
 from pathlib import Path
@@ -176,7 +176,7 @@ _HUB_LAYERING_PAGE = _REPO_ROOT / "docs" / "contribute" / "hub-layering.md"
 def _run_closure(*, entry_point: str) -> subprocess.CompletedProcess[str]:
     """Import one entry point in a fresh interpreter and return the detector's verdict."""
     try:
-        return subprocess.run(  # noqa: S603
+        return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             [sys.executable, "-c", _CLOSURE_SCRIPT, entry_point, *INTERPRETER_PACKAGES],
             capture_output=True,
             text=True,

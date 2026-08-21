@@ -25,8 +25,8 @@ from pipelex.system.runtime import ProblemReaction
 
 # Both methods are private leaves of the membership resolver; aliasing them keeps the call
 # sites in the tests free of repeated noqa/ignore pragmas.
-_collect_deck_referenced_handles = ModelManager._collect_deck_referenced_handles  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
-_extract_choice_handle = ModelManager._extract_choice_handle  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+_collect_deck_referenced_handles = ModelManager._collect_deck_referenced_handles  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+_extract_choice_handle = ModelManager._extract_choice_handle  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
 
 def _make_deck(

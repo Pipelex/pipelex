@@ -52,20 +52,20 @@ def s3_mock(mocker: MockerFixture) -> dict[str, Any]:
     mock_exceptions.NoSuchBucket = type("NoSuchBucket", (Exception,), {})
     mock_exceptions.ClientError = type("ClientError", (Exception,), {})
 
-    def mock_get_object(Bucket: str, Key: str) -> dict[str, Any]:  # noqa: ARG001, N803
+    def mock_get_object(Bucket: str, Key: str) -> dict[str, Any]:  # ruff: ignore[unused-function-argument, invalid-argument-name]
         if Key not in mock_data_storage:
             msg = f"Key {Key} not found"
             raise mock_exceptions.NoSuchKey(msg)
         return {"Body": create_mock_stream(Key)}
 
-    def mock_put_object(Bucket: str, Key: str, Body: bytes, **kwargs: Any) -> dict[str, Any]:  # noqa: ARG001, N803
+    def mock_put_object(Bucket: str, Key: str, Body: bytes, **kwargs: Any) -> dict[str, Any]:  # ruff: ignore[unused-function-argument, invalid-argument-name]
         mock_data_storage[Key] = Body
         return {}
 
     def mock_generate_presigned_url(
-        method: str,  # noqa: ARG001
-        Params: dict[str, str],  # noqa: N803
-        ExpiresIn: int,  # noqa: ARG001, N803
+        method: str,  # ruff: ignore[unused-function-argument]
+        Params: dict[str, str],  # ruff: ignore[invalid-argument-name]
+        ExpiresIn: int,  # ruff: ignore[unused-function-argument, invalid-argument-name]
     ) -> str:
         key = Params.get("Key", "")
         return f"https://{S3_TEST_BUCKET}.s3.{S3_TEST_REGION}.amazonaws.com/{key}?X-Amz-Signature=mock"
@@ -103,7 +103,7 @@ def gcp_mock(tmp_path: Path, mocker: MockerFixture) -> dict[str, Any]:
     Creates a mock that simulates GCS behavior using an in-memory dict.
     """
     # Import the module first so it can be patched
-    from google.cloud import storage  # type: ignore[import-untyped]  # noqa: PLC0415
+    from google.cloud import storage  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level]
 
     # Create mock credentials file
     credentials_path = tmp_path / "gcp_credentials.json"
@@ -117,7 +117,7 @@ def gcp_mock(tmp_path: Path, mocker: MockerFixture) -> dict[str, Any]:
         blob: MockType = mocker.MagicMock()
         blob.exists.side_effect = lambda: key in mock_data_storage
         blob.download_as_bytes.side_effect = lambda: mock_data_storage[key]
-        blob.upload_from_string.side_effect = lambda data, content_type=None: mock_data_storage.__setitem__(key, data)  # noqa: ARG005  # pyright: ignore[reportUnknownLambdaType,reportUnknownArgumentType]
+        blob.upload_from_string.side_effect = lambda data, content_type=None: mock_data_storage.__setitem__(key, data)  # ruff: ignore[unused-lambda-argument]  # pyright: ignore[reportUnknownLambdaType,reportUnknownArgumentType]
         blob.generate_signed_url.return_value = f"https://storage.googleapis.com/{GCP_TEST_BUCKET}/{key}?signed=true"
         return blob
 

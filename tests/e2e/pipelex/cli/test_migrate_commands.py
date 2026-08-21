@@ -38,7 +38,7 @@ never reads it.
 from __future__ import annotations
 
 import json
-import subprocess  # noqa: S404 - invokes the real pipelex binaries for E2E coverage
+import subprocess  # ruff: ignore[suspicious-subprocess-import] - invokes the real pipelex binaries for E2E coverage
 from typing import TYPE_CHECKING, Any
 
 from pipelex.migration.backup import existing_backups_of
@@ -316,7 +316,7 @@ def _run(*, args: list[str], env: dict[str, str], cwd: Path, answers: str | None
     # `answers` feeds an interactive command's prompts. Every confirmation the doctor asks defaults
     # to yes, so a run of bare newlines accepts each one in turn without this having to know how
     # many there will be or what order they come in.
-    return subprocess.run(  # noqa: S603
+    return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
         args,
         env={**env, "COLUMNS": "400"},
         cwd=str(cwd),
@@ -409,7 +409,7 @@ class TestTheHumanMigrateCommand:
 
     def test_the_two_write_flags_contradict_each_other_and_are_refused(
         self,
-        hermetic_home: Path,  # noqa: ARG002 - the fixture is what makes HOME hermetic for the subprocess
+        hermetic_home: Path,  # ruff: ignore[unused-method-argument] - the fixture is what makes HOME hermetic for the subprocess
         offline_subprocess_env: dict[str, str],
     ) -> None:
         refused = _run(
@@ -478,7 +478,7 @@ class TestTheAgentMigrateLoop:
 
     def test_the_two_write_flags_contradict_each_other_and_are_refused(
         self,
-        hermetic_home: Path,  # noqa: ARG002 - the fixture is what makes HOME hermetic for the subprocess
+        hermetic_home: Path,  # ruff: ignore[unused-method-argument] - the fixture is what makes HOME hermetic for the subprocess
         offline_subprocess_env: dict[str, str],
     ) -> None:
         refused = _run(

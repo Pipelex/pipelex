@@ -28,7 +28,7 @@ def _make_linkup_extract_worker(mocker: MockerFixture) -> LinkupExtractWorker:
 
     mock_client = mocker.MagicMock()
     mock_client.async_fetch = mocker.AsyncMock()
-    setattr(worker, "_linkup_client", mock_client)  # noqa: B010
+    setattr(worker, "_linkup_client", mock_client)  # ruff: ignore[set-attr-with-constant]
 
     return worker
 
@@ -44,14 +44,14 @@ def _make_linkup_search_worker(mocker: MockerFixture) -> LinkupSearchWorker:
 
     mock_client = mocker.MagicMock()
     mock_client.async_search = mocker.AsyncMock()
-    setattr(worker, "_linkup_client", mock_client)  # noqa: B010
+    setattr(worker, "_linkup_client", mock_client)  # ruff: ignore[set-attr-with-constant]
 
     return worker
 
 
 def _get_linkup_client(worker: Any) -> Any:
     """Access the _linkup_client attribute via object.__getattribute__ to avoid linter complaints."""
-    return worker._linkup_client  # noqa: SLF001
+    return worker._linkup_client  # ruff: ignore[private-member-access]
 
 
 def _make_extract_job(mocker: MockerFixture) -> Any:
@@ -106,7 +106,7 @@ class TestLinkupWorkerErrorHandling:
         _get_linkup_client(worker).async_fetch.side_effect = sdk_exc
 
         with pytest.raises(ExtractJobFailureError) as exc_info:
-            await worker._extract_pages(extract_job=_make_extract_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._extract_pages(extract_job=_make_extract_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.__cause__ is sdk_exc
@@ -134,7 +134,7 @@ class TestLinkupWorkerErrorHandling:
         _get_linkup_client(worker).async_search.side_effect = sdk_exc
 
         with pytest.raises(SearchJobFailureError) as exc_info:
-            await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.__cause__ is sdk_exc
@@ -163,7 +163,7 @@ class TestLinkupWorkerErrorHandling:
         _get_linkup_client(worker).async_search.side_effect = sdk_exc
 
         with pytest.raises(SearchJobFailureError) as exc_info:
-            await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is expected_kind
@@ -177,7 +177,7 @@ class TestLinkupWorkerErrorHandling:
         _get_linkup_client(worker).async_fetch.side_effect = sdk_exc
 
         with pytest.raises(ExtractJobFailureError) as exc_info:
-            await worker._extract_pages(extract_job=_make_extract_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._extract_pages(extract_job=_make_extract_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         report = exc_info.value.to_error_report()
         assert report.error_category == "configuration"
@@ -191,7 +191,7 @@ class TestLinkupWorkerErrorHandling:
         _get_linkup_client(worker).async_search.side_effect = sdk_exc
 
         with pytest.raises(SearchJobFailureError) as exc_info:
-            await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         report = exc_info.value.to_error_report()
         assert report.error_category == "transient"
@@ -204,7 +204,7 @@ class TestLinkupWorkerErrorHandling:
         _get_linkup_client(worker).async_search.side_effect = sdk_exc
 
         with pytest.raises(SearchJobFailureError) as exc_info:
-            await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         report = exc_info.value.to_error_report()
         assert report.error_category == "content"
@@ -217,7 +217,7 @@ class TestLinkupWorkerErrorHandling:
         _get_linkup_client(worker).async_fetch.side_effect = sdk_exc
 
         with pytest.raises(ExtractJobFailureError) as exc_info:
-            await worker._extract_pages(extract_job=_make_extract_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._extract_pages(extract_job=_make_extract_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         report = exc_info.value.to_error_report()
         assert report.error_category == "content"

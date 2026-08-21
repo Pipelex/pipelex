@@ -12,7 +12,7 @@ class TestPipeFuncBlueprintConversion:
     )
     def test_pipe_func_spec_to_blueprint(
         self,
-        test_name: str,  # noqa: ARG002
+        test_name: str,  # ruff: ignore[unused-method-argument]
         pipe_spec: PipeFuncSpec,
         expected_blueprint: PipeFuncBlueprint,
     ):

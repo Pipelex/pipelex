@@ -16,7 +16,7 @@ whole-directory path: many bundles merged into one library, then dry-run togethe
 import shutil
 from pathlib import Path
 
-from pipelex.cli.commands.validate._validate_core import do_validate_all_libraries_and_dry_run  # noqa: PLC2701
+from pipelex.cli.commands.validate._validate_core import do_validate_all_libraries_and_dry_run
 from pipelex.test_extras.mthds_corpus.loader import iter_entries
 from pipelex.test_extras.mthds_corpus.manifest import EntryValidity
 

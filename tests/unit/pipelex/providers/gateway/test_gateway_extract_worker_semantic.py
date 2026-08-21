@@ -95,7 +95,7 @@ class TestGatewayExtractWorkerSemantic:
         )
 
         with pytest.raises(ExtractJobFailureError) as exc_info:
-            await worker._extract_web_fetch(extract_job=_make_extract_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._extract_web_fetch(extract_job=_make_extract_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.user_action is not None
@@ -123,7 +123,7 @@ class TestGatewayExtractWorkerSemantic:
         )
 
         with pytest.raises(ExtractModelNotFoundError) as exc_info:
-            await worker._extract_web_fetch(extract_job=_make_extract_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._extract_web_fetch(extract_job=_make_extract_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
         assert exc_info.value.user_action is not None
