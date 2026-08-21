@@ -6,6 +6,10 @@
 
 Author a probe bundle that exercises every construct the language accepts, capture what each hop of the emission chain does to every authored fact, and let the diff — not the code — say what survives to the wire.
 
+## The harness is a keeper, not a scratch script
+
+Decision (Louis, 2026-08-21): the capture harness is built as a durable internal tool, not throwaway scaffolding. It lands as a `pipelex-dev` command (home: `pipelex/cli/dev_cli/commands/`, like `generate-mthds-schema` and friends) — call it `trace-input-semantics`: given a bundle, it dumps one artifact per hop of the chain below into an output directory. The probe bundle rides along as a committed fixture the audit (and any future re-run) points the tool at. Scope discipline: build exactly what this audit needs — per-hop captures for a given bundle — and nothing more generic; if another project needs more, it evolves the tool then. When the audit closes, the tool stays, with a short entry in the repo docs so it is findable. The survival *table* stays audit-side (built from the captures), so the tool stays a tracer, not a report generator.
+
 ## The chain under audit
 
 Five hops, end to end in this repo. Every probe capture happens at each hop so a lost fact is localized to exactly one:
@@ -38,17 +42,17 @@ Candidates gathered from the brief and a first pass over the chain code. Each is
 - [x] Read the direction doc and the roadmap (`../wip/devx/input-form-projection.md`, `../wip/devx/input-form-roadmap.md`) and the chain files named above.
 - [ ] Pin the parse hop: find the exact code where TOML structure syntax becomes `ConceptStructureBlueprint` (both the explicit table syntax and any inline/shorthand forms), and record what the parser accepts — this, not the brief's paragraph, is the authority for the language ceiling.
 - [ ] Pin the schema hop: trace `render_stuff_spec` → `ConceptRepresentationFormat.SCHEMA` and note every transform applied after `model_json_schema()`.
-- [ ] Build the capture harness: a scratch script that loads the probe bundle through the validation library and, inside the validation window, dumps one JSON artifact per hop — blueprint dump, generated class source, raw `model_json_schema()`, the SCHEMA render, and the final `PipeInputContract`. Harness and captures live under `wip/input-semantics/probe/`.
+- [ ] Build the capture harness as the `pipelex-dev trace-input-semantics` command (see "The harness is a keeper" above): it loads a bundle through the validation library and, inside the validation window, dumps one JSON artifact per hop — blueprint dump, generated class source, raw `model_json_schema()`, the SCHEMA render, and the final `PipeInputContract` — into a given output directory. Give it the tests a kept tool deserves (a unit test per hop capture on a small fixture), per the repo's testing discipline.
 - [ ] Enumerate the probe matrix **from the parsing layer**: every field type, `choices` (multi and single), `default_value` on each type that allows one, `required` both ways, concept refs (native and custom, bare and qualified), `refines` (of a native, of a custom concept, and a chain of two), lists of scalars and of concepts, dicts, nesting at least two levels deep, concept descriptions, `?` and `[]` on pipe inputs, and native concepts as direct inputs.
 
 ## Phase 1 — The probe bundle
 
-- [ ] Author the probe `.mthds` bundle(s) covering the full matrix. Every authored fact carries a distinctive sentinel string (e.g. `PROBE_desc_field_price`) so its survival — or its absence — is greppable in every capture.
+- [ ] Author the probe `.mthds` bundle(s) covering the full matrix, committed as a fixture beside the tool's tests (exact spot decided when the tool lands — somewhere under `tests/data/`, per repo convention). Every authored fact carries a distinctive sentinel string (e.g. `PROBE_desc_field_price`) so its survival — or its absence — is greppable in every capture.
 - [ ] Confirm the bundle validates cleanly; where a construct is *rejected*, keep it in a separate deliberately-failing file and record the rejection as evidence of the language ceiling.
 
 ## Phase 2 — Measure
 
-- [ ] Run the harness; store the per-hop captures under `probe/`.
+- [ ] Run `pipelex-dev trace-input-semantics` on the probe bundle; store the per-hop captures under `wip/input-semantics/probe/` (the captures are audit evidence, not part of the tool).
 - [ ] Build the survival table: one row per authored fact, one column per hop, each cell `survived` / `transformed (how)` / `dropped`. This table is the evidence backbone of every findings entry.
 
 **Checkpoint CP1 — measurements in hand.** Natural handoff point: the probe bundle, harness, and survival table exist; classification has not started. If the session breaks here, update this plan with any surprises the measurement produced (constructs that failed to author, hops that behaved unexpectedly) so the next session classifies without re-running anything.
@@ -69,5 +73,6 @@ Candidates gathered from the brief and a first pass over the chain code. Each is
 
 **Checkpoint CP2 — milestone gate.** When `findings.md` is written:
 
+- [ ] Keep the tool: document `pipelex-dev trace-input-semantics` in the repo docs (a short page or a section in the dev-CLI docs, same register as `generate-mthds-schema`), and note it in the changelog's Unreleased section.
 - [ ] Update this plan's checkboxes and record decisions taken and surprises found.
 - [ ] Update `../wip/devx/input-form-roadmap.md` per its checkpoint protocol — S1 closed, the D1 freeze is waiting on the news, and S2 takes the engine-side list as its worklist.
