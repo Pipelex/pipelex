@@ -144,7 +144,7 @@ class TestPipeSignature:
         runtime = _make_runtime(blueprint, pipe_code="sig_live_fail")
         working_memory = WorkingMemoryFactory.make_empty()
         with pytest.raises(PipeSignatureNotExecutableError) as exc_info:
-            await runtime._live_run_pipe(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await runtime._live_run_pipe(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
                 job_metadata=JobMetadata(
                     run_metadata=RunMetadata(storage_scope="test/scope", user_id=DRY_RUN_USER_ID, pipeline_run_id=SpecialPipelineId.UNTITLED)
                 ),

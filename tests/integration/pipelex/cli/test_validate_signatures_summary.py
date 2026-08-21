@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipelex.cli.commands.validate._validate_core import (
-    _validate_pipe_or_bundle,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
-    do_validate_all_libraries_and_dry_run,  # noqa: PLC2701
+    _validate_pipe_or_bundle,  # pyright: ignore[reportPrivateUsage]
+    do_validate_all_libraries_and_dry_run,
 )
 
 if TYPE_CHECKING:

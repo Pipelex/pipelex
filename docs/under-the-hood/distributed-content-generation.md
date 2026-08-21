@@ -56,7 +56,7 @@ Reconstruction is the *boundary* answer, and only that. An in-process run never 
 On the worker, `SchemaToModelFactory.make_from_json_schema(schema, *, class_name)` (`pipelex/cogt/content_generation/schema_to_model_factory.py`) rebuilds a live Pydantic class from the embedded schema:
 
 ```python
-source_code = cls._generate_source_from_schema(schema)        # datamodel-code-generator
+source_code = cls._generate_source_from_schema(schema)  # datamodel-code-generator
 reconstructed_class = cls._exec_and_extract_class(source_code, class_name=class_name)  # exec()
 reconstructed_class.__kajson_class_source__ = source_code  # attached for downstream use
 ```

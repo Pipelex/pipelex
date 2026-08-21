@@ -67,7 +67,7 @@ class GcpStorageProvider(StorageProviderAbstract):
                     msg,
                 )
 
-            from google.cloud import storage  # type: ignore[import-untyped]  # noqa: PLC0415
+            from google.cloud import storage  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level]
 
             credentials_path = Path(self._credentials_file_path)
             if not credentials_path.exists():
@@ -96,7 +96,7 @@ class GcpStorageProvider(StorageProviderAbstract):
         """
         bucket = self._get_bucket()
 
-        from google.api_core.exceptions import (  # type: ignore[import-untyped]  # noqa: PLC0415 - optional dependency, lazy import
+        from google.api_core.exceptions import (  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
             GoogleAPIError,
             NotFound,
         )
@@ -144,7 +144,9 @@ class GcpStorageProvider(StorageProviderAbstract):
         """
         bucket = self._get_bucket()
 
-        from google.api_core.exceptions import GoogleAPIError  # type: ignore[import-untyped]  # noqa: PLC0415 - optional dependency, lazy import
+        from google.api_core.exceptions import (  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
+            GoogleAPIError,
+        )
 
         try:
             blob = bucket.blob(key)
@@ -189,7 +191,9 @@ class GcpStorageProvider(StorageProviderAbstract):
         """
         bucket = self._get_bucket()
 
-        from google.api_core.exceptions import GoogleAPIError  # type: ignore[import-untyped]  # noqa: PLC0415 - optional dependency, lazy import
+        from google.api_core.exceptions import (  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
+            GoogleAPIError,
+        )
 
         try:
             blob = bucket.blob(key)

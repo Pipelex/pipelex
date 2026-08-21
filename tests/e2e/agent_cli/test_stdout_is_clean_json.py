@@ -30,7 +30,7 @@ If anyone flips the kit-template / package default back to stdout, or adds a
 from __future__ import annotations
 
 import json
-import subprocess  # noqa: S404 — invokes the real pipelex-agent binary for E2E coverage
+import subprocess  # ruff: ignore[suspicious-subprocess-import] — invokes the real pipelex-agent binary for E2E coverage
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -147,7 +147,7 @@ class TestAgentCliStdoutIsCleanJson:
         """
         _set_pipelex_package_log_level_to_debug(hermetic_home / ".pipelex" / "pipelex.toml")
 
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             [
                 str(PIPELEX_AGENT_BIN),
                 "models",
@@ -200,7 +200,7 @@ class TestAgentCliStdoutIsCleanJson:
         for package_name in ("anthropic", "httpx", "botocore", "openai"):
             _set_package_log_level(pipelex_toml, package_name=package_name, level="DEBUG")
 
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             [
                 str(PIPELEX_AGENT_BIN),
                 "models",
@@ -246,7 +246,7 @@ class TestAgentCliStdoutIsCleanJson:
         _set_pipelex_package_log_level_to_debug(pipelex_toml)
         _set_console_targets(pipelex_toml, log_target="stdout", print_target="stdout")
 
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             [
                 str(PIPELEX_AGENT_BIN),
                 "models",

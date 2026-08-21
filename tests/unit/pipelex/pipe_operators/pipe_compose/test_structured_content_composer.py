@@ -584,7 +584,7 @@ class TestGetNestedFieldClassOptionalSyntaxes:
         )
 
         # Directly test the private method (noqa needed for testing internal behavior)
-        result = composer._get_nested_field_class("headquarters")  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        result = composer._get_nested_field_class("headquarters")  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
 
         assert result is Address, f"Expected Address, got {result}"
 
@@ -614,7 +614,7 @@ class TestGetNestedFieldClassOptionalSyntaxes:
         )
 
         # Directly test the private method (noqa needed for testing internal behavior)
-        result = composer._get_nested_field_class("headquarters")  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        result = composer._get_nested_field_class("headquarters")  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
 
         assert result is Address, f"Expected Address, got {result}"
 
@@ -647,8 +647,8 @@ class TestGetNestedFieldClassOptionalSyntaxes:
         )
 
         # Ignore lint/type errors: testing internal behavior directly
-        result_typing = composer_typing_optional._get_nested_field_class("headquarters")  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
-        result_union = composer_union_syntax._get_nested_field_class("headquarters")  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        result_typing = composer_typing_optional._get_nested_field_class("headquarters")  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+        result_union = composer_union_syntax._get_nested_field_class("headquarters")  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
 
         assert result_typing is Address
         assert result_union is Address
@@ -706,7 +706,7 @@ class TestGetNestedFieldClassGenericTypes:
         )
 
         # Directly test the private method (noqa needed for testing internal behavior)
-        result = composer._get_nested_field_class("branches")  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        result = composer._get_nested_field_class("branches")  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
 
         # The bug would have returned Address here instead of list[Address]
         assert result is not Address, "list[Address] should NOT be unwrapped to Address"
@@ -735,7 +735,7 @@ class TestGetNestedFieldClassGenericTypes:
         )
 
         # Directly test the private method (noqa needed for testing internal behavior)
-        result = composer._get_nested_field_class("offices")  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        result = composer._get_nested_field_class("offices")  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
 
         # The bug would have returned str here instead of dict[str, Address]
         assert result is not str, "dict[str, Address] should NOT be unwrapped to str"

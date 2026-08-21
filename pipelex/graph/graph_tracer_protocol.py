@@ -6,7 +6,7 @@ from typing_extensions import override
 from pipelex.graph.graphspec import EdgeKind, GraphSpec, GraphSpecMode, IOSpec, NodeKind
 from pipelex.system.data_inclusion_config import DataInclusionConfig
 from pipelex.system.trace_context import TraceContext
-from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in setup signature
+from pipelex.tracing.event_log_protocol import EventLogProtocol  # ruff: ignore[typing-only-first-party-import] - used in setup signature
 
 
 class GraphTracerProtocol(Protocol):

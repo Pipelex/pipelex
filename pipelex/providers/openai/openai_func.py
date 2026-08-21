@@ -46,7 +46,7 @@ def create_openai_schema_from_function(func: Callable[..., Any]) -> dict[str, An
 
     """
     model: type[BaseModel] = create_pydantic_model_from_function(func)
-    from instructor import openai_schema  # noqa: PLC0415
+    from instructor import openai_schema  # ruff: ignore[import-outside-top-level]
 
     the_openai_schema: OpenAISchema = openai_schema(model)
     as_openai_schema: dict[str, Any] = the_openai_schema.openai_schema

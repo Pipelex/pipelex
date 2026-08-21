@@ -32,7 +32,7 @@ def _make_worker(mocker: MockerFixture) -> LinkupSearchWorker:
     worker.inference_model = mock_model
     mock_client = mocker.MagicMock()
     mock_client.async_search = mocker.AsyncMock()
-    setattr(worker, "_linkup_client", mock_client)  # noqa: B010
+    setattr(worker, "_linkup_client", mock_client)  # ruff: ignore[set-attr-with-constant]
     return worker
 
 
@@ -75,11 +75,11 @@ class TestLinkupSearchWorkerSemantic:
     ) -> None:
         worker = _make_worker(mocker)
         sdk_exc = exception_class(f"{exception_class.__name__} happened")
-        client: Any = getattr(worker, "_linkup_client")  # noqa: B009
+        client: Any = getattr(worker, "_linkup_client")  # ruff: ignore[get-attr-with-constant]
         client.async_search.side_effect = sdk_exc
 
         with pytest.raises(SearchJobFailureError) as exc_info:
-            await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.user_action is not None

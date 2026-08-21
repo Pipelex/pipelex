@@ -67,7 +67,7 @@ def read_file_snapshot(path: Path) -> FileSnapshot:
 
 def write_staged_file(*, snapshot: FileSnapshot, content: bytes, label: str) -> Path:
     """Write and fsync a same-directory temp file ready for atomic replacement."""
-    temp_file = tempfile.NamedTemporaryFile(  # noqa: SIM115 - closed before the atomic replace
+    temp_file = tempfile.NamedTemporaryFile(  # ruff: ignore[open-file-with-context-handler] - closed before the atomic replace
         mode="wb",
         dir=str(snapshot.path.parent),
         prefix=f".{snapshot.path.name}.pipelex-fix-{label}.",

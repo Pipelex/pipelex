@@ -65,7 +65,7 @@ class TestAnthropicReasoning:
         budget_mock = mocker.MagicMock(return_value=expected_budget)
         _mock_config(mocker, budget_mock=budget_mock)
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=effort)
-        result = worker._build_thinking_params(job_params=job_params, max_tokens=100000)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        result = worker._build_thinking_params(job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result.thinking == {"type": "enabled", "budget_tokens": expected_budget}
         assert result.suppress_temperature is True
         budget_mock.assert_called_once_with(family="anthropic", effort=effort)
@@ -76,7 +76,7 @@ class TestAnthropicReasoning:
         budget_mock = mocker.MagicMock()
         _mock_config(mocker, budget_mock=budget_mock)
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.NONE)
-        result = worker._build_thinking_params(job_params=job_params, max_tokens=100000)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        result = worker._build_thinking_params(job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result.thinking is None
         assert result.suppress_temperature is False
         budget_mock.assert_not_called()
@@ -87,14 +87,14 @@ class TestAnthropicReasoning:
         budget_mock = mocker.MagicMock(return_value=16384)
         _mock_config(mocker, budget_mock=budget_mock)
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.HIGH)
-        result = worker._build_thinking_params(job_params=job_params, max_tokens=2000)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        result = worker._build_thinking_params(job_params=job_params, max_tokens=2000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result.thinking == {"type": "enabled", "budget_tokens": 1999}
 
     def test_explicit_budget_passes_through(self, mocker: MockerFixture):
         """Explicit reasoning_budget passes through directly as budget_tokens in MANUAL mode."""
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
         job_params = LLMJobParams(temperature=0.5, reasoning_budget=8192)
-        result = worker._build_thinking_params(job_params=job_params, max_tokens=100000)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        result = worker._build_thinking_params(job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result.thinking == {"type": "enabled", "budget_tokens": 8192}
         assert result.suppress_temperature is True
 
@@ -103,4 +103,4 @@ class TestAnthropicReasoning:
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.NONE)
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.HIGH)
         with pytest.raises(LLMCapabilityError, match="does not support reasoning"):
-            worker._build_thinking_params(job_params=job_params, max_tokens=100000)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            worker._build_thinking_params(job_params=job_params, max_tokens=100000)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]

@@ -56,7 +56,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
 
         self.openai_client_for_text: openai.AsyncOpenAI = sdk_instance
         self.openai_completions_factory = openai_completions_factory
-        from instructor import from_openai  # noqa: PLC0415
+        from instructor import from_openai  # ruff: ignore[import-outside-top-level]
 
         if instructor_mode := self.inference_model.get_instructor_mode():
             self.instructor_for_objects = from_openai(client=sdk_instance, mode=instructor_mode)
@@ -213,7 +213,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
         self._validate_no_reasoning_for_structured_gen(job_params=job_params)
         messages = await self.openai_completions_factory.make_simple_messages(llm_job=llm_job)
         # Deferred import: avoid pulling heavy SDK at module-load time
-        from instructor.core import InstructorRetryException  # noqa: PLC0415
+        from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
 
         extra_headers, extra_body = self.openai_completions_factory.make_extras(
             inference_model=self.inference_model, inference_job=llm_job, output_desc=schema.__name__

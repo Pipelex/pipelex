@@ -19,7 +19,7 @@ and the PipeFunc executor modes are all empty on it — an import-time check can
 that tries to resolve out of one of them.
 """
 
-import subprocess  # noqa: S404
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
 import textwrap
 
@@ -103,7 +103,7 @@ CONTROL_PACKAGE_THE_RUNTIME_ALWAYS_LOADS = "cogt"
 def _run_booted_runtime(*, interpreter_packages: "tuple[str, ...]") -> subprocess.CompletedProcess[str]:
     """Boot the kernel layer in a fresh interpreter and return the sweep's verdict."""
     try:
-        return subprocess.run(  # noqa: S603
+        return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             [sys.executable, "-c", _BOOTED_RUNTIME_SCRIPT, *interpreter_packages],
             capture_output=True,
             text=True,

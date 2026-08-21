@@ -8,20 +8,20 @@ from pipelex.system.registries.func_registry import pipe_func
 
 
 @pipe_func()
-async def oshow_analyze_clause(working_memory: WorkingMemory) -> TextContent:  # noqa: RUF029
+async def oshow_analyze_clause(working_memory: WorkingMemory) -> TextContent:  # ruff: ignore[unused-async]
     return TextContent(text=f"analysis of {working_memory.get_stuff_as_str(name='clause')}")
 
 
 @pipe_func()
-async def oshow_summarize_analysis(working_memory: WorkingMemory) -> TextContent:  # noqa: RUF029
+async def oshow_summarize_analysis(working_memory: WorkingMemory) -> TextContent:  # ruff: ignore[unused-async]
     return TextContent(text=f"summary: {working_memory.get_stuff_as_str(name='analysis')}")
 
 
 @pipe_func()
-async def oshow_flag_risk(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001,RUF029
+async def oshow_flag_risk(working_memory: WorkingMemory) -> TextContent:  # ruff: ignore[unused-function-argument, unused-async]
     return TextContent(text="penalty risk detected")
 
 
 @pipe_func()
-async def oshow_force_extract(working_memory: WorkingMemory) -> TextContent:  # noqa: RUF029
+async def oshow_force_extract(working_memory: WorkingMemory) -> TextContent:  # ruff: ignore[unused-async]
     return TextContent(text=f"extracted: {working_memory.get_stuff_as_str(name='clause')}")

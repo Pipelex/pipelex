@@ -16,7 +16,8 @@ Pydantic models in Pipelex often enforce format constraints via `field_validator
 ```python
 class BundleHeaderSpec(StructuredContent):
     domain_code: str  # Must be snake_case
-    main_pipe: str    # Must be snake_case, must exist in pipe dict
+    main_pipe: str  # Must be snake_case, must exist in pipe dict
+
 
 class ConceptSpec(StructuredContent):
     concept_code: str  # Must be PascalCase
@@ -102,8 +103,7 @@ class DryRunFactory:
         *,
         snake_case_field_names: set[str] | None = None,
         pascal_case_field_names: set[str] | None = None,
-    ) -> type[ModelFactory[BaseModelTypeVar]]:
-        ...
+    ) -> type[ModelFactory[BaseModelTypeVar]]: ...
 ```
 
 ---
@@ -130,12 +130,10 @@ The `DryRunFactory` auto-detects format constraints from Pydantic `Field` defini
 from pydantic import Field
 from pipelex.cogt.content_generation.dry_run_factory import MockFormat
 
+
 class ConceptStructureSpec(StructuredContent):
     # Snake case field
-    the_field_name: str = Field(
-        description="Field name. Must be snake_case.",
-        json_schema_extra={"mock_format": MockFormat.SNAKE_CASE}
-    )
+    the_field_name: str = Field(description="Field name. Must be snake_case.", json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
 
     # Concept reference field (domain.ConceptCode format)
     concept_ref: str | None = Field(
@@ -145,10 +143,7 @@ class ConceptStructureSpec(StructuredContent):
     )
 
     # Field to ignore during mock generation (use default/None)
-    default_value: Any | None = Field(
-        default=None,
-        json_schema_extra={"mock_format": MockFormat.IGNORE}
-    )
+    default_value: Any | None = Field(default=None, json_schema_extra={"mock_format": MockFormat.IGNORE})
 ```
 
 ---
@@ -164,6 +159,7 @@ class ConceptSpec(StructuredContent):
         default=None,
         examples=["Text", "Image", "Document", "TextAndImages", "Number", "Page"],
     )
+
 
 class PipeComposeSpec(PipeSpec):
     # Target format should be a valid TargetFormat value
@@ -297,10 +293,7 @@ There is one fallback: when composition fails with a `StructuredContentComposerV
 
 ```python
 class MySpec(StructuredContent):
-    my_kebab_field: str = Field(
-        description="A kebab-case identifier",
-        json_schema_extra={"mock_format": MockFormat.KEBAB_CASE}
-    )
+    my_kebab_field: str = Field(description="A kebab-case identifier", json_schema_extra={"mock_format": MockFormat.KEBAB_CASE})
 ```
 
 !!! warning "Field name matching is exact"

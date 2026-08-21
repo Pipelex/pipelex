@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.integration.pipelex.fixtures.model_combo import ModelCombo  # noqa: TC001
+from tests.integration.pipelex.fixtures.model_combo import ModelCombo  # ruff: ignore[typing-only-first-party-import]
 
 # Path to generated fixtures file
 GENERATED_FIXTURES_PATH = Path(__file__).parent / "_generated_model_sets.py"
@@ -51,8 +51,8 @@ def get_llm_combos() -> list[ModelCombo]:
         FileNotFoundError: If the generated fixtures file does not exist.
     """
     _ensure_generated_fixtures_exist()
-    from tests.integration.pipelex.fixtures._generated_model_sets import (  # noqa: PLC0415
-        LLM_COMBOS,  # noqa: PLC2701
+    from tests.integration.pipelex.fixtures._generated_model_sets import (  # ruff: ignore[import-outside-top-level]
+        LLM_COMBOS,
     )
 
     return _or_skip(list(LLM_COMBOS), "LLM")
@@ -69,8 +69,8 @@ def get_img_gen_combos() -> list[ModelCombo]:
         FileNotFoundError: If the generated fixtures file does not exist.
     """
     _ensure_generated_fixtures_exist()
-    from tests.integration.pipelex.fixtures._generated_model_sets import (  # noqa: PLC0415
-        IMG_GEN_COMBOS,  # noqa: PLC2701
+    from tests.integration.pipelex.fixtures._generated_model_sets import (  # ruff: ignore[import-outside-top-level]
+        IMG_GEN_COMBOS,
     )
 
     return _or_skip(list(IMG_GEN_COMBOS), "image generation")
@@ -87,8 +87,8 @@ def get_extract_combos() -> list[ModelCombo]:
         FileNotFoundError: If the generated fixtures file does not exist.
     """
     _ensure_generated_fixtures_exist()
-    from tests.integration.pipelex.fixtures._generated_model_sets import (  # noqa: PLC0415
-        EXTRACT_COMBOS,  # noqa: PLC2701
+    from tests.integration.pipelex.fixtures._generated_model_sets import (  # ruff: ignore[import-outside-top-level]
+        EXTRACT_COMBOS,
     )
 
     return _or_skip(list(EXTRACT_COMBOS), "extraction")
@@ -105,8 +105,8 @@ def get_search_combos() -> list[ModelCombo]:
         FileNotFoundError: If the generated fixtures file does not exist.
     """
     _ensure_generated_fixtures_exist()
-    from tests.integration.pipelex.fixtures._generated_model_sets import (  # noqa: PLC0415
-        SEARCH_COMBOS,  # noqa: PLC2701
+    from tests.integration.pipelex.fixtures._generated_model_sets import (  # ruff: ignore[import-outside-top-level]
+        SEARCH_COMBOS,
     )
 
     return _or_skip(list(SEARCH_COMBOS), "search")

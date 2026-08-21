@@ -43,7 +43,7 @@ class TestGcpStorageProvider:
         for test assertions.
         """
         # Import the module first so it can be patched
-        from google.cloud import storage  # type: ignore[import-untyped]  # noqa: PLC0415
+        from google.cloud import storage  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level]
 
         # Create mock objects
         mock_blob = mocker.MagicMock()
@@ -78,7 +78,7 @@ class TestGcpStorageProvider:
         gcp_bucket_name: str,
         gcp_project_id: str,
         gcp_credentials_file: str,
-        mock_gcp_storage: dict[str, Any],  # noqa: ARG002
+        mock_gcp_storage: dict[str, Any],  # ruff: ignore[unused-method-argument]
     ) -> GcpStorageProvider:
         """Create a GcpStorageProvider with signed URLs disabled."""
         return GcpStorageProvider(
@@ -94,7 +94,7 @@ class TestGcpStorageProvider:
         gcp_bucket_name: str,
         gcp_project_id: str,
         gcp_credentials_file: str,
-        mock_gcp_storage: dict[str, Any],  # noqa: ARG002
+        mock_gcp_storage: dict[str, Any],  # ruff: ignore[unused-method-argument]
     ) -> GcpStorageProvider:
         """Create a GcpStorageProvider with signed URLs enabled (1 hour lifespan)."""
         return GcpStorageProvider(
@@ -155,7 +155,7 @@ class TestGcpStorageProvider:
         mock_gcp_storage: dict[str, Any],
     ) -> None:
         """Test that loading a non-existent object raises StorageFileNotFoundError."""
-        from google.api_core.exceptions import NotFound  # type: ignore[import-untyped]  # noqa: PLC0415
+        from google.api_core.exceptions import NotFound  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level]
 
         mock_gcp_storage["blob"].download_as_bytes.side_effect = NotFound("Object not found")
         nonexistent_uri = f"{PIPELEX_STORAGE_SCHEME}nonexistent/file.bin"

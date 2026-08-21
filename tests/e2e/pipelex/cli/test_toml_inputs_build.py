@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import os
 import shutil
-import subprocess  # noqa: S404 — invokes the real pipelex binary for E2E coverage
+import subprocess  # ruff: ignore[suspicious-subprocess-import] — invokes the real pipelex binary for E2E coverage
 from pathlib import Path
 from typing import Any, cast
 
@@ -43,7 +43,7 @@ class TestTomlInputsBuild:
 
     def _build(self, staged: Path, tmp_path: Path, *, extra_args: list[str]) -> None:
         """Run ``build inputs bundle --format toml`` (plus extra args) on the staged bundle."""
-        build_result = subprocess.run(  # noqa: S603
+        build_result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             [
                 str(PIPELEX_BIN),
                 "build",
@@ -67,7 +67,7 @@ class TestTomlInputsBuild:
 
     def _dry_run(self, staged: Path, tmp_path: Path, inputs_toml: Path) -> None:
         """Feed the generated inputs.toml straight into ``run --dry-run`` — the round trip."""
-        run_result = subprocess.run(  # noqa: S603
+        run_result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             [
                 str(PIPELEX_BIN),
                 "run",

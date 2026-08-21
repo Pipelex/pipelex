@@ -46,14 +46,14 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
     ) -> list[ChatCompletionMessageParam]:
         """Override to use image_url format for documents which Portkey/Gateway translates correctly."""
         # Deferred imports: avoid pulling heavy SDK at module-load time
-        from openai.types.chat import (  # noqa: PLC0415
+        from openai.types.chat import (  # ruff: ignore[import-outside-top-level]
             ChatCompletionContentPartImageParam,
             ChatCompletionContentPartParam,
             ChatCompletionContentPartTextParam,
             ChatCompletionSystemMessageParam,
             ChatCompletionUserMessageParam,
         )
-        from openai.types.chat.chat_completion_content_part_image_param import ImageURL as OpenAIImageURL  # noqa: PLC0415
+        from openai.types.chat.chat_completion_content_part_image_param import ImageURL as OpenAIImageURL  # ruff: ignore[import-outside-top-level]
 
         llm_prompt = llm_job.llm_prompt
         messages: list[ChatCompletionMessageParam] = []
@@ -108,7 +108,7 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
         backend: InferenceBackend,
     ) -> openai.AsyncOpenAI:
         # Deferred import: avoid pulling heavy SDK at module-load time
-        import openai  # noqa: PLC0415
+        import openai  # ruff: ignore[import-outside-top-level]
 
         is_debug_enabled = GatewayFactory.is_debug_enabled(backend=backend)
         endpoint = GatewayFactory.get_endpoint(backend=backend)

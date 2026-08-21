@@ -151,7 +151,7 @@ def _rename_key_in_place(*, parent_table: dict[str, Any], key: str, new_key: str
         # only the first would leave the other chunk under the old dotted name — orphaning the
         # pipe's nested content in a phantom, still-invalid key. Rename in every chunk holding it.
         renamed_in_any = False
-        for sub_table in parent_table._tables:  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        for sub_table in parent_table._tables:  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
             if key in sub_table:
                 _replace_key_in_container(container=sub_table.value, key=key, new_key=new_key)
                 renamed_in_any = True
@@ -236,7 +236,7 @@ def _renamed_key(*, previous: Key, new_key: str) -> SingleKey:
     if previous.is_dotted():
         # There is no public way to say "dotted": the flag is private, and tomlkit's own parser
         # sets it exactly this way in ``Container._handle_dotted_key``.
-        renamed._dotted = True  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        renamed._dotted = True  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
     return renamed
 
 
@@ -255,7 +255,7 @@ def _rehome_key_indexes(*, container: Container, key: str, renamed: SingleKey, i
     dict, holding items rather than values. Repairing one of the two would move the inconsistency
     rather than end it, so the whole set of facades is one deliberate pass, not a rider on this one.
     """
-    container._map[renamed] = container._map.pop(SingleKey(key))  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+    container._map[renamed] = container._map.pop(SingleKey(key))  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
     # ``dict`` explicitly on both lines — a ``Container`` is a ``MutableMapping`` *and* a ``dict``,
     # so its own ``pop`` and ``[] =`` route through ``Container.__getitem__`` / ``__delitem__``,
     # which read and rewrite the very body this function has just finished renaming. The stubs
@@ -264,7 +264,7 @@ def _rehome_key_indexes(*, container: Container, key: str, renamed: SingleKey, i
     if isinstance(item, Table):
         # The raw storage holds one entry per name, and for a key written as several chunks
         # tomlkit keeps the last one appended — which is the item this is handed.
-        dict.__setitem__(container, renamed.key, item.value)  # noqa: PLC2801 # pyright: ignore[reportUnknownMemberType]
+        dict.__setitem__(container, renamed.key, item.value)  # ruff: ignore[unnecessary-dunder-call] # pyright: ignore[reportUnknownMemberType]
 
 
 # --- Comment fidelity: the trivia that introduces an item goes where the item goes -----------------
@@ -335,7 +335,7 @@ def _last_container(*, item: Item) -> Container | None:
     if isinstance(item, AoT):
         return item.body[-1].value if item.body else None
     if isinstance(item, OutOfOrderTableProxy):
-        return item._tables[-1].value  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        return item._tables[-1].value  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
     return None
 
 
@@ -365,7 +365,7 @@ def _key_slot(*, parent_table: dict[str, Any], key: str) -> _Slot:
     """
     candidates: list[tuple[Container, Table | None]]
     if isinstance(parent_table, OutOfOrderTableProxy):
-        candidates = [(sub_table.value, sub_table) for sub_table in parent_table._tables if key in sub_table]  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        candidates = [(sub_table.value, sub_table) for sub_table in parent_table._tables if key in sub_table]  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
     elif isinstance(parent_table, Table):
         candidates = [(parent_table.value, parent_table)]
     elif isinstance(parent_table, Container):
@@ -374,7 +374,7 @@ def _key_slot(*, parent_table: dict[str, Any], key: str) -> _Slot:
         msg = f"cannot locate key '{key}' in unsupported tomlkit node type '{type(parent_table).__name__}' — applier bug"
         raise PipelexUnexpectedError(msg)
     for container, owner in candidates:
-        position = container._map.get(SingleKey(key))  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        position = container._map.get(SingleKey(key))  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
         if position is None:
             continue
         positions = sorted(position) if isinstance(position, tuple) else [position]
@@ -555,7 +555,7 @@ def _introduction_of_slot(*, chain: list[_Slot]) -> _TriviaRun:
 
 def _shift_map(*, container: Container, from_index: int, delta: int) -> None:
     """Keep the container's key→position index in step with a body insert or removal at ``from_index``."""
-    key_map = container._map  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+    key_map = container._map  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
     for map_key, position in list(key_map.items()):
         if isinstance(position, tuple):
             key_map[map_key] = tuple(chunk + delta if chunk >= from_index else chunk for chunk in position)
@@ -1035,7 +1035,7 @@ def _refresh_table_headers(*, item: Any) -> None:
     here is what lets a rename or move come out whole for any layout the parser accepts.
     """
     if isinstance(item, OutOfOrderTableProxy):
-        for chunk in item._tables:  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        for chunk in item._tables:  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
             _refresh_table_headers(item=chunk)
         return
     if isinstance(item, Table):

@@ -32,7 +32,7 @@ def list_mistral_models(
             msg,
         )
 
-    from pipelex.providers.mistral.mistral_llms import mistral_list_available_models  # noqa: PLC0415
+    from pipelex.providers.mistral.mistral_llms import mistral_list_available_models  # ruff: ignore[import-outside-top-level]
 
     mistral_models = mistral_list_available_models()
 

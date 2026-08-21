@@ -13,7 +13,7 @@ class TestPipeBatchBlueprintConversion:
     )
     def test_pipe_batch_spec_to_blueprint(
         self,
-        test_name: str,  # noqa: ARG002
+        test_name: str,  # ruff: ignore[unused-method-argument]
         pipe_spec: PipeBatchSpec,
         expected_blueprint: PipeBatchBlueprint,
     ):

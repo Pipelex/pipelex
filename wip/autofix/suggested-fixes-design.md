@@ -29,23 +29,25 @@ Three layers, all in `pipelex/`:
 
 ```python
 class FixOpKind(StrEnum):
-    SET_KEY = "set_key"          # set (or create) a key's value at a table path
+    SET_KEY = "set_key"  # set (or create) a key's value at a table path
     DELETE_KEY = "delete_key"
     DELETE_TABLE = "delete_table"
-    RENAME_TABLE_KEY = "rename_table_key"   # position-preserving; needed for strip-namespace (stretch)
+    RENAME_TABLE_KEY = "rename_table_key"  # position-preserving; needed for strip-namespace (stretch)
+
 
 class FixOp(BaseModel):
     kind: FixOpKind
-    table_path: list[str]        # e.g. ["pipe", "my_seq"] — aligned with field_path conventions
+    table_path: list[str]  # e.g. ["pipe", "my_seq"] — aligned with field_path conventions
     key: str | None
-    value: TomlValue | None      # TOML-representable
-    new_key: str | None          # rename only
+    value: TomlValue | None  # TOML-representable
+    new_key: str | None  # rename only
+
 
 class SuggestedFix(BaseModel):
-    fix_code: str                # kebab-case rule id, e.g. "match-sequence-output"
-    description: str             # human/agent-readable, e.g. "Set output to 'Report[]' to match last step"
-    safety: FixSafety            # SAFE (auto-appliable) | UNSAFE (opt-in)
-    source: str | None           # file the ops target (multi-file libraries)
+    fix_code: str  # kebab-case rule id, e.g. "match-sequence-output"
+    description: str  # human/agent-readable, e.g. "Set output to 'Report[]' to match last step"
+    safety: FixSafety  # SAFE (auto-appliable) | UNSAFE (opt-in)
+    source: str | None  # file the ops target (multi-file libraries)
     ops: list[FixOp]
 ```
 

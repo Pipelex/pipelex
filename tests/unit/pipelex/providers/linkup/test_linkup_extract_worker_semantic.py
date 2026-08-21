@@ -35,7 +35,7 @@ def _make_worker(mocker: MockerFixture) -> LinkupExtractWorker:
     worker.inference_model = mock_model
     mock_client = mocker.MagicMock()
     mock_client.async_fetch = mocker.AsyncMock()
-    setattr(worker, "_linkup_client", mock_client)  # noqa: B010
+    setattr(worker, "_linkup_client", mock_client)  # ruff: ignore[set-attr-with-constant]
     return worker
 
 
@@ -78,11 +78,11 @@ class TestLinkupExtractWorkerSemantic:
     ) -> None:
         worker = _make_worker(mocker)
         sdk_exc = exception_class(f"{exception_class.__name__} happened")
-        client: Any = getattr(worker, "_linkup_client")  # noqa: B009
+        client: Any = getattr(worker, "_linkup_client")  # ruff: ignore[get-attr-with-constant]
         client.async_fetch.side_effect = sdk_exc
 
         with pytest.raises(ExtractJobFailureError) as exc_info:
-            await worker._extract_pages(extract_job=_make_extract_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._extract_pages(extract_job=_make_extract_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.user_action is not None

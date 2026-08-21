@@ -233,13 +233,13 @@ class WorkingMemoryFactory(BaseModel):
         for a discriminated union), picks a random subclass. Otherwise returns the class as-is.
         """
         # Import here to avoid circular imports
-        from pipelex.builder.pipe.pipe_spec import PipeSpec  # noqa: PLC0415
+        from pipelex.builder.pipe.pipe_spec import PipeSpec  # ruff: ignore[import-outside-top-level]
 
         # Check for specific base classes that need special handling
         if structure_class is PipeSpec:
             # PipeSpec has many subclasses - pick one that has minimal extra required fields
             # PipeBatchSpec is chosen as it's commonly used and has straightforward fields
-            from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec  # noqa: PLC0415
+            from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec  # ruff: ignore[import-outside-top-level]
 
             return PipeBatchSpec
 

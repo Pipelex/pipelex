@@ -26,8 +26,8 @@ def make_instructor_schema_retrying(*, max_attempts: int) -> AsyncRetrying:
     # `instructor` raises its own validation-error types alongside pydantic's; mirror the exact
     # set `instructor` itself treats as re-askable (see `instructor.core.retry.retry_async`) so a
     # genuine schema failure is still re-asked regardless of which of the two it surfaces as.
-    from instructor.core import AsyncValidationError  # noqa: PLC0415
-    from instructor.core import ValidationError as InstructorValidationError  # noqa: PLC0415
+    from instructor.core import AsyncValidationError  # ruff: ignore[import-outside-top-level]
+    from instructor.core import ValidationError as InstructorValidationError  # ruff: ignore[import-outside-top-level]
 
     return AsyncRetrying(
         retry=retry_if_exception_type((ValidationError, json.JSONDecodeError, AsyncValidationError, InstructorValidationError)),

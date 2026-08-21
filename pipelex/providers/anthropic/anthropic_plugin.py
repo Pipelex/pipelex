@@ -24,8 +24,8 @@ def _make_anthropic_worker(
 ) -> InferenceWorkerAbstract:
     require_sdk(spec="anthropic", extra="anthropic", msg=_ANTHROPIC_MISSING_MSG)
 
-    from pipelex.providers.anthropic.anthropic_factory import AnthropicFactory  # noqa: PLC0415
-    from pipelex.providers.anthropic.anthropic_llm_worker import AnthropicLLMWorker  # noqa: PLC0415
+    from pipelex.providers.anthropic.anthropic_factory import AnthropicFactory  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.anthropic.anthropic_llm_worker import AnthropicLLMWorker  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     sdk_instance = sdk_clients.get_or_create(
@@ -48,9 +48,9 @@ async def _list_anthropic_models(
     flat: bool,
     any_listed: bool,
 ) -> None:
-    from pipelex.cogt.exceptions import ModelListingUnsupportedError  # noqa: PLC0415
-    from pipelex.providers.anthropic.anthropic_exceptions import AnthropicSDKUnsupportedError  # noqa: PLC0415
-    from pipelex.providers.anthropic.anthropic_list import list_anthropic_models  # noqa: PLC0415
+    from pipelex.cogt.exceptions import ModelListingUnsupportedError  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.anthropic.anthropic_exceptions import AnthropicSDKUnsupportedError  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.anthropic.anthropic_list import list_anthropic_models  # ruff: ignore[import-outside-top-level]
 
     try:
         await list_anthropic_models(sdk=sdk, backend_name=backend_name, backend=backend, flat=flat, any_listed=any_listed)

@@ -16,7 +16,7 @@ from tests.integration.pipelex.cogt.test_data import LLMTestCases
 @pytest.mark.asyncio(loop_scope="class")
 class TestLLMReport:
     @pytest.mark.parametrize(("topic", "prompt_text"), LLMTestCases.SINGLE_TEXT)
-    async def test_llm_report_single(self, job_metadata: JobMetadata, llm_preset_id: str, topic: str, prompt_text: str):  # noqa: ARG002
+    async def test_llm_report_single(self, job_metadata: JobMetadata, llm_preset_id: str, topic: str, prompt_text: str):  # ruff: ignore[unused-method-argument]
         llm_worker, llm_job = self._get_async_worker_and_job(llm_preset_id=llm_preset_id, prompt_text=prompt_text, job_metadata=job_metadata)
         generated_text = await llm_worker.gen_text(llm_job=llm_job)
         assert generated_text

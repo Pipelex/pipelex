@@ -64,18 +64,20 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
                     loop = asyncio.get_running_loop()
                     task = loop.create_task(httpx_client.aclose())
                     task.add_done_callback(
-                        lambda task_result: log.debug(f"Portkey httpx client cleanup error: {task_result.exception()}")
-                        if not task_result.cancelled() and task_result.exception()
-                        else None
+                        lambda task_result: (
+                            log.debug(f"Portkey httpx client cleanup error: {task_result.exception()}")
+                            if not task_result.cancelled() and task_result.exception()
+                            else None
+                        )
                     )
                 except RuntimeError:
                     # No running event loop, best-effort sync close
                     try:
                         asyncio.run(httpx_client.aclose())
-                    except Exception as exc:  # noqa: BLE001
+                    except Exception as exc:  # ruff: ignore[blind-except]
                         # Best-effort: asyncio.run() runs aclose(), whose failure surface is not enumerable; teardown must never fail.
                         log.debug(f"Error closing portkey httpx client during teardown: {exc}")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # ruff: ignore[blind-except]
             # Best-effort cleanup boundary: teardown must never fail, whatever client/event-loop close throws.
             log.debug(f"Error during GatewayExtractWorker teardown: {exc}")
 

@@ -61,7 +61,7 @@ def pipe_func(name: str | None = None) -> Callable[[T], T]:
         setattr(func, PIPE_FUNC_MARKER, True)
         # Store custom name if provided
         if name is not None:
-            func._pipe_func_name = name  # type: ignore[attr-defined] # noqa: SLF001
+            func._pipe_func_name = name  # type: ignore[attr-defined] # ruff: ignore[private-member-access]
         return func
 
     return decorator
@@ -252,8 +252,8 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
 
         # Import here to avoid circular imports
         # TODO: code-smell
-        from pipelex.core.memory.working_memory import WorkingMemory  # noqa: PLC0415
-        from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
+        from pipelex.core.memory.working_memory import WorkingMemory  # ruff: ignore[import-outside-top-level]
+        from pipelex.core.stuffs.stuff_content import StuffContent  # ruff: ignore[import-outside-top-level]
 
         # Get function signature
         sig = inspect.signature(the_function)
@@ -317,8 +317,8 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
         the_function = cast("Callable[..., Any]", func)
 
         # Import here to avoid circular imports
-        from pipelex.core.memory.working_memory import WorkingMemory  # noqa: PLC0415
-        from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
+        from pipelex.core.memory.working_memory import WorkingMemory  # ruff: ignore[import-outside-top-level]
+        from pipelex.core.stuffs.stuff_content import StuffContent  # ruff: ignore[import-outside-top-level]
 
         # Get function signature
         try:

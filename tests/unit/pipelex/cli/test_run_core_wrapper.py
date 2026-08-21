@@ -12,7 +12,7 @@ import typer
 from rich.console import Console
 
 from pipelex.base_exceptions import PipelexError
-from pipelex.cli.commands.run._run_core import execute_run  # noqa: PLC2701
+from pipelex.cli.commands.run._run_core import execute_run
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError

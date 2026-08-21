@@ -37,7 +37,7 @@ class TimeContent(StuffContent):
             raise ValueError(msg)
         if isinstance(value, datetime.datetime):
             msg = "A Time takes a time of day alone, not a datetime; use Date for a date with a time."
-            raise ValueError(msg)  # noqa: TRY004 — must be ValueError so pydantic wraps it into a ValidationError
+            raise ValueError(msg)  # ruff: ignore[type-check-without-type-error] — must be ValueError so pydantic wraps it into a ValidationError
         # Parsing the ISO string here — rather than leaving it to the field's own validation — is what
         # keeps this model usable under the strict validation instructor applies to every LLM response:
         # a mode="before" validator forfeits pydantic's strict-JSON acceptance of ISO strings, because

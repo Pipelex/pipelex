@@ -20,29 +20,29 @@ def another_function(x: int):
 
 
 # Valid function for testing
-def valid_function(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001 # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
+def valid_function(working_memory: WorkingMemory) -> TextContent:  # ruff: ignore[unused-function-argument] # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
     return TextContent(text="test")
 
 
 # Valid async function for testing (should also be eligible)
-async def valid_async_function(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001,RUF029 # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
+async def valid_async_function(working_memory: WorkingMemory) -> TextContent:  # ruff: ignore[unused-function-argument, unused-async] # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
     return TextContent(text="test")
 
 
 # Invalid functions for testing eligibility
-def wrong_param_name(other_param: WorkingMemory) -> TextContent:  # noqa: ARG001 # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
+def wrong_param_name(other_param: WorkingMemory) -> TextContent:  # ruff: ignore[unused-function-argument] # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
     return TextContent(text="test")
 
 
-def wrong_param_type(working_memory: str) -> TextContent:  # noqa: ARG001 # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
+def wrong_param_type(working_memory: str) -> TextContent:  # ruff: ignore[unused-function-argument] # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
     return TextContent(text="test")
 
 
-def wrong_return_type(working_memory: WorkingMemory) -> str:  # noqa: ARG001 # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
+def wrong_return_type(working_memory: WorkingMemory) -> str:  # ruff: ignore[unused-function-argument] # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
     return "test"
 
 
-def too_many_params(working_memory: WorkingMemory, extra: str) -> TextContent:  # noqa: ARG001 # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
+def too_many_params(working_memory: WorkingMemory, extra: str) -> TextContent:  # ruff: ignore[unused-function-argument] # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
     return TextContent(text="test")
 
 
@@ -50,7 +50,7 @@ def no_params() -> TextContent:
     return TextContent(text="test")
 
 
-def no_type_hints(working_memory):  # noqa: ARG001, ANN001 # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
+def no_type_hints(working_memory):  # ruff: ignore[unused-function-argument, missing-type-function-argument] # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
     return TextContent(text="test")
 
 

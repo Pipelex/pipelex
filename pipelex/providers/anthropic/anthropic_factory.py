@@ -202,7 +202,7 @@ class AnthropicFactory:
     ) -> 'list["ChatCompletionMessageParam"]':
         """Makes a list of messages with a system message (if provided) and followed by a user message."""
         # Deferred import: avoid pulling heavy SDK at module-load time
-        from openai.types.chat import ChatCompletionSystemMessageParam  # noqa: PLC0415
+        from openai.types.chat import ChatCompletionSystemMessageParam  # ruff: ignore[import-outside-top-level]
 
         llm_prompt = llm_job.llm_prompt
         messages: list[ChatCompletionMessageParam] = []

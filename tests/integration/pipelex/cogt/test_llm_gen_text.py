@@ -64,14 +64,14 @@ class TestLLMGenText:
         pretty_print(generated_text)
 
     @pytest.mark.parametrize(("topic", "prompt_text"), LLMTestCases.SINGLE_TEXT)
-    async def test_gen_text_using_llm_preset(self, job_metadata: JobMetadata, llm_preset_id: str, topic: str, prompt_text: str):  # noqa: ARG002
+    async def test_gen_text_using_llm_preset(self, job_metadata: JobMetadata, llm_preset_id: str, topic: str, prompt_text: str):  # ruff: ignore[unused-method-argument]
         llm_worker, llm_job = get_worker_and_job(llm_preset_id=llm_preset_id, user_text=prompt_text, job_metadata=job_metadata)
         generated_text = await llm_worker.gen_text(llm_job=llm_job)
         assert generated_text
         pretty_print(generated_text)
 
     @pytest.mark.parametrize(("topic", "prompt_text"), LLMTestCases.SINGLE_TEXT)
-    async def test_gen_text_multiple_using_llm_preset(self, job_metadata: JobMetadata, llm_preset_id: str, topic: str, prompt_text: str):  # noqa: ARG002
+    async def test_gen_text_multiple_using_llm_preset(self, job_metadata: JobMetadata, llm_preset_id: str, topic: str, prompt_text: str):  # ruff: ignore[unused-method-argument]
         llm_worker, llm_job = get_worker_and_job(llm_preset_id=llm_preset_id, user_text=prompt_text, job_metadata=job_metadata)
         job_params_base = llm_job.job_params
         max_tokens = 30

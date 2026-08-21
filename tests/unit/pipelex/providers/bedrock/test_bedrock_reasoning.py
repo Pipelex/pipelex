@@ -22,7 +22,7 @@ class TestBedrockReasoning:
         """Validation passes when no reasoning params are set."""
         worker = _make_worker(mocker)
         job_params = LLMJobParams(temperature=0.5)
-        worker._validate_no_reasoning_params(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        worker._validate_no_reasoning_params(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     @pytest.mark.parametrize(
         "effort",
@@ -40,11 +40,11 @@ class TestBedrockReasoning:
         worker = _make_worker(mocker)
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=effort)
         with pytest.raises(LLMCapabilityError, match="does not support reasoning parameters"):
-            worker._validate_no_reasoning_params(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            worker._validate_no_reasoning_params(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     def test_reasoning_budget_raises_capability_error(self, mocker: MockerFixture):
         """reasoning_budget should raise LLMCapabilityError for Bedrock."""
         worker = _make_worker(mocker)
         job_params = LLMJobParams(temperature=0.5, reasoning_budget=4096)
         with pytest.raises(LLMCapabilityError, match="does not support reasoning parameters"):
-            worker._validate_no_reasoning_params(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            worker._validate_no_reasoning_params(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]

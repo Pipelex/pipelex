@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pipelex.cli.commands.fix._diff_sandbox import mirror_bundle_for_preview  # noqa: PLC2701
+from pipelex.cli.commands.fix._diff_sandbox import mirror_bundle_for_preview
 
 if TYPE_CHECKING:
     from pathlib import Path

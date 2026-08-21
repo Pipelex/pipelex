@@ -9,7 +9,7 @@ pin the full truth table of the validator itself.
 import pytest
 import typer
 
-from pipelex.cli.commands.run._run_core import validate_run_flag_combination  # noqa: PLC2701
+from pipelex.cli.commands.run._run_core import validate_run_flag_combination
 
 
 class TestRunFlagCombination:

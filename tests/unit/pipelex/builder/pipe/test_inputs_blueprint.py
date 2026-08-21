@@ -10,7 +10,7 @@ class TestInputRequirementBlueprintConversion:
     )
     def test_input_requirement_spec_to_string(
         self,
-        test_name: str,  # noqa: ARG002
+        test_name: str,  # ruff: ignore[unused-method-argument]
         input_spec: str,
         expected_string: str,
     ):

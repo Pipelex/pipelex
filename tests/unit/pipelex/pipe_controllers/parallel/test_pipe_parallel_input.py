@@ -49,7 +49,7 @@ class TestPipeParallelValidateInputs:
         load_empty_library()
         log.verbose(f"Testing error case: {test_id}")
 
-        with pytest.raises((PipeValidationError, ValueError)) as exc_info:  # noqa: PT012
+        with pytest.raises((PipeValidationError, ValueError)) as exc_info:  # ruff: ignore[pytest-raises-with-multiple-statements]
             # Construct blueprint from dict at test time to trigger validation
             blueprint = PipeParallelBlueprint.model_validate(blueprint_dict)
             pipe_parallel = PipeFactory[PipeParallel].make_from_blueprint(

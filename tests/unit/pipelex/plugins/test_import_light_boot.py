@@ -5,7 +5,7 @@ Enforced in a subprocess whose meta-path finder raises on those SDKs, which is d
 where an in-process sys.modules check is not.
 """
 
-import subprocess  # noqa: S404
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
 import textwrap
 
@@ -80,7 +80,7 @@ _GUARD_SCRIPT = textwrap.dedent(
 
 class TestImportLightBoot:
     def test_building_registrar_imports_no_backend_sdk(self) -> None:
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             [sys.executable, "-c", _GUARD_SCRIPT],
             capture_output=True,
             text=True,

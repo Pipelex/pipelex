@@ -187,8 +187,8 @@ Generated code is never edited — hand edits are overwritten on regeneration, a
     # my_types_ext.py
     from .structures import Report
 
-    class MyReport(Report):
-        ...
+
+    class MyReport(Report): ...
     ```
 
 - **TypeScript** — augment the generated type from a sibling module via declaration merging.

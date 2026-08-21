@@ -41,13 +41,13 @@ class BedrockFactory:
         log.verbose(f"Using '{sdk_variant}' for BedrockClient")
         match sdk_variant:
             case BedrockSdkVariant.AIBOTO3:
-                from pipelex.providers.bedrock.bedrock_client_aioboto3 import BedrockClientAioboto3  # noqa: PLC0415
+                from pipelex.providers.bedrock.bedrock_client_aioboto3 import BedrockClientAioboto3  # ruff: ignore[import-outside-top-level]
 
                 bedrock_async_client = BedrockClientAioboto3(
                     aws_region=backend.extra_config[BedrockExtraField.AWS_REGION],
                 )
             case BedrockSdkVariant.BOTO3:
-                from pipelex.providers.bedrock.bedrock_client_boto3 import BedrockClientBoto3  # noqa: PLC0415
+                from pipelex.providers.bedrock.bedrock_client_boto3 import BedrockClientBoto3  # ruff: ignore[import-outside-top-level]
 
                 bedrock_async_client = BedrockClientBoto3(
                     aws_region=backend.extra_config[BedrockExtraField.AWS_REGION],

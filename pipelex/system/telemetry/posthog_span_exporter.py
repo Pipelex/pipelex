@@ -367,7 +367,7 @@ class PostHogSpanExporter(SpanExporter):
                     case SpanCategory.PIPE:
                         self._export_pipe_span(span=span, attributes=attributes)
 
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:  # ruff: ignore[blind-except]
                 # Fail silently to avoid breaking app
                 log.debug(f"Failed to export span to PostHog: {exc}")
 

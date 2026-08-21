@@ -108,8 +108,8 @@ The plugin bridges that gap by contributing a **framework-agnostic mapper** — 
 
 ```python
 registrar.add_http_error_mapper(
-    exc_type_provider=lambda: TemporalError,      # SDK imported only when a host resolves the mappers, never at register
-    to_error_report=lambda exc: ErrorReport(...), # classified transient / RUNTIME
+    exc_type_provider=lambda: TemporalError,  # SDK imported only when a host resolves the mappers, never at register
+    to_error_report=lambda exc: ErrorReport(...),  # classified transient / RUNTIME
 )
 ```
 
@@ -133,7 +133,7 @@ Not every orchestrator goes this far. A per-call-only plugin — our Mistral Wor
 
 ```python
 if registrar.boot_orchestrator == self.name:
-    registrar.claim_content_generator(_make_temporal_content_generator)   # a thunk, not an instance
+    registrar.claim_content_generator(_make_temporal_content_generator)  # a thunk, not an instance
     registrar.claim_task_manager(_setup_temporal_task_manager)
     registrar.claim_pipe_router(_make_temporal_pipe_router)
     registrar.claim_pipe_run(_make_temporal_pipe_run)

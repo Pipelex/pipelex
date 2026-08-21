@@ -156,7 +156,7 @@ class TestLibraryIsolation:
         mock_pipe.pipe_dependencies.return_value = ["scoring_dep->pkg_test_scoring_dep.pkg_test_compute_score"]
 
         # Even though the pipe isn't in the main pipe library, the alias has a child library
-        assert library._has_unresolved_cross_package_deps(mock_pipe) is False  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        assert library._has_unresolved_cross_package_deps(mock_pipe) is False  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     def test_has_unresolved_cross_package_deps_without_child_library(self, mocker: MockerFixture):
         """_has_unresolved_cross_package_deps returns True when alias has no child library."""
@@ -165,4 +165,4 @@ class TestLibraryIsolation:
         mock_pipe = mocker.MagicMock()
         mock_pipe.pipe_dependencies.return_value = ["unknown_dep->domain.pipe"]
 
-        assert library._has_unresolved_cross_package_deps(mock_pipe) is True  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        assert library._has_unresolved_cross_package_deps(mock_pipe) is True  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]

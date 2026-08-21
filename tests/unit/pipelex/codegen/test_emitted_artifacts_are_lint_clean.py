@@ -28,7 +28,7 @@ See `render_import_block` in `pipelex/codegen/emitters/python_common.py`.
 
 import re
 import shutil
-import subprocess  # noqa: S404
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -83,7 +83,7 @@ def _collect_kinds(resolved_type: ResolvedType) -> set[ResolvedTypeKind]:
 def _write_artifacts(*, emitted: list[EmittedFile], tmp_path: Path) -> None:
     """Write the artifacts out, skipping the test when the current interpreter has no ruff."""
     try:
-        subprocess.run([sys.executable, "-m", "ruff", "--version"], check=True, capture_output=True)  # noqa: S603
+        subprocess.run([sys.executable, "-m", "ruff", "--version"], check=True, capture_output=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
         pytest.skip("ruff not available in current interpreter")
 
@@ -101,7 +101,7 @@ def _label(*, target: str, line_length: int | None) -> str:
 
 def _assert_ruff_format_stable(*, tmp_path: Path, target: str, line_length: int | None = None) -> None:
     """Require `ruff format --check` to find nothing — the property byte-reproducibility rests on."""
-    formatted = subprocess.run(  # noqa: S603
+    formatted = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
         [sys.executable, "-m", "ruff", "format", "--check", str(tmp_path), "--config", str(_PYPROJECT), *_width_config(line_length)],
         capture_output=True,
         text=True,
@@ -115,7 +115,7 @@ def _assert_ruff_clean(*, emitted: list[EmittedFile], tmp_path: Path, target: st
     """Write the artifacts out and require both `ruff check` and `ruff format --check` to find nothing."""
     _write_artifacts(emitted=emitted, tmp_path=tmp_path)
 
-    check = subprocess.run(  # noqa: S603
+    check = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
         [sys.executable, "-m", "ruff", "check", str(tmp_path), *_CONSUMER_LINT_CONFIG, *_width_config(line_length)],
         capture_output=True,
         text=True,
@@ -315,7 +315,7 @@ class TestEmittedArtifactsAreLintClean:
         for emitted_file in emit_ts_zod(resolve_concepts_from_crate(every_type_kind_crate)):
             (tmp_path / emitted_file.filename).write_text(emitted_file.content, encoding="utf-8")
 
-        checked = subprocess.run(  # noqa: S603
+        checked = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             [prettier, "--check", str(tmp_path / "*.ts")],
             capture_output=True,
             text=True,

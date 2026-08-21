@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pipelex.cli.agent_cli.commands.run._output_helpers import build_run_output  # noqa: PLC2701
+from pipelex.cli.agent_cli.commands.run._output_helpers import build_run_output
 
 
 class TestBuildRunOutput:

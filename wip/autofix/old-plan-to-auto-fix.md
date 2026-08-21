@@ -267,8 +267,8 @@ pipelex/cli/
 
 ```python
 class FixRuleCategory(StrEnum):
-    CORRECTION = "correction"   # default ON
-    PRUNING = "pruning"         # default OFF, opt-in via --prune
+    CORRECTION = "correction"  # default ON
+    PRUNING = "pruning"  # default OFF, opt-in via --prune
 
 
 class FixResult(BaseModel):
@@ -280,7 +280,7 @@ class FixResult(BaseModel):
 
 
 class FixRule(ABC):
-    code: str                       # e.g. "strip-namespace"
+    code: str  # e.g. "strip-namespace"
     category: FixRuleCategory
     description: str
 

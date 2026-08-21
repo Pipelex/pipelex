@@ -1,4 +1,4 @@
-# ruff: noqa: INP001 - a standalone probe script, deliberately not a package
+# ruff: file-ignore[implicit-namespace-package] - a standalone probe script, deliberately not a package
 """What the concept entry lookup actually does with a bare code.
 
 Originally written against `ConceptLibrary.get_required_concept_from_concept_ref_or_code` and its
@@ -41,7 +41,7 @@ def library_declaring(*declarations: tuple[str, str]) -> ConceptLibrary:
 def attempt(*, label: str, library: ConceptLibrary, code: str, search_scope: str | None) -> None:
     try:
         found = library.get_required_entry_concept(code, search_scope=search_scope)
-    except BaseException as exc:  # noqa: BLE001 - naming *which* error escapes IS the measurement here
+    except BaseException as exc:  # ruff: ignore[blind-except] - naming *which* error escapes IS the measurement here
         print(f"{label:46} -> {type(exc).__name__}: {exc}")
     else:
         print(f"{label:46} -> resolved {found.concept_ref}")

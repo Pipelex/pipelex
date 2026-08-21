@@ -152,9 +152,7 @@ from pipelex.pipelex import Pipelex
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # Set instance-level defaults at initialization
-Pipelex.make(
-    library_dirs=["/path/to/shared_pipes", "/path/to/project_pipes"]
-)
+Pipelex.make(library_dirs=["/path/to/shared_pipes", "/path/to/project_pipes"])
 
 # All PipelexMTHDSProtocol.execute() calls will use these directories by default
 runner = PipelexMTHDSProtocol()
@@ -174,9 +172,7 @@ from pipelex.pipelex import Pipelex
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # Initialize with default directories
-Pipelex.make(
-    library_dirs=["/path/to/default_pipes"]
-)
+Pipelex.make(library_dirs=["/path/to/default_pipes"])
 
 # Use the default directories
 runner1 = PipelexMTHDSProtocol()
@@ -439,6 +435,7 @@ from pipelex.system.registries.func_registry import pipe_func
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.text_content import TextContent
 
+
 @pipe_func()
 async def my_custom_function(working_memory: WorkingMemory) -> TextContent:
     """
@@ -447,6 +444,7 @@ async def my_custom_function(working_memory: WorkingMemory) -> TextContent:
     input_data = working_memory.get_stuff("input_name")
     # Process data
     return TextContent(text=f"Processed: {input_data.content.text}")
+
 
 # Optional: specify a custom name
 @pipe_func(name="custom_processor")

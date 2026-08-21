@@ -29,7 +29,7 @@ def main() -> None:
     request = PipeFuncExecutionRequest.model_validate_json(request_path.read_text(encoding="utf-8"))
 
     # Import here so module import (e.g. for tests) stays cheap and free of boot side effects.
-    from pipelex.pipelex import Pipelex  # noqa: PLC0415
+    from pipelex.pipelex import Pipelex  # ruff: ignore[import-outside-top-level]
 
     Pipelex.make(needs_inference=False)
     try:

@@ -50,7 +50,7 @@ class InferenceBackendFactory:
         match name:
             case "vertexai":
                 # Deferred import: avoid pulling heavy SDK at module-load time
-                from pipelex.providers.openai.vertexai_factory import VertexAIFactory  # noqa: PLC0415
+                from pipelex.providers.openai.vertexai_factory import VertexAIFactory  # ruff: ignore[import-outside-top-level]
 
                 endpoint, api_key = VertexAIFactory.make_endpoint_and_api_key(extra_config=extra_config)
             case _:

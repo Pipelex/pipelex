@@ -57,7 +57,7 @@ class PipelexAgentCLI(TyperGroup):
         """Get command by name."""
         cmd = super().get_command(ctx, cmd_name)
         if cmd is None:
-            from pipelex.cli.agent_cli.commands.agent_output import agent_error  # noqa: PLC0415
+            from pipelex.cli.agent_cli.commands.agent_output import agent_error  # ruff: ignore[import-outside-top-level]
 
             valid_commands = super().list_commands(ctx)
             agent_error(
@@ -87,7 +87,7 @@ def version_callback(value: bool) -> None:  # kw-only: ignore — click invokes 
 @app.callback(invoke_without_command=True)
 def app_callback(
     ctx: typer.Context,
-    version: Annotated[  # noqa: ARG001
+    version: Annotated[  # ruff: ignore[unused-function-argument]
         bool,
         typer.Option(
             "--version",

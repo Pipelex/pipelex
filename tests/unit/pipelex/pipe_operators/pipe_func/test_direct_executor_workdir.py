@@ -67,12 +67,12 @@ class TestDirectExecutorWorkdir:
             pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10, batch_max_concurrency=None),
         )
 
-        with scoped_current_library(library_id=direct_pipe_func_executor._TRANSPORTED_LIBRARY_ID):  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        with scoped_current_library(library_id=direct_pipe_func_executor._TRANSPORTED_LIBRARY_ID):  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
             try:
                 with pytest.raises((PipelexError, ValidationError)):
                     await DirectPipeFuncExecutor().run_pipe_func_transported(request=request)
             finally:
-                get_library_manager().teardown(library_id=direct_pipe_func_executor._TRANSPORTED_LIBRARY_ID)  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+                get_library_manager().teardown(library_id=direct_pipe_func_executor._TRANSPORTED_LIBRARY_ID)  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
 
         assert not workdir.exists()
 
@@ -92,12 +92,12 @@ class TestDirectExecutorWorkdir:
             pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10, batch_max_concurrency=None),
         )
 
-        with scoped_current_library(library_id=direct_pipe_func_executor._TRANSPORTED_LIBRARY_ID):  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        with scoped_current_library(library_id=direct_pipe_func_executor._TRANSPORTED_LIBRARY_ID):  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
             try:
                 with pytest.raises((PipelexError, ValidationError)):
                     await DirectPipeFuncExecutor().run_pipe_func_transported(request=request)
             finally:
-                get_library_manager().teardown(library_id=direct_pipe_func_executor._TRANSPORTED_LIBRARY_ID)  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+                get_library_manager().teardown(library_id=direct_pipe_func_executor._TRANSPORTED_LIBRARY_ID)  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
 
         stale_entries = [entry for entry in sys.path if Path(entry).is_relative_to(workdir)]
         assert stale_entries == []
@@ -144,12 +144,12 @@ class TestDirectExecutorWorkdir:
             pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10, batch_max_concurrency=None),
         )
 
-        with scoped_current_library(library_id=direct_pipe_func_executor._TRANSPORTED_LIBRARY_ID):  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        with scoped_current_library(library_id=direct_pipe_func_executor._TRANSPORTED_LIBRARY_ID):  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
             try:
                 # No raise = the func registered = `from structures import Greeting` resolved against the
                 # generated structures.py. Before the fix this raised "Function 'greet_it' not found in registry".
                 response = await DirectPipeFuncExecutor().run_pipe_func_transported(request=request)
             finally:
-                get_library_manager().teardown(library_id=direct_pipe_func_executor._TRANSPORTED_LIBRARY_ID)  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+                get_library_manager().teardown(library_id=direct_pipe_func_executor._TRANSPORTED_LIBRARY_ID)  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
 
         assert response.function_qualname == "greet_it"

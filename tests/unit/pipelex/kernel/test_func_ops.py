@@ -33,11 +33,11 @@ RESULT_NAME = "func_output"
 
 
 # Being a coroutine function with nothing to await is the point: it is what selects the awaited arm.
-async def _async_producer(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001, RUF029
+async def _async_producer(working_memory: WorkingMemory) -> TextContent:  # ruff: ignore[unused-function-argument, unused-async]
     return TextContent(text=ASYNC_TEXT)
 
 
-def _sync_producer(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001
+def _sync_producer(working_memory: WorkingMemory) -> TextContent:  # ruff: ignore[unused-function-argument]
     return TextContent(text=SYNC_TEXT)
 
 

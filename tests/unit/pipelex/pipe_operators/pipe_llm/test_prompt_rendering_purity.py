@@ -141,7 +141,7 @@ class TestPromptRenderingPurity:
         )
         snapshot = pipe_llm.model_dump()
 
-        await pipe_llm._dry_run_operator_pipe(  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        await pipe_llm._dry_run_operator_pipe(  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
             job_metadata=JobMetadata(
                 run_metadata=RunMetadata(storage_scope="test/scope", user_id="pytest", pipeline_run_id="test_prompt_rendering_purity")
             ),

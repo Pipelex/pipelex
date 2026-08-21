@@ -12,7 +12,7 @@ from portkey_ai import AsyncPortkey
 # The vendored openai package is the one AsyncPortkey.openai_client is built from, so the
 # exceptions it raises are the vendored classes (not the real `openai` package's) — there is
 # no public re-export of them in portkey_ai.
-from portkey_ai._vendor import openai as portkey_vendored_openai  # noqa: PLC2701
+from portkey_ai._vendor import openai as portkey_vendored_openai  # ruff: ignore[import-private-name]
 from portkey_ai.api_resources import exceptions as portkey_exceptions
 from portkey_ai.api_resources.utils import GenericResponse
 from pydantic import ValidationError

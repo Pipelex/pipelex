@@ -62,7 +62,7 @@ class DynamoDBEventLog(EventLogProtocol):
         # Translate construction-time botocore failures (e.g. a misconfigured region) into our
         # domain EventLogSetupError, mirroring the read_events boundary. Best-effort callers
         # (tracing assembly) catch the EventLogError base and degrade rather than aborting the run.
-        from botocore.exceptions import (  # noqa: PLC0415 - optional dependency, lazy import
+        from botocore.exceptions import (  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
             BotoCoreError,
             ClientError,
         )
@@ -126,7 +126,7 @@ class DynamoDBEventLog(EventLogProtocol):
         gracefully without catching raw botocore exceptions. Individual
         unparseable items are skipped with a warning rather than failing the read.
         """
-        from botocore.exceptions import (  # noqa: PLC0415 - optional dependency, lazy import
+        from botocore.exceptions import (  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
             BotoCoreError,
             ClientError,
         )

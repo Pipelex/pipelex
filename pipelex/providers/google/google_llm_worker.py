@@ -51,7 +51,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
         )
         genai_client: GoogleGenAiClient = sdk_instance
         self.genai_async_client = genai_client.aio
-        from instructor import from_genai  # noqa: PLC0415
+        from instructor import from_genai  # ruff: ignore[import-outside-top-level]
 
         if instructor_mode := self.inference_model.get_instructor_mode():
             self.instructor_for_objects = from_genai(client=sdk_instance, mode=instructor_mode, use_async=True)
@@ -100,10 +100,10 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 try:
                     asyncio.run(self.genai_async_client.aclose())
                     log.verbose("Closed Google async client using asyncio.run()")
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:  # ruff: ignore[blind-except]
                     # Best-effort: asyncio.run() runs aclose(), whose failure surface is not enumerable; teardown must never fail.
                     log.verbose(f"Error closing Google async client during teardown: {exc}")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # ruff: ignore[blind-except]
             # Best-effort cleanup boundary: teardown must never fail, whatever client/event-loop close throws.
             log.debug(f"Error during Google async client teardown: {exc}")
 
@@ -260,7 +260,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
         )
 
         # Deferred import: avoid pulling heavy SDK at module-load time
-        from instructor.core import InstructorRetryException  # noqa: PLC0415
+        from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
 
         try:
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(

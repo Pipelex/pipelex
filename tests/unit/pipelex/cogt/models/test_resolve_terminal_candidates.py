@@ -23,7 +23,7 @@ from pipelex.cogt.models.model_reference import ModelReference
 
 # ``_collect_candidates`` is the pure-logic leaf of the membership resolver; testing it
 # directly keeps the unit tests free of ModelDeck setup boilerplate.
-_collect_candidates = ModelManager._collect_candidates  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+_collect_candidates = ModelManager._collect_candidates  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
 
 class TestResolveTerminalCandidates:

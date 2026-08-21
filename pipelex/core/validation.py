@@ -175,7 +175,7 @@ def _pending_migration(*, surface_id: str, config_dirs: list[Path] | None) -> Mi
     # this module sits in `runtime_boot`'s import closure — the kernel layer, whose stated
     # property is that importing it loads zero interpreter modules. `make agent-check` would not
     # catch a module-level import here; only the full `make agent-test` would.
-    from pipelex.migration.run import scan_config_surface  # noqa: PLC0415
+    from pipelex.migration.run import scan_config_surface  # ruff: ignore[import-outside-top-level]
 
     try:
         report = scan_config_surface(surface_id=surface_id, config_dirs=config_dirs)

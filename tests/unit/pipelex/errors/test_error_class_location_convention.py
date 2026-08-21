@@ -35,7 +35,7 @@ from pathlib import Path
 import pipelex
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.error_pages_generator import (
-    _FIXTURE_DIR_NAMES,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+    _FIXTURE_DIR_NAMES,  # pyright: ignore[reportPrivateUsage]
     iter_pipelex_error_subclasses,
 )
 

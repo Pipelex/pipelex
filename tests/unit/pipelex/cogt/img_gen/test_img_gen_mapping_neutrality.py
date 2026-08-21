@@ -19,7 +19,7 @@
 from __future__ import annotations
 
 import ast
-import subprocess  # noqa: S404
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
 import textwrap
 from pathlib import Path
@@ -100,7 +100,7 @@ class TestImgGenMappingNeutrality:
         assert MAPPING_MODULE_QNAMES, f"no img_gen_*_mapping.py found under {_MAPPING_DIR} — this check measures nothing"
 
         try:
-            result = subprocess.run(  # noqa: S603
+            result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
                 [sys.executable, "-c", _CLOSURE_SCRIPT, *MAPPING_MODULE_QNAMES],
                 capture_output=True,
                 text=True,

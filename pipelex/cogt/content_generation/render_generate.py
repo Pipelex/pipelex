@@ -27,7 +27,7 @@ async def render_page_views_and_store(
     if render_assignment.cogt_run_params.run_mode.is_dry:
         return dry_render_page_views(render_assignment)
     # Deferred import: avoid pulling the pdf rendering SDK at module-load time
-    from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer  # noqa: PLC0415
+    from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer  # ruff: ignore[import-outside-top-level]
 
     page_view_images = await pypdfium2_renderer.render_pdf_pages_from_uri(
         pdf_uri=render_assignment.document_uri,

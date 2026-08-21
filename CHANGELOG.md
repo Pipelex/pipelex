@@ -1,5 +1,23 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Ruff moves to 0.16.2, matching the version the VS Code extension bundles.** The extension now syncs `pyproject.toml` and `ruff.toml` documents to the language server, because Ruff from 0.16 on lints its own config files. A binary older than that parses those documents as Python source and paints phantom `invalid-syntax` diagnostics across every `pyproject.toml` — `requires-python = ...` read as `requires - python`. Pinning the dev dependency to the exact version the extension ships keeps the editor and the command line on one binary, so a rule can never fire in one and not the other. This is a dev-dependency change: nothing shipped changes, and there is no version bump.
+
+  Two mechanical conversions ride along, both applied by `ruff check --fix` and therefore not deferrable — `make lint` would re-apply them on first contact. Selector lists in `pyproject.toml` now name rules rather than code them (`"implicit-namespace-package"` for `INP001`), which is what the config linter prefers and reads better besides; and `# noqa: CODE` suppressions became `# ruff: ignore[rule-name]`, explanations preserved. The new formatter also reformats Python code blocks inside Markdown, so the documentation picked up trailing-comment and blank-line normalization.
+
+  The new directive is not a drop-in for `# noqa`: it attaches to the first line of a statement's range, where `# noqa` was also honoured on a continuation line. Where the migration made a line long enough for the formatter to split it, the suppression landed on a continuation line and stopped applying, which the follow-up pass then removed as unused. The affected deferred imports in `pipelex/tools/storage/gcp_storage_provider.py` and `pipelex/providers/openai/openai_completions_factory.py` carry their directive on the `from ... import (` line again.
+
+- **Rules newly reported under `preview` are ignored deliberately rather than in bulk.** `too-many-statements-in-try-clause` and `property-docstring-starts-with-verb` are ignored globally, `float-equality-comparison` and `import-private-name` only under `tests/`, each with the reason recorded next to it. Shrinking an existing `try` clause changes which statements its handlers cover, so it is an error-handling refactor rather than lint cleanup; the tests that compare floats assert literals that round-trip exactly, and the ones that import private `_core` modules do so on purpose, to exercise the logic behind a CLI command without going through the CLI. Those test-wide relaxations replace the per-line suppressions that used to carry them.
+
+### Fixed
+
+- **`pipelex.providers.bedrock` imported a type-stub package at runtime.** `ConverseResponseTypeDef` was imported both at module level and inside the module's `if TYPE_CHECKING:` block. It resolves only through `types-aioboto3`, which is a development dependency, so the module-level copy would raise `ModuleNotFoundError` on any install of `pipelex[bedrock]` without the dev extras. The duplicate is gone and the surviving import is the type-checking one; the annotation it serves is a local variable annotation, which is never evaluated at runtime.
+
+- **A usage example in `pipelex.test_extras.shared_pytest_plugins` had lost its `yield`.** The example fixture in `needs_inference_in_pipelex`'s docstring showed a teardown call with nothing handing control to the test first, its `yield` line having drifted into a literal `Yield:` docstring section on a function that only ever returns a `bool`. The example is a working fixture again.
+
 ## [v0.51.0] - 2026-08-21
 
 ### Added

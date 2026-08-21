@@ -10,7 +10,7 @@ from pipelex.graph.graphspec import GraphSpec, GraphSpecMode, IOSpec, NodeKind
 from pipelex.system.data_inclusion_config import DataInclusionConfig
 from pipelex.system.registries.singleton import ABCSingletonMeta, MetaSingleton
 from pipelex.system.trace_context import TraceContext
-from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in open_tracer signature
+from pipelex.tracing.event_log_protocol import EventLogProtocol  # ruff: ignore[typing-only-first-party-import] - used in open_tracer signature
 
 
 class GraphTracerManager(metaclass=ABCSingletonMeta):
@@ -143,7 +143,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             log.warning(f"Tracer for key '{key}' already exists; replacing stale tracer left by a prior interrupted execution")
             try:
                 self.close_tracer(key)
-            except Exception as stale_teardown_exc:  # noqa: BLE001
+            except Exception as stale_teardown_exc:  # ruff: ignore[blind-except]
                 # Best-effort: the stale tracer's teardown runs graph assembly over arbitrary
                 # half-built state from the interrupted execution — its failure must never
                 # fail the fresh run's setup (that would be the M1 class again: worker-local

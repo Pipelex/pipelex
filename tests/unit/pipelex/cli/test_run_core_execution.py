@@ -16,7 +16,7 @@ import pytest
 import typer
 from rich.console import Console
 
-from pipelex.cli.commands.run._run_core import _execute_run  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+from pipelex.cli.commands.run._run_core import _execute_run  # pyright: ignore[reportPrivateUsage]
 from pipelex.core.concepts.exceptions import ConceptValueError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.text_content import TextContent
@@ -102,8 +102,8 @@ class TestRunCoreExecution:
 
     def _make_absent_main_pipe_output(self) -> Any:
         """A pipe output whose main output resolved absent (real WorkingMemory, recorded absence)."""
-        from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord  # noqa: PLC0415
-        from pipelex.core.memory.working_memory import WorkingMemory  # noqa: PLC0415
+        from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord  # ruff: ignore[import-outside-top-level]
+        from pipelex.core.memory.working_memory import WorkingMemory  # ruff: ignore[import-outside-top-level]
 
         memory = WorkingMemory()
         memory.record_new_main_absence(

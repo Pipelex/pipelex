@@ -74,7 +74,7 @@ class TestGoogleImgGenWorkerPayload:
         worker = _make_worker(mocker)
         job = _make_img_gen_job(mocker, aspect_ratio=AspectRatio.SQUARE, size=SizeTier.TWO_K)
 
-        details = await worker._gen_image(img_gen_job=job)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        details = await worker._gen_image(img_gen_job=job)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         image_config = _sent_image_config(worker)
         assert image_config.aspect_ratio == "1:1"
@@ -86,7 +86,7 @@ class TestGoogleImgGenWorkerPayload:
         worker = _make_worker(mocker)
         job = _make_img_gen_job(mocker, aspect_ratio=AspectRatio.LANDSCAPE_16_9, size=None)
 
-        details = await worker._gen_image(img_gen_job=job)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        details = await worker._gen_image(img_gen_job=job)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         image_config = _sent_image_config(worker)
         assert image_config.aspect_ratio == "16:9"
@@ -98,7 +98,7 @@ class TestGoogleImgGenWorkerPayload:
         worker = _make_worker(mocker)
         job = _make_img_gen_job(mocker, aspect_ratio=AspectRatio.SQUARE, size=ImageSize(width=2752, height=1536))
 
-        details = await worker._gen_image(img_gen_job=job)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        details = await worker._gen_image(img_gen_job=job)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         image_config = _sent_image_config(worker)
         assert image_config.aspect_ratio == "16:9"

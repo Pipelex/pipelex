@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipelex.cli.dev_cli.commands.check_rules_sync_cmd import (
-    _DEFAULT_TARGETS,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
-    _get_preferred_targets_from_toml,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+    _DEFAULT_TARGETS,  # pyright: ignore[reportPrivateUsage]
+    _get_preferred_targets_from_toml,  # pyright: ignore[reportPrivateUsage]
     check_rules_sync_cmd,
 )
 from pipelex.system.configuration.configs import AgentTarget

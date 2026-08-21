@@ -30,7 +30,7 @@ class TestSyncAgentRulesCleanup:
         fake_config.kit.preferred_agent_targets = [AgentTarget.CLAUDE, AgentTarget.AGENTS]
         mocker.patch.object(kit_cmd, "get_config", return_value=fake_config)
 
-        kit_cmd._sync_agent_rules(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        kit_cmd._sync_agent_rules(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             repo_root=repo_root,
             agent_set="all",
             cleanup=True,

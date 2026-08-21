@@ -110,7 +110,7 @@ def set_nested_value(doc: TOMLDocument | Table | dict[str, Any], *, key_path: st
         if existing_trivia is not None:
             new_item: Any = current[final_key]  # type: ignore[assignment]
             if isinstance(new_item, Item):
-                new_item._trivia = existing_trivia  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+                new_item._trivia = existing_trivia  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         return True
 

@@ -109,8 +109,8 @@ def pytest_configure(config: Config) -> None:
         return
 
     # Import here to avoid circular imports during pytest startup
-    from pipelex.system.configuration.config_loader import config_manager  # noqa: PLC0415
-    from pipelex.system.pipelex_service.pipelex_service_config import (  # noqa: PLC0415
+    from pipelex.system.configuration.config_loader import config_manager  # ruff: ignore[import-outside-top-level]
+    from pipelex.system.pipelex_service.pipelex_service_config import (  # ruff: ignore[import-outside-top-level]
         is_pipelex_gateway_enabled,
         load_pipelex_service_config_if_exists,
     )
@@ -241,7 +241,7 @@ def needs_inference_in_pipelex(request: FixtureRequest) -> bool:
                 needs_inference=needs_inference_in_pipelex(request),
             )
 
-    Yield:
+            yield
             pipelex_instance.teardown()
 
     Args:

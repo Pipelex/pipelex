@@ -5,7 +5,7 @@ from pipelex.tools.secrets.secrets_config import SecretsProviderConfig
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
 
-def _make_env_secrets_provider(config: SecretsProviderConfig) -> SecretsProviderAbstract:  # noqa: ARG001 - env provider reads no config; uniform SecretsProviderFactoryFn signature
+def _make_env_secrets_provider(config: SecretsProviderConfig) -> SecretsProviderAbstract:  # ruff: ignore[unused-function-argument] - env provider reads no config; uniform SecretsProviderFactoryFn signature
     return EnvSecretsProvider()
 
 

@@ -12,7 +12,7 @@ class TestPipeBlueprintConversion:
     )
     def test_pipe_blueprint_to_core(
         self,
-        test_name: str,  # noqa: ARG002
+        test_name: str,  # ruff: ignore[unused-method-argument]
         pipe_spec: PipeSpec,
         expected_blueprint: PipeBlueprint,
     ):

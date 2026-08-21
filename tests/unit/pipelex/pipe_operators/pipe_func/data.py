@@ -8,7 +8,7 @@ from pipelex.system.registries.func_registry import pipe_func
 
 # Register test functions for validation tests
 @pipe_func(name="my_function")
-def my_function(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001  # pyright: ignore[reportUnusedParameter]
+def my_function(working_memory: WorkingMemory) -> TextContent:  # ruff: ignore[unused-function-argument]  # pyright: ignore[reportUnusedParameter]
     """Test function with no inputs."""
     return TextContent(text="test output")
 

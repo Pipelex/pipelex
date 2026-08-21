@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.cli.commands.run._run_core import _execute_run  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+from pipelex.cli.commands.run._run_core import _execute_run  # pyright: ignore[reportPrivateUsage]
 from pipelex.config import get_config
 from pipelex.core.memory.absence import AbsenceKind
 from pipelex.core.pipes.inputs.exceptions import OptionalValueAbsentError

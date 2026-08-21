@@ -16,10 +16,7 @@ Inject at boot, by passing your implementation to `Pipelex.make()`:
 from pipelex.pipelex import Pipelex
 
 pipelex = Pipelex.make(
-    reporting_delegate=MyReportingDelegate(),
-    secrets_provider=MySecretsProvider(),
-    content_generator=MyContentGenerator(),
-    pipe_router=MyPipeRouter()
+    reporting_delegate=MyReportingDelegate(), secrets_provider=MySecretsProvider(), content_generator=MyContentGenerator(), pipe_router=MyPipeRouter()
 )
 ```
 

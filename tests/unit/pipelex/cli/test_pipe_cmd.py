@@ -17,7 +17,7 @@ import typer
 
 from pipelex.builder.operations.pipe_ops import parse_pipe_spec
 from pipelex.cli.agent_cli.commands.pipe_cmd import (
-    _pipe_spec_to_toml,  # noqa: PLC2701 # pyright: ignore[reportPrivateUsage]
+    _pipe_spec_to_toml,  # pyright: ignore[reportPrivateUsage]
     pipe_cmd,
 )
 

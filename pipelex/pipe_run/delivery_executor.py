@@ -285,7 +285,7 @@ class DeliveryExecutor:
             self._add_optional_text_file(files=files, filename="mermaidflow.mmd", text=graph_outputs.mermaidflow_mmd, content_type="text/plain")
             self._add_optional_text_file(files=files, filename="mermaidflow.html", text=graph_outputs.mermaidflow_html, content_type="text/html")
             self._add_optional_text_file(files=files, filename="reactflow.html", text=graph_outputs.reactflow_html, content_type="text/html")
-        except Exception:  # noqa: BLE001
+        except Exception:  # ruff: ignore[blind-except]
             # Best-effort: graph generation spans a deep mermaid/reactflow render tree; a graph failure must never fail result delivery.
             log.warning("Failed to generate graph outputs")
 
@@ -301,7 +301,7 @@ class DeliveryExecutor:
         """Await a render coroutine and store the encoded result; log a warning on failure."""
         try:
             text = await render
-        except Exception:  # noqa: BLE001
+        except Exception:  # ruff: ignore[blind-except]
             # Best-effort: per-format rendering (incl. jinja2 viewer); a single render failure must not drop the other result files.
             log.warning(f"Failed to render {filename}")
             return

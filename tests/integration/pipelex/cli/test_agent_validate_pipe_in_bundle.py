@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipelex.cli.agent_cli.commands.validate._validate_core import (
-    validate_bundle_core,  # noqa: PLC2701
-    validate_pipe_in_bundle_core,  # noqa: PLC2701
+    validate_bundle_core,
+    validate_pipe_in_bundle_core,
 )
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 

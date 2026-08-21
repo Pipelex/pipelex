@@ -14,8 +14,8 @@ import typer
 from rich.console import Console
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
-from pipelex.cli.commands.fix._diff_sandbox import PreviewSandbox  # noqa: PLC2701
-from pipelex.cli.commands.fix._fix_core import _remap_result_to_originals  # pyright: ignore[reportPrivateUsage]  # noqa: PLC2701
+from pipelex.cli.commands.fix._diff_sandbox import PreviewSandbox
+from pipelex.cli.commands.fix._fix_core import _remap_result_to_originals  # pyright: ignore[reportPrivateUsage]
 from pipelex.cli.commands.fix.bundle_cmd import fix_bundle_cmd
 from pipelex.pipeline.fixes.fix_loop import FixBundleResult
 from pipelex.suggested_fix import FixSafety, SuggestedFix

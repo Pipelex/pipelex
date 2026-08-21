@@ -17,7 +17,7 @@ class TestMthdsVersionWarning:
         mock_log = mocker.patch("pipelex.libraries.library_manager.log")
 
         manager = LibraryManager()
-        manager._warn_if_mthds_version_unsatisfied(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        manager._warn_if_mthds_version_unsatisfied(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             mthds_version_constraint="^2.0.0",
             package_address="github.com/org/pkg",
         )
@@ -34,7 +34,7 @@ class TestMthdsVersionWarning:
         mock_log = mocker.patch("pipelex.libraries.library_manager.log")
 
         manager = LibraryManager()
-        manager._warn_if_mthds_version_unsatisfied(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        manager._warn_if_mthds_version_unsatisfied(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             mthds_version_constraint="^1.0.0",
             package_address="github.com/org/pkg",
         )
@@ -46,7 +46,7 @@ class TestMthdsVersionWarning:
         mock_log = mocker.patch("pipelex.libraries.library_manager.log")
 
         manager = LibraryManager()
-        manager._warn_if_mthds_version_unsatisfied(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        manager._warn_if_mthds_version_unsatisfied(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             mthds_version_constraint=">>>garbage",
             package_address="github.com/org/pkg",
         )
@@ -82,7 +82,7 @@ class TestMthdsVersionWarning:
         manager = LibraryManager()
         library = LibraryFactory.make_empty()
 
-        manager._load_single_dependency(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             library=library,
             resolved_dep=resolved_dep,
         )

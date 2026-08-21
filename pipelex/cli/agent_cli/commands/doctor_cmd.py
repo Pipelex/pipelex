@@ -263,7 +263,7 @@ def agent_doctor_cmd(
             models_healthy = False
             models_message = "skipped — fix configuration errors first"
             backend_file_reports = {}
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         # Agent CLI command boundary: agent_error() (NoReturn) converts any genuinely
         # unexpected failure into the structured error payload. PipelexConfigError is
         # handled by the inner arm above and never reaches here.

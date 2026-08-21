@@ -349,120 +349,122 @@ target-version = "py311"
 preview = true
 select = ["ALL"]
 ignore = [
-  "ANN201",   # Missing return type annotation for public function `my_func`
-  "ANN202",   # Missing return type annotation for private function `my_func`
-  "ANN204",   # Missing return type annotation for special method `my_func`
-  "ANN206",   #  Missing return type annotation for classmethod `my_func`
-  "ANN401",   # Dynamically typed expressions (typing.Any) are disallowed in `...`
-  "ASYNC230", # Async functions should not open files with blocking methods like `open`
-  "ASYNC240", # Async functions should not use pathlib.Path methods, use trio.Path or anyio.path
+  "missing-return-type-undocumented-public-function", # Missing return type annotation for public function `my_func`
+  "missing-return-type-private-function",             # Missing return type annotation for private function `my_func`
+  "missing-return-type-special-method",               # Missing return type annotation for special method `my_func`
+  "missing-return-type-class-method",                 #  Missing return type annotation for classmethod `my_func`
+  "any-type",                                         # Dynamically typed expressions (typing.Any) are disallowed in `...`
+  "blocking-open-call-in-async-function",             # Async functions should not open files with blocking methods like `open`
+  "blocking-path-method-in-async-function",           # Async functions should not use pathlib.Path methods, use trio.Path or anyio.path
 
-  "B903", # Class could be dataclass or namedtuple
+  "class-as-data-structure", # Class could be dataclass or namedtuple
 
-  "C901",   # Is to complex
-  "COM812", # Checks for the absence of trailing commas.
+  "complex-structure",      # Is to complex
+  "missing-trailing-comma", # Checks for the absence of trailing commas.
 
-  "CPY001", # Missing copyright notice at top of file
+  "missing-copyright-notice", # Missing copyright notice at top of file
 
-  "D100", # Missing docstring in public module
-  "D101", # Missing docstring in public class
-  "D102", # Missing docstring in public method
-  "D103", # Missing docstring in public function
-  "D104", # Missing docstring in public package
-  "D105", # Missing docstring in magic method
-  "D107", # Missing docstring in __init__
-  "D205", # 1 blank line required between summary line and description
-  "D400", # First line should end with a period
-  "D401", # First line of docstring should be in imperative mood: "My docstring...."
-  "D404", # First word of the docstring should not be "This"
-  "D415", # First line should end with a period, question mark, or exclamation point
+  "undocumented-public-module",          # Missing docstring in public module
+  "undocumented-public-class",           # Missing docstring in public class
+  "undocumented-public-method",          # Missing docstring in public method
+  "undocumented-public-function",        # Missing docstring in public function
+  "undocumented-public-package",         # Missing docstring in public package
+  "undocumented-magic-method",           # Missing docstring in magic method
+  "undocumented-public-init",            # Missing docstring in __init__
+  "missing-blank-line-after-summary",    # 1 blank line required between summary line and description
+  "missing-trailing-period",             # First line should end with a period
+  "non-imperative-mood",                 # First line of docstring should be in imperative mood: "My docstring...."
+  "docstring-starts-with-this",          # First word of the docstring should not be "This"
+  "property-docstring-starts-with-verb", # Our property docstrings read as noun phrases describing the value ("The resolved config."), which is how they render in reference docs
+  "missing-terminal-punctuation",        # First line should end with a period, question mark, or exclamation point
 
-  "DOC201", # `return` is not documented in docstring
-  "DOC202", # Docstring should not have a returns section because the function doesn't return anything
-  "DOC402", # `yield` is not documented in docstring
-  "DOC502", # Raised exception is not explicitly raised: `FileNotFoundError`
-  "DOC501", # Raised exception `ModuleFileError` missing from docstring
+  "docstring-missing-returns",      # `return` is not documented in docstring
+  "docstring-extraneous-returns",   # Docstring should not have a returns section because the function doesn't return anything
+  "docstring-missing-yields",       # `yield` is not documented in docstring
+  "docstring-extraneous-exception", # Raised exception is not explicitly raised: `FileNotFoundError`
+  "docstring-missing-exception",    # Raised exception `ModuleFileError` missing from docstring
 
-  "DTZ001", # `datetime.datetime()` called without a `tzinfo` argument
-  "DTZ005", # `datetime.datetime.now()` called without a `tz` argument
+  "call-datetime-without-tzinfo",     # `datetime.datetime()` called without a `tzinfo` argument
+  "call-datetime-now-without-tzinfo", # `datetime.datetime.now()` called without a `tz` argument
 
-  "ERA001", # Found commented-out code
+  "commented-out-code", # Found commented-out code
 
-  "FBT001", # Boolean-typed positional argument in function definition
-  "FBT002", # Boolean default positional argument in function definition
-  "FBT003", #Boolean positional value in function call
+  "boolean-type-hint-positional-argument",     # Boolean-typed positional argument in function definition
+  "boolean-default-value-positional-argument", # Boolean default positional argument in function definition
+  "boolean-positional-value-in-call",          #Boolean positional value in function call
 
-  "FIX002", # Line contains TODO, consider resolving the issue
+  "line-contains-todo", # Line contains TODO, consider resolving the issue
 
-  "FURB101", # `open` and `read` should be replaced by `Path(file_path.path).read_text(encoding="utf-8")`
-  "FURB113", # Checks for consecutive calls to append.
-  "FURB152", # Checks for literals that are similar to constants in math module.
+  "read-whole-file", # `open` and `read` should be replaced by `Path(file_path.path).read_text(encoding="utf-8")`
+  "repeated-append", # Checks for consecutive calls to append.
+  "math-constant",   # Checks for literals that are similar to constants in math module.
 
-  "LOG004", # `.exception()` call outside exception handlers
+  "log-exception-outside-except-handler", # `.exception()` call outside exception handlers
 
-  "PLC0105", # `TypeVar` name "SomethingType" does not reflect its covariance; consider renaming it to "SomethingType_co"
-  "PLC1901", # Checks for comparisons to empty strings.
+  "type-name-incorrect-variance", # `TypeVar` name "SomethingType" does not reflect its covariance; consider renaming it to "SomethingType_co"
+  "compare-to-empty-string",      # Checks for comparisons to empty strings.
 
-  "PLR0904", # Too many public methods ( > 20)
-  "PLR0911", # Too many return statements (/6)
-  "PLR0912", # Too many branches (/12)
-  "PLR0913", # Too many arguments in function definition (/5)
-  "PLR0914", # Too many local variables ( /15)
-  "PLR0915", # Too many statements (/50)
-  "PLR0917", # Too many positional arguments ( /5)
-  "PLR2004", # Magic value used in comparison, consider replacing `2` with a constant variable
-  "PLR6301", # Too many return statements in `for` loop
-  "PLR1702", # Too many nested blocks ( > 5)
+  "too-many-public-methods",           # Too many public methods ( > 20)
+  "too-many-return-statements",        # Too many return statements (/6)
+  "too-many-branches",                 # Too many branches (/12)
+  "too-many-arguments",                # Too many arguments in function definition (/5)
+  "too-many-locals",                   # Too many local variables ( /15)
+  "too-many-statements",               # Too many statements (/50)
+  "too-many-positional-arguments",     # Too many positional arguments ( /5)
+  "magic-value-comparison",            # Magic value used in comparison, consider replacing `2` with a constant variable
+  "no-self-use",                       # Too many return statements in `for` loop
+  "too-many-nested-blocks",            # Too many nested blocks ( > 5)
+  "too-many-statements-in-try-clause", # Shrinking an existing try clause changes which statements are covered by its handlers: an error-handling refactor, not lint cleanup
 
-  "PT013", # Incorrect import of `pytest`; use `import pytest` instead
+  "pytest-incorrect-pytest-import", # Incorrect import of `pytest`; use `import pytest` instead
 
-  "PTH100", # `os.path.abspath()` should be replaced by `Path.resolve()`
-  "PTH103", # `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
-  "PTH107", # `os.remove()` should be replaced by `Path.unlink()`
-  "PTH109", # `os.getcwd()` should be replaced by `Path.cwd()`
-  "PTH118", # `os.path.join()` should be replaced by `Path` with `/` operator
-  "PTH120", # `os.path.dirname()` should be replaced by `Path.parent`
-  "PTH110", # `os.path.exists()` should be replaced by `Path.exists()`
-  "PTH112", # `os.path.isdir()` should be replaced by `Path.is_dir()`
-  "PTH119", # `os.path.basename()` should be replaced by `Path.name`
-  "PTH123", # `open()` should be replaced by `Path.open()`
-  "PTH208", # Use `pathlib.Path.iterdir()` instead.
+  "os-path-abspath",  # `os.path.abspath()` should be replaced by `Path.resolve()`
+  "os-makedirs",      # `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
+  "os-remove",        # `os.remove()` should be replaced by `Path.unlink()`
+  "os-getcwd",        # `os.getcwd()` should be replaced by `Path.cwd()`
+  "os-path-join",     # `os.path.join()` should be replaced by `Path` with `/` operator
+  "os-path-dirname",  # `os.path.dirname()` should be replaced by `Path.parent`
+  "os-path-exists",   # `os.path.exists()` should be replaced by `Path.exists()`
+  "os-path-isdir",    # `os.path.isdir()` should be replaced by `Path.is_dir()`
+  "os-path-basename", # `os.path.basename()` should be replaced by `Path.name`
+  "builtin-open",     # `open()` should be replaced by `Path.open()`
+  "os-listdir",       # Use `pathlib.Path.iterdir()` instead.
 
-  "PYI051", # `Literal["auto"]` is redundant in a union with `str`
+  "redundant-literal-union", # `Literal["auto"]` is redundant in a union with `str`
 
-  "RET505", # superfluous-else-return
+  "superfluous-else-return", # superfluous-else-return
 
-  "RUF001", # String contains ambiguous `′` (PRIME). Did you mean ``` (GRAVE ACCENT)?
-  "RUF003", # Comment contains ambiguous `’` (RIGHT SINGLE QUOTATION MARK). Did you mean ``` (GRAVE ACCENT)?
-  "RUF022", # Checks for __all__ definitions that are not ordered according to an "isort-style" sort.
+  "ambiguous-unicode-character-string",  # String contains ambiguous `′` (PRIME). Did you mean ``` (GRAVE ACCENT)?
+  "ambiguous-unicode-character-comment", # Comment contains ambiguous `’` (RIGHT SINGLE QUOTATION MARK). Did you mean ``` (GRAVE ACCENT)?
+  "unsorted-dunder-all",                 # Checks for __all__ definitions that are not ordered according to an "isort-style" sort.
 
-  "SIM105", # Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
-  "SIM108", # Use ternary operator `description = func.__doc__.strip().split("\n")[0] if func.__doc__ else func.__name__` instead of `if`-`else`-block
+  "suppressible-exception",          # Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
+  "if-else-block-instead-of-if-exp", # Use ternary operator `description = func.__doc__.strip().split("\n")[0] if func.__doc__ else func.__name__` instead of `if`-`else`-block
 
-  "S101", # Use of `assert` detected
-  "S102", # Use of `exec` detected
-  "S106", # Possible hardcoded password assigned to argument: "secret"
-  "S105", # Possible hardcoded password assigned to: "child_secret"
+  "assert",                      # Use of `assert` detected
+  "exec-builtin",                # Use of `exec` detected
+  "hardcoded-password-func-arg", # Possible hardcoded password assigned to argument: "secret"
+  "hardcoded-password-string",   # Possible hardcoded password assigned to: "child_secret"
 
-  "S311", # Cryptographically weak pseudo-random number generator
+  "suspicious-non-cryptographic-random-usage", # Cryptographically weak pseudo-random number generator
 
-  "TD002", # Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`
-  "TD003", # Missing issue link for this TODO
+  "missing-todo-author", # Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`
+  "missing-todo-link",   # Missing issue link for this TODO
 
-  "T201", # `print` found
+  "print", # `print` found
 
   # TODO: stop ignoring these rules
-  "B027",    # Checks for empty methods in abstract base classes without an abstract decorator.
-  "UP007",   # Use `X | Y` for type annotations
-  "UP036",   # Version block is outdated for minimum Python version
-  "SIM102",  # Use a single `if` statement instead of nested `if` statements
-  "S701",    # Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
-  "TRY301",  # Abstract `raise` to an inner function
-  "PERF401", # Use a list comprehension to create a transformed list
-  "PLW2901", # `for` loop variable `line` overwritten by assignment target
-  "TRY300",  # Consider moving this statement to an `else` block
-  "UP035",   # `typing.List` is deprecated, use `list` instead
-  "RET503",  # Missing explicit `return` at the end of function able to return non-`None` value
+  "empty-method-without-abstract-decorator", # Checks for empty methods in abstract base classes without an abstract decorator.
+  "non-pep604-annotation-union",             # Use `X | Y` for type annotations
+  "outdated-version-block",                  # Version block is outdated for minimum Python version
+  "collapsible-if",                          # Use a single `if` statement instead of nested `if` statements
+  "jinja2-autoescape-false",                 # Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
+  "raise-within-try",                        # Abstract `raise` to an inner function
+  "manual-list-comprehension",               # Use a list comprehension to create a transformed list
+  "redefined-loop-name",                     # `for` loop variable `line` overwritten by assignment target
+  "try-consider-else",                       # Consider moving this statement to an `else` block
+  "deprecated-import",                       # `typing.List` is deprecated, use `list` instead
+  "implicit-return",                         # Missing explicit `return` at the end of function able to return non-`None` value
 ]
 
 [tool.ruff.lint.pydocstyle]
@@ -480,8 +482,21 @@ runtime-evaluated-base-classes = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = [
-  "INP001", # Allow test files to not have __init__.py in their directories (avoids namespace collisions)
-  "BLE001", # Broad `except Exception` is acceptable in tests (asserting failure modes, defensive fixtures)
+  "implicit-namespace-package", # Allow test files to not have __init__.py in their directories (avoids namespace collisions)
+  "blind-except",               # Broad `except Exception` is acceptable in tests (asserting failure modes, defensive fixtures)
+  "float-equality-comparison",  # Tests assert exact float literals that round-trip exactly; `pytest.approx` would only add noise
+  "import-private-name",        # Tests reach into private `_core` modules on purpose, to exercise the logic behind a CLI command without going through the CLI
+]
+
+# The usage example in `needs_inference_in_pipelex` is a pytest fixture, so it contains a bare `yield`
+# line. Ruff's Google-style parser reads any line starting with `yield` as a section header, wherever it
+# is indented, and its autofixes then rewrite it into a literal `Yield:` section that breaks the example.
+# The diagnostics land inside the docstring body, so no suppression comment can reach them.
+"pipelex/test_extras/shared_pytest_plugins.py" = [
+  "incorrect-section-order",
+  "overindented-section",
+  "non-capitalized-section-name",
+  "missing-section-name-colon",
 ]
 
 [tool.uv]

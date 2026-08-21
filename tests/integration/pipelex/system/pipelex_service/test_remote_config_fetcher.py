@@ -14,7 +14,7 @@ These tests pin the post-refactor semantics:
 from __future__ import annotations
 
 import json
-from pathlib import Path  # noqa: TC003 — referenced by pytest fixture type hints at runtime
+from pathlib import Path  # ruff: ignore[typing-only-standard-library-import] — referenced by pytest fixture type hints at runtime
 from typing import TYPE_CHECKING, Any
 
 import httpx

@@ -96,7 +96,7 @@ class TestGatewayImgGenWorkerMalformedBody:
         _patch_gateway_success(mocker, worker, response)
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.UNKNOWN
         assert exc_info.value.user_action is not None
@@ -119,7 +119,7 @@ class TestGatewayImgGenWorkerMalformedBody:
         _patch_gateway_success(mocker, worker, response)
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.UNKNOWN
         assert exc_info.value.user_action is not None

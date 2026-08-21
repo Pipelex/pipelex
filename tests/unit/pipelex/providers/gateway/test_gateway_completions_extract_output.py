@@ -91,7 +91,7 @@ class TestGatewayCompletionsExtractOutput:
         page_dicts = [{"index": 0, "markdown": "hello"}, {"index": 1, "markdown": "world"}]
         response = _choices_response(json.dumps(page_dicts))
 
-        result = GatewayCompletionsFactory._extract_pages_from_choices_content(response=response)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        result = GatewayCompletionsFactory._extract_pages_from_choices_content(response=response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert result == page_dicts
 
@@ -113,7 +113,7 @@ class TestGatewayCompletionsExtractOutput:
         """Every malformed or missing choices/message/content shape returns None, never raises."""
         response = _response(payload)
 
-        result = GatewayCompletionsFactory._extract_pages_from_choices_content(response=response)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        result = GatewayCompletionsFactory._extract_pages_from_choices_content(response=response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert result is None
 
@@ -149,7 +149,7 @@ class TestGatewayCompletionsExtractOutput:
             },
         )
 
-        extract_output = GatewayCompletionsFactory._make_extract_output_from_response_azure(response=response)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        extract_output = GatewayCompletionsFactory._make_extract_output_from_response_azure(response=response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert list(extract_output.pages.keys()) == [2]
         page = extract_output.pages[2]
@@ -169,7 +169,7 @@ class TestGatewayCompletionsExtractOutput:
         page_dicts: list[dict[str, Any]] = [{"index": 0, "markdown": "Fallback page", "images": []}]
         response = _choices_response(json.dumps(page_dicts))
 
-        extract_output = GatewayCompletionsFactory._make_extract_output_from_response_azure(response=response)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        extract_output = GatewayCompletionsFactory._make_extract_output_from_response_azure(response=response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert list(extract_output.pages.keys()) == [0]
         assert extract_output.pages[0].text == "Fallback page"
@@ -178,21 +178,21 @@ class TestGatewayCompletionsExtractOutput:
     def test_azure_without_pages_anywhere_raises(self) -> None:
         """Neither a top-level pages field nor a choices fallback means the response is unusable."""
         with pytest.raises(GatewayExtractResponseError, match="does not have pages"):
-            GatewayCompletionsFactory._make_extract_output_from_response_azure(response=_response({"success": True}))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            GatewayCompletionsFactory._make_extract_output_from_response_azure(response=_response({"success": True}))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     def test_azure_page_schema_violation_is_wrapped(self) -> None:
         """A page dict failing GatewayExtractPageAzure validation is wrapped in GatewayExtractResponseError."""
         response = _response({"pages": [{"index": 0, "images": []}]})
 
         with pytest.raises(GatewayExtractResponseError, match="Azure schema"):
-            GatewayCompletionsFactory._make_extract_output_from_response_azure(response=response)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            GatewayCompletionsFactory._make_extract_output_from_response_azure(response=response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     # ---- Mistral Doc AI ----
 
     def test_mistral_without_pages_raises(self) -> None:
         """A response with no pages attribute is rejected (Mistral has no choices fallback)."""
         with pytest.raises(GatewayExtractResponseError, match="does not have pages"):
-            GatewayCompletionsFactory._make_extract_output_from_response_mistral(response=_response({"success": True}))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            GatewayCompletionsFactory._make_extract_output_from_response_mistral(response=_response({"success": True}))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     def test_mistral_pages_with_images_corner_handling(self) -> None:
         """Images without base64 are skipped; full corner coords build a BoundingBox; partial coords leave it None."""
@@ -219,7 +219,7 @@ class TestGatewayCompletionsExtractOutput:
             },
         )
 
-        extract_output = GatewayCompletionsFactory._make_extract_output_from_response_mistral(response=response)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        extract_output = GatewayCompletionsFactory._make_extract_output_from_response_mistral(response=response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert list(extract_output.pages.keys()) == [0]
         page = extract_output.pages[0]
@@ -248,7 +248,7 @@ class TestGatewayCompletionsExtractOutput:
         response = _response({"pages": [{"index": 0, "markdown": "missing images field"}]})
 
         with pytest.raises(GatewayExtractResponseError, match="Mistral schema"):
-            GatewayCompletionsFactory._make_extract_output_from_response_mistral(response=response)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            GatewayCompletionsFactory._make_extract_output_from_response_mistral(response=response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     # ---- DeepSeek OCR ----
 
@@ -256,7 +256,7 @@ class TestGatewayCompletionsExtractOutput:
         """Top-level pages parse into text-only Pages with no extracted images."""
         response = _response({"pages": [{"index": 1, "markdown": "## Page two"}]})
 
-        extract_output = GatewayCompletionsFactory._make_extract_output_from_response_deepseek(response=response)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        extract_output = GatewayCompletionsFactory._make_extract_output_from_response_deepseek(response=response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert list(extract_output.pages.keys()) == [1]
         assert extract_output.pages[1].text == "## Page two"
@@ -281,7 +281,7 @@ class TestGatewayCompletionsExtractOutput:
             },
         )
 
-        extract_output = GatewayCompletionsFactory._make_extract_output_from_response_deepseek(response=response)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        extract_output = GatewayCompletionsFactory._make_extract_output_from_response_deepseek(response=response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert extract_output.pages[0].text == "Scaled page"
         mock_log.warning.assert_called_once()
@@ -294,7 +294,7 @@ class TestGatewayCompletionsExtractOutput:
         page_dicts = [{"index": 0, "markdown": "Fallback md"}]
         response = _choices_response(json.dumps(page_dicts))
 
-        extract_output = GatewayCompletionsFactory._make_extract_output_from_response_deepseek(response=response)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        extract_output = GatewayCompletionsFactory._make_extract_output_from_response_deepseek(response=response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert list(extract_output.pages.keys()) == [0]
         assert extract_output.pages[0].text == "Fallback md"
@@ -302,14 +302,14 @@ class TestGatewayCompletionsExtractOutput:
     def test_deepseek_without_pages_anywhere_raises(self) -> None:
         """Neither a top-level pages field nor a choices fallback means the response is unusable."""
         with pytest.raises(GatewayExtractResponseError, match="does not have pages"):
-            GatewayCompletionsFactory._make_extract_output_from_response_deepseek(response=_response({"success": True}))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            GatewayCompletionsFactory._make_extract_output_from_response_deepseek(response=_response({"success": True}))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     def test_deepseek_page_schema_violation_is_wrapped(self) -> None:
         """A page dict failing GatewayExtractPageDeepseek validation is wrapped in GatewayExtractResponseError."""
         response = _response({"pages": [{"markdown": "missing index"}]})
 
         with pytest.raises(GatewayExtractResponseError, match="Deepseek schema"):
-            GatewayCompletionsFactory._make_extract_output_from_response_deepseek(response=response)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            GatewayCompletionsFactory._make_extract_output_from_response_deepseek(response=response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     # ---- Linkup fetch ----
 
@@ -327,7 +327,7 @@ class TestGatewayCompletionsExtractOutput:
         }
         response = _choices_response(json.dumps(fetch_payload))
 
-        extract_output = GatewayCompletionsFactory._make_extract_output_from_response_linkup_fetch(response=response)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        extract_output = GatewayCompletionsFactory._make_extract_output_from_response_linkup_fetch(response=response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert list(extract_output.pages.keys()) == [0]
         page = extract_output.pages[0]
@@ -352,14 +352,14 @@ class TestGatewayCompletionsExtractOutput:
     )
     def test_extract_content_string_falsy_paths_return_none(self, payload: dict[str, Any]) -> None:
         """Malformed message/content shapes yield None from the content-string extractor."""
-        result = GatewayCompletionsFactory._extract_content_string_from_response(response=_response(payload))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        result = GatewayCompletionsFactory._extract_content_string_from_response(response=_response(payload))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert result is None
 
     def test_linkup_fetch_without_content_raises(self) -> None:
         """A response with no usable choices content cannot be parsed as a fetch result."""
         with pytest.raises(GatewayExtractResponseError, match="does not contain content"):
-            GatewayCompletionsFactory._make_extract_output_from_response_linkup_fetch(response=_response({"success": True}))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            GatewayCompletionsFactory._make_extract_output_from_response_linkup_fetch(response=_response({"success": True}))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     @pytest.mark.parametrize(
         "invalid_content",
@@ -371,4 +371,4 @@ class TestGatewayCompletionsExtractOutput:
         response = _choices_response(invalid_content)
 
         with pytest.raises(GatewayExtractResponseError, match="Error parsing Gateway fetch response"):
-            GatewayCompletionsFactory._make_extract_output_from_response_linkup_fetch(response=response)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            GatewayCompletionsFactory._make_extract_output_from_response_linkup_fetch(response=response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-import subprocess  # noqa: S404
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 from typing import TYPE_CHECKING
 
 import pytest
@@ -60,7 +60,7 @@ class TestPlxtPassthrough:
     def test_run_plxt_propagates_exit_code(
         self,
         mocker: MockerFixture,
-        topic: str,  # noqa: ARG002
+        topic: str,  # ruff: ignore[unused-method-argument]
         exit_code: int,
     ) -> None:
         """run_plxt propagates the subprocess exit code via typer.Exit."""

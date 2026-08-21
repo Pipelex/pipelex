@@ -127,7 +127,7 @@ class TestAzureImgGenWorkerSemantic:
         _patch_httpx_status_error(mocker, sdk_exc)
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
         assert exc_info.value.user_action is not None
@@ -143,7 +143,7 @@ class TestAzureImgGenWorkerSemantic:
         _patch_httpx_status_error(mocker, sdk_exc)
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CAPACITY
         assert exc_info.value.user_action is not None
@@ -155,7 +155,7 @@ class TestAzureImgGenWorkerSemantic:
         _patch_httpx_status_error(mocker, sdk_exc)
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
         assert exc_info.value.user_action is not None
@@ -167,7 +167,7 @@ class TestAzureImgGenWorkerSemantic:
         _patch_httpx_status_error(mocker, sdk_exc)
 
         with pytest.raises(ImgGenModelNotFoundError) as exc_info:
-            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
         assert exc_info.value.user_action is not None
@@ -180,7 +180,7 @@ class TestAzureImgGenWorkerSemantic:
         _patch_httpx_status_error(mocker, sdk_exc)
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONTENT
         assert exc_info.value.user_action is not None
@@ -193,7 +193,7 @@ class TestAzureImgGenWorkerSemantic:
         _patch_httpx_status_error(mocker, sdk_exc)
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONTENT
         assert exc_info.value.user_action is not None
@@ -208,7 +208,7 @@ class TestAzureImgGenWorkerSemantic:
         _patch_httpx_status_error(mocker, sdk_exc)
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.AMBIGUOUS
         assert exc_info.value.user_action is not None
@@ -223,7 +223,7 @@ class TestAzureImgGenWorkerSemantic:
         _patch_httpx_malformed_json(mocker, raw_body=raw_body)
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.UNKNOWN
         assert exc_info.value.user_action is not None
@@ -241,7 +241,7 @@ class TestAzureImgGenWorkerSemantic:
         _patch_httpx_status_error(mocker, sdk_exc)
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert secret_body not in exc_info.value.message
         assert secret_body not in str(exc_info.value)
@@ -283,7 +283,7 @@ class TestAzureImgGenWorkerSemantic:
         _patch_httpx_post_raises(mocker, sdk_exc)
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.user_action is not None
@@ -304,7 +304,7 @@ class TestAzureImgGenWorkerSemantic:
         )
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.UNKNOWN
         assert exc_info.value.user_action is not None

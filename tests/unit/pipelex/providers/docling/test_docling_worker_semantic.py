@@ -28,7 +28,7 @@ def _make_worker(mocker: MockerFixture) -> DoclingExtractWorker:
 def _make_extract_job(mocker: MockerFixture) -> Any:
     job = mocker.MagicMock()
     job.extract_input.image_uri = None
-    job.extract_input.document_uri = "/tmp/test.pdf"  # noqa: S108
+    job.extract_input.document_uri = "/tmp/test.pdf"  # ruff: ignore[hardcoded-temp-file]
     job.job_params.max_nb_images = 0
     job.job_report.extract_tokens_usage = None
     return job
@@ -58,12 +58,12 @@ class TestDoclingWorkerSemantic:
         worker = _make_worker(mocker)
         sdk_exc = exception_class(exception_message)
 
-        from pipelex.tools.uri.prepared_file import PreparedFileLocalPath  # noqa: PLC0415
+        from pipelex.tools.uri.prepared_file import PreparedFileLocalPath  # ruff: ignore[import-outside-top-level]
 
         mocker.patch(
             "pipelex.providers.docling.docling_extract_worker.prepare_file_from_uri",
             new_callable=mocker.AsyncMock,
-            return_value=PreparedFileLocalPath(path="/tmp/test.pdf"),  # noqa: S108
+            return_value=PreparedFileLocalPath(path="/tmp/test.pdf"),  # ruff: ignore[hardcoded-temp-file]
         )
         mocker.patch(
             "pipelex.providers.docling.docling_extract_worker.asyncio.to_thread",
@@ -72,7 +72,7 @@ class TestDoclingWorkerSemantic:
         )
 
         with pytest.raises(ExtractJobFailureError) as exc_info:
-            await worker._extract_pages(extract_job=_make_extract_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._extract_pages(extract_job=_make_extract_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.user_action is not None

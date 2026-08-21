@@ -14,8 +14,8 @@ from pipelex.pipeline.fixes.file_transaction import (
     read_file_snapshot,
 )
 from pipelex.pipeline.fixes.fix_loop import (
-    _bind_fixes_to_snapshots,  # pyright: ignore[reportPrivateUsage]  # noqa: PLC2701
-    _snapshot_loaded_sources,  # pyright: ignore[reportPrivateUsage]  # noqa: PLC2701
+    _bind_fixes_to_snapshots,  # pyright: ignore[reportPrivateUsage]
+    _snapshot_loaded_sources,  # pyright: ignore[reportPrivateUsage]
 )
 from pipelex.suggested_fix import FixSafety, SuggestedFix
 
