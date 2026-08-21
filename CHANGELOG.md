@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`pipelex-dev trace-input-semantics`, a capture harness for the input-schema emission chain.** Given one or more `.mthds` bundles, it dumps one artifact per hop of the chain that turns authored structure syntax into the `json_schema` on `pipe_io_contracts` — parse blueprint, generated class source, raw pydantic schema, SCHEMA render, wire contract — plus a manifest with each input's wire framing, so a lost or mangled authored fact is localized to exactly one hop. A committed probe bundle at `tests/data/input_semantics/probe_bundle.mthds` exercises every construct the language accepts, with deliberately-invalid fixtures under `tests/data/input_semantics/rejected/` pinning what it refuses. Documented in `docs/contribute/trace-input-semantics.md`.
+
 ### Changed
 
 - **Ruff moves to 0.16.4, matching the version the VS Code extension bundles.** The extension now syncs `pyproject.toml` and `ruff.toml` documents to the language server, because Ruff from 0.16 on lints its own config files. A binary older than that parses those documents as Python source and paints phantom `invalid-syntax` diagnostics across every `pyproject.toml` — `requires-python = ...` read as `requires - python`. Pinning the dev dependency to the exact version the extension ships keeps the editor and the command line on one binary, so a rule can never fire in one and not the other. This is a dev-dependency change: nothing shipped changes, and there is no version bump.

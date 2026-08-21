@@ -68,20 +68,28 @@ Candidates gathered from the brief and a first pass over the chain code. Each is
 
 ## Phase 3 — Classify and place the wrinkles
 
-- [ ] Mark every gap **engine-side** or **language-side** using the brief's test: could a `.mthds` author write it today, in any syntax the parser accepts? Evidence as `path/file.py:line` for every engine-side claim.
-- [ ] Confirm and complete the language-side ceiling from the Phase 0 parser findings — the brief's candidate list (no numeric ranges, no string lengths or patterns, no examples, no units, no per-input-slot description on a pipe) verified against what the parser actually accepts, plus anything the brief missed (e.g. non-string choice values, labeled choices).
-- [ ] Catalogue the engine-authored descriptions on the native content classes (`TextContent`, `DocumentContent`, `ImageContent`, and friends): which are contracts-in-disguise. Verify the known one — the app's upload dropzone keying on the "pipelex storage url" / "document url" wording of `DocumentContent.url` — read-only in `pipelex-app`, and sweep for others of the same kind.
-- [ ] Settle the two meaning questions with evidence, not guesses: what `default_value` *means* today (find where the generated default is actually consumed at runtime — is it applied on absence during execution, is it "prefill the form", or both?), and how `required` (structure-field level) relates to `?` (pipe-input level) — two levels, two wire routes, both documented precisely.
-- [ ] Fill the downstream column: pin each of the direction doc's `pipelex-app` workarounds (hardcoded native ref sets, object-shape sniffing, description-substring matching, prose-vs-label by nesting depth) to the specific gap it compensates for. Worked-around gaps rank first.
+- [x] Mark every gap **engine-side** or **language-side** using the brief's test: could a `.mthds` author write it today, in any syntax the parser accepts? Evidence as `path/file.py:line` for every engine-side claim. Result: ten engine-side entries (E1–E10 in `findings.md` §A), each a closable work item.
+- [x] Confirm and complete the language-side ceiling from the Phase 0 parser findings — thirteen entries (`findings.md` §B), including three the brief missed: choice labels, inner types of nested lists, and refine-and-extend (`refines` XOR `structure` means a refinement can never add fields, `concept_blueprint.py:95`).
+- [x] Catalogue the engine-authored descriptions on the native content classes (`findings.md` §D). The known contract-in-disguise was verified read-only in `pipelex-app` — and found *already half-drifted*: the app's matcher checks `"pipelex storage url"` and `"document url"`, but the current `DocumentContent.url` wording ("a storage URI") only matches the second. Two more contract families surfaced: `DocumentContent`'s field *names* (a value-sniff set in the app) and `TextContent`'s `{text}` wrapper shape.
+- [x] Settle the two meaning questions (`findings.md` §C). `default_value` is an execution-level default applied on absence at the one input-ingestion seam (`stuff_content_factory.py:35`) and for LLM structured output; the inputs template deliberately omits defaulted fields; dry-run mocks ignore defaults. `required` (payload-level, travels inside the schema) and `?` (slot-level, travels as the contract flag) never interact; `!` is a use-site assertion flattened into plain at the contract.
+- [x] Fill the downstream column — every one of the direction doc's four workaround families pinned to file:line in `pipelex-app`, plus finds the direction doc missed: `const` (single-entry choices) unhandled anywhere in the app, multiplicity rebuilt from `type: "array"` in three independent places (one documented gating bug), and the pydantic `title` discarded/overwritten because it is the class name.
 
 ## Phase 4 — Write the findings and close the milestone
 
-- [ ] Write `findings.md` beside this file: the two lists, every entry carrying *where authored*, *where lost* (the exact hop), and *who guesses today* — at most one sentence of recommendation per entry, no design sections.
-- [ ] Phrase the engine-side list so S2 can be scoped directly from it (each entry a closable work item), and the language-side list so the MTHDS design session (Track H) can read it without this repo's context.
-- [ ] Place the native-description catalogue and the two meaning answers in `findings.md` as their own sections — they are inputs to S2's blast-radius planning and to D1's slot semantics respectively.
+- [x] `findings.md` written beside this file: the two lists with *where authored* / *where lost* / *who guesses today* per entry, one sentence of recommendation each, no design sections.
+- [x] Engine-side list phrased as S2 work items with a ranking section (§E, worked-around gaps first); language-side list written repo-context-free for Track H.
+- [x] Native-description catalogue (§D) and the two meaning answers (§C) placed as their own sections.
 
-**Checkpoint CP2 — milestone gate.** When `findings.md` is written:
+**Checkpoint CP2 — milestone gate. ✅ Reached 2026-08-21, S1 closed.**
 
-- [ ] Keep the tool: document `pipelex-dev trace-input-semantics` in the repo docs (a short page or a section in the dev-CLI docs, same register as `generate-mthds-schema`), and note it in the changelog's Unreleased section.
-- [ ] Update this plan's checkboxes and record decisions taken and surprises found.
-- [ ] Update `../wip/devx/input-form-roadmap.md` per its checkpoint protocol — S1 closed, the D1 freeze is waiting on the news, and S2 takes the engine-side list as its worklist.
+- [x] Tool kept and documented: `docs/contribute/trace-input-semantics.md` (in both mkdocs navs), a `trace-input-semantics` bullet in the kit agent-rules templates (`commands.md` / `codex_commands.md`, regenerated via `make rules`), and a changelog entry under Unreleased.
+- [x] Plan checkboxes updated; decisions and surprises recorded below.
+- [x] `../wip/devx/input-form-roadmap.md` updated per its checkpoint protocol — S1 marked closed with what D1, S2, H1, and K1/M1 each need from the findings.
+
+**Decisions taken and surprises found in Phases 3–4** (beyond the CP1 list, which still stands):
+
+- **A live authoring-path data-loss bug surfaced during the `default_value` trace** (findings E8): the builder's TOML writer emits the key `default` instead of `default_value` (`pipelex/builder/operations/concept_ops.py:115-116`), and because `ConceptStructureBlueprint` ignores extras, a builder-emitted default validates green and evaporates on re-load. Per the brief, not fixed here — it is on the S2 list, and E7's `extra="forbid"` would have caught it.
+- **The app's description-substring contract has already half-broken in the wild**: the `"pipelex storage url"` branch of `document-url-widget.tsx:130-136` matches nothing against the current `DocumentContent.url` wording — the drift the brief warned about had already happened, silently. `ImageContent.url` matches neither substring, so image inputs never get the RJSF dropzone by that route.
+- **The parse-layer extras asymmetry is the ceiling's enforcement gap**: `ConceptBlueprint` forbids unknown keys, `ConceptStructureBlueprint` silently drops them — so almost the whole language-side ceiling fails silently at the field level. Classified engine-side (E7) because the silence, not the ceiling, is the engine's.
+- **Classification judgment call:** `[]` multiplicity was given an engine-side entry (E9) even though it "survives" as array wrapping, because the contract carries no structured multiplicity field and the app rebuilds it from schema shape in three places — the brief's who-guesses test decided it.
+- **Scope discipline held:** no fixes, no descriptor design; the only repo changes besides `wip/` documents are the tool docs, the kit-template bullets, and the changelog entry required by this gate.
