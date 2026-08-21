@@ -23,7 +23,7 @@ The language can say it; the emission drops or mangles it. Each entry is phrased
 - **Lost:** between hop 2 and hop 3 — the generated class *inherits* from the refined class, so only inherited field shapes survive; the link itself is gone. Measured on `RefinedDoc` and the `BaseEntity ← SpecialEntity ← ExtraSpecialEntity` chain.
 - **Who guesses:** "does this refine Document" is answered by object-shape sniffing on one surface — `isDocumentObject` is `Boolean(schema.properties?.url)` "and nothing more" (`pipelex-app/src/lib/run-form/field-model.ts:186-197`) — and by description-substring matching on the other (`src/components/method/document-url-widget.tsx:130-136`, matching lowercased `"pipelex storage url"` / `"document url"`). A value-side twin hardcodes `DocumentContent`'s field names as a sniff set (`src/lib/input-format.ts:176-182`).
 - **Measured drift, worth flagging in S2's blast radius:** the current `DocumentContent.url` description is "The document URL: a storage URI, an HTTP(S) URL, or a base64 data URL" (`pipelex/core/stuffs/document_content.py:16`) — the `"pipelex storage url"` branch of the app's matcher **already matches nothing** (the app's own test fixture pins the older wording); only `"document url"` still fires. `ImageContent.url` ("The image URL: …", `image_content.py:20`) matches neither substring, so image URL fields never get the RJSF dropzone by this route.
-- **Recommendation:** expose the refinement chain (at least "refines `native.X`") as a fact on the wire.
+- **Recommendation:** expose the refinement chain (at least "refines `native.X`") as a fact on the wire. The half-dead matcher is filed app-side as `../wip/inbox/2026-08-21-pipelex-app-document-dropzone-matcher-half-dead.md`.
 
 ### E3. `required = true` plus `default_value` silently drops the required-ness
 
@@ -65,7 +65,7 @@ The language can say it; the emission drops or mangles it. Each entry is phrased
 - **Authored:** via the builder / agent-CLI `concept` command — `structure_field_to_dict` emits the TOML key `default` (`pipelex/builder/operations/concept_ops.py:115-116`).
 - **Lost:** hop 1 on the round trip — `ConceptStructureBlueprint` has no alias for `default`, and extras are ignored (E7), so a builder-emitted default validates green and reaches nothing (verified by direct `model_validate`). Docs and fixtures agree the authored spelling is `default_value`; only this writer disagrees.
 - **Who guesses:** any agent or user authoring through the builder — their default evaporates without a signal.
-- **Recommendation:** one-line fix in `concept_ops.py` (write `default_value`); E7's `extra="forbid"` would have caught this as a hard failure.
+- **Recommendation:** one-line fix in `concept_ops.py` (write `default_value`); E7's `extra="forbid"` would have caught this as a hard failure. Filed as `../wip/inbox/2026-08-21-pipelex-builder-default-key-dropped.md` so it need not wait for the whole S2 milestone.
 
 ### E9. Multiplicity survives only as schema shape, never as a contract field
 
