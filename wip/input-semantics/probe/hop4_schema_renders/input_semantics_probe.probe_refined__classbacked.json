@@ -1,0 +1,17 @@
+{
+  "concept": "input_semantics_probe.ClassBacked",
+  "content": {
+    "properties": {
+      "text": {
+        "description": "The text",
+        "title": "Text",
+        "type": "string"
+      }
+    },
+    "required": [
+      "text"
+    ],
+    "title": "TextContent",
+    "type": "object"
+  }
+}

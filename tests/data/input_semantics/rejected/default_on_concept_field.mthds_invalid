@@ -1,0 +1,14 @@
+domain      = "input_semantics_rejected"
+description = "REJECTED probe: a concept-typed field cannot carry a default_value"
+
+[concept.Holder]
+description = "Holder of a concept field with a default"
+
+[concept.Holder.structure]
+part = { type = "concept", concept_ref = "Part", description = "concept field with default", default_value = "nope" }
+
+[concept.Part]
+description = "A part"
+
+[concept.Part.structure]
+name = "A name"

@@ -1,0 +1,123 @@
+{
+  "concept": "native.Image",
+  "content": {
+    "properties": {
+      "url": {
+        "description": "The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
+        "title": "Url",
+        "type": "string"
+      },
+      "public_url": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "The public URL of the image",
+        "title": "Public Url"
+      },
+      "source_prompt": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "The source prompt of the image",
+        "title": "Source Prompt"
+      },
+      "source_negative_prompt": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "The source negative prompt of the image",
+        "title": "Source Negative Prompt"
+      },
+      "caption": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "The caption of the image",
+        "title": "Caption"
+      },
+      "mime_type": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "The MIME type of the image",
+        "title": "Mime Type"
+      },
+      "width": {
+        "anyOf": [
+          {
+            "exclusiveMinimum": 0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "The width of the image, in pixels",
+        "title": "Width"
+      },
+      "height": {
+        "anyOf": [
+          {
+            "exclusiveMinimum": 0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "The height of the image, in pixels",
+        "title": "Height"
+      },
+      "filename": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "The original filename of the image",
+        "title": "Filename"
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "title": "ImageContent",
+    "type": "object"
+  }
+}

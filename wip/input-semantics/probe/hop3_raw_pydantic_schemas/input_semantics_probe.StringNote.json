@@ -1,0 +1,15 @@
+{
+  "description": "PROBE_desc_concept_StringNote: a concept declared as a bare string",
+  "properties": {
+    "text": {
+      "description": "The text",
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "text"
+  ],
+  "title": "input_semantics_probe__StringNote",
+  "type": "object"
+}

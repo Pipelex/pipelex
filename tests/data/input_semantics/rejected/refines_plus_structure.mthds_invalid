@@ -1,0 +1,9 @@
+domain      = "input_semantics_rejected"
+description = "REJECTED probe: refines and structure are mutually exclusive on a concept"
+
+[concept.Hybrid]
+description = "A concept trying to refine AND declare structure"
+refines     = "native.Text"
+
+[concept.Hybrid.structure]
+extra = "An extra field"

@@ -1,0 +1,8 @@
+domain      = "input_semantics_rejected"
+description = "REJECTED probe: choices must be strings — numeric choice values are refused"
+
+[concept.Rating]
+description = "A rating with numeric choices"
+
+[concept.Rating.structure]
+stars = { choices = [1, 2, 3], description = "numeric choices" }

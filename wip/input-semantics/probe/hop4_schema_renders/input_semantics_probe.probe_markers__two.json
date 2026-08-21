@@ -1,0 +1,50 @@
+{
+  "concept": "input_semantics_probe.Gadget",
+  "content": {
+    "type": "array",
+    "items": {
+      "$defs": {
+        "input_semantics_probe__Trinket": {
+          "description": "PROBE_desc_concept_Trinket: leaf structure for two-level nesting",
+          "properties": {
+            "label": {
+              "description": "PROBE_desc_field_trinket_label: shorthand string field on the nesting leaf",
+              "title": "Label",
+              "type": "string"
+            }
+          },
+          "required": [
+            "label"
+          ],
+          "title": "input_semantics_probe__Trinket",
+          "type": "object"
+        }
+      },
+      "description": "PROBE_desc_concept_Gadget: mid-level structure nested inside Widget",
+      "properties": {
+        "name": {
+          "description": "PROBE_desc_field_gadget_name",
+          "title": "Name",
+          "type": "string"
+        },
+        "trinket": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/input_semantics_probe__Trinket"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "PROBE_desc_field_gadget_trinket: nested concept, level two"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "input_semantics_probe__Gadget",
+      "type": "object"
+    }
+  }
+}
