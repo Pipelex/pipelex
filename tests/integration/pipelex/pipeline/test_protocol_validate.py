@@ -102,6 +102,11 @@ class TestProtocolValidate:
             assert report.bundle_blueprint.domain == "protocol_validate"
             # `pipe_io_contracts` and `validated_pipes` are keyed/identified by namespaced pipe_ref.
             assert report.pipe_io_contracts["protocol_validate.summarize"].output.concept_ref == "protocol_validate.Summary"
+            # `input_form` is assembled in the same library window and shares the contracts' key set.
+            assert set(report.input_form) == set(report.pipe_io_contracts)
+            assert [field.name for field in report.input_form["protocol_validate.summarize"].fields] == list(
+                report.pipe_io_contracts["protocol_validate.summarize"].inputs
+            )
             assert {(entry["pipe_ref"], entry["status"]) for entry in report.validated_pipes} == {
                 ("protocol_validate.summarize", DryRunStatus.SUCCESS)
             }

@@ -1,0 +1,20 @@
+{
+  "properties": {
+    "inner_html": {
+      "description": "The inner HTML of the content",
+      "title": "Inner Html",
+      "type": "string"
+    },
+    "css_class": {
+      "description": "The CSS class of the content",
+      "title": "Css Class",
+      "type": "string"
+    }
+  },
+  "required": [
+    "inner_html",
+    "css_class"
+  ],
+  "title": "HtmlContent",
+  "type": "object"
+}

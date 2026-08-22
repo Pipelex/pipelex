@@ -1,0 +1,255 @@
+{
+  "bundle_paths": [
+    "tests/data/input_semantics/probe_bundle.mthds"
+  ],
+  "hop1_bundle_blueprints": "hop1_bundle_blueprints.json",
+  "hop2_generated_sources": {
+    "input_semantics_probe.StringNote": "hop2_generated_sources/input_semantics_probe.StringNote.py.txt",
+    "input_semantics_probe.Trinket": "hop2_generated_sources/input_semantics_probe.Trinket.py.txt",
+    "input_semantics_probe.Gadget": "hop2_generated_sources/input_semantics_probe.Gadget.py.txt",
+    "input_semantics_probe.Widget": "hop2_generated_sources/input_semantics_probe.Widget.py.txt",
+    "input_semantics_probe.PlainNote": "hop2_generated_sources/input_semantics_probe.PlainNote.py.txt",
+    "input_semantics_probe.RefinedDoc": "hop2_generated_sources/input_semantics_probe.RefinedDoc.py.txt",
+    "input_semantics_probe.BaseEntity": "hop2_generated_sources/input_semantics_probe.BaseEntity.py.txt",
+    "input_semantics_probe.SpecialEntity": "hop2_generated_sources/input_semantics_probe.SpecialEntity.py.txt",
+    "input_semantics_probe.ExtraSpecialEntity": "hop2_generated_sources/input_semantics_probe.ExtraSpecialEntity.py.txt",
+    "input_semantics_probe.ClassBacked": null
+  },
+  "hop3_raw_pydantic_schemas": {
+    "input_semantics_probe.StringNote": "hop3_raw_pydantic_schemas/input_semantics_probe.StringNote.json",
+    "input_semantics_probe.Trinket": "hop3_raw_pydantic_schemas/input_semantics_probe.Trinket.json",
+    "input_semantics_probe.Gadget": "hop3_raw_pydantic_schemas/input_semantics_probe.Gadget.json",
+    "input_semantics_probe.Widget": "hop3_raw_pydantic_schemas/input_semantics_probe.Widget.json",
+    "input_semantics_probe.PlainNote": "hop3_raw_pydantic_schemas/input_semantics_probe.PlainNote.json",
+    "input_semantics_probe.RefinedDoc": "hop3_raw_pydantic_schemas/input_semantics_probe.RefinedDoc.json",
+    "input_semantics_probe.BaseEntity": "hop3_raw_pydantic_schemas/input_semantics_probe.BaseEntity.json",
+    "input_semantics_probe.SpecialEntity": "hop3_raw_pydantic_schemas/input_semantics_probe.SpecialEntity.json",
+    "input_semantics_probe.ExtraSpecialEntity": "hop3_raw_pydantic_schemas/input_semantics_probe.ExtraSpecialEntity.json",
+    "input_semantics_probe.ClassBacked": "hop3_raw_pydantic_schemas/input_semantics_probe.ClassBacked.json",
+    "native.Text": "hop3_raw_pydantic_schemas/native.Text.json",
+    "native.Image": "hop3_raw_pydantic_schemas/native.Image.json",
+    "native.Document": "hop3_raw_pydantic_schemas/native.Document.json",
+    "native.Page": "hop3_raw_pydantic_schemas/native.Page.json",
+    "native.Number": "hop3_raw_pydantic_schemas/native.Number.json",
+    "native.Date": "hop3_raw_pydantic_schemas/native.Date.json",
+    "native.Time": "hop3_raw_pydantic_schemas/native.Time.json",
+    "native.Html": "hop3_raw_pydantic_schemas/native.Html.json",
+    "native.YesNo": "hop3_raw_pydantic_schemas/native.YesNo.json"
+  },
+  "hop3_skipped": [],
+  "hop4_schema_renders": {
+    "input_semantics_probe.probe_single.widget": "hop4_schema_renders/input_semantics_probe.probe_single__widget.json",
+    "input_semantics_probe.probe_single.gadget_q": "hop4_schema_renders/input_semantics_probe.probe_single__gadget_q.json",
+    "input_semantics_probe.probe_single.note": "hop4_schema_renders/input_semantics_probe.probe_single__note.json",
+    "input_semantics_probe.probe_native_inputs.text_in": "hop4_schema_renders/input_semantics_probe.probe_native_inputs__text_in.json",
+    "input_semantics_probe.probe_native_inputs.image_in": "hop4_schema_renders/input_semantics_probe.probe_native_inputs__image_in.json",
+    "input_semantics_probe.probe_native_inputs.document_in": "hop4_schema_renders/input_semantics_probe.probe_native_inputs__document_in.json",
+    "input_semantics_probe.probe_native_inputs.page_in": "hop4_schema_renders/input_semantics_probe.probe_native_inputs__page_in.json",
+    "input_semantics_probe.probe_native_inputs.number_in": "hop4_schema_renders/input_semantics_probe.probe_native_inputs__number_in.json",
+    "input_semantics_probe.probe_native_inputs.date_in": "hop4_schema_renders/input_semantics_probe.probe_native_inputs__date_in.json",
+    "input_semantics_probe.probe_native_inputs.time_in": "hop4_schema_renders/input_semantics_probe.probe_native_inputs__time_in.json",
+    "input_semantics_probe.probe_native_inputs.html_in": "hop4_schema_renders/input_semantics_probe.probe_native_inputs__html_in.json",
+    "input_semantics_probe.probe_native_inputs.yesno_in": "hop4_schema_renders/input_semantics_probe.probe_native_inputs__yesno_in.json",
+    "input_semantics_probe.probe_markers.opt": "hop4_schema_renders/input_semantics_probe.probe_markers__opt.json",
+    "input_semantics_probe.probe_markers.many": "hop4_schema_renders/input_semantics_probe.probe_markers__many.json",
+    "input_semantics_probe.probe_markers.two": "hop4_schema_renders/input_semantics_probe.probe_markers__two.json",
+    "input_semantics_probe.probe_markers.forced": "hop4_schema_renders/input_semantics_probe.probe_markers__forced.json",
+    "input_semantics_probe.probe_refined.refdoc": "hop4_schema_renders/input_semantics_probe.probe_refined__refdoc.json",
+    "input_semantics_probe.probe_refined.special": "hop4_schema_renders/input_semantics_probe.probe_refined__special.json",
+    "input_semantics_probe.probe_refined.extra": "hop4_schema_renders/input_semantics_probe.probe_refined__extra.json",
+    "input_semantics_probe.probe_refined.classbacked": "hop4_schema_renders/input_semantics_probe.probe_refined__classbacked.json",
+    "input_semantics_probe.probe_refined.stringnote": "hop4_schema_renders/input_semantics_probe.probe_refined__stringnote.json"
+  },
+  "hop5_pipe_io_contracts": "hop5_pipe_io_contracts.json",
+  "wire_framing": [
+    {
+      "pipe_ref": "input_semantics_probe.probe_single",
+      "input_name": "widget",
+      "authored_spec": "Widget",
+      "concept_ref": "input_semantics_probe.Widget",
+      "multiplicity": null,
+      "presence": "plain",
+      "is_multiple": false
+    },
+    {
+      "pipe_ref": "input_semantics_probe.probe_single",
+      "input_name": "gadget_q",
+      "authored_spec": "input_semantics_probe.Gadget",
+      "concept_ref": "input_semantics_probe.Gadget",
+      "multiplicity": null,
+      "presence": "plain",
+      "is_multiple": false
+    },
+    {
+      "pipe_ref": "input_semantics_probe.probe_single",
+      "input_name": "note",
+      "authored_spec": "PlainNote",
+      "concept_ref": "input_semantics_probe.PlainNote",
+      "multiplicity": null,
+      "presence": "plain",
+      "is_multiple": false
+    },
+    {
+      "pipe_ref": "input_semantics_probe.probe_native_inputs",
+      "input_name": "text_in",
+      "authored_spec": "Text",
+      "concept_ref": "native.Text",
+      "multiplicity": null,
+      "presence": "plain",
+      "is_multiple": false
+    },
+    {
+      "pipe_ref": "input_semantics_probe.probe_native_inputs",
+      "input_name": "image_in",
+      "authored_spec": "Image",
+      "concept_ref": "native.Image",
+      "multiplicity": null,
+      "presence": "plain",
+      "is_multiple": false
+    },
+    {
+      "pipe_ref": "input_semantics_probe.probe_native_inputs",
+      "input_name": "document_in",
+      "authored_spec": "Document",
+      "concept_ref": "native.Document",
+      "multiplicity": null,
+      "presence": "plain",
+      "is_multiple": false
+    },
+    {
+      "pipe_ref": "input_semantics_probe.probe_native_inputs",
+      "input_name": "page_in",
+      "authored_spec": "Page",
+      "concept_ref": "native.Page",
+      "multiplicity": null,
+      "presence": "plain",
+      "is_multiple": false
+    },
+    {
+      "pipe_ref": "input_semantics_probe.probe_native_inputs",
+      "input_name": "number_in",
+      "authored_spec": "Number",
+      "concept_ref": "native.Number",
+      "multiplicity": null,
+      "presence": "plain",
+      "is_multiple": false
+    },
+    {
+      "pipe_ref": "input_semantics_probe.probe_native_inputs",
+      "input_name": "date_in",
+      "authored_spec": "Date",
+      "concept_ref": "native.Date",
+      "multiplicity": null,
+      "presence": "plain",
+      "is_multiple": false
+    },
+    {
+      "pipe_ref": "input_semantics_probe.probe_native_inputs",
+      "input_name": "time_in",
+      "authored_spec": "Time",
+      "concept_ref": "native.Time",
+      "multiplicity": null,
+      "presence": "plain",
+      "is_multiple": false
+    },
+    {
+      "pipe_ref": "input_semantics_probe.probe_native_inputs",
+      "input_name": "html_in",
+      "authored_spec": "Html",
+      "concept_ref": "native.Html",
+      "multiplicity": null,
+      "presence": "plain",
+      "is_multiple": false
+    },
+    {
+      "pipe_ref": "input_semantics_probe.probe_native_inputs",
+      "input_name": "yesno_in",
+      "authored_spec": "YesNo",
+      "concept_ref": "native.YesNo",
+      "multiplicity": null,
+      "presence": "plain",
+      "is_multiple": false
+    },
+    {
+      "pipe_ref": "input_semantics_probe.probe_markers",
+      "input_name": "opt",
+      "authored_spec": "Widget?",
+      "concept_ref": "input_semantics_probe.Widget",
+      "multiplicity": null,
+      "presence": "optional",
+      "is_multiple": false
+    },
+    {
+      "pipe_ref": "input_semantics_probe.probe_markers",
+      "input_name": "many",
+      "authored_spec": "Widget[]",
+      "concept_ref": "input_semantics_probe.Widget",
+      "multiplicity": true,
+      "presence": "plain",
+      "is_multiple": true
+    },
+    {
+      "pipe_ref": "input_semantics_probe.probe_markers",
+      "input_name": "two",
+      "authored_spec": "Gadget[2]",
+      "concept_ref": "input_semantics_probe.Gadget",
+      "multiplicity": 2,
+      "presence": "plain",
+      "is_multiple": true
+    },
+    {
+      "pipe_ref": "input_semantics_probe.probe_markers",
+      "input_name": "forced",
+      "authored_spec": "Text!",
+      "concept_ref": "native.Text",
+      "multiplicity": null,
+      "presence": "force",
+      "is_multiple": false
+    },
+    {
+      "pipe_ref": "input_semantics_probe.probe_refined",
+      "input_name": "refdoc",
+      "authored_spec": "RefinedDoc",
+      "concept_ref": "input_semantics_probe.RefinedDoc",
+      "multiplicity": null,
+      "presence": "plain",
+      "is_multiple": false
+    },
+    {
+      "pipe_ref": "input_semantics_probe.probe_refined",
+      "input_name": "special",
+      "authored_spec": "SpecialEntity",
+      "concept_ref": "input_semantics_probe.SpecialEntity",
+      "multiplicity": null,
+      "presence": "plain",
+      "is_multiple": false
+    },
+    {
+      "pipe_ref": "input_semantics_probe.probe_refined",
+      "input_name": "extra",
+      "authored_spec": "ExtraSpecialEntity",
+      "concept_ref": "input_semantics_probe.ExtraSpecialEntity",
+      "multiplicity": null,
+      "presence": "plain",
+      "is_multiple": false
+    },
+    {
+      "pipe_ref": "input_semantics_probe.probe_refined",
+      "input_name": "classbacked",
+      "authored_spec": "ClassBacked",
+      "concept_ref": "input_semantics_probe.ClassBacked",
+      "multiplicity": null,
+      "presence": "plain",
+      "is_multiple": false
+    },
+    {
+      "pipe_ref": "input_semantics_probe.probe_refined",
+      "input_name": "stringnote",
+      "authored_spec": "StringNote",
+      "concept_ref": "input_semantics_probe.StringNote",
+      "multiplicity": null,
+      "presence": "plain",
+      "is_multiple": false
+    }
+  ]
+}

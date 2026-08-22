@@ -60,6 +60,7 @@ class TestRunnerValidatePlumbing:
         # without a real loaded library. Their output shaping is pinned in test_validation_report.py
         # and the integration test_protocol_validate.py — this module asserts only the plumbing.
         mocker.patch("pipelex.pipeline.validate_in_process.build_pipe_io_contracts", return_value={})
+        mocker.patch("pipelex.pipeline.validate_in_process.build_input_form", return_value={})
         mocker.patch("pipelex.pipeline.validate_in_process.select_primary_blueprint")
         mocker.patch("pipelex.pipeline.validate_in_process.best_effort_graph_spec", new=mocker.AsyncMock(return_value=None))
         mocker.patch("pipelex.pipeline.validate_in_process.build_validation_report")

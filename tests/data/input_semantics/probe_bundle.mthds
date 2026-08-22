@@ -1,0 +1,148 @@
+domain      = "input_semantics_probe"
+description = "PROBE_bundle_desc: probe bundle for the input-semantics audit — every authored fact carries a PROBE_ sentinel so its survival is greppable in every capture"
+main_pipe   = "probe_single"
+
+[concept]
+StringNote = "PROBE_desc_concept_StringNote: a concept declared as a bare string"
+
+[concept.Trinket]
+description = "PROBE_desc_concept_Trinket: leaf structure for two-level nesting"
+
+[concept.Trinket.structure]
+label = "PROBE_desc_field_trinket_label: shorthand string field on the nesting leaf"
+
+[concept.Gadget]
+description = "PROBE_desc_concept_Gadget: mid-level structure nested inside Widget"
+
+[concept.Gadget.structure]
+name    = { type = "text", description = "PROBE_desc_field_gadget_name", required = true }
+trinket = { type = "concept", concept_ref = "Trinket", description = "PROBE_desc_field_gadget_trinket: nested concept, level two" }
+
+[concept.Widget]
+description = "PROBE_desc_concept_Widget: the full-matrix structure under audit"
+
+[concept.Widget.structure]
+shorthand_note = "PROBE_desc_field_shorthand_note: shorthand string field (implies text, required)"
+title = { type = "text", description = "PROBE_desc_field_title: required text", required = true }
+subtitle = { type = "text", description = "PROBE_desc_field_subtitle: optional text (required omitted)" }
+summary = { type = "text", description = "PROBE_desc_field_summary: optional text (required explicit false)", required = false }
+motto = { type = "text", description = "PROBE_desc_field_motto: text with default", default_value = "PROBE_default_motto" }
+titled_default = { type = "text", description = "PROBE_desc_field_titled_default: required AND default together", required = true, default_value = "PROBE_default_titled" }
+count = { type = "integer", description = "PROBE_desc_field_count: integer with default", default_value = 42 }
+enabled = { type = "boolean", description = "PROBE_desc_field_enabled: boolean with default", default_value = true }
+price = { type = "number", description = "PROBE_desc_field_price: number with default", default_value = 9.99 }
+released_on = { type = "date", description = "PROBE_desc_field_released_on: date with default", default_value = 2026-01-15 }
+launched_at = { type = "datetime", description = "PROBE_desc_field_launched_at: datetime with default", default_value = 2026-01-15T12:30:00 }
+daily_at = { type = "time", description = "PROBE_desc_field_daily_at: time with default", default_value = 12:30:00 }
+tags = { type = "list", item_type = "text", description = "PROBE_desc_field_tags: list of text with default", default_value = [
+  "PROBE_tag_a",
+  "PROBE_tag_b",
+] }
+ratings = { type = "list", item_type = "integer", description = "PROBE_desc_field_ratings: list of integer" }
+matrix = { type = "list", item_type = "list", description = "PROBE_desc_field_matrix: nested list with unspecified inner item" }
+gadgets = { type = "list", item_type = "concept", item_concept_ref = "Gadget", description = "PROBE_desc_field_gadgets: list of concept" }
+attributes = { type = "dict", key_type = "text", value_type = "text", description = "PROBE_desc_field_attributes: dict text to text" }
+scores = { type = "dict", key_type = "text", value_type = "number", description = "PROBE_desc_field_scores: dict text to number with default", default_value = { speed = 5 } }
+milestones = { type = "dict", key_type = "text", value_type = "date", description = "PROBE_desc_field_milestones: dict text to date" }
+main_gadget = { type = "concept", concept_ref = "Gadget", description = "PROBE_desc_field_main_gadget: required concept field", required = true }
+icon = { type = "concept", concept_ref = "native.Image", description = "PROBE_desc_field_icon: native concept field" }
+tone = { choices = [
+  "PROBE_choice_formal",
+  "PROBE_choice_casual",
+  "PROBE_choice_playful",
+], description = "PROBE_desc_field_tone: choices with default", default_value = "PROBE_choice_casual" }
+only_choice = { choices = [
+  "PROBE_choice_single",
+], description = "PROBE_desc_field_only_choice: single-entry choice list" }
+typed_choice = { type = "text", choices = [
+  "PROBE_choice_typed_a",
+  "PROBE_choice_typed_b",
+], description = "PROBE_desc_field_typed_choice: type AND choices together" }
+constrained_count = { type = "integer", description = "PROBE_desc_field_constrained_count: integer carrying unknown constraint keys", minimum = 0, maximum = 100, examples = [
+  1,
+  2,
+], unit = "PROBE_unit_items" }
+
+[concept.PlainNote]
+description = "PROBE_desc_concept_PlainNote: description-only concept (basic blueprint)"
+
+[concept.RefinedDoc]
+description = "PROBE_desc_concept_RefinedDoc: refinement of a native concept"
+refines     = "native.Document"
+
+[concept.BaseEntity]
+description = "PROBE_desc_concept_BaseEntity: base of a custom refinement chain"
+
+[concept.BaseEntity.structure]
+ident = { type = "text", description = "PROBE_desc_field_base_ident: inherited field", required = true }
+
+[concept.SpecialEntity]
+description = "PROBE_desc_concept_SpecialEntity: refines a custom concept"
+refines     = "BaseEntity"
+
+[concept.ExtraSpecialEntity]
+description = "PROBE_desc_concept_ExtraSpecialEntity: second link of the refinement chain"
+refines     = "SpecialEntity"
+
+[concept.ClassBacked]
+description = "PROBE_desc_concept_ClassBacked: structure declared as an existing class name"
+structure   = "TextContent"
+
+[pipe.probe_single]
+type = "PipeLLM"
+description = "PROBE_pipe_probe_single: plain structured, qualified, and description-only inputs"
+inputs = { widget = "Widget", gadget_q = "input_semantics_probe.Gadget", note = "PlainNote" }
+output = "Text"
+prompt = """
+Consider the widget:
+@widget
+And the gadget:
+@gadget_q
+And the note:
+@note
+"""
+
+[pipe.probe_native_inputs]
+type = "PipeLLM"
+description = "PROBE_pipe_probe_native_inputs: native concepts as direct inputs"
+inputs = { text_in = "Text", image_in = "Image", document_in = "Document", page_in = "Page", number_in = "Number", date_in = "Date", time_in = "Time", html_in = "Html", yesno_in = "YesNo" }
+output = "Text"
+prompt = """
+@text_in
+@image_in
+@document_in
+@page_in
+@number_in
+@date_in
+@time_in
+@html_in
+@yesno_in
+"""
+
+[pipe.probe_markers]
+type = "PipeLLM"
+description = "PROBE_pipe_probe_markers: optional, list, fixed-count, and force markers"
+inputs = { opt = "Widget?", many = "Widget[]", two = "Gadget[2]", forced = "Text!" }
+output = "Text"
+prompt = """
+@?opt
+Many widgets:
+@many
+Two gadgets:
+@two
+Forced text:
+@forced
+"""
+
+[pipe.probe_refined]
+type = "PipeLLM"
+description = "PROBE_pipe_probe_refined: refinements and class-backed concepts as inputs"
+inputs = { refdoc = "RefinedDoc", special = "SpecialEntity", extra = "ExtraSpecialEntity", classbacked = "ClassBacked", stringnote = "StringNote" }
+output = "Text"
+prompt = """
+@refdoc
+@special
+@extra
+@classbacked
+@stringnote
+"""

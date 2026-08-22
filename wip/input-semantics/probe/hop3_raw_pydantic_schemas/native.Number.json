@@ -1,0 +1,21 @@
+{
+  "properties": {
+    "number": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "description": "The number",
+      "title": "Number"
+    }
+  },
+  "required": [
+    "number"
+  ],
+  "title": "NumberContent",
+  "type": "object"
+}

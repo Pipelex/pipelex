@@ -1,0 +1,6 @@
+domain      = "input_semantics_rejected"
+description = "REJECTED probe: refines takes a single ref — a list of refined concepts is refused"
+
+[concept.MultiParent]
+description = "A concept trying to refine two concepts"
+refines     = ["native.Text", "native.Document"]

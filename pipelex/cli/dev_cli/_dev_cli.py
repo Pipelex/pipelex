@@ -31,6 +31,7 @@ from pipelex.cli.dev_cli.commands.store_test_durations_cmd import store_test_dur
 from pipelex.cli.dev_cli.commands.subject_grant_cmd import subject_grant_cmd
 from pipelex.cli.dev_cli.commands.sync_kit_configs_cmd import sync_kit_configs_cmd
 from pipelex.cli.dev_cli.commands.sync_main_config_cmd import SyncTarget, sync_main_config_cmd
+from pipelex.cli.dev_cli.commands.trace_input_semantics_cmd import trace_input_semantics_cmd
 from pipelex.cli.dev_cli.commands.update_gateway_models_cmd import update_gateway_models_cmd
 from pipelex.cli.dev_cli.commands.update_migration_schemas_cmd import update_migration_schemas_cmd
 from pipelex.runtime_hub import get_console
@@ -65,6 +66,7 @@ class PipelexDevCLI(TyperGroup):
             "subject-grant",
             "sync-kit-configs",
             "sync-main-config",
+            "trace-input-semantics",
             "update-gateway-models",
             "update-migration-schemas",
         ]
@@ -502,6 +504,16 @@ def sync_kit_configs_command(
         console.print()
         console.print(Traceback())
         sys.exit(1)
+
+
+@app.command(name="trace-input-semantics", help="Dump one artifact per hop of the input-schema emission chain for a bundle")
+def trace_input_semantics_command(
+    bundles: Annotated[list[Path], typer.Argument(help="MTHDS bundle file(s) to load as one batch")],
+    output_dir: Annotated[Path, typer.Option("--output-dir", "-o", help="Directory receiving the per-hop artifacts")],
+    allow_signatures: Annotated[bool, typer.Option("--allow-signatures", help="Tolerate unimplemented pipe signatures")] = False,
+) -> None:
+    """Trace what each hop of the emission chain does to every authored input fact."""
+    trace_input_semantics_cmd(bundle_paths=bundles, output_dir=output_dir, allow_signatures=allow_signatures)
 
 
 @app.command(name="preprocess-test-models", help="Preprocess test models and generate fixture files")

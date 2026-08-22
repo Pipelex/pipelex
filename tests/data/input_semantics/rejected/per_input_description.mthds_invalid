@@ -1,0 +1,11 @@
+domain      = "input_semantics_rejected"
+description = "REJECTED probe: a pipe input slot cannot carry its own description — inputs values are ref strings only"
+
+[pipe.annotated_inputs]
+type = "PipeLLM"
+description = "Pipe trying to describe an input slot"
+inputs = { doc = { concept = "Text", description = "the document to analyse" } }
+output = "Text"
+prompt = """
+@doc
+"""
