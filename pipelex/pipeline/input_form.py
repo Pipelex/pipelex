@@ -30,7 +30,9 @@ from collections.abc import Sequence
 from enum import StrEnum
 from typing import Any
 
+from annotated_types import Ge, Gt, Le, Lt, MaxLen, MinLen
 from pydantic import BaseModel, Field, SerializerFunctionWrapHandler, model_serializer, model_validator
+from pydantic.fields import FieldInfo
 from typing_extensions import Self
 
 from pipelex.codegen.native_expansion import reflect_structure_class
@@ -209,7 +211,7 @@ def build_input_form(pipes: Sequence[PipeAbstract], *, blueprints: Sequence[Pipe
         `pipe_ref` → `PipeInputFormDescriptor` for every given pipe.
     """
     qualified = qualify_crate(LibraryCrateFactory.make_from_blueprints(list(blueprints)))
-    deriver = _InputFormDeriver(concepts=qualified.concepts)
+    deriver = InputFormDeriver(concepts=qualified.concepts)
     input_form: dict[str, PipeInputFormDescriptor] = {}
     for pipe in pipes:
         fields = [deriver.derive_slot(name=var_name, stuff_spec=stuff_spec) for var_name, stuff_spec in pipe.inputs.root.items()]
@@ -217,8 +219,8 @@ def build_input_form(pipes: Sequence[PipeAbstract], *, blueprints: Sequence[Pipe
     return input_form
 
 
-class _InputFormDeriver:
-    """Derives field descriptors over one qualified crate's concepts."""
+class InputFormDeriver:
+    """Derives field descriptors over one qualified crate's concepts (`QualifiedCrateContent.concepts`)."""
 
     def __init__(self, *, concepts: dict[str, ConceptBlueprint | str]) -> None:
         self._concepts = concepts
@@ -247,6 +249,10 @@ class _InputFormDeriver:
         return node.model_copy(update={"presence": presence, "required": required, "gating": gating})
 
     # ---- Concept nodes ----------------------------------------------------------------------------
+
+    def derive_concept(self, *, name: str, concept_ref: str) -> InputFormField:
+        """The descriptor of a concept-typed node on its own, with no pipe-slot facts."""
+        return self._concept_node(name=name, concept_ref=concept_ref, seen=frozenset())
 
     def _concept_node(self, *, name: str, concept_ref: str, seen: frozenset[str]) -> InputFormField:
         """The descriptor of a concept-typed node (no slot facts); `seen` is the concept-ref path."""
@@ -366,14 +372,17 @@ class _InputFormDeriver:
         if native_code is not None:
             return self._native_node(name=name, native_code=native_code, concept_ref=concept_ref, description=description, refines=refines, seen=seen)
         structure_class = get_class_registry().get_class(name=class_name)
-        reflected = (
-            reflect_structure_class(structure_class=structure_class)
-            if isinstance(structure_class, type) and issubclass(structure_class, BaseModel)
-            else None
-        )
+        if not (isinstance(structure_class, type) and issubclass(structure_class, BaseModel)):
+            return _unknown_node(name=name, concept_ref=concept_ref, description=description, refines=refines)
+        reflected = reflect_structure_class(structure_class=structure_class)
         if reflected is None:
             return _unknown_node(name=name, concept_ref=concept_ref, description=description, refines=refines)
-        fields = [self._structure_field(name=field_name, field=field, seen=seen) for field_name, field in reflected.items()]
+        fields = [
+            _with_reflected_constraints(
+                node=self._structure_field(name=field_name, field=field, seen=seen), field_info=structure_class.model_fields[field_name]
+            )
+            for field_name, field in reflected.items()
+        ]
         return InputFormField(
             kind=FieldKind.OBJECT, name=name, concept_ref=concept_ref, refines=refines, description=description, required=True, fields=fields
         )
@@ -532,6 +541,54 @@ def _scalar_field(
         datetime_flag=datetime_flag,
         format=text_format,
     )
+
+
+def _with_reflected_constraints(*, node: InputFormField, field_info: FieldInfo) -> InputFormField:
+    """Stamp the constraints a registered class states on a field (`Field(gt=..., max_length=..., pattern=...)`).
+
+    Only the slots that apply to the node's kind are read: bounds on a `number`, length and pattern
+    on a `text`. Anything else the class may declare is not a form fact and is left out.
+    """
+    constraints: dict[str, Any] = {}
+    match node.kind:
+        case FieldKind.NUMBER:
+            for constraint in field_info.metadata:
+                match constraint:
+                    case Gt(gt=bound):
+                        constraints["exclusive_minimum"] = bound
+                    case Ge(ge=bound):
+                        constraints["minimum"] = bound
+                    case Lt(lt=bound):
+                        constraints["exclusive_maximum"] = bound
+                    case Le(le=bound):
+                        constraints["maximum"] = bound
+                    case _:
+                        pass
+        case FieldKind.TEXT:
+            for constraint in field_info.metadata:
+                match constraint:
+                    case MinLen(min_length=length):
+                        constraints["min_length"] = length
+                    case MaxLen(max_length=length):
+                        constraints["max_length"] = length
+                    case _:
+                        # pydantic folds `pattern=` into its own general-metadata object.
+                        pattern = getattr(constraint, "pattern", None)
+                        if isinstance(pattern, str):
+                            constraints["pattern"] = pattern
+        case (
+            FieldKind.PROSE
+            | FieldKind.DATE
+            | FieldKind.BOOLEAN
+            | FieldKind.ENUM
+            | FieldKind.DOCUMENT
+            | FieldKind.IMAGE
+            | FieldKind.OBJECT
+            | FieldKind.LIST
+            | FieldKind.UNKNOWN
+        ):
+            pass
+    return node.model_copy(update=constraints) if constraints else node
 
 
 def _prose_promoted_node(*, name: str, concept_ref: str, description: str, chain: list[str]) -> InputFormField:

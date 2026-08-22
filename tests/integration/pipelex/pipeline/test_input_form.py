@@ -23,11 +23,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
+from pydantic import Field
 
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipeline.input_form import FieldKind, InputFormField, build_input_form
 from pipelex.pipeline.pipe_io_contracts import build_pipe_io_contracts
 from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.system.registries.class_registry_access import get_class_registry
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -291,3 +294,149 @@ class TestBuildInputForm:
                 for nested in nested_fields:
                     assert "presence" not in nested
                     assert "gating" not in nested
+
+
+# ---- Phase 3: the rest of the kind-assignment table ---------------------------------------------
+
+
+class InputFormConstrainedPayload(StructuredContent):
+    """A hand-written structure class a bundle names via `structure = "..."`, with engine-stated constraints."""
+
+    width: int = Field(gt=0, le=4096, description="PROBE_desc_reflected_width")
+    code: str = Field(min_length=2, max_length=8, pattern="^[A-Z]+$", description="PROBE_desc_reflected_code")
+    ratio: float | None = Field(default=None, ge=0.0, lt=1.0, description="PROBE_desc_reflected_ratio")
+
+
+class InputFormUnmappablePayload(StructuredContent):
+    """A structure class whose field has no single blueprint shape — reflection must stay absent, never guess."""
+
+    payload: str | int = Field(description="PROBE_desc_reflected_payload")
+
+
+_KIND_TABLE_MTHDS = """
+domain = "input_form_kinds"
+description = "Bundle pinning the rest of the kind-assignment table"
+
+[concept.Constrained]
+description = "PROBE_desc_concept_Constrained: class-backed by a hand-written constrained class"
+structure = "InputFormConstrainedPayload"
+
+[concept.Unmappable]
+description = "PROBE_desc_concept_Unmappable: class-backed by a class reflection cannot map"
+structure = "InputFormUnmappablePayload"
+
+[concept.Gadget]
+description = "PROBE_desc_concept_Gadget"
+
+[concept.Gadget.structure]
+name = { type = "text", description = "PROBE_desc_field_gadget_name", required = true }
+
+[pipe.remaining_natives]
+type = "PipeCompose"
+description = "The native concepts the probe bundle does not exercise as direct inputs"
+inputs = { tai_in = "TextAndImages", search_result_in = "SearchResult", dynamic_in = "Dynamic", anything_in = "Anything", json_in = "JSON" }
+output = "Text"
+template = "$tai_in $search_result_in $dynamic_in $anything_in $json_in"
+
+[pipe.edges]
+type = "PipeLLM"
+description = "Fixed-count-of-one multiplicity and class-backed reflection"
+inputs = { one = "Gadget[1]", constrained = "Constrained", unmappable = "Unmappable" }
+output = "Text"
+prompt = \"\"\"
+@one
+@constrained
+@unmappable
+\"\"\"
+"""
+
+
+@pytest.mark.asyncio(loop_scope="class")
+class TestKindAssignmentTable:
+    async def _derive_kind_table(self, load_empty_library: Callable[[], str]) -> dict[str, PipeInputFormDescriptor]:
+        outer_library_id = load_empty_library()
+        try:
+            registry = get_class_registry()
+            registry.register_class(InputFormConstrainedPayload)
+            registry.register_class(InputFormUnmappablePayload)
+            result = await validate_bundle(mthds_contents=[_KIND_TABLE_MTHDS])
+            return build_input_form(result.pipes, blueprints=result.blueprints)
+        finally:
+            _teardown_validation_library(outer_library_id)
+
+    async def test_remaining_natives_complete_the_table(self, load_empty_library: Callable[[], str]) -> None:
+        """With the probe bundle's natives, every `NativeConceptCode` a pipe can take as input has a pinned kind."""
+        input_form = await self._derive_kind_table(load_empty_library)
+        natives = input_form["input_form_kinds.remaining_natives"]
+
+        text_and_images = _field_by_name(natives, "tai_in")
+        assert text_and_images.kind == FieldKind.OBJECT
+        assert text_and_images.fields is not None
+        assert [field.name for field in text_and_images.fields][:2] == ["text", "images"], "Pinned-blueprint fields, in pinned order"
+        search_result = _field_by_name(natives, "search_result_in")
+        assert search_result.kind == FieldKind.OBJECT
+        assert search_result.fields is not None
+        assert _field_by_name(natives, "dynamic_in").kind == FieldKind.UNKNOWN
+        assert _field_by_name(natives, "anything_in").kind == FieldKind.UNKNOWN
+        assert _field_by_name(natives, "json_in").kind == FieldKind.UNKNOWN
+        for field in natives.fields:
+            assert field.concept_ref is not None
+            assert field.concept_ref.startswith("native.")
+            assert field.description, f"{field.name} carries its pinned native description"
+
+    async def test_fixed_count_of_one_is_a_single_node(self, load_empty_library: Callable[[], str]) -> None:
+        """`Concept[1]` is not multiple to the runtime (`is_multiple()` is `count > 1`), so the form asks for one value."""
+        input_form = await self._derive_kind_table(load_empty_library)
+        one = _field_by_name(input_form["input_form_kinds.edges"], "one")
+
+        assert one.kind == FieldKind.OBJECT
+        assert one.concept_ref == "input_form_kinds.Gadget"
+        assert one.item is None
+        assert one.item_count is None
+        assert one.required is True
+        assert one.gating is True
+
+    async def test_custom_class_reflects_to_object_with_constraints(self, load_empty_library: Callable[[], str]) -> None:
+        """A hand-written structure class is reflected field by field, with the constraints the engine states."""
+        input_form = await self._derive_kind_table(load_empty_library)
+        constrained = _field_by_name(input_form["input_form_kinds.edges"], "constrained")
+
+        assert constrained.kind == FieldKind.OBJECT
+        assert constrained.concept_ref == "input_form_kinds.Constrained"
+        assert constrained.description is not None
+        assert "PROBE_desc_concept_Constrained" in constrained.description, "The concept description survives (E6)"
+        assert constrained.fields is not None
+        by_name = {field.name: field for field in constrained.fields}
+
+        width = by_name["width"]
+        assert width.kind == FieldKind.NUMBER
+        assert width.integer is True
+        assert width.required is True
+        assert width.exclusive_minimum == 0
+        assert width.maximum == 4096
+        assert width.minimum is None
+        assert width.description == "PROBE_desc_reflected_width"
+
+        code = by_name["code"]
+        assert code.kind == FieldKind.TEXT
+        assert code.min_length == 2
+        assert code.max_length == 8
+        assert code.pattern == "^[A-Z]+$"
+
+        ratio = by_name["ratio"]
+        assert ratio.kind == FieldKind.NUMBER
+        assert ratio.integer is False
+        assert ratio.required is False
+        assert ratio.minimum == 0.0
+        assert ratio.exclusive_maximum == 1.0
+
+    async def test_unmappable_class_falls_back_to_unknown(self, load_empty_library: Callable[[], str]) -> None:
+        """Reflection is faithful-or-absent: a class with an unmappable field yields `unknown`, with identity kept."""
+        input_form = await self._derive_kind_table(load_empty_library)
+        unmappable = _field_by_name(input_form["input_form_kinds.edges"], "unmappable")
+
+        assert unmappable.kind == FieldKind.UNKNOWN
+        assert unmappable.concept_ref == "input_form_kinds.Unmappable"
+        assert unmappable.description is not None
+        assert "PROBE_desc_concept_Unmappable" in unmappable.description
+        assert unmappable.fields is None
