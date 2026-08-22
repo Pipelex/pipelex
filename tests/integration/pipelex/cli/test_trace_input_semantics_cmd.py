@@ -12,6 +12,9 @@ import pytest
 
 from pipelex.cli.dev_cli.commands.trace_input_semantics_cmd import (
     HOP1_FILE_NAME,
+    HOP2_DIR_NAME,
+    HOP3_DIR_NAME,
+    HOP4_DIR_NAME,
     HOP5_FILE_NAME,
     HOP5_INPUT_FORM_FILE_NAME,
     MANIFEST_FILE_NAME,
@@ -109,6 +112,31 @@ class TestTraceInputSemantics:
         assert framing_by_input["trace_tool_test.do_one.items"]["is_multiple"] is True
         assert framing_by_input["trace_tool_test.do_one.hint"]["presence"] == "optional"
         assert (output_dir / MANIFEST_FILE_NAME).is_file()
+
+    async def test_rerun_into_same_output_dir_prunes_stale_hop_artifacts(self, tmp_path: Path, load_empty_library: Callable[[], str]) -> None:
+        """A rerun into an existing output directory replaces the per-item hop captures wholesale —
+        no artifact from a removed or renamed concept, pipe, or input survives on disk.
+        """
+        load_empty_library()
+        bundle_path = tmp_path / "small_bundle.mthds"
+        bundle_path.write_text(_SMALL_BUNDLE, encoding="utf-8")
+        output_dir = tmp_path / "trace"
+        await trace_input_semantics(bundle_paths=[bundle_path], output_dir=output_dir)
+
+        renamed_bundle_path = tmp_path / "renamed_bundle.mthds"
+        renamed_bundle_path.write_text(_SMALL_BUNDLE.replace("Item", "Widget"), encoding="utf-8")
+        manifest = await trace_input_semantics(bundle_paths=[renamed_bundle_path], output_dir=output_dir)
+
+        assert manifest["hop2_generated_sources"]["trace_tool_test.Widget"] is not None
+        hop_dirs_to_manifest_keys = {
+            HOP2_DIR_NAME: "hop2_generated_sources",
+            HOP3_DIR_NAME: "hop3_raw_pydantic_schemas",
+            HOP4_DIR_NAME: "hop4_schema_renders",
+        }
+        for hop_dir_name, manifest_key in hop_dirs_to_manifest_keys.items():
+            on_disk = {str(path.relative_to(output_dir)) for path in (output_dir / hop_dir_name).rglob("*") if path.is_file()}
+            expected = {relative_path for relative_path in manifest[manifest_key].values() if relative_path is not None}
+            assert on_disk == expected, f"stale artifacts under {hop_dir_name}: {sorted(on_disk - expected)}"
 
     async def test_probe_fixture_validates_and_traces(self, tmp_path: Path, load_empty_library: Callable[[], str]) -> None:
         """The committed audit probe bundle validates cleanly and every hop capture lands."""

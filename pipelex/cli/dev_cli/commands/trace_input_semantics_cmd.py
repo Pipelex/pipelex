@@ -24,6 +24,7 @@ of the captures (e.g. a survival table) stays with the caller.
 
 import asyncio
 import json
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -291,6 +292,13 @@ async def trace_input_semantics(
     mthds_sources = [str(bundle_path) for bundle_path in bundle_paths]
 
     output_dir.mkdir(parents=True, exist_ok=True)
+    # The per-item hop directories accumulate one file per concept / per pipe input, so a rerun
+    # into the same output directory must replace them wholesale — a leftover capture from a
+    # removed or renamed declaration would read as part of the current trace.
+    for hop_dir_name in (HOP2_DIR_NAME, HOP3_DIR_NAME, HOP4_DIR_NAME):
+        stale_hop_dir = output_dir / hop_dir_name
+        if stale_hop_dir.is_dir():
+            shutil.rmtree(stale_hop_dir)
 
     prev_library_id = get_current_library_id_or_none()
     validation_library_id: str | None = None

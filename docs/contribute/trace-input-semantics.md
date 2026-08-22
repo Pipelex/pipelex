@@ -18,7 +18,7 @@ The chain has five hops, and the output directory holds one artifact per hop, so
 - `hop5_input_form.json` — the input-form descriptors from `build_input_form`, the sibling projection that reads the authored blueprints directly instead of the emitted schema (see [Input-Form Descriptor](../under-the-hood/input-form-descriptor.md)). Captured beside the contracts so a fact can be checked on both sides: lost in the schema, stated in the descriptor.
 - `trace_manifest.json` — the capture inventory plus the wire framing per pipe input: authored ref string, resolved concept ref, multiplicity, presence marker.
 
-The tool is a tracer, not a report generator: it never mutates the loaded library, and any analysis of the captures (diffing hops, building a survival table) stays with the caller.
+The tool is a tracer, not a report generator: it never mutates the loaded library, and any analysis of the captures (diffing hops, building a survival table) stays with the caller. Rerunning into the same output directory replaces the `hop2_generated_sources/`, `hop3_raw_pydantic_schemas/`, and `hop4_schema_renders/` capture directories wholesale, so no artifact from a removed or renamed concept, pipe, or input lingers from an earlier trace.
 
 ## When to reach for it
 
