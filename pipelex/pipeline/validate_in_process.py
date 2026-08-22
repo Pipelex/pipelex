@@ -107,7 +107,7 @@ async def validate_bundles_in_process(
         # something inside the window later moves the contextvar.
         validation_library_id = get_current_library_id_or_none()
         pipe_io_contracts: dict[str, PipeIOContract] = build_pipe_io_contracts(result.pipes)
-        input_form: dict[str, PipeInputFormDescriptor] = build_input_form(result.pipes, blueprints=result.blueprints)
+        input_form: dict[str, PipeInputFormDescriptor] = build_input_form(result.pipes)
         # One taint walk per validate pass — both report projections read the same analyses.
         taint_analyses = collect_controller_taint_analyses(result.pipes)
         liftable_pipes: list[LiftablePipeEntry] = build_liftable_pipes(taint_analyses)

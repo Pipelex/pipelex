@@ -6,7 +6,7 @@ The descriptor exists because the emitted `json_schema` is a *payload* contract,
 
 ## Where it lives
 
-- `pipelex/pipeline/input_form.py` — the wire models (`FieldKind`, `InputFormField`, `PipeInputFormDescriptor`), the one public derivation `build_input_form(pipes, *, blueprints)`, and the `InputFormDeriver` behind it.
+- `pipelex/pipeline/input_form.py` — the wire models (`FieldKind`, `InputFormField`, `PipeInputFormDescriptor`), the one public derivation `build_input_form(pipes)`, and the `InputFormDeriver` behind it.
 - `PipelexValidationReport.input_form` (`pipelex/pipeline/validation_report.py`) — a **required** field, keyed exactly like `pipe_io_contracts`. `build_validation_report` requires it as a keyword: the shared-assembly rule says a report field is populated on every backend or none, so a backend that forgets it fails loudly instead of shipping an empty view.
 - `pipelex/pipeline/validate_in_process.py` — the in-process assembly derives it inside the validation library's window, right beside `build_pipe_io_contracts`.
 - `pipelex/codegen/native_expansion.py` — `reflect_structure_class`, the faithful-or-absent reflection of a registered structure class into blueprint form, shared with the native consistency probe.
@@ -31,7 +31,7 @@ Kinds are decided by chain membership and declared types — never by sniffing a
 3. Otherwise, a chain bottoming at a native concept takes that native's row, keeping the concept's own `concept_ref`, description and `refines`.
 4. Otherwise — a description-only or string-described concept — `prose` with `refines` ending in `native.Text`: this engine backs such a concept with a `TextContent` subclass, so that is a stated fact, not shape invention.
 
-A concept the crate never saw — one loaded through `library_dirs` rather than the validated bundle — has no blueprint to read, so the deriver asks the loaded concept for its registered structure class (generated structures register under a domain-qualified class name) and reflects that class as in rule 2.
+The crate the deriver reads is the current library's accumulated one, which holds the validated bundle and every `library_dirs` bundle loaded beside it — so a concept from a library dir, or a local concept refining one, follows the same rules as a local concept. A concept absent from that crate altogether is `unknown`.
 
 | Native concept | Kind |
 |---|---|

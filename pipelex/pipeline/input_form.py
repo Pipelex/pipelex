@@ -26,7 +26,7 @@ library's window, beside `build_pipe_io_contracts`: class-backed reflection read
 registry, and bundle-defined classes are only reliably current while their library is loaded.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from enum import StrEnum
 from typing import Any
 
@@ -42,10 +42,9 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.native.pinned_blueprints import make_pinned_native_blueprint
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import PresenceMarker
-from pipelex.interpreter_hub import get_required_concept
+from pipelex.interpreter_hub import get_current_library, get_library_manager
 from pipelex.libraries.crate_qualification import qualify_crate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
-from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.system.registries.class_registry_access import get_class_registry
 
@@ -197,22 +196,23 @@ class PipeInputFormDescriptor(BaseModel):
     """One field descriptor per input slot, in authored input order. Empty for a pipe with no inputs."""
 
 
-def build_input_form(pipes: Sequence[PipeAbstract], *, blueprints: Sequence[PipelexBundleBlueprint]) -> dict[str, PipeInputFormDescriptor]:
-    """Derive the `input_form` descriptors of loaded pipes from their authored blueprints.
+def build_input_form(pipes: Sequence[PipeAbstract]) -> dict[str, PipeInputFormDescriptor]:
+    """Derive the `input_form` descriptors of loaded pipes from the authored blueprints of the current library.
 
     Works on any loaded `PipeAbstract`, `PipeSignature` placeholders included, iterating exactly
     as `build_pipe_io_contracts` does so the two artifacts share one key set. Must run while the
-    validation library is still loaded (see the module docstring).
+    validation library is still loaded (see the module docstring): the authored facts are the
+    library's accumulated crate, which covers the validated bundle and every `library_dirs`
+    bundle loaded beside it, so a concept from a library dir is derived exactly like a local one.
 
     Args:
         pipes: The loaded pipes to describe (typically `ValidateBundleResult.pipes`).
-        blueprints: The parsed bundle blueprints the pipes were loaded from — the authored facts.
 
     Returns:
         `pipe_ref` → `PipeInputFormDescriptor` for every given pipe.
     """
-    qualified = qualify_crate(LibraryCrateFactory.make_from_blueprints(list(blueprints)))
-    deriver = InputFormDeriver(concepts=qualified.concepts, structure_class_name_of=_loaded_structure_class_name)
+    crate = get_library_manager().get_crate(library_id=get_current_library()) or LibraryCrateFactory.make_from_blueprints([])
+    deriver = InputFormDeriver(concepts=qualify_crate(crate).concepts)
     input_form: dict[str, PipeInputFormDescriptor] = {}
     for pipe in pipes:
         fields = [deriver.derive_slot(name=var_name, stuff_spec=stuff_spec) for var_name, stuff_spec in pipe.inputs.root.items()]
@@ -220,22 +220,11 @@ def build_input_form(pipes: Sequence[PipeAbstract], *, blueprints: Sequence[Pipe
     return input_form
 
 
-def _loaded_structure_class_name(concept_ref: str) -> str:
-    """The registered structure class name of a loaded concept — generated structures register under a
-    domain-qualified name, so it is read from the concept rather than guessed from the ref.
-    """
-    return get_required_concept(concept_ref).structure_class_name
-
-
 class InputFormDeriver:
     """Derives field descriptors over one qualified crate's concepts (`QualifiedCrateContent.concepts`)."""
 
-    def __init__(self, *, concepts: dict[str, ConceptBlueprint | str], structure_class_name_of: Callable[[str], str] | None = None) -> None:
-        """`structure_class_name_of` resolves a concept ref the crate never saw (a `library_dirs` load) to its registered
-        structure class name; without it such a concept derives to `unknown`.
-        """
+    def __init__(self, *, concepts: dict[str, ConceptBlueprint | str]) -> None:
         self._concepts = concepts
-        self._structure_class_name_of = structure_class_name_of
 
     # ---- Pipe slots -------------------------------------------------------------------------------
 
@@ -276,11 +265,8 @@ class InputFormDeriver:
             return self._native_node(name=name, native_code=_native_code_of(native_ref=native_ref), seen=seen)
         entry = self._concepts.get(concept_ref)
         if entry is None:
-            # Not in the crate (loaded from a library dir): the loaded concept's registered class is the only fact left.
-            if self._structure_class_name_of is None:
-                return _unknown_node(name=name, concept_ref=concept_ref)
-            class_name = self._structure_class_name_of(concept_ref)
-            return self._class_backed_node(name=name, concept_ref=concept_ref, class_name=class_name, description=None, refines=None, seen=seen)
+            # Not in the crate: no authored fact to read, so the honest answer is the raw escape hatch.
+            return _unknown_node(name=name, concept_ref=concept_ref)
         if isinstance(entry, str):
             return _prose_promoted_node(name=name, concept_ref=concept_ref, description=entry, chain=[])
         return self._blueprint_node(name=name, concept_ref=concept_ref, blueprint=entry, seen=seen)

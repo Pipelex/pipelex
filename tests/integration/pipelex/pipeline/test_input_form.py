@@ -60,18 +60,33 @@ description = "An invoice"
 [concept.Invoice.structure]
 number = { type = "text", description = "Invoice number", required = true }
 total = { type = "number", description = "Total amount" }
+
+[concept]
+Memo = "A short memo"
 """
 
 _LIBRARY_CONSUMER_MTHDS = """
 domain = "input_form_consumer"
 description = "Bundle whose pipe input is a concept from a library dir"
 
+[concept.SpecialInvoice]
+description = "An invoice flagged for review"
+refines = "input_form_lib.Invoice"
+
 [pipe.process]
 type = "PipeLLM"
 description = "Process an invoice"
-inputs = { invoice = "input_form_lib.Invoice" }
 output = "Text"
-prompt = "@invoice"
+prompt = '''
+@invoice
+@memo
+@special
+'''
+
+[pipe.process.inputs]
+invoice = "input_form_lib.Invoice"
+memo = "input_form_lib.Memo"
+special = "SpecialInvoice"
 """
 
 
@@ -110,7 +125,7 @@ class TestBuildInputForm:
         outer_library_id = load_empty_library()
         try:
             result = await validate_bundle(mthds_contents=[_PROBE_BUNDLE_PATH.read_text(encoding="utf-8")])
-            input_form = build_input_form(result.pipes, blueprints=result.blueprints)
+            input_form = build_input_form(result.pipes)
             contract_keys = set(build_pipe_io_contracts(result.pipes))
         finally:
             _teardown_validation_library(outer_library_id)
@@ -300,29 +315,43 @@ class TestBuildInputForm:
         outer_library_id = load_empty_library()
         try:
             result = await validate_bundle(mthds_contents=[_NO_INPUTS_MTHDS])
-            input_form = build_input_form(result.pipes, blueprints=result.blueprints)
+            input_form = build_input_form(result.pipes)
         finally:
             _teardown_validation_library(outer_library_id)
 
         assert input_form["input_form_empty.generate"].fields == []
 
-    async def test_library_dir_concept_reflects_its_generated_class(self, tmp_path: Path, load_empty_library: Callable[[], str]) -> None:
-        """A concept loaded through `library_dirs` is not in the crate: its generated structure class is reflected, not `unknown`."""
+    async def test_library_dir_concepts_derive_like_local_ones(self, tmp_path: Path, load_empty_library: Callable[[], str]) -> None:
+        """Concepts loaded through `library_dirs` are in the library's crate: structured, description-only, and refined alike."""
         (tmp_path / "input_form_lib.mthds").write_text(_LIBRARY_DIR_MTHDS)
         outer_library_id = load_empty_library()
         try:
             result = await validate_bundle(mthds_contents=[_LIBRARY_CONSUMER_MTHDS], library_dirs=[tmp_path])
-            input_form = build_input_form(result.pipes, blueprints=result.blueprints)
+            input_form = build_input_form(result.pipes)
         finally:
             _teardown_validation_library(outer_library_id)
 
-        invoice = _field_by_name(input_form["input_form_consumer.process"], "invoice")
+        descriptor = input_form["input_form_consumer.process"]
+        invoice = _field_by_name(descriptor, "invoice")
         assert invoice.kind == FieldKind.OBJECT
         assert invoice.concept_ref == "input_form_lib.Invoice"
+        assert invoice.description == "An invoice"
         assert invoice.fields is not None
         number, total = invoice.fields
         assert (number.name, number.kind, number.required) == ("number", FieldKind.TEXT, True)
         assert (total.name, total.kind) == ("total", FieldKind.NUMBER)
+
+        memo = _field_by_name(descriptor, "memo")
+        assert memo.kind == FieldKind.PROSE
+        assert memo.description == "A short memo"
+        assert memo.refines == ["native.Text"]
+
+        special = _field_by_name(descriptor, "special")
+        assert special.kind == FieldKind.OBJECT
+        assert special.refines == ["input_form_lib.Invoice"]
+        assert special.fields is not None
+        assert [field.name for field in special.fields] == ["number", "total"]
+        assert special.description == "An invoice flagged for review"
 
     async def test_wire_dump_has_no_null_slots(self, load_empty_library: Callable[[], str]) -> None:
         """The valid arm is dumped WITHOUT `exclude_none`, so inapplicable slots must self-exclude."""
@@ -403,7 +432,7 @@ class TestKindAssignmentTable:
             registry.register_class(InputFormConstrainedPayload)
             registry.register_class(InputFormUnmappablePayload)
             result = await validate_bundle(mthds_contents=[_KIND_TABLE_MTHDS])
-            return build_input_form(result.pipes, blueprints=result.blueprints)
+            return build_input_form(result.pipes)
         finally:
             _teardown_validation_library(outer_library_id)
 

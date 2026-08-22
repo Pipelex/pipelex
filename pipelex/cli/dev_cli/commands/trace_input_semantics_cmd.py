@@ -227,9 +227,9 @@ def _capture_hop5(*, pipes: list[PipeAbstract], output_dir: Path) -> str:
     return HOP5_FILE_NAME
 
 
-def _capture_hop5_input_form(*, pipes: list[PipeAbstract], blueprints: list[PipelexBundleBlueprint], output_dir: Path) -> str:
+def _capture_hop5_input_form(*, pipes: list[PipeAbstract], output_dir: Path) -> str:
     """The descriptor projection, captured beside the schema one so the two can be diffed fact by fact."""
-    input_form = build_input_form(pipes, blueprints=blueprints)
+    input_form = build_input_form(pipes)
     payload = {pipe_ref: descriptor.model_dump(mode="json") for pipe_ref, descriptor in input_form.items()}
     _write_json(path=output_dir / HOP5_INPUT_FORM_FILE_NAME, payload=payload)
     return HOP5_INPUT_FORM_FILE_NAME
@@ -309,7 +309,7 @@ async def trace_input_semantics(
         hop3_captures, hop3_skipped = _capture_hop3(concept_refs=concept_refs, concept_provider=concept_provider, output_dir=output_dir)
         hop4_captures = _capture_hop4(pipes=result.pipes, concept_provider=concept_provider, output_dir=output_dir)
         hop5_capture = _capture_hop5(pipes=result.pipes, output_dir=output_dir)
-        hop5_input_form_capture = _capture_hop5_input_form(pipes=result.pipes, blueprints=result.blueprints, output_dir=output_dir)
+        hop5_input_form_capture = _capture_hop5_input_form(pipes=result.pipes, output_dir=output_dir)
         wire_framing = _build_wire_framing(blueprints=result.blueprints, pipes=result.pipes)
     finally:
         if validation_library_id is not None and validation_library_id != prev_library_id:

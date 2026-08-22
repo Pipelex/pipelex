@@ -4552,13 +4552,9 @@ rationale = "Verb-object: plans the fix for the error data; single operand."
 param = "error_data"
 rationale = "Verb-object: plans the fix for the error data; single operand."
 
-["pipelex/pipeline/input_form.py::_loaded_structure_class_name"]
-param = "concept_ref"
-rationale = "Resolves one concept ref to its structure class name: a single obvious operand."
-
 ["pipelex/pipeline/input_form.py::build_input_form"]
 param = "pipes"
-rationale = "Reads as a verb-object sentence over the loaded pipes, mirroring build_pipe_io_contracts; the blueprints are a keyword fact source."
+rationale = "Reads as a verb-object sentence over the loaded pipes, mirroring build_pipe_io_contracts."
 
 ["pipelex/pipeline/input_normalizer.py::_normalize_list"]
 param = "items"
