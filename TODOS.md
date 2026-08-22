@@ -26,39 +26,37 @@ Implements `/Users/lchoquel/repos/Pipelex/wip/inbox/2026-08-22-pipelex-d2-input-
 - **Keyword-only rule:** new functions keyword-only; if `build_input_form(pipes, ...)` keeps a positional subject, record the grant (`make sgr`) BEFORE running `make agent-check` (the auto-fixer silently keyword-onlys ungranted subjects).
 - Rich ready-made fixture for tests: `tests/data/input_semantics/probe_bundle.mthds` (chains, class-backed, natives, defaults, single choice, `[N]`, `!`, `?`).
 
-## Session state (updated 2026-08-22 — resume here after /compact or cold start)
+## Session state (updated 2026-08-22 at CP1 — resume here after /compact or cold start)
 
-**Done:** the plan below; the Phase 1 red tests are WRITTEN and deliberately failing (module `pipelex/pipeline/input_form.py` does not exist yet):
+**Done: Phases 1 and 2 (CP1).** `pipelex/pipeline/input_form.py` exists (models + `build_input_form(pipes, *, blueprints)`), the report carries `input_form` as a required field, the in-process assembly derives it inside the library window, and the two red test modules plus the carriage sweep are green under `make agent-check` and the pipeline/codegen suites. Nothing in Phases 3–7 has started.
 
-- `tests/integration/pipelex/pipeline/test_input_form.py` — derivation behavior against `tests/data/input_semantics/probe_bundle.mthds` + inline bundles, using the `load_empty_library` fixture / `_teardown_validation_library` pattern copied from `test_pipe_io_contracts.py`.
-- `tests/unit/pipelex/pipeline/test_input_form_models.py` — per-kind validators + null-free serialization.
+**Next action:** Phase 3 — extend the unit tests with the full per-native kind table, the `[1]` multiplicity edge, class-backed reflection of a custom registered class and the `unknown` fallback, the cycle guard, and the reflected constraint slots (`ImageContent.width` → `exclusive_minimum`); then CP2.
 
-**Next action:** write `pipelex/pipeline/input_form.py` (models + `build_input_form(pipes, *, blueprints)`) per the decisions above, then run those two modules. Late-discovered facts a fresh session needs:
+Decisions taken while implementing (beyond the settled list above):
 
-- Expected API (the tests pin it): `FieldKind` StrEnum, recursive `InputFormField`, `PipeInputFormDescriptor(fields=[...])`, `build_input_form(pipes, *, blueprints)` returning `dict[str, PipeInputFormDescriptor]`. The `datetime` wire slot is the Python attr `datetime_flag`; a custom `@model_serializer(mode="wrap")` drops `None` slots AND renames `datetime_flag` → `datetime` (an alias alone is NOT enough — the route dumps without `by_alias`).
-- Crate plumbing: `LibraryCrateFactory.make_from_blueprints(list(blueprints))` then `qualify_crate(crate)` → `QualifiedCrateContent(concepts, pipes)` (NamedTuple, `pipelex/libraries/crate_qualification.py:57`). Walk `refines` chains over `qualified.concepts` (qualify_crate qualifies in-body refines); stop after a `native.*` link; cycle-guard with a seen-set.
-- Natives: `materialize_native_concept(NativeConceptCode(...))` (`pipelex/codegen/native_expansion.py:41`) returns the pinned `ConceptBlueprint` (description + structure). `NativeConceptCode.structure_class_name` / `.concept_ref` / `.is_native_concept_ref_or_code(...)` exist (`pipelex/core/concepts/native/concept_native.py`).
-- Class registry for class-backed reflection: `from pipelex.system.registries.class_registry_access import get_class_registry` (the import `concept_factory.py:23` uses; do NOT import `runtime_hub` from pipeline code).
-- Multiplicity semantics (`variable_multiplicity.py:121`): `[]` → `True`, `[N]` → int N, none → `None`; presence `PresenceMarker` values are already the wire vocabulary. Mirror `is_multiple()` (`int > 1`) for list-ness so the descriptor never disagrees with the contract's array wrapping; `[1]` therefore renders as a single node — pin that in Phase 3.
-- `StuffSpec` (`pipelex/core/pipes/stuff_spec/stuff_spec.py`): `.concept.concept_ref` (qualified), `.presence`, `.multiplicity`. Loaded `Concept` has `description`/`refines`/`structure_class_name` but NO structure fields — field facts come from blueprints/pinned natives/reflection only.
-- Grant `build_input_form`'s positional `pipes` subject (`make sgr FUNC="pipelex/pipeline/input_form.py::build_input_form" RATIONALE=…`) BEFORE the first `make agent-check` (precedent: `build_pipe_io_contracts` at `subject_grants.toml:4587`; the auto-fixer silently rewrites ungranted subjects).
-- Unverified assumption in the tests: a `PipeLLM` with no `inputs` key validates green (`_NO_INPUTS_MTHDS`); if not, swap that bundle for a `PipeSignature` + `allow_signatures=True`.
+- **Signature is `build_input_form(pipes, *, blueprints)`**, not `crate=`: the deriver builds the qualified crate itself (`qualify_crate(LibraryCrateFactory.make_from_blueprints(...))`) so both assembly paths hand it the same thing they already hold. The `pipes` subject is granted in `subject_grants.toml`.
+- **Inheritance of structure along a chain.** A refining concept with no structure of its own (`SpecialEntity refines BaseEntity`) is an `object` whose fields are the merged authored structures along its chain, base fields first, a refining concept overriding its parents' — because the validator requires `fields` on `object` and the test pins `object` for exactly this case. Precedence per node: merged dict structure → `object`; else the first `structure = "ClassName"` on the chain (self first) → class-backed; else a chain bottoming at a native → that native's kind with the concept's own `concept_ref`/description/`refines`; else prose promotion (`refines` = chain + `["native.Text"]`).
+- **Class-backed reflection** goes through a new public `reflect_structure_class(*, structure_class)` in `pipelex/codegen/native_expansion.py` (the native probe now delegates to it). A native class name maps by identity (`TextContent` → the `native.Text` rules); any other registered `BaseModel` is reflected into blueprint form and rendered as `object`; unregistered or unmappable → `unknown`. A concept absent from the crate (a `library_dirs` load) takes the same path with the class named by its code.
+- **Nested concept fields** take the blueprint field's `description` and `required` over the concept's (the author described the field); a flattened scalar at the top level keeps the concept's description (E6).
+- **Item nodes** reuse the parent field's `name` and report `required: true` (a list element is a value); nested `list` nodes copy the element's `concept_ref`/`refines` per the spec.
+- **Enum comparisons** go through properties (`PresenceMarker.is_optional`, a new `FieldKind.is_list`) per the house match/case rule; the scalar-type mapping is one exhaustive `match` in `_scalar_field`.
+- `make agent-check`'s keyword-only auto-fixer silently rewrote an internal helper's positional parameter mid-session — the helper was replaced by a keyword-only one; nothing else was touched by it.
 
 ## Phase 1 — Wire models + derivation (`pipelex/pipeline/input_form.py`)
 
 - [x] TDD red: derivation + model tests written (see Session state above; paths differ slightly from the original sketch — integration tests live in `tests/integration/pipelex/pipeline/test_input_form.py`, model tests in `tests/unit/pipelex/pipeline/test_input_form_models.py`): key set equals `build_pipe_io_contracts`'s; authored slot order preserved; presence three-valued (`!` ≠ plain — E5); `required`/`gating` incl. the divergence (plain scalar `gating: true` vs plain `Concept[]` `required: true, gating: false`) and `?` (`required: false, gating: false`); `[N]` → `item_count` + `gating: true` (E4); empty-inputs pipe → `{ "fields": [] }`; namespaced `concept_ref` on every concept node incl. nested (E1); `refines` chain walked to the end, absent when nothing refined (E2); E3 both-facts; single-member `choices` list (E10); serialization drops inapplicable slots (no `null`s in `model_dump(mode="json")`).
-- [ ] Models: `FieldKind` StrEnum (closed union), recursive `InputFormField` (common slots + per-kind slots + reserved `examples`/`hints`), `PipeInputFormDescriptor` (`fields: list[InputFormField]`), all snake_case wire names per the spec's common-slots table (MTHDS-owned artifact — no `pipelex_` prefixes), None-dropping serializer, per-kind validators (`datetime` required on `date`, `choices` on `enum`, `fields` on `object`, `item` on `list`, `integer` on `number`).
-- [ ] Deriver: `build_input_form(pipes, *, crate) -> dict[str, PipeInputFormDescriptor]` — one public function per the spec's shared-assembly rule; internals per the decisions above.
-- [ ] Green + `make agent-check`.
+- [x] Models: `FieldKind` StrEnum (closed union), recursive `InputFormField` (common slots + per-kind slots + reserved `examples`/`hints`), `PipeInputFormDescriptor` (`fields: list[InputFormField]`), all snake_case wire names per the spec's common-slots table (MTHDS-owned artifact — no `pipelex_` prefixes), None-dropping serializer, per-kind validators (`datetime` required on `date`, `choices` on `enum`, `fields` on `object`, `item` on `list`, `integer` on `number`).
+- [x] Deriver: `build_input_form(pipes, *, blueprints) -> dict[str, PipeInputFormDescriptor]` — one public function per the spec's shared-assembly rule; internals per the decisions above.
+- [x] Green + `make agent-check`.
 
 ## Phase 2 — Report carriage (both in-repo assembly points)
 
-- [ ] `PipelexValidationReport.input_form` (required field, docstringed per house style) + required `input_form` kwarg on `build_validation_report`.
-- [ ] `validate_in_process.py`: build the qualified crate and call `build_input_form` inside the library window, right beside `build_pipe_io_contracts` (the descriptor must be assembled before teardown for the same class-registry reason).
-- [ ] Sweep other report producers/consumers in-repo: `tests/unit/pipelex/pipeline/test_validation_report.py`, `test_runner_validate_plumbing.py`, `test_direct_bundle_validator.py`, `test_protocol_validate.py`, the agent-CLI validate envelope, `format_validate_markdown` — update constructions; nothing renders the descriptor in Markdown (it is a structured view, not text).
-- [ ] Integration assertion in `test_protocol_validate.py` (or a sibling): the in-process report carries `input_form` keyed like `pipe_io_contracts`.
+- [x] `PipelexValidationReport.input_form` (required field, docstringed per house style) + required `input_form` kwarg on `build_validation_report`.
+- [x] `validate_in_process.py`: build the qualified crate and call `build_input_form` inside the library window, right beside `build_pipe_io_contracts` (the descriptor must be assembled before teardown for the same class-registry reason).
+- [x] Sweep other report producers/consumers in-repo: `tests/unit/pipelex/pipeline/test_validation_report.py`, `test_runner_validate_plumbing.py`, `test_direct_bundle_validator.py`, `test_protocol_validate.py`, the agent-CLI validate envelope, `format_validate_markdown` — update constructions; nothing renders the descriptor in Markdown (it is a structured view, not text).
+- [x] Integration assertion in `test_protocol_validate.py` (or a sibling): the in-process report carries `input_form` keyed like `pipe_io_contracts`.
 
-**CP1 — commit:** models + derivation + carriage, suite green (`make agent-check`, targeted pytest). Update this file: status of Phases 1–2, decisions taken, open questions.
+**CP1 — DONE (commit "D2 CP1: input-form descriptor derivation + report carriage"):** models + derivation + carriage, `make agent-check` and the pipeline/codegen suites green. Decisions recorded in the session state above.
 
 ## Phase 3 — Pin the full kind-assignment table (pipelex tests)
 

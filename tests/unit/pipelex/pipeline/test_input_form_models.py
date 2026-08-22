@@ -12,11 +12,12 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from pipelex.core.pipes.variable_multiplicity import PresenceMarker
 from pipelex.pipeline.input_form import FieldKind, InputFormField, PipeInputFormDescriptor
 
 
 def _prose_field(name: str = "brief") -> InputFormField:
-    return InputFormField(kind=FieldKind.PROSE, name=name, concept_ref="demo.Brief", required=True, presence="plain", gating=True)
+    return InputFormField(kind=FieldKind.PROSE, name=name, concept_ref="demo.Brief", required=True, presence=PresenceMarker.PLAIN, gating=True)
 
 
 class TestInputFormFieldValidators:
@@ -64,7 +65,7 @@ class TestInputFormSerialization:
             name="count",
             concept_ref="demo.Count",
             required=False,
-            presence="optional",
+            presence=PresenceMarker.OPTIONAL,
             gating=False,
             integer=False,
             exclusive_minimum=0,
@@ -93,7 +94,7 @@ class TestInputFormSerialization:
                     name="gadgets",
                     concept_ref="demo.Gadget",
                     required=True,
-                    presence="plain",
+                    presence=PresenceMarker.PLAIN,
                     gating=True,
                     item_count=2,
                     item=InputFormField(

@@ -20,7 +20,7 @@ success), mirroring `build_pipe_io_contracts` — same window, same key space.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -65,14 +65,14 @@ def _field_by_name(descriptor: PipeInputFormDescriptor, name: str) -> InputFormF
     return by_name[name]
 
 
-def _assert_no_null_values(dumped: object, *, path: str = "$") -> None:
+def _assert_no_null_values(dumped: Any, *, path: str = "$") -> None:
     """No slot on the dumped wire form ever carries JSON null — inapplicable slots are ABSENT."""
     if isinstance(dumped, dict):
-        for key, value in dumped.items():
+        for key, value in cast("dict[str, Any]", dumped).items():
             assert value is not None, f"Slot {path}.{key} dumped as null — inapplicable slots must be absent"
             _assert_no_null_values(value, path=f"{path}.{key}")
     elif isinstance(dumped, list):
-        for index, value in enumerate(dumped):
+        for index, value in enumerate(cast("list[Any]", dumped)):
             _assert_no_null_values(value, path=f"{path}[{index}]")
 
 
@@ -287,6 +287,7 @@ class TestBuildInputForm:
             _assert_no_null_values(dumped, path=pipe_ref)
             for dumped_field in dumped["fields"]:
                 # Nested fields never carry pipe-slot facts.
-                for nested in dumped_field.get("fields") or []:
+                nested_fields: list[dict[str, Any]] = dumped_field.get("fields") or []
+                for nested in nested_fields:
                     assert "presence" not in nested
                     assert "gating" not in nested
