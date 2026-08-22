@@ -31,6 +31,8 @@ Kinds are decided by chain membership and declared types — never by sniffing a
 3. Otherwise, a chain bottoming at a native concept takes that native's row, keeping the concept's own `concept_ref`, description and `refines`.
 4. Otherwise — a description-only or string-described concept — `prose` with `refines` ending in `native.Text`: this engine backs such a concept with a `TextContent` subclass, so that is a stated fact, not shape invention.
 
+A concept the crate never saw — one loaded through `library_dirs` rather than the validated bundle — has no blueprint to read, so the deriver asks the loaded concept for its registered structure class (generated structures register under a domain-qualified class name) and reflects that class as in rule 2.
+
 | Native concept | Kind |
 |---|---|
 | `Text`, `Html` | `prose` |

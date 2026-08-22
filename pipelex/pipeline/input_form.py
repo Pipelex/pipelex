@@ -26,7 +26,7 @@ library's window, beside `build_pipe_io_contracts`: class-backed reflection read
 registry, and bundle-defined classes are only reliably current while their library is loaded.
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from enum import StrEnum
 from typing import Any
 
@@ -42,6 +42,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.native.pinned_blueprints import make_pinned_native_blueprint
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import PresenceMarker
+from pipelex.interpreter_hub import get_required_concept
 from pipelex.libraries.crate_qualification import qualify_crate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
@@ -211,7 +212,7 @@ def build_input_form(pipes: Sequence[PipeAbstract], *, blueprints: Sequence[Pipe
         `pipe_ref` → `PipeInputFormDescriptor` for every given pipe.
     """
     qualified = qualify_crate(LibraryCrateFactory.make_from_blueprints(list(blueprints)))
-    deriver = InputFormDeriver(concepts=qualified.concepts)
+    deriver = InputFormDeriver(concepts=qualified.concepts, structure_class_name_of=_loaded_structure_class_name)
     input_form: dict[str, PipeInputFormDescriptor] = {}
     for pipe in pipes:
         fields = [deriver.derive_slot(name=var_name, stuff_spec=stuff_spec) for var_name, stuff_spec in pipe.inputs.root.items()]
@@ -219,11 +220,22 @@ def build_input_form(pipes: Sequence[PipeAbstract], *, blueprints: Sequence[Pipe
     return input_form
 
 
+def _loaded_structure_class_name(concept_ref: str) -> str:
+    """The registered structure class name of a loaded concept — generated structures register under a
+    domain-qualified name, so it is read from the concept rather than guessed from the ref.
+    """
+    return get_required_concept(concept_ref).structure_class_name
+
+
 class InputFormDeriver:
     """Derives field descriptors over one qualified crate's concepts (`QualifiedCrateContent.concepts`)."""
 
-    def __init__(self, *, concepts: dict[str, ConceptBlueprint | str]) -> None:
+    def __init__(self, *, concepts: dict[str, ConceptBlueprint | str], structure_class_name_of: Callable[[str], str] | None = None) -> None:
+        """`structure_class_name_of` resolves a concept ref the crate never saw (a `library_dirs` load) to its registered
+        structure class name; without it such a concept derives to `unknown`.
+        """
         self._concepts = concepts
+        self._structure_class_name_of = structure_class_name_of
 
     # ---- Pipe slots -------------------------------------------------------------------------------
 
@@ -264,10 +276,11 @@ class InputFormDeriver:
             return self._native_node(name=name, native_code=_native_code_of(native_ref=native_ref), seen=seen)
         entry = self._concepts.get(concept_ref)
         if entry is None:
-            # Not in the crate (loaded from a library dir): the registered class, if any, is the only fact left.
-            return self._class_backed_node(
-                name=name, concept_ref=concept_ref, class_name=concept_ref.rsplit(".", 1)[-1], description=None, refines=None, seen=seen
-            )
+            # Not in the crate (loaded from a library dir): the loaded concept's registered class is the only fact left.
+            if self._structure_class_name_of is None:
+                return _unknown_node(name=name, concept_ref=concept_ref)
+            class_name = self._structure_class_name_of(concept_ref)
+            return self._class_backed_node(name=name, concept_ref=concept_ref, class_name=class_name, description=None, refines=None, seen=seen)
         if isinstance(entry, str):
             return _prose_promoted_node(name=name, concept_ref=concept_ref, description=entry, chain=[])
         return self._blueprint_node(name=name, concept_ref=concept_ref, blueprint=entry, seen=seen)

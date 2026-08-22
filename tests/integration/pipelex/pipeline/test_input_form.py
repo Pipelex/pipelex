@@ -50,6 +50,31 @@ def _teardown_validation_library(outer_library_id: str) -> None:
 _PROBE_BUNDLE_PATH = Path(__file__).parents[3] / "data" / "input_semantics" / "probe_bundle.mthds"
 
 
+_LIBRARY_DIR_MTHDS = """
+domain = "input_form_lib"
+description = "Library domain loaded through library_dirs"
+
+[concept.Invoice]
+description = "An invoice"
+
+[concept.Invoice.structure]
+number = { type = "text", description = "Invoice number", required = true }
+total = { type = "number", description = "Total amount" }
+"""
+
+_LIBRARY_CONSUMER_MTHDS = """
+domain = "input_form_consumer"
+description = "Bundle whose pipe input is a concept from a library dir"
+
+[pipe.process]
+type = "PipeLLM"
+description = "Process an invoice"
+inputs = { invoice = "input_form_lib.Invoice" }
+output = "Text"
+prompt = "@invoice"
+"""
+
+
 _NO_INPUTS_MTHDS = """
 domain = "input_form_empty"
 description = "Bundle with a pipe declaring no inputs"
@@ -280,6 +305,24 @@ class TestBuildInputForm:
             _teardown_validation_library(outer_library_id)
 
         assert input_form["input_form_empty.generate"].fields == []
+
+    async def test_library_dir_concept_reflects_its_generated_class(self, tmp_path: Path, load_empty_library: Callable[[], str]) -> None:
+        """A concept loaded through `library_dirs` is not in the crate: its generated structure class is reflected, not `unknown`."""
+        (tmp_path / "input_form_lib.mthds").write_text(_LIBRARY_DIR_MTHDS)
+        outer_library_id = load_empty_library()
+        try:
+            result = await validate_bundle(mthds_contents=[_LIBRARY_CONSUMER_MTHDS], library_dirs=[tmp_path])
+            input_form = build_input_form(result.pipes, blueprints=result.blueprints)
+        finally:
+            _teardown_validation_library(outer_library_id)
+
+        invoice = _field_by_name(input_form["input_form_consumer.process"], "invoice")
+        assert invoice.kind == FieldKind.OBJECT
+        assert invoice.concept_ref == "input_form_lib.Invoice"
+        assert invoice.fields is not None
+        number, total = invoice.fields
+        assert (number.name, number.kind, number.required) == ("number", FieldKind.TEXT, True)
+        assert (total.name, total.kind) == ("total", FieldKind.NUMBER)
 
     async def test_wire_dump_has_no_null_slots(self, load_empty_library: Callable[[], str]) -> None:
         """The valid arm is dumped WITHOUT `exclude_none`, so inapplicable slots must self-exclude."""
