@@ -1,6 +1,6 @@
-# S1 — The input-semantics audit: plan
+# S1 — The input-semantics audit: plan (✅ done — S1 closed 2026-08-21)
 
-**Status:** plan written 2026-08-21, companion to [`audit.md`](audit.md) (the brief — read it first; this document schedules the audit, it does not re-argue it). Progress is tracked here with checkboxes. The deliverable is `findings.md`, written beside this file when Phase 4 completes. Per the brief: audit only — no fixes, no descriptor design, no wire changes.
+**Status:** ✅ **Done.** Every phase below is complete and both checkpoints were reached; the milestone closed on 2026-08-21 with the deliverable in [`findings.md`](findings.md). This file is kept as the as-built record of how the audit was run — plan written 2026-08-21, companion to [`audit.md`](audit.md) (the brief — read it first; this document schedules the audit, it does not re-argue it). Progress is tracked here with checkboxes. The deliverable is `findings.md`, written beside this file when Phase 4 completes. Per the brief: audit only — no fixes, no descriptor design, no wire changes.
 
 ## The method, in one sentence
 
