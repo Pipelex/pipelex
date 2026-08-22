@@ -26,17 +26,21 @@ Implements `/Users/lchoquel/repos/Pipelex/wip/inbox/2026-08-22-pipelex-d2-input-
 - **Keyword-only rule:** new functions keyword-only; if `build_input_form(pipes, ...)` keeps a positional subject, record the grant (`make sgr`) BEFORE running `make agent-check` (the auto-fixer silently keyword-onlys ungranted subjects).
 - Rich ready-made fixture for tests: `tests/data/input_semantics/probe_bundle.mthds` (chains, class-backed, natives, defaults, single choice, `[N]`, `!`, `?`).
 
-## Session state (updated 2026-08-22 at CP1 — resume here after /compact or cold start)
+## Session state (updated 2026-08-22 at CP2 — resume here after /compact or cold start)
 
-**Done: Phases 1 and 2 (CP1).** `pipelex/pipeline/input_form.py` exists (models + `build_input_form(pipes, *, blueprints)`), the report carries `input_form` as a required field, the in-process assembly derives it inside the library window, and the two red test modules plus the carriage sweep are green under `make agent-check` and the pipeline/codegen suites. Nothing in Phases 3–7 has started.
+**Done: Phases 1–6.** Phase 5 landed as `docs/under-the-hood/input-form-descriptor.md` (in both nav lists of `mkdocs.yml`), the `hop5_input_form.json` capture in the trace harness (+ its doc and test), and the `## [Unreleased]` changelog entry. Phase 6 filed `../wip/inbox/2026-08-22-pipelex-api-validate-views-input-form.md` and `../wip/inbox/2026-08-22-pipelex-server-worker-input-form-carriage.md`. The derivation, the report carriage and the full kind-assignment table are pinned: `tests/integration/pipelex/pipeline/test_input_form.py` (probe bundle + a second bundle for the remaining natives, `[1]`, and class-backed reflection with constraint slots), `tests/unit/pipelex/pipeline/test_input_form_models.py` (wire models) and `tests/unit/pipelex/pipeline/test_input_form_deriver.py` (the escape hatches the loader keeps unreachable: cycle guard, unregistered class, concept absent from the crate). Nothing in Phases 4–7 has started.
 
-**Next action:** Phase 3 — extend the unit tests with the full per-native kind table, the `[1]` multiplicity edge, class-backed reflection of a custom registered class and the `unknown` fallback, the cycle guard, and the reflected constraint slots (`ImageContent.width` → `exclusive_minimum`); then CP2.
+**Next action:** Phase 7 — full gates, commit, final checkpoint note.
 
 Decisions taken while implementing (beyond the settled list above):
 
-- **Signature is `build_input_form(pipes, *, blueprints)`**, not `crate=`: the deriver builds the qualified crate itself (`qualify_crate(LibraryCrateFactory.make_from_blueprints(...))`) so both assembly paths hand it the same thing they already hold. The `pipes` subject is granted in `subject_grants.toml`.
+- **Signature is `build_input_form(pipes, *, blueprints)`**, not `crate=`: the deriver builds the qualified crate itself (`qualify_crate(LibraryCrateFactory.make_from_blueprints(...))`) so both assembly paths hand it the same thing they already hold. The `pipes` subject is granted in `subject_grants.toml`. The deriver class is public (`InputFormDeriver`, with `derive_slot` and `derive_concept`) so its escape hatches can be unit-tested on a hand-built crate without private access.
 - **Inheritance of structure along a chain.** A refining concept with no structure of its own (`SpecialEntity refines BaseEntity`) is an `object` whose fields are the merged authored structures along its chain, base fields first, a refining concept overriding its parents' — because the validator requires `fields` on `object` and the test pins `object` for exactly this case. Precedence per node: merged dict structure → `object`; else the first `structure = "ClassName"` on the chain (self first) → class-backed; else a chain bottoming at a native → that native's kind with the concept's own `concept_ref`/description/`refines`; else prose promotion (`refines` = chain + `["native.Text"]`).
 - **Class-backed reflection** goes through a new public `reflect_structure_class(*, structure_class)` in `pipelex/codegen/native_expansion.py` (the native probe now delegates to it). A native class name maps by identity (`TextContent` → the `native.Text` rules); any other registered `BaseModel` is reflected into blueprint form and rendered as `object`; unregistered or unmappable → `unknown`. A concept absent from the crate (a `library_dirs` load) takes the same path with the class named by its code.
+- **Constraint slots come only from reflected classes.** The blueprint parser drops unknown keys (E7), so an authored `minimum = 0` never reaches the deriver; a registered class's `Field(gt=, ge=, lt=, le=, min_length=, max_length=, pattern=)` does, read from `FieldInfo.metadata` and stamped on `number` (bounds) and `text` (length/pattern) nodes only.
+- **`[1]` is a single node.** The parser keeps `multiplicity = 1`, but `StuffSpec.is_multiple()` is `count > 1`, so the runtime takes one value, not a one-element list — the descriptor says the same (no `item`, no `item_count`, `gating: true`).
+- **The cycle guard is unreachable from a bundle**: the library loader rejects concept cycles (`Cycle detected in concept references`) before `build_input_form` runs. It stays, because the derivation must be total on any crate handed to it, and is pinned at the deriver level.
+- **Remaining natives as inputs** (`TextAndImages`, `SearchResult`, `Dynamic`, `Anything`, `JSON`) are exercised through a `PipeCompose`, because a PipeLLM's dry run treats a `Dynamic` input as an image. `Composite` is not a pipe input and has no row.
 - **Nested concept fields** take the blueprint field's `description` and `required` over the concept's (the author described the field); a flattened scalar at the top level keeps the concept's description (E6).
 - **Item nodes** reuse the parent field's `name` and report `required: true` (a list element is a value); nested `list` nodes copy the element's `concept_ref`/`refines` per the spec.
 - **Enum comparisons** go through properties (`PresenceMarker.is_optional`, a new `FieldKind.is_list`) per the house match/case rule; the scalar-type mapping is one exhaustive `match` in `_scalar_field`.
@@ -60,30 +64,30 @@ Decisions taken while implementing (beyond the settled list above):
 
 ## Phase 3 — Pin the full kind-assignment table (pipelex tests)
 
-- [ ] Extend the unit tests with the complete per-native ruling (every `NativeConceptCode` as a direct input → its kind above), string-promoted concept → `prose` + `refines: ["native.Text"]`, class-backed reflection (e.g. `structure = "TextContent"` → flattened `prose` carrying the concept description — E6) and the unmappable → `unknown` fallback, nested `dict`/inner-list → `unknown`, `datetime`/`time` formats, cycle guard.
-- [ ] Pin whatever the parser does for `[1]` (an `is_multiple()` edge) in one test, reporting it as authored.
-- [ ] Constraint slots: populate from reflected `FieldInfo` metadata where the engine states them (`Gt`/`Ge`/`Lt`/`Le`/`MinLen`/`MaxLen`/pattern → `exclusive_minimum` etc.); test on a registered class with a constrained field (the `ImageContent.width` precedent).
+- [x] Extend the unit tests with the complete per-native ruling (every `NativeConceptCode` as a direct input → its kind above), string-promoted concept → `prose` + `refines: ["native.Text"]`, class-backed reflection (e.g. `structure = "TextContent"` → flattened `prose` carrying the concept description — E6) and the unmappable → `unknown` fallback, nested `dict`/inner-list → `unknown`, `datetime`/`time` formats, cycle guard.
+- [x] Pin whatever the parser does for `[1]` (an `is_multiple()` edge) in one test, reporting it as authored.
+- [x] Constraint slots: populate from reflected `FieldInfo` metadata where the engine states them (`Gt`/`Ge`/`Lt`/`Le`/`MinLen`/`MaxLen`/pattern → `exclusive_minimum` etc.); test on a registered class with a constrained field (the `ImageContent.width` precedent).
 
-**CP2 — commit:** assignment table pinned; `make agent-check` + full `make agent-test` green. Update this file.
+**CP2 — DONE (commit "D2 CP2: pin the kind-assignment table and reflected constraint slots"):** assignment table pinned; `make agent-check` + full `make agent-test` green.
 
 ## Phase 4 — Conformance: per-kind coverage (sibling repo `conformance/`, own commit there)
 
-- [ ] Add per-kind skeleton tests to `conformance/tests/pipelex_api/test_validate_input_form.py`, skip-gated with the same `SKELETON_REASON` (the sibling boots a pinned PyPI runtime that predates the derivation): one bundle exercising the assignment table end to end (prose/document/image/number/boolean/single-member-enum/object-with-nested-concept_ref/list-with-`[N]`-item_count/date/unknown-dict), asserting kinds, `refines` membership, `presence`, E3 both-facts, and no-`null` inapplicable slots.
-- [ ] Do NOT touch the two live absent-by-default tests.
-- [ ] `make check-spec-links` in `conformance/` (new tests join the already-linked module; verify nothing drifted). Follow that repo's branch/PR convention for the commit.
+- [x] Add per-kind skeleton tests to `conformance/tests/pipelex_api/test_validate_input_form.py`, skip-gated with the same `SKELETON_REASON` (the sibling boots a pinned PyPI runtime that predates the derivation): one bundle exercising the assignment table end to end (prose/document/image/number/boolean/single-member-enum/object-with-nested-concept_ref/list-with-`[N]`-item_count/date/unknown-dict), asserting kinds, `refines` membership, `presence`, E3 both-facts, and no-`null` inapplicable slots.
+- [x] Do NOT touch the two live absent-by-default tests.
+- [x] `make check-spec-links` in `conformance/` (new tests join the already-linked module; verify nothing drifted). Follow that repo's branch/PR convention for the commit.
 
-**CP3 — commit (in `conformance/`):** per-kind skeletons added, spec links green. Update this file.
+**CP3 — DONE:** `conformance/` branch `feature/Input-form-kind-table` (commit "Pin the kind-assignment table skeletons in the input-form descriptor module", `make agent-check` green there) plus the spec's two new `> Verified by:` lines under *Field kinds* and *Structured multiplicity*, committed on the workspace root's `dev` ("Link the field-kinds and structured-multiplicity sections to their conformance skeletons"). The kind-table bundle was derived locally on this branch before the assertions were written, so the skeletons state what the deriver already produces.
 
 ## Phase 5 — Docs + changelog (this repo)
 
-- [ ] New docs page documenting the descriptor derivation: where it lives, the fact sources, the kind-assignment table, the gating rule, pointer to the workspace spec as the contract. Link it from the docs nav where natural (MkDocs conventions: blank line before lists).
-- [ ] `docs/contribute/trace-input-semantics.md` + harness: add the descriptor as a trace artifact (a hop beside `hop5_pipe_io_contracts.json`) so a mangled authored fact localizes into the new projection too — small, per the keep-useful-harnesses rule.
-- [ ] `CHANGELOG.md` under `## [Unreleased]`: bold-label condensed entry (breaking: `build_validation_report` requires `input_form`; the report gains the field).
+- [x] New docs page documenting the descriptor derivation: where it lives, the fact sources, the kind-assignment table, the gating rule, pointer to the workspace spec as the contract. Link it from the docs nav where natural (MkDocs conventions: blank line before lists).
+- [x] `docs/contribute/trace-input-semantics.md` + harness: add the descriptor as a trace artifact (a hop beside `hop5_pipe_io_contracts.json`) so a mangled authored fact localizes into the new projection too — small, per the keep-useful-harnesses rule.
+- [x] `CHANGELOG.md` under `## [Unreleased]`: bold-label condensed entry (breaking: `build_validation_report` requires `input_form`; the report gains the field).
 
 ## Phase 6 — File the two cross-repo follow-ups (workspace `wip/inbox/`, from here `../wip/inbox/`)
 
-- [ ] `YYYY-MM-DD-pipelex-api-validate-views-input-form.md` (use `_TEMPLATE.md`): add `views: list[str]` beside `render` with identical lenient mechanics (`validate.py:31/:59` precedent), resolve-then-attach-or-pop `input_form` on the valid arm only, regenerate the committed OpenAPI, bump the `pipelex` pin once released, then **de-gate the whole conformance module** (this closes D2's gate). Carry the evidence pointers (spec section, skeleton file/lines, this branch's derivation site).
-- [ ] `YYYY-MM-DD-pipelex-server-worker-input-form-carriage.md`: carry `input_form` on `DryValidateResult` inside the library window (`act_dry_validate.py:52`) and hand it to `build_validation_report` (`temporal_bundle_validator.py:107`); state plainly that the next pipelex bump fails loudly on the missing kwarg by design (shared-assembly rule) — rides D3's cascade. Name the member (`temporal/`) in the body.
+- [x] `YYYY-MM-DD-pipelex-api-validate-views-input-form.md` (use `_TEMPLATE.md`): add `views: list[str]` beside `render` with identical lenient mechanics (`validate.py:31/:59` precedent), resolve-then-attach-or-pop `input_form` on the valid arm only, regenerate the committed OpenAPI, bump the `pipelex` pin once released, then **de-gate the whole conformance module** (this closes D2's gate). Carry the evidence pointers (spec section, skeleton file/lines, this branch's derivation site).
+- [x] `YYYY-MM-DD-pipelex-server-worker-input-form-carriage.md`: carry `input_form` on `DryValidateResult` inside the library window (`act_dry_validate.py:52`) and hand it to `build_validation_report` (`temporal_bundle_validator.py:107`); state plainly that the next pipelex bump fails loudly on the missing kwarg by design (shared-assembly rule) — rides D3's cascade. Name the member (`temporal/`) in the body.
 
 ## Phase 7 — Close out
 

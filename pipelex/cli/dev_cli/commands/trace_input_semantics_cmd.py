@@ -13,6 +13,8 @@ facts into the `json_schema` emitted on `pipe_io_contracts`:
 - ``hop4_schema_renders/`` — the `ConceptRepresentationFormat.SCHEMA` render per pipe input
   (the `{"concept": ..., "content": ...}` envelope, with array wrapping when multiple).
 - ``hop5_pipe_io_contracts.json`` — the final wire contracts from `build_pipe_io_contracts`.
+- ``hop5_input_form.json`` — the input-form descriptors from `build_input_form`, the projection
+  that reads the authored facts directly (a fact lost on the schema side should survive here).
 - ``trace_manifest.json`` — the capture inventory plus the wire framing per pipe input
   (authored ref string, resolved concept ref, multiplicity, presence marker).
 
@@ -49,6 +51,7 @@ from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprin
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.input_form import build_input_form
 from pipelex.pipeline.pipe_io_contracts import build_pipe_io_contracts
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.runtime_hub import get_console
@@ -59,6 +62,7 @@ HOP2_DIR_NAME = "hop2_generated_sources"
 HOP3_DIR_NAME = "hop3_raw_pydantic_schemas"
 HOP4_DIR_NAME = "hop4_schema_renders"
 HOP5_FILE_NAME = "hop5_pipe_io_contracts.json"
+HOP5_INPUT_FORM_FILE_NAME = "hop5_input_form.json"
 
 
 def _write_json(*, path: Path, payload: Any) -> None:
@@ -223,6 +227,14 @@ def _capture_hop5(*, pipes: list[PipeAbstract], output_dir: Path) -> str:
     return HOP5_FILE_NAME
 
 
+def _capture_hop5_input_form(*, pipes: list[PipeAbstract], blueprints: list[PipelexBundleBlueprint], output_dir: Path) -> str:
+    """The descriptor projection, captured beside the schema one so the two can be diffed fact by fact."""
+    input_form = build_input_form(pipes, blueprints=blueprints)
+    payload = {pipe_ref: descriptor.model_dump(mode="json") for pipe_ref, descriptor in input_form.items()}
+    _write_json(path=output_dir / HOP5_INPUT_FORM_FILE_NAME, payload=payload)
+    return HOP5_INPUT_FORM_FILE_NAME
+
+
 def _build_wire_framing(*, blueprints: list[PipelexBundleBlueprint], pipes: list[PipeAbstract]) -> list[dict[str, Any]]:
     """One entry per pipe input: what the author wrote versus what the loaded spec resolved it to."""
     authored_specs: dict[str, str] = {}
@@ -297,6 +309,7 @@ async def trace_input_semantics(
         hop3_captures, hop3_skipped = _capture_hop3(concept_refs=concept_refs, concept_provider=concept_provider, output_dir=output_dir)
         hop4_captures = _capture_hop4(pipes=result.pipes, concept_provider=concept_provider, output_dir=output_dir)
         hop5_capture = _capture_hop5(pipes=result.pipes, output_dir=output_dir)
+        hop5_input_form_capture = _capture_hop5_input_form(pipes=result.pipes, blueprints=result.blueprints, output_dir=output_dir)
         wire_framing = _build_wire_framing(blueprints=result.blueprints, pipes=result.pipes)
     finally:
         if validation_library_id is not None and validation_library_id != prev_library_id:
@@ -314,6 +327,7 @@ async def trace_input_semantics(
         "hop3_skipped": hop3_skipped,
         "hop4_schema_renders": hop4_captures,
         "hop5_pipe_io_contracts": hop5_capture,
+        "hop5_input_form": hop5_input_form_capture,
         "wire_framing": wire_framing,
     }
     _write_json(path=output_dir / MANIFEST_FILE_NAME, payload=manifest)
@@ -351,5 +365,5 @@ def trace_input_semantics_cmd(*, bundle_paths: list[Path], output_dir: Path, all
     console.print(f"  hop 2: {len(manifest['hop2_generated_sources'])} generated sources under {HOP2_DIR_NAME}/")
     console.print(f"  hop 3: {len(manifest['hop3_raw_pydantic_schemas'])} raw schemas under {HOP3_DIR_NAME}/")
     console.print(f"  hop 4: {len(manifest['hop4_schema_renders'])} schema renders under {HOP4_DIR_NAME}/")
-    console.print(f"  hop 5: {manifest['hop5_pipe_io_contracts']}")
+    console.print(f"  hop 5: {manifest['hop5_pipe_io_contracts']} + {manifest['hop5_input_form']}")
     console.print(f"  manifest: {MANIFEST_FILE_NAME}")

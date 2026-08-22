@@ -15,13 +15,14 @@ The chain has five hops, and the output directory holds one artifact per hop, so
 - `hop3_raw_pydantic_schemas/` — raw `model_json_schema()` per structure class, before any Pipelex render wrapping.
 - `hop4_schema_renders/` — the `SCHEMA` representation per pipe input: the `{"concept", "content"}` envelope, with array wrapping when the input is multiple.
 - `hop5_pipe_io_contracts.json` — the final wire contracts from `build_pipe_io_contracts`.
+- `hop5_input_form.json` — the input-form descriptors from `build_input_form`, the sibling projection that reads the authored blueprints directly instead of the emitted schema (see [Input-Form Descriptor](../under-the-hood/input-form-descriptor.md)). Captured beside the contracts so a fact can be checked on both sides: lost in the schema, stated in the descriptor.
 - `trace_manifest.json` — the capture inventory plus the wire framing per pipe input: authored ref string, resolved concept ref, multiplicity, presence marker.
 
 The tool is a tracer, not a report generator: it never mutates the loaded library, and any analysis of the captures (diffing hops, building a survival table) stays with the caller.
 
 ## When to reach for it
 
-Use it whenever a change touches the emission chain — the structure blueprint, the structure generator, the schema render, or the contract builder — and you want to see what actually reaches the wire rather than reason about it. The committed probe bundle at `tests/data/input_semantics/probe_bundle.mthds` exercises every construct the language accepts (all field types, choices, defaults, required both ways, nesting, refinements, native concepts, and the `?` / `!` / `[]` / `[N]` input markers), and `tests/data/input_semantics/rejected/` holds deliberately-invalid fixtures pinning what the language refuses:
+Use it whenever a change touches the emission chain — the structure blueprint, the structure generator, the schema render, the contract builder, or the input-form deriver — and you want to see what actually reaches the wire rather than reason about it. The committed probe bundle at `tests/data/input_semantics/probe_bundle.mthds` exercises every construct the language accepts (all field types, choices, defaults, required both ways, nesting, refinements, native concepts, and the `?` / `!` / `[]` / `[N]` input markers), and `tests/data/input_semantics/rejected/` holds deliberately-invalid fixtures pinning what the language refuses:
 
 ```bash
 .venv/bin/pipelex-dev trace-input-semantics tests/data/input_semantics/probe_bundle.mthds -o /tmp/probe-trace

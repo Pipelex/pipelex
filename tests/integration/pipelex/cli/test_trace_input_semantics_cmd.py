@@ -13,6 +13,7 @@ import pytest
 from pipelex.cli.dev_cli.commands.trace_input_semantics_cmd import (
     HOP1_FILE_NAME,
     HOP5_FILE_NAME,
+    HOP5_INPUT_FORM_FILE_NAME,
     MANIFEST_FILE_NAME,
     trace_input_semantics,
 )
@@ -94,6 +95,14 @@ class TestTraceInputSemantics:
         assert do_one["inputs"]["hint"]["optional"] is True
         assert do_one["inputs"]["items"]["json_schema"]["type"] == "array"
 
+        # Hop 5, descriptor side: the same pipes, keyed identically, with the authored facts stated directly.
+        input_form = _read_json(output_dir / HOP5_INPUT_FORM_FILE_NAME)
+        assert set(input_form) == set(hop5)
+        do_one_fields = {field["name"]: field for field in input_form["trace_tool_test.do_one"]["fields"]}
+        assert do_one_fields["items"]["kind"] == "list"
+        assert do_one_fields["items"]["concept_ref"] == "trace_tool_test.Item"
+        assert do_one_fields["hint"]["presence"] == "optional"
+
         # Manifest: wire framing pairs the authored ref string with the resolved spec.
         framing_by_input = {f"{entry['pipe_ref']}.{entry['input_name']}": entry for entry in manifest["wire_framing"]}
         assert framing_by_input["trace_tool_test.do_one.items"]["authored_spec"] == "Item[]"
@@ -117,3 +126,4 @@ class TestTraceInputSemantics:
         assert manifest["hop4_schema_renders"]
         hop5 = _read_json(output_dir / HOP5_FILE_NAME)
         assert "input_semantics_probe.probe_markers" in hop5
+        assert "input_semantics_probe.probe_markers" in _read_json(output_dir / HOP5_INPUT_FORM_FILE_NAME)
