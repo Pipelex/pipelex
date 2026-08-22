@@ -1,0 +1,5 @@
+# Deferred: order-dependent failure under serial `make test`
+
+Seen while closing D2 (`feature/Input-semantics-D2`): the serial `make test` run failed exactly one test, `tests/unit/pipelex/pipe_operators/pipe_func/test_direct_executor_workdir.py::TestDirectExecutorWorkdir::test_transported_run_generates_concept_structures`, with `Function 'greet_it' not found in registry`. The same test passes in isolation and under the parallel `make agent-test`, and D2 touches nothing under `pipe_func`. So an earlier test in the serial ordering leaves the func registry in a state this test does not expect — a test-isolation leak on the base branch, not a D2 regression.
+
+Not fixed here: it is outside the D2 diff and the right fix (which fixture resets the func registry, and which earlier test pollutes it) needs its own bisect. Reproduce with the serial `make test` ordering and bisect with `pytest -p no:randomly tests/unit/pipelex/pipe_operators/pipe_func/test_direct_executor_workdir.py <suspect earlier module>`.

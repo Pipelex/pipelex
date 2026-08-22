@@ -26,11 +26,17 @@ Implements `/Users/lchoquel/repos/Pipelex/wip/inbox/2026-08-22-pipelex-d2-input-
 - **Keyword-only rule:** new functions keyword-only; if `build_input_form(pipes, ...)` keeps a positional subject, record the grant (`make sgr`) BEFORE running `make agent-check` (the auto-fixer silently keyword-onlys ungranted subjects).
 - Rich ready-made fixture for tests: `tests/data/input_semantics/probe_bundle.mthds` (chains, class-backed, natives, defaults, single choice, `[N]`, `!`, `?`).
 
-## Session state (updated 2026-08-22 at CP2 — resume here after /compact or cold start)
+## Session state (updated 2026-08-22 at close-out — resume here after /compact or cold start)
 
-**Done: Phases 1–6.** Phase 5 landed as `docs/under-the-hood/input-form-descriptor.md` (in both nav lists of `mkdocs.yml`), the `hop5_input_form.json` capture in the trace harness (+ its doc and test), and the `## [Unreleased]` changelog entry. Phase 6 filed `../wip/inbox/2026-08-22-pipelex-api-validate-views-input-form.md` and `../wip/inbox/2026-08-22-pipelex-server-worker-input-form-carriage.md`. The derivation, the report carriage and the full kind-assignment table are pinned: `tests/integration/pipelex/pipeline/test_input_form.py` (probe bundle + a second bundle for the remaining natives, `[1]`, and class-backed reflection with constraint slots), `tests/unit/pipelex/pipeline/test_input_form_models.py` (wire models) and `tests/unit/pipelex/pipeline/test_input_form_deriver.py` (the escape hatches the loader keeps unreachable: cycle guard, unregistered class, concept absent from the crate). Nothing in Phases 4–7 has started.
+**All phases done.** What landed where:
 
-**Next action:** Phase 7 — full gates, commit, final checkpoint note.
+- `pipelex/pipeline/input_form.py` — wire models, `build_input_form`, `InputFormDeriver`; `pipelex/codegen/native_expansion.py` — `reflect_structure_class`; `pipelex/pipeline/validation_report.py` + `validate_in_process.py` — the required `input_form` carriage.
+- Tests: `tests/integration/pipelex/pipeline/test_input_form.py` (probe bundle + kind-table bundle), `tests/unit/pipelex/pipeline/test_input_form_models.py`, `tests/unit/pipelex/pipeline/test_input_form_deriver.py`, plus the carriage sweep and the trace-harness test.
+- Docs: `docs/under-the-hood/input-form-descriptor.md` (nav'd), `docs/contribute/trace-input-semantics.md` (the `hop5_input_form.json` capture), the `## [Unreleased]` changelog entry.
+- Sibling repos: `conformance/` branch `feature/Input-form-kind-table` (per-kind skeletons, skip-gated); workspace root `dev` (the spec's two new `> Verified by:` lines).
+- Inbox: `../wip/inbox/2026-08-22-pipelex-api-validate-views-input-form.md` (the `views` opt-in + OpenAPI + the de-gating of the whole conformance module once the pin moves — this closes D2's gate) and `../wip/inbox/2026-08-22-pipelex-server-worker-input-form-carriage.md` (`temporal/`: carry `input_form` on `DryValidateResult`; rides the D3 pin cascade, fails loudly until then by design).
+
+**Waiting on:** a `pipelex` release carrying the derivation, then the two inbox items. Nothing else in this repo.
 
 Decisions taken while implementing (beyond the settled list above):
 
@@ -91,9 +97,10 @@ Decisions taken while implementing (beyond the settled list above):
 
 ## Phase 7 — Close out
 
-- [ ] Full `make agent-check` + `make agent-test` (the full suite — new test modules only get seen there).
-- [ ] Commit remaining work on `feature/Input-semantics-D2` with the CP structure above; no PR to `dev` (program ruling).
-- [ ] Final checkpoint note in this file: what landed where, decisions taken, what the two inbox items are waiting on.
+- [x] Full `make agent-check` + `make agent-test` (the full suite — new test modules only get seen there).
+- [x] Commit remaining work on `feature/Input-semantics-D2` with the CP structure above; no PR to `dev` (program ruling) — the PR is stacked on `feature/Input-semantics`.
+- [x] Final checkpoint note in this file: what landed where, decisions taken, what the two inbox items are waiting on.
+- [x] `make check` + serial `make test` before the PR: one order-dependent failure in a `pipe_func` workdir test, unrelated to D2 (passes alone and under `agent-test`); deferred to `wip/input-semantics/deferred-serial-make-test-flake.md`.
 
 ## Deliberately out of scope (do not widen the diff)
 
