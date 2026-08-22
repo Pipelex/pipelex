@@ -100,6 +100,7 @@ Decisions taken while implementing (beyond the settled list above):
 - [x] Full `make agent-check` + `make agent-test` (the full suite — new test modules only get seen there).
 - [x] Commit remaining work on `feature/Input-semantics-D2` with the CP structure above; no PR to `dev` (program ruling) — the PR is stacked on `feature/Input-semantics`.
 - [x] Final checkpoint note in this file: what landed where, decisions taken, what the two inbox items are waiting on.
+- [x] PR #1146 review round (stacked on `feature/Input-semantics`): greptile's one finding (library-dir concepts degraded to `unknown`) led to deriving over the library's accumulated crate instead of the bundle blueprints — `build_input_form(pipes)` no longer takes `blueprints`; the gstack pre-landing review's two clear wins (description-only and refining library-dir concepts) are covered by the same change and its test; its two decision-first items are deferred in `wip/input-semantics/deferred-descriptor-reflection-and-roundtrip.md`. cubic and Codex were out of quota for this PR.
 - [x] `make check` + serial `make test` before the PR: one order-dependent failure in a `pipe_func` workdir test, unrelated to D2 (passes alone and under `agent-test`); deferred to `wip/input-semantics/deferred-serial-make-test-flake.md`.
 
 ## Deliberately out of scope (do not widen the diff)
