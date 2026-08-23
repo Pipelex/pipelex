@@ -1,6 +1,8 @@
-# D2 — Input-form descriptor: reference derivation + report carriage
+# D2 — Input-form descriptor: reference derivation + report carriage (✅ done — all phases complete 2026-08-22)
 
-Implements `/Users/lchoquel/repos/Pipelex/wip/inbox/2026-08-22-pipelex-d2-input-form-descriptor-derivation.md` on the stacked branch `feature/Input-semantics-D2` (program branch `feature/Input-semantics`; no PR to `dev`, per the program's branch ruling).
+> **Archived 2026-08-23 from the repo-root `TODOS.md`, where it was the live tracker while D2 was built.** Every phase and checkpoint below is complete; this file is kept as the as-built record — the settled design decisions, the decisions taken while implementing, and what landed where. Paths in this document are relative to the repo root, not to this file's own directory. What is still open lives outside this repo: the two `../wip/inbox/` items filed in Phase 6, both waiting on a `pipelex` release that carries the derivation.
+
+Implements `../wip/inbox/2026-08-22-pipelex-d2-input-form-descriptor-derivation.md` on the stacked branch `feature/Input-semantics-D2` (program branch `feature/Input-semantics`; no PR to `dev`, per the program's branch ruling).
 
 **Contract:** `docs/specs/mthds-input-form-descriptor.md` (workspace root) — every section. **Gate:** the skip-gated skeletons in `conformance/tests/pipelex_api/test_validate_input_form.py` de-gated and green against the booted sibling `pipelex-api`, plus the per-kind assignment coverage. The two live absent-by-default tests must keep passing untouched. The de-gating itself rides the `pipelex-api` inbox item (Phase 6) because the sibling boots a **pinned PyPI runtime** — this repo's deliverable is the derivation, the report carriage, the pinned assignment table, and the follow-up filings.
 
@@ -26,7 +28,7 @@ Implements `/Users/lchoquel/repos/Pipelex/wip/inbox/2026-08-22-pipelex-d2-input-
 - **Keyword-only rule:** new functions keyword-only; if `build_input_form(pipes, ...)` keeps a positional subject, record the grant (`make sgr`) BEFORE running `make agent-check` (the auto-fixer silently keyword-onlys ungranted subjects).
 - Rich ready-made fixture for tests: `tests/data/input_semantics/probe_bundle.mthds` (chains, class-backed, natives, defaults, single choice, `[N]`, `!`, `?`).
 
-## Session state (updated 2026-08-22 at close-out — resume here after /compact or cold start)
+## Close-out state (2026-08-22) — what landed where
 
 **All phases done.** What landed where:
 
