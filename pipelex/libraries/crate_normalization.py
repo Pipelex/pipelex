@@ -232,7 +232,7 @@ def _collect_referenced_natives(*, concepts: dict[str, _ConceptEntry], pipes: di
                     _add_native_ref(referenced=referenced, concept_ref_or_code=field.concept_ref)
                     _add_native_ref(referenced=referenced, concept_ref_or_code=field.item_concept_ref)
     for blueprint in pipes.values():
-        for io_ref in [*(blueprint.inputs or {}).values(), blueprint.output]:
+        for io_ref in [*(blueprint.inputs_concept_specs or {}).values(), blueprint.output]:
             _add_native_ref(referenced=referenced, concept_ref_or_code=_io_ref_concept(io_ref))
     return referenced
 

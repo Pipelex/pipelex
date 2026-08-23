@@ -91,7 +91,7 @@ class PipeBatchSpec(PipeSpec):
         base_blueprint = super().to_blueprint()
         return PipeBatchBlueprint(
             description=base_blueprint.description,
-            inputs=base_blueprint.inputs,
+            inputs=base_blueprint.inputs_concept_specs,
             output=base_blueprint.output,
             branch_pipe_code=self.branch_pipe_code,
             input_list_name=self.input_list_name,

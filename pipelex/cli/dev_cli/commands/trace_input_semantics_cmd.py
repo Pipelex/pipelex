@@ -245,7 +245,9 @@ def _build_wire_framing(*, blueprints: list[PipelexBundleBlueprint], pipes: list
         for pipe_code, pipe_blueprint in blueprint.pipe.items():
             if not pipe_blueprint.inputs:
                 continue
-            for var_name, authored in pipe_blueprint.inputs.items():
+            # The framing manifest tracks the slot grammar (ref + markers), so an expanded-form slot
+            # contributes its `concept` string; its hints surface at hop 5 (the input-form descriptor).
+            for var_name, authored in (pipe_blueprint.inputs_concept_specs or {}).items():
                 authored_specs[f"{blueprint.domain}.{pipe_code}.{var_name}"] = authored
 
     framing: list[dict[str, Any]] = []

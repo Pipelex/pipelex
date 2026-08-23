@@ -2,32 +2,44 @@
 
 Working tracker for `wip/engine-hints/design.md` on branch `feature/Engine-hints`. Read the design doc first — it holds the rationale, the contract, and the file/line anchors; this file only tracks execution. Checkpoint protocol: at each checkpoint, update the design doc with decisions taken and deviations, verify cold-start readiness, and tick the checkpoint box here.
 
+## Resume state (for a cold start)
+
+Phase 1 core is landed and green (`make agent-check`, pyright, mypy, and the affected unit + integration slices all pass). Decisions taken so far that the design doc does not spell out:
+
+- **`PipeBlueprint.inputs` is `Mapping[str, str | InputSlotBlueprint] | None`, not `dict`** — value-covariant, so the many `dict[str, str]` construction sites (specs, tests) stay legal without casts. Rationale is a docstring on the field.
+- **Two access paths for consumers:** grammar-only consumers read the projection `PipeBlueprint.inputs_concept_specs` (or `slot_concept_spec(value)` per value); hints-aware consumers read `inputs` itself. Sites swept to the projection: `contract_match` (hints don't affect contract identity), `crate_normalization._collect_referenced_natives`, `pipe_factory` (both the concept-existence loop and the `InputStuffSpecsFactory` call — the design's "factory accepts the union" became a call-site projection, same invariant: runtime `StuffSpec` never sees hints), `pipe_llm_factory` + `pipe_img_gen_factory` template analyzers, `pipe_structure_blueprint`, `pipelex_bundle_blueprint._collect_local_refs_from_pipe`, `trace_input_semantics_cmd` (framing manifest carries the concept string; hints surface at hop 5), and all builder `*_spec.from_blueprint` sites (spec layer stays `dict[str, str]`; hints dropped there — builder emission is the known out-of-scope follow-up).
+- **Hints travel untouched through:** `crate_qualification` (new `_qualify_slot_value` qualifies the table arm's `concept`, hints pass through) and `bundle_elaborator` (copies `inputs` as-is, so PipeLLM→sequence elaboration keeps slot hints on the draft step and the wrapping sequence).
+- **Subject grants recorded** for `merge_hints`, `applicable_intent`, `is_intent_word_known`, `intent_word_applies`, `slot_concept_spec`, `_qualify_slot_value` (in `subject_grants.toml`).
+- The pinned fingerprints live in `tests/unit/pipelex/libraries/test_fingerprint_pins.py`, computed on the probe bundle BEFORE the fields landed — keep `tests/data/input_semantics/probe_bundle.mthds` hint-free forever; hinted fixtures go in sibling files.
+
+Next actions, in order: finish Phase 1's remaining fixtures/tests (unchecked boxes below), then Phase 2's effective-hints merge in normalization.
+
 ## Phase 1 — Language surface
 
 ### Shared hints module
 
-- [ ] Create `pipelex/language/intent_hints.py`: `INTENT_HINT_KEY = "intent"`, the closed vocabulary (`prose`, `label`, `rating`, `quantity`), pinned per standard version like the native concept definitions.
-- [ ] Implement `merge_hints(layers)` — key-by-key, later (nearer) layer wins, empty result is `None`. This is the ONE precedence implementation; normalizer and deriver both call it.
-- [ ] Implement the applicability predicates (text-valued / number-valued site judgment per the spec's Applicability section; description-only concepts are text-valued; plural sites judged per item) and `applicable_intent(hints, *, site) -> str | None`.
-- [ ] Unit tests for the module: merge precedence, empty-merge → `None`, applicability over each site shape, `applicable_intent` returns only known-and-applicable words.
+- [x] Create `pipelex/language/intent_hints.py`: `INTENT_HINT_KEY = "intent"`, the closed vocabulary (`prose`, `label`, `rating`, `quantity`), pinned per standard version like the native concept definitions.
+- [x] Implement `merge_hints(layers)` — key-by-key, later (nearer) layer wins, empty result is `None`. This is the ONE precedence implementation; normalizer and deriver both call it.
+- [x] Implement the applicability predicates (text-valued / number-valued site judgment per the spec's Applicability section; description-only concepts are text-valued; plural sites judged per item) and `applicable_intent(hints, *, site) -> str | None`.
+- [x] Unit tests for the module: merge precedence, empty-merge → `None`, applicability over each site shape, `applicable_intent` returns only known-and-applicable words.
 
 ### Pinned-fingerprint regression (land BEFORE the model changes)
 
-- [ ] Compute the normalized fingerprint of a committed hint-free fixture bundle against the unchanged models, hardcode the hex in a regression test, and commit it first — the suite must prove existing digests do not move when the fields land.
+- [x] Compute the normalized fingerprint of a committed hint-free fixture bundle against the unchanged models, hardcode the hex in a regression test, and commit it first — the suite must prove existing digests do not move when the fields land.
 
 ### The three parse sites
 
-- [ ] `ConceptBlueprint` (`pipelex/core/concepts/concept_blueprint.py`): add `hints: dict[str, str] | None = None` (`extra="forbid"` already in force — strict shape for free).
-- [ ] `ConceptStructureBlueprint` (`pipelex/core/concepts/concept_structure_blueprint.py`): add the same field. Do NOT change the extras policy — the E7 `extra="forbid"` fix stays in S2's strictness sweep (design Part 1b).
-- [ ] New `InputSlotBlueprint(BaseModel)` with `extra="forbid"` and exactly two fields: `concept: str` (full existing slot grammar) and `hints: dict[str, str] | None = None`.
-- [ ] Widen `PipeBlueprint.inputs` to `dict[str, str | InputSlotBlueprint] | None` (`pipelex/pipe_machinery/pipe_blueprint.py`); check the union assembly in `pipelex/mthds_parsing/pipelex_bundle_blueprint.py` propagates to every `Pipe*Blueprint` subclass.
-- [ ] Extend `generic_validate_inputs` (`pipe_blueprint.py`) to validate the table arm's `concept` with the same ref+multiplicity+presence grammar as the string arm — one grammar, two spellings.
-- [ ] Implement the parse-time collapse rule at model validation: a slot table with absent or empty `hints` collapses to its plain string, so hint-free bundles produce byte-identical blueprints by construction.
-- [ ] Empty-table removal on concept/field models too (validator normalizing `hints = {}` to `None`) so the crate never holds an empty hints table.
+- [x] `ConceptBlueprint` (`pipelex/core/concepts/concept_blueprint.py`): add `hints: dict[str, str] | None = None` (`extra="forbid"` already in force — strict shape for free).
+- [x] `ConceptStructureBlueprint` (`pipelex/core/concepts/concept_structure_blueprint.py`): add the same field. Do NOT change the extras policy — the E7 `extra="forbid"` fix stays in S2's strictness sweep (design Part 1b).
+- [x] New `InputSlotBlueprint(BaseModel)` with `extra="forbid"` and exactly two fields: `concept: str` (full existing slot grammar) and `hints: dict[str, str] | None = None`.
+- [x] Widen `PipeBlueprint.inputs` to `dict[str, str | InputSlotBlueprint] | None` (`pipelex/pipe_machinery/pipe_blueprint.py`); check the union assembly in `pipelex/mthds_parsing/pipelex_bundle_blueprint.py` propagates to every `Pipe*Blueprint` subclass.
+- [x] Extend `generic_validate_inputs` (`pipe_blueprint.py`) to validate the table arm's `concept` with the same ref+multiplicity+presence grammar as the string arm — one grammar, two spellings.
+- [x] Implement the parse-time collapse rule at model validation: a slot table with absent or empty `hints` collapses to its plain string, so hint-free bundles produce byte-identical blueprints by construction.
+- [x] Empty-table removal on concept/field models too (validator normalizing `hints = {}` to `None`) so the crate never holds an empty hints table.
 
 ### Serialization — fingerprint neutrality
 
-- [ ] Add a `@model_serializer(mode="wrap")` to `ConceptBlueprint`, `ConceptStructureBlueprint`, and `InputSlotBlueprint` that drops only the `hints` key when `None` (pattern: `InputFormField.serialize_without_inapplicable_slots`, `pipelex/pipeline/input_form.py`). Deliberately NOT a blanket `exclude_none` — see design Part 2.
+- [x] Add a `@model_serializer(mode="wrap")` to `ConceptBlueprint`, `ConceptStructureBlueprint`, and `InputSlotBlueprint` that drops only the `hints` key when `None` (pattern: `InputFormField.serialize_without_inapplicable_slots`, `pipelex/pipeline/input_form.py`). Deliberately NOT a blanket `exclude_none` — see design Part 2.
 - [ ] Check `pipelex/codegen/crate_encoding.py`'s TOML emission orders hints entries sorted by key; fix if not (JSON side is covered by `sort_keys=True` in both fingerprint functions).
 
 ### Fixtures and tests
@@ -40,9 +52,9 @@ Working tracker for `wip/engine-hints/design.md` on branch `feature/Engine-hints
 
 ## Phase 2 — Crate travel
 
-- [ ] `crate_qualification._qualify_io_ref` (`pipelex/libraries/crate_qualification.py`): handle the table arm — qualify the table's `concept` through `_render_ref_with_markers`, pass `hints` through untouched.
-- [ ] `crate_normalization._collect_referenced_natives` (`pipelex/libraries/crate_normalization.py`): read the table arm's `concept`.
-- [ ] `InputStuffSpecsFactory.make_from_blueprint` (`pipelex/core/pipes/inputs/input_stuff_specs_factory.py`): accept the union, extract the `concept` string ONLY. `StuffSpec` must NOT grow a hints field — runtime models stay hint-free (structural non-normativity).
+- [x] `crate_qualification._qualify_io_ref` (`pipelex/libraries/crate_qualification.py`): handle the table arm — qualify the table's `concept` through `_render_ref_with_markers`, pass `hints` through untouched.
+- [x] `crate_normalization._collect_referenced_natives` (`pipelex/libraries/crate_normalization.py`): read the table arm's `concept`.
+- [x] `InputStuffSpecsFactory.make_from_blueprint` (`pipelex/core/pipes/inputs/input_stuff_specs_factory.py`): accept the union, extract the `concept` string ONLY. `StuffSpec` must NOT grow a hints field — runtime models stay hint-free (structural non-normativity).
 - [ ] Effective hints in normalization: extend `_RefinementResolution` with `effective_hints: dict[str, str] | None`; accumulate along the child→base walk in `_resolve_refinement` via the shared `merge_hints` (nearer declaration wins). Applies to both the flattened arm and the `refines`-keeping (native-backed) arm; pinned natives contribute nothing. Empty merge leaves no member.
 - [ ] Memoization guard: a cached mid-chain resolution must carry the hints of ITS position in the chain, not the querying concept's — add a test that exposes this.
 - [ ] Structure-field and slot hints carried as authored through qualification and normalization (no merge at crate level — the site-over-concept merge is the deriver's).

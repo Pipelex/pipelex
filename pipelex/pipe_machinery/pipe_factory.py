@@ -60,7 +60,7 @@ class PipeFactory(Generic[PipeAbstractType]):
         # TODO: This test should move to the PipelexBlueprint validation.
         # Validate that the specified concepts are declared in the bundle, or are natives concepts.
         if blueprint.inputs is not None:
-            for input_name, input_concept_ref_or_code in blueprint.inputs.items():
+            for input_name, input_concept_ref_or_code in (blueprint.inputs_concept_specs or {}).items():
                 stripped_input_concept_ref_or_code = strip_markers_from_concept_ref_or_code(concept_ref_or_code=input_concept_ref_or_code)
                 if "." not in stripped_input_concept_ref_or_code:
                     if (
@@ -103,10 +103,12 @@ class PipeFactory(Generic[PipeAbstractType]):
         except StuffSpecFactoryError as exc:
             msg = f"Error parsing output string '{blueprint.output}': {exc}"
             raise PipeFactoryError(msg) from exc
+        # The concept-spec projection, deliberately: runtime `StuffSpec`s never receive hints — the
+        # execution path cannot consult what it never gets (hints are non-normative by construction).
         parsed_inputs = InputStuffSpecsFactory.make_from_blueprint(
             concept_provider=get_concept_library(),
             domain_code=domain_code,
-            blueprint=blueprint.inputs or {},
+            blueprint=blueprint.inputs_concept_specs or {},
         )
 
         # The factory class name for that specific type of Pipe is the pipe class name with "Factory" suffix.
