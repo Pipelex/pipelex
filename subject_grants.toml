@@ -4576,6 +4576,30 @@ rationale = "Verb-object: plans the fix for the error data; single operand."
 param = "error_data"
 rationale = "Verb-object: plans the fix for the error data; single operand."
 
+["pipelex/pipeline/hint_warnings.py::_HintLinter._concept_site_kind"]
+param = "concept_ref"
+rationale = "Verb-object read with a single obvious operand: the site or ref being classified/linted."
+
+["pipelex/pipeline/hint_warnings.py::_HintLinter._field_site_kind"]
+param = "field"
+rationale = "Verb-object read with a single obvious operand: the site or ref being classified/linted."
+
+["pipelex/pipeline/hint_warnings.py::_HintLinter._resolve_concept_kind"]
+param = "concept_ref"
+rationale = "Verb-object read with a single obvious operand: the site or ref being classified/linted."
+
+["pipelex/pipeline/hint_warnings.py::_HintLinter._slot_site_kind"]
+param = "concept_spec"
+rationale = "Verb-object read with a single obvious operand: the site or ref being classified/linted."
+
+["pipelex/pipeline/hint_warnings.py::_HintLinter._split_ref"]
+param = "qualified_ref"
+rationale = "Verb-object read with a single obvious operand: the site or ref being classified/linted."
+
+["pipelex/pipeline/hint_warnings.py::build_hint_warnings"]
+param = "qualified"
+rationale = "Verb-object read with one obvious operand: the qualified crate content being swept."
+
 ["pipelex/pipeline/input_form.py::build_input_form"]
 param = "pipes"
 rationale = "Reads as a verb-object sentence over the loaded pipes, mirroring build_pipe_io_contracts."

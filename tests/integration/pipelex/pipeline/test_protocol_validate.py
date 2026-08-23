@@ -23,6 +23,7 @@ from pipelex.pipeline.bundle_validator import DryRunStatus
 from pipelex.pipeline.exceptions import PipeIOContractError, ValidateBundleError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validation_report import PipelexValidationReport
+from pipelex.validation_error_types import HintLintErrorType
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -80,6 +81,23 @@ prompt = "Summarize $outline_text"
 """
 
 
+_HINTED_WARN_MTHDS = """
+domain = "protocol_validate_hints"
+description = "Bundle carrying an applicable hint and a warnable one, for the advisory hint lint"
+
+[concept.Essay]
+description = "An essay"
+hints = { intent = "prose", emphasis = "strong" }
+
+[pipe.write_essay]
+type = "PipeLLM"
+description = "Write an essay"
+inputs = { topic = "Text" }
+output = "Essay"
+prompt = "Write about $topic"
+"""
+
+
 def _signature_only_contents() -> list[str]:
     return [
         (_SIGNATURE_ONLY_DIR / "concepts.mthds").read_text(encoding="utf-8"),
@@ -112,6 +130,26 @@ class TestProtocolValidate:
             }
             # No main_pipe declared → no graph.
             assert report.graph_spec is None
+        finally:
+            clear_current_library()
+
+    async def test_hint_lint_warns_without_invalidating(self, load_empty_library: Callable[[], str]) -> None:
+        """A warnable hint (unknown key) rides the advisory `warnings` channel; the bundle stays
+        valid and runnable, and the applicable `intent` beside it warns nothing (spec: hints are
+        non-normative — warn only, never reject; well-formed unknown content is preserved).
+        """
+        load_empty_library()
+        try:
+            runner = PipelexMTHDSProtocol()
+            report = await runner.validate(mthds_contents=[_HINTED_WARN_MTHDS])
+
+            assert isinstance(report, PipelexValidationReport)
+            assert report.is_runnable is True
+            hint_warnings = [warning for warning in report.warnings if warning.error_type == HintLintErrorType.HINT_UNKNOWN_KEY]
+            assert len(hint_warnings) == 1
+            assert hint_warnings[0].concept_code == "Essay"
+            assert "emphasis" in hint_warnings[0].message
+            assert [warning for warning in report.warnings if warning.error_type == HintLintErrorType.HINT_UNKNOWN_INTENT] == []
         finally:
             clear_current_library()
 
