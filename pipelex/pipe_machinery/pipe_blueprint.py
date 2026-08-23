@@ -196,7 +196,9 @@ class InputSlotBlueprint(BaseModel):
     @field_validator("hints", mode="after")
     @classmethod
     def normalize_empty_hints(cls, hints: dict[str, str] | None) -> dict[str, str] | None:
-        return hints or None
+        # Sorted here so every serialization is canonical (spec: hints entries emitted sorted by
+        # key); hint key order is not semantic, unlike structure-field order.
+        return dict(sorted(hints.items())) if hints else None
 
     @model_serializer(mode="wrap")
     def serialize_without_absent_hints(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:

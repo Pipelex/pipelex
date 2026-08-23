@@ -111,6 +111,13 @@ Update `docs/under-the-hood/input-form-descriptor.md` (the stated no-hint kind r
 
 **Checkpoint A** — the crate layer is done: hints parse at three sites, travel qualified and normalized, hint-free crates provably keep their digests. Update this doc with decisions taken and any deviation folded into the later phases; verify cold-start readiness.
 
+> **Checkpoint A reached.** Phases 1–2 landed on `feature/Engine-hints`; execution detail is tracked in `TODOS.md` (repo root), whose "Resume state" section records the decisions this design left open, with these outcomes worth pinning here:
+>
+> - `PipeBlueprint.inputs` widened to `Mapping[str, str | InputSlotBlueprint]` (value-covariant, so `dict[str, str]` construction sites stay legal), with the grammar-only projection `inputs_concept_specs` / `slot_concept_spec` for consumers that don't read hints. `InputStuffSpecsFactory` kept its `dict[str, str]` signature; the projection happens at the `pipe_factory` call site — same invariant (runtime `StuffSpec` never sees hints), smaller surface.
+> - The spec's sorted-hints-emission rule is implemented at the model: the shared `normalize_empty_hints` validator sorts keys, so fingerprints, codegen crate encoding, and the wire all emit canonically without encoder logic.
+> - Effective hints ride `_RefinementResolution.effective_hints` and are position-specific in the memoization cache (each visited ref's entry merges its own hints over what lies below); `_flatten_refinement` stamps the merge on the flattened arm, the native-backed refines-keeping arm, and structureless-base chains alike. The position-correctness guard is mutation-verified.
+> - Hint-free digest neutrality is proven by `tests/unit/pipelex/libraries/test_fingerprint_pins.py`, whose pinned hexes were committed before any model change; `tests/data/input_semantics/probe_bundle.mthds` must stay hint-free forever — hinted fixtures live in `hinted_bundle.mthds` beside it.
+
 **Phase 3 — Advisory lint.** `hint_warnings.py`, the advisory error-type enum joined into `ValidationErrorType`, wiring in `validate_in_process` beside the optionality warnings, error-identity snapshot and error-docs regenerated, lint unit tests.
 
 **Phase 4 — Descriptor population.** Slot-hints plumbing from the qualified crate through `build_input_form` into `derive_slot`; concept/field/slot stamping via the shared merge; the intent→kind rule on text-valued nodes; `InputFormField.hints` narrowed; list/item duplication; deriver unit + integration tests over the hinted probe bundle; hint-free descriptor byte-identity.

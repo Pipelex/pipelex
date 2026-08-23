@@ -1,0 +1,5 @@
+# Engine intent hints (H2) — deferred items
+
+Items identified during H2 execution that are deliberately not done in this branch. Each is small and self-contained; none blocks the milestone.
+
+- **Hint lint on the CLI and builder validate channels.** `build_current_library_hint_warnings()` is wired only into `pipelex/pipeline/validate_in_process.py` (the report/API path). The bare CLI (`pipelex/cli/commands/validate/_validate_core.py`), the agent CLI (`pipelex/cli/agent_cli/commands/validate/_validate_core.py`, three sites), and the builder ops (`pipelex/builder/operations/validate_ops.py`, three sites) each assemble their `warnings` from `build_optionality_warnings` alone, so an author validating through those channels does not see the hint lint. All seven sites run inside the validation library window, so appending `+ build_current_library_hint_warnings()` is mechanical — but it touches three presentation surfaces whose output shape each needs verifying, so it was deferred rather than folded into Phase 3. Consider a shared "all advisory warnings" composition point when doing it, instead of an eighth copy of the pattern.
