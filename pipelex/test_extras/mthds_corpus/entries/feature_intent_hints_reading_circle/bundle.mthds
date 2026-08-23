@@ -1,0 +1,28 @@
+domain      = "reading_circle"
+description = "Writing the monthly reading-circle card, with presentation intent stated where it helps a form"
+main_pipe   = "write_card"
+
+[concept.BookTitle]
+description = "The title of the book under discussion"
+hints       = { intent = "label" }
+
+[concept.CircleCard]
+description = "The card pinned up for the month's reading circle"
+
+[concept.CircleCard.structure]
+headline = { type = "text", description = "the card's headline", hints = { intent = "label" }, required = true }
+blurb    = { type = "text", description = "a short blurb inviting people in", hints = { intent = "prose" } }
+seats    = { type = "integer", description = "how many seats the room holds", hints = { intent = "quantity" } }
+
+[pipe.write_card]
+type = "PipeLLM"
+description = "Writes the circle card from the title and the host's notes"
+inputs = { title = "BookTitle", notes = { concept = "Text", hints = { intent = "prose" } } }
+output = "CircleCard"
+prompt = """
+Write the reading-circle card for this book:
+@title
+
+Host's notes:
+@notes
+"""

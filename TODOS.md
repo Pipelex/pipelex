@@ -95,18 +95,18 @@ Next actions, in order: finish Phase 1's remaining fixtures/tests (unchecked box
 
 ## Phase 5 — Schema, corpus, docs, close
 
-- [ ] Regenerate `derived/mthds_schema.json` (`make gms`), verify with `make cms`; if Taplo's `anyOf` disambiguation misbehaves on the slot union, hand-patch via the `_patch_construct_schema` precedent in `pipelex/language/mthds_schema_generator.py`.
-- [ ] Corpus entry authoring hints at all three sites (`pipelex/test_extras/mthds_corpus/`); re-run `make generate-corpus-vocabulary`. This entry is the "one real method" the gate's round-trip proof runs on.
-- [ ] Check the builder writer (`pipelex/builder/operations/concept_ops.py`): if preserving hints on rewrite is a one-liner, do it; otherwise file the follow-up (it sits beside the known E8 spelling bug in the same writer).
-- [ ] Docs: `docs/under-the-hood/input-form-descriptor.md` — the stated no-hint kind rules (promote heuristics to specified rules), hints slot no longer reserved-only, drop the now-false "parser drops unknown keys" framing where it touches hints; document the three authoring sites and the lint in the language-facing blueprint docs.
-- [ ] Changelog: record the feature under `## [Unreleased]`.
-- [ ] Full gates: `make agent-check` + `make agent-test` green.
+- [x] Regenerate `derived/mthds_schema.json` (`make gms`), verify with `make cms`; if Taplo's `anyOf` disambiguation misbehaves on the slot union, hand-patch via the `_patch_construct_schema` precedent in `pipelex/language/mthds_schema_generator.py`. *(All three hint sites present in the schema; `cms` green, no hand-patch needed.)*
+- [x] Corpus entry authoring hints at all three sites (`pipelex/test_extras/mthds_corpus/`); re-run `make generate-corpus-vocabulary`. This entry is the "one real method" the gate's round-trip proof runs on. *(`feature_intent_hints_reading_circle`: concept + structure-field + expanded-slot hints; `feature.intent_hints` tag added; corpus suites green.)*
+- [x] Check the builder writer (`pipelex/builder/operations/concept_ops.py`): if preserving hints on rewrite is a one-liner, do it; otherwise file the follow-up (it sits beside the known E8 spelling bug in the same writer). *(Not a one-liner — `ConceptSpec`/`ConceptStructureSpec` lack the field entirely; follow-up filed in `wip/engine-hints/deferred.md`.)*
+- [x] Docs: `docs/under-the-hood/input-form-descriptor.md` — the stated no-hint kind rules (promote heuristics to specified rules), hints slot no longer reserved-only, drop the now-false "parser drops unknown keys" framing where it touches hints; document the three authoring sites and the lint in the language-facing blueprint docs.
+- [x] Changelog: record the feature under `## [Unreleased]`.
+- [x] Full gates: `make agent-check` + `make agent-test` green. *(Both green on the settled Phase 5 tree; the pre-existing `test_transported_run_generates_concept_structures` order-dependent flake did not recur — noted in `wip/flaky-test-transported-run-structures.md`.)*
 - [ ] Milestone close per workspace protocol:
   - [ ] Roadmap checkpoint in `../wip/devx/input-form-roadmap.md` with SHAs, including the gate-wording reconciliation (open question 2: engine-provable gate = wire-descriptor visibility; rendered-control half completes with M1/H3).
-  - [ ] Workspace descriptor spec (`../docs/specs/mthds-input-form-descriptor.md`): reserved-hint-slot section from "reserved" to "populated"; kind-assignment section reflects the stated no-hint rules.
-  - [ ] Conformance repo: hint-slot arm as a skip-gated skeleton (D2's de-gating pattern, arming at the release that ships H2); `make check-spec-links` in `conformance/`.
-  - [ ] Inbox items (`../wip/inbox/`): the `mthds`-site "Specification Status" conformance-assertion update, and the `mthds-corpus-sync` / `mthds-schema-sync` runs that ride the next release.
-  - [ ] H3 handoff note.
+  - [x] Workspace descriptor spec (`../docs/specs/mthds-input-form-descriptor.md`): reserved-hint-slot section from "reserved" to "populated"; kind-assignment section reflects the stated no-hint rules.
+  - [x] Conformance repo: hint-slot arm as a skip-gated skeleton (D2's de-gating pattern, arming at the release that ships H2); `make check-spec-links` in `conformance/`. *(`TestInputFormHintSlot`, 4 skip-gated tests; both conformance gates green.)*
+  - [x] Inbox items (`../wip/inbox/`): the `mthds`-site "Specification Status" conformance-assertion update, and the `mthds-corpus-sync` / `mthds-schema-sync` runs that ride the next release.
+  - [x] H3 handoff note. *(`../wip/inbox/2026-08-23-mthds-form-h3-render-intent-hints.md`.)*
 
 ## Out of scope (do not do here)
 

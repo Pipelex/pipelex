@@ -105,6 +105,11 @@ _FEATURE_TAGS: dict[str, str] = {
         "Bare caller values — a string, a number, a dict, a list — interpreted top-down against the entry "
         "pipe's declared signature, so a caller need not wrap each one in its concept envelope."
     ),
+    "intent_hints": (
+        "An `intent` hint authored in a `hints` table — on a concept, a structure field, or an expanded "
+        "input slot — carrying non-normative presentation intent (`prose`, `label`, `rating`, `quantity`) "
+        "that renderers may honor and every other consumer safely ignores."
+    ),
     "multi_file_library": (
         "A method split across several `.mthds` files in one directory and merged additively behind a "
         "`bundle.mthds` entry point, so a pipe can be forward-declared as a signature in one file and "

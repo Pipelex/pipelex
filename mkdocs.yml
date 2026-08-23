@@ -246,6 +246,7 @@ plugins:
         - building-methods/concepts/python-classes.md: "Python Classes"
         - building-methods/concepts/native-concepts.md: "Native Concepts"
         - building-methods/concepts/refining-concepts.md: "Refining Concepts"
+        - building-methods/concepts/intent-hints.md: "Intent Hints"
         - building-methods/pipes/index.md: "Design and Run Methods Overview"
         - building-methods/libraries.md: "Libraries"
         - building-methods/packages.md: "Packages"
