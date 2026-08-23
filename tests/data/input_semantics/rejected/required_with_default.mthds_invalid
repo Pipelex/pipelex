@@ -1,0 +1,8 @@
+domain      = "input_semantics_rejected"
+description = "REJECTED probe: a field declaring both required = true and default_value is rejected (E3) — a default makes absence legal, which contradicts requiring the field"
+
+[concept.Contradictory]
+description = "Holder of the field the probe bundle's titled_default used to author"
+
+[concept.Contradictory.structure]
+titled_default = { type = "text", description = "PROBE_desc_field_titled_default: required AND default together", required = true, default_value = "PROBE_default_titled" }

@@ -508,12 +508,12 @@ class TestIncludeOptionalParameter:
 
 
 # =============================================================================
-# Tests for SCHEMA format with is_multiple parameter
+# Tests for SCHEMA format with the multiplicity parameter
 # =============================================================================
 
 
 class TestSchemaRepresentationWithMultiple:
-    """Test schema representation with is_multiple parameter."""
+    """Test schema representation with the multiplicity parameter."""
 
     def test_schema_single_item(self) -> None:
         """Schema for single item returns the JSON schema directly."""
@@ -527,7 +527,7 @@ class TestSchemaRepresentationWithMultiple:
         result, imports = concept.render_concept_representation(
             structure_class=SimpleContent,
             output_format=ConceptRepresentationFormat.SCHEMA,
-            is_multiple=False,
+            multiplicity=None,
         )
 
         assert result["concept"] == "test.SimpleContent"
@@ -549,7 +549,7 @@ class TestSchemaRepresentationWithMultiple:
         result, imports = concept.render_concept_representation(
             structure_class=SimpleContent,
             output_format=ConceptRepresentationFormat.SCHEMA,
-            is_multiple=True,
+            multiplicity=True,
         )
 
         assert result["concept"] == "test.SimpleContent"
@@ -575,7 +575,7 @@ class TestSchemaRepresentationWithMultiple:
         result, _ = concept.render_concept_representation(
             structure_class=ContentWithNestedClass,
             output_format=ConceptRepresentationFormat.SCHEMA,
-            is_multiple=True,
+            multiplicity=True,
         )
 
         assert result["concept"] == "test.ContentWithNestedClass"
@@ -586,6 +586,87 @@ class TestSchemaRepresentationWithMultiple:
         items_schema = result["content"]["items"]
         assert items_schema["type"] == "object"
         assert "properties" in items_schema
+
+    def test_schema_title_and_description_are_the_concept_facts(self) -> None:
+        """The schema's top-level title is the concept ref and its description the concept's
+        authored description — injected at the render, overriding whatever the (possibly shared)
+        structure class carries.
+        """
+        concept = Concept(
+            code="SimpleContent",
+            domain_code="test",
+            description="The authored concept description",
+            structure_class_name="SimpleContent",
+        )
+
+        result, _ = concept.render_concept_representation(
+            structure_class=SimpleContent,
+            output_format=ConceptRepresentationFormat.SCHEMA,
+        )
+
+        assert result["content"]["title"] == "test.SimpleContent"
+        assert result["content"]["description"] == "The authored concept description"
+
+    def test_schema_array_wrap_keeps_identity_on_items(self) -> None:
+        """A variable-length list wraps in a bare array — identity on items, no count bounds."""
+        concept = Concept(
+            code="SimpleContent",
+            domain_code="test",
+            description="The authored concept description",
+            structure_class_name="SimpleContent",
+        )
+
+        result, _ = concept.render_concept_representation(
+            structure_class=SimpleContent,
+            output_format=ConceptRepresentationFormat.SCHEMA,
+            multiplicity=True,
+        )
+
+        array_schema = result["content"]
+        assert array_schema["type"] == "array"
+        assert "minItems" not in array_schema
+        assert "maxItems" not in array_schema
+        assert array_schema["items"]["title"] == "test.SimpleContent"
+        assert array_schema["items"]["description"] == "The authored concept description"
+
+    def test_schema_fixed_count_emits_min_and_max_items(self) -> None:
+        """A fixed count [N] emits minItems and maxItems = N on the array wrap."""
+        concept = Concept(
+            code="SimpleContent",
+            domain_code="test",
+            description="Test concept",
+            structure_class_name="SimpleContent",
+        )
+
+        result, _ = concept.render_concept_representation(
+            structure_class=SimpleContent,
+            output_format=ConceptRepresentationFormat.SCHEMA,
+            multiplicity=3,
+        )
+
+        array_schema = result["content"]
+        assert array_schema["type"] == "array"
+        assert array_schema["minItems"] == 3
+        assert array_schema["maxItems"] == 3
+        assert array_schema["items"]["type"] == "object"
+
+    def test_schema_fixed_count_of_one_stays_single(self) -> None:
+        """[1] is single: no array wrap, no bounds."""
+        concept = Concept(
+            code="SimpleContent",
+            domain_code="test",
+            description="Test concept",
+            structure_class_name="SimpleContent",
+        )
+
+        result, _ = concept.render_concept_representation(
+            structure_class=SimpleContent,
+            output_format=ConceptRepresentationFormat.SCHEMA,
+            multiplicity=1,
+        )
+
+        assert result["content"]["type"] == "object"
+        assert result["content"]["title"] == "test.SimpleContent"
 
 
 # =============================================================================

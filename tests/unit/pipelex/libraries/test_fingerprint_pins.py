@@ -18,9 +18,12 @@ from pipelex.mthds_parsing.parser import MthdsParser
 
 _PROBE_BUNDLE_PATH = Path(__file__).parents[3] / "data" / "input_semantics" / "probe_bundle.mthds"
 
-# Computed on the probe bundle at the base of feature/Engine-hints (models without hints fields).
-_PINNED_CONTENT_FINGERPRINT = "32d3b801c1124334b5415c77f7e501b41890dbeb6bd881a76ff10c41a1fa1c14"
-_PINNED_NORMALIZED_FINGERPRINT = "c6265a638147a5dcc6d9b22d24751c6579d46f7d8d29220ff443265c896fec28"
+# Computed on the probe bundle at the base of feature/Engine-hints (models without hints fields),
+# recomputed once on feature/Enrich when the bundle itself changed content: its `titled_default`
+# field moved to a rejected/ fixture (E3 outlaws the required+default pair) — a fixture-content
+# change, not a model leak, so the recompute is the legitimate exception to the note above.
+_PINNED_CONTENT_FINGERPRINT = "053d3ce1a1963feffcea1aaea21e6329a7d2d2371cecdb92eb4a1e51269b0043"
+_PINNED_NORMALIZED_FINGERPRINT = "0a2aac25fe00afb191d52eb12bed7a778a4cab6687bbd1c0455b016e7eae1847"
 
 _MTHDS_TEST_VERSION = "0.0.0-test"
 

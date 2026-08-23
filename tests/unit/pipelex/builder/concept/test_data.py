@@ -110,7 +110,6 @@ class ConceptBlueprintTestCases:
                     description="Age",
                     type=ConceptStructureSpecFieldType.INTEGER,
                     required=True,
-                    default_value=18,
                 ),
                 "active": ConceptStructureSpec(
                     the_field_name="active",
@@ -135,7 +134,6 @@ class ConceptBlueprintTestCases:
                     description="Age",
                     type=ConceptStructureBlueprintFieldType.INTEGER,
                     required=True,
-                    default_value=18,
                 ),
                 "active": ConceptStructureBlueprint(
                     description="Active status",

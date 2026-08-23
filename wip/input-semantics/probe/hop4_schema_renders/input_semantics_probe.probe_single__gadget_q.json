@@ -41,7 +41,7 @@
     "required": [
       "name"
     ],
-    "title": "input_semantics_probe__Gadget",
+    "title": "input_semantics_probe.Gadget",
     "type": "object"
   }
 }

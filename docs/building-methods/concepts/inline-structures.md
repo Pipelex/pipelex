@@ -56,7 +56,8 @@ Each field can specify:
 
 - **type**: The data type (required for detailed definitions)
 - **description**: Human-readable description
-- **default_value**: Default value if not provided
+- **required**: Whether the field must be present in the payload (defaults to `false`)
+- **default_value**: Default value applied when the field is omitted. A field cannot declare both `required = true` and a `default_value` — a default makes absence legal, which contradicts requiring the field, so the pair is rejected at validation
 - **choices**: For `enum`-like fields, a list of valid values
 - **item_type**: For `list` fields, the type of list items
 - **key_type** and **value_type**: For `dict` fields, the types of keys and values
