@@ -78,9 +78,11 @@ class TestApplicability:
     def test_intent_word_applies(self, word: IntentWord, site_kind: HintSiteValueKind, applies: bool):
         assert intent_word_applies(word, site_kind=site_kind) is applies
 
-    def test_unknown_word_never_applies(self):
-        for site_kind in HintSiteValueKind:
-            assert not intent_word_applies("banana", site_kind=site_kind)
+    def test_every_word_applies_to_exactly_one_value_kind(self):
+        # The vocabulary partition: enum growth keeps this meaningful without enumerating members.
+        for word in IntentWord:
+            applicable = [kind for kind in HintSiteValueKind if intent_word_applies(word, site_kind=kind)]
+            assert len(applicable) == 1
 
 
 class TestApplicableIntent:

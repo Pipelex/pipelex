@@ -181,8 +181,12 @@ class _HintLinter:
                     f"(prose, label, rating, quantity). The entry is preserved; consumers ignore it."
                 )
                 findings.append((HintLintErrorType.HINT_UNKNOWN_INTENT, unknown_intent_message))
-            elif not intent_word_applies(intent_word, site_kind=site_kind):
-                needed_kind = "text" if IntentWord(intent_word) in {IntentWord.PROSE, IntentWord.LABEL} else "number"
+            elif not intent_word_applies(known_word := IntentWord(intent_word), site_kind=site_kind):
+                match known_word:
+                    case IntentWord.PROSE | IntentWord.LABEL:
+                        needed_kind = "text"
+                    case IntentWord.RATING | IntentWord.QUANTITY:
+                        needed_kind = "number"
                 inapplicable_message = (
                     f"Intent word '{intent_word}' does not apply to {site_desc} (the site is not "
                     f"{needed_kind}-valued). The entry is preserved; consumers ignore it there."
@@ -243,6 +247,10 @@ class _HintLinter:
         return HintSiteValueKind.OTHER
 
     def _field_site_kind(self, field: ConceptStructureBlueprint) -> HintSiteValueKind:
+        if field.choices:
+            # Choices dominate the declared type (the deriver and the structure generator agree):
+            # the payload is an enum, which no intent word applies to.
+            return HintSiteValueKind.OTHER
         match field.type:
             case ConceptStructureBlueprintFieldType.TEXT:
                 return HintSiteValueKind.TEXT_VALUED

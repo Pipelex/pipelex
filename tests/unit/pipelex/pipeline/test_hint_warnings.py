@@ -45,6 +45,30 @@ class TestHintLintFindings:
         assert warnings[0].error_type == HintLintErrorType.HINT_UNKNOWN_INTENT
         assert "poetry" in warnings[0].message
 
+    def test_choice_field_is_not_a_text_site(self):
+        """Choices dominate the declared type (the deriver emits an enum), so a text intent on a
+        typed-choice field is inapplicable and must warn.
+        """
+        warnings = _lint(
+            _crate(
+                {
+                    "docs.Card": ConceptBlueprint(
+                        description="a card",
+                        structure={
+                            "mood": ConceptStructureBlueprint(
+                                description="the mood",
+                                type=ConceptStructureBlueprintFieldType.TEXT,
+                                choices=["calm", "wild"],
+                                hints={"intent": "prose"},
+                            )
+                        },
+                    )
+                }
+            )
+        )
+        assert len(warnings) == 1
+        assert warnings[0].error_type == HintLintErrorType.HINT_INAPPLICABLE_INTENT
+
     def test_class_backed_native_text_concept_takes_text_intents(self):
         """A `structure = "TextContent"` concept IS the native Text payload: the deriver honors a
         `prose`/`label` hint there, so the lint must not call it inapplicable.

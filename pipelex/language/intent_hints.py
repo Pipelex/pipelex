@@ -40,10 +40,6 @@ class HintSiteValueKind(StrEnum):
     OTHER = "other"
 
 
-_TEXT_INTENT_WORDS = frozenset({IntentWord.PROSE, IntentWord.LABEL})
-_NUMBER_INTENT_WORDS = frozenset({IntentWord.RATING, IntentWord.QUANTITY})
-
-
 def merge_hints(layers: Sequence[dict[str, str] | None]) -> dict[str, str] | None:
     """Merge hint layers key by key, ordered farthest to nearest — a later layer wins.
 
@@ -64,13 +60,20 @@ def is_intent_word_known(word: str) -> bool:
     return word in set(IntentWord)
 
 
-def intent_word_applies(word: str, *, site_kind: HintSiteValueKind) -> bool:
-    """Whether a KNOWN intent word applies to a site of the given value kind (unknown words never apply)."""
+def intent_word_applies(word: IntentWord, *, site_kind: HintSiteValueKind) -> bool:
+    """Whether an intent word applies to a site of the given value kind.
+
+    Exhaustive over the vocabulary, so a new word cannot land without an explicit applicability
+    decision here (unknown raw words are filtered out by `is_intent_word_known` upstream).
+    """
+    match word:
+        case IntentWord.PROSE | IntentWord.LABEL:
+            applicable_kind = HintSiteValueKind.TEXT_VALUED
+        case IntentWord.RATING | IntentWord.QUANTITY:
+            applicable_kind = HintSiteValueKind.NUMBER_VALUED
     match site_kind:
-        case HintSiteValueKind.TEXT_VALUED:
-            return word in _TEXT_INTENT_WORDS
-        case HintSiteValueKind.NUMBER_VALUED:
-            return word in _NUMBER_INTENT_WORDS
+        case HintSiteValueKind.TEXT_VALUED | HintSiteValueKind.NUMBER_VALUED:
+            return site_kind is applicable_kind
         case HintSiteValueKind.OTHER:
             return False
 
@@ -86,6 +89,7 @@ def applicable_intent(hints: dict[str, str] | None, *, site_kind: HintSiteValueK
     word = hints.get(INTENT_HINT_KEY)
     if word is None or not is_intent_word_known(word):
         return None
-    if not intent_word_applies(word, site_kind=site_kind):
+    intent = IntentWord(word)
+    if not intent_word_applies(intent, site_kind=site_kind):
         return None
-    return IntentWord(word)
+    return intent
