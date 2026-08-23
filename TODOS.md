@@ -101,8 +101,8 @@ Next actions, in order: finish Phase 1's remaining fixtures/tests (unchecked box
 - [x] Docs: `docs/under-the-hood/input-form-descriptor.md` — the stated no-hint kind rules (promote heuristics to specified rules), hints slot no longer reserved-only, drop the now-false "parser drops unknown keys" framing where it touches hints; document the three authoring sites and the lint in the language-facing blueprint docs.
 - [x] Changelog: record the feature under `## [Unreleased]`.
 - [x] Full gates: `make agent-check` + `make agent-test` green. *(Both green on the settled Phase 5 tree; the pre-existing `test_transported_run_generates_concept_structures` order-dependent flake did not recur — noted in `wip/flaky-test-transported-run-structures.md`.)*
-- [ ] Milestone close per workspace protocol:
-  - [ ] Roadmap checkpoint in `../wip/devx/input-form-roadmap.md` with SHAs, including the gate-wording reconciliation (open question 2: engine-provable gate = wire-descriptor visibility; rendered-control half completes with M1/H3).
+- [x] Milestone close per workspace protocol:
+  - [x] Roadmap checkpoint in `../wip/devx/input-form-roadmap.md` with SHAs, including the gate-wording reconciliation (open question 2: engine-provable gate = wire-descriptor visibility; rendered-control half completes with M1/H3). *(Applied with commit subjects rather than SHAs — the branch squash-merges, so branch SHAs die; H2 marked ✅ in the dependency graph. Workspace-repo edits left uncommitted for review.)*
   - [x] Workspace descriptor spec (`../docs/specs/mthds-input-form-descriptor.md`): reserved-hint-slot section from "reserved" to "populated"; kind-assignment section reflects the stated no-hint rules.
   - [x] Conformance repo: hint-slot arm as a skip-gated skeleton (D2's de-gating pattern, arming at the release that ships H2); `make check-spec-links` in `conformance/`. *(`TestInputFormHintSlot`, 4 skip-gated tests; both conformance gates green.)*
   - [x] Inbox items (`../wip/inbox/`): the `mthds`-site "Specification Status" conformance-assertion update, and the `mthds-corpus-sync` / `mthds-schema-sync` runs that ride the next release.

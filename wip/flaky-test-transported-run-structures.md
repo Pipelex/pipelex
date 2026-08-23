@@ -1,6 +1,6 @@
 # Flaky under full suite: `test_transported_run_generates_concept_structures`
 
-`tests/unit/pipelex/pipe_operators/pipe_func/test_direct_executor_workdir.py::TestDirectExecutorWorkdir::test_transported_run_generates_concept_structures` failed in two consecutive full `make test` runs on `feature/Engine-hints` with:
+`tests/unit/pipelex/pipe_operators/pipe_func/test_direct_executor_workdir.py::TestDirectExecutorWorkdir::test_transported_run_generates_concept_structures` failed in three of four full-suite runs on `feature/Engine-hints` (both checkpoint `make test` runs and the final `make test`; the Phase 5 `make agent-test` run passed) with:
 
 ```
 pydantic_core._pydantic_core.ValidationError: 1 validation error for PipeFunc
