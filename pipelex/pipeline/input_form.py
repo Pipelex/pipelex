@@ -584,22 +584,33 @@ def _with_effective_hints(*, node: InputFormField, hints: dict[str, str] | None)
 def _node_site_kind(node: InputFormField) -> HintSiteValueKind:
     """The node's site value-kind for intent applicability (spec: intent-hints.md, Applicability).
 
-    Recomputed from node facts, matching the lint's structural judgment exactly: `number` nodes come
-    only from `integer`/`number` fields and `native.Number` chains, so the kind IS the judgment;
-    `text`/`prose` nodes are text-valued EXCEPT a time-formatted text (`type = "time"` is neither)
-    and an `Html`-backed node (`prose` presentation, but the chain reaches `native.Html`, not
-    `native.Text`).
+    Recomputed from node facts, mirroring the lint's structural judgment (the known divergences are
+    recorded in wip/engine-hints/deferred.md): `number` nodes come only from `integer`/`number`
+    fields and `native.Number` chains, so the kind IS the judgment; `text`/`prose` nodes are
+    text-valued EXCEPT a time-formatted text (`type = "time"` is neither) and an `Html`-backed node
+    (`prose` presentation, but the chain reaches `native.Html`, not `native.Text`).
     """
-    if node.kind is FieldKind.NUMBER:
-        return HintSiteValueKind.NUMBER_VALUED
-    if node.kind is FieldKind.TEXT or node.kind is FieldKind.PROSE:
-        if node.format is not None:
+    match node.kind:
+        case FieldKind.NUMBER:
+            return HintSiteValueKind.NUMBER_VALUED
+        case FieldKind.TEXT | FieldKind.PROSE:
+            if node.format is not None:
+                return HintSiteValueKind.OTHER
+            html_ref = NativeConceptCode.HTML.concept_ref
+            if node.concept_ref == html_ref or (node.refines is not None and html_ref in node.refines):
+                return HintSiteValueKind.OTHER
+            return HintSiteValueKind.TEXT_VALUED
+        case (
+            FieldKind.DATE
+            | FieldKind.BOOLEAN
+            | FieldKind.ENUM
+            | FieldKind.DOCUMENT
+            | FieldKind.IMAGE
+            | FieldKind.OBJECT
+            | FieldKind.LIST
+            | FieldKind.UNKNOWN
+        ):
             return HintSiteValueKind.OTHER
-        html_ref = NativeConceptCode.HTML.concept_ref
-        if node.concept_ref == html_ref or (node.refines is not None and html_ref in node.refines):
-            return HintSiteValueKind.OTHER
-        return HintSiteValueKind.TEXT_VALUED
-    return HintSiteValueKind.OTHER
 
 
 def _scalar_field(

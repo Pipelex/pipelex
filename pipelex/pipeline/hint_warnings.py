@@ -32,8 +32,8 @@ from pipelex.libraries.crate_qualification import QualifiedCrateContent, qualify
 from pipelex.pipe_machinery.pipe_blueprint import InputSlotBlueprint
 from pipelex.validation_error_types import HintLintErrorType
 
-_NATIVE_TEXT_REF = "native.Text"
-_NATIVE_NUMBER_REF = "native.Number"
+_NATIVE_TEXT_REF = NativeConceptCode.TEXT.concept_ref
+_NATIVE_NUMBER_REF = NativeConceptCode.NUMBER.concept_ref
 
 
 def _native_class_value_kind(*, class_name: str) -> HintSiteValueKind:
@@ -216,35 +216,41 @@ class _HintLinter:
         return kind
 
     def _resolve_concept_kind(self, concept_ref: str, *, seen: set[str]) -> HintSiteValueKind:
-        if concept_ref in seen:
-            return HintSiteValueKind.OTHER  # defensive: cycles are rejected upstream
-        seen.add(concept_ref)
-        if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept_ref):
-            native_ref = NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=concept_ref)
-            if native_ref == _NATIVE_TEXT_REF:
+        # Iterative on purpose, like every other chain walker (`_resolve_refinement`,
+        # `_refines_chain`): a legal, arbitrarily deep refinement chain must not be able to
+        # RecursionError an advisory lint out of the validate call.
+        current_ref = concept_ref
+        while True:
+            if current_ref in seen:
+                return HintSiteValueKind.OTHER  # defensive: cycles are rejected upstream
+            seen.add(current_ref)
+            if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=current_ref):
+                native_ref = NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=current_ref)
+                if native_ref == _NATIVE_TEXT_REF:
+                    return HintSiteValueKind.TEXT_VALUED
+                if native_ref == _NATIVE_NUMBER_REF:
+                    return HintSiteValueKind.NUMBER_VALUED
+                return HintSiteValueKind.OTHER
+            value = self._concepts.get(current_ref)
+            if isinstance(value, str):
+                # String-described concept: description-only, hence text-valued.
                 return HintSiteValueKind.TEXT_VALUED
-            if native_ref == _NATIVE_NUMBER_REF:
-                return HintSiteValueKind.NUMBER_VALUED
+            if not isinstance(value, ConceptBlueprint):
+                # Cross-package or unknown: not classifiable in-crate.
+                return HintSiteValueKind.OTHER
+            if value.refines:
+                current_ref = value.refines
+                continue
+            if value.structure is None:
+                # Description-only concepts are text-valued per the spec.
+                return HintSiteValueKind.TEXT_VALUED
+            if isinstance(value.structure, str):
+                # Class-backed: a native class name maps by identity to its native's value kind,
+                # mirroring the input-form deriver's judgment for resolvable sites (the known
+                # divergences are recorded in wip/engine-hints/deferred.md). Any other registered
+                # class is an object payload, hence OTHER.
+                return _native_class_value_kind(class_name=value.structure)
             return HintSiteValueKind.OTHER
-        value = self._concepts.get(concept_ref)
-        if isinstance(value, str):
-            # String-described concept: description-only, hence text-valued.
-            return HintSiteValueKind.TEXT_VALUED
-        if not isinstance(value, ConceptBlueprint):
-            # Cross-package or unknown: not classifiable in-crate.
-            return HintSiteValueKind.OTHER
-        if value.refines:
-            return self._resolve_concept_kind(value.refines, seen=seen)
-        if value.structure is None:
-            # Description-only concepts are text-valued per the spec.
-            return HintSiteValueKind.TEXT_VALUED
-        if isinstance(value.structure, str):
-            # Class-backed: a native class name maps by identity to its native's value kind, the
-            # same judgment the input-form deriver makes — so the lint never calls a hint
-            # inapplicable that the descriptor then honors. Any other registered class is an
-            # object payload, hence OTHER.
-            return _native_class_value_kind(class_name=value.structure)
-        return HintSiteValueKind.OTHER
 
     def _field_site_kind(self, field: ConceptStructureBlueprint) -> HintSiteValueKind:
         if field.choices:
@@ -261,16 +267,24 @@ class _HintLinter:
             case ConceptStructureBlueprintFieldType.LIST:
                 # Plural site: judged against the item as if it stood alone.
                 match field.item_type:
-                    case "text":
+                    case ConceptStructureBlueprintFieldType.TEXT:
                         return HintSiteValueKind.TEXT_VALUED
-                    case "integer" | "number":
+                    case ConceptStructureBlueprintFieldType.INTEGER | ConceptStructureBlueprintFieldType.NUMBER:
                         return HintSiteValueKind.NUMBER_VALUED
-                    case "concept":
+                    case ConceptStructureBlueprintFieldType.CONCEPT:
                         return self._concept_site_kind(field.item_concept_ref) if field.item_concept_ref else HintSiteValueKind.OTHER
                     case _:
+                        # item_type is a free string on the blueprint; anything unrecognized is OTHER.
                         return HintSiteValueKind.OTHER
-            case _:
-                # No type (choices), dict, boolean, date/datetime/time: neither text- nor number-valued.
+            case (
+                ConceptStructureBlueprintFieldType.DICT
+                | ConceptStructureBlueprintFieldType.BOOLEAN
+                | ConceptStructureBlueprintFieldType.DATE
+                | ConceptStructureBlueprintFieldType.DATETIME
+                | ConceptStructureBlueprintFieldType.TIME
+                | None
+            ):
+                # No type (choices-only), dict, boolean, date/datetime/time: neither text- nor number-valued.
                 return HintSiteValueKind.OTHER
 
     def _slot_site_kind(self, concept_spec: str) -> HintSiteValueKind:
