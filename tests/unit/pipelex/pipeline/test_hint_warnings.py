@@ -45,6 +45,23 @@ class TestHintLintFindings:
         assert warnings[0].error_type == HintLintErrorType.HINT_UNKNOWN_INTENT
         assert "poetry" in warnings[0].message
 
+    def test_class_backed_native_text_concept_takes_text_intents(self):
+        """A `structure = "TextContent"` concept IS the native Text payload: the deriver honors a
+        `prose`/`label` hint there, so the lint must not call it inapplicable.
+        """
+        warnings = _lint(_crate({"docs.Styled": ConceptBlueprint(description="styled text", structure="TextContent", hints={"intent": "prose"})}))
+        assert warnings == []
+
+    def test_class_backed_native_number_concept_takes_number_intents(self):
+        warnings = _lint(_crate({"docs.Score": ConceptBlueprint(description="a score", structure="NumberContent", hints={"intent": "rating"})}))
+        assert warnings == []
+
+    def test_class_backed_project_class_is_not_a_hint_site(self):
+        # A registered non-native class is an object payload: intent words do not apply.
+        warnings = _lint(_crate({"docs.Custom": ConceptBlueprint(description="custom", structure="SomeProjectClass", hints={"intent": "prose"})}))
+        assert len(warnings) == 1
+        assert warnings[0].error_type == HintLintErrorType.HINT_INAPPLICABLE_INTENT
+
     def test_inapplicable_intent_warns_on_structured_concept(self):
         # A structured concept is neither text- nor number-valued: `prose` does not apply there.
         warnings = _lint(

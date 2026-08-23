@@ -571,11 +571,13 @@ def _with_effective_hints(*, node: InputFormField, hints: dict[str, str] | None)
     if not hints:
         return node
     updates: dict[str, Any] = {"hints": hints}
-    intent = applicable_intent(hints, site_kind=_node_site_kind(node))
-    if intent == IntentWord.PROSE:
-        updates["kind"] = FieldKind.PROSE
-    elif intent == IntentWord.LABEL:
-        updates["kind"] = FieldKind.TEXT
+    match applicable_intent(hints, site_kind=_node_site_kind(node)):
+        case IntentWord.PROSE:
+            updates["kind"] = FieldKind.PROSE
+        case IntentWord.LABEL:
+            updates["kind"] = FieldKind.TEXT
+        case IntentWord.RATING | IntentWord.QUANTITY | None:
+            pass
     return node.model_copy(update=updates)
 
 

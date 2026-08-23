@@ -36,6 +36,38 @@ _NATIVE_TEXT_REF = "native.Text"
 _NATIVE_NUMBER_REF = "native.Number"
 
 
+def _native_class_value_kind(*, class_name: str) -> HintSiteValueKind:
+    """The value kind of a class-backed structure, by native-class identity.
+
+    Mirrors the deriver's `_class_backed_node` lookup: `TextContent` is the native Text payload
+    (text-valued), `NumberContent` the native Number payload (number-valued). Every other class —
+    the remaining natives and registered project classes alike — is not a hint-applicable site.
+    """
+    native_code = next((code for code in NativeConceptCode if code.structure_class_name == class_name), None)
+    match native_code:
+        case NativeConceptCode.TEXT:
+            return HintSiteValueKind.TEXT_VALUED
+        case NativeConceptCode.NUMBER:
+            return HintSiteValueKind.NUMBER_VALUED
+        case (
+            NativeConceptCode.DYNAMIC
+            | NativeConceptCode.IMAGE
+            | NativeConceptCode.DOCUMENT
+            | NativeConceptCode.HTML
+            | NativeConceptCode.TEXT_AND_IMAGES
+            | NativeConceptCode.YES_NO
+            | NativeConceptCode.DATE
+            | NativeConceptCode.TIME
+            | NativeConceptCode.PAGE
+            | NativeConceptCode.JSON
+            | NativeConceptCode.SEARCH_RESULT
+            | NativeConceptCode.ANYTHING
+            | NativeConceptCode.COMPOSITE
+            | None
+        ):
+            return HintSiteValueKind.OTHER
+
+
 def build_current_library_hint_warnings() -> list[ValidationErrorItem]:
     """Hint lint over the current library's accumulated crate.
 
@@ -202,6 +234,12 @@ class _HintLinter:
         if value.structure is None:
             # Description-only concepts are text-valued per the spec.
             return HintSiteValueKind.TEXT_VALUED
+        if isinstance(value.structure, str):
+            # Class-backed: a native class name maps by identity to its native's value kind, the
+            # same judgment the input-form deriver makes — so the lint never calls a hint
+            # inapplicable that the descriptor then honors. Any other registered class is an
+            # object payload, hence OTHER.
+            return _native_class_value_kind(class_name=value.structure)
         return HintSiteValueKind.OTHER
 
     def _field_site_kind(self, field: ConceptStructureBlueprint) -> HintSiteValueKind:

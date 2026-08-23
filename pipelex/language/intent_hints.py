@@ -55,7 +55,9 @@ def merge_hints(layers: Sequence[dict[str, str] | None]) -> dict[str, str] | Non
     for layer in layers:
         if layer:
             merged.update(layer)
-    return merged or None
+    # Sorted here too: merged results are installed via model_copy(update=...), which bypasses the
+    # blueprint validators that sort authored tables, yet still reach canonical serialization.
+    return dict(sorted(merged.items())) or None
 
 
 def is_intent_word_known(word: str) -> bool:
@@ -73,7 +75,7 @@ def intent_word_applies(word: str, *, site_kind: HintSiteValueKind) -> bool:
             return False
 
 
-def applicable_intent(hints: dict[str, str] | None, *, site_kind: HintSiteValueKind) -> str | None:
+def applicable_intent(hints: dict[str, str] | None, *, site_kind: HintSiteValueKind) -> IntentWord | None:
     """The effective `intent` word, only when it is known AND applicable to the site.
 
     The deriver's and the lint's shared question: absent, unknown, and inapplicable intents all
@@ -86,4 +88,4 @@ def applicable_intent(hints: dict[str, str] | None, *, site_kind: HintSiteValueK
         return None
     if not intent_word_applies(word, site_kind=site_kind):
         return None
-    return word
+    return IntentWord(word)

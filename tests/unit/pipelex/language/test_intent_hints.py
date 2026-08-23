@@ -39,6 +39,14 @@ class TestMergeHints:
         assert merged == base
         assert merged is not base
 
+    def test_result_is_sorted_by_key(self):
+        """Merged results are installed via model_copy, bypassing the sorting validators — the
+        merge itself must hand back the canonical order (spec: hints entries emitted sorted by key).
+        """
+        merged = merge_hints([{"zeta": "1"}, {"alpha": "2"}])
+        assert merged is not None
+        assert list(merged) == ["alpha", "zeta"]
+
 
 class TestVocabulary:
     def test_known_words(self):
