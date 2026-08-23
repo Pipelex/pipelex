@@ -99,18 +99,6 @@
             "default_value": "PROBE_default_motto",
             "required": false
           },
-          "titled_default": {
-            "description": "PROBE_desc_field_titled_default: required AND default together",
-            "type": "text",
-            "key_type": null,
-            "value_type": null,
-            "item_type": null,
-            "concept_ref": null,
-            "item_concept_ref": null,
-            "choices": null,
-            "default_value": "PROBE_default_titled",
-            "required": true
-          },
           "count": {
             "description": "PROBE_desc_field_count: integer with default",
             "type": "integer",

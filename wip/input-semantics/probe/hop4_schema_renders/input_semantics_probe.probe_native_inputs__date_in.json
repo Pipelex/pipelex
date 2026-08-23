@@ -1,7 +1,7 @@
 {
   "concept": "native.Date",
   "content": {
-    "description": "A calendar date, optionally with a time of day — as precise as its source states.\n\nThe optional ``time`` carries the UTC offset on its ``tzinfo`` when the source states one\n(fidelity, not normalization). Invalid states are unrepresentable by construction: no time\nwithout a date, no offset without a time.",
+    "description": "A calendar date, optionally with a time of day — as precise as its source states.",
     "properties": {
       "date": {
         "description": "The calendar date, in ISO 8601 (e.g. 2026-07-07). Always required.",
@@ -27,7 +27,7 @@
     "required": [
       "date"
     ],
-    "title": "DateContent",
+    "title": "native.Date",
     "type": "object"
   }
 }

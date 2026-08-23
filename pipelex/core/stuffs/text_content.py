@@ -14,6 +14,8 @@ HTML_PATTERN = re.compile(r"^\s*<(!DOCTYPE|!--|[a-zA-Z])", re.IGNORECASE)
 
 
 class TextContent(StuffContent):
+    """A text"""
+
     text: str = Field(description="The text")
 
     @property

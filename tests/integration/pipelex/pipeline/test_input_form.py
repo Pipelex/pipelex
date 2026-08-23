@@ -211,7 +211,7 @@ class TestBuildInputForm:
         assert "PROBE_desc_concept_PlainNote" in note.description
 
     async def test_object_fields_carry_authored_facts(self, load_empty_library: Callable[[], str]) -> None:
-        """Nested fields state the blueprint's facts: E3 both-facts, defaults, choices (E10), nesting (E1)."""
+        """Nested fields state the blueprint's facts: defaults (the E3 pair is rejected upstream), choices (E10), nesting (E1)."""
         input_form, _ = await self._derive_probe(load_empty_library)
         widget = _field_by_name(input_form["input_semantics_probe.probe_single"], "widget")
         assert widget.kind == FieldKind.OBJECT
@@ -221,9 +221,9 @@ class TestBuildInputForm:
         # Declared order is preserved.
         assert [field.name for field in widget.fields][:4] == ["shorthand_note", "title", "subtitle", "summary"]
 
-        titled_default = by_name["titled_default"]
-        assert titled_default.required is True, "Authored required-ness survives beside a default (E3)"
-        assert titled_default.default_value == "PROBE_default_titled"
+        motto = by_name["motto"]
+        assert motto.required is False, "A defaulted field is not required — the E3 pair is rejected upstream"
+        assert motto.default_value == "PROBE_default_motto"
 
         assert by_name["shorthand_note"].required is True, "A shorthand string field implies required text"
         assert by_name["shorthand_note"].kind == FieldKind.TEXT
@@ -285,7 +285,7 @@ class TestBuildInputForm:
 
         constrained_count = by_name["constrained_count"]
         assert constrained_count.kind == FieldKind.NUMBER
-        assert constrained_count.minimum is None, "Unknown blueprint keys died at parse (E7) — nothing to report"
+        assert constrained_count.minimum is None, "Unknown blueprint keys are rejected at parse (E7) — a valid bundle cannot carry them"
 
     async def test_native_direct_inputs_kind_assignment(self, load_empty_library: Callable[[], str]) -> None:
         """Native concepts as direct inputs map by identity, never by shape sniffing."""
@@ -447,6 +447,7 @@ class InputFormConstrainedPayload(StructuredContent):
     width: int = Field(gt=0, le=4096, description="PROBE_desc_reflected_width")
     code: str = Field(min_length=2, max_length=8, pattern="^[A-Z]+$", description="PROBE_desc_reflected_code")
     ratio: float | None = Field(default=None, ge=0.0, lt=1.0, description="PROBE_desc_reflected_ratio")
+    retries: int = Field(default=3, description="PROBE_desc_reflected_retries")
 
 
 class InputFormUnmappablePayload(StructuredContent):
@@ -571,6 +572,12 @@ class TestKindAssignmentTable:
         assert ratio.required is False
         assert ratio.minimum == 0.0
         assert ratio.exclusive_maximum == 1.0
+        assert ratio.default_value is None, "A None default is the optionality artifact, never a default_value"
+
+        retries = by_name["retries"]
+        assert retries.kind == FieldKind.NUMBER
+        assert retries.required is False, "A pydantic default on a reflected class is an authored fact — the field is not required"
+        assert retries.default_value == 3
 
     async def test_unmappable_class_falls_back_to_unknown(self, load_empty_library: Callable[[], str]) -> None:
         """Reflection is faithful-or-absent: a class with an unmappable field yields `unknown`, with identity kept."""

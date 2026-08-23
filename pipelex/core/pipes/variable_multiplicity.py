@@ -112,6 +112,31 @@ def make_variable_multiplicity(*, nb_items: int | None, multiple_items: bool | N
     return variable_multiplicity
 
 
+def is_multiple_multiplicity(*, multiplicity: VariableMultiplicity | None) -> bool:
+    """Whether a multiplicity denotes a list of items.
+
+    True for a variable-length list (`[]`) and for a fixed count above one (`[N]`, N > 1).
+    A fixed count of exactly one (`[1]`) stays single: no list framing.
+    """
+    if multiplicity is None:
+        return False
+    if isinstance(multiplicity, bool):
+        return multiplicity
+    return multiplicity > 1
+
+
+def fixed_item_count(*, multiplicity: VariableMultiplicity | None) -> int | None:
+    """The exact item count when the multiplicity is a fixed count above one, else None.
+
+    Both a variable-length list (`True`) and a single item (`None` or `[1]`) report None —
+    only a genuine fixed-length list carries a count. The bool check must come first:
+    `True` is an `int` in Python and would otherwise read as a count of 1.
+    """
+    if multiplicity is None or isinstance(multiplicity, bool):
+        return None
+    return multiplicity if multiplicity > 1 else None
+
+
 class MultiplicityParseResult(BaseModel):
     concept_ref_or_code: str
     multiplicity: int | bool | None

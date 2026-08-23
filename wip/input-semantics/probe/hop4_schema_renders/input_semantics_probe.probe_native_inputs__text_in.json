@@ -1,6 +1,7 @@
 {
   "concept": "native.Text",
   "content": {
+    "description": "A text",
     "properties": {
       "text": {
         "description": "The text",
@@ -11,7 +12,7 @@
     "required": [
       "text"
     ],
-    "title": "TextContent",
+    "title": "native.Text",
     "type": "object"
   }
 }

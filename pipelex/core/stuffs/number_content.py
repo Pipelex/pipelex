@@ -7,6 +7,8 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 
 
 class NumberContent(StuffContent):
+    """A number"""
+
     number: int | float = Field(description="The number")
 
     @property

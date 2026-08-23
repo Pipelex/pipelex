@@ -3,6 +3,7 @@
   "content": {
     "$defs": {
       "ImageContent": {
+        "description": "An image",
         "properties": {
           "url": {
             "description": "The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
@@ -215,12 +216,6 @@
         "default": "PROBE_default_motto",
         "description": "PROBE_desc_field_motto: text with default",
         "title": "Motto"
-      },
-      "titled_default": {
-        "default": "PROBE_default_titled",
-        "description": "PROBE_desc_field_titled_default: required AND default together",
-        "title": "Titled Default",
-        "type": "string"
       },
       "count": {
         "anyOf": [
@@ -506,7 +501,7 @@
       "title",
       "main_gadget"
     ],
-    "title": "input_semantics_probe__Widget",
+    "title": "input_semantics_probe.Widget",
     "type": "object"
   }
 }

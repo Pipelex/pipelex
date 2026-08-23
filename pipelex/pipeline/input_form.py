@@ -33,6 +33,7 @@ from typing import Any
 from annotated_types import Ge, Gt, Le, Lt, MaxLen, MinLen
 from pydantic import BaseModel, Field, SerializerFunctionWrapHandler, model_serializer, model_validator
 from pydantic.fields import FieldInfo
+from pydantic_core import PydanticUndefined
 from typing_extensions import Self
 
 from pipelex.codegen.native_expansion import reflect_structure_class
@@ -661,12 +662,22 @@ def _scalar_field(
 
 
 def _with_reflected_constraints(*, node: InputFormField, field_info: FieldInfo) -> InputFormField:
-    """Stamp the constraints a registered class states on a field (`Field(gt=..., max_length=..., pattern=...)`).
+    """Stamp the facts a registered class states on a field: presence, default, and constraints.
 
-    Only the slots that apply to the node's kind are read: bounds on a `number`, length and pattern
-    on a `text`. Anything else the class may declare is not a form fact and is left out.
+    A pydantic default on a reflected class is an authored fact (the S2 ruling closing the D2
+    deferral): the class author wrote it, validation applies it on absence exactly like a blueprint
+    `default_value`, so `field_info.is_required()` is the source of truth for `required` and a
+    defaulted field is never required — the same invariant the blueprint side enforces (E3). A
+    `None` default is the emission artifact of optionality, never reported as a `default_value`.
+
+    Constraint slots read only what applies to the node's kind: bounds on a `number`, length and
+    pattern on a `text`. Anything else the class may declare is not a form fact and is left out.
     """
     constraints: dict[str, Any] = {}
+    if field_info.is_required() != node.required:
+        constraints["required"] = field_info.is_required()
+    if field_info.default is not PydanticUndefined and field_info.default is not None:
+        constraints["default_value"] = field_info.default
     match node.kind:
         case FieldKind.NUMBER:
             for constraint in field_info.metadata:

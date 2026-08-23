@@ -116,10 +116,6 @@ rationale = "Verb-object: collects imports for the pipe inputs; single operand."
 param = "representation"
 rationale = "Verb-object: formats the representation dict as Python; is_multiple stays keyword."
 
-["pipelex/builder/runner_code.py::_is_multiple"]
-param = "multiplicity"
-rationale = "Predicate on the multiplicity value; single operand."
-
 ["pipelex/builder/runner_code.py::generate_runner_code"]
 param = "pipe"
 rationale = "Verb-object: generates runner code for the pipe; single obvious operand."

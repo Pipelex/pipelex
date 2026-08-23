@@ -161,3 +161,24 @@ Worked-around gaps first, per the brief:
 5. **E3** (`required` + `default_value`) — silent semantic rewrite, uncompensated.
 6. **E10** (`const` unread) — a real form-correctness hole, one-line-ish on either side.
 7. **E4, E5** (`[N]`, `!`) — uncompensated and currently consequence-free; close them when touching the adjacent code (E4 rides E9's contract change).
+
+---
+
+## F. S2 closure evidence (2026-08-23, `feature/Enrich`)
+
+Every engine-side entry of §A/§E is closed; the evidence standard is the audit's own — each closure is visible as a before/after row change in the [survival table](survival-table.md) against the regenerated captures under `probe/`. Design and rulings: `wip/enrich/design.md`; wire spec: `docs/specs/pipelex-mthds-protocol.md` (workspace root).
+
+| Entry | Closure | Evidence |
+|---|---|---|
+| E1 concept identity | Top-level schema `title` is the concept ref, injected at `_render_schema_representation` (`concept.py`). Nested `$defs` identity stays descriptor-only, per the design ruling. | `probe/hop4_schema_renders/*.json` — every render's `content.title` is the concept ref (e.g. `native.Text`, `input_semantics_probe.ClassBacked`). |
+| E2 refinement chain | Ruled closed by the descriptor (`refines` list); no schema change, by design. | Descriptor spec + `hop5_input_form.json`. |
+| E3 required + default | The pair is rejected by a `ConceptStructureBlueprint` model validator; the generator's silent tiebreak is now an explicit raising invariant; a reflected class's pydantic default counts as an authored fact (`required: false` + `default_value`, closing the D2 deferral's first item). | `rejected/required_with_default.mthds_invalid`; unit seams `test_concept_structure_blueprint_required_default.py`, `test_structure_generator_required_default_invariant.py`; reflected row in `test_input_form.py`. Survival-table row now "rejected at hop 1". |
+| E4 `[N]` multiplicity | Real multiplicity threaded through `render_stuff_spec` → `render_concept_representation`; fixed counts emit `minItems`/`maxItems`; memo key normalized (no `hash(True)==hash(1)` collision); `[1]` stays single. | `probe/hop4_schema_renders/input_semantics_probe.probe_markers.two.json` (`minItems: 2`, `maxItems: 2`); `many` unbounded. |
+| E5 `!` on the contract | `PipeInputContract.presence` (three-valued, replacing `optional`) — protocol change, spec-first. | `probe/hop5_pipe_io_contracts.json`: `forced` reports `presence: "force"`. Conformance arms at the re-pin (shape-detected skip). |
+| E6 missing descriptions | Top-level schema `description` is the concept's authored description for every species; the seven bare native content classes gained docstrings (instructor-side schemas carry them too). | `probe/hop4_schema_renders/…classbacked.json` (authored description present); native renders carry pinned descriptions. |
+| E7 silent extras | `extra="forbid"` on `ConceptStructureBlueprint` (hint content stays lenient). | `rejected/unknown_structure_field_key.mthds_invalid`; `test_concept_structure_blueprint_extra_keys.py`. |
+| E8 builder `default` key | Builder writes `default_value`; write-then-validate round trip pinned. | `concept_ops.py` + `test_concept_spec_to_toml.py`; inbox item delivered and removed. |
+| E9 multiplicity on contract | Input and output contracts carry three-valued `multiplicity` + `item_count` (`make_io_multiplicity`); the fixed-reports-as-variable ruling retired. | `probe/hop5_pipe_io_contracts.json`: `two` reports `("fixed", 2)` on input and output; `many` `("variable", null)`. |
+| E10 `const` vs `enum` | Schema stays pydantic-canonical; `const` documented as part of the contract (protocol spec sentence). Descriptor half closed by D2. | Spec `pipe_io_contracts` row; `only_choice` render shows `const`. |
+
+The §B language ceiling is untouched (out of scope, by design §9); its absence is now loud where it used to be silent (E7). Cross-repo follow-ups filed: `mthds` (the two validation sentences), `pipelex-js` (mirror), `mthds-js` (protocol types at the cascade).

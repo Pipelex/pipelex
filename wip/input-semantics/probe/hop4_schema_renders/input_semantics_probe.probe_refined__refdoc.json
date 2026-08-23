@@ -77,7 +77,7 @@
     "required": [
       "url"
     ],
-    "title": "input_semantics_probe__RefinedDoc",
+    "title": "input_semantics_probe.RefinedDoc",
     "type": "object"
   }
 }

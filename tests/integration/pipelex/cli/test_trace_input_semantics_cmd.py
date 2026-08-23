@@ -95,7 +95,8 @@ class TestTraceInputSemantics:
         hop5 = _read_json(output_dir / HOP5_FILE_NAME)
         do_one = hop5["trace_tool_test.do_one"]
         assert do_one["inputs"]["item"]["concept_ref"] == "trace_tool_test.Item"
-        assert do_one["inputs"]["hint"]["optional"] is True
+        assert do_one["inputs"]["hint"]["presence"] == "optional"
+        assert do_one["inputs"]["items"]["multiplicity"] == "variable"
         assert do_one["inputs"]["items"]["json_schema"]["type"] == "array"
 
         # Hop 5, descriptor side: the same pipes, keyed identically, with the authored facts stated directly.

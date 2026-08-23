@@ -305,7 +305,16 @@ class StructureGenerator:
         # Generate Field parameters (default/... first, then description)
         field_params = [self._format_field_description(resolved_field.description)]
         default_value = resolved_field.default_value
-        if resolved_field.required and default_value is None:
+        if resolved_field.required:
+            # The blueprint validator rejects `required = true` beside a `default_value` (E3),
+            # so a required field can never carry a default here — assert the invariant loudly
+            # instead of letting parameter ordering tiebreak silently.
+            if default_value is not None:
+                msg = (
+                    f"Field '{resolved_field.name}' is required AND carries default_value {default_value!r} — "
+                    f"the blueprint validator rejects this pair, so reaching the generator with it is a bug."
+                )
+                raise ConceptStructureGeneratorError(msg)
             field_params.insert(0, "...")
         elif default_value is not None:
             field_params.insert(0, f"default={self._format_default_value(default_value)}")

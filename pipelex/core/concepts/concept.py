@@ -13,6 +13,7 @@ from pipelex.core.concepts.validation import is_concept_ref_or_code_valid, valid
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
+from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, fixed_item_count, is_multiple_multiplicity
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.misc.string_utils import pascal_case_to_sentence
@@ -155,7 +156,7 @@ class Concept(ConceptAbstract):
         *,
         structure_class: type[StuffContent],
         output_format: ConceptRepresentationFormat,
-        is_multiple: bool = False,
+        multiplicity: VariableMultiplicity | None = None,
         class_name_overrides: dict[str, str] | None = None,
     ) -> tuple[dict[str, Any], set[str]]:
         """Render a representation for this concept.
@@ -165,19 +166,22 @@ class Concept(ConceptAbstract):
                 looked up: turning `structure_class_name` into a type is a registry read, and the
                 caller's provider is the only thing that knows *which* registry to read.
             output_format: The format to generate (JSON, PYTHON, or SCHEMA)
-            is_multiple: If True, wrap content in a list/array schema
+            multiplicity: The declared multiplicity: None for a single item, True for a
+                variable-length list, an int for a fixed count. A list-shaped multiplicity wraps
+                the content in a list/array, and a fixed count reaches the SCHEMA render as
+                `minItems`/`maxItems` bounds.
             class_name_overrides: Optional runtime-class-name -> rendered-name mapping applied to
                 Python instantiation code and imports (see ConceptRepresentationGenerator)
 
         Returns:
             Tuple of (representation dict, imports_needed set)
-            - For JSON: content is a dict (or list of dicts if is_multiple)
+            - For JSON: content is a dict (or list of dicts when multiple)
             - For Python: content is a class instantiation string (wrapping handled by caller)
-            - For SCHEMA: content is a JSON Schema dict (or array schema if is_multiple)
+            - For SCHEMA: content is a JSON Schema dict (or array schema when multiple)
         """
         match output_format:
             case ConceptRepresentationFormat.SCHEMA:
-                return self._render_schema_representation(structure_class=structure_class, is_multiple=is_multiple)
+                return self._render_schema_representation(structure_class=structure_class, multiplicity=multiplicity)
             case ConceptRepresentationFormat.JSON | ConceptRepresentationFormat.PYTHON:
                 generator = ConceptRepresentationGenerator(output_format, class_name_overrides=class_name_overrides)
                 # For inputs, we only want required fields (not optional ones)
@@ -185,30 +189,46 @@ class Concept(ConceptAbstract):
 
                 # If multiple and JSON format, wrap content in a list
                 # For Python format, the caller handles wrapping since content is a string
-                if is_multiple and output_format == ConceptRepresentationFormat.JSON:
+                if is_multiple_multiplicity(multiplicity=multiplicity) and output_format == ConceptRepresentationFormat.JSON:
                     result["content"] = [result["content"]]
 
                 return result, generator.imports_needed
 
-    def _render_schema_representation(self, *, structure_class: type[StuffContent], is_multiple: bool = False) -> tuple[dict[str, Any], set[str]]:
+    def _render_schema_representation(
+        self,
+        *,
+        structure_class: type[StuffContent],
+        multiplicity: VariableMultiplicity | None = None,
+    ) -> tuple[dict[str, Any], set[str]]:
         """Render JSON Schema for this concept.
 
         Args:
             structure_class: This concept's already-resolved structure class.
-            is_multiple: If True, wrap the schema in an array type
+            multiplicity: None for a single item, True for a variable-length list, an int for a
+                fixed count. A list-shaped multiplicity wraps the schema in an array type, and a
+                fixed count adds `minItems`/`maxItems` bounds on the array.
 
         Returns:
             Tuple of (representation dict with JSON Schema content, empty set)
             The dict has "concept" and "content" keys where content is the JSON Schema.
         """
         json_schema = structure_class.model_json_schema()
+        # The concept's identity and authored description are facts of the concept, not of its
+        # (possibly shared) structure class, so they are injected on the object schema at the
+        # render: `title` is the concept ref, `description` the concept's authored description.
+        json_schema["title"] = self.concept_ref
+        json_schema["description"] = self.description
 
-        if is_multiple:
-            # Wrap the schema in an array schema
+        if is_multiple_multiplicity(multiplicity=multiplicity):
+            # Wrap the schema in an array schema; the concept identity stays on `items`.
             array_schema: dict[str, Any] = {
                 "type": "array",
                 "items": json_schema,
             }
+            item_count = fixed_item_count(multiplicity=multiplicity)
+            if item_count is not None:
+                array_schema["minItems"] = item_count
+                array_schema["maxItems"] = item_count
             return {"concept": self.concept_ref, "content": array_schema}, set()
 
         return {"concept": self.concept_ref, "content": json_schema}, set()

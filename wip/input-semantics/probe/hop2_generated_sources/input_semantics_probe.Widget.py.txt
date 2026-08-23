@@ -28,7 +28,6 @@ class input_semantics_probe__Widget(StructuredContent):
     subtitle: str | None = Field(default=None, description="PROBE_desc_field_subtitle: optional text (required omitted)")
     summary: str | None = Field(default=None, description="PROBE_desc_field_summary: optional text (required explicit false)")
     motto: str | None = Field(default="PROBE_default_motto", description="PROBE_desc_field_motto: text with default")
-    titled_default: str = Field(default="PROBE_default_titled", description="PROBE_desc_field_titled_default: required AND default together")
     count: int | None = Field(default=42, description="PROBE_desc_field_count: integer with default")
     enabled: bool | None = Field(default=True, description="PROBE_desc_field_enabled: boolean with default")
     price: float | None = Field(default=9.99, description="PROBE_desc_field_price: number with default")
