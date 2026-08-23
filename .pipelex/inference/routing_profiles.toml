@@ -12,7 +12,7 @@
 # which routing profile you select. See the documentation for details.
 
 # Which profile to use (change this to switch routing)
-active = "all_pipelex_gateway"
+active = "pig_native_anthropic" # SPIKE 5 WORKBENCH: was "all_pipelex_gateway"
 
 # We recommend using the "all_pipelex_gateway" profile to get a head start with all models.
 # To use the Pipelex Gateway backend:
@@ -27,6 +27,22 @@ active = "all_pipelex_gateway"
 [profiles.all_pipelex_gateway]
 description = "Use Pipelex Gateway for all its supported models"
 default = "pipelex_gateway"
+
+# =========================================================================================
+# SPIKE 5 WORKBENCH ONLY - remove when the spike closes
+# Everything still goes to the gateway; the two Claude handles the spike drives go to the
+# same gateway over the native Anthropic protocol instead of the chat-completions substrate.
+# =========================================================================================
+[profiles.pig_native_anthropic]
+description = "Spike 5: Claude over pig's native /v1/messages, everything else over the gateway substrate"
+default = "pipelex_gateway"
+
+[profiles.pig_native_anthropic.routes]
+"claude-4.5-haiku" = "pig_anthropic"
+"claude-5-sonnet" = "pig_anthropic"
+# The BYOK control case: a plain Anthropic backend on the user's own ANTHROPIC_API_KEY,
+# reached by the same worker and the same factory. It must keep working unchanged.
+"claude-4.5-sonnet" = "anthropic"
 
 [profiles.all_anthropic]
 description = "Use Anthropic backend for all its supported models"

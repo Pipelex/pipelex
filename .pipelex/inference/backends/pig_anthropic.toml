@@ -1,0 +1,40 @@
+################################################################################
+# pig backend, native Anthropic protocol — SPIKE 5 WORKBENCH ONLY
+################################################################################
+#
+# Claude on Bedrock reached through the local Pipelex inference gateway (pig) over
+# `POST /v1/messages`, rather than over the OpenAI chat-completions substrate the
+# `pipelex_gateway` backend uses. This is what rung 3 of the native-protocol study
+# proposes for the adaptive Claude line, tried on a laptop first.
+#
+# The model ids are pig's wire ids (the Bedrock ones), not Anthropic's own: pig
+# routes on the model id in the request body, and refuses one it does not serve.
+#
+# This file is workbench state for spike 5. It is not a catalog release, and it is
+# not part of the pipelex change that ships from that spike.
+#
+################################################################################
+
+[defaults]
+model_type = "llm"
+sdk = "anthropic"
+structure_method = "instructor/anthropic_tools"
+thinking_mode = "manual"
+
+["claude-4.5-haiku"]
+model_id = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 1.0, output = 5.0 }
+
+[claude-5-sonnet]
+model_id = "global.anthropic.claude-sonnet-5"
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }
+thinking_mode = "adaptive"
+listed_constraints = ["temperature_unsupported"]

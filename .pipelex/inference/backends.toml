@@ -90,6 +90,16 @@ enabled = true
 endpoint = "https://openrouter.ai/api/v1"
 api_key = "${OPENROUTER_API_KEY}"
 
+[pig_anthropic] # SPIKE 5 WORKBENCH ONLY - local pig over the native Anthropic protocol
+display_name = "pig (native Anthropic protocol)"
+enabled = true
+# No `/v1` suffix, unlike every OpenAI-substrate backend: the anthropic SDK appends its own
+# `/v1/messages`. With the suffix the call lands on `/v1/v1/messages`, which pig's catch-all
+# proxy accepts and forwards to Bedrock — a 200 carrying an UnknownOperationException, not a 404.
+endpoint = "http://localhost:8787"
+api_key = "${PIG_SERVICE_TOKEN}"
+auth_header = "x-portkey-api-key"       # pig authenticates on this, never on the SDK's x-api-key
+
 [portkey]
 display_name = "Portkey"
 enabled = true

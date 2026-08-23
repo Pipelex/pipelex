@@ -42,8 +42,13 @@ class TestTransportRetryWiring:
         mock_client = mocker.patch("pipelex.providers.anthropic.anthropic_factory.AsyncAnthropic")
         model_handle = mocker.MagicMock()
         model_handle.sdk = "anthropic"
+        backend = mocker.MagicMock()
+        # Keep this on the plain `x-api-key` path: a bare MagicMock answers every extra-config
+        # lookup with a truthy mock, which would silently route the call through the auth-header
+        # branch instead. See test_anthropic_client_auth.py for that branch.
+        backend.get_extra_config.return_value = None
 
-        AnthropicFactory.make_anthropic_client(model_handle=model_handle, backend=mocker.MagicMock())
+        AnthropicFactory.make_anthropic_client(model_handle=model_handle, backend=backend)
 
         mock_client.assert_called_once()
         assert mock_client.call_args.kwargs["max_retries"] == 5
