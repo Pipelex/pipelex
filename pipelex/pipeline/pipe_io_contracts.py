@@ -56,7 +56,9 @@ class PipeInputContract(BaseModel):
 
     multiplicity: IOMultiplicity = IOMultiplicity.SINGLE
     item_count: int | None = None
-    """The exact item count, present exactly when `multiplicity` is `fixed`."""
+    """The exact item count, non-null exactly when `multiplicity` is `fixed`. The slot is always
+    on the wire — `null` off the fixed arm, per the protocol spec (the input-form descriptor makes
+    the opposite choice and omits it; the two artifacts deliberately differ)."""
 
     json_schema: dict[str, Any] = Field(default_factory=dict)
 
@@ -67,7 +69,8 @@ class PipeOutputContract(BaseModel):
     concept_ref: str
     multiplicity: IOMultiplicity
     item_count: int | None = None
-    """The exact item count, present exactly when `multiplicity` is `fixed`."""
+    """The exact item count, non-null exactly when `multiplicity` is `fixed`. Always on the wire,
+    `null` off the fixed arm — see `PipeInputContract.item_count`."""
 
     optional: bool = False
     """`True` when the output is declared optional (`?`): the pipe may resolve it as a recorded
