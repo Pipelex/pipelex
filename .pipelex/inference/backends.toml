@@ -14,6 +14,7 @@
 display_name = "⭐ Pipelex Gateway"
 enabled = true                         # Enable after accepting terms via `pipelex init config`
 api_key = "${PIPELEX_GATEWAY_API_KEY}"
+endpoint = "http://localhost:8791/v1"
 
 [anthropic]
 enabled = true

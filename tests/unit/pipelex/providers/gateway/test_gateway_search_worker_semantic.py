@@ -36,11 +36,11 @@ def _make_worker(mocker: MockerFixture) -> GatewaySearchWorker:
     mock_model.extra_headers = {}
     worker.inference_model = mock_model
 
-    mock_post = mocker.AsyncMock()
-    mock_options = mocker.MagicMock()
-    mock_options.post = mock_post
+    # The worker posts on the client directly: routing is the gateway's business
+    # now, decided from the model id in the body, so there is no per-call config
+    # to select with with_options().
     mock_client = mocker.MagicMock()
-    mock_client.with_options.return_value = mock_options
+    mock_client.post = mocker.AsyncMock()
     worker.portkey_client = mock_client
     return worker
 
@@ -83,12 +83,7 @@ class TestGatewaySearchWorkerSemantic:
         worker = _make_worker(mocker)
         sdk_exc = _make_status_error(exc_cls, status_code)
         client: Any = worker.portkey_client
-        client.with_options.return_value.post.side_effect = sdk_exc
-
-        mocker.patch(
-            "pipelex.providers.gateway.gateway_search_worker.GatewayDeck.get_config_id",
-            return_value="linkup-sourced-answer",
-        )
+        client.post.side_effect = sdk_exc
 
         with pytest.raises(SearchJobFailureError) as exc_info:
             await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
@@ -107,12 +102,7 @@ class TestGatewaySearchWorkerSemantic:
         worker = _make_worker(mocker)
         sdk_exc = _make_status_error(portkey_exc.NotFoundError, 404)
         client: Any = worker.portkey_client
-        client.with_options.return_value.post.side_effect = sdk_exc
-
-        mocker.patch(
-            "pipelex.providers.gateway.gateway_search_worker.GatewayDeck.get_config_id",
-            return_value="linkup-sourced-answer",
-        )
+        client.post.side_effect = sdk_exc
 
         with pytest.raises(SearchModelNotFoundError) as exc_info:
             await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]

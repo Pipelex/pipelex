@@ -19,7 +19,6 @@ from pipelex.cogt.search.structured_search_payload import extract_structured_sea
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
-from pipelex.providers.gateway.gateway_deck import GatewayDeck
 from pipelex.providers.gateway.gateway_exceptions import GatewaySearchEmptyResultError, GatewaySearchResponseError
 from pipelex.providers.gateway.gateway_search_schemas import GatewaySearchRequestParams
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -212,13 +211,12 @@ class GatewaySearchWorker(SearchWorkerAbstract):
         Returns:
             The Portkey GenericResponse
         """
-        config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
-        log.dev(f"Search via gateway config '{config_id}' with model '{model}'")
+        log.dev(f"Search via gateway with model '{model}'")
 
         messages: list[dict[str, str]] = [{"role": "user", "content": content}]
 
         try:
-            response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            response = await self.portkey_client.post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
                 "/chat/completions",
                 model=model,
                 messages=messages,

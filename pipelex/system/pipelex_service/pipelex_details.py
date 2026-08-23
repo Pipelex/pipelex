@@ -2,7 +2,12 @@ import os
 
 from pipelex.tools.misc.hash_utils import hash_sha256
 
-_DEFAULT_REMOTE_CONFIG_URL = "https://pipelex-config.s3.eu-west-3.amazonaws.com/pipelex_remote_config_12.json"
+# Spike 4 workbench catalog, out of band at version 1000 so it sits beside the
+# official files without pushing the next real build past its natural successor.
+# It is the first catalog that carries no gateway routing at all: no
+# `x-portkey-config`, no `endpoint_path`. When the change ships, this line moves
+# to the real next version and the 1000 file is abandoned.
+_DEFAULT_REMOTE_CONFIG_URL = "https://pipelex-config.s3.eu-west-3.amazonaws.com/pipelex_remote_config_1000.json"
 REMOTE_CONFIG_URL_ENV_VAR = "PIPELEX_REMOTE_CONFIG_URL"
 
 

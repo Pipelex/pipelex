@@ -19,7 +19,6 @@ from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.providers.gateway.gateway_completions_factory import GatewayCompletionsFactory
-from pipelex.providers.gateway.gateway_deck import GatewayDeck
 from pipelex.providers.gateway.gateway_factory import GatewayFactory
 from pipelex.providers.gateway.gateway_protocols import GatewayExtractProtocol
 from pipelex.providers.gateway.gateway_search_schemas import GatewayFetchRequestParams
@@ -148,13 +147,12 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
             extract_images=extract_images,
         )
 
-        config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
-        log.dev(f"Web fetch via gateway config '{config_id}' for URL: {document_uri}")
+        log.dev(f"Web fetch via gateway for URL: {document_uri}")
 
         messages: list[dict[str, str]] = [{"role": "user", "content": fetch_params.model_dump_json()}]
 
         try:
-            response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            response = await self.portkey_client.post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
                 "/chat/completions",
                 model=self.inference_model.model_id,
                 messages=messages,
@@ -197,8 +195,7 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
         base64_url: str,
         should_include_images: bool = False,
     ) -> ExtractOutput:
-        config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
-        log.dev(f"Extracting using config '{config_id}' with should_include_images: {should_include_images}")
+        log.dev(f"Extracting with should_include_images: {should_include_images}")
 
         extra_headers, extra_body = GatewayFactory.make_extras(
             inference_model=self.inference_model, inference_job=extract_job, output_desc=InferenceOutputType.PAGES
@@ -213,7 +210,7 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
                 {"type": "image_url", "image_url": {"url": base64_url}},
             ]
         try:
-            response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            response = await self.portkey_client.post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
                 "/chat/completions",
                 model=self.inference_model.model_id,
                 headers=extra_headers,

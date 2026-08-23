@@ -97,9 +97,12 @@ class GatewayFactory:
         extra_headers: dict[str, str] = {}
         extra_body: dict[str, Any] = {}
         if inference_model.extra_headers:
+            # Per-model outbound headers the catalog sets through model_spec_keys'
+            # hyphenated-key rule — `anthropic-beta` is the live example. Nothing
+            # here is routing: the gateway decides which integration serves a model
+            # from the model id in the body, and refuses any client header that
+            # tries to say otherwise.
             extra_headers.update(inference_model.extra_headers)
-        if not extra_headers.get(PortkeyHeaderKey.CONFIG) and not extra_headers.get(PortkeyHeaderKey.PROVIDER):
-            extra_headers[PortkeyHeaderKey.PROVIDER] = inference_model.backend_name
 
         if isinstance(inference_job, ExtractJob):
             # Derive boolean from max_nb_images: None/positive = True, 0 = False

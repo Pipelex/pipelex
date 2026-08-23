@@ -137,14 +137,7 @@ class TestGatewayQuotaDetection:
         worker = _make_gateway_search_worker(mocker)
         sdk_exc = _make_portkey_exception("AuthenticationError", 401, "Invalid API key")
 
-        mock_options = mocker.MagicMock()
-        mock_options.post = mocker.AsyncMock(side_effect=sdk_exc)
-        worker.portkey_client.with_options = mocker.MagicMock(return_value=mock_options)  # type: ignore[method-assign]
-
-        mocker.patch(
-            "pipelex.providers.gateway.gateway_search_worker.GatewayDeck.get_config_id",
-            return_value="test-config",
-        )
+        worker.portkey_client.post = mocker.AsyncMock(side_effect=sdk_exc)  # type: ignore[method-assign]
 
         with pytest.raises(SearchJobFailureError) as exc_info:
             await worker._call_relay(model="linkup/standard", content='{"query": "test"}')  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
@@ -157,14 +150,8 @@ class TestGatewayQuotaDetection:
         worker = _make_gateway_extract_worker(mocker)
         sdk_exc = _make_portkey_exception("RateLimitError", 429, "You have exceeded your quota allocation")
 
-        mock_options = mocker.MagicMock()
-        mock_options.post = mocker.AsyncMock(side_effect=sdk_exc)
-        worker.portkey_client.with_options = mocker.MagicMock(return_value=mock_options)  # type: ignore[method-assign]
+        worker.portkey_client.post = mocker.AsyncMock(side_effect=sdk_exc)  # type: ignore[method-assign]
 
-        mocker.patch(
-            "pipelex.providers.gateway.gateway_extract_worker.GatewayDeck.get_config_id",
-            return_value="test-config",
-        )
         mocker.patch(
             "pipelex.providers.gateway.gateway_extract_worker.GatewayFactory.make_extras",
             return_value=({}, {"messages": [{"role": "user", "content": "test"}]}),
