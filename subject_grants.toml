@@ -4600,6 +4600,14 @@ rationale = "Verb-object read with a single obvious operand: the site or ref bei
 param = "qualified"
 rationale = "Verb-object read with one obvious operand: the qualified crate content being swept."
 
+["pipelex/pipeline/input_form.py::_node_site_kind"]
+param = "node"
+rationale = "Verb-object read: the node whose site value-kind is judged."
+
+["pipelex/pipeline/input_form.py::_slot_hints_of"]
+param = "slot_value"
+rationale = "Verb-object read: the slot value whose hints are extracted."
+
 ["pipelex/pipeline/input_form.py::build_input_form"]
 param = "pipes"
 rationale = "Reads as a verb-object sentence over the loaded pipes, mirroring build_pipe_io_contracts."

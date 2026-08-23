@@ -79,19 +79,19 @@ Next actions, in order: finish Phase 1's remaining fixtures/tests (unchecked box
 
 ## Phase 4 — Descriptor population
 
-- [ ] Narrow `InputFormField.hints` from `dict[str, Any]` to `dict[str, str]` (`pipelex/pipeline/input_form.py`) — flatness is contract.
-- [ ] Plumb slot hints from the qualified crate: `build_input_form` keeps the qualified crate's `pipes` too; per slot name, the blueprint's `inputs` value is a string (no hints) or a slot table (hints). Open question 3: per-call `derive_slot` argument vs pipe-ref-keyed lookup — taste call, decide here; the invariant is that `StuffSpec` stays hint-free. Fallback path (no crate) derives with no hints.
-- [ ] Concept nodes (`_blueprint_node`, `derive_concept`): stamp the concept's effective hints — deriver computes the chain merge via its existing `_refines_chain` walk calling the shared `merge_hints`. String-shorthand, natives, and class-backed concepts stamp nothing.
-- [ ] Structure fields (`_structure_field`): `merge_hints([referenced concept's effective hints (concept-typed and concept-item fields only), field.hints])`, stamped via `model_copy(update=…)`.
-- [ ] Input slots (`derive_slot`): `merge_hints([slot concept's effective hints, slot hints])`, stamped in the final `model_copy(update=…)` beside `presence`/`required`/`gating`.
-- [ ] Plural slots and list fields: merged hints stamped on the `list` node AND its `item` descriptor (the `concept_ref` duplication precedent).
-- [ ] Intent feeds kind — never competes: via `applicable_intent(...)`, on text-valued nodes `intent = "prose"` → `kind: "prose"`, `intent = "label"` → `kind: "text"`; absent/inapplicable/unknown intent leaves the no-hint default; `rating`/`quantity` never change `kind` and ride the slot; inapplicable words change nothing in `kind` but still ride the slot as preserved content.
-- [ ] Extend the probe bundle under `tests/data/input_semantics/` with hinted fixtures.
-- [ ] Deriver unit + integration tests (`tests/integration/pipelex/pipeline/test_input_form.py` kind table): site-over-concept and chain precedence visible on the wire; `prose`/`label` flip `kind` on text-valued nodes only; `rating`/`quantity` untouched-kind + slot ride; list/item duplication; hint-free descriptor output byte-identical to today.
+- [x] Narrow `InputFormField.hints` from `dict[str, Any]` to `dict[str, str]` (`pipelex/pipeline/input_form.py`) — flatness is contract.
+- [x] Plumb slot hints from the qualified crate: `build_input_form` keeps the qualified crate's `pipes` too; per slot name, the blueprint's `inputs` value is a string (no hints) or a slot table (hints). Open question 3: per-call `derive_slot` argument vs pipe-ref-keyed lookup — taste call, decide here; the invariant is that `StuffSpec` stays hint-free. Fallback path (no crate) derives with no hints. RESOLVED open question 3: per-call `derive_slot(slot_hints=...)` argument — the `build_input_form` loop has blueprint and StuffSpec in hand; the deriver stays stateless over pipes.
+- [x] Concept nodes (`_blueprint_node`, `derive_concept`): stamp the concept's effective hints — deriver computes the chain merge via its existing `_refines_chain` walk calling the shared `merge_hints`. String-shorthand, natives, and class-backed concepts stamp nothing.
+- [x] Structure fields (`_structure_field`): `merge_hints([referenced concept's effective hints (concept-typed and concept-item fields only), field.hints])`, stamped via `model_copy(update=…)`.
+- [x] Input slots (`derive_slot`): `merge_hints([slot concept's effective hints, slot hints])`, stamped in the final `model_copy(update=…)` beside `presence`/`required`/`gating`.
+- [x] Plural slots and list fields: merged hints stamped on the `list` node AND its `item` descriptor (the `concept_ref` duplication precedent).
+- [x] Intent feeds kind — never competes: via `applicable_intent(...)`, on text-valued nodes `intent = "prose"` → `kind: "prose"`, `intent = "label"` → `kind: "text"`; absent/inapplicable/unknown intent leaves the no-hint default; `rating`/`quantity` never change `kind` and ride the slot; inapplicable words change nothing in `kind` but still ride the slot as preserved content. Implemented as one terminal `_with_effective_hints` stamp per node (inner layers carry hints without flipping), so the flip always reads the FINAL merge against the no-hint kind; `_node_site_kind` mirrors the lint's structural judgment (time-formatted text and Html-backed nodes are not text-valued).
+- [x] Extend the probe bundle under `tests/data/input_semantics/` with hinted fixtures. Done as the SIBLING `hinted_bundle.mthds` (probe_bundle stays hint-free forever — its fingerprints are pinned).
+- [x] Deriver unit + integration tests (`tests/integration/pipelex/pipeline/test_input_form.py` kind table): site-over-concept and chain precedence visible on the wire; `prose`/`label` flip `kind` on text-valued nodes only; `rating`/`quantity` untouched-kind + slot ride; list/item duplication; hint-free descriptor output byte-identical to today.
 
 ## Checkpoint B — round trip end to end
 
-- [ ] Authored hints visible in `hop5_input_form.json` via the trace harness (`pipelex-dev trace-input-semantics`) on the hinted corpus method. Same checkpoint protocol as A: update the design doc, verify cold-start readiness, commit.
+- [x] Authored hints visible in `hop5_input_form.json` via the trace harness (`pipelex-dev trace-input-semantics`) on the hinted corpus method. Same checkpoint protocol as A: update the design doc, verify cold-start readiness, commit.
 
 ## Phase 5 — Schema, corpus, docs, close
 
