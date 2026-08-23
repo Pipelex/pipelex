@@ -42,7 +42,7 @@ from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBl
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.native.pinned_blueprints import make_pinned_native_blueprint
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
-from pipelex.core.pipes.variable_multiplicity import PresenceMarker
+from pipelex.core.pipes.variable_multiplicity import PresenceMarker, fixed_item_count
 from pipelex.interpreter_hub import get_current_library, get_library_manager
 from pipelex.language.intent_hints import HintSiteValueKind, IntentWord, applicable_intent, merge_hints
 from pipelex.libraries.crate_qualification import qualify_crate
@@ -128,7 +128,8 @@ class InputFormField(BaseModel):
 
     default_value: Any | None = None
     """The value applied when the caller omits the field — present only when a default was authored,
-    never the emission's `null`-for-optional artifact. May sit beside `required: true`."""
+    never the emission's `null`-for-optional artifact. Always beside `required: false`: the blueprint
+    rejects `required = true` with a default, and a reflected default makes the field not required."""
 
     examples: list[Any] | None = None
     hints: dict[str, str] | None = None
@@ -257,8 +258,7 @@ class InputFormDeriver:
         node = self._concept_node(name=name, concept_ref=stuff_spec.concept.concept_ref, seen=frozenset())
         effective_hints = merge_hints([node.hints, slot_hints])
         if stuff_spec.is_multiple():
-            multiplicity = stuff_spec.multiplicity
-            item_count = multiplicity if isinstance(multiplicity, int) and not isinstance(multiplicity, bool) else None
+            item_count = fixed_item_count(multiplicity=stuff_spec.multiplicity)
             # A plural slot's merged hints ride the `list` node AND its `item` (the `concept_ref`
             # duplication precedent): applicability is judged per item, and a renderer reading
             # either node finds the same answer.

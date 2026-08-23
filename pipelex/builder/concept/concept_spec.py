@@ -104,6 +104,13 @@ class ConceptStructureSpec(StructuredContent):
     @model_validator(mode="after")
     def validate_structure_blueprint(self) -> Self:
         """Validate the structure blueprint according to type rules."""
+        if self.required and self.default_value is not None:
+            msg = (
+                f"A field cannot declare both required = true and a default_value: a default is applied when "
+                f"the caller omits the field, which contradicts requiring it. Got default_value: {self.default_value!r}. "
+                f"Drop `required` to keep the default, or drop `default_value` to keep the field required."
+            )
+            raise ValueError(msg)
         match self.type:
             case ConceptStructureSpecFieldType.CONCEPT:
                 if not self.concept_ref:

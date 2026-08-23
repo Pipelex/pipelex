@@ -72,6 +72,13 @@ description = "Make exactly two items"
 inputs = { docs = "Text[2]" }
 output = "Item[2]"
 prompt = "Make two items from:\\n@docs"
+
+[pipe.make_from_one]
+type = "PipeLLM"
+description = "Make an item from a [1]-declared doc"
+inputs = { docs = "Text[1]" }
+output = "Item"
+prompt = "Make an item from:\\n@docs"
 """
 
 
@@ -85,10 +92,10 @@ description = "A verdict"
 [pipe.assess]
 type = "PipeLLM"
 description = "Assess with an optional hint"
-inputs = { doc = "Text", hint = "Text?" }
+inputs = { doc = "Text", hint = "Text?", brief = "Text!" }
 output = "Verdict"
 prompt = '''
-Assess $doc.
+Assess $doc following $brief.
 @?hint
 '''
 
@@ -126,6 +133,7 @@ class TestBuildPipeIOContracts:
         assess = io_contracts["optional_contracts_test.assess"]
         assert assess.inputs["doc"].presence == PresenceMarker.PLAIN
         assert assess.inputs["hint"].presence == PresenceMarker.OPTIONAL
+        assert assess.inputs["brief"].presence == PresenceMarker.FORCE
         assert assess.output.optional is False
 
         gate = io_contracts["optional_contracts_test.gate"]
@@ -140,7 +148,12 @@ class TestBuildPipeIOContracts:
         finally:
             _teardown_validation_library(outer_library_id)
 
-        assert set(io_contracts) == {"structures_test.make_one", "structures_test.make_many", "structures_test.make_two"}
+        assert set(io_contracts) == {
+            "structures_test.make_one",
+            "structures_test.make_many",
+            "structures_test.make_two",
+            "structures_test.make_from_one",
+        }
 
         make_one = io_contracts["structures_test.make_one"]
         assert make_one.output.concept_ref == "structures_test.Item"
@@ -173,6 +186,15 @@ class TestBuildPipeIOContracts:
         assert two_schema.get("type") == "array"
         assert two_schema.get("minItems") == 2
         assert two_schema.get("maxItems") == 2
+
+        # A `[1]` input projects to single: no count, no array framing — and the schema memo
+        # must not serve it another arm's schema (the memo key normalizes multiplicity because
+        # `hash(True) == hash(1)` would collide `Text[]` with `Text[1]` under a raw key).
+        make_from_one = io_contracts["structures_test.make_from_one"]
+        assert make_from_one.inputs["docs"].multiplicity == IOMultiplicity.SINGLE
+        assert make_from_one.inputs["docs"].item_count is None
+        one_schema = make_from_one.inputs["docs"].json_schema
+        assert one_schema.get("type") != "array"
 
     async def test_schema_render_failure_converts_to_structured_error(
         self,

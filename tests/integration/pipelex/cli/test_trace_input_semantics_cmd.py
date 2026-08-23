@@ -98,6 +98,10 @@ class TestTraceInputSemantics:
         assert do_one["inputs"]["hint"]["presence"] == "optional"
         assert do_one["inputs"]["items"]["multiplicity"] == "variable"
         assert do_one["inputs"]["items"]["json_schema"]["type"] == "array"
+        # The contract's item_count slot is always on the wire — `null` off the fixed arm, per the
+        # protocol spec (unlike the descriptor, which omits inapplicable slots).
+        assert "item_count" in do_one["inputs"]["items"]
+        assert do_one["inputs"]["items"]["item_count"] is None
 
         # Hop 5, descriptor side: the same pipes, keyed identically, with the authored facts stated directly.
         input_form = _read_json(output_dir / HOP5_INPUT_FORM_FILE_NAME)

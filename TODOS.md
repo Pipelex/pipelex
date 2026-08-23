@@ -94,6 +94,14 @@ Phase 2 delivered entirely inside: `concept.py` (render seam: multiplicity param
 - [x] In-repo docs swept: `inline-structures.md` gains the `required` bullet + the pair rule; `under-the-hood/input-form-descriptor.md` constraint paragraph updated (E7 made the "parser drops unknown constraint keys" claim false) + reflected-defaults sentence
 - [x] Final: `make agent-check` + full `make agent-test` green (suite exit 0)
 
+## PR #1149 review loop
+
+- [x] PR created (`feature/Enrich` → `dev`), CI fully green on first push
+- [x] Bot reviews (Greptile + codex): both converged on ONE finding — `item_count: null` for non-fixed multiplicity "violates the contract". REJECTED after verification: the protocol spec, its wire example, and `conformance/tests/pipelex_api/test_validate_optionals.py` all pin `item_count: null` off the fixed arm for `pipe_io_contracts` (the omit-when-absent convention belongs to the input-form descriptor; the two artifacts deliberately differ). Replied with evidence, resolved both threads; the misleading docstring wording disambiguated
+- [x] gstack `/review @TODOS.md` (fresh context): verdict SHIP, no P1. Clear wins applied: spec-layer E3 validator on `ConceptStructureSpec` (same two-remedies message; an authoring agent no longer validates green then dies on its own TOML) + spec-level test; stale `default_value` docstring in `input_form.py` fixed; inline duplicate of `fixed_item_count` in `derive_slot` replaced by the helper; parser-level tests wiring both new `rejected/` fixtures (`test_parser_rejected_structure_fields.py`); `force` presence pinned on the wire contract (`brief = "Text!"`); `Text[1]`→single contract projection + memo-key collision pinned (`make_from_one`); reflected `default_factory` (no fabricated default) and falsy default (`False` survives the None guard) pinned; wire-level `item_count`-always-present pinned in the trace test; changelog extended with the spec-layer half
+- [x] Deferred (review findings short of clear wins): `wip/enrich/deferred.md` — non-serializable reflected default, `_peel_multiplicity` `[1]`-as-list divergence (pre-existing), `_with_reflected_constraints` naming, double multiplicity normalization, mostly-inert `rejected/` corpus audit. Skipped outright: 0/negative-count helper rows (unreachable from bundles)
+- [x] Cross-repo: `../wip/inbox/2026-08-23-mthds-form-contract-reshape.md` filed — `mthds-form` still gates the Run button on the retired input `optional` and lacks the `fixed` multiplicity arm; no reshape item covered it
+
 ## Out of scope (per design §9)
 
 Language ceiling (S1 §B) syntax, app-side fixes (M1), corpus widening, `const`→`enum` render rewrite, descriptor wire-model round-trip alias (D4).

@@ -448,6 +448,8 @@ class InputFormConstrainedPayload(StructuredContent):
     code: str = Field(min_length=2, max_length=8, pattern="^[A-Z]+$", description="PROBE_desc_reflected_code")
     ratio: float | None = Field(default=None, ge=0.0, lt=1.0, description="PROBE_desc_reflected_ratio")
     retries: int = Field(default=3, description="PROBE_desc_reflected_retries")
+    strict: bool = Field(default=False, description="PROBE_desc_reflected_strict")
+    tags: list[str] = Field(default_factory=list, description="PROBE_desc_reflected_tags")
 
 
 class InputFormUnmappablePayload(StructuredContent):
@@ -578,6 +580,14 @@ class TestKindAssignmentTable:
         assert retries.kind == FieldKind.NUMBER
         assert retries.required is False, "A pydantic default on a reflected class is an authored fact — the field is not required"
         assert retries.default_value == 3
+
+        strict = by_name["strict"]
+        assert strict.required is False
+        assert strict.default_value is False, "A falsy non-None default is an authored fact — the None guard must not drop it"
+
+        tags = by_name["tags"]
+        assert tags.required is False, "A default_factory makes the field not required"
+        assert tags.default_value is None, "A default_factory has no reportable value — no default_value is fabricated"
 
     async def test_unmappable_class_falls_back_to_unknown(self, load_empty_library: Callable[[], str]) -> None:
         """Reflection is faithful-or-absent: a class with an unmappable field yields `unknown`, with identity kept."""
