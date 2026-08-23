@@ -12,7 +12,7 @@ id = "pipelex-config"
 title = "The main Pipelex configuration"
 base_file = "pipelex.toml"
 tier_glob = "pipelex_*.toml"
-current_schema_version = 3
+current_schema_version = 4
 min_supported_schema_version = 0
 
 # This entry is inserted *below* the reshape rather than appended above it, and the order is what
@@ -347,3 +347,29 @@ table_path = ["migration"]
 kind = "delete_key"
 table_path = []
 key = "session_id"
+
+[[migration]]
+id = "pipelex-config@4"
+to_schema_version = 4
+introduced_in = "0.51.0"
+breaking = true
+safety = "safe"
+title = "The gateway test override goes"
+description = """
+`[inference.gateway_test.config_id_substitutions]` mapped one Pipelex Gateway config id onto \
+another, so that a member of staff could point a model at a different gateway configuration \
+without touching the catalog. There are no gateway config ids any more: the gateway routes on \
+the model id in the request body, and which backend serves a model is decided by the gateway's \
+own configuration rather than by anything the runtime sends. A substitution table keyed by config \
+id has nothing left to key on, so the section goes rather than staying as a knob that silently \
+does nothing.
+"""
+guidance = """
+Nothing replaces it, and nothing needs to. To send a model somewhere else, change what the \
+gateway serves for that model; the runtime no longer has a say. A table left in a file is \
+deleted whatever it held — it was empty in the packaged defaults and only ever set by hand.
+"""
+
+[[migration.ops]]
+kind = "delete_table"
+table_path = ["inference", "gateway_test"]

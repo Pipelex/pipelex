@@ -13,7 +13,7 @@ import base64
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from portkey_ai.api_resources.utils import GenericResponse
+from portkey_ai.api_resources.types.image_type import ImagesResponse
 
 from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import UserActionKind
@@ -35,19 +35,14 @@ _UNRECOGNIZED_BYTES = base64.b64encode(b"plainly not an image" + b"\x00" * 40).d
 def _make_worker(mocker: MockerFixture) -> GatewayImgGenWorker:
     worker = object.__new__(GatewayImgGenWorker)
     mock_model = mocker.MagicMock()
-    mock_model.model_id = "gpt-image-1"
+    mock_model.model_id = "gpt-image-1-2025-04-15"
     mock_model.name = "gpt-image-1"
     mock_model.desc = "test-gateway-img-model"
-    mock_model.endpoint_path = "/gpt-image-1"
-    mock_model.extra_headers = {}
     mock_model.rules = mocker.MagicMock()
     worker.inference_model = mock_model
 
-    mock_post = mocker.AsyncMock()
-    mock_options = mocker.MagicMock()
-    mock_options.post = mock_post
     mock_client = mocker.MagicMock()
-    mock_client.with_options.return_value = mock_options
+    mock_client.images.generate = mocker.AsyncMock()
     worker.portkey_client = mock_client
     return worker
 
@@ -59,17 +54,13 @@ def _make_img_gen_job(mocker: MockerFixture) -> Any:
     return job
 
 
-def _patch_gateway_success(mocker: MockerFixture, worker: GatewayImgGenWorker, response: GenericResponse) -> None:
-    """Patch the worker so ``.post()`` succeeds and returns the given GenericResponse body."""
-    worker.portkey_client.with_options.return_value.post.return_value = response  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+def _patch_gateway_success(mocker: MockerFixture, worker: GatewayImgGenWorker, response: ImagesResponse) -> None:
+    """Patch the worker so ``images.generate()`` succeeds and returns the given body."""
+    worker.portkey_client.images.generate.return_value = response  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
     mocker.patch(
         "pipelex.providers.gateway.gateway_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
         new_callable=mocker.AsyncMock,
-        return_value={"prompt": "test"},
-    )
-    mocker.patch(
-        "pipelex.providers.gateway.gateway_img_gen_worker.GatewayDeck.get_config_id",
-        return_value="cfg-1",
+        return_value={"model": "gpt-image-1-2025-04-15", "prompt": "test"},
     )
 
 
@@ -84,8 +75,8 @@ class TestGatewayImgGenWorkerMalformedBody:
         """
         worker = _make_worker(mocker)
         # model_validate keeps the Azure-GPT-Image extras (size / output_format) — the
-        # GenericResponse constructor does not declare them.
-        response = GenericResponse.model_validate(
+        # ImagesResponse constructor does not declare them.
+        response = ImagesResponse.model_validate(
             {
                 "success": True,
                 "data": [{"b64_json": "aGVsbG8="}],
@@ -115,7 +106,7 @@ class TestGatewayImgGenWorkerMalformedBody:
         GPT-Image validation fails and the Flux-2-Pro branch is taken.
         """
         worker = _make_worker(mocker)
-        response = GenericResponse.model_validate({"success": True, "data": [{"b64_json": malformed_base64}]})
+        response = ImagesResponse.model_validate({"success": True, "data": [{"b64_json": malformed_base64}]})
         _patch_gateway_success(mocker, worker, response)
 
         with pytest.raises(ImgGenGenerationError) as exc_info:

@@ -67,11 +67,9 @@ def _make_gateway_img_gen_worker(mocker: MockerFixture) -> GatewayImgGenWorker:
     worker = object.__new__(GatewayImgGenWorker)
     mock_model = mocker.MagicMock()
     mock_model.desc = "test-gateway-imggen"
-    mock_model.model_id = "gpt-image-1"
+    mock_model.model_id = "gpt-image-1-2025-04-15"
     mock_model.name = "gpt-image-1"
     mock_model.tag = "test-imggen-tag"
-    mock_model.endpoint_path = "/gpt-image-1"
-    mock_model.extra_headers = {}
     mock_model.rules = mocker.MagicMock()
     worker.inference_model = mock_model
 
@@ -107,18 +105,12 @@ class TestGatewayQuotaDetection:
         worker = _make_gateway_img_gen_worker(mocker)
         sdk_exc = _make_portkey_exception("RateLimitError", 429, "Rate limit exceeded")
 
-        mock_options = mocker.MagicMock()
-        mock_options.post = mocker.AsyncMock(side_effect=sdk_exc)
-        worker.portkey_client.with_options = mocker.MagicMock(return_value=mock_options)  # type: ignore[method-assign]
+        worker.portkey_client.images.generate = mocker.AsyncMock(side_effect=sdk_exc)  # type: ignore[method-assign]
 
         mocker.patch(
             "pipelex.providers.gateway.gateway_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
             new_callable=mocker.AsyncMock,
-            return_value={"prompt": "test"},
-        )
-        mocker.patch(
-            "pipelex.providers.gateway.gateway_img_gen_worker.GatewayDeck.get_config_id",
-            return_value="test-config",
+            return_value={"model": "gpt-image-1-2025-04-15", "prompt": "test"},
         )
 
         img_gen_job = mocker.MagicMock()

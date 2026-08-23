@@ -30,19 +30,14 @@ def _make_status_error(exc_cls: type[portkey_exc.APIStatusError], status_code: i
 def _make_worker(mocker: MockerFixture) -> GatewayImgGenWorker:
     worker = object.__new__(GatewayImgGenWorker)
     mock_model = mocker.MagicMock()
-    mock_model.model_id = "gpt-image-1"
+    mock_model.model_id = "gpt-image-1-2025-04-15"
     mock_model.name = "gpt-image-1"
     mock_model.desc = "test-gateway-img-model"
-    mock_model.endpoint_path = "/gpt-image-1"
-    mock_model.extra_headers = {}
     mock_model.rules = mocker.MagicMock()
     worker.inference_model = mock_model
 
-    mock_post = mocker.AsyncMock()
-    mock_options = mocker.MagicMock()
-    mock_options.post = mock_post
     mock_client = mocker.MagicMock()
-    mock_client.with_options.return_value = mock_options
+    mock_client.images.generate = mocker.AsyncMock()
     worker.portkey_client = mock_client
     return worker
 
@@ -77,16 +72,12 @@ class TestGatewayImgGenWorkerSemantic:
     ) -> None:
         worker = _make_worker(mocker)
         sdk_exc = _make_status_error(exc_cls, status_code)
-        worker.portkey_client.with_options.return_value.post.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+        worker.portkey_client.images.generate.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         mocker.patch(
             "pipelex.providers.gateway.gateway_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
             new_callable=mocker.AsyncMock,
-            return_value={"prompt": "test"},
-        )
-        mocker.patch(
-            "pipelex.providers.gateway.gateway_img_gen_worker.GatewayDeck.get_config_id",
-            return_value="cfg-1",
+            return_value={"model": "gpt-image-1-2025-04-15", "prompt": "test"},
         )
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
@@ -103,16 +94,12 @@ class TestGatewayImgGenWorkerSemantic:
         """A genuine unknown-model 404 specializes to ImgGenModelNotFoundError (CONFIGURATION, CHANGE_MODEL)."""
         worker = _make_worker(mocker)
         sdk_exc = _make_status_error(portkey_exc.NotFoundError, 404)
-        worker.portkey_client.with_options.return_value.post.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+        worker.portkey_client.images.generate.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         mocker.patch(
             "pipelex.providers.gateway.gateway_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
             new_callable=mocker.AsyncMock,
-            return_value={"prompt": "test"},
-        )
-        mocker.patch(
-            "pipelex.providers.gateway.gateway_img_gen_worker.GatewayDeck.get_config_id",
-            return_value="cfg-1",
+            return_value={"model": "gpt-image-1-2025-04-15", "prompt": "test"},
         )
 
         with pytest.raises(ImgGenModelNotFoundError) as exc_info:
@@ -136,16 +123,12 @@ class TestGatewayImgGenWorkerSemantic:
             response=response,
             body={"error": {"message": "insufficient_quota: your credits are exhausted"}},
         )
-        worker.portkey_client.with_options.return_value.post.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+        worker.portkey_client.images.generate.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         mocker.patch(
             "pipelex.providers.gateway.gateway_img_gen_worker.ImgGenArgsFactory.make_args_for_model",
             new_callable=mocker.AsyncMock,
-            return_value={"prompt": "test"},
-        )
-        mocker.patch(
-            "pipelex.providers.gateway.gateway_img_gen_worker.GatewayDeck.get_config_id",
-            return_value="cfg-1",
+            return_value={"model": "gpt-image-1-2025-04-15", "prompt": "test"},
         )
 
         with pytest.raises(ImgGenGenerationError) as exc_info:

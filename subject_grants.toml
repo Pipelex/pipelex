@@ -4884,10 +4884,6 @@ rationale = "Predicate on the sdk; single operand."
 param = "sdk"
 rationale = "Predicate on the sdk; single operand."
 
-["pipelex/providers/gateway/gateway_deck.py::GatewayDeck.get_config_id"]
-param = "headers"
-rationale = "Derives the gateway config id from the request headers; single operand."
-
 ["pipelex/providers/gateway/gateway_extract_worker.py::GatewayExtractWorker._extract_base64_url"]
 param = "extract_job"
 rationale = "Extracts from the extract_job; single operand (qualifiers keyword-only)."

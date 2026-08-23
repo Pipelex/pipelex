@@ -93,7 +93,6 @@ FuncRegistryError | Func registry | https://docs.pipelex.com/latest/errors/func-
 GatewayApiKeyMissingError | Gateway api key missing | https://docs.pipelex.com/latest/errors/gateway-api-key-missing-error/
 GatewayConfigMergeError | Gateway config merge | https://docs.pipelex.com/latest/errors/gateway-config-merge-error/
 GatewayCredentialsError | Gateway credentials | https://docs.pipelex.com/latest/errors/gateway-credentials-error/
-GatewayDeckError | Gateway deck | https://docs.pipelex.com/latest/errors/gateway-deck-error/
 GatewayDoNotTrackConflictError | Gateway do not track conflict | https://docs.pipelex.com/latest/errors/gateway-do-not-track-conflict-error/
 GatewayError | Gateway | https://docs.pipelex.com/latest/errors/gateway-error/
 GatewayExtractResponseError | Gateway extract response | https://docs.pipelex.com/latest/errors/gateway-extract-response-error/

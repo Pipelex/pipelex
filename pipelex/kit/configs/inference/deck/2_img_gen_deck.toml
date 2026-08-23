@@ -36,11 +36,7 @@ best-gemini = "nano-banana-2"
 
 default-general = "nano-banana"
 default-premium = "nano-banana-2"
-# Was gpt-image-1-mini. The Azure gpt-image-* family left the gateway catalog
-# when routing moved into the request body, so an all-gateway routing profile
-# could no longer resolve it and every boot failed the gateway-membership check.
-# It returns when that family does.
-default-small = "nano-banana-2-lite"
+default-small = "gpt-image-1-mini"
 
 ####################################################################################################
 # Image Generation Presets

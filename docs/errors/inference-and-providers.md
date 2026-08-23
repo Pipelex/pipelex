@@ -84,7 +84,6 @@ own page. Classes are grouped by subsystem.
 - [`BedrockFactoryError`](bedrock-factory-error.md) — Bedrock factory
 - [`BedrockWorkerConfigurationError`](bedrock-worker-configuration-error.md) — Bedrock worker configuration
 - [`GatewayCredentialsError`](gateway-credentials-error.md) — Gateway credentials
-- [`GatewayDeckError`](gateway-deck-error.md) — Gateway deck
 - [`GatewayError`](gateway-error.md) — Gateway
 - [`GatewayExtractResponseError`](gateway-extract-response-error.md) — Gateway extract response
 - [`GatewayFactoryError`](gateway-factory-error.md) — Gateway factory
