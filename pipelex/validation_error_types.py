@@ -282,7 +282,25 @@ class ValidationResidualErrorType(StrEnum):
     DRY_RUN_ERROR = "DryRunError"
 
 
-ValidationErrorType: TypeAlias = PipeValidationErrorType | PipeFactoryErrorType | ValidationResidualErrorType
+class HintLintErrorType(StrEnum):
+    """Advisory intent-hints lint findings (spec: intent-hints.md).
+
+    Every member is advisory-only: it rides the validation report's ``warnings`` array and never
+    makes a verdict invalid — hints are non-normative, and well-formed unknown content is
+    preserved, only warned about. A separate enum rather than new ``PipeValidationErrorType``
+    members because hints attach to concepts and structure fields too, so the pipe enum is the
+    wrong home.
+    """
+
+    # A hint key the pinned standard version does not define (only `intent` exists today).
+    HINT_UNKNOWN_KEY = "hint_unknown_key"
+    # An `intent` value outside the closed vocabulary (`prose`, `label`, `rating`, `quantity`).
+    HINT_UNKNOWN_INTENT = "hint_unknown_intent"
+    # A known `intent` word on a site it does not apply to (e.g. `rating` on a text-valued site).
+    HINT_INAPPLICABLE_INTENT = "hint_inapplicable_intent"
+
+
+ValidationErrorType: TypeAlias = PipeValidationErrorType | PipeFactoryErrorType | ValidationResidualErrorType | HintLintErrorType
 """The type of a bundle-validation diagnostic's ``error_type``.
 
 ``ValidationErrorItem.error_type`` is typed against this alias, which is what makes the registry
@@ -295,6 +313,7 @@ VALIDATION_ERROR_TYPES: tuple[ValidationErrorType, ...] = (
     *PipeValidationErrorType,
     *PipeFactoryErrorType,
     *ValidationResidualErrorType,
+    *HintLintErrorType,
 )
 """Every ``error_type`` a bundle-validation diagnostic can carry, in a deterministic order.
 

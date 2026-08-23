@@ -29,7 +29,7 @@ class PipeStructureBlueprint(PipeBlueprint):
         # input via `working_memory.get_stuff_as_str`, which expects a single TextContent and
         # would otherwise crash on a ListContent with an opaque error. Users with a list of
         # texts should wrap PipeStructure in a PipeBatch.
-        input_name, input_concept_spec = next(iter((self.inputs or {}).items()))
+        input_name, input_concept_spec = next(iter((self.inputs_concept_specs or {}).items()))
         input_parse_result = parse_concept_with_multiplicity(input_concept_spec)
         if input_parse_result.multiplicity is not None:
             msg = (

@@ -70,7 +70,7 @@ class PipeImgGenSpec(PipeSpec):
 
         return PipeImgGenBlueprint(
             description=base_blueprint.description,
-            inputs=base_blueprint.inputs,
+            inputs=base_blueprint.inputs_concept_specs,
             output=base_blueprint.output,
             prompt=self.prompt,
             model=self.model,

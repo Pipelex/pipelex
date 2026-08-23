@@ -218,7 +218,8 @@ class LibraryCrateFactory:
     def _contract_mismatch_msg(pipe_ref: str, *, existing: PipeDeclaration, incoming: PipeDeclaration) -> str:
         return (
             f"Pipe '{pipe_ref}' is declared with mismatched contracts: "
-            f"'{existing.source or 'unknown'}' has inputs={existing.blueprint.inputs or {}}, output='{existing.blueprint.output}' "
-            f"while '{incoming.source or 'unknown'}' has inputs={incoming.blueprint.inputs or {}}, output='{incoming.blueprint.output}'. "
+            f"'{existing.source or 'unknown'}' has inputs={existing.blueprint.inputs_concept_specs or {}}, output='{existing.blueprint.output}' "
+            f"while '{incoming.source or 'unknown'}' has inputs={incoming.blueprint.inputs_concept_specs or {}}, "
+            f"output='{incoming.blueprint.output}'. "
             "A forward declaration (PipeSignature) and the matching declaration must agree on inputs and output."
         )

@@ -82,7 +82,7 @@ class PipeConditionSpec(PipeSpec):
         base_blueprint = super().to_blueprint()
         return PipeConditionBlueprint(
             description=base_blueprint.description,
-            inputs=base_blueprint.inputs,
+            inputs=base_blueprint.inputs_concept_specs,
             output=base_blueprint.output,
             type=self.type,
             pipe_category=self.pipe_category,

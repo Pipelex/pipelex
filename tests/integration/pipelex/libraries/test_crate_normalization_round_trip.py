@@ -2,10 +2,12 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.mthds_parsing.parser import MthdsParser
+from pipelex.pipe_machinery.pipe_blueprint import InputSlotBlueprint
 
 MTHDS_TEST_VERSION = "0.0.0-test"
 
@@ -106,3 +108,40 @@ class TestCrateNormalizationRoundTrip:
             library_manager.load_from_crate(library_id=library_id, crate=normalized)
             library = library_manager.get_library(library_id=library_id)
             assert "intake.extract_pages" in library.pipe_library.root
+
+    def test_hinted_crate_round_trips_and_loads(self, load_empty_library: Callable[[], str]):
+        """The committed hinted fixture (hints at all three sites) normalizes, re-normalizes to a
+        fixed point, and loads back into a live library — hints riding the crate, never the runtime.
+        """
+        library_manager = get_library_manager()
+
+        hinted_path = Path(__file__).parents[3] / "data" / "input_semantics" / "hinted_bundle.mthds"
+        blueprints = [MthdsParser.make_pipelex_bundle_blueprint(bundle_path=hinted_path)]
+        crate = LibraryCrateFactory.make_from_blueprints(blueprints=blueprints)
+        normalized = normalize_crate(crate, mthds_version=MTHDS_TEST_VERSION)
+
+        # Hints are in the normalized crate: effective on concepts, as authored on slots.
+        special_badge = normalized.concepts["input_semantics_hinted.SpecialBadge"]
+        assert isinstance(special_badge, ConceptBlueprint)
+        assert special_badge.hints == {"intent": "prose"}
+        plain_badge = normalized.concepts["input_semantics_hinted.PlainBadge"]
+        assert isinstance(plain_badge, ConceptBlueprint)
+        assert plain_badge.hints == {"intent": "label"}
+        hinted_pipe_inputs = normalized.pipes["input_semantics_hinted.hinted_slots"].inputs
+        assert hinted_pipe_inputs is not None
+        hinted_slot = hinted_pipe_inputs["hinted"]
+        assert isinstance(hinted_slot, InputSlotBlueprint)
+        assert hinted_slot.hints == {"intent": "prose"}
+
+        renormalized = normalize_crate(normalized, mthds_version=MTHDS_TEST_VERSION)
+        assert renormalized.fingerprint == normalized.fingerprint
+        assert renormalized.concepts == normalized.concepts
+        assert renormalized.pipes == normalized.pipes
+
+        library_id = load_empty_library()
+        library_manager.load_from_crate(library_id=library_id, crate=normalized)
+        library = library_manager.get_library(library_id=library_id)
+        assert "input_semantics_hinted.hinted_slots" in library.pipe_library.root
+        # Runtime stays hint-free: the loaded pipe's StuffSpec sees only the concept.
+        loaded_pipe = library.pipe_library.root["input_semantics_hinted.hinted_slots"]
+        assert "hinted" in loaded_pipe.inputs.root

@@ -48,6 +48,7 @@ def _teardown_validation_library(outer_library_id: str) -> None:
 
 
 _PROBE_BUNDLE_PATH = Path(__file__).parents[3] / "data" / "input_semantics" / "probe_bundle.mthds"
+_HINTED_BUNDLE_PATH = Path(__file__).parents[3] / "data" / "input_semantics" / "hinted_bundle.mthds"
 
 
 _LIBRARY_DIR_MTHDS = """
@@ -352,6 +353,75 @@ class TestBuildInputForm:
         assert special.fields is not None
         assert [field.name for field in special.fields] == ["number", "total"]
         assert special.description == "An invoice flagged for review"
+
+    async def test_hinted_slots_carry_effective_hints_on_the_wire(self, load_empty_library: Callable[[], str]) -> None:
+        """Authored hints reach the descriptor (H2): slot hints merge over the concept layer, an
+        applicable intent feeds `kind`, a plural slot's hints ride list AND item, and hint-free
+        slots stay hint-free.
+        """
+        outer_library_id = load_empty_library()
+        try:
+            result = await validate_bundle(mthds_contents=[_HINTED_BUNDLE_PATH.read_text(encoding="utf-8")])
+            input_form = build_input_form(result.pipes)
+        finally:
+            _teardown_validation_library(outer_library_id)
+
+        fields = {field.name: field for field in input_form["input_semantics_hinted.hinted_slots"].fields}
+        # Plain and collapsed slots derive identically: the concept layer alone (Essay: prose).
+        for slot_name in ["plain", "expanded_plain"]:
+            assert fields[slot_name].hints == {"intent": "prose"}
+            assert fields[slot_name].kind is FieldKind.PROSE
+        # Slot hints on a structured concept: inapplicable intent rides, kind stays `object`.
+        assert fields["hinted"].hints == {"intent": "prose"}
+        assert fields["hinted"].kind is FieldKind.OBJECT
+        # Plural slot: merged hints on the list node AND its item; the item's kind flips.
+        marked = fields["hinted_marked"]
+        assert marked.kind is FieldKind.LIST
+        assert marked.hints == {"intent": "label"}
+        assert marked.item is not None
+        assert marked.item.hints == {"intent": "label"}
+        assert marked.item.kind is FieldKind.TEXT
+
+    async def test_hinted_structure_fields_on_the_wire(self, load_empty_library: Callable[[], str]) -> None:
+        """Field-site hints from the parsed bundle survive to the descriptor, unknown keys included."""
+        outer_library_id = load_empty_library()
+        try:
+            result = await validate_bundle(mthds_contents=[_HINTED_BUNDLE_PATH.read_text(encoding="utf-8")])
+            input_form = build_input_form(result.pipes)
+        finally:
+            _teardown_validation_library(outer_library_id)
+
+        review = {field.name: field for field in input_form["input_semantics_hinted.hinted_slots"].fields}["hinted"]
+        review_fields = {field.name: field for field in review.fields or []}
+        assert review_fields["headline"].hints == {"intent": "label"}
+        assert review_fields["headline"].kind is FieldKind.TEXT
+        assert review_fields["body"].hints == {"intent": "prose"}
+        assert review_fields["body"].kind is FieldKind.PROSE
+        assert review_fields["stars"].hints == {"intent": "rating"}
+        assert review_fields["stars"].kind is FieldKind.NUMBER
+        assert review_fields["plain"].hints is None
+        # Unknown key: preserved content, riding the slot with no kind effect.
+        assert review_fields["quirk"].hints == {"emphasis": "HINTED_unknown_value"}
+        assert review_fields["quirk"].kind is FieldKind.TEXT
+
+    async def test_hint_free_probe_descriptor_carries_no_hints_key(self, load_empty_library: Callable[[], str]) -> None:
+        """Population is wire-additive: the hint-free probe bundle's descriptor is byte-identical
+        to before hints existed — no `hints` key at any depth.
+        """
+        input_form, _ = await self._derive_probe(load_empty_library)
+
+        def assert_no_hints(dumped: dict[str, Any]) -> None:
+            assert "hints" not in dumped
+            children: list[dict[str, Any]] = dumped.get("fields") or []
+            for child in children:
+                assert_no_hints(child)
+            item: dict[str, Any] | None = dumped.get("item")
+            if item:
+                assert_no_hints(item)
+
+        for descriptor in input_form.values():
+            for field in descriptor.fields:
+                assert_no_hints(field.model_dump())
 
     async def test_wire_dump_has_no_null_slots(self, load_empty_library: Callable[[], str]) -> None:
         """The valid arm is dumped WITHOUT `exclude_none`, so inapplicable slots must self-exclude."""

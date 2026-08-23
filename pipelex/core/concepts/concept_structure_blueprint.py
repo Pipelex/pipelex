@@ -2,7 +2,7 @@ from datetime import date, datetime, time
 from enum import StrEnum
 from typing import Any, Self
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, SerializerFunctionWrapHandler, field_validator, model_serializer, model_validator
 
 from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.system.pipe_run_param_key import PipeRunParamKey
@@ -62,6 +62,27 @@ class ConceptStructureBlueprint(BaseModel):
     choices: list[str] | None = Field(default=None)
     default_value: Any | None = None
     required: bool = Field(default=False)
+    hints: dict[str, str] | None = None
+    """MTHDS intent hints (spec: intent-hints.md) — non-normative presentation intent for this
+    field as a site. Carried as authored through the crate; the site-over-concept merge is the
+    consumer's. An empty table is equivalent to no hints and normalizes to absence."""
+
+    @field_validator("hints", mode="after")
+    @classmethod
+    def normalize_empty_hints(cls, hints: dict[str, str] | None) -> dict[str, str] | None:
+        # Sorted here so every serialization is canonical (spec: hints entries emitted sorted by
+        # key); hint key order is not semantic, unlike structure-field order.
+        return dict(sorted(hints.items())) if hints else None
+
+    @model_serializer(mode="wrap")
+    def serialize_without_absent_hints(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        """Absent hints are an absent member — never `null` (spec rule; keeps hint-free crate
+        fingerprints byte-identical to before hints existed).
+        """
+        dumped: dict[str, Any] = handler(self)
+        if dumped.get("hints") is None:
+            dumped.pop("hints", None)
+        return dumped
 
     @field_validator("concept_ref", mode="before")
     @classmethod
