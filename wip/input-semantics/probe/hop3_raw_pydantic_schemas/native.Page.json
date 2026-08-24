@@ -1,0 +1,211 @@
+{
+  "$defs": {
+    "ImageContent": {
+      "description": "An image",
+      "properties": {
+        "url": {
+          "description": "The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
+          "title": "Url",
+          "type": "string"
+        },
+        "public_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The public URL of the image",
+          "title": "Public Url"
+        },
+        "source_prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The source prompt of the image",
+          "title": "Source Prompt"
+        },
+        "source_negative_prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The source negative prompt of the image",
+          "title": "Source Negative Prompt"
+        },
+        "caption": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The caption of the image",
+          "title": "Caption"
+        },
+        "mime_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The MIME type of the image",
+          "title": "Mime Type"
+        },
+        "width": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The width of the image, in pixels",
+          "title": "Width"
+        },
+        "height": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The height of the image, in pixels",
+          "title": "Height"
+        },
+        "filename": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The original filename of the image",
+          "title": "Filename"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "title": "ImageContent",
+      "type": "object"
+    },
+    "TextAndImagesContent": {
+      "properties": {
+        "text": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextContent"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A text content"
+        },
+        "images": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ImageContent"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A list of images that were extracted from the text",
+          "title": "Images"
+        },
+        "raw_html": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The raw HTML of the fetched page, if requested",
+          "title": "Raw Html"
+        }
+      },
+      "title": "TextAndImagesContent",
+      "type": "object"
+    },
+    "TextContent": {
+      "description": "A text",
+      "properties": {
+        "text": {
+          "description": "The text",
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "TextContent",
+      "type": "object"
+    }
+  },
+  "description": "The content of a page of a document, comprising text and linked images and an optional page view image",
+  "properties": {
+    "text_and_images": {
+      "$ref": "#/$defs/TextAndImagesContent",
+      "description": "The text and images content extracted from the page"
+    },
+    "page_view": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ImageContent"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The screenshot of the page"
+    }
+  },
+  "required": [
+    "text_and_images"
+  ],
+  "title": "PageContent",
+  "type": "object"
+}

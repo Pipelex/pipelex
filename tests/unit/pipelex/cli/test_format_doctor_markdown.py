@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 from pipelex.cli.agent_cli.commands.doctor_cmd import (
-    _format_doctor_markdown,  # noqa: PLC2701 # pyright: ignore[reportPrivateUsage]
+    _format_doctor_markdown,  # pyright: ignore[reportPrivateUsage]
 )
 
 

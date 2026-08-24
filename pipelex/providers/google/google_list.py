@@ -32,7 +32,7 @@ async def list_google_models(
             msg,
         )
 
-    from pipelex.providers.google.google_factory import GoogleFactory  # noqa: PLC0415
+    from pipelex.providers.google.google_factory import GoogleFactory  # ruff: ignore[import-outside-top-level]
 
     client = GoogleFactory.make_google_client(backend)
     google_models: list[Any] = []

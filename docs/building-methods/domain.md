@@ -184,7 +184,7 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 invoice_stuff = StuffFactory.make_from_concept_ref(
     concept_ref="finance.Invoice",  # domain_code.ConceptName
     name="invoice_123",
-    content=invoice_data
+    content=invoice_data,
 )
 ```
 

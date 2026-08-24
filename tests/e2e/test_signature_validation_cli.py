@@ -6,7 +6,9 @@ from pathlib import Path
 import pytest
 import typer
 
-from pipelex.cli.commands.validate._validate_core import _validate_pipe_or_bundle  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+from pipelex.cli.commands.validate._validate_core import (
+    _validate_pipe_or_bundle,  # pyright: ignore[reportPrivateUsage]
+)
 
 _FIXTURE_DIR = Path(__file__).parent / "fixtures" / "signature_bundles"
 _SIGNATURE_ONLY = _FIXTURE_DIR / "signature_only.mthds"

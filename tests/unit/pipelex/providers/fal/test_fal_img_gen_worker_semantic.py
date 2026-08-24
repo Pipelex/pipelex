@@ -80,7 +80,7 @@ class TestFalImgGenWorkerSemantic:
         )
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._submit_and_get_result(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._submit_and_get_result(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.user_action is not None
@@ -102,7 +102,7 @@ class TestFalImgGenWorkerSemantic:
         )
 
         with pytest.raises(ImgGenModelNotFoundError) as exc_info:
-            await worker._submit_and_get_result(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._submit_and_get_result(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
         assert exc_info.value.user_action is not None
@@ -123,7 +123,7 @@ class TestFalImgGenWorkerSemantic:
         )
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._submit_and_get_result(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._submit_and_get_result(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
         assert exc_info.value.user_action is not None
@@ -143,7 +143,7 @@ class TestFalImgGenWorkerSemantic:
         )
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._submit_and_get_result(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._submit_and_get_result(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
         assert exc_info.value.user_action is not None

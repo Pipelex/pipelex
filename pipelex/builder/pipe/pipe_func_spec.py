@@ -38,7 +38,7 @@ class PipeFuncSpec(PipeSpec):
         base_blueprint = super().to_blueprint()
         return PipeFuncBlueprint(
             description=base_blueprint.description,
-            inputs=base_blueprint.inputs,
+            inputs=base_blueprint.inputs_concept_specs,
             output=base_blueprint.output,
             function_name=self.function_name,
         )

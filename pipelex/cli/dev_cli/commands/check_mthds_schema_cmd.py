@@ -55,7 +55,7 @@ def check_mthds_schema_cmd(*, show_diff: bool = True, quiet: bool = False) -> No
     # Generate expected schema
     try:
         schema = generate_mthds_schema()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         # Dev CLI command root: any schema-generation failure is reported as a FAILED status line; exit non-zero.
         if quiet:
             console.print(f"[red]✗ MTHDS schema check: FAILED[/red] - Schema generation error: {escape(str(exc))}")

@@ -380,8 +380,8 @@ class TestDeliveryExecutor:
         assert usage_doc == {"tokens_usages": None, "usage_assembly_error": "usage event read failed"}
 
     async def test_try_local_hydrate_stuff_returns_typed_for_builtin(self) -> None:
-        from pipelex.core.stuffs.text_content import TextContent  # noqa: PLC0415
-        from pipelex.runtime_hub import get_class_registry  # noqa: PLC0415
+        from pipelex.core.stuffs.text_content import TextContent  # ruff: ignore[import-outside-top-level]
+        from pipelex.runtime_hub import get_class_registry  # ruff: ignore[import-outside-top-level]
 
         registry = get_class_registry()
         if not registry.has_class(name="TextContent"):
@@ -406,7 +406,7 @@ class TestDeliveryExecutor:
         assert result.content.text == "Hello!"
 
     async def test_try_local_hydrate_stuff_returns_none_for_missing_class(self, mocker: MockerFixture) -> None:
-        from pipelex import log as pipelex_log  # noqa: PLC0415
+        from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
 
         warn_spy = mocker.spy(pipelex_log, "warning")
 
@@ -429,7 +429,7 @@ class TestDeliveryExecutor:
         assert "Local hydration failed" in str(warn_spy.call_args)
 
     async def test_try_local_hydrate_stuff_returns_none_for_malformed_dict(self, mocker: MockerFixture) -> None:
-        from pipelex import log as pipelex_log  # noqa: PLC0415
+        from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
 
         warn_spy = mocker.spy(pipelex_log, "warning")
 
@@ -493,10 +493,10 @@ class TestDeliveryExecutor:
         delivery activity blows up with `TypeError: Object of type PageContent is not JSON
         serializable`. This test pins that scenario.
         """
-        from pipelex.core.stuffs.image_content import ImageContent  # noqa: PLC0415
-        from pipelex.core.stuffs.page_content import PageContent  # noqa: PLC0415
-        from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent  # noqa: PLC0415
-        from pipelex.core.stuffs.text_content import TextContent  # noqa: PLC0415
+        from pipelex.core.stuffs.image_content import ImageContent  # ruff: ignore[import-outside-top-level]
+        from pipelex.core.stuffs.page_content import PageContent  # ruff: ignore[import-outside-top-level]
+        from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent  # ruff: ignore[import-outside-top-level]
+        from pipelex.core.stuffs.text_content import TextContent  # ruff: ignore[import-outside-top-level]
 
         page = PageContent(
             text_and_images=TextAndImagesContent(
@@ -637,7 +637,7 @@ class TestDeliveryExecutor:
 
     async def test_storage_completion_log_includes_request_id_when_set(self, mocker: MockerFixture) -> None:
         """The ``Storage delivery completed`` log line carries the originating ``request_id`` for cross-phase correlation."""
-        from pipelex import log as pipelex_log  # noqa: PLC0415
+        from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
 
         info_spy = mocker.spy(pipelex_log, "info")
 
@@ -670,7 +670,7 @@ class TestDeliveryExecutor:
 
     async def test_webhook_completion_log_includes_request_id_when_set(self, mocker: MockerFixture) -> None:
         """The ``Webhook delivery completed`` log line carries the originating ``request_id`` for cross-phase correlation."""
-        from pipelex import log as pipelex_log  # noqa: PLC0415
+        from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
 
         info_spy = mocker.spy(pipelex_log, "info")
 
@@ -707,7 +707,7 @@ class TestDeliveryExecutor:
         delivery log line — so a future refactor that split the FAILED and COMPLETED webhook code
         paths cannot drop the correlation id from the failure surface.
         """
-        from pipelex import log as pipelex_log  # noqa: PLC0415
+        from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
 
         info_spy = mocker.spy(pipelex_log, "info")
 
@@ -759,7 +759,7 @@ class TestDeliveryExecutor:
 
     async def test_completion_logs_omit_request_id_when_unset(self, mocker: MockerFixture) -> None:
         """When ``request_id`` is None (run dispatched without an inbound id), the log lines do NOT print a stray ``request_id=None``."""
-        from pipelex import log as pipelex_log  # noqa: PLC0415
+        from pipelex import log as pipelex_log  # ruff: ignore[import-outside-top-level]
 
         info_spy = mocker.spy(pipelex_log, "info")
 
@@ -813,7 +813,7 @@ class TestDeliveryExecutor:
             )
 
     async def test_webhook_failure_raises(self, mocker: MockerFixture) -> None:
-        import httpx  # noqa: PLC0415
+        import httpx  # ruff: ignore[import-outside-top-level]
 
         mock_client = mocker.AsyncMock()
         mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)

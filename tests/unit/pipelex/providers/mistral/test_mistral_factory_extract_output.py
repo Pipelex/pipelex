@@ -49,7 +49,7 @@ class TestMistralFactoryExtractOutput:
     def test_clean_base64_already_clean_returned_unchanged(self, _topic: str, raw_bytes: bytes) -> None:
         """Data already starting with a JPEG or PNG magic number is returned as the exact same base64 string."""
         base64_str = _encode(raw_bytes)
-        cleaned = MistralFactory._clean_mistral_image_base64(base64_str)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        cleaned = MistralFactory._clean_mistral_image_base64(base64_str)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert cleaned == base64_str
 
     @pytest.mark.parametrize(
@@ -62,7 +62,7 @@ class TestMistralFactoryExtractOutput:
     def test_clean_base64_strips_prepended_metadata(self, _topic: str, image_body: bytes) -> None:
         """Metadata bytes prepended before the image magic number are stripped, leaving exactly the image bytes."""
         base64_str = _encode(b"METADATA" + image_body)
-        cleaned = MistralFactory._clean_mistral_image_base64(base64_str)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        cleaned = MistralFactory._clean_mistral_image_base64(base64_str)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert base64.b64decode(cleaned) == image_body
 
     @pytest.mark.parametrize(
@@ -75,13 +75,13 @@ class TestMistralFactoryExtractOutput:
     def test_clean_base64_no_magic_in_window_returns_original(self, _topic: str, raw_bytes: bytes) -> None:
         """When no image magic number appears in the first 32 bytes, the original string is returned untouched."""
         base64_str = _encode(raw_bytes)
-        cleaned = MistralFactory._clean_mistral_image_base64(base64_str)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        cleaned = MistralFactory._clean_mistral_image_base64(base64_str)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert cleaned == base64_str
 
     def test_clean_base64_invalid_input_returns_original(self) -> None:
         """An input that fails base64 decoding is returned unmodified (ValueError branch)."""
         invalid_base64 = "not-valid-base64!!!"
-        cleaned = MistralFactory._clean_mistral_image_base64(invalid_base64)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        cleaned = MistralFactory._clean_mistral_image_base64(invalid_base64)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert cleaned == invalid_base64
 
     # ---- make_extracted_image_from_page_from_mistral_ocr_image_obj ----

@@ -20,9 +20,9 @@ def _make_fal_img_gen_worker(
 ) -> InferenceWorkerAbstract:
     require_sdk(spec="fal_client", dependency_name="fal-client", extra="fal", msg=_FAL_MISSING_MSG)
 
-    from fal_client import AsyncClient as FalAsyncClient  # noqa: PLC0415
+    from fal_client import AsyncClient as FalAsyncClient  # ruff: ignore[import-outside-top-level]
 
-    from pipelex.providers.fal.fal_img_gen_worker import FalImgGenWorker  # noqa: PLC0415
+    from pipelex.providers.fal.fal_img_gen_worker import FalImgGenWorker  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     sdk_instance = sdk_clients.get_or_create(

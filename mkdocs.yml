@@ -246,6 +246,7 @@ plugins:
         - building-methods/concepts/python-classes.md: "Python Classes"
         - building-methods/concepts/native-concepts.md: "Native Concepts"
         - building-methods/concepts/refining-concepts.md: "Refining Concepts"
+        - building-methods/concepts/intent-hints.md: "Intent Hints"
         - building-methods/pipes/index.md: "Design and Run Methods Overview"
         - building-methods/libraries.md: "Libraries"
         - building-methods/packages.md: "Packages"
@@ -317,6 +318,8 @@ plugins:
         - under-the-hood/pipelex-kernel.md: "The Pipelex Kernel"
         - under-the-hood/build-time-elaboration.md: "Build-time Elaboration"
         - under-the-hood/codegen-projections.md: "Codegen Projections"
+        - under-the-hood/input-form-descriptor.md: "Input-Form Descriptor"
+        - under-the-hood/pipe-io-contracts.md: "Per-Pipe IO Contracts"
         - under-the-hood/dry-run-mock-generation.md: "Dry Run Mock Generation"
         - under-the-hood/execution-graph-tracing.md: "Execution Graph Tracing"
         - under-the-hood/tokens-usage-wire-records.md: "TokensUsage Wire Records"
@@ -343,6 +346,7 @@ plugins:
         - contribute/registration-surface.md: "Registration Surface"
         - contribute/drift-contracts.md: "Drift Contracts"
         - contribute/mthds-test-corpus.md: "MTHDS Test Corpus"
+        - contribute/trace-input-semantics.md: "Tracing Input Semantics"
         - migration-ledger.md: "Migration Ledger"
         - changelog.md: "Changelog"
 
@@ -467,6 +471,7 @@ nav:
         - Python classes: building-methods/concepts/python-classes.md
         - Native Concepts: building-methods/concepts/native-concepts.md
         - Refining Concepts: building-methods/concepts/refining-concepts.md
+        - Intent Hints: building-methods/concepts/intent-hints.md
       - Design and Run Methods:
         - Overview: building-methods/pipes/index.md
         - Libraries: building-methods/libraries.md
@@ -563,6 +568,8 @@ nav:
       - The Pipelex Kernel: under-the-hood/pipelex-kernel.md
       - Build-time Elaboration: under-the-hood/build-time-elaboration.md
       - Codegen Projections: under-the-hood/codegen-projections.md
+      - Input-Form Descriptor: under-the-hood/input-form-descriptor.md
+      - Per-Pipe IO Contracts: under-the-hood/pipe-io-contracts.md
       - Dry Run Mock Generation: under-the-hood/dry-run-mock-generation.md
       - Execution Graph Tracing: under-the-hood/execution-graph-tracing.md
       - TokensUsage Wire Records: under-the-hood/tokens-usage-wire-records.md
@@ -589,6 +596,7 @@ nav:
     - Registration Surface: contribute/registration-surface.md
     - Drift Contracts: contribute/drift-contracts.md
     - MTHDS Test Corpus: contribute/mthds-test-corpus.md
+    - Tracing Input Semantics: contribute/trace-input-semantics.md
     - Migration Ledger: migration-ledger.md
     - Code of Conduct: CODE_OF_CONDUCT.md
     - License: license.md

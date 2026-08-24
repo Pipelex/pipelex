@@ -56,7 +56,7 @@ def _make_worker(mocker: MockerFixture, *, sdk_result: Any) -> LinkupSearchWorke
     worker.inference_model = mock_model
     mock_client = mocker.MagicMock()
     mock_client.async_search = mocker.AsyncMock(return_value=sdk_result)
-    setattr(worker, "_linkup_client", mock_client)  # noqa: B010
+    setattr(worker, "_linkup_client", mock_client)  # ruff: ignore[set-attr-with-constant]
     return worker
 
 
@@ -79,9 +79,9 @@ class TestLinkupStructuredSearchContract:
     async def test_the_callers_own_schema_crosses_as_json_without_the_class(self, mocker: MockerFixture) -> None:
         """The request carries the caller's real schema, and the SDK gets no class to instantiate."""
         worker = _make_worker(mocker, sdk_result={"title": "pipelex", "summary": "a language"})
-        client: Any = getattr(worker, "_linkup_client")  # noqa: B009
+        client: Any = getattr(worker, "_linkup_client")  # ruff: ignore[get-attr-with-constant]
 
-        await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         sent_schema = client.async_search.await_args.kwargs["structured_output_schema"]
         assert isinstance(sent_schema, str), "a class would make the SDK validate the response itself"
@@ -93,9 +93,9 @@ class TestLinkupStructuredSearchContract:
     async def test_sources_are_not_requested(self, mocker: MockerFixture) -> None:
         """Asking for sources wraps the payload in an envelope the output structure class cannot accept."""
         worker = _make_worker(mocker, sdk_result={"title": "pipelex", "summary": "a language"})
-        client: Any = getattr(worker, "_linkup_client")  # noqa: B009
+        client: Any = getattr(worker, "_linkup_client")  # ruff: ignore[get-attr-with-constant]
 
-        await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert client.async_search.await_args.kwargs["include_sources"] is False
 
@@ -103,7 +103,7 @@ class TestLinkupStructuredSearchContract:
         """The dict is the structured payload itself, un-normalized: the leaf's validation is the first one."""
         worker = _make_worker(mocker, sdk_result={"title": "pipelex", "summary": "a language"})
 
-        result = await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        result = await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert result == {"title": "pipelex", "summary": "a language"}
         # The caller's transforming validator has not run yet — it runs once, when the leaf validates.
@@ -124,7 +124,7 @@ class TestLinkupStructuredSearchContract:
         envelope = {"data": payload, "sources": [{"name": "src", "url": "https://example.com", "snippet": "…"}]}
         worker = _make_worker(mocker, sdk_result=envelope)
 
-        result = await worker._search_structured(search_job=_make_search_job(mocker), schema=AllDefaults)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        result = await worker._search_structured(search_job=_make_search_job(mocker), schema=AllDefaults)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert result == payload
         # What the guard prevents: validating the envelope instead would have succeeded and thrown the
@@ -136,11 +136,11 @@ class TestLinkupStructuredSearchContract:
         worker = _make_worker(mocker, sdk_result={"data": None, "sources": []})
 
         with pytest.raises(LinkupSearchEmptyResultError, match="empty structured result"):
-            await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     async def test_a_non_object_payload_raises_a_classified_search_error(self, mocker: MockerFixture) -> None:
         """The SDK returns the provider's JSON verbatim, so a non-object payload must surface here as a classified error, not at the leaf."""
         worker = _make_worker(mocker, sdk_result=["not", "an", "object"])
 
         with pytest.raises(LinkupSearchResponseError, match="list"):
-            await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._search_structured(search_job=_make_search_job(mocker), schema=TopicSummary)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]

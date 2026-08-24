@@ -9,12 +9,12 @@ import pytest
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.error_pages_generator import (
-    _MACRO_SECTIONS,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+    _MACRO_SECTIONS,  # pyright: ignore[reportPrivateUsage]
     AUTHORED_MARKER,
     GENERATED_MARKER,
     INDEX_STEM,
     ErrorPagesReport,
-    _force_load_all_error_modules,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+    _force_load_all_error_modules,  # pyright: ignore[reportPrivateUsage]
     generate_error_pages,
     has_authored_marker,
     iter_pipelex_error_subclasses,
@@ -152,7 +152,7 @@ class TestErrorPagesGenerator:
 
         # Deliberately no `Error` suffix: the collision can only arise for a name that kebabs
         # onto a reserved listing-page stem, and an ``…Error`` name always kebabs to ``…-error``.
-        class PlatformAndTooling(PipelexError):  # noqa: N818
+        class PlatformAndTooling(PipelexError):  # ruff: ignore[error-suffix-on-exception-name]
             pass
 
         with pytest.raises(RuntimeError, match="Reserved-slug collision on 'platform-and-tooling'"):

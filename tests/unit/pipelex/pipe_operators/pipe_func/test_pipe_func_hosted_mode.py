@@ -87,7 +87,7 @@ class TestPipeFuncHostedMode:
             blueprint=blueprint,
         )
 
-        pipe_output = await pipe_func._dry_run_operator_pipe(  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        pipe_output = await pipe_func._dry_run_operator_pipe(  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
             job_metadata=JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", user_id="user", pipeline_run_id="run")),
             working_memory=WorkingMemoryFactory.make_empty(),
             pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10, batch_max_concurrency=None),

@@ -48,7 +48,7 @@ interpreter-group orchestrator is never registered and the existing gate rejects
 Neither remedy the earlier analysis proposed was built.
 """
 
-import subprocess  # noqa: S404
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
 import textwrap
 
@@ -418,7 +418,7 @@ CONTROL_PACKAGE_THE_KERNEL_ALWAYS_LOADS = "cogt"
 def _run_kernel_call(*, interpreter_packages: tuple[str, ...]) -> subprocess.CompletedProcess[str]:
     """Boot the kernel layer in a fresh interpreter, call the kernel, and return the verdict."""
     try:
-        return subprocess.run(  # noqa: S603
+        return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             [sys.executable, "-c", _KERNEL_CALL_SCRIPT, *interpreter_packages],
             capture_output=True,
             text=True,

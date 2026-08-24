@@ -1,0 +1,15 @@
+{
+  "description": "PROBE_desc_concept_PlainNote: description-only concept (basic blueprint)",
+  "properties": {
+    "text": {
+      "description": "The text",
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "text"
+  ],
+  "title": "input_semantics_probe__PlainNote",
+  "type": "object"
+}

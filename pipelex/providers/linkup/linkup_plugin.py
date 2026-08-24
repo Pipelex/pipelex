@@ -15,12 +15,12 @@ def _make_linkup_extract_worker(
     *,
     inference_model: InferenceModelSpec,
     backend: InferenceBackend,
-    sdk_clients: SdkClientRegistry,  # noqa: ARG001 - stateless worker, no SDK-client caching
+    sdk_clients: SdkClientRegistry,  # ruff: ignore[unused-function-argument] - stateless worker, no SDK-client caching
     reporting_delegate: ReportingProtocol | None,
 ) -> InferenceWorkerAbstract:
     require_sdk(spec="linkup", extra="linkup", msg=_LINKUP_MISSING_MSG)
 
-    from pipelex.providers.linkup.linkup_extract_worker import LinkupExtractWorker  # noqa: PLC0415
+    from pipelex.providers.linkup.linkup_extract_worker import LinkupExtractWorker  # ruff: ignore[import-outside-top-level]
 
     return LinkupExtractWorker(
         extra_config=backend.extra_config,
@@ -32,13 +32,13 @@ def _make_linkup_extract_worker(
 def _make_linkup_search_worker(
     *,
     inference_model: InferenceModelSpec,
-    backend: InferenceBackend,  # noqa: ARG001 - uniform MakeWorkerFn signature; the search worker builds its own client
-    sdk_clients: SdkClientRegistry,  # noqa: ARG001 - stateless worker, no SDK-client caching
+    backend: InferenceBackend,  # ruff: ignore[unused-function-argument] - uniform MakeWorkerFn signature; the search worker builds its own client
+    sdk_clients: SdkClientRegistry,  # ruff: ignore[unused-function-argument] - stateless worker, no SDK-client caching
     reporting_delegate: ReportingProtocol | None,
 ) -> InferenceWorkerAbstract:
     require_sdk(spec="linkup", extra="linkup", msg=_LINKUP_SEARCH_MISSING_MSG)
 
-    from pipelex.providers.linkup.linkup_search_worker import LinkupSearchWorker  # noqa: PLC0415
+    from pipelex.providers.linkup.linkup_search_worker import LinkupSearchWorker  # ruff: ignore[import-outside-top-level]
 
     return LinkupSearchWorker(
         inference_model=inference_model,

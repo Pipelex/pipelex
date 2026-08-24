@@ -59,21 +59,21 @@ class TestImgGenWorkerInputImagesGuard:
         job = _make_img_gen_job(mocker, input_images=[mocker.MagicMock()])
 
         with pytest.raises(ImgGenParameterError, match="nano-banana-test"):
-            worker._check_can_perform_job(img_gen_job=job)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            worker._check_can_perform_job(img_gen_job=job)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     def test_input_images_on_img2img_model_passes(self, mocker: MockerFixture) -> None:
         """Input images on an img2img-capable model pass the guard."""
         worker = _make_worker(mocker, is_img2img_supported=True)
         job = _make_img_gen_job(mocker, input_images=[mocker.MagicMock()])
 
-        worker._check_can_perform_job(img_gen_job=job)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        worker._check_can_perform_job(img_gen_job=job)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     def test_no_input_images_on_text_only_model_passes(self, mocker: MockerFixture) -> None:
         """A plain text-to-image job on a text-only model passes the guard."""
         worker = _make_worker(mocker, is_img2img_supported=False)
         job = _make_img_gen_job(mocker, input_images=None)
 
-        worker._check_can_perform_job(img_gen_job=job)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        worker._check_can_perform_job(img_gen_job=job)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     @pytest.mark.asyncio
     async def test_gen_image_rejects_before_provider_call(self, mocker: MockerFixture) -> None:

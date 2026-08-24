@@ -183,7 +183,7 @@ def customize_backends_config(*, is_first_time_setup: bool = False, target_confi
                         )
                     console.print("[dim]Re-run 'pipelex init' to set up gateway again.[/dim]")
 
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         # Command-level boundary: backend customization is optional during init — any failure is reported and init continues.
         console.print(f"[yellow]⚠ Warning: Failed to customize backends: {escape(str(exc))}[/yellow]")
         console.print("[dim]You can manually edit .pipelex/inference/backends.toml later[/dim]")

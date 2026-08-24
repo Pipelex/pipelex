@@ -23,7 +23,7 @@ to success.
 from __future__ import annotations
 
 import os
-import subprocess  # noqa: S404
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
 import textwrap
 from typing import TYPE_CHECKING
@@ -137,7 +137,7 @@ class TestInstalledPluginGroupIsolation:
         )
 
         sentinel = tmp_path / "imported.sentinel"
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             [sys.executable, "-c", _DISCOVERY_SCRIPT, str(site_dir), str(sentinel), _ENTRY_POINT_NAME],
             capture_output=True,
             text=True,

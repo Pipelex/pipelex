@@ -92,6 +92,12 @@
      .venv/bin/pipelex-dev generate-error-identity
      ```
 
+   - **`trace-input-semantics`**: Capture harness for the input-schema emission chain — given one or more `.mthds` bundles, dumps one artifact per hop (parse blueprint, generated class source, raw pydantic schema, SCHEMA render, wire contract) plus a manifest of each pipe input's wire framing, so a lost or mangled authored fact is localized to exactly one hop. Use when changing the structure blueprint, the structure generator, the schema render, or the contract builder. See `docs/contribute/trace-input-semantics.md`.
+
+     ```bash
+     .venv/bin/pipelex-dev trace-input-semantics tests/data/input_semantics/probe_bundle.mthds -o /tmp/probe-trace
+     ```
+
 ## Pipelex CLI Commands
 
    To run the Pipelex CLI commands without the logo, you can use the `--no-logo` flag, this will avoid useless tokens in the console output.

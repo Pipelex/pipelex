@@ -58,7 +58,18 @@ def reflect_native_structure(native_code: NativeConceptCode) -> dict[str, Concep
     structure_class = native_code.structure_class
     if structure_class is None:
         return None
-    model_fields = cast("type[StuffContent]", structure_class).model_fields
+    return reflect_structure_class(structure_class=cast("type[BaseModel]", structure_class))
+
+
+def reflect_structure_class(*, structure_class: type[BaseModel]) -> dict[str, ConceptStructureBlueprintType] | None:
+    """Reflect a registered structure class into blueprint form, faithful-or-absent.
+
+    Same rules as native reflection: every field must map unambiguously to a blueprint field, or
+    the whole reflected structure is absent (`None`) — never a guessed shape. The input-form
+    deriver uses this for class-backed concepts (`structure = "ClassName"`), where the class is
+    the only statement of the payload's fields.
+    """
+    model_fields = structure_class.model_fields
     if not model_fields:
         return None
     try:

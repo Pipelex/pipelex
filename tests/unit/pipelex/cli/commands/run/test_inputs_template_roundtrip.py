@@ -12,7 +12,9 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from pipelex.cli.commands.run._inputs_file_loader import load_inputs_dict_from_path  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+from pipelex.cli.commands.run._inputs_file_loader import (
+    load_inputs_dict_from_path,  # pyright: ignore[reportPrivateUsage]
+)
 from pipelex.pipe_machinery.rendering.input_renderer import serialize_inputs_template_to_toml
 
 if TYPE_CHECKING:

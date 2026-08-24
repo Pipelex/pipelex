@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: file-ignore[line-too-long]
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint

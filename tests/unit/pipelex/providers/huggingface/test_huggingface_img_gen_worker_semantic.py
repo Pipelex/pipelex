@@ -83,7 +83,7 @@ class TestHuggingFaceImgGenWorkerSemantic:
         )
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._generate_single_image(img_gen_job=_make_img_gen_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._generate_single_image(img_gen_job=_make_img_gen_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.user_action is not None
@@ -105,7 +105,7 @@ class TestHuggingFaceImgGenWorkerSemantic:
         )
 
         with pytest.raises(ImgGenModelNotFoundError) as exc_info:
-            await worker._generate_single_image(img_gen_job=_make_img_gen_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._generate_single_image(img_gen_job=_make_img_gen_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
         assert exc_info.value.user_action is not None
@@ -126,7 +126,7 @@ class TestHuggingFaceImgGenWorkerSemantic:
         )
 
         with pytest.raises(ImgGenGenerationError) as exc_info:
-            await worker._generate_single_image(img_gen_job=_make_img_gen_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._generate_single_image(img_gen_job=_make_img_gen_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
         assert exc_info.value.user_action is not None

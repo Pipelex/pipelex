@@ -22,7 +22,7 @@ Two things make this test catch the bug where the existing CLI tests did not:
 from __future__ import annotations
 
 import shutil
-import subprocess  # noqa: S404 -- invokes the real pipelex binary on purpose
+import subprocess  # ruff: ignore[suspicious-subprocess-import] -- invokes the real pipelex binary on purpose
 import sys
 from pathlib import Path
 
@@ -65,7 +65,7 @@ class TestCliEntrypointStarts:
         bin_path = PIPELEX_BIN
         if bin_path is None:
             pytest.fail("`pipelex` console script not found next to the interpreter or on PATH; install the package before running this test.")
-        result = subprocess.run(  # noqa: S603 -- fixed, trusted argv
+        result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] -- fixed, trusted argv
             [bin_path, *args],
             capture_output=True,
             text=True,

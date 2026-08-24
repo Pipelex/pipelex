@@ -1,4 +1,4 @@
-import subprocess  # noqa: S404
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
 
 
@@ -28,5 +28,5 @@ class TestErrorReportColdImport:
             "assert direct.to_dict() == {'error_type': 'X', 'message': 'm', "
             "'title': 'X error', 'type_uri': 'https://docs.pipelex.com/latest/errors/x/'}\n"
         )
-        result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)  # noqa: S603
+        result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)  # ruff: ignore[subprocess-without-shell-equals-true]
         assert result.returncode == 0, f"cold-path ErrorReport construction failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"

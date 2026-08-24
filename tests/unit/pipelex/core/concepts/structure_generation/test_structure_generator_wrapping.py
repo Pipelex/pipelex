@@ -12,7 +12,7 @@ Generated structure files must stay under the project's ruff line-length limit
 For short descriptions, both fall back to the compact single-line form.
 """
 
-import subprocess  # noqa: S404
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
 from pathlib import Path
 
@@ -132,7 +132,7 @@ class TestStructureGeneratorWrapping:
         hanging-indent paren block get joined by ruff format, defeating the wrap.
         """
         try:
-            subprocess.run([sys.executable, "-m", "ruff", "--version"], check=True, capture_output=True)  # noqa: S603
+            subprocess.run([sys.executable, "-m", "ruff", "--version"], check=True, capture_output=True)
         except (subprocess.CalledProcessError, FileNotFoundError):
             pytest.skip("ruff not available in current interpreter")
 
@@ -157,7 +157,7 @@ class TestStructureGeneratorWrapping:
         target.write_text(code)
         # Use --isolated so ruff ignores any pyproject.toml in the path above tmp_path,
         # and run via the current interpreter to ensure we use the project's pinned ruff.
-        subprocess.run(  # noqa: S603
+        subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             [sys.executable, "-m", "ruff", "format", "--isolated", str(target)],
             check=True,
             capture_output=True,

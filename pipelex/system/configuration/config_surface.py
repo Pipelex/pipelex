@@ -158,7 +158,7 @@ def replay_surface_files_in_memory(*, surface_id: str, paths: Sequence[Path]) ->
     # `runtime_hub`'s import closure — the kernel layer, which loads zero interpreter modules.
     # Deferring it also makes the contract's "the healthy path is untouched" literal: a boot whose
     # configuration validates never even imports the migration engine.
-    from pipelex.migration.engine import replay_ledger_over_text  # noqa: PLC0415
+    from pipelex.migration.engine import replay_ledger_over_text  # ruff: ignore[import-outside-top-level]
 
     try:
         ledger = load_ledger_cached(migration_dir=packaged_migration_dir(), surface_id=surface_id)

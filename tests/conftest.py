@@ -36,7 +36,7 @@ _remote_config_cache: dict[str, RemoteConfig] = {}
 _original_fetch_remote_config = RemoteConfigFetcher.fetch_remote_config
 
 
-def _cached_fetch_remote_config(require_fresh: bool = False) -> "RemoteConfigResult":  # noqa: ARG001
+def _cached_fetch_remote_config(require_fresh: bool = False) -> "RemoteConfigResult":  # ruff: ignore[unused-function-argument]
     """Wrapper that caches the remote config for the entire test session.
 
     The ``require_fresh`` arg matches the new fetcher signature; ignored here because the
@@ -82,7 +82,7 @@ def _fast_telemetry_teardown(self: "TelemetryManager") -> None:
     if self._tracer_provider:  # pyright: ignore[reportPrivateUsage]
         try:
             self._tracer_provider.shutdown()  # pyright: ignore[reportPrivateUsage]
-        except Exception:  # noqa: S110
+        except Exception:  # ruff: ignore[try-except-pass]
             pass  # Suppress all shutdown errors; logging may already be torn down
     TelemetryManagerAbstract.clear_instance()
 
@@ -98,7 +98,7 @@ def cache_configs_for_session(session_mocker: MockerFixture):
         _cached_load_pipelex_service_config,
     )
     # Skip expensive telemetry shutdown (OTel + PostHog flush) during tests
-    from pipelex.system.telemetry.telemetry_manager import TelemetryManager  # noqa: PLC0415
+    from pipelex.system.telemetry.telemetry_manager import TelemetryManager  # ruff: ignore[import-outside-top-level]
 
     session_mocker.patch.object(TelemetryManager, "teardown", _fast_telemetry_teardown)
 

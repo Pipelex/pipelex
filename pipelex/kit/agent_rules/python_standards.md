@@ -115,6 +115,7 @@ Once you've landed on a `BaseModel` (the default for anything that serializes), 
   from pydantic import BaseModel, Field
   from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
+
   class MyModel(BaseModel):
       names: list[str] = Field(default_factory=list)  # OK for strings
       numbers: list[int] = Field(default_factory=empty_list_factory_of(int), description="A list of numbers")

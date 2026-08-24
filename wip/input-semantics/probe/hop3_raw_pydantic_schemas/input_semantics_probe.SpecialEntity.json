@@ -1,0 +1,15 @@
+{
+  "description": "PROBE_desc_concept_SpecialEntity: refines a custom concept",
+  "properties": {
+    "ident": {
+      "description": "PROBE_desc_field_base_ident: inherited field",
+      "title": "Ident",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ident"
+  ],
+  "title": "input_semantics_probe__SpecialEntity",
+  "type": "object"
+}

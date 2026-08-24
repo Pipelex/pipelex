@@ -86,6 +86,14 @@ Every pipe defines a **contract** through its `inputs` and `output` fields. This
 *   **`inputs`**: This dictionary defines the **mandatory and necessary** data that must be present in the [Working Memory](working-memory.md) before the pipe can execute. Each key in the dictionary becomes a variable name that you can reference in your pipe's logic (e.g., in prompts), and each value specifies the concept type that the data must conform to. If any required input is missing or doesn't match the expected concept, the pipeline will fail a clear error message.
 You can specify multiple inputs by using a list of concepts. For example, `inputs = { description = "ProductDescription", keywords = "Keyword[]" }` will require a `ProductDescription` and a list of `Keyword`s. (See more about [Understanding Multiplicity](./understanding-multiplicity.md) for details.)
 
+    Each input slot can be written in two equivalent ways. The **plain form** gives the concept as a string — `topic = "Text"` — and is what you want almost always. The **expanded form** gives a table instead, so the slot can carry [intent hints](../concepts/intent-hints.md) beside its concept:
+
+    ```toml
+    inputs = { topic = { concept = "Text", hints = { intent = "prose" } } }
+    ```
+
+    The `concept` key takes exactly the grammar the plain string does, presence markers and multiplicity included (`"Note?"`, `"Keyword[]"`). The table is closed — `concept` and `hints` are the only keys it accepts, and anything else is a validation error. A slot table with no hints is the same slot as the plain string: `x = { concept = "Text" }` and `x = "Text"` parse to identical blueprints, so reach for the expanded form only when you have hints to attach.
+
 *   **`output`**: This field declares what the pipe will produce. The output will always be an instance of the specified concept. The structure and type of the output depend on the concept definition (See more about concepts [here](../concepts/native-concepts.md)).
     *   You can specify **multiple outputs** using bracket notation (e.g., `Keyword[]` for a variable list, or `Image[3]` for exactly 3 images)
 

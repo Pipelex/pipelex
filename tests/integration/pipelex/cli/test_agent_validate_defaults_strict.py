@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipelex.cli.agent_cli.commands.validate._validate_core import validate_bundle_core  # noqa: PLC2701
+from pipelex.cli.agent_cli.commands.validate._validate_core import validate_bundle_core
 
 if TYPE_CHECKING:
     from collections.abc import Iterator

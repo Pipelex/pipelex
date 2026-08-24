@@ -399,7 +399,7 @@ class TestAgentDoctorCmd:
         same as the broken-config short-circuit — mark models as skipped, surface the
         translated message under checks.models, keep every other check in the envelope.
         """
-        from pipelex.base_exceptions import PipelexConfigError  # noqa: PLC0415
+        from pipelex.base_exceptions import PipelexConfigError  # ruff: ignore[import-outside-top-level]
 
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.setup_doctor_runtime",

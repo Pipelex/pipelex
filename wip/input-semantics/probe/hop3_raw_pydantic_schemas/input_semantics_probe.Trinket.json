@@ -1,0 +1,15 @@
+{
+  "description": "PROBE_desc_concept_Trinket: leaf structure for two-level nesting",
+  "properties": {
+    "label": {
+      "description": "PROBE_desc_field_trinket_label: shorthand string field on the nesting leaf",
+      "title": "Label",
+      "type": "string"
+    }
+  },
+  "required": [
+    "label"
+  ],
+  "title": "input_semantics_probe__Trinket",
+  "type": "object"
+}

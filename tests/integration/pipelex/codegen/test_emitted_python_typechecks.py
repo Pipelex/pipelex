@@ -10,7 +10,7 @@ generated files and asserts zero errors, and (2) imports them so the classes are
 
 import importlib.util
 import json
-import subprocess  # noqa: S404 -- runs the venv's own pyright on generated files with a fixed, trusted argv
+import subprocess  # ruff: ignore[suspicious-subprocess-import] -- runs the venv's own pyright on generated files with a fixed, trusted argv
 import sys
 from pathlib import Path
 
@@ -67,7 +67,7 @@ def _run_strict_pyright(*, directory: Path) -> tuple[int, str]:
     pyright = Path(sys.executable).parent / "pyright"
     failures: list[str] = []
     for attempt_index in range(2):
-        completed = subprocess.run(  # noqa: S603 -- fixed, trusted argv (the venv's pyright over a tmp dir)
+        completed = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] -- fixed, trusted argv (the venv's pyright over a tmp dir)
             [str(pyright), "--pythonpath", sys.executable, "--project", str(directory), "--outputjson"],
             capture_output=True,
             text=True,

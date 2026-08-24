@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
     from pytest_mock import MockerFixture
 
-from pipelex.cli.commands.run._run_core import _execute_run  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+from pipelex.cli.commands.run._run_core import _execute_run  # pyright: ignore[reportPrivateUsage]
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.system.pipe_run_mode import PipeRunMode
 

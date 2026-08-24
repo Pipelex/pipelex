@@ -697,7 +697,7 @@ def preprocess_test_models_cmd(
             console.print("  • Fixture generation must not proceed without fresh Gateway model specs")
             console.print()
         sys.exit(1)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         # Dev CLI command root: any unexpected preprocessing failure is reported as a FAILED status line; exit non-zero.
         if quiet:
             console.print(f"[red]✗ Preprocessing failed:[/red] {escape(str(exc))}")

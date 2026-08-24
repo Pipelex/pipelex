@@ -1,0 +1,16 @@
+{
+  "description": "A time of day, optionally with a UTC offset — as precise as its source states.\n\nThe ``time`` carries the UTC offset on its ``tzinfo`` when the source states one\n(fidelity, not normalization). A time of day is not an instant: it has no date to\nattach to, so it never converts to a datetime on its own.",
+  "properties": {
+    "time": {
+      "description": "The time of day, in ISO 8601 (e.g. 15:40:00, or 15:40:00+02:00 with a UTC offset).",
+      "format": "time",
+      "title": "Time",
+      "type": "string"
+    }
+  },
+  "required": [
+    "time"
+  ],
+  "title": "TimeContent",
+  "type": "object"
+}

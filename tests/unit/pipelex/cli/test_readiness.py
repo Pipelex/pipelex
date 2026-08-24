@@ -12,9 +12,9 @@ from rich.console import Console
 import pipelex
 from pipelex.cli.exceptions import ReadinessCheckError
 from pipelex.cli.readiness import (
-    _find_venv_directories,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
-    _is_development_install,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
-    _is_in_virtual_environment,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+    _find_venv_directories,  # pyright: ignore[reportPrivateUsage]
+    _is_development_install,  # pyright: ignore[reportPrivateUsage]
+    _is_in_virtual_environment,  # pyright: ignore[reportPrivateUsage]
     check_readiness,
 )
 

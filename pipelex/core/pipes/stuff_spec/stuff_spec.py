@@ -5,7 +5,12 @@ from pydantic import BaseModel
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
-from pipelex.core.pipes.variable_multiplicity import PresenceMarker, VariableMultiplicity, format_concept_with_multiplicity
+from pipelex.core.pipes.variable_multiplicity import (
+    PresenceMarker,
+    VariableMultiplicity,
+    format_concept_with_multiplicity,
+    is_multiple_multiplicity,
+)
 
 
 class StuffSpec(BaseModel):
@@ -14,11 +19,7 @@ class StuffSpec(BaseModel):
     presence: PresenceMarker = PresenceMarker.PLAIN
 
     def is_multiple(self) -> bool:
-        if self.multiplicity is None:
-            return False
-        if isinstance(self.multiplicity, bool):
-            return self.multiplicity
-        return self.multiplicity > 1
+        return is_multiple_multiplicity(multiplicity=self.multiplicity)
 
     def to_bundle_representation(self, *, relative_to_domain: str | None = None) -> str:
         """Render this spec as a bundle ref string (concept + multiplicity + presence marker).
@@ -55,6 +56,6 @@ class StuffSpec(BaseModel):
         json_value, _ = self.concept.render_concept_representation(
             structure_class=concept_provider.get_structure_class(concept=self.concept),
             output_format=output_format,
-            is_multiple=self.is_multiple(),
+            multiplicity=self.multiplicity,
         )
         return json_value

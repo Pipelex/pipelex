@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING, Any, cast
 
 import aioboto3
-from types_aiobotocore_bedrock_runtime.type_defs import ConverseResponseTypeDef
 from typing_extensions import override
 
 from pipelex import log

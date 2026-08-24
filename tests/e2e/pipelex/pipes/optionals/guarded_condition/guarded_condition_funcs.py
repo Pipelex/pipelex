@@ -8,10 +8,10 @@ from pipelex.system.registries.func_registry import pipe_func
 
 
 @pipe_func()
-async def ogc_make_flagged_note(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001,RUF029
+async def ogc_make_flagged_note(working_memory: WorkingMemory) -> TextContent:  # ruff: ignore[unused-function-argument, unused-async]
     return TextContent(text="flagged-branch")
 
 
 @pipe_func()
-async def ogc_make_plain_note(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001,RUF029
+async def ogc_make_plain_note(working_memory: WorkingMemory) -> TextContent:  # ruff: ignore[unused-function-argument, unused-async]
     return TextContent(text="plain-branch")

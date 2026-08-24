@@ -88,7 +88,7 @@ class TestBedrockWorkerErrorHandling:
         )
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_text(llm_job=_make_llm_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_text(llm_job=_make_llm_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.__cause__ is sdk_exc
@@ -112,7 +112,7 @@ class TestBedrockWorkerErrorHandling:
         )
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_text(llm_job=_make_llm_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_text(llm_job=_make_llm_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         report = exc_info.value.to_error_report()
         assert report.error_category == "transient"
@@ -133,7 +133,7 @@ class TestBedrockWorkerErrorHandling:
         )
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_text(llm_job=_make_llm_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_text(llm_job=_make_llm_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         report = exc_info.value.to_error_report()
         assert report.error_category == "capacity"
@@ -153,7 +153,7 @@ class TestBedrockWorkerErrorHandling:
         )
 
         with pytest.raises(LLMCompletionError) as exc_info:
-            await worker._gen_text(llm_job=_make_llm_job(mocker))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_text(llm_job=_make_llm_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         report = exc_info.value.to_error_report()
         assert report.error_category == "configuration"

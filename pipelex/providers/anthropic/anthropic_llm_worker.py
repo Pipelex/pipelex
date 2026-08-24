@@ -93,7 +93,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
             raise SdkTypeError(msg)
 
         self.anthropic_async_client = sdk_instance
-        from instructor import from_anthropic  # noqa: PLC0415
+        from instructor import from_anthropic  # ruff: ignore[import-outside-top-level]
 
         if instructor_mode := self.inference_model.get_instructor_mode():
             self.instructor_for_objects = from_anthropic(client=sdk_instance, mode=instructor_mode)
@@ -327,7 +327,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         effective_max_tokens = min(requested_max_tokens, safe_max_tokens)
 
         # Deferred import: avoid pulling heavy SDK at module-load time
-        from instructor.core import InstructorRetryException  # noqa: PLC0415
+        from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
 
         temperature_unsupported = ListedConstraint.TEMPERATURE_UNSUPPORTED in self.inference_model.listed_constraints
         try:

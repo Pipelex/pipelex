@@ -7,7 +7,7 @@ from typing import Any
 
 from kajson import kajson
 
-from pipelex.cli.agent_cli.commands.run._output_helpers import format_run_markdown  # noqa: PLC2701
+from pipelex.cli.agent_cli.commands.run._output_helpers import format_run_markdown
 
 
 class TestFormatRunMarkdown:

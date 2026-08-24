@@ -129,7 +129,7 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
 
         return PipeLLMBlueprint(
             description=base_blueprint.description,
-            inputs=base_blueprint.inputs,
+            inputs=base_blueprint.inputs_concept_specs,
             output=base_blueprint.output,
             system_prompt=self.system_prompt,
             prompt=self.prompt,

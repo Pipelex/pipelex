@@ -170,7 +170,7 @@ class TestDateContentRenders:
         """The base rendered_pretty feeds smart_dump()'s real date objects to stdlib json and crashes;
         DateContent overrides it to render the ISO form. Guard against a regression to the base path.
         """
-        from pipelex.tools.misc.pretty import pretty_print  # noqa: PLC0415 — local import keeps the render dep test-local
+        from pipelex.tools.misc.pretty import pretty_print  # ruff: ignore[import-outside-top-level] — local import keeps the render dep test-local
 
         pretty_print(DateContent(date=TestData.SAMPLE_DATE, time=TestData.SAMPLE_TIME_OFFSET))
 

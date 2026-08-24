@@ -167,8 +167,8 @@ class SchemaToModelFactory:
     @classmethod
     def _generate_source_from_schema(cls, schema: dict[str, Any]) -> str:
         """Generate Python source code from a JSON schema using datamodel-code-generator."""
-        from datamodel_code_generator import InputFileType, LiteralType, generate  # noqa: PLC0415
-        from datamodel_code_generator.enums import DataModelType  # noqa: PLC0415
+        from datamodel_code_generator import InputFileType, LiteralType, generate  # ruff: ignore[import-outside-top-level]
+        from datamodel_code_generator.enums import DataModelType  # ruff: ignore[import-outside-top-level]
 
         cls._reject_unsafe_schema_extensions(schema)
 

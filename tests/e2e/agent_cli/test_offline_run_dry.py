@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 import shutil
-import subprocess  # noqa: S404 — invokes the real pipelex-agent binary for E2E coverage
+import subprocess  # ruff: ignore[suspicious-subprocess-import] — invokes the real pipelex-agent binary for E2E coverage
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -47,7 +47,7 @@ def _run_agent_bundle(bundle_dir: Path, env: dict[str, str], cwd: Path) -> subpr
     repository's project-level one. ``bundle_dir`` SHOULD be a staged copy (see
     ``_stage_bundle``) — the CLI writes ``dry_run.json`` next to the bundle file.
     """
-    return subprocess.run(  # noqa: S603
+    return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
         [
             str(PIPELEX_AGENT_BIN),
             "run",

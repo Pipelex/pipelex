@@ -2,7 +2,7 @@ from datetime import date, datetime, time
 from enum import StrEnum
 from typing import Any, Self
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SerializerFunctionWrapHandler, field_validator, model_serializer, model_validator
 
 from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.system.pipe_run_param_key import PipeRunParamKey
@@ -48,6 +48,13 @@ class ConceptStructureBlueprintFieldType(StrEnum):
 
 
 class ConceptStructureBlueprint(BaseModel):
+    """One field of a concept's structure table. Unknown keys are rejected — the field table's
+    keys are strict, exactly like an input slot table's; hint *content* stays lenient (unknown
+    hint keys warn and are preserved, per intent-hints.md).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
     description: str
     type: ConceptStructureBlueprintFieldType | None = None
     # type=dict
@@ -62,6 +69,27 @@ class ConceptStructureBlueprint(BaseModel):
     choices: list[str] | None = Field(default=None)
     default_value: Any | None = None
     required: bool = Field(default=False)
+    hints: dict[str, str] | None = None
+    """MTHDS intent hints (spec: intent-hints.md) — non-normative presentation intent for this
+    field as a site. Carried as authored through the crate; the site-over-concept merge is the
+    consumer's. An empty table is equivalent to no hints and normalizes to absence."""
+
+    @field_validator("hints", mode="after")
+    @classmethod
+    def normalize_empty_hints(cls, hints: dict[str, str] | None) -> dict[str, str] | None:
+        # Sorted here so every serialization is canonical (spec: hints entries emitted sorted by
+        # key); hint key order is not semantic, unlike structure-field order.
+        return dict(sorted(hints.items())) if hints else None
+
+    @model_serializer(mode="wrap")
+    def serialize_without_absent_hints(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        """Absent hints are an absent member — never `null` (spec rule; keeps hint-free crate
+        fingerprints byte-identical to before hints existed).
+        """
+        dumped: dict[str, Any] = handler(self)
+        if dumped.get("hints") is None:
+            dumped.pop("hints", None)
+        return dumped
 
     @field_validator("concept_ref", mode="before")
     @classmethod
@@ -84,6 +112,16 @@ class ConceptStructureBlueprint(BaseModel):
     @model_validator(mode="after")
     def validate_structure_blueprint(self) -> Self:
         """Validate the structure blueprint according to type rules."""
+        # required + default_value contradict each other: a default's meaning is "applied when the
+        # caller omits the field", which makes absence legal — the opposite of required (E3).
+        if self.required and self.default_value is not None:
+            msg = (
+                f"A field cannot declare both required = true and a default_value: a default is applied when "
+                f"the caller omits the field, which contradicts requiring it. Got default_value: {self.default_value!r}. "
+                f"Drop `required` to keep the default, or drop `default_value` to keep the field required."
+            )
+            raise ValueError(msg)
+
         # If type is None (array), choices must not be None
         if self.type is None and not self.choices:
             msg = f"When type is None (array), choices must not be empty. Actual type: {self.type}, choices: {self.choices}"

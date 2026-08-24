@@ -25,10 +25,10 @@ def _make_huggingface_img_gen_worker(
 ) -> InferenceWorkerAbstract:
     require_sdk(spec="huggingface_hub", extra="huggingface", msg=_HUGGINGFACE_MISSING_MSG)
 
-    from huggingface_hub import AsyncInferenceClient  # noqa: PLC0415
+    from huggingface_hub import AsyncInferenceClient  # ruff: ignore[import-outside-top-level]
 
-    from pipelex.providers.huggingface.huggingface_factory import HuggingFaceFactory  # noqa: PLC0415
-    from pipelex.providers.huggingface.huggingface_img_gen_worker import HuggingFaceImgGenWorker  # noqa: PLC0415
+    from pipelex.providers.huggingface.huggingface_factory import HuggingFaceFactory  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.huggingface.huggingface_img_gen_worker import HuggingFaceImgGenWorker  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     provider_literal: PROVIDER_OR_POLICY_T

@@ -211,9 +211,9 @@ This file contains:
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 LLM_COMBOS: list[ModelCombo] = [
-    ModelCombo('claude-4.5-haiku', 'pipelex_gateway'),
-    ModelCombo('gemini-2.5-flash-lite', 'pipelex_gateway'),
-    ModelCombo('gpt-4o-mini', 'pipelex_gateway'),
+    ModelCombo("claude-4.5-haiku", "pipelex_gateway"),
+    ModelCombo("gemini-2.5-flash-lite", "pipelex_gateway"),
+    ModelCombo("gpt-4o-mini", "pipelex_gateway"),
 ]
 
 IMG_GEN_COMBOS: list[ModelCombo] = [...]

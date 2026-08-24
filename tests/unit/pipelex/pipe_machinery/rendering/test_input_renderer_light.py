@@ -22,7 +22,7 @@ import tomli
 
 from pipelex.core.memory.input_shaper import InputKind
 from pipelex.pipe_machinery.rendering.input_renderer import (
-    _delighten_entry,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+    _delighten_entry,  # pyright: ignore[reportPrivateUsage]
     serialize_inputs_template_to_toml,
 )
 

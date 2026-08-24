@@ -7,7 +7,7 @@ from typing import Any, ClassVar
 
 import pytest
 
-from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths, resolve_url_in_value  # noqa: PLC2701
+from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths, resolve_url_in_value
 from pipelex.tools.uri.uri_resolver import is_relative_local_path
 
 
@@ -254,7 +254,7 @@ class TestInputsPathResolver:
             _ResolveInputsPathsCases.NO_URL_KEYS,
         ],
     )
-    def test_resolve_inputs_paths(self, topic: str, inputs_dict: dict[str, Any], expected: dict[str, Any]) -> None:  # noqa: ARG002
+    def test_resolve_inputs_paths(self, topic: str, inputs_dict: dict[str, Any], expected: dict[str, Any]) -> None:  # ruff: ignore[unused-method-argument]
         """Resolves relative url paths in various input structures."""
         result = resolve_inputs_paths(inputs_dict, base_dir=_ResolveInputsPathsCases.BASE_DIR)
         assert result == expected

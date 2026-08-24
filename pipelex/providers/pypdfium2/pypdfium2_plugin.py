@@ -12,10 +12,10 @@ def _make_pypdfium2_extract_worker(
     *,
     inference_model: InferenceModelSpec,
     backend: InferenceBackend,
-    sdk_clients: SdkClientRegistry,  # noqa: ARG001 - stateless worker, no SDK-client caching
+    sdk_clients: SdkClientRegistry,  # ruff: ignore[unused-function-argument] - stateless worker, no SDK-client caching
     reporting_delegate: ReportingProtocol | None,
 ) -> InferenceWorkerAbstract:
-    from pipelex.providers.pypdfium2.pypdfium2_worker import Pypdfium2Worker  # noqa: PLC0415
+    from pipelex.providers.pypdfium2.pypdfium2_worker import Pypdfium2Worker  # ruff: ignore[import-outside-top-level]
 
     return Pypdfium2Worker(
         extra_config=backend.extra_config,

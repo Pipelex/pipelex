@@ -499,7 +499,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
             # Cleanup result
             if hasattr(object_result, "_raw_response"):
-                delattr(object_result, "_raw_response")
+                delattr(object_result, "_raw_response")  # ruff: ignore[del-attr-with-constant] - not a declared model field, so `del obj._attr` cannot type-check
 
             await self._after_object_job(span=span, llm_job=llm_job, result_object=object_result)
             return object_result

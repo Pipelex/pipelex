@@ -4,7 +4,7 @@ import pytest
 
 from pipelex.core.stuffs.stuff_template_set import STUFF_TEMPLATE_SET
 from pipelex.core.stuffs.stuff_viewer import (
-    _get_html_tab_label,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+    _get_html_tab_label,  # pyright: ignore[reportPrivateUsage]
     render_stuff_content_viewer,
     render_stuff_viewer,
 )

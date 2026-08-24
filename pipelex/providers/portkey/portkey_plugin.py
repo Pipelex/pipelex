@@ -16,8 +16,8 @@ def _make_portkey_completions_worker(
     sdk_clients: SdkClientRegistry,
     reporting_delegate: ReportingProtocol | None,
 ) -> InferenceWorkerAbstract:
-    from pipelex.providers.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker  # noqa: PLC0415
-    from pipelex.providers.portkey.portkey_completions_factory import PortkeyCompletionsFactory  # noqa: PLC0415
+    from pipelex.providers.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.portkey.portkey_completions_factory import PortkeyCompletionsFactory  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     sdk_instance = sdk_clients.get_or_create(
@@ -39,8 +39,8 @@ def _make_portkey_responses_worker(
     sdk_clients: SdkClientRegistry,
     reporting_delegate: ReportingProtocol | None,
 ) -> InferenceWorkerAbstract:
-    from pipelex.providers.openai.openai_responses_llm_worker import OpenAIResponsesLLMWorker  # noqa: PLC0415
-    from pipelex.providers.portkey.portkey_responses_factory import PortkeyResponsesFactory  # noqa: PLC0415
+    from pipelex.providers.openai.openai_responses_llm_worker import OpenAIResponsesLLMWorker  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.portkey.portkey_responses_factory import PortkeyResponsesFactory  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     sdk_instance = sdk_clients.get_or_create(

@@ -7,7 +7,7 @@ digest covers exactly what would land in the commit. Working-tree bytes are neve
 
 from __future__ import annotations
 
-import subprocess  # noqa: S404
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 from pathlib import Path
 
 from pipelex.cli.dev_cli.commands.drift.exceptions import DriftGitError
@@ -19,8 +19,8 @@ OID_PREFIX = "blob:"
 def _run_git(args: list[str], *, cwd: Path) -> str:
     """Run one git plumbing command and return stdout; every failure is a DriftGitError."""
     try:
-        result = subprocess.run(  # noqa: S603
-            ["git", *args],  # noqa: S607
+        result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
+            ["git", *args],  # ruff: ignore[start-process-with-partial-path]
             cwd=cwd,
             capture_output=True,
             text=True,
@@ -93,7 +93,7 @@ def get_git_user_name(repo_root: Path) -> str | None:
     """The configured git user.name, or None when unset (callers must then require --by)."""
     try:
         result = subprocess.run(
-            ["git", "config", "user.name"],  # noqa: S607
+            ["git", "config", "user.name"],  # ruff: ignore[start-process-with-partial-path]
             cwd=repo_root,
             capture_output=True,
             text=True,

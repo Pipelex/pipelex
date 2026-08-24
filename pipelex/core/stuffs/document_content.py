@@ -13,6 +13,8 @@ from pipelex.tools.uri.uri_resolver import extract_filename_from_uri, resolve_ur
 
 
 class DocumentContent(StuffContent):
+    """A document"""
+
     url: str = Field(..., description="The document URL: a storage URI, an HTTP(S) URL, or a base64 data URL")
 
     public_url: str | None = Field(default=None, description="The public HTTPS URL of the document")

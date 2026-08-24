@@ -48,14 +48,14 @@ class LibraryManagerAbstract(ABC):
     def get_current_library(self) -> "Library":
         """Get the Library object for the current library."""
 
-    def get_library_class_registry(self, library_id: str) -> ClassRegistry | None:  # noqa: ARG002
+    def get_library_class_registry(self, library_id: str) -> ClassRegistry | None:  # ruff: ignore[unused-method-argument]
         """Get the ClassRegistry associated with a library, if any.
 
         Returns None by default. Overridden by LibraryManager.
         """
         return None
 
-    def get_pipe_source(self, pipe_code: str) -> str | None:  # noqa: ARG002
+    def get_pipe_source(self, pipe_code: str) -> str | None:  # ruff: ignore[unused-method-argument]
         """Get the source identifier for a pipe.
 
         Args:
@@ -67,7 +67,7 @@ class LibraryManagerAbstract(ABC):
         """
         return None
 
-    def is_crate_loaded(self, *, library_id: str, fingerprint: str) -> bool:  # noqa: ARG002
+    def is_crate_loaded(self, *, library_id: str, fingerprint: str) -> bool:  # ruff: ignore[unused-method-argument]
         """Whether a crate with this fingerprint was already loaded into this library.
 
         Returns False by default (managers that don't track crate fingerprints report

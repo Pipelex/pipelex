@@ -59,7 +59,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
 
         self.openai_client_for_responses: openai.AsyncOpenAI = sdk_instance
         self.openai_responses_factory = openai_responses_factory
-        from instructor import from_openai  # noqa: PLC0415
+        from instructor import from_openai  # ruff: ignore[import-outside-top-level]
 
         if instructor_mode := self.inference_model.get_instructor_mode():
             self.instructor_for_objects = from_openai(client=sdk_instance, mode=instructor_mode)
@@ -189,7 +189,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
         self._validate_no_reasoning_for_structured_gen(job_params=job_params)
-        from instructor.core import InstructorRetryException  # noqa: PLC0415
+        from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
 
         if not hasattr(self.instructor_for_objects, "responses"):
             msg = "Instructor client is not configured for the Responses API. Set a responses-capable structure_method for this model."

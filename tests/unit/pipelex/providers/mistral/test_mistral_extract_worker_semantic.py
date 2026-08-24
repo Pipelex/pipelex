@@ -76,7 +76,7 @@ class TestMistralExtractWorkerSemantic:
         )
 
         with pytest.raises(ExtractJobFailureError) as exc_info:
-            await worker._extract_page_from_image(image_uri="https://example.com/test.png")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._extract_page_from_image(image_uri="https://example.com/test.png")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is expected_category
         assert exc_info.value.user_action is not None
@@ -117,7 +117,7 @@ class TestMistralExtractWorkerSemantic:
         )
 
         with pytest.raises(ExtractJobFailureError) as exc_info:
-            await worker._extract_page_from_image(image_uri="https://example.com/test.png")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._extract_page_from_image(image_uri="https://example.com/test.png")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
         assert exc_info.value.user_action is not None
@@ -153,7 +153,7 @@ class TestMistralExtractWorkerSemantic:
         extract_job_params.image_min_size = None
 
         with pytest.raises(ExtractJobFailureError) as exc_info:
-            await worker._extract_pages_from_document(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._extract_pages_from_document(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
                 document_uri="https://example.com/doc.pdf",
                 extract_job_params=extract_job_params,
             )
@@ -180,7 +180,7 @@ class TestMistralExtractWorkerSemantic:
         )
 
         with pytest.raises(ExtractModelNotFoundError) as exc_info:
-            await worker._extract_page_from_image(image_uri="https://example.com/test.png")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._extract_page_from_image(image_uri="https://example.com/test.png")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
         assert exc_info.value.user_action is not None

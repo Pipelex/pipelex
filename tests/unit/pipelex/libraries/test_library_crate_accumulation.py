@@ -191,7 +191,7 @@ class TestLibraryCrateAccumulation:
 
                 # Fingerprint must NOT be cached — a retry should attempt loading again
                 concrete_manager = cast("LibraryManager", library_manager)
-                loaded_set = concrete_manager._loaded_fingerprints.get(target_library_id, set())  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+                loaded_set = concrete_manager._loaded_fingerprints.get(target_library_id, set())  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
                 assert crate.fingerprint not in loaded_set
             finally:
                 library_manager.teardown(library_id=target_library_id)

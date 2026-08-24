@@ -31,6 +31,7 @@ from pipelex.cli.dev_cli.commands.store_test_durations_cmd import store_test_dur
 from pipelex.cli.dev_cli.commands.subject_grant_cmd import subject_grant_cmd
 from pipelex.cli.dev_cli.commands.sync_kit_configs_cmd import sync_kit_configs_cmd
 from pipelex.cli.dev_cli.commands.sync_main_config_cmd import SyncTarget, sync_main_config_cmd
+from pipelex.cli.dev_cli.commands.trace_input_semantics_cmd import trace_input_semantics_cmd
 from pipelex.cli.dev_cli.commands.update_gateway_models_cmd import update_gateway_models_cmd
 from pipelex.cli.dev_cli.commands.update_migration_schemas_cmd import update_migration_schemas_cmd
 from pipelex.runtime_hub import get_console
@@ -65,6 +66,7 @@ class PipelexDevCLI(TyperGroup):
             "subject-grant",
             "sync-kit-configs",
             "sync-main-config",
+            "trace-input-semantics",
             "update-gateway-models",
             "update-migration-schemas",
         ]
@@ -129,7 +131,7 @@ def check_config_sync_command(
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
@@ -150,7 +152,7 @@ def check_rules_command(
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
@@ -171,7 +173,7 @@ def check_urls_command(
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
@@ -191,7 +193,7 @@ def generate_corpus_vocabulary_command(
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
@@ -213,7 +215,7 @@ def generate_error_identity_command(
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
@@ -235,7 +237,7 @@ def generate_error_pages_command(
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
@@ -257,7 +259,7 @@ def generate_mthds_schema_command(
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
@@ -278,7 +280,7 @@ def check_gateway_models_command(
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
@@ -299,7 +301,7 @@ def check_mthds_schema_command(
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
@@ -321,7 +323,7 @@ def check_ledger_command(
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
@@ -343,7 +345,7 @@ def check_migration_schemas_command(
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
@@ -364,7 +366,7 @@ def update_migration_schemas_command(
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
@@ -386,7 +388,7 @@ def check_hub_layering_command(
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
@@ -419,7 +421,7 @@ def check_keyword_only_command(
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
@@ -447,7 +449,7 @@ def subject_grant_command(
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
@@ -473,7 +475,7 @@ def sync_main_config_command(
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
@@ -494,7 +496,7 @@ def sync_kit_configs_command(
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
@@ -502,6 +504,16 @@ def sync_kit_configs_command(
         console.print()
         console.print(Traceback())
         sys.exit(1)
+
+
+@app.command(name="trace-input-semantics", help="Dump one artifact per hop of the input-schema emission chain for a bundle")
+def trace_input_semantics_command(
+    bundles: Annotated[list[Path], typer.Argument(help="MTHDS bundle file(s) to load as one batch")],
+    output_dir: Annotated[Path, typer.Option("--output-dir", "-o", help="Directory receiving the per-hop artifacts")],
+    allow_signatures: Annotated[bool, typer.Option("--allow-signatures", help="Tolerate unimplemented pipe signatures")] = False,
+) -> None:
+    """Trace what each hop of the emission chain does to every authored input fact."""
+    trace_input_semantics_cmd(bundle_paths=bundles, output_dir=output_dir, allow_signatures=allow_signatures)
 
 
 @app.command(name="preprocess-test-models", help="Preprocess test models and generate fixture files")
@@ -517,7 +529,7 @@ def preprocess_test_models_command(
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
@@ -552,7 +564,7 @@ def refresh_graph_ui_sri_command(
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
@@ -572,7 +584,7 @@ def update_gateway_models_command(
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()
@@ -600,7 +612,7 @@ def store_test_durations_command(
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
-    except Exception:  # noqa: BLE001
+    except Exception:  # ruff: ignore[blind-except]
         # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
         console = get_console()
         console.print()

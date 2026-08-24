@@ -1,0 +1,80 @@
+{
+  "description": "A document",
+  "properties": {
+    "url": {
+      "description": "The document URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
+      "title": "Url",
+      "type": "string"
+    },
+    "public_url": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The public HTTPS URL of the document",
+      "title": "Public Url"
+    },
+    "mime_type": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The MIME type of the document",
+      "title": "Mime Type"
+    },
+    "filename": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The original filename of the document",
+      "title": "Filename"
+    },
+    "title": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The title of the document or source",
+      "title": "Title"
+    },
+    "snippet": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "A text snippet or excerpt from the document",
+      "title": "Snippet"
+    }
+  },
+  "required": [
+    "url"
+  ],
+  "title": "DocumentContent",
+  "type": "object"
+}

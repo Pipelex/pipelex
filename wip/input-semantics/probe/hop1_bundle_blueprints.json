@@ -1,0 +1,481 @@
+[
+  {
+    "source": "tests/data/input_semantics/probe_bundle.mthds",
+    "domain": "input_semantics_probe",
+    "description": "PROBE_bundle_desc: probe bundle for the input-semantics audit — every authored fact carries a PROBE_ sentinel so its survival is greppable in every capture",
+    "system_prompt": null,
+    "main_pipe": "probe_single",
+    "concept": {
+      "StringNote": "PROBE_desc_concept_StringNote: a concept declared as a bare string",
+      "Trinket": {
+        "source": null,
+        "description": "PROBE_desc_concept_Trinket: leaf structure for two-level nesting",
+        "structure": {
+          "label": "PROBE_desc_field_trinket_label: shorthand string field on the nesting leaf"
+        },
+        "refines": null
+      },
+      "Gadget": {
+        "source": null,
+        "description": "PROBE_desc_concept_Gadget: mid-level structure nested inside Widget",
+        "structure": {
+          "name": {
+            "description": "PROBE_desc_field_gadget_name",
+            "type": "text",
+            "key_type": null,
+            "value_type": null,
+            "item_type": null,
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": null,
+            "required": true
+          },
+          "trinket": {
+            "description": "PROBE_desc_field_gadget_trinket: nested concept, level two",
+            "type": "concept",
+            "key_type": null,
+            "value_type": null,
+            "item_type": null,
+            "concept_ref": "Trinket",
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": null,
+            "required": false
+          }
+        },
+        "refines": null
+      },
+      "Widget": {
+        "source": null,
+        "description": "PROBE_desc_concept_Widget: the full-matrix structure under audit",
+        "structure": {
+          "shorthand_note": "PROBE_desc_field_shorthand_note: shorthand string field (implies text, required)",
+          "title": {
+            "description": "PROBE_desc_field_title: required text",
+            "type": "text",
+            "key_type": null,
+            "value_type": null,
+            "item_type": null,
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": null,
+            "required": true
+          },
+          "subtitle": {
+            "description": "PROBE_desc_field_subtitle: optional text (required omitted)",
+            "type": "text",
+            "key_type": null,
+            "value_type": null,
+            "item_type": null,
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": null,
+            "required": false
+          },
+          "summary": {
+            "description": "PROBE_desc_field_summary: optional text (required explicit false)",
+            "type": "text",
+            "key_type": null,
+            "value_type": null,
+            "item_type": null,
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": null,
+            "required": false
+          },
+          "motto": {
+            "description": "PROBE_desc_field_motto: text with default",
+            "type": "text",
+            "key_type": null,
+            "value_type": null,
+            "item_type": null,
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": "PROBE_default_motto",
+            "required": false
+          },
+          "count": {
+            "description": "PROBE_desc_field_count: integer with default",
+            "type": "integer",
+            "key_type": null,
+            "value_type": null,
+            "item_type": null,
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": 42,
+            "required": false
+          },
+          "enabled": {
+            "description": "PROBE_desc_field_enabled: boolean with default",
+            "type": "boolean",
+            "key_type": null,
+            "value_type": null,
+            "item_type": null,
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": true,
+            "required": false
+          },
+          "price": {
+            "description": "PROBE_desc_field_price: number with default",
+            "type": "number",
+            "key_type": null,
+            "value_type": null,
+            "item_type": null,
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": 9.99,
+            "required": false
+          },
+          "released_on": {
+            "description": "PROBE_desc_field_released_on: date with default",
+            "type": "date",
+            "key_type": null,
+            "value_type": null,
+            "item_type": null,
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": "2026-01-15",
+            "required": false
+          },
+          "launched_at": {
+            "description": "PROBE_desc_field_launched_at: datetime with default",
+            "type": "datetime",
+            "key_type": null,
+            "value_type": null,
+            "item_type": null,
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": "2026-01-15T12:30:00",
+            "required": false
+          },
+          "daily_at": {
+            "description": "PROBE_desc_field_daily_at: time with default",
+            "type": "time",
+            "key_type": null,
+            "value_type": null,
+            "item_type": null,
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": "12:30:00",
+            "required": false
+          },
+          "tags": {
+            "description": "PROBE_desc_field_tags: list of text with default",
+            "type": "list",
+            "key_type": null,
+            "value_type": null,
+            "item_type": "text",
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": [
+              "PROBE_tag_a",
+              "PROBE_tag_b"
+            ],
+            "required": false
+          },
+          "ratings": {
+            "description": "PROBE_desc_field_ratings: list of integer",
+            "type": "list",
+            "key_type": null,
+            "value_type": null,
+            "item_type": "integer",
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": null,
+            "required": false
+          },
+          "matrix": {
+            "description": "PROBE_desc_field_matrix: nested list with unspecified inner item",
+            "type": "list",
+            "key_type": null,
+            "value_type": null,
+            "item_type": "list",
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": null,
+            "required": false
+          },
+          "gadgets": {
+            "description": "PROBE_desc_field_gadgets: list of concept",
+            "type": "list",
+            "key_type": null,
+            "value_type": null,
+            "item_type": "concept",
+            "concept_ref": null,
+            "item_concept_ref": "Gadget",
+            "choices": null,
+            "default_value": null,
+            "required": false
+          },
+          "attributes": {
+            "description": "PROBE_desc_field_attributes: dict text to text",
+            "type": "dict",
+            "key_type": "text",
+            "value_type": "text",
+            "item_type": null,
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": null,
+            "required": false
+          },
+          "scores": {
+            "description": "PROBE_desc_field_scores: dict text to number with default",
+            "type": "dict",
+            "key_type": "text",
+            "value_type": "number",
+            "item_type": null,
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": {
+              "speed": 5
+            },
+            "required": false
+          },
+          "milestones": {
+            "description": "PROBE_desc_field_milestones: dict text to date",
+            "type": "dict",
+            "key_type": "text",
+            "value_type": "date",
+            "item_type": null,
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": null,
+            "required": false
+          },
+          "main_gadget": {
+            "description": "PROBE_desc_field_main_gadget: required concept field",
+            "type": "concept",
+            "key_type": null,
+            "value_type": null,
+            "item_type": null,
+            "concept_ref": "Gadget",
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": null,
+            "required": true
+          },
+          "icon": {
+            "description": "PROBE_desc_field_icon: native concept field",
+            "type": "concept",
+            "key_type": null,
+            "value_type": null,
+            "item_type": null,
+            "concept_ref": "native.Image",
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": null,
+            "required": false
+          },
+          "tone": {
+            "description": "PROBE_desc_field_tone: choices with default",
+            "type": null,
+            "key_type": null,
+            "value_type": null,
+            "item_type": null,
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": [
+              "PROBE_choice_formal",
+              "PROBE_choice_casual",
+              "PROBE_choice_playful"
+            ],
+            "default_value": "PROBE_choice_casual",
+            "required": false
+          },
+          "only_choice": {
+            "description": "PROBE_desc_field_only_choice: single-entry choice list",
+            "type": null,
+            "key_type": null,
+            "value_type": null,
+            "item_type": null,
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": [
+              "PROBE_choice_single"
+            ],
+            "default_value": null,
+            "required": false
+          },
+          "typed_choice": {
+            "description": "PROBE_desc_field_typed_choice: type AND choices together",
+            "type": "text",
+            "key_type": null,
+            "value_type": null,
+            "item_type": null,
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": [
+              "PROBE_choice_typed_a",
+              "PROBE_choice_typed_b"
+            ],
+            "default_value": null,
+            "required": false
+          },
+          "constrained_count": {
+            "description": "PROBE_desc_field_constrained_count: integer carrying unknown constraint keys",
+            "type": "integer",
+            "key_type": null,
+            "value_type": null,
+            "item_type": null,
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": null,
+            "required": false
+          }
+        },
+        "refines": null
+      },
+      "PlainNote": {
+        "source": null,
+        "description": "PROBE_desc_concept_PlainNote: description-only concept (basic blueprint)",
+        "structure": null,
+        "refines": null
+      },
+      "RefinedDoc": {
+        "source": null,
+        "description": "PROBE_desc_concept_RefinedDoc: refinement of a native concept",
+        "structure": null,
+        "refines": "native.Document"
+      },
+      "BaseEntity": {
+        "source": null,
+        "description": "PROBE_desc_concept_BaseEntity: base of a custom refinement chain",
+        "structure": {
+          "ident": {
+            "description": "PROBE_desc_field_base_ident: inherited field",
+            "type": "text",
+            "key_type": null,
+            "value_type": null,
+            "item_type": null,
+            "concept_ref": null,
+            "item_concept_ref": null,
+            "choices": null,
+            "default_value": null,
+            "required": true
+          }
+        },
+        "refines": null
+      },
+      "SpecialEntity": {
+        "source": null,
+        "description": "PROBE_desc_concept_SpecialEntity: refines a custom concept",
+        "structure": null,
+        "refines": "BaseEntity"
+      },
+      "ExtraSpecialEntity": {
+        "source": null,
+        "description": "PROBE_desc_concept_ExtraSpecialEntity: second link of the refinement chain",
+        "structure": null,
+        "refines": "SpecialEntity"
+      },
+      "ClassBacked": {
+        "source": null,
+        "description": "PROBE_desc_concept_ClassBacked: structure declared as an existing class name",
+        "structure": "TextContent",
+        "refines": null
+      }
+    },
+    "pipe": {
+      "probe_single": {
+        "source": null,
+        "pipe_category": "PipeOperator",
+        "type": "PipeLLM",
+        "description": "PROBE_pipe_probe_single: plain structured, qualified, and description-only inputs",
+        "inputs": {
+          "widget": "Widget",
+          "gadget_q": "input_semantics_probe.Gadget",
+          "note": "PlainNote"
+        },
+        "output": "Text",
+        "model": null,
+        "model_to_structure": null,
+        "system_prompt": null,
+        "prompt": "Consider the widget:\n@widget\nAnd the gadget:\n@gadget_q\nAnd the note:\n@note\n",
+        "structuring_method": null,
+        "templating_style": null
+      },
+      "probe_native_inputs": {
+        "source": null,
+        "pipe_category": "PipeOperator",
+        "type": "PipeLLM",
+        "description": "PROBE_pipe_probe_native_inputs: native concepts as direct inputs",
+        "inputs": {
+          "text_in": "Text",
+          "image_in": "Image",
+          "document_in": "Document",
+          "page_in": "Page",
+          "number_in": "Number",
+          "date_in": "Date",
+          "time_in": "Time",
+          "html_in": "Html",
+          "yesno_in": "YesNo"
+        },
+        "output": "Text",
+        "model": null,
+        "model_to_structure": null,
+        "system_prompt": null,
+        "prompt": "@text_in\n@image_in\n@document_in\n@page_in\n@number_in\n@date_in\n@time_in\n@html_in\n@yesno_in\n",
+        "structuring_method": null,
+        "templating_style": null
+      },
+      "probe_markers": {
+        "source": null,
+        "pipe_category": "PipeOperator",
+        "type": "PipeLLM",
+        "description": "PROBE_pipe_probe_markers: optional, list, fixed-count, and force markers",
+        "inputs": {
+          "opt": "Widget?",
+          "many": "Widget[]",
+          "two": "Gadget[2]",
+          "forced": "Text!"
+        },
+        "output": "Text",
+        "model": null,
+        "model_to_structure": null,
+        "system_prompt": null,
+        "prompt": "@?opt\nMany widgets:\n@many\nTwo gadgets:\n@two\nForced text:\n@forced\n",
+        "structuring_method": null,
+        "templating_style": null
+      },
+      "probe_refined": {
+        "source": null,
+        "pipe_category": "PipeOperator",
+        "type": "PipeLLM",
+        "description": "PROBE_pipe_probe_refined: refinements and class-backed concepts as inputs",
+        "inputs": {
+          "refdoc": "RefinedDoc",
+          "special": "SpecialEntity",
+          "extra": "ExtraSpecialEntity",
+          "classbacked": "ClassBacked",
+          "stringnote": "StringNote"
+        },
+        "output": "Text",
+        "model": null,
+        "model_to_structure": null,
+        "system_prompt": null,
+        "prompt": "@refdoc\n@special\n@extra\n@classbacked\n@stringnote\n",
+        "structuring_method": null,
+        "templating_style": null
+      }
+    }
+  }
+]

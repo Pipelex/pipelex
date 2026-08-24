@@ -42,6 +42,7 @@ from pipelex.core.concepts.helpers import normalize_structure_blueprint
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.language.intent_hints import merge_hints
 from pipelex.libraries.crate_qualification import qualify_crate
 from pipelex.libraries.exceptions import CrateNormalizationError
 from pipelex.libraries.library_crate import LibraryCrate
@@ -53,6 +54,11 @@ _ConceptEntry = ConceptBlueprint | str
 class _RefinementResolution(NamedTuple):
     is_native_backed: bool
     effective_structure: dict[str, ConceptStructureBlueprint] | None
+    effective_hints: dict[str, str] | None = None
+    """The resolved ref's OWN effective hints — its authored hints merged over its bases', nearer
+    winning (spec: intent-hints.md, Precedence and Inheritance). Position-specific: a cached
+    mid-chain resolution carries the hints of ITS position, unlike `effective_structure`, which
+    every ref above the structure-carrying base legitimately shares."""
 
 
 def normalize_crate(crate: LibraryCrate, *, mthds_version: str) -> LibraryCrate:
@@ -130,10 +136,18 @@ def _flatten_refinement(concepts: dict[str, _ConceptEntry]) -> None:
         if not isinstance(value, ConceptBlueprint) or not value.refines or isinstance(value.structure, dict):
             continue
         resolution = _resolve_refinement(value.refines, concepts=concepts, cache=resolution_cache)
-        if resolution.is_native_backed:
-            continue
-        if resolution.effective_structure:
-            concepts[concept_ref] = value.model_copy(update={"refines": None, "structure": dict(resolution.effective_structure)})
+        updates: dict[str, object] = {}
+        # Effective hints are assembled here, where the chain is walked and nowhere later — on the
+        # flattened and the refines-keeping arm alike, so a consumer reads a concept's hints without
+        # walking anything (spec: library-crate.md step 3). An empty merge leaves no member.
+        effective_hints = merge_hints([resolution.effective_hints, value.hints])
+        if effective_hints != value.hints:
+            updates["hints"] = effective_hints
+        if not resolution.is_native_backed and resolution.effective_structure:
+            updates["refines"] = None
+            updates["structure"] = dict(resolution.effective_structure)
+        if updates:
+            concepts[concept_ref] = value.model_copy(update=updates)
 
 
 def _resolve_refinement(
@@ -184,9 +198,16 @@ def _resolve_refinement(
     else:
         resolution = cache[current_ref]
 
+    # Write back one entry per visited ref. `effective_structure` is genuinely shared (every ref
+    # above the structure-carrying base has that same effective structure), but hints accumulate:
+    # each position's entry merges its own authored hints over everything below it, nearer winning.
+    accumulated_hints = resolution.effective_hints
     for visited_ref in reversed(path):
-        cache[visited_ref] = resolution
-    return resolution
+        visited_value = concepts.get(visited_ref)
+        own_hints = visited_value.hints if isinstance(visited_value, ConceptBlueprint) else None
+        accumulated_hints = merge_hints([accumulated_hints, own_hints])
+        cache[visited_ref] = resolution._replace(effective_hints=accumulated_hints)
+    return cache[concept_ref]
 
 
 def _native_effective_structure(native_ref: str) -> dict[str, ConceptStructureBlueprint] | None:
@@ -232,7 +253,7 @@ def _collect_referenced_natives(*, concepts: dict[str, _ConceptEntry], pipes: di
                     _add_native_ref(referenced=referenced, concept_ref_or_code=field.concept_ref)
                     _add_native_ref(referenced=referenced, concept_ref_or_code=field.item_concept_ref)
     for blueprint in pipes.values():
-        for io_ref in [*(blueprint.inputs or {}).values(), blueprint.output]:
+        for io_ref in [*(blueprint.inputs_concept_specs or {}).values(), blueprint.output]:
             _add_native_ref(referenced=referenced, concept_ref_or_code=_io_ref_concept(io_ref))
     return referenced
 

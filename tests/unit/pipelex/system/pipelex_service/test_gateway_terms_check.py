@@ -100,7 +100,7 @@ class TestGatewayTermsCheck:
             )
         except (GatewayTermsNotAcceptedError, InferenceSetupRequiredError):
             pytest.fail("setup() raised a terms/setup error even though needs_inference=False")
-        except Exception:  # noqa: S110
+        except Exception:  # ruff: ignore[try-except-pass]
             # Expected: setup() will fail later in the init chain (telemetry, models, etc.)
             # We only care that it did NOT fail with terms/setup errors
             pass

@@ -96,7 +96,7 @@ class TestGatewayImgGenWorkerEditRouting:
         mock_edits_post.return_value = _make_edits_http_response(mocker)
         _patch_args(mocker, args_dict={"prompt": "edit me", "n": 1, "size": "1024x1024", "image": [_PNG_FILE_TUPLE]})
 
-        await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         # The edit call goes through the vendored AsyncOpenAI client the AsyncPortkey carries
         # (portkey_ai's AsyncAPIClient silently drops 'files'); the portkey post must not be used.
@@ -121,7 +121,7 @@ class TestGatewayImgGenWorkerEditRouting:
         mock_edits_post.return_value = _make_edits_http_response(mocker)
         _patch_args(mocker, args_dict={"prompt": "edit me", "image": [_PNG_FILE_TUPLE, _PNG_FILE_TUPLE_2]})
 
-        await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         mock_generations_post.assert_not_called()
         multipart_files: list[tuple[str, Any]] = mock_edits_post.call_args.kwargs["files"]
@@ -133,7 +133,7 @@ class TestGatewayImgGenWorkerEditRouting:
         mock_generations_post.return_value = GenericResponse.model_validate(_success_response_dict())
         _patch_args(mocker, args_dict={"prompt": "generate me", "n": 1})
 
-        await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         mock_edits_post.assert_not_called()
         call_kwargs = mock_generations_post.call_args.kwargs
@@ -148,6 +148,6 @@ class TestGatewayImgGenWorkerEditRouting:
         _patch_args(mocker, args_dict={"prompt": "edit me", "image": [_PNG_FILE_TUPLE]})
 
         with pytest.raises(ImgGenParameterError):
-            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         mock_edits_post.assert_not_called()

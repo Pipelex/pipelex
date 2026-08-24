@@ -16,8 +16,8 @@ def _make_gateway_completions_worker(
     sdk_clients: SdkClientRegistry,
     reporting_delegate: ReportingProtocol | None,
 ) -> InferenceWorkerAbstract:
-    from pipelex.providers.gateway.gateway_completions_factory import GatewayCompletionsFactory  # noqa: PLC0415
-    from pipelex.providers.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker  # noqa: PLC0415
+    from pipelex.providers.gateway.gateway_completions_factory import GatewayCompletionsFactory  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     sdk_instance = sdk_clients.get_or_create(
@@ -39,8 +39,8 @@ def _make_gateway_responses_worker(
     sdk_clients: SdkClientRegistry,
     reporting_delegate: ReportingProtocol | None,
 ) -> InferenceWorkerAbstract:
-    from pipelex.providers.gateway.gateway_responses_factory import GatewayResponsesFactory  # noqa: PLC0415
-    from pipelex.providers.openai.openai_responses_llm_worker import OpenAIResponsesLLMWorker  # noqa: PLC0415
+    from pipelex.providers.gateway.gateway_responses_factory import GatewayResponsesFactory  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.openai.openai_responses_llm_worker import OpenAIResponsesLLMWorker  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     sdk_instance = sdk_clients.get_or_create(
@@ -62,8 +62,8 @@ def _make_gateway_img_gen_worker(
     sdk_clients: SdkClientRegistry,
     reporting_delegate: ReportingProtocol | None,
 ) -> InferenceWorkerAbstract:
-    from pipelex.providers.gateway.gateway_factory import GatewayFactory  # noqa: PLC0415
-    from pipelex.providers.gateway.gateway_img_gen_worker import GatewayImgGenWorker  # noqa: PLC0415
+    from pipelex.providers.gateway.gateway_factory import GatewayFactory  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.gateway.gateway_img_gen_worker import GatewayImgGenWorker  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     sdk_instance = sdk_clients.get_or_create(
@@ -84,8 +84,8 @@ def _make_gateway_completions_img_gen_worker(
     sdk_clients: SdkClientRegistry,
     reporting_delegate: ReportingProtocol | None,
 ) -> InferenceWorkerAbstract:
-    from pipelex.providers.gateway.gateway_completions_factory import GatewayCompletionsFactory  # noqa: PLC0415
-    from pipelex.providers.openai.openai_completions_img_gen_worker import OpenAICompletionsImgGenWorker  # noqa: PLC0415
+    from pipelex.providers.gateway.gateway_completions_factory import GatewayCompletionsFactory  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.openai.openai_completions_img_gen_worker import OpenAICompletionsImgGenWorker  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     sdk_instance = sdk_clients.get_or_create(
@@ -107,8 +107,8 @@ def _make_gateway_extract_worker(
     sdk_clients: SdkClientRegistry,
     reporting_delegate: ReportingProtocol | None,
 ) -> InferenceWorkerAbstract:
-    from pipelex.providers.gateway.gateway_extract_worker import GatewayExtractWorker  # noqa: PLC0415
-    from pipelex.providers.gateway.gateway_factory import GatewayFactory  # noqa: PLC0415
+    from pipelex.providers.gateway.gateway_extract_worker import GatewayExtractWorker  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.gateway.gateway_factory import GatewayFactory  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     sdk_instance = sdk_clients.get_or_create(
@@ -130,8 +130,8 @@ def _make_gateway_search_worker(
     sdk_clients: SdkClientRegistry,
     reporting_delegate: ReportingProtocol | None,
 ) -> InferenceWorkerAbstract:
-    from pipelex.providers.gateway.gateway_factory import GatewayFactory  # noqa: PLC0415
-    from pipelex.providers.gateway.gateway_search_worker import GatewaySearchWorker  # noqa: PLC0415
+    from pipelex.providers.gateway.gateway_factory import GatewayFactory  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.gateway.gateway_search_worker import GatewaySearchWorker  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     sdk_instance = sdk_clients.get_or_create(

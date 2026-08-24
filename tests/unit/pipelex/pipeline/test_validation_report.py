@@ -57,6 +57,7 @@ class TestBuildValidationReport:
         report = build_validation_report(
             blueprints=blueprints,
             pipe_io_contracts=pipe_io_contracts,
+            input_form={},
             dry_run_result=dry_run_result,
             pending_signatures=["beta.still_pending"],
         )
@@ -77,6 +78,7 @@ class TestBuildValidationReport:
         report = build_validation_report(
             blueprints=blueprints,
             pipe_io_contracts={},
+            input_form={},
             dry_run_result={},
             pending_signatures=[],
         )
@@ -102,6 +104,7 @@ class TestBuildValidationReport:
         report = build_validation_report(
             blueprints=blueprints,
             pipe_io_contracts={},
+            input_form={},
             dry_run_result={},
             pending_signatures=[],
             warnings=[warning_item],

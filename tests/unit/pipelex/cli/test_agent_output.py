@@ -11,12 +11,12 @@ import typer
 from typer.testing import CliRunner
 
 from pipelex.base_exceptions import PipelexConfigError, PipelexError
-from pipelex.cli.agent_cli._agent_cli import app  # noqa: PLC2701
+from pipelex.cli.agent_cli._agent_cli import app
 from pipelex.cli.agent_cli.commands.agent_output import (
     AGENT_ERROR_DOMAINS,
     AGENT_ERROR_HINTS,
     CliOutputFormat,
-    _build_error_source,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+    _build_error_source,  # pyright: ignore[reportPrivateUsage]
     agent_error,
     agent_success,
     consume_setup_warnings,

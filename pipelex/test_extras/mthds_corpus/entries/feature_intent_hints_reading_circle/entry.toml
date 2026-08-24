@@ -1,0 +1,10 @@
+name = "feature_intent_hints_reading_circle"
+description = "A reading-circle card written from a hinted brief — intent hints authored at all three sites"
+
+validity = "valid"
+tier = "dry"
+granularity = "focused"
+
+covers = [
+  "feature.intent_hints",
+]

@@ -21,8 +21,8 @@ def _make_google_worker(
 ) -> InferenceWorkerAbstract:
     require_sdk(spec="google.genai", dependency_name="google-genai", extra="google", msg=_GOOGLE_MISSING_MSG)
 
-    from pipelex.providers.google.google_factory import GoogleFactory  # noqa: PLC0415
-    from pipelex.providers.google.google_llm_worker import GoogleLLMWorker  # noqa: PLC0415
+    from pipelex.providers.google.google_factory import GoogleFactory  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.google.google_llm_worker import GoogleLLMWorker  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     sdk_instance = sdk_clients.get_or_create(
@@ -45,8 +45,8 @@ def _make_google_img_gen_worker(
 ) -> InferenceWorkerAbstract:
     require_sdk(spec="google.genai", dependency_name="google-genai", extra="google", msg=_GOOGLE_IMG_GEN_MISSING_MSG)
 
-    from pipelex.providers.google.google_factory import GoogleFactory  # noqa: PLC0415
-    from pipelex.providers.google.google_img_gen_worker import GoogleImgGenWorker  # noqa: PLC0415
+    from pipelex.providers.google.google_factory import GoogleFactory  # ruff: ignore[import-outside-top-level]
+    from pipelex.providers.google.google_img_gen_worker import GoogleImgGenWorker  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     sdk_instance = sdk_clients.get_or_create(
@@ -68,7 +68,7 @@ async def _list_google_models(
     flat: bool,
     any_listed: bool,
 ) -> None:
-    from pipelex.providers.google.google_list import list_google_models  # noqa: PLC0415
+    from pipelex.providers.google.google_list import list_google_models  # ruff: ignore[import-outside-top-level]
 
     await list_google_models(sdk=sdk, backend_name=backend_name, backend=backend, flat=flat, any_listed=any_listed)
 

@@ -1,9 +1,10 @@
 import re
 from abc import ABC
+from collections.abc import Mapping
 from enum import StrEnum
 from typing import Any, Self, cast, final
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SerializerFunctionWrapHandler, field_validator, model_serializer, model_validator
 
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import validate_concept_ref_or_code
@@ -176,6 +177,46 @@ def valid_pipe_type_tags() -> list[str]:
     return [*PipeType.value_list(), PIPE_SIGNATURE_TYPE_TAG]
 
 
+class InputSlotBlueprint(BaseModel):
+    """The expanded input-slot form: `name = { concept = "…", hints = { … } }` (spec: intent-hints.md).
+
+    `concept` carries the full slot grammar of the string form (ref, optional multiplicity, optional
+    presence marker). The form is deliberately closed (`extra="forbid"` implements the spec's
+    "unknown slot-table keys MUST be rejected") so future per-slot semantic keys land here without a
+    second syntax. A slot table carrying no hints collapses to its plain string at parse time (see
+    `PipeBlueprint.collapse_hint_free_slot_tables`), so a slot value that IS a table carries
+    non-empty hints — hint-free bundles produce byte-identical blueprints to the string form.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    concept: str
+    hints: dict[str, str] | None = None
+
+    @field_validator("hints", mode="after")
+    @classmethod
+    def normalize_empty_hints(cls, hints: dict[str, str] | None) -> dict[str, str] | None:
+        # Sorted here so every serialization is canonical (spec: hints entries emitted sorted by
+        # key); hint key order is not semantic, unlike structure-field order.
+        return dict(sorted(hints.items())) if hints else None
+
+    @model_serializer(mode="wrap")
+    def serialize_without_absent_hints(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        """Absent hints are an absent member — never `null` (spec rule). Unreachable for a
+        hint-free slot in practice (the parse-time collapse leaves it a plain string), kept so any
+        directly-constructed instance still serializes canonically.
+        """
+        dumped: dict[str, Any] = handler(self)
+        if dumped.get("hints") is None:
+            dumped.pop("hints", None)
+        return dumped
+
+
+def slot_concept_spec(slot_value: "str | InputSlotBlueprint") -> str:
+    """The concept spec string of an input-slot value (markers included), whichever arm authored it."""
+    return slot_value if isinstance(slot_value, str) else slot_value.concept
+
+
 class PipeBlueprint(ABC, BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -183,8 +224,22 @@ class PipeBlueprint(ABC, BaseModel):
     pipe_category: Any = Field(exclude=True)  # Technical field for Union discrimination, not user-facing
     type: Any  # TODO: Find a better way to handle this.
     description: str
-    inputs: dict[str, str] | None = None
+    inputs: Mapping[str, str | InputSlotBlueprint] | None = None
+    """`Mapping` (not `dict`) deliberately: value-covariant, so the dominant hint-free callers keep
+    passing plain `dict[str, str]` without a cast. Values are strings except for slots authored in
+    the expanded form WITH hints (see the collapse rule below)."""
     output: str
+
+    @field_validator("inputs", mode="after")
+    @classmethod
+    def collapse_hint_free_slot_tables(cls, inputs: Mapping[str, str | InputSlotBlueprint] | None) -> Mapping[str, str | InputSlotBlueprint] | None:
+        """Parse-time collapse rule: `x = { concept = "S" }` and `x = { concept = "S", hints = {} }`
+        are the same slot as `x = "S"` and become that string (the spec says they hash identically).
+        Invariant bought downstream: a slot value that is a table carries non-empty hints.
+        """
+        if not inputs:
+            return inputs
+        return {name: value.concept if isinstance(value, InputSlotBlueprint) and not value.hints else value for name, value in inputs.items()}
 
     @property
     def nb_inputs(self) -> int:
@@ -193,6 +248,18 @@ class PipeBlueprint(ABC, BaseModel):
     @property
     def input_names(self) -> list[str]:
         return list(self.inputs.keys()) if self.inputs else []
+
+    @property
+    def inputs_concept_specs(self) -> dict[str, str] | None:
+        """Slot name -> concept spec string (markers included), whichever arm authored each slot.
+
+        The projection for consumers that read the slot grammar and nothing else — template
+        analyzers, contract matching, the runtime spec factory. Hints-aware consumers (crate
+        qualification, the input-form deriver) read `inputs` itself.
+        """
+        if self.inputs is None:
+            return None
+        return {name: slot_concept_spec(value) for name, value in self.inputs.items()}
 
     @property
     def is_signature(self) -> bool:
@@ -281,8 +348,12 @@ class PipeBlueprint(ABC, BaseModel):
     @final
     def generic_validate_inputs(self):
         if self.inputs:
-            for input_name, concept_spec in self.inputs.items():
+            for input_name, slot_value in self.inputs.items():
                 validate_input_name(input_name)
+
+                # One grammar, two spellings: the expanded slot form's `concept` value is validated
+                # with the same ref+multiplicity+presence grammar as the plain string form.
+                concept_spec = slot_concept_spec(slot_value)
 
                 # Validate the concept spec format: optional multiplicity brackets then optional
                 # presence marker. Pattern allows: ConceptName, domain.ConceptName, ConceptName[],

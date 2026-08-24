@@ -29,7 +29,7 @@ def _make_worker(mocker: MockerFixture, thinking_mode: ThinkingMode) -> MistralL
 
 def _mock_config(mocker: MockerFixture) -> None:
     """Mock get_config() to return a mistral_config with the effort_to_level_map."""
-    from pipelex.providers.mistral.mistral_config import MistralConfig  # noqa: PLC0415
+    from pipelex.providers.mistral.mistral_config import MistralConfig  # ruff: ignore[import-outside-top-level]
 
     mistral_config = MistralConfig(effort_to_level_map=_MISTRAL_LEVEL_MAP)
     mocker.patch(
@@ -52,14 +52,14 @@ class TestMistralReasoning:
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.NONE)
         job_params = LLMJobParams(temperature=0.5, reasoning_budget=4096)
         with pytest.raises(LLMCapabilityError, match="does not support reasoning"):
-            worker._resolve_prompt_mode(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            worker._resolve_prompt_mode(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     def test_reasoning_budget_with_thinking_mode_manual_raises(self, mocker: MockerFixture):
         """reasoning_budget with thinking_mode=manual raises with 'prompt_mode' guidance."""
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
         job_params = LLMJobParams(temperature=0.5, reasoning_budget=4096)
         with pytest.raises(LLMCapabilityError, match="reasoning_budget"):
-            worker._resolve_prompt_mode(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            worker._resolve_prompt_mode(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     @pytest.mark.parametrize(
         ("effort", "expected_prompt_mode"),
@@ -82,7 +82,7 @@ class TestMistralReasoning:
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
         _mock_config(mocker)
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=effort)
-        result = worker._resolve_prompt_mode(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        result = worker._resolve_prompt_mode(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result == expected_prompt_mode
 
     def test_thinking_mode_none_raises_capability_error(self, mocker: MockerFixture):
@@ -90,20 +90,20 @@ class TestMistralReasoning:
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.NONE)
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.HIGH)
         with pytest.raises(LLMCapabilityError, match="does not support reasoning"):
-            worker._resolve_prompt_mode(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            worker._resolve_prompt_mode(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     def test_thinking_mode_adaptive_raises_capability_error(self, mocker: MockerFixture):
         """Adaptive thinking mode is not applicable to Mistral models."""
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.ADAPTIVE)
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.HIGH)
         with pytest.raises(LLMCapabilityError, match="adaptive"):
-            worker._resolve_prompt_mode(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            worker._resolve_prompt_mode(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     def test_no_reasoning_params_returns_unset(self, mocker: MockerFixture):
         """When neither reasoning_effort nor reasoning_budget is set, returns UNSET."""
-        from mistralai.types import UNSET  # noqa: PLC0415
+        from mistralai.types import UNSET  # ruff: ignore[import-outside-top-level]
 
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
         job_params = LLMJobParams(temperature=0.5)
-        result = worker._resolve_prompt_mode(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        result = worker._resolve_prompt_mode(job_params=job_params)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result is UNSET

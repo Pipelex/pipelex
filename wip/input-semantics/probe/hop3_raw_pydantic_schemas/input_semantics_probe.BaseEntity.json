@@ -1,0 +1,15 @@
+{
+  "description": "PROBE_desc_concept_BaseEntity: base of a custom refinement chain",
+  "properties": {
+    "ident": {
+      "description": "PROBE_desc_field_base_ident: inherited field",
+      "title": "Ident",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ident"
+  ],
+  "title": "input_semantics_probe__BaseEntity",
+  "type": "object"
+}

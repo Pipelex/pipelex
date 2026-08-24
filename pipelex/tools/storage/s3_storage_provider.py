@@ -62,7 +62,7 @@ class S3StorageProvider(StorageProviderAbstract):
         self._check_dependency()
 
         if self._session is None:
-            import aioboto3  # noqa: PLC0415 - optional dependency, lazy import
+            import aioboto3  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
 
             self._session = aioboto3.Session()  # pyright: ignore[reportUnknownMemberType]
         return self._session
@@ -73,7 +73,7 @@ class S3StorageProvider(StorageProviderAbstract):
         Returns:
             Dictionary of client configuration parameters.
         """
-        from botocore.config import Config  # noqa: PLC0415 - optional dependency, lazy import
+        from botocore.config import Config  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
 
         endpoint_url = f"https://s3.{self._region}.amazonaws.com"
         config = Config(signature_version="s3v4")  # pyright: ignore[reportUnknownArgumentType]
@@ -99,7 +99,7 @@ class S3StorageProvider(StorageProviderAbstract):
             StorageFileNotFoundError: If the object does not exist.
             StorageS3Error: If the S3 operation fails (any ClientError or BotoCoreError).
         """
-        from botocore.exceptions import (  # noqa: PLC0415 - optional dependency, lazy import
+        from botocore.exceptions import (  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
             BotoCoreError,
             ClientError,
         )
@@ -144,7 +144,7 @@ class S3StorageProvider(StorageProviderAbstract):
         Raises:
             StorageS3Error: If the S3 operation fails (any ClientError or BotoCoreError).
         """
-        from botocore.exceptions import (  # noqa: PLC0415 - optional dependency, lazy import
+        from botocore.exceptions import (  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
             BotoCoreError,
             ClientError,
         )
@@ -194,7 +194,7 @@ class S3StorageProvider(StorageProviderAbstract):
         Returns:
             Presigned URL if signed_urls_lifespan is configured, otherwise a public URL.
         """
-        from botocore.exceptions import (  # noqa: PLC0415 - optional dependency, lazy import
+        from botocore.exceptions import (  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
             BotoCoreError,
             ClientError,
         )

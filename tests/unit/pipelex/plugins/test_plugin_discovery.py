@@ -119,7 +119,7 @@ def _build_registrar_with(
 class TestPluginDiscovery:
     def test_builtin_plugins_satisfy_the_protocol(self) -> None:
         """Every shipped built-in is a structural PipelexPlugin; a bare object is not."""
-        from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS  # noqa: PLC0415
+        from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS  # ruff: ignore[import-outside-top-level]
 
         for plugin in BUILTIN_PLUGINS:
             assert isinstance(plugin, PipelexPlugin)
@@ -133,13 +133,16 @@ class TestPluginDiscovery:
         failure mode this pins is a half silently dropping out of the composition, which would present
         as a plugin quietly missing at boot rather than as an import error.
         """
-        from pipelex.interpreter_plugins.builtins import (  # noqa: PLC0415
+        from pipelex.interpreter_plugins.builtins import (  # ruff: ignore[import-outside-top-level]
             BUILTIN_PLUGINS,
             CORE_UNCONDITIONAL_PLUGIN_NAMES,
             INTERPRETER_BUILTIN_PLUGINS,
             INTERPRETER_CORE_UNCONDITIONAL_PLUGIN_NAMES,
         )
-        from pipelex.providers.builtins import KERNEL_BUILTIN_PLUGINS, KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES  # noqa: PLC0415
+        from pipelex.providers.builtins import (  # ruff: ignore[import-outside-top-level]
+            KERNEL_BUILTIN_PLUGINS,
+            KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES,
+        )
 
         assert [*INTERPRETER_BUILTIN_PLUGINS, *KERNEL_BUILTIN_PLUGINS] == BUILTIN_PLUGINS
         assert CORE_UNCONDITIONAL_PLUGIN_NAMES == INTERPRETER_CORE_UNCONDITIONAL_PLUGIN_NAMES | KERNEL_CORE_UNCONDITIONAL_PLUGIN_NAMES
@@ -151,7 +154,7 @@ class TestPluginDiscovery:
         """A registered backend is retrievable by (family, sdk) and is the exact callable."""
         registrar = _build_registrar_with(mocker=mocker, plugins=[_InferencePlugin(name="synthetic", sdk="synthetic_sdk")])
 
-        from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry  # noqa: PLC0415
+        from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry  # ruff: ignore[import-outside-top-level]
 
         registry = InferenceBackendRegistry(registrar.inference_backends)
         assert registry.lookup(family=InferenceFamily.LLM, sdk="synthetic_sdk") is _noop_make_worker
@@ -251,7 +254,7 @@ class TestPluginDiscovery:
     @pytest.mark.parametrize("plugin_name", ["direct", "pipe_func", "storage", "secrets", "openai"])
     def test_disabling_core_unconditional_plugin_raises(self, plugin_name: str) -> None:
         """Denylisting any plugin core requires unconditionally (pipe_func/storage/secrets included) is a startup error."""
-        from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS, CORE_UNCONDITIONAL_PLUGIN_NAMES  # noqa: PLC0415
+        from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS, CORE_UNCONDITIONAL_PLUGIN_NAMES  # ruff: ignore[import-outside-top-level]
 
         with pytest.raises(CoreUnconditionalPluginDisabledError) as exc_info:
             build_registrar(
@@ -265,7 +268,7 @@ class TestPluginDiscovery:
 
     def test_discoveries_describe_builtins(self) -> None:
         """build_registrar records each built-in with origin/status/contributions for `plugins list`."""
-        from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS, CORE_UNCONDITIONAL_PLUGIN_NAMES  # noqa: PLC0415
+        from pipelex.interpreter_plugins.builtins import BUILTIN_PLUGINS, CORE_UNCONDITIONAL_PLUGIN_NAMES  # ruff: ignore[import-outside-top-level]
 
         registrar = build_registrar(
             config=_fake_config([]),

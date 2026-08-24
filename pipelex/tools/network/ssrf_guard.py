@@ -38,7 +38,7 @@ async def resolve_to_allowed_ips(
     host: str,
     *,
     port: int,
-    timeout: float | None = None,  # noqa: ASYNC109 — propagates httpcore's connect timeout to bound DNS resolution
+    timeout: float | None = None,  # ruff: ignore[async-function-with-timeout] — propagates httpcore's connect timeout to bound DNS resolution
 ) -> list[str]:
     """Resolve ``host`` and return every IP that passes the disallowed-host rule.
 
@@ -101,7 +101,7 @@ class SsrfGuardedBackend(httpcore.AsyncNetworkBackend):
         self,
         host: str,
         port: int,
-        timeout: float | None = None,  # noqa: ASYNC109 — mandated by the AsyncNetworkBackend interface being overridden
+        timeout: float | None = None,
         local_address: str | None = None,
         socket_options: Iterable[SOCKET_OPTION] | None = None,
     ) -> httpcore.AsyncNetworkStream:
@@ -138,7 +138,7 @@ class SsrfGuardedBackend(httpcore.AsyncNetworkBackend):
     async def connect_unix_socket(
         self,
         path: str,
-        timeout: float | None = None,  # noqa: ASYNC109 — mandated by the AsyncNetworkBackend interface being overridden
+        timeout: float | None = None,
         socket_options: Iterable[SOCKET_OPTION] | None = None,
     ) -> httpcore.AsyncNetworkStream:
         return await self._inner.connect_unix_socket(path, timeout=timeout, socket_options=socket_options)
@@ -160,4 +160,4 @@ class SsrfGuardedTransport(httpx.AsyncHTTPTransport):
         super().__init__()
         # httpx 0.28.1 exposes no public seam to inject a network backend, so wrap
         # the connection pool's backend in place (before any connection is built).
-        self._pool._network_backend = SsrfGuardedBackend(self._pool._network_backend)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        self._pool._network_backend = SsrfGuardedBackend(self._pool._network_backend)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]

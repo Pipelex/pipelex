@@ -46,7 +46,7 @@ class PipeRun(PipeRunProtocol):
             # output stays in-process, so stamping at every `PipeOutput(...)` site
             # would be noise on ~17 constructors to serve one of them.
             pipe_output.set_job_metadata(job_metadata=pipe_job.job_metadata)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # ruff: ignore[blind-except]
             # Observe-and-reraise: records FAILED status so the finally delivery sees it, then re-raises the original error below.
             status = DeliveryStatus.FAILED
             execution_error = exc

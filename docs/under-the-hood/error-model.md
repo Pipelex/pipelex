@@ -105,9 +105,9 @@ Membership means a value is *reachable on the wire*, not that it is a useful thi
 
 ```python
 report = exc.to_error_report()
-report.to_dict()         # {"error_type": "LLMCompletionError", "message": "...", ...}
-ErrorReport.from_dict(d) # strict inverse — raises ValidationError on a malformed dict
-report.http_status       # 422 / 429 / 500 — for HTTP adapters
+report.to_dict()  # {"error_type": "LLMCompletionError", "message": "...", ...}
+ErrorReport.from_dict(d)  # strict inverse — raises ValidationError on a malformed dict
+report.http_status  # 422 / 429 / 500 — for HTTP adapters
 ```
 
 !!! warning "`ErrorReport` is `extra="forbid"`"
@@ -182,7 +182,7 @@ Defined in `pipelex/base_exceptions.py`. Set as a class-level attribute on the e
 
 ```python
 class PipelexConfigError(PipelexError):
-    error_domain = ErrorDomain.CONFIG     # class-level — every instance carries it
+    error_domain = ErrorDomain.CONFIG  # class-level — every instance carries it
 ```
 
 ---
@@ -230,7 +230,7 @@ class ProviderErrorMetadata(BaseModel):
     request_id: str | None = None
     retry_after_seconds: float | None = None
     provider_error_code: str | None = None
-    body: Any | None = Field(default=None, exclude=True)   # may carry secrets
+    body: Any | None = Field(default=None, exclude=True)  # may carry secrets
 ```
 
 !!! warning "`body` is excluded from serialization"
@@ -264,7 +264,7 @@ def _enrich_error_report_from_cause(self, report: ErrorReport) -> ErrorReport:
         return report
     cause_report = cause.to_error_report()
     return ErrorReport(
-        error_type=report.error_type,                                  # keep own identity
+        error_type=report.error_type,  # keep own identity
         message=report.message,
         error_category=report.error_category or cause_report.error_category,
         error_domain=report.error_domain or cause_report.error_domain,
@@ -412,19 +412,19 @@ The "outcome" exceptions (`LLMCompletionError`, `ImgGenGenerationError`, `Extrac
 
 ```python
 # Produce a report from any PipelexError
-report = exc.to_error_report()          # enriched from the __cause__ chain
-payload = report.to_dict()              # None-free dict for serialization
+report = exc.to_error_report()  # enriched from the __cause__ chain
+payload = report.to_dict()  # None-free dict for serialization
 
 # Consume a report
-report.http_status                      # 422 / 429 / 500
-report.user_action_detail()             # free-form advice text, or None
-report.error_category                   # "transient" / "capacity" / ...
+report.http_status  # 422 / 429 / 500
+report.user_action_detail()  # free-form advice text, or None
+report.error_category  # "transient" / "capacity" / ...
 
 # Round-trip across a boundary
-ErrorReport.from_dict(payload)           # strict inverse of to_dict()
+ErrorReport.from_dict(payload)  # strict inverse of to_dict()
 
 # Retry decision
-InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
+InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 ```
 
 ### File → Purpose

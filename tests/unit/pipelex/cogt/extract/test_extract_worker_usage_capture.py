@@ -61,7 +61,7 @@ def _make_extract_model() -> InferenceModelSpec:
 
 def _make_extract_job() -> ExtractJob:
     return ExtractJob(
-        extract_input=ExtractInput(document_uri="/tmp/test.pdf"),  # noqa: S108
+        extract_input=ExtractInput(document_uri="/tmp/test.pdf"),  # ruff: ignore[hardcoded-temp-file]
         job_params=ExtractJobParams.make_default_extract_job_params(),
         job_config=ExtractJobConfig(),
         job_report=ExtractJobReport(),

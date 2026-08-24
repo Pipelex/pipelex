@@ -51,8 +51,8 @@ class VertexAIFactory(ConfigModel):
     def _make_api_key(cls, gcp_credentials_file_path: str) -> str:
         """Get GCP credentials and return access token."""
         try:
-            from google.auth.transport.requests import Request  # noqa: PLC0415
-            from google.oauth2.service_account import Credentials  # noqa: PLC0415
+            from google.auth.transport.requests import Request  # ruff: ignore[import-outside-top-level]
+            from google.oauth2.service_account import Credentials  # ruff: ignore[import-outside-top-level]
         except ImportError as exc:
             lib_name = "google-auth-oauthlib"
             lib_extra_name = "google"

@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
-from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths  # noqa: PLC2701
+from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.interpreter_hub import get_concept_library

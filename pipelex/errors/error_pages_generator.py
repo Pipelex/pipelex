@@ -88,7 +88,7 @@ def _force_load_all_error_modules() -> None:
         dotted = ".".join(rel.parts)
         try:
             importlib.import_module(dotted)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # ruff: ignore[blind-except]
             # importlib runs the target module's top-level code — an open-ended exception surface
             # (NameError, SyntaxError, …) that must be aggregated like ImportError so the dev
             # sees the full list of broken modules at once instead of aborting on the first one.

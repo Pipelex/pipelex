@@ -1,0 +1,15 @@
+{
+  "description": "The answer to a yes/no question",
+  "properties": {
+    "yes_no": {
+      "description": "Whether the answer is yes (true) or no (false).",
+      "title": "Yes No",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "yes_no"
+  ],
+  "title": "YesNoContent",
+  "type": "object"
+}

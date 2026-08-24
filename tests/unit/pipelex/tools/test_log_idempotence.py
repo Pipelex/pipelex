@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 @pytest.fixture
 def log_config() -> LogConfig:
     """Build a real LogConfig from the package defaults — no hand-rolled stub."""
-    from pipelex.system.configuration.config_loader import ConfigLoader  # noqa: PLC0415
+    from pipelex.system.configuration.config_loader import ConfigLoader  # ruff: ignore[import-outside-top-level]
 
     loader = ConfigLoader()
     config_dict = load_toml_from_path(loader.pipelex_root_dir / "pipelex.toml")

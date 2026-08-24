@@ -18,7 +18,7 @@ silent pass. It runs in GitHub Actions, which is where a packaging regression ha
 """
 
 import shutil
-import subprocess  # noqa: S404 — builds the real wheel; inspecting a hand-rolled file list would prove nothing
+import subprocess  # ruff: ignore[suspicious-subprocess-import] — builds the real wheel; inspecting a hand-rolled file list would prove nothing
 import zipfile
 from pathlib import Path
 
@@ -40,7 +40,7 @@ class TestMthdsCorpusPackaging:
         # packaging gate that quietly passes when it could not build anything is worse than no gate.
         assert uv_path is not None, "uv is not on PATH, so the wheel cannot be built and the packaging gate cannot run"
 
-        build = subprocess.run(  # noqa: S603
+        build = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             [uv_path, "build", "--wheel", "--out-dir", str(tmp_path)],
             cwd=str(_REPO_ROOT),
             capture_output=True,

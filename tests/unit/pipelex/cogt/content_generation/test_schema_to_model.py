@@ -279,8 +279,8 @@ class TestSchemaToModel:
         fresh codegen). Saves and restores the class-level cache to keep the test isolated.
         """
         # Snapshot then clear class-level state so this test is hermetic.
-        saved_cache = SchemaToModelFactory._schema_cache.copy()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
-        SchemaToModelFactory._schema_cache.clear()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        saved_cache = SchemaToModelFactory._schema_cache.copy()  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        SchemaToModelFactory._schema_cache.clear()  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         mocker.patch.object(SchemaToModelFactory, "_SCHEMA_CACHE_MAX_SIZE", 3)
         spy = mocker.spy(SchemaToModelFactory, "_generate_source_from_schema")
 
@@ -292,10 +292,10 @@ class TestSchemaToModel:
                 schema["title"] = title
                 schemas.append((title, schema))
                 SchemaToModelFactory.make_from_json_schema(schema, class_name=title)
-                assert len(SchemaToModelFactory._schema_cache) <= 3  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+                assert len(SchemaToModelFactory._schema_cache) <= 3  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
             assert spy.call_count == 4
-            assert len(SchemaToModelFactory._schema_cache) == 3  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            assert len(SchemaToModelFactory._schema_cache) == 3  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
             # Oldest schema (index 0) must have been evicted: re-requesting it triggers fresh codegen.
             oldest_title, oldest_schema = schemas[0]
@@ -307,14 +307,14 @@ class TestSchemaToModel:
             SchemaToModelFactory.make_from_json_schema(recent_schema, class_name=recent_title)
             assert spy.call_count == 5
         finally:
-            SchemaToModelFactory._schema_cache.clear()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
-            SchemaToModelFactory._schema_cache.update(saved_cache)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            SchemaToModelFactory._schema_cache.clear()  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+            SchemaToModelFactory._schema_cache.update(saved_cache)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     def test_exec_blocks_dangerous_builtins(self) -> None:
         """The restricted exec namespace blocks open(), eval(), exec(), and compile()."""
         malicious_source = "from pydantic import BaseModel\nclass Innocent(BaseModel):\n    name: str = 'ok'\nleaked = open('/etc/passwd')\n"
         with pytest.raises(NameError, match="open"):
-            SchemaToModelFactory._exec_and_extract_class(malicious_source, class_name="Innocent")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            SchemaToModelFactory._exec_and_extract_class(malicious_source, class_name="Innocent")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     # ---- Layer 1: schema sanitization (x-python-* extensions are rejected) ----
 
@@ -427,13 +427,13 @@ class TestSchemaToModel:
         """Even bypassing Layer 1, the restricted __import__ blocks `import subprocess`."""
         malicious_source = "from pydantic import BaseModel\nimport subprocess\nclass Innocent(BaseModel):\n    name: str = 'ok'\n"
         with pytest.raises(ImportError, match="subprocess"):
-            SchemaToModelFactory._exec_and_extract_class(malicious_source, class_name="Innocent")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            SchemaToModelFactory._exec_and_extract_class(malicious_source, class_name="Innocent")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     def test_exec_blocks_direct_dunder_import_call(self) -> None:
         """A direct __import__('subprocess') call is also blocked."""
         malicious_source = "from pydantic import BaseModel\nclass Innocent(BaseModel):\n    name: str = 'ok'\n_leak = __import__('subprocess')\n"
         with pytest.raises(ImportError, match="subprocess"):
-            SchemaToModelFactory._exec_and_extract_class(malicious_source, class_name="Innocent")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            SchemaToModelFactory._exec_and_extract_class(malicious_source, class_name="Innocent")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     @pytest.mark.parametrize(
         ("import_line", "expected_module"),
@@ -448,7 +448,7 @@ class TestSchemaToModel:
         """A range of dangerous stdlib imports is blocked by the allowlist."""
         malicious_source = f"from pydantic import BaseModel\n{import_line}\nclass Innocent(BaseModel):\n    name: str = 'ok'\n"
         with pytest.raises(ImportError, match=expected_module):
-            SchemaToModelFactory._exec_and_extract_class(malicious_source, class_name="Innocent")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            SchemaToModelFactory._exec_and_extract_class(malicious_source, class_name="Innocent")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
     @pytest.mark.parametrize(
         "import_line",
@@ -468,5 +468,5 @@ class TestSchemaToModel:
     def test_exec_allowlisted_imports_succeed(self, import_line: str) -> None:
         """Allowlisted imports required by datamodel-code-generator output continue to work."""
         source = f"{import_line}\nfrom pydantic import BaseModel\nclass Innocent(BaseModel):\n    name: str = 'ok'\n"
-        result_class = SchemaToModelFactory._exec_and_extract_class(source, class_name="Innocent")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        result_class = SchemaToModelFactory._exec_and_extract_class(source, class_name="Innocent")  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
         assert result_class.__name__ == "Innocent"

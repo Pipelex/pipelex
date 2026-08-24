@@ -129,8 +129,8 @@ def run_method_cmd(
             if mock_inputs:
                 agent_error("--mock-inputs is not supported with --runner api", error_type="ArgumentError")
 
-            from mthds.protocol.exceptions import PipelineRequestError  # noqa: PLC0415
-            from mthds.runners.api.exceptions import ClientAuthenticationError  # noqa: PLC0415
+            from mthds.protocol.exceptions import PipelineRequestError  # ruff: ignore[import-outside-top-level]
+            from mthds.runners.api.exceptions import ClientAuthenticationError  # ruff: ignore[import-outside-top-level]
 
             try:
                 result = asyncio.run(
@@ -151,7 +151,7 @@ def run_method_cmd(
             except PipelineRequestError as exc:
                 agent_error(str(exc), error_type="PipelineRequestError", cause=exc)
 
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:  # ruff: ignore[blind-except]
                 # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
                 agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
 
@@ -209,7 +209,7 @@ def run_method_cmd(
                     availability_extra["pipe_stack"] = exc.pipe_stack
                 agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
 
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:  # ruff: ignore[blind-except]
                 # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
                 agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
 

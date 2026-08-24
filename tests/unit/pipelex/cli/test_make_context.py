@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import click
 
-from pipelex.cli._cli import PipelexCLI  # noqa: PLC2701
+from pipelex.cli._cli import PipelexCLI
 
 
 class TestPipelexCLIMakeContext:

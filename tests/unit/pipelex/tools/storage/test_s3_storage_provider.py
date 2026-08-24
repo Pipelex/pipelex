@@ -85,7 +85,7 @@ class TestS3StorageProvider:
     async def test_store_returns_uri_with_scheme(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],  # noqa: ARG002
+        mock_aioboto3: dict[str, Any],  # ruff: ignore[unused-method-argument]
     ) -> None:
         """Test that store() returns a URI with the pipelex-storage:// scheme prefix."""
         test_data = b"Hello, World!"
@@ -148,7 +148,7 @@ class TestS3StorageProvider:
     async def test_store_raises_if_key_has_scheme_prefix(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],  # noqa: ARG002
+        mock_aioboto3: dict[str, Any],  # ruff: ignore[unused-method-argument]
     ) -> None:
         """Test that passing a key with pipelex-storage:// prefix raises an error."""
         invalid_key = f"{PIPELEX_STORAGE_SCHEME}already/prefixed.bin"
@@ -161,7 +161,7 @@ class TestS3StorageProvider:
     async def test_public_url_returns_public_url_when_signed_urls_disabled(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
-        mock_aioboto3: dict[str, Any],  # noqa: ARG002
+        mock_aioboto3: dict[str, Any],  # ruff: ignore[unused-method-argument]
     ) -> None:
         """Test that public_url() returns a public URL when signed URLs are disabled."""
         key = "display/test.bin"
@@ -447,7 +447,7 @@ class TestS3StorageProvider:
     @pytest.mark.usefixtures("mock_aioboto3")
     async def test_session_is_reused(self) -> None:
         """Test that the session is lazily initialized and reused."""
-        import aioboto3  # noqa: PLC0415
+        import aioboto3  # ruff: ignore[import-outside-top-level]
 
         provider = S3StorageProvider(
             bucket_name=S3_TEST_BUCKET,

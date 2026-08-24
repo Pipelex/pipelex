@@ -69,8 +69,10 @@ def contracts_match(*, existing: PipeBlueprint, incoming: PipeBlueprint, domain_
     ``inputs`` and an empty ``inputs`` are treated alike. Input *names* must match exactly — they are
     variable names, not concepts.
     """
-    existing_inputs = {name: _canonical_concept_spec(spec, domain_code=domain_code) for name, spec in (existing.inputs or {}).items()}
-    incoming_inputs = {name: _canonical_concept_spec(spec, domain_code=domain_code) for name, spec in (incoming.inputs or {}).items()}
+    # Hints are non-normative, so contract identity reads the concept-spec projection: a hinted slot
+    # and its hint-free twin denote the same contract (`x = { concept = "S" }` ≡ `x = "S"`).
+    existing_inputs = {name: _canonical_concept_spec(spec, domain_code=domain_code) for name, spec in (existing.inputs_concept_specs or {}).items()}
+    incoming_inputs = {name: _canonical_concept_spec(spec, domain_code=domain_code) for name, spec in (incoming.inputs_concept_specs or {}).items()}
     if existing_inputs != incoming_inputs:
         return False
     return _canonical_concept_spec(existing.output, domain_code=domain_code) == _canonical_concept_spec(incoming.output, domain_code=domain_code)

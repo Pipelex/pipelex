@@ -176,11 +176,9 @@ inputs = {
     # Light values, shaped against the signature
     "topic": "A robot learning to love",
     "priority": 3,
-
     # Native content objects (typed directly)
     "photo": ImageContent(url="photo.jpg"),
     "contract": DocumentContent(url="nda.pdf"),
-
     # Explicit envelope with a custom concept
     "draft_tweet": {
         "concept": "social.DraftTweet",

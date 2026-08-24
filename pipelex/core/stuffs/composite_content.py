@@ -25,7 +25,7 @@ class CompositeContent(StuffContent):
         """Named sub-contents of this composite, keyed by their given names."""
         return dict(self.model_extra or {})
 
-    def __json_encode__(self) -> dict[str, Any]:  # noqa: PLW3201 — kajson encoder hook, name fixed by kajson's protocol
+    def __json_encode__(self) -> dict[str, Any]:  # ruff: ignore[bad-dunder-method-name] — kajson encoder hook, name fixed by kajson's protocol
         """Kajson encoding hook.
 
         Pydantic stores `extra="allow"` fields outside `__dict__`, so kajson's default

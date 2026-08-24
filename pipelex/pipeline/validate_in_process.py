@@ -29,6 +29,8 @@ from pipelex.interpreter_hub import clear_current_library, get_current_library_i
 from pipelex.pipe_run.dry_run_in_process import best_effort_graph_spec
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.controller_taint import collect_controller_taint_analyses
+from pipelex.pipeline.hint_warnings import build_current_library_hint_warnings
+from pipelex.pipeline.input_form import PipeInputFormDescriptor, build_input_form
 from pipelex.pipeline.liftable_pipes import LiftablePipeEntry, build_liftable_pipes
 from pipelex.pipeline.optionality_warnings import build_optionality_warnings
 from pipelex.pipeline.pipe_io_contracts import PipeIOContract, build_pipe_io_contracts
@@ -85,8 +87,9 @@ async def validate_bundles_in_process(
     # `validation_library_id` stays None and the cleanup below is a no-op. Artifacts that
     # need the open validation library are built INSIDE the window, before the `finally`
     # tears it down: `pipe_io_contracts`'s JSON-Schema rendering resolves bundle-defined
-    # structure classes through the class registry, and the graph arm dry-runs the main
-    # pipe against the loaded library.
+    # structure classes through the class registry, `input_form`'s class-backed reflection
+    # reads the same registry, and the graph arm dry-runs the main pipe against the loaded
+    # library.
     prev_library_id = get_current_library_id_or_none()
     validation_library_id: str | None = None
     # Explicit body-success flag — NOT sys.exc_info() in the finally, which also sees an
@@ -105,10 +108,11 @@ async def validate_bundles_in_process(
         # something inside the window later moves the contextvar.
         validation_library_id = get_current_library_id_or_none()
         pipe_io_contracts: dict[str, PipeIOContract] = build_pipe_io_contracts(result.pipes)
+        input_form: dict[str, PipeInputFormDescriptor] = build_input_form(result.pipes)
         # One taint walk per validate pass — both report projections read the same analyses.
         taint_analyses = collect_controller_taint_analyses(result.pipes)
         liftable_pipes: list[LiftablePipeEntry] = build_liftable_pipes(taint_analyses)
-        warnings: list[ValidationErrorItem] = build_optionality_warnings(taint_analyses)
+        warnings: list[ValidationErrorItem] = build_optionality_warnings(taint_analyses) + build_current_library_hint_warnings()
         graph_target_ref = graph_pipe_code if graph_pipe_code is not None else select_primary_blueprint(result.blueprints).main_pipe_ref
         graph_spec: GraphSpec | None = await best_effort_graph_spec(
             pipe_ref=graph_target_ref,
@@ -140,6 +144,7 @@ async def validate_bundles_in_process(
     return build_validation_report(
         blueprints=result.blueprints,
         pipe_io_contracts=pipe_io_contracts,
+        input_form=input_form,
         liftable_pipes=liftable_pipes,
         dry_run_result=result.dry_run_result,
         pending_signatures=result.pending_signatures,

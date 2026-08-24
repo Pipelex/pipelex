@@ -200,7 +200,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         if self._exception_capture:
             try:
                 self._exception_capture.close()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:  # ruff: ignore[blind-except]
                 # Telemetry teardown must never break the app: a close failure is logged at debug and swallowed.
                 log.debug(f"Error closing exception capture: {exc}")
 
@@ -211,7 +211,7 @@ class TelemetryManager(TelemetryManagerAbstract):
                 log.verbose("Shutting down OTel TracerProvider (flushing pending spans)...")
                 self._tracer_provider.shutdown()
                 log.verbose("OTel TracerProvider shutdown complete")
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:  # ruff: ignore[blind-except]
                 # Suppress any shutdown errors to avoid cascading failures
                 log.debug(f"Error during TracerProvider shutdown: {exc}")
 
@@ -219,7 +219,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         if self.custom_posthog_client:
             try:
                 self.custom_posthog_client.shutdown()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:  # ruff: ignore[blind-except]
                 # Suppress any shutdown errors to avoid cascading failures
                 log.debug(f"Error during custom PostHog shutdown: {exc}")
 
@@ -227,7 +227,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         if self.pipelex_posthog_client:
             try:
                 self.pipelex_posthog_client.shutdown()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:  # ruff: ignore[blind-except]
                 # Suppress any shutdown errors to avoid cascading failures
                 log.debug(f"Error during Pipelex PostHog shutdown: {exc}")
 

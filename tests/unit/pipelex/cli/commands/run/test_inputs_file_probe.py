@@ -6,7 +6,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipelex.cli.commands.run._inputs_file_loader import find_default_inputs_file  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+from pipelex.cli.commands.run._inputs_file_loader import (
+    find_default_inputs_file,  # pyright: ignore[reportPrivateUsage]
+)
 from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError
 
 if TYPE_CHECKING:

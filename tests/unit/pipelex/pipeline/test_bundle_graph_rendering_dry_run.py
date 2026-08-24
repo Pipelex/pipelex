@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipelex.pipeline.bundle_graph_rendering import (
-    _dry_run_bundle,  # noqa: PLC2701 # pyright: ignore[reportPrivateUsage]
+    _dry_run_bundle,  # pyright: ignore[reportPrivateUsage]
 )
 
 if TYPE_CHECKING:

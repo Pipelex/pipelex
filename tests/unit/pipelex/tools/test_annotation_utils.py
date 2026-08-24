@@ -14,12 +14,12 @@ class TestUnwrapOptional:
     @pytest.mark.parametrize(
         ("annotation", "expected"),
         [
-            pytest.param(Optional[str], str, id="typing_optional_str"),  # noqa: UP045 — the typing.Optional spelling is the test subject
+            pytest.param(Optional[str], str, id="typing_optional_str"),  # ruff: ignore[non-pep604-annotation-optional] — the typing.Optional spelling is the test subject
             pytest.param(Union[str, None], str, id="typing_union_str_none"),
             pytest.param(str | None, str, id="pep604_str_none"),
-            pytest.param(Optional[list[str]], list[str], id="typing_optional_list_str"),  # noqa: UP045 — the typing.Optional spelling is the test subject
+            pytest.param(Optional[list[str]], list[str], id="typing_optional_list_str"),  # ruff: ignore[non-pep604-annotation-optional] — the typing.Optional spelling is the test subject
             pytest.param(list[str] | None, list[str], id="pep604_list_str_none"),
-            pytest.param(Optional[TextContent], TextContent, id="typing_optional_text_content"),  # noqa: UP045 — the typing.Optional spelling is the test subject
+            pytest.param(Optional[TextContent], TextContent, id="typing_optional_text_content"),  # ruff: ignore[non-pep604-annotation-optional] — the typing.Optional spelling is the test subject
             pytest.param(TextContent | None, TextContent, id="pep604_text_content_none"),
         ],
     )

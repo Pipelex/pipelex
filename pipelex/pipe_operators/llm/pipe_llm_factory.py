@@ -68,13 +68,16 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 )
                 raise PipeLLMFactoryError(error_msg) from exc
 
+        # Template analyzers read the slot grammar only, so they get the concept-spec projection.
+        blueprint_input_specs = blueprint.inputs_concept_specs or {}
+
         # Analyze template for image references
         user_image_references = None
         if blueprint.prompt and blueprint.inputs:
             user_image_references = (
                 TemplateImageAnalyzer.analyze_template_for_images(
                     template_source=blueprint.prompt,
-                    input_specs=blueprint.inputs,
+                    input_specs=blueprint_input_specs,
                     domain_code=domain_code,
                 )
                 or None
@@ -86,7 +89,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             user_document_references = (
                 TemplateDocumentAnalyzer.analyze_template_for_documents(
                     template_source=blueprint.prompt,
-                    input_specs=blueprint.inputs,
+                    input_specs=blueprint_input_specs,
                     domain_code=domain_code,
                 )
                 or None
@@ -98,7 +101,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             system_image_references = (
                 TemplateImageAnalyzer.analyze_template_for_images(
                     template_source=blueprint.system_prompt,
-                    input_specs=blueprint.inputs,
+                    input_specs=blueprint_input_specs,
                     domain_code=domain_code,
                 )
                 or None
@@ -110,7 +113,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             system_document_references = (
                 TemplateDocumentAnalyzer.analyze_template_for_documents(
                     template_source=blueprint.system_prompt,
-                    input_specs=blueprint.inputs,
+                    input_specs=blueprint_input_specs,
                     domain_code=domain_code,
                 )
                 or None

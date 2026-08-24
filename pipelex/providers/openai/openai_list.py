@@ -60,7 +60,7 @@ def _display_openai_models_flat(
     for model in models:
         # Convert Unix timestamp to formatted date
         if hasattr(model, "created") and model.created:
-            created = datetime.fromtimestamp(model.created).strftime("%Y-%m-%d")  # noqa: DTZ006
+            created = datetime.fromtimestamp(model.created).strftime("%Y-%m-%d")  # ruff: ignore[call-datetime-fromtimestamp]
         else:
             created = "N/A"
         owned_by = model.owned_by if hasattr(model, "owned_by") else "N/A"
@@ -87,7 +87,7 @@ def _display_openai_models_table(
     for model in models:
         # Convert Unix timestamp to formatted date
         if hasattr(model, "created") and model.created:
-            created = datetime.fromtimestamp(model.created).strftime("%Y-%m-%d")  # noqa: DTZ006
+            created = datetime.fromtimestamp(model.created).strftime("%Y-%m-%d")  # ruff: ignore[call-datetime-fromtimestamp]
         else:
             created = "N/A"
         owned_by = model.owned_by if hasattr(model, "owned_by") else "N/A"

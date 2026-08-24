@@ -6,7 +6,7 @@ from pipelex.plugins.registrar import PluginRegistrar
 from pipelex.system.configuration.pipe_func_config import PipeFuncConfig
 
 
-def _make_direct_pipe_func_executor(config: PipeFuncConfig) -> PipeFuncExecutorProtocol:  # noqa: ARG001 — stateless; the mode carries no config
+def _make_direct_pipe_func_executor(config: PipeFuncConfig) -> PipeFuncExecutorProtocol:  # ruff: ignore[unused-function-argument] — stateless; the mode carries no config
     return DirectPipeFuncExecutor()
 
 

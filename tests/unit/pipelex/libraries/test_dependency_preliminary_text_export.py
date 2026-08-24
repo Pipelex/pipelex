@@ -73,7 +73,7 @@ class TestDependencyPreliminaryTextExport:
         mocker.patch.object(library_manager, "get_current_library", return_value=library)
 
         manager = LibraryManager()
-        manager._load_single_dependency(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             library=library,
             resolved_dep=self._build_resolved_dep(tmp_path=tmp_path, exported={"make_review"}),
         )
@@ -99,7 +99,7 @@ class TestDependencyPreliminaryTextExport:
         mocker.patch.object(library_manager, "get_current_library", return_value=library)
 
         manager = LibraryManager()
-        manager._load_single_dependency(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        manager._load_single_dependency(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
             library=library,
             resolved_dep=self._build_resolved_dep(tmp_path=tmp_path, exported=set()),
         )

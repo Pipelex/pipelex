@@ -597,7 +597,7 @@ def init_cmd(
     except typer.Exit:
         # Re-raise Exit exceptions
         raise
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # ruff: ignore[blind-except]
         # Command-level boundary: any unexpected init failure is reported as a warning and the command returns without crashing.
         console.print(f"\n[red]⚠ Warning: Initialization failed: {escape(str(exc))}[/red]", style="bold")
         if needs_config:

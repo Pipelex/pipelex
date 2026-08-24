@@ -9,7 +9,9 @@ from typing import TYPE_CHECKING, Any
 import pytest
 import typer
 
-from pipelex.cli.commands.build.inputs._inputs_core import _generate_inputs_core  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+from pipelex.cli.commands.build.inputs._inputs_core import (
+    _generate_inputs_core,  # pyright: ignore[reportPrivateUsage]
+)
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
 from pipelex.pipeline.exceptions import ValidateBundleError
 

@@ -52,7 +52,7 @@ class DirectOrchestrator:
             workflow_id=None,
         )
 
-    async def start(self, *, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None) -> PipelexPipeDispatchAck:  # noqa: ARG002 — protocol signature; unreachable behind the supports_fire_and_forget gate
+    async def start(self, *, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None) -> PipelexPipeDispatchAck:  # ruff: ignore[unused-method-argument] — protocol signature; unreachable behind the supports_fire_and_forget gate
         msg = (
             f"DIRECT orchestrator cannot fire-and-forget pipe '{pipe_job.pipe.code}': in-process execution has no genuine async path. "
             "Callers must check `supports_fire_and_forget` before dispatching a fire-and-forget job."

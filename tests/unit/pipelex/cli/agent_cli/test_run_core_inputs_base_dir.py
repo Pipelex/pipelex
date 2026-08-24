@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from pipelex.base_exceptions import PipelexError
-from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core  # pyright: ignore[reportPrivateUsage]
 
 if TYPE_CHECKING:
     from pathlib import Path

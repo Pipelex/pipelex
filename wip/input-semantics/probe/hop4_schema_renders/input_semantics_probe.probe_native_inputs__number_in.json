@@ -1,0 +1,25 @@
+{
+  "concept": "native.Number",
+  "content": {
+    "description": "A number",
+    "properties": {
+      "number": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "number"
+          }
+        ],
+        "description": "The number",
+        "title": "Number"
+      }
+    },
+    "required": [
+      "number"
+    ],
+    "title": "native.Number",
+    "type": "object"
+  }
+}

@@ -179,14 +179,14 @@ class TestDetectFileTypeFromBase64:
         assert result.mime == "text/plain"
         mock_detect_bytes.assert_called_once_with(raw_bytes=test_bytes)
 
-    def test_detect_file_type_from_base64_invalid_base64_string(self, mocker: MockerFixture):  # noqa: ARG002
+    def test_detect_file_type_from_base64_invalid_base64_string(self, mocker: MockerFixture):  # ruff: ignore[unused-method-argument]
         # Test with invalid base64 string
         invalid_b64 = "invalid!base64!string!"
 
         with pytest.raises(FileTypeError, match="Could not identify file type of given bytes because input is not valid base64"):
             detect_file_type_from_base64(invalid_b64)
 
-    def test_detect_file_type_from_base64_invalid_base64_bytes(self, mocker: MockerFixture):  # noqa: ARG002
+    def test_detect_file_type_from_base64_invalid_base64_bytes(self, mocker: MockerFixture):  # ruff: ignore[unused-method-argument]
         # Test with invalid base64 bytes
         invalid_b64_bytes = b"invalid!base64!bytes!"
 

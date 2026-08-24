@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pipelex.cli.commands.run._inputs_file_loader import resolve_inputs_arg_against_dir  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+from pipelex.cli.commands.run._inputs_file_loader import (
+    resolve_inputs_arg_against_dir,  # pyright: ignore[reportPrivateUsage]
+)
 
 
 class TestResolveInputsArgAgainstDir:

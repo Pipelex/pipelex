@@ -1,0 +1,2477 @@
+{
+  "input_semantics_probe.probe_single": {
+    "inputs": {
+      "widget": {
+        "concept_ref": "input_semantics_probe.Widget",
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
+        "json_schema": {
+          "$defs": {
+            "ImageContent": {
+              "description": "An image",
+              "properties": {
+                "url": {
+                  "description": "The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
+                  "title": "Url",
+                  "type": "string"
+                },
+                "public_url": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The public URL of the image",
+                  "title": "Public Url"
+                },
+                "source_prompt": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The source prompt of the image",
+                  "title": "Source Prompt"
+                },
+                "source_negative_prompt": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The source negative prompt of the image",
+                  "title": "Source Negative Prompt"
+                },
+                "caption": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The caption of the image",
+                  "title": "Caption"
+                },
+                "mime_type": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The MIME type of the image",
+                  "title": "Mime Type"
+                },
+                "width": {
+                  "anyOf": [
+                    {
+                      "exclusiveMinimum": 0,
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The width of the image, in pixels",
+                  "title": "Width"
+                },
+                "height": {
+                  "anyOf": [
+                    {
+                      "exclusiveMinimum": 0,
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The height of the image, in pixels",
+                  "title": "Height"
+                },
+                "filename": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The original filename of the image",
+                  "title": "Filename"
+                }
+              },
+              "required": [
+                "url"
+              ],
+              "title": "ImageContent",
+              "type": "object"
+            },
+            "input_semantics_probe__Gadget": {
+              "description": "PROBE_desc_concept_Gadget: mid-level structure nested inside Widget",
+              "properties": {
+                "name": {
+                  "description": "PROBE_desc_field_gadget_name",
+                  "title": "Name",
+                  "type": "string"
+                },
+                "trinket": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/input_semantics_probe__Trinket"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "PROBE_desc_field_gadget_trinket: nested concept, level two"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "title": "input_semantics_probe__Gadget",
+              "type": "object"
+            },
+            "input_semantics_probe__Trinket": {
+              "description": "PROBE_desc_concept_Trinket: leaf structure for two-level nesting",
+              "properties": {
+                "label": {
+                  "description": "PROBE_desc_field_trinket_label: shorthand string field on the nesting leaf",
+                  "title": "Label",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label"
+              ],
+              "title": "input_semantics_probe__Trinket",
+              "type": "object"
+            }
+          },
+          "description": "PROBE_desc_concept_Widget: the full-matrix structure under audit",
+          "properties": {
+            "shorthand_note": {
+              "description": "PROBE_desc_field_shorthand_note: shorthand string field (implies text, required)",
+              "title": "Shorthand Note",
+              "type": "string"
+            },
+            "title": {
+              "description": "PROBE_desc_field_title: required text",
+              "title": "Title",
+              "type": "string"
+            },
+            "subtitle": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_subtitle: optional text (required omitted)",
+              "title": "Subtitle"
+            },
+            "summary": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_summary: optional text (required explicit false)",
+              "title": "Summary"
+            },
+            "motto": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "PROBE_default_motto",
+              "description": "PROBE_desc_field_motto: text with default",
+              "title": "Motto"
+            },
+            "count": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": 42,
+              "description": "PROBE_desc_field_count: integer with default",
+              "title": "Count"
+            },
+            "enabled": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": true,
+              "description": "PROBE_desc_field_enabled: boolean with default",
+              "title": "Enabled"
+            },
+            "price": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": 9.99,
+              "description": "PROBE_desc_field_price: number with default",
+              "title": "Price"
+            },
+            "released_on": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "2026-01-15",
+              "description": "PROBE_desc_field_released_on: date with default",
+              "title": "Released On"
+            },
+            "launched_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "2026-01-15T12:30:00",
+              "description": "PROBE_desc_field_launched_at: datetime with default",
+              "title": "Launched At"
+            },
+            "daily_at": {
+              "anyOf": [
+                {
+                  "format": "time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "12:30:00",
+              "description": "PROBE_desc_field_daily_at: time with default",
+              "title": "Daily At"
+            },
+            "tags": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": [
+                "PROBE_tag_a",
+                "PROBE_tag_b"
+              ],
+              "description": "PROBE_desc_field_tags: list of text with default",
+              "title": "Tags"
+            },
+            "ratings": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_ratings: list of integer",
+              "title": "Ratings"
+            },
+            "matrix": {
+              "anyOf": [
+                {
+                  "items": {
+                    "items": {},
+                    "type": "array"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_matrix: nested list with unspecified inner item",
+              "title": "Matrix"
+            },
+            "gadgets": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/$defs/input_semantics_probe__Gadget"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_gadgets: list of concept",
+              "title": "Gadgets"
+            },
+            "attributes": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_attributes: dict text to text",
+              "title": "Attributes"
+            },
+            "scores": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "number"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": {
+                "speed": 5
+              },
+              "description": "PROBE_desc_field_scores: dict text to number with default",
+              "title": "Scores"
+            },
+            "milestones": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_milestones: dict text to date",
+              "title": "Milestones"
+            },
+            "main_gadget": {
+              "$ref": "#/$defs/input_semantics_probe__Gadget",
+              "description": "PROBE_desc_field_main_gadget: required concept field"
+            },
+            "icon": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ImageContent"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_icon: native concept field"
+            },
+            "tone": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "PROBE_choice_formal",
+                    "PROBE_choice_casual",
+                    "PROBE_choice_playful"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "PROBE_choice_casual",
+              "description": "PROBE_desc_field_tone: choices with default",
+              "title": "Tone"
+            },
+            "only_choice": {
+              "anyOf": [
+                {
+                  "const": "PROBE_choice_single",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_only_choice: single-entry choice list",
+              "title": "Only Choice"
+            },
+            "typed_choice": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "PROBE_choice_typed_a",
+                    "PROBE_choice_typed_b"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_typed_choice: type AND choices together",
+              "title": "Typed Choice"
+            },
+            "constrained_count": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_constrained_count: integer carrying unknown constraint keys",
+              "title": "Constrained Count"
+            }
+          },
+          "required": [
+            "shorthand_note",
+            "title",
+            "main_gadget"
+          ],
+          "title": "input_semantics_probe.Widget",
+          "type": "object"
+        }
+      },
+      "gadget_q": {
+        "concept_ref": "input_semantics_probe.Gadget",
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
+        "json_schema": {
+          "$defs": {
+            "input_semantics_probe__Trinket": {
+              "description": "PROBE_desc_concept_Trinket: leaf structure for two-level nesting",
+              "properties": {
+                "label": {
+                  "description": "PROBE_desc_field_trinket_label: shorthand string field on the nesting leaf",
+                  "title": "Label",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label"
+              ],
+              "title": "input_semantics_probe__Trinket",
+              "type": "object"
+            }
+          },
+          "description": "PROBE_desc_concept_Gadget: mid-level structure nested inside Widget",
+          "properties": {
+            "name": {
+              "description": "PROBE_desc_field_gadget_name",
+              "title": "Name",
+              "type": "string"
+            },
+            "trinket": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/input_semantics_probe__Trinket"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_gadget_trinket: nested concept, level two"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "title": "input_semantics_probe.Gadget",
+          "type": "object"
+        }
+      },
+      "note": {
+        "concept_ref": "input_semantics_probe.PlainNote",
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
+        "json_schema": {
+          "description": "PROBE_desc_concept_PlainNote: description-only concept (basic blueprint)",
+          "properties": {
+            "text": {
+              "description": "The text",
+              "title": "Text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "title": "input_semantics_probe.PlainNote",
+          "type": "object"
+        }
+      }
+    },
+    "output": {
+      "concept_ref": "native.Text",
+      "multiplicity": "single",
+      "item_count": null,
+      "optional": false
+    }
+  },
+  "input_semantics_probe.probe_native_inputs": {
+    "inputs": {
+      "text_in": {
+        "concept_ref": "native.Text",
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
+        "json_schema": {
+          "description": "A text",
+          "properties": {
+            "text": {
+              "description": "The text",
+              "title": "Text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "title": "native.Text",
+          "type": "object"
+        }
+      },
+      "image_in": {
+        "concept_ref": "native.Image",
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
+        "json_schema": {
+          "description": "An image",
+          "properties": {
+            "url": {
+              "description": "The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
+              "title": "Url",
+              "type": "string"
+            },
+            "public_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The public URL of the image",
+              "title": "Public Url"
+            },
+            "source_prompt": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The source prompt of the image",
+              "title": "Source Prompt"
+            },
+            "source_negative_prompt": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The source negative prompt of the image",
+              "title": "Source Negative Prompt"
+            },
+            "caption": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The caption of the image",
+              "title": "Caption"
+            },
+            "mime_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The MIME type of the image",
+              "title": "Mime Type"
+            },
+            "width": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The width of the image, in pixels",
+              "title": "Width"
+            },
+            "height": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The height of the image, in pixels",
+              "title": "Height"
+            },
+            "filename": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The original filename of the image",
+              "title": "Filename"
+            }
+          },
+          "required": [
+            "url"
+          ],
+          "title": "native.Image",
+          "type": "object"
+        }
+      },
+      "document_in": {
+        "concept_ref": "native.Document",
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
+        "json_schema": {
+          "description": "A document",
+          "properties": {
+            "url": {
+              "description": "The document URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
+              "title": "Url",
+              "type": "string"
+            },
+            "public_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The public HTTPS URL of the document",
+              "title": "Public Url"
+            },
+            "mime_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The MIME type of the document",
+              "title": "Mime Type"
+            },
+            "filename": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The original filename of the document",
+              "title": "Filename"
+            },
+            "title": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The title of the document or source",
+              "title": "Title"
+            },
+            "snippet": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "A text snippet or excerpt from the document",
+              "title": "Snippet"
+            }
+          },
+          "required": [
+            "url"
+          ],
+          "title": "native.Document",
+          "type": "object"
+        }
+      },
+      "page_in": {
+        "concept_ref": "native.Page",
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
+        "json_schema": {
+          "$defs": {
+            "ImageContent": {
+              "description": "An image",
+              "properties": {
+                "url": {
+                  "description": "The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
+                  "title": "Url",
+                  "type": "string"
+                },
+                "public_url": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The public URL of the image",
+                  "title": "Public Url"
+                },
+                "source_prompt": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The source prompt of the image",
+                  "title": "Source Prompt"
+                },
+                "source_negative_prompt": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The source negative prompt of the image",
+                  "title": "Source Negative Prompt"
+                },
+                "caption": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The caption of the image",
+                  "title": "Caption"
+                },
+                "mime_type": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The MIME type of the image",
+                  "title": "Mime Type"
+                },
+                "width": {
+                  "anyOf": [
+                    {
+                      "exclusiveMinimum": 0,
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The width of the image, in pixels",
+                  "title": "Width"
+                },
+                "height": {
+                  "anyOf": [
+                    {
+                      "exclusiveMinimum": 0,
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The height of the image, in pixels",
+                  "title": "Height"
+                },
+                "filename": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The original filename of the image",
+                  "title": "Filename"
+                }
+              },
+              "required": [
+                "url"
+              ],
+              "title": "ImageContent",
+              "type": "object"
+            },
+            "TextAndImagesContent": {
+              "properties": {
+                "text": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TextContent"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "A text content"
+                },
+                "images": {
+                  "anyOf": [
+                    {
+                      "items": {
+                        "$ref": "#/$defs/ImageContent"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "A list of images that were extracted from the text",
+                  "title": "Images"
+                },
+                "raw_html": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The raw HTML of the fetched page, if requested",
+                  "title": "Raw Html"
+                }
+              },
+              "title": "TextAndImagesContent",
+              "type": "object"
+            },
+            "TextContent": {
+              "description": "A text",
+              "properties": {
+                "text": {
+                  "description": "The text",
+                  "title": "Text",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text"
+              ],
+              "title": "TextContent",
+              "type": "object"
+            }
+          },
+          "description": "The content of a page of a document, comprising text and linked images and an optional page view image",
+          "properties": {
+            "text_and_images": {
+              "$ref": "#/$defs/TextAndImagesContent",
+              "description": "The text and images content extracted from the page"
+            },
+            "page_view": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ImageContent"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The screenshot of the page"
+            }
+          },
+          "required": [
+            "text_and_images"
+          ],
+          "title": "native.Page",
+          "type": "object"
+        }
+      },
+      "number_in": {
+        "concept_ref": "native.Number",
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
+        "json_schema": {
+          "description": "A number",
+          "properties": {
+            "number": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "description": "The number",
+              "title": "Number"
+            }
+          },
+          "required": [
+            "number"
+          ],
+          "title": "native.Number",
+          "type": "object"
+        }
+      },
+      "date_in": {
+        "concept_ref": "native.Date",
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
+        "json_schema": {
+          "description": "A calendar date, optionally with a time of day — as precise as its source states.",
+          "properties": {
+            "date": {
+              "description": "The calendar date, in ISO 8601 (e.g. 2026-07-07). Always required.",
+              "format": "date",
+              "title": "Date",
+              "type": "string"
+            },
+            "time": {
+              "anyOf": [
+                {
+                  "format": "time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The time of day, in ISO 8601 (e.g. 15:40:00, or 15:40:00+02:00 with a UTC offset). Include it only when the source states a time — never invent a time. Keep the UTC offset exactly when the source states one.",
+              "title": "Time"
+            }
+          },
+          "required": [
+            "date"
+          ],
+          "title": "native.Date",
+          "type": "object"
+        }
+      },
+      "time_in": {
+        "concept_ref": "native.Time",
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
+        "json_schema": {
+          "description": "A time of day, optionally with a UTC offset — as precise as its source states.",
+          "properties": {
+            "time": {
+              "description": "The time of day, in ISO 8601 (e.g. 15:40:00, or 15:40:00+02:00 with a UTC offset).",
+              "format": "time",
+              "title": "Time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "time"
+          ],
+          "title": "native.Time",
+          "type": "object"
+        }
+      },
+      "html_in": {
+        "concept_ref": "native.Html",
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
+        "json_schema": {
+          "description": "HTML content",
+          "properties": {
+            "inner_html": {
+              "description": "The inner HTML of the content",
+              "title": "Inner Html",
+              "type": "string"
+            },
+            "css_class": {
+              "description": "The CSS class of the content",
+              "title": "Css Class",
+              "type": "string"
+            }
+          },
+          "required": [
+            "inner_html",
+            "css_class"
+          ],
+          "title": "native.Html",
+          "type": "object"
+        }
+      },
+      "yesno_in": {
+        "concept_ref": "native.YesNo",
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
+        "json_schema": {
+          "description": "The answer to a yes/no question",
+          "properties": {
+            "yes_no": {
+              "description": "Whether the answer is yes (true) or no (false).",
+              "title": "Yes No",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "yes_no"
+          ],
+          "title": "native.YesNo",
+          "type": "object"
+        }
+      }
+    },
+    "output": {
+      "concept_ref": "native.Text",
+      "multiplicity": "single",
+      "item_count": null,
+      "optional": false
+    }
+  },
+  "input_semantics_probe.probe_markers": {
+    "inputs": {
+      "opt": {
+        "concept_ref": "input_semantics_probe.Widget",
+        "presence": "optional",
+        "multiplicity": "single",
+        "item_count": null,
+        "json_schema": {
+          "$defs": {
+            "ImageContent": {
+              "description": "An image",
+              "properties": {
+                "url": {
+                  "description": "The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
+                  "title": "Url",
+                  "type": "string"
+                },
+                "public_url": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The public URL of the image",
+                  "title": "Public Url"
+                },
+                "source_prompt": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The source prompt of the image",
+                  "title": "Source Prompt"
+                },
+                "source_negative_prompt": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The source negative prompt of the image",
+                  "title": "Source Negative Prompt"
+                },
+                "caption": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The caption of the image",
+                  "title": "Caption"
+                },
+                "mime_type": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The MIME type of the image",
+                  "title": "Mime Type"
+                },
+                "width": {
+                  "anyOf": [
+                    {
+                      "exclusiveMinimum": 0,
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The width of the image, in pixels",
+                  "title": "Width"
+                },
+                "height": {
+                  "anyOf": [
+                    {
+                      "exclusiveMinimum": 0,
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The height of the image, in pixels",
+                  "title": "Height"
+                },
+                "filename": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "The original filename of the image",
+                  "title": "Filename"
+                }
+              },
+              "required": [
+                "url"
+              ],
+              "title": "ImageContent",
+              "type": "object"
+            },
+            "input_semantics_probe__Gadget": {
+              "description": "PROBE_desc_concept_Gadget: mid-level structure nested inside Widget",
+              "properties": {
+                "name": {
+                  "description": "PROBE_desc_field_gadget_name",
+                  "title": "Name",
+                  "type": "string"
+                },
+                "trinket": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/input_semantics_probe__Trinket"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "PROBE_desc_field_gadget_trinket: nested concept, level two"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "title": "input_semantics_probe__Gadget",
+              "type": "object"
+            },
+            "input_semantics_probe__Trinket": {
+              "description": "PROBE_desc_concept_Trinket: leaf structure for two-level nesting",
+              "properties": {
+                "label": {
+                  "description": "PROBE_desc_field_trinket_label: shorthand string field on the nesting leaf",
+                  "title": "Label",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label"
+              ],
+              "title": "input_semantics_probe__Trinket",
+              "type": "object"
+            }
+          },
+          "description": "PROBE_desc_concept_Widget: the full-matrix structure under audit",
+          "properties": {
+            "shorthand_note": {
+              "description": "PROBE_desc_field_shorthand_note: shorthand string field (implies text, required)",
+              "title": "Shorthand Note",
+              "type": "string"
+            },
+            "title": {
+              "description": "PROBE_desc_field_title: required text",
+              "title": "Title",
+              "type": "string"
+            },
+            "subtitle": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_subtitle: optional text (required omitted)",
+              "title": "Subtitle"
+            },
+            "summary": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_summary: optional text (required explicit false)",
+              "title": "Summary"
+            },
+            "motto": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "PROBE_default_motto",
+              "description": "PROBE_desc_field_motto: text with default",
+              "title": "Motto"
+            },
+            "count": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": 42,
+              "description": "PROBE_desc_field_count: integer with default",
+              "title": "Count"
+            },
+            "enabled": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": true,
+              "description": "PROBE_desc_field_enabled: boolean with default",
+              "title": "Enabled"
+            },
+            "price": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": 9.99,
+              "description": "PROBE_desc_field_price: number with default",
+              "title": "Price"
+            },
+            "released_on": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "2026-01-15",
+              "description": "PROBE_desc_field_released_on: date with default",
+              "title": "Released On"
+            },
+            "launched_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "2026-01-15T12:30:00",
+              "description": "PROBE_desc_field_launched_at: datetime with default",
+              "title": "Launched At"
+            },
+            "daily_at": {
+              "anyOf": [
+                {
+                  "format": "time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "12:30:00",
+              "description": "PROBE_desc_field_daily_at: time with default",
+              "title": "Daily At"
+            },
+            "tags": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": [
+                "PROBE_tag_a",
+                "PROBE_tag_b"
+              ],
+              "description": "PROBE_desc_field_tags: list of text with default",
+              "title": "Tags"
+            },
+            "ratings": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_ratings: list of integer",
+              "title": "Ratings"
+            },
+            "matrix": {
+              "anyOf": [
+                {
+                  "items": {
+                    "items": {},
+                    "type": "array"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_matrix: nested list with unspecified inner item",
+              "title": "Matrix"
+            },
+            "gadgets": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/$defs/input_semantics_probe__Gadget"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_gadgets: list of concept",
+              "title": "Gadgets"
+            },
+            "attributes": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_attributes: dict text to text",
+              "title": "Attributes"
+            },
+            "scores": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "number"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": {
+                "speed": 5
+              },
+              "description": "PROBE_desc_field_scores: dict text to number with default",
+              "title": "Scores"
+            },
+            "milestones": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_milestones: dict text to date",
+              "title": "Milestones"
+            },
+            "main_gadget": {
+              "$ref": "#/$defs/input_semantics_probe__Gadget",
+              "description": "PROBE_desc_field_main_gadget: required concept field"
+            },
+            "icon": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ImageContent"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_icon: native concept field"
+            },
+            "tone": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "PROBE_choice_formal",
+                    "PROBE_choice_casual",
+                    "PROBE_choice_playful"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "PROBE_choice_casual",
+              "description": "PROBE_desc_field_tone: choices with default",
+              "title": "Tone"
+            },
+            "only_choice": {
+              "anyOf": [
+                {
+                  "const": "PROBE_choice_single",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_only_choice: single-entry choice list",
+              "title": "Only Choice"
+            },
+            "typed_choice": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "PROBE_choice_typed_a",
+                    "PROBE_choice_typed_b"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_typed_choice: type AND choices together",
+              "title": "Typed Choice"
+            },
+            "constrained_count": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "PROBE_desc_field_constrained_count: integer carrying unknown constraint keys",
+              "title": "Constrained Count"
+            }
+          },
+          "required": [
+            "shorthand_note",
+            "title",
+            "main_gadget"
+          ],
+          "title": "input_semantics_probe.Widget",
+          "type": "object"
+        }
+      },
+      "many": {
+        "concept_ref": "input_semantics_probe.Widget",
+        "presence": "plain",
+        "multiplicity": "variable",
+        "item_count": null,
+        "json_schema": {
+          "type": "array",
+          "items": {
+            "$defs": {
+              "ImageContent": {
+                "description": "An image",
+                "properties": {
+                  "url": {
+                    "description": "The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
+                    "title": "Url",
+                    "type": "string"
+                  },
+                  "public_url": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "The public URL of the image",
+                    "title": "Public Url"
+                  },
+                  "source_prompt": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "The source prompt of the image",
+                    "title": "Source Prompt"
+                  },
+                  "source_negative_prompt": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "The source negative prompt of the image",
+                    "title": "Source Negative Prompt"
+                  },
+                  "caption": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "The caption of the image",
+                    "title": "Caption"
+                  },
+                  "mime_type": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "The MIME type of the image",
+                    "title": "Mime Type"
+                  },
+                  "width": {
+                    "anyOf": [
+                      {
+                        "exclusiveMinimum": 0,
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "The width of the image, in pixels",
+                    "title": "Width"
+                  },
+                  "height": {
+                    "anyOf": [
+                      {
+                        "exclusiveMinimum": 0,
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "The height of the image, in pixels",
+                    "title": "Height"
+                  },
+                  "filename": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "The original filename of the image",
+                    "title": "Filename"
+                  }
+                },
+                "required": [
+                  "url"
+                ],
+                "title": "ImageContent",
+                "type": "object"
+              },
+              "input_semantics_probe__Gadget": {
+                "description": "PROBE_desc_concept_Gadget: mid-level structure nested inside Widget",
+                "properties": {
+                  "name": {
+                    "description": "PROBE_desc_field_gadget_name",
+                    "title": "Name",
+                    "type": "string"
+                  },
+                  "trinket": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/input_semantics_probe__Trinket"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "PROBE_desc_field_gadget_trinket: nested concept, level two"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "title": "input_semantics_probe__Gadget",
+                "type": "object"
+              },
+              "input_semantics_probe__Trinket": {
+                "description": "PROBE_desc_concept_Trinket: leaf structure for two-level nesting",
+                "properties": {
+                  "label": {
+                    "description": "PROBE_desc_field_trinket_label: shorthand string field on the nesting leaf",
+                    "title": "Label",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "label"
+                ],
+                "title": "input_semantics_probe__Trinket",
+                "type": "object"
+              }
+            },
+            "description": "PROBE_desc_concept_Widget: the full-matrix structure under audit",
+            "properties": {
+              "shorthand_note": {
+                "description": "PROBE_desc_field_shorthand_note: shorthand string field (implies text, required)",
+                "title": "Shorthand Note",
+                "type": "string"
+              },
+              "title": {
+                "description": "PROBE_desc_field_title: required text",
+                "title": "Title",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "PROBE_desc_field_subtitle: optional text (required omitted)",
+                "title": "Subtitle"
+              },
+              "summary": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "PROBE_desc_field_summary: optional text (required explicit false)",
+                "title": "Summary"
+              },
+              "motto": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": "PROBE_default_motto",
+                "description": "PROBE_desc_field_motto: text with default",
+                "title": "Motto"
+              },
+              "count": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": 42,
+                "description": "PROBE_desc_field_count: integer with default",
+                "title": "Count"
+              },
+              "enabled": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": true,
+                "description": "PROBE_desc_field_enabled: boolean with default",
+                "title": "Enabled"
+              },
+              "price": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": 9.99,
+                "description": "PROBE_desc_field_price: number with default",
+                "title": "Price"
+              },
+              "released_on": {
+                "anyOf": [
+                  {
+                    "format": "date",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": "2026-01-15",
+                "description": "PROBE_desc_field_released_on: date with default",
+                "title": "Released On"
+              },
+              "launched_at": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": "2026-01-15T12:30:00",
+                "description": "PROBE_desc_field_launched_at: datetime with default",
+                "title": "Launched At"
+              },
+              "daily_at": {
+                "anyOf": [
+                  {
+                    "format": "time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": "12:30:00",
+                "description": "PROBE_desc_field_daily_at: time with default",
+                "title": "Daily At"
+              },
+              "tags": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": [
+                  "PROBE_tag_a",
+                  "PROBE_tag_b"
+                ],
+                "description": "PROBE_desc_field_tags: list of text with default",
+                "title": "Tags"
+              },
+              "ratings": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "PROBE_desc_field_ratings: list of integer",
+                "title": "Ratings"
+              },
+              "matrix": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "items": {},
+                      "type": "array"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "PROBE_desc_field_matrix: nested list with unspecified inner item",
+                "title": "Matrix"
+              },
+              "gadgets": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "$ref": "#/$defs/input_semantics_probe__Gadget"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "PROBE_desc_field_gadgets: list of concept",
+                "title": "Gadgets"
+              },
+              "attributes": {
+                "anyOf": [
+                  {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "PROBE_desc_field_attributes: dict text to text",
+                "title": "Attributes"
+              },
+              "scores": {
+                "anyOf": [
+                  {
+                    "additionalProperties": {
+                      "type": "number"
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": {
+                  "speed": 5
+                },
+                "description": "PROBE_desc_field_scores: dict text to number with default",
+                "title": "Scores"
+              },
+              "milestones": {
+                "anyOf": [
+                  {
+                    "additionalProperties": {
+                      "format": "date",
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "PROBE_desc_field_milestones: dict text to date",
+                "title": "Milestones"
+              },
+              "main_gadget": {
+                "$ref": "#/$defs/input_semantics_probe__Gadget",
+                "description": "PROBE_desc_field_main_gadget: required concept field"
+              },
+              "icon": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ImageContent"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "PROBE_desc_field_icon: native concept field"
+              },
+              "tone": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "PROBE_choice_formal",
+                      "PROBE_choice_casual",
+                      "PROBE_choice_playful"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": "PROBE_choice_casual",
+                "description": "PROBE_desc_field_tone: choices with default",
+                "title": "Tone"
+              },
+              "only_choice": {
+                "anyOf": [
+                  {
+                    "const": "PROBE_choice_single",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "PROBE_desc_field_only_choice: single-entry choice list",
+                "title": "Only Choice"
+              },
+              "typed_choice": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "PROBE_choice_typed_a",
+                      "PROBE_choice_typed_b"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "PROBE_desc_field_typed_choice: type AND choices together",
+                "title": "Typed Choice"
+              },
+              "constrained_count": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "PROBE_desc_field_constrained_count: integer carrying unknown constraint keys",
+                "title": "Constrained Count"
+              }
+            },
+            "required": [
+              "shorthand_note",
+              "title",
+              "main_gadget"
+            ],
+            "title": "input_semantics_probe.Widget",
+            "type": "object"
+          }
+        }
+      },
+      "two": {
+        "concept_ref": "input_semantics_probe.Gadget",
+        "presence": "plain",
+        "multiplicity": "fixed",
+        "item_count": 2,
+        "json_schema": {
+          "type": "array",
+          "items": {
+            "$defs": {
+              "input_semantics_probe__Trinket": {
+                "description": "PROBE_desc_concept_Trinket: leaf structure for two-level nesting",
+                "properties": {
+                  "label": {
+                    "description": "PROBE_desc_field_trinket_label: shorthand string field on the nesting leaf",
+                    "title": "Label",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "label"
+                ],
+                "title": "input_semantics_probe__Trinket",
+                "type": "object"
+              }
+            },
+            "description": "PROBE_desc_concept_Gadget: mid-level structure nested inside Widget",
+            "properties": {
+              "name": {
+                "description": "PROBE_desc_field_gadget_name",
+                "title": "Name",
+                "type": "string"
+              },
+              "trinket": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/input_semantics_probe__Trinket"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "PROBE_desc_field_gadget_trinket: nested concept, level two"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "title": "input_semantics_probe.Gadget",
+            "type": "object"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      },
+      "forced": {
+        "concept_ref": "native.Text",
+        "presence": "force",
+        "multiplicity": "single",
+        "item_count": null,
+        "json_schema": {
+          "description": "A text",
+          "properties": {
+            "text": {
+              "description": "The text",
+              "title": "Text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "title": "native.Text",
+          "type": "object"
+        }
+      }
+    },
+    "output": {
+      "concept_ref": "native.Text",
+      "multiplicity": "single",
+      "item_count": null,
+      "optional": false
+    }
+  },
+  "input_semantics_probe.probe_refined": {
+    "inputs": {
+      "refdoc": {
+        "concept_ref": "input_semantics_probe.RefinedDoc",
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
+        "json_schema": {
+          "description": "PROBE_desc_concept_RefinedDoc: refinement of a native concept",
+          "properties": {
+            "url": {
+              "description": "The document URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
+              "title": "Url",
+              "type": "string"
+            },
+            "public_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The public HTTPS URL of the document",
+              "title": "Public Url"
+            },
+            "mime_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The MIME type of the document",
+              "title": "Mime Type"
+            },
+            "filename": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The original filename of the document",
+              "title": "Filename"
+            },
+            "title": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The title of the document or source",
+              "title": "Title"
+            },
+            "snippet": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "A text snippet or excerpt from the document",
+              "title": "Snippet"
+            }
+          },
+          "required": [
+            "url"
+          ],
+          "title": "input_semantics_probe.RefinedDoc",
+          "type": "object"
+        }
+      },
+      "special": {
+        "concept_ref": "input_semantics_probe.SpecialEntity",
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
+        "json_schema": {
+          "description": "PROBE_desc_concept_SpecialEntity: refines a custom concept",
+          "properties": {
+            "ident": {
+              "description": "PROBE_desc_field_base_ident: inherited field",
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          "required": [
+            "ident"
+          ],
+          "title": "input_semantics_probe.SpecialEntity",
+          "type": "object"
+        }
+      },
+      "extra": {
+        "concept_ref": "input_semantics_probe.ExtraSpecialEntity",
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
+        "json_schema": {
+          "description": "PROBE_desc_concept_ExtraSpecialEntity: second link of the refinement chain",
+          "properties": {
+            "ident": {
+              "description": "PROBE_desc_field_base_ident: inherited field",
+              "title": "Ident",
+              "type": "string"
+            }
+          },
+          "required": [
+            "ident"
+          ],
+          "title": "input_semantics_probe.ExtraSpecialEntity",
+          "type": "object"
+        }
+      },
+      "classbacked": {
+        "concept_ref": "input_semantics_probe.ClassBacked",
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
+        "json_schema": {
+          "description": "PROBE_desc_concept_ClassBacked: structure declared as an existing class name",
+          "properties": {
+            "text": {
+              "description": "The text",
+              "title": "Text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "title": "input_semantics_probe.ClassBacked",
+          "type": "object"
+        }
+      },
+      "stringnote": {
+        "concept_ref": "input_semantics_probe.StringNote",
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
+        "json_schema": {
+          "description": "PROBE_desc_concept_StringNote: a concept declared as a bare string",
+          "properties": {
+            "text": {
+              "description": "The text",
+              "title": "Text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "title": "input_semantics_probe.StringNote",
+          "type": "object"
+        }
+      }
+    },
+    "output": {
+      "concept_ref": "native.Text",
+      "multiplicity": "single",
+      "item_count": null,
+      "optional": false
+    }
+  }
+}

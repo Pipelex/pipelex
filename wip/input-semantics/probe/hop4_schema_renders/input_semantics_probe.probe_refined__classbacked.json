@@ -1,0 +1,18 @@
+{
+  "concept": "input_semantics_probe.ClassBacked",
+  "content": {
+    "description": "PROBE_desc_concept_ClassBacked: structure declared as an existing class name",
+    "properties": {
+      "text": {
+        "description": "The text",
+        "title": "Text",
+        "type": "string"
+      }
+    },
+    "required": [
+      "text"
+    ],
+    "title": "input_semantics_probe.ClassBacked",
+    "type": "object"
+  }
+}

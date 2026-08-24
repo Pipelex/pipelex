@@ -6,14 +6,14 @@ modules; what is tested here is how the command reads pytest's exit codes.
 
 from __future__ import annotations
 
-import subprocess  # noqa: S404
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 from typing import TYPE_CHECKING
 
 import pytest
 
 from pipelex.cli.dev_cli.commands.store_test_durations_cmd import (
     PYTEST_EXIT_NO_TESTS_COLLECTED,
-    _collect_node_ids,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+    _collect_node_ids,  # pyright: ignore[reportPrivateUsage]
 )
 
 if TYPE_CHECKING:

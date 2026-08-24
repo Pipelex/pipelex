@@ -58,6 +58,7 @@ from pipelex.system.registries.func_registry import pipe_func
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.text_content import TextContent
 
+
 @pipe_func()  # Required decorator for auto-discovery
 async def concatenate_texts(working_memory: WorkingMemory) -> TextContent:
     """

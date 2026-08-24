@@ -12,11 +12,11 @@ from pipelex.reporting.reporting_protocol import ReportingProtocol
 def _make_azure_rest_img_gen_worker(
     *,
     inference_model: InferenceModelSpec,
-    backend: InferenceBackend,  # noqa: ARG001 - uniform MakeWorkerFn signature; this REST worker builds its own client
-    sdk_clients: SdkClientRegistry,  # noqa: ARG001 - direct construction, no SDK-client caching
+    backend: InferenceBackend,  # ruff: ignore[unused-function-argument] - uniform MakeWorkerFn signature; this REST worker builds its own client
+    sdk_clients: SdkClientRegistry,  # ruff: ignore[unused-function-argument] - direct construction, no SDK-client caching
     reporting_delegate: ReportingProtocol | None,
 ) -> InferenceWorkerAbstract:
-    from pipelex.providers.azure_rest.azure_img_gen_worker import AzureImgGenWorker  # noqa: PLC0415
+    from pipelex.providers.azure_rest.azure_img_gen_worker import AzureImgGenWorker  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
     return AzureImgGenWorker(

@@ -1,0 +1,1101 @@
+{
+  "input_semantics_probe.probe_single": {
+    "fields": [
+      {
+        "kind": "object",
+        "name": "widget",
+        "concept_ref": "input_semantics_probe.Widget",
+        "description": "PROBE_desc_concept_Widget: the full-matrix structure under audit",
+        "required": true,
+        "presence": "plain",
+        "gating": true,
+        "fields": [
+          {
+            "kind": "text",
+            "name": "shorthand_note",
+            "description": "PROBE_desc_field_shorthand_note: shorthand string field (implies text, required)",
+            "required": true
+          },
+          {
+            "kind": "text",
+            "name": "title",
+            "description": "PROBE_desc_field_title: required text",
+            "required": true
+          },
+          {
+            "kind": "text",
+            "name": "subtitle",
+            "description": "PROBE_desc_field_subtitle: optional text (required omitted)",
+            "required": false
+          },
+          {
+            "kind": "text",
+            "name": "summary",
+            "description": "PROBE_desc_field_summary: optional text (required explicit false)",
+            "required": false
+          },
+          {
+            "kind": "text",
+            "name": "motto",
+            "description": "PROBE_desc_field_motto: text with default",
+            "required": false,
+            "default_value": "PROBE_default_motto"
+          },
+          {
+            "kind": "number",
+            "name": "count",
+            "description": "PROBE_desc_field_count: integer with default",
+            "required": false,
+            "default_value": 42,
+            "integer": true
+          },
+          {
+            "kind": "boolean",
+            "name": "enabled",
+            "description": "PROBE_desc_field_enabled: boolean with default",
+            "required": false,
+            "default_value": true
+          },
+          {
+            "kind": "number",
+            "name": "price",
+            "description": "PROBE_desc_field_price: number with default",
+            "required": false,
+            "default_value": 9.99,
+            "integer": false
+          },
+          {
+            "kind": "date",
+            "name": "released_on",
+            "description": "PROBE_desc_field_released_on: date with default",
+            "required": false,
+            "default_value": "2026-01-15",
+            "datetime": false
+          },
+          {
+            "kind": "date",
+            "name": "launched_at",
+            "description": "PROBE_desc_field_launched_at: datetime with default",
+            "required": false,
+            "default_value": "2026-01-15T12:30:00",
+            "datetime": true
+          },
+          {
+            "kind": "text",
+            "name": "daily_at",
+            "description": "PROBE_desc_field_daily_at: time with default",
+            "required": false,
+            "default_value": "12:30:00",
+            "format": "time"
+          },
+          {
+            "kind": "list",
+            "name": "tags",
+            "description": "PROBE_desc_field_tags: list of text with default",
+            "required": false,
+            "default_value": [
+              "PROBE_tag_a",
+              "PROBE_tag_b"
+            ],
+            "item": {
+              "kind": "text",
+              "name": "tags",
+              "required": true
+            }
+          },
+          {
+            "kind": "list",
+            "name": "ratings",
+            "description": "PROBE_desc_field_ratings: list of integer",
+            "required": false,
+            "item": {
+              "kind": "number",
+              "name": "ratings",
+              "required": true,
+              "integer": true
+            }
+          },
+          {
+            "kind": "list",
+            "name": "matrix",
+            "description": "PROBE_desc_field_matrix: nested list with unspecified inner item",
+            "required": false,
+            "item": {
+              "kind": "unknown",
+              "name": "matrix",
+              "required": true
+            }
+          },
+          {
+            "kind": "list",
+            "name": "gadgets",
+            "concept_ref": "input_semantics_probe.Gadget",
+            "description": "PROBE_desc_field_gadgets: list of concept",
+            "required": false,
+            "item": {
+              "kind": "object",
+              "name": "gadgets",
+              "concept_ref": "input_semantics_probe.Gadget",
+              "description": "PROBE_desc_concept_Gadget: mid-level structure nested inside Widget",
+              "required": true,
+              "fields": [
+                {
+                  "kind": "text",
+                  "name": "name",
+                  "description": "PROBE_desc_field_gadget_name",
+                  "required": true
+                },
+                {
+                  "kind": "object",
+                  "name": "trinket",
+                  "concept_ref": "input_semantics_probe.Trinket",
+                  "description": "PROBE_desc_field_gadget_trinket: nested concept, level two",
+                  "required": false,
+                  "fields": [
+                    {
+                      "kind": "text",
+                      "name": "label",
+                      "description": "PROBE_desc_field_trinket_label: shorthand string field on the nesting leaf",
+                      "required": true
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "kind": "unknown",
+            "name": "attributes",
+            "description": "PROBE_desc_field_attributes: dict text to text",
+            "required": false
+          },
+          {
+            "kind": "unknown",
+            "name": "scores",
+            "description": "PROBE_desc_field_scores: dict text to number with default",
+            "required": false,
+            "default_value": {
+              "speed": 5
+            }
+          },
+          {
+            "kind": "unknown",
+            "name": "milestones",
+            "description": "PROBE_desc_field_milestones: dict text to date",
+            "required": false
+          },
+          {
+            "kind": "object",
+            "name": "main_gadget",
+            "concept_ref": "input_semantics_probe.Gadget",
+            "description": "PROBE_desc_field_main_gadget: required concept field",
+            "required": true,
+            "fields": [
+              {
+                "kind": "text",
+                "name": "name",
+                "description": "PROBE_desc_field_gadget_name",
+                "required": true
+              },
+              {
+                "kind": "object",
+                "name": "trinket",
+                "concept_ref": "input_semantics_probe.Trinket",
+                "description": "PROBE_desc_field_gadget_trinket: nested concept, level two",
+                "required": false,
+                "fields": [
+                  {
+                    "kind": "text",
+                    "name": "label",
+                    "description": "PROBE_desc_field_trinket_label: shorthand string field on the nesting leaf",
+                    "required": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "image",
+            "name": "icon",
+            "concept_ref": "native.Image",
+            "description": "PROBE_desc_field_icon: native concept field",
+            "required": false
+          },
+          {
+            "kind": "enum",
+            "name": "tone",
+            "description": "PROBE_desc_field_tone: choices with default",
+            "required": false,
+            "default_value": "PROBE_choice_casual",
+            "choices": [
+              "PROBE_choice_formal",
+              "PROBE_choice_casual",
+              "PROBE_choice_playful"
+            ]
+          },
+          {
+            "kind": "enum",
+            "name": "only_choice",
+            "description": "PROBE_desc_field_only_choice: single-entry choice list",
+            "required": false,
+            "choices": [
+              "PROBE_choice_single"
+            ]
+          },
+          {
+            "kind": "enum",
+            "name": "typed_choice",
+            "description": "PROBE_desc_field_typed_choice: type AND choices together",
+            "required": false,
+            "choices": [
+              "PROBE_choice_typed_a",
+              "PROBE_choice_typed_b"
+            ]
+          },
+          {
+            "kind": "number",
+            "name": "constrained_count",
+            "description": "PROBE_desc_field_constrained_count: integer carrying unknown constraint keys",
+            "required": false,
+            "integer": true
+          }
+        ]
+      },
+      {
+        "kind": "object",
+        "name": "gadget_q",
+        "concept_ref": "input_semantics_probe.Gadget",
+        "description": "PROBE_desc_concept_Gadget: mid-level structure nested inside Widget",
+        "required": true,
+        "presence": "plain",
+        "gating": true,
+        "fields": [
+          {
+            "kind": "text",
+            "name": "name",
+            "description": "PROBE_desc_field_gadget_name",
+            "required": true
+          },
+          {
+            "kind": "object",
+            "name": "trinket",
+            "concept_ref": "input_semantics_probe.Trinket",
+            "description": "PROBE_desc_field_gadget_trinket: nested concept, level two",
+            "required": false,
+            "fields": [
+              {
+                "kind": "text",
+                "name": "label",
+                "description": "PROBE_desc_field_trinket_label: shorthand string field on the nesting leaf",
+                "required": true
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "prose",
+        "name": "note",
+        "concept_ref": "input_semantics_probe.PlainNote",
+        "refines": [
+          "native.Text"
+        ],
+        "description": "PROBE_desc_concept_PlainNote: description-only concept (basic blueprint)",
+        "required": true,
+        "presence": "plain",
+        "gating": true
+      }
+    ]
+  },
+  "input_semantics_probe.probe_native_inputs": {
+    "fields": [
+      {
+        "kind": "prose",
+        "name": "text_in",
+        "concept_ref": "native.Text",
+        "description": "A text",
+        "required": true,
+        "presence": "plain",
+        "gating": true
+      },
+      {
+        "kind": "image",
+        "name": "image_in",
+        "concept_ref": "native.Image",
+        "description": "An image",
+        "required": true,
+        "presence": "plain",
+        "gating": true
+      },
+      {
+        "kind": "document",
+        "name": "document_in",
+        "concept_ref": "native.Document",
+        "description": "A document",
+        "required": true,
+        "presence": "plain",
+        "gating": true
+      },
+      {
+        "kind": "object",
+        "name": "page_in",
+        "concept_ref": "native.Page",
+        "description": "The content of a page of a document, comprising text and linked images and an optional page view image",
+        "required": true,
+        "presence": "plain",
+        "gating": true,
+        "fields": [
+          {
+            "kind": "object",
+            "name": "text_and_images",
+            "concept_ref": "native.TextAndImages",
+            "description": "The text and images content extracted from the page",
+            "required": true,
+            "fields": [
+              {
+                "kind": "prose",
+                "name": "text",
+                "concept_ref": "native.Text",
+                "description": "A text content",
+                "required": false
+              },
+              {
+                "kind": "list",
+                "name": "images",
+                "concept_ref": "native.Image",
+                "description": "A list of images that were extracted from the text",
+                "required": false,
+                "item": {
+                  "kind": "image",
+                  "name": "images",
+                  "concept_ref": "native.Image",
+                  "description": "An image",
+                  "required": true
+                }
+              },
+              {
+                "kind": "text",
+                "name": "raw_html",
+                "description": "The raw HTML of the fetched page, if requested",
+                "required": false
+              }
+            ]
+          },
+          {
+            "kind": "image",
+            "name": "page_view",
+            "concept_ref": "native.Image",
+            "description": "The screenshot of the page",
+            "required": false
+          }
+        ]
+      },
+      {
+        "kind": "number",
+        "name": "number_in",
+        "concept_ref": "native.Number",
+        "description": "A number",
+        "required": true,
+        "presence": "plain",
+        "gating": true,
+        "integer": false
+      },
+      {
+        "kind": "date",
+        "name": "date_in",
+        "concept_ref": "native.Date",
+        "description": "A calendar date, optionally with a time of day — as precise as its source states.",
+        "required": true,
+        "presence": "plain",
+        "gating": true,
+        "datetime": false
+      },
+      {
+        "kind": "text",
+        "name": "time_in",
+        "concept_ref": "native.Time",
+        "description": "A time of day, optionally with a UTC offset — as precise as its source states.",
+        "required": true,
+        "presence": "plain",
+        "gating": true,
+        "format": "time"
+      },
+      {
+        "kind": "prose",
+        "name": "html_in",
+        "concept_ref": "native.Html",
+        "description": "HTML content",
+        "required": true,
+        "presence": "plain",
+        "gating": true
+      },
+      {
+        "kind": "boolean",
+        "name": "yesno_in",
+        "concept_ref": "native.YesNo",
+        "description": "The answer to a yes/no question",
+        "required": true,
+        "presence": "plain",
+        "gating": true
+      }
+    ]
+  },
+  "input_semantics_probe.probe_markers": {
+    "fields": [
+      {
+        "kind": "object",
+        "name": "opt",
+        "concept_ref": "input_semantics_probe.Widget",
+        "description": "PROBE_desc_concept_Widget: the full-matrix structure under audit",
+        "required": false,
+        "presence": "optional",
+        "gating": false,
+        "fields": [
+          {
+            "kind": "text",
+            "name": "shorthand_note",
+            "description": "PROBE_desc_field_shorthand_note: shorthand string field (implies text, required)",
+            "required": true
+          },
+          {
+            "kind": "text",
+            "name": "title",
+            "description": "PROBE_desc_field_title: required text",
+            "required": true
+          },
+          {
+            "kind": "text",
+            "name": "subtitle",
+            "description": "PROBE_desc_field_subtitle: optional text (required omitted)",
+            "required": false
+          },
+          {
+            "kind": "text",
+            "name": "summary",
+            "description": "PROBE_desc_field_summary: optional text (required explicit false)",
+            "required": false
+          },
+          {
+            "kind": "text",
+            "name": "motto",
+            "description": "PROBE_desc_field_motto: text with default",
+            "required": false,
+            "default_value": "PROBE_default_motto"
+          },
+          {
+            "kind": "number",
+            "name": "count",
+            "description": "PROBE_desc_field_count: integer with default",
+            "required": false,
+            "default_value": 42,
+            "integer": true
+          },
+          {
+            "kind": "boolean",
+            "name": "enabled",
+            "description": "PROBE_desc_field_enabled: boolean with default",
+            "required": false,
+            "default_value": true
+          },
+          {
+            "kind": "number",
+            "name": "price",
+            "description": "PROBE_desc_field_price: number with default",
+            "required": false,
+            "default_value": 9.99,
+            "integer": false
+          },
+          {
+            "kind": "date",
+            "name": "released_on",
+            "description": "PROBE_desc_field_released_on: date with default",
+            "required": false,
+            "default_value": "2026-01-15",
+            "datetime": false
+          },
+          {
+            "kind": "date",
+            "name": "launched_at",
+            "description": "PROBE_desc_field_launched_at: datetime with default",
+            "required": false,
+            "default_value": "2026-01-15T12:30:00",
+            "datetime": true
+          },
+          {
+            "kind": "text",
+            "name": "daily_at",
+            "description": "PROBE_desc_field_daily_at: time with default",
+            "required": false,
+            "default_value": "12:30:00",
+            "format": "time"
+          },
+          {
+            "kind": "list",
+            "name": "tags",
+            "description": "PROBE_desc_field_tags: list of text with default",
+            "required": false,
+            "default_value": [
+              "PROBE_tag_a",
+              "PROBE_tag_b"
+            ],
+            "item": {
+              "kind": "text",
+              "name": "tags",
+              "required": true
+            }
+          },
+          {
+            "kind": "list",
+            "name": "ratings",
+            "description": "PROBE_desc_field_ratings: list of integer",
+            "required": false,
+            "item": {
+              "kind": "number",
+              "name": "ratings",
+              "required": true,
+              "integer": true
+            }
+          },
+          {
+            "kind": "list",
+            "name": "matrix",
+            "description": "PROBE_desc_field_matrix: nested list with unspecified inner item",
+            "required": false,
+            "item": {
+              "kind": "unknown",
+              "name": "matrix",
+              "required": true
+            }
+          },
+          {
+            "kind": "list",
+            "name": "gadgets",
+            "concept_ref": "input_semantics_probe.Gadget",
+            "description": "PROBE_desc_field_gadgets: list of concept",
+            "required": false,
+            "item": {
+              "kind": "object",
+              "name": "gadgets",
+              "concept_ref": "input_semantics_probe.Gadget",
+              "description": "PROBE_desc_concept_Gadget: mid-level structure nested inside Widget",
+              "required": true,
+              "fields": [
+                {
+                  "kind": "text",
+                  "name": "name",
+                  "description": "PROBE_desc_field_gadget_name",
+                  "required": true
+                },
+                {
+                  "kind": "object",
+                  "name": "trinket",
+                  "concept_ref": "input_semantics_probe.Trinket",
+                  "description": "PROBE_desc_field_gadget_trinket: nested concept, level two",
+                  "required": false,
+                  "fields": [
+                    {
+                      "kind": "text",
+                      "name": "label",
+                      "description": "PROBE_desc_field_trinket_label: shorthand string field on the nesting leaf",
+                      "required": true
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "kind": "unknown",
+            "name": "attributes",
+            "description": "PROBE_desc_field_attributes: dict text to text",
+            "required": false
+          },
+          {
+            "kind": "unknown",
+            "name": "scores",
+            "description": "PROBE_desc_field_scores: dict text to number with default",
+            "required": false,
+            "default_value": {
+              "speed": 5
+            }
+          },
+          {
+            "kind": "unknown",
+            "name": "milestones",
+            "description": "PROBE_desc_field_milestones: dict text to date",
+            "required": false
+          },
+          {
+            "kind": "object",
+            "name": "main_gadget",
+            "concept_ref": "input_semantics_probe.Gadget",
+            "description": "PROBE_desc_field_main_gadget: required concept field",
+            "required": true,
+            "fields": [
+              {
+                "kind": "text",
+                "name": "name",
+                "description": "PROBE_desc_field_gadget_name",
+                "required": true
+              },
+              {
+                "kind": "object",
+                "name": "trinket",
+                "concept_ref": "input_semantics_probe.Trinket",
+                "description": "PROBE_desc_field_gadget_trinket: nested concept, level two",
+                "required": false,
+                "fields": [
+                  {
+                    "kind": "text",
+                    "name": "label",
+                    "description": "PROBE_desc_field_trinket_label: shorthand string field on the nesting leaf",
+                    "required": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "image",
+            "name": "icon",
+            "concept_ref": "native.Image",
+            "description": "PROBE_desc_field_icon: native concept field",
+            "required": false
+          },
+          {
+            "kind": "enum",
+            "name": "tone",
+            "description": "PROBE_desc_field_tone: choices with default",
+            "required": false,
+            "default_value": "PROBE_choice_casual",
+            "choices": [
+              "PROBE_choice_formal",
+              "PROBE_choice_casual",
+              "PROBE_choice_playful"
+            ]
+          },
+          {
+            "kind": "enum",
+            "name": "only_choice",
+            "description": "PROBE_desc_field_only_choice: single-entry choice list",
+            "required": false,
+            "choices": [
+              "PROBE_choice_single"
+            ]
+          },
+          {
+            "kind": "enum",
+            "name": "typed_choice",
+            "description": "PROBE_desc_field_typed_choice: type AND choices together",
+            "required": false,
+            "choices": [
+              "PROBE_choice_typed_a",
+              "PROBE_choice_typed_b"
+            ]
+          },
+          {
+            "kind": "number",
+            "name": "constrained_count",
+            "description": "PROBE_desc_field_constrained_count: integer carrying unknown constraint keys",
+            "required": false,
+            "integer": true
+          }
+        ]
+      },
+      {
+        "kind": "list",
+        "name": "many",
+        "concept_ref": "input_semantics_probe.Widget",
+        "description": "PROBE_desc_concept_Widget: the full-matrix structure under audit",
+        "required": true,
+        "presence": "plain",
+        "gating": false,
+        "item": {
+          "kind": "object",
+          "name": "many",
+          "concept_ref": "input_semantics_probe.Widget",
+          "description": "PROBE_desc_concept_Widget: the full-matrix structure under audit",
+          "required": true,
+          "fields": [
+            {
+              "kind": "text",
+              "name": "shorthand_note",
+              "description": "PROBE_desc_field_shorthand_note: shorthand string field (implies text, required)",
+              "required": true
+            },
+            {
+              "kind": "text",
+              "name": "title",
+              "description": "PROBE_desc_field_title: required text",
+              "required": true
+            },
+            {
+              "kind": "text",
+              "name": "subtitle",
+              "description": "PROBE_desc_field_subtitle: optional text (required omitted)",
+              "required": false
+            },
+            {
+              "kind": "text",
+              "name": "summary",
+              "description": "PROBE_desc_field_summary: optional text (required explicit false)",
+              "required": false
+            },
+            {
+              "kind": "text",
+              "name": "motto",
+              "description": "PROBE_desc_field_motto: text with default",
+              "required": false,
+              "default_value": "PROBE_default_motto"
+            },
+            {
+              "kind": "number",
+              "name": "count",
+              "description": "PROBE_desc_field_count: integer with default",
+              "required": false,
+              "default_value": 42,
+              "integer": true
+            },
+            {
+              "kind": "boolean",
+              "name": "enabled",
+              "description": "PROBE_desc_field_enabled: boolean with default",
+              "required": false,
+              "default_value": true
+            },
+            {
+              "kind": "number",
+              "name": "price",
+              "description": "PROBE_desc_field_price: number with default",
+              "required": false,
+              "default_value": 9.99,
+              "integer": false
+            },
+            {
+              "kind": "date",
+              "name": "released_on",
+              "description": "PROBE_desc_field_released_on: date with default",
+              "required": false,
+              "default_value": "2026-01-15",
+              "datetime": false
+            },
+            {
+              "kind": "date",
+              "name": "launched_at",
+              "description": "PROBE_desc_field_launched_at: datetime with default",
+              "required": false,
+              "default_value": "2026-01-15T12:30:00",
+              "datetime": true
+            },
+            {
+              "kind": "text",
+              "name": "daily_at",
+              "description": "PROBE_desc_field_daily_at: time with default",
+              "required": false,
+              "default_value": "12:30:00",
+              "format": "time"
+            },
+            {
+              "kind": "list",
+              "name": "tags",
+              "description": "PROBE_desc_field_tags: list of text with default",
+              "required": false,
+              "default_value": [
+                "PROBE_tag_a",
+                "PROBE_tag_b"
+              ],
+              "item": {
+                "kind": "text",
+                "name": "tags",
+                "required": true
+              }
+            },
+            {
+              "kind": "list",
+              "name": "ratings",
+              "description": "PROBE_desc_field_ratings: list of integer",
+              "required": false,
+              "item": {
+                "kind": "number",
+                "name": "ratings",
+                "required": true,
+                "integer": true
+              }
+            },
+            {
+              "kind": "list",
+              "name": "matrix",
+              "description": "PROBE_desc_field_matrix: nested list with unspecified inner item",
+              "required": false,
+              "item": {
+                "kind": "unknown",
+                "name": "matrix",
+                "required": true
+              }
+            },
+            {
+              "kind": "list",
+              "name": "gadgets",
+              "concept_ref": "input_semantics_probe.Gadget",
+              "description": "PROBE_desc_field_gadgets: list of concept",
+              "required": false,
+              "item": {
+                "kind": "object",
+                "name": "gadgets",
+                "concept_ref": "input_semantics_probe.Gadget",
+                "description": "PROBE_desc_concept_Gadget: mid-level structure nested inside Widget",
+                "required": true,
+                "fields": [
+                  {
+                    "kind": "text",
+                    "name": "name",
+                    "description": "PROBE_desc_field_gadget_name",
+                    "required": true
+                  },
+                  {
+                    "kind": "object",
+                    "name": "trinket",
+                    "concept_ref": "input_semantics_probe.Trinket",
+                    "description": "PROBE_desc_field_gadget_trinket: nested concept, level two",
+                    "required": false,
+                    "fields": [
+                      {
+                        "kind": "text",
+                        "name": "label",
+                        "description": "PROBE_desc_field_trinket_label: shorthand string field on the nesting leaf",
+                        "required": true
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "kind": "unknown",
+              "name": "attributes",
+              "description": "PROBE_desc_field_attributes: dict text to text",
+              "required": false
+            },
+            {
+              "kind": "unknown",
+              "name": "scores",
+              "description": "PROBE_desc_field_scores: dict text to number with default",
+              "required": false,
+              "default_value": {
+                "speed": 5
+              }
+            },
+            {
+              "kind": "unknown",
+              "name": "milestones",
+              "description": "PROBE_desc_field_milestones: dict text to date",
+              "required": false
+            },
+            {
+              "kind": "object",
+              "name": "main_gadget",
+              "concept_ref": "input_semantics_probe.Gadget",
+              "description": "PROBE_desc_field_main_gadget: required concept field",
+              "required": true,
+              "fields": [
+                {
+                  "kind": "text",
+                  "name": "name",
+                  "description": "PROBE_desc_field_gadget_name",
+                  "required": true
+                },
+                {
+                  "kind": "object",
+                  "name": "trinket",
+                  "concept_ref": "input_semantics_probe.Trinket",
+                  "description": "PROBE_desc_field_gadget_trinket: nested concept, level two",
+                  "required": false,
+                  "fields": [
+                    {
+                      "kind": "text",
+                      "name": "label",
+                      "description": "PROBE_desc_field_trinket_label: shorthand string field on the nesting leaf",
+                      "required": true
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "kind": "image",
+              "name": "icon",
+              "concept_ref": "native.Image",
+              "description": "PROBE_desc_field_icon: native concept field",
+              "required": false
+            },
+            {
+              "kind": "enum",
+              "name": "tone",
+              "description": "PROBE_desc_field_tone: choices with default",
+              "required": false,
+              "default_value": "PROBE_choice_casual",
+              "choices": [
+                "PROBE_choice_formal",
+                "PROBE_choice_casual",
+                "PROBE_choice_playful"
+              ]
+            },
+            {
+              "kind": "enum",
+              "name": "only_choice",
+              "description": "PROBE_desc_field_only_choice: single-entry choice list",
+              "required": false,
+              "choices": [
+                "PROBE_choice_single"
+              ]
+            },
+            {
+              "kind": "enum",
+              "name": "typed_choice",
+              "description": "PROBE_desc_field_typed_choice: type AND choices together",
+              "required": false,
+              "choices": [
+                "PROBE_choice_typed_a",
+                "PROBE_choice_typed_b"
+              ]
+            },
+            {
+              "kind": "number",
+              "name": "constrained_count",
+              "description": "PROBE_desc_field_constrained_count: integer carrying unknown constraint keys",
+              "required": false,
+              "integer": true
+            }
+          ]
+        }
+      },
+      {
+        "kind": "list",
+        "name": "two",
+        "concept_ref": "input_semantics_probe.Gadget",
+        "description": "PROBE_desc_concept_Gadget: mid-level structure nested inside Widget",
+        "required": true,
+        "presence": "plain",
+        "gating": true,
+        "item": {
+          "kind": "object",
+          "name": "two",
+          "concept_ref": "input_semantics_probe.Gadget",
+          "description": "PROBE_desc_concept_Gadget: mid-level structure nested inside Widget",
+          "required": true,
+          "fields": [
+            {
+              "kind": "text",
+              "name": "name",
+              "description": "PROBE_desc_field_gadget_name",
+              "required": true
+            },
+            {
+              "kind": "object",
+              "name": "trinket",
+              "concept_ref": "input_semantics_probe.Trinket",
+              "description": "PROBE_desc_field_gadget_trinket: nested concept, level two",
+              "required": false,
+              "fields": [
+                {
+                  "kind": "text",
+                  "name": "label",
+                  "description": "PROBE_desc_field_trinket_label: shorthand string field on the nesting leaf",
+                  "required": true
+                }
+              ]
+            }
+          ]
+        },
+        "item_count": 2
+      },
+      {
+        "kind": "prose",
+        "name": "forced",
+        "concept_ref": "native.Text",
+        "description": "A text",
+        "required": true,
+        "presence": "force",
+        "gating": true
+      }
+    ]
+  },
+  "input_semantics_probe.probe_refined": {
+    "fields": [
+      {
+        "kind": "document",
+        "name": "refdoc",
+        "concept_ref": "input_semantics_probe.RefinedDoc",
+        "refines": [
+          "native.Document"
+        ],
+        "description": "PROBE_desc_concept_RefinedDoc: refinement of a native concept",
+        "required": true,
+        "presence": "plain",
+        "gating": true
+      },
+      {
+        "kind": "object",
+        "name": "special",
+        "concept_ref": "input_semantics_probe.SpecialEntity",
+        "refines": [
+          "input_semantics_probe.BaseEntity"
+        ],
+        "description": "PROBE_desc_concept_SpecialEntity: refines a custom concept",
+        "required": true,
+        "presence": "plain",
+        "gating": true,
+        "fields": [
+          {
+            "kind": "text",
+            "name": "ident",
+            "description": "PROBE_desc_field_base_ident: inherited field",
+            "required": true
+          }
+        ]
+      },
+      {
+        "kind": "object",
+        "name": "extra",
+        "concept_ref": "input_semantics_probe.ExtraSpecialEntity",
+        "refines": [
+          "input_semantics_probe.SpecialEntity",
+          "input_semantics_probe.BaseEntity"
+        ],
+        "description": "PROBE_desc_concept_ExtraSpecialEntity: second link of the refinement chain",
+        "required": true,
+        "presence": "plain",
+        "gating": true,
+        "fields": [
+          {
+            "kind": "text",
+            "name": "ident",
+            "description": "PROBE_desc_field_base_ident: inherited field",
+            "required": true
+          }
+        ]
+      },
+      {
+        "kind": "prose",
+        "name": "classbacked",
+        "concept_ref": "input_semantics_probe.ClassBacked",
+        "description": "PROBE_desc_concept_ClassBacked: structure declared as an existing class name",
+        "required": true,
+        "presence": "plain",
+        "gating": true
+      },
+      {
+        "kind": "prose",
+        "name": "stringnote",
+        "concept_ref": "input_semantics_probe.StringNote",
+        "refines": [
+          "native.Text"
+        ],
+        "description": "PROBE_desc_concept_StringNote: a concept declared as a bare string",
+        "required": true,
+        "presence": "plain",
+        "gating": true
+      }
+    ]
+  }
+}

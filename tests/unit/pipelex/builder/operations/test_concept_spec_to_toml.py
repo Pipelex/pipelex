@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import tomllib
 from typing import Any
 
 from pipelex.builder.concept.concept_spec import ConceptStructureSpec, ConceptStructureSpecFieldType
@@ -11,6 +12,8 @@ from pipelex.builder.operations.concept_ops import (
     parse_concept_spec,
     structure_field_to_dict,
 )
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
 
 
 class TestConceptSpecToToml:
@@ -58,7 +61,7 @@ class TestConceptSpecToToml:
             default_value=0,
         )
         result = structure_field_to_dict(field_spec)
-        assert result["default"] == 0
+        assert result["default_value"] == 0, "The language key is default_value — `default` evaporates on re-load (E8)"
 
     def test_concept_field_with_concept_ref(self) -> None:
         field_spec = ConceptStructureSpec(
@@ -102,7 +105,7 @@ class TestConceptSpecToToml:
         )
         result = structure_field_to_dict(field_spec)
         assert result["choices"] == ["active", "inactive", "pending"]
-        assert result["default"] == "pending"
+        assert result["default_value"] == "pending"
 
     # -- concept_spec_to_toml ---------------------------------------------
 
@@ -217,6 +220,31 @@ class TestConceptSpecToToml:
         concept_spec = parse_concept_spec(spec_data)
         toml_output = concept_spec_to_toml(concept_spec)
         assert "structure" not in toml_output
+
+    def test_builder_toml_roundtrips_through_blueprint_with_default(self) -> None:
+        """Write-then-validate round trip (E8): a builder-authored default must survive re-load as a
+        blueprint — the builder once wrote the key `default`, which the language does not read, so
+        the fact evaporated silently. E7's forbid now turns any recurrence into a hard failure.
+        """
+        spec_data: dict[str, Any] = {
+            "concept_code": "Counter",
+            "description": "A counter with a default",
+            "structure": {
+                "count": {"type": "integer", "description": "Number of items", "default_value": 7},
+                "label": {"type": "text", "description": "A label", "required": True},
+            },
+        }
+        concept_spec = parse_concept_spec(spec_data)
+        toml_output = concept_spec_to_toml(concept_spec)
+        reloaded = tomllib.loads(toml_output)
+        blueprint = ConceptBlueprint.model_validate(reloaded["concept"]["Counter"])
+        assert isinstance(blueprint.structure, dict)
+        count_field = blueprint.structure["count"]
+        assert isinstance(count_field, ConceptStructureBlueprint)
+        assert count_field.default_value == 7, "The authored default must survive the write-then-validate loop"
+        label_field = blueprint.structure["label"]
+        assert isinstance(label_field, ConceptStructureBlueprint)
+        assert label_field.required is True
 
     def test_no_refines_omits_refines(self) -> None:
         spec_data: dict[str, Any] = {

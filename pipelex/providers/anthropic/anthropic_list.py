@@ -40,9 +40,9 @@ async def list_anthropic_models(
             msg,
         )
 
-    from anthropic import AuthenticationError  # noqa: PLC0415
+    from anthropic import AuthenticationError  # ruff: ignore[import-outside-top-level]
 
-    from pipelex.providers.anthropic.anthropic_llms import anthropic_list_available_models  # noqa: PLC0415
+    from pipelex.providers.anthropic.anthropic_llms import anthropic_list_available_models  # ruff: ignore[import-outside-top-level]
 
     model_handle = ModelHandle(sdk=sdk, backend=backend_name)
     try:

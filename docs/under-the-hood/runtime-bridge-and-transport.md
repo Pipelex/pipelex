@@ -53,10 +53,10 @@ A `LibraryCrate` (`pipelex/libraries/library_crate.py`) is a flat, serializable 
 ```python
 class LibraryCrate(BaseModel):
     concepts: dict[str, ConceptBlueprint | str]  # concept ref -> blueprint or description
-    pipes: dict[str, PipeBlueprintUnion]          # pipe ref -> blueprint
-    domains: dict[str, DomainBlueprint]           # domain code -> domain metadata
-    source_map: dict[str, str]                    # ref -> source file (error traceability)
-    fingerprint: str                              # SHA256 of serialized content
+    pipes: dict[str, PipeBlueprintUnion]  # pipe ref -> blueprint
+    domains: dict[str, DomainBlueprint]  # domain code -> domain metadata
+    source_map: dict[str, str]  # ref -> source file (error traceability)
+    fingerprint: str  # SHA256 of serialized content
 ```
 
 Domain is encoded in the dictionary keys (e.g., `scoring.WeightedScore`, `scoring.compute_score`), not in a structural container. `source_map` lets error messages trace back to origin files. The `fingerprint` enables idempotent loading — a worker that already loaded a crate with the same fingerprint skips the reload. The crate is a plain Pydantic model, so a host runtime serializes it as structured JSON in the job input — fully inspectable, not opaque bytes.

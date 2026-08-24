@@ -110,7 +110,7 @@ class TestDoctorLayeredResolution:
         setup_doctor_runtime, and the user deserves the friendly translation in the report
         rather than a generic failure message.
         """
-        from pipelex.base_exceptions import PipelexConfigError  # noqa: PLC0415
+        from pipelex.base_exceptions import PipelexConfigError  # ruff: ignore[import-outside-top-level]
 
         mock_setup = mocker.patch(
             "pipelex.cli.commands.doctor_cmd.setup_doctor_runtime",
