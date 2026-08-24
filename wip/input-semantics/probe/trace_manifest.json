@@ -61,6 +61,7 @@
     "input_semantics_probe.probe_refined.stringnote": "hop4_schema_renders/input_semantics_probe.probe_refined__stringnote.json"
   },
   "hop5_pipe_io_contracts": "hop5_pipe_io_contracts.json",
+  "hop5_input_form": "hop5_input_form.json",
   "wire_framing": [
     {
       "pipe_ref": "input_semantics_probe.probe_single",

@@ -1,6 +1,7 @@
 {
   "concept": "native.Image",
   "content": {
+    "description": "An image",
     "properties": {
       "url": {
         "description": "The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
@@ -117,7 +118,7 @@
     "required": [
       "url"
     ],
-    "title": "ImageContent",
+    "title": "native.Image",
     "type": "object"
   }
 }

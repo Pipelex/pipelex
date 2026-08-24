@@ -48,6 +48,7 @@ def _teardown_validation_library(outer_library_id: str) -> None:
 
 
 _PROBE_BUNDLE_PATH = Path(__file__).parents[3] / "data" / "input_semantics" / "probe_bundle.mthds"
+_HINTED_BUNDLE_PATH = Path(__file__).parents[3] / "data" / "input_semantics" / "hinted_bundle.mthds"
 
 
 _LIBRARY_DIR_MTHDS = """
@@ -210,7 +211,7 @@ class TestBuildInputForm:
         assert "PROBE_desc_concept_PlainNote" in note.description
 
     async def test_object_fields_carry_authored_facts(self, load_empty_library: Callable[[], str]) -> None:
-        """Nested fields state the blueprint's facts: E3 both-facts, defaults, choices (E10), nesting (E1)."""
+        """Nested fields state the blueprint's facts: defaults (the E3 pair is rejected upstream), choices (E10), nesting (E1)."""
         input_form, _ = await self._derive_probe(load_empty_library)
         widget = _field_by_name(input_form["input_semantics_probe.probe_single"], "widget")
         assert widget.kind == FieldKind.OBJECT
@@ -220,9 +221,9 @@ class TestBuildInputForm:
         # Declared order is preserved.
         assert [field.name for field in widget.fields][:4] == ["shorthand_note", "title", "subtitle", "summary"]
 
-        titled_default = by_name["titled_default"]
-        assert titled_default.required is True, "Authored required-ness survives beside a default (E3)"
-        assert titled_default.default_value == "PROBE_default_titled"
+        motto = by_name["motto"]
+        assert motto.required is False, "A defaulted field is not required — the E3 pair is rejected upstream"
+        assert motto.default_value == "PROBE_default_motto"
 
         assert by_name["shorthand_note"].required is True, "A shorthand string field implies required text"
         assert by_name["shorthand_note"].kind == FieldKind.TEXT
@@ -284,7 +285,7 @@ class TestBuildInputForm:
 
         constrained_count = by_name["constrained_count"]
         assert constrained_count.kind == FieldKind.NUMBER
-        assert constrained_count.minimum is None, "Unknown blueprint keys died at parse (E7) — nothing to report"
+        assert constrained_count.minimum is None, "Unknown blueprint keys are rejected at parse (E7) — a valid bundle cannot carry them"
 
     async def test_native_direct_inputs_kind_assignment(self, load_empty_library: Callable[[], str]) -> None:
         """Native concepts as direct inputs map by identity, never by shape sniffing."""
@@ -353,6 +354,75 @@ class TestBuildInputForm:
         assert [field.name for field in special.fields] == ["number", "total"]
         assert special.description == "An invoice flagged for review"
 
+    async def test_hinted_slots_carry_effective_hints_on_the_wire(self, load_empty_library: Callable[[], str]) -> None:
+        """Authored hints reach the descriptor (H2): slot hints merge over the concept layer, an
+        applicable intent feeds `kind`, a plural slot's hints ride list AND item, and hint-free
+        slots stay hint-free.
+        """
+        outer_library_id = load_empty_library()
+        try:
+            result = await validate_bundle(mthds_contents=[_HINTED_BUNDLE_PATH.read_text(encoding="utf-8")])
+            input_form = build_input_form(result.pipes)
+        finally:
+            _teardown_validation_library(outer_library_id)
+
+        fields = {field.name: field for field in input_form["input_semantics_hinted.hinted_slots"].fields}
+        # Plain and collapsed slots derive identically: the concept layer alone (Essay: prose).
+        for slot_name in ["plain", "expanded_plain"]:
+            assert fields[slot_name].hints == {"intent": "prose"}
+            assert fields[slot_name].kind is FieldKind.PROSE
+        # Slot hints on a structured concept: inapplicable intent rides, kind stays `object`.
+        assert fields["hinted"].hints == {"intent": "prose"}
+        assert fields["hinted"].kind is FieldKind.OBJECT
+        # Plural slot: merged hints on the list node AND its item; the item's kind flips.
+        marked = fields["hinted_marked"]
+        assert marked.kind is FieldKind.LIST
+        assert marked.hints == {"intent": "label"}
+        assert marked.item is not None
+        assert marked.item.hints == {"intent": "label"}
+        assert marked.item.kind is FieldKind.TEXT
+
+    async def test_hinted_structure_fields_on_the_wire(self, load_empty_library: Callable[[], str]) -> None:
+        """Field-site hints from the parsed bundle survive to the descriptor, unknown keys included."""
+        outer_library_id = load_empty_library()
+        try:
+            result = await validate_bundle(mthds_contents=[_HINTED_BUNDLE_PATH.read_text(encoding="utf-8")])
+            input_form = build_input_form(result.pipes)
+        finally:
+            _teardown_validation_library(outer_library_id)
+
+        review = {field.name: field for field in input_form["input_semantics_hinted.hinted_slots"].fields}["hinted"]
+        review_fields = {field.name: field for field in review.fields or []}
+        assert review_fields["headline"].hints == {"intent": "label"}
+        assert review_fields["headline"].kind is FieldKind.TEXT
+        assert review_fields["body"].hints == {"intent": "prose"}
+        assert review_fields["body"].kind is FieldKind.PROSE
+        assert review_fields["stars"].hints == {"intent": "rating"}
+        assert review_fields["stars"].kind is FieldKind.NUMBER
+        assert review_fields["plain"].hints is None
+        # Unknown key: preserved content, riding the slot with no kind effect.
+        assert review_fields["quirk"].hints == {"emphasis": "HINTED_unknown_value"}
+        assert review_fields["quirk"].kind is FieldKind.TEXT
+
+    async def test_hint_free_probe_descriptor_carries_no_hints_key(self, load_empty_library: Callable[[], str]) -> None:
+        """Population is wire-additive: the hint-free probe bundle's descriptor is byte-identical
+        to before hints existed — no `hints` key at any depth.
+        """
+        input_form, _ = await self._derive_probe(load_empty_library)
+
+        def assert_no_hints(dumped: dict[str, Any]) -> None:
+            assert "hints" not in dumped
+            children: list[dict[str, Any]] = dumped.get("fields") or []
+            for child in children:
+                assert_no_hints(child)
+            item: dict[str, Any] | None = dumped.get("item")
+            if item:
+                assert_no_hints(item)
+
+        for descriptor in input_form.values():
+            for field in descriptor.fields:
+                assert_no_hints(field.model_dump())
+
     async def test_wire_dump_has_no_null_slots(self, load_empty_library: Callable[[], str]) -> None:
         """The valid arm is dumped WITHOUT `exclude_none`, so inapplicable slots must self-exclude."""
         input_form, _ = await self._derive_probe(load_empty_library)
@@ -377,6 +447,9 @@ class InputFormConstrainedPayload(StructuredContent):
     width: int = Field(gt=0, le=4096, description="PROBE_desc_reflected_width")
     code: str = Field(min_length=2, max_length=8, pattern="^[A-Z]+$", description="PROBE_desc_reflected_code")
     ratio: float | None = Field(default=None, ge=0.0, lt=1.0, description="PROBE_desc_reflected_ratio")
+    retries: int = Field(default=3, description="PROBE_desc_reflected_retries")
+    strict: bool = Field(default=False, description="PROBE_desc_reflected_strict")
+    tags: list[str] = Field(default_factory=list, description="PROBE_desc_reflected_tags")
 
 
 class InputFormUnmappablePayload(StructuredContent):
@@ -501,6 +574,20 @@ class TestKindAssignmentTable:
         assert ratio.required is False
         assert ratio.minimum == 0.0
         assert ratio.exclusive_maximum == 1.0
+        assert ratio.default_value is None, "A None default is the optionality artifact, never a default_value"
+
+        retries = by_name["retries"]
+        assert retries.kind == FieldKind.NUMBER
+        assert retries.required is False, "A pydantic default on a reflected class is an authored fact — the field is not required"
+        assert retries.default_value == 3
+
+        strict = by_name["strict"]
+        assert strict.required is False
+        assert strict.default_value is False, "A falsy non-None default is an authored fact — the None guard must not drop it"
+
+        tags = by_name["tags"]
+        assert tags.required is False, "A default_factory makes the field not required"
+        assert tags.default_value is None, "A default_factory has no reportable value — no default_value is fabricated"
 
     async def test_unmappable_class_falls_back_to_unknown(self, load_empty_library: Callable[[], str]) -> None:
         """Reflection is faithful-or-absent: a class with an unmappable field yields `unknown`, with identity kept."""

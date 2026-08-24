@@ -113,7 +113,7 @@ def structure_field_to_dict(field_spec: ConceptStructureSpec) -> dict[str, Any]:
         result["required"] = True
 
     if field_spec.default_value is not None:
-        result["default"] = field_spec.default_value
+        result["default_value"] = field_spec.default_value
 
     if field_spec.concept_ref:
         result["concept_ref"] = field_spec.concept_ref

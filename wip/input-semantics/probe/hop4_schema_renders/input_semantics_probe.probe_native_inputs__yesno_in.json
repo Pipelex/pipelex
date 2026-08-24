@@ -1,6 +1,7 @@
 {
   "concept": "native.YesNo",
   "content": {
+    "description": "The answer to a yes/no question",
     "properties": {
       "yes_no": {
         "description": "Whether the answer is yes (true) or no (false).",
@@ -11,7 +12,7 @@
     "required": [
       "yes_no"
     ],
-    "title": "YesNoContent",
+    "title": "native.YesNo",
     "type": "object"
   }
 }

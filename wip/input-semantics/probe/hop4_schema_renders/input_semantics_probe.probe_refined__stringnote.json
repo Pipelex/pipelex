@@ -12,7 +12,7 @@
     "required": [
       "text"
     ],
-    "title": "input_semantics_probe__StringNote",
+    "title": "input_semantics_probe.StringNote",
     "type": "object"
   }
 }

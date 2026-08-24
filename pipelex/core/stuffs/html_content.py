@@ -9,6 +9,8 @@ from pipelex.tools.jinja2.template_category import TemplateCategory
 
 
 class HtmlContent(StuffContent):
+    """HTML content"""
+
     inner_html: str = Field(..., description="The inner HTML of the content")
     css_class: str = Field(..., description="The CSS class of the content")
 

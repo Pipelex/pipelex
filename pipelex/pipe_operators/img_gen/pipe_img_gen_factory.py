@@ -55,6 +55,8 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
         # Images may be referenced in positive prompt, negative prompt, or both
         image_references: list[ImageReference] | None = None
         if blueprint.inputs:
+            # Template analyzers read the slot grammar only, so they get the concept-spec projection.
+            blueprint_input_specs = blueprint.inputs_concept_specs or {}
             all_image_refs: list[ImageReference] = []
             seen_paths: set[str] = set()
 
@@ -62,7 +64,7 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
             if blueprint.prompt:
                 prompt_refs = TemplateImageAnalyzer.analyze_template_for_images(
                     template_source=blueprint.prompt,
-                    input_specs=blueprint.inputs,
+                    input_specs=blueprint_input_specs,
                     domain_code=domain_code,
                     template_category=TemplateCategory.IMG_GEN_PROMPT,
                 )
@@ -75,7 +77,7 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
             if blueprint.negative_prompt:
                 negative_refs = TemplateImageAnalyzer.analyze_template_for_images(
                     template_source=blueprint.negative_prompt,
-                    input_specs=blueprint.inputs,
+                    input_specs=blueprint_input_specs,
                     domain_code=domain_code,
                     template_category=TemplateCategory.IMG_GEN_PROMPT,
                 )

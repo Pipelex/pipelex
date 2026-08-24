@@ -65,3 +65,14 @@ class TestInputFormDeriverEscapeHatches:
 
         assert missing.kind == FieldKind.UNKNOWN
         assert missing.concept_ref == "elsewhere.Missing"
+
+    def test_chain_ending_at_a_base_absent_from_the_crate_is_unknown(self) -> None:
+        """A cross-package `alias->…` base never enters the crate, so its shape is unknown — never prose."""
+        concepts: dict[str, ConceptBlueprint | str] = {
+            "demo.RefinedScore": ConceptBlueprint(description="Refines a dependency's score", refines="dep->other.Score"),
+        }
+        node = InputFormDeriver(concepts=concepts).derive_concept(name="score", concept_ref="demo.RefinedScore")
+
+        assert node.kind == FieldKind.UNKNOWN
+        assert node.refines == ["dep->other.Score"]
+        assert node.description == "Refines a dependency's score"

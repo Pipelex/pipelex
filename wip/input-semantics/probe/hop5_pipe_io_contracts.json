@@ -3,10 +3,13 @@
     "inputs": {
       "widget": {
         "concept_ref": "input_semantics_probe.Widget",
-        "optional": false,
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
         "json_schema": {
           "$defs": {
             "ImageContent": {
+              "description": "An image",
               "properties": {
                 "url": {
                   "description": "The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
@@ -219,12 +222,6 @@
               "default": "PROBE_default_motto",
               "description": "PROBE_desc_field_motto: text with default",
               "title": "Motto"
-            },
-            "titled_default": {
-              "default": "PROBE_default_titled",
-              "description": "PROBE_desc_field_titled_default: required AND default together",
-              "title": "Titled Default",
-              "type": "string"
             },
             "count": {
               "anyOf": [
@@ -510,13 +507,15 @@
             "title",
             "main_gadget"
           ],
-          "title": "input_semantics_probe__Widget",
+          "title": "input_semantics_probe.Widget",
           "type": "object"
         }
       },
       "gadget_q": {
         "concept_ref": "input_semantics_probe.Gadget",
-        "optional": false,
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
         "json_schema": {
           "$defs": {
             "input_semantics_probe__Trinket": {
@@ -558,13 +557,15 @@
           "required": [
             "name"
           ],
-          "title": "input_semantics_probe__Gadget",
+          "title": "input_semantics_probe.Gadget",
           "type": "object"
         }
       },
       "note": {
         "concept_ref": "input_semantics_probe.PlainNote",
-        "optional": false,
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
         "json_schema": {
           "description": "PROBE_desc_concept_PlainNote: description-only concept (basic blueprint)",
           "properties": {
@@ -577,7 +578,7 @@
           "required": [
             "text"
           ],
-          "title": "input_semantics_probe__PlainNote",
+          "title": "input_semantics_probe.PlainNote",
           "type": "object"
         }
       }
@@ -585,6 +586,7 @@
     "output": {
       "concept_ref": "native.Text",
       "multiplicity": "single",
+      "item_count": null,
       "optional": false
     }
   },
@@ -592,8 +594,11 @@
     "inputs": {
       "text_in": {
         "concept_ref": "native.Text",
-        "optional": false,
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
         "json_schema": {
+          "description": "A text",
           "properties": {
             "text": {
               "description": "The text",
@@ -604,14 +609,17 @@
           "required": [
             "text"
           ],
-          "title": "TextContent",
+          "title": "native.Text",
           "type": "object"
         }
       },
       "image_in": {
         "concept_ref": "native.Image",
-        "optional": false,
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
         "json_schema": {
+          "description": "An image",
           "properties": {
             "url": {
               "description": "The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
@@ -728,14 +736,17 @@
           "required": [
             "url"
           ],
-          "title": "ImageContent",
+          "title": "native.Image",
           "type": "object"
         }
       },
       "document_in": {
         "concept_ref": "native.Document",
-        "optional": false,
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
         "json_schema": {
+          "description": "A document",
           "properties": {
             "url": {
               "description": "The document URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
@@ -811,16 +822,19 @@
           "required": [
             "url"
           ],
-          "title": "DocumentContent",
+          "title": "native.Document",
           "type": "object"
         }
       },
       "page_in": {
         "concept_ref": "native.Page",
-        "optional": false,
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
         "json_schema": {
           "$defs": {
             "ImageContent": {
+              "description": "An image",
               "properties": {
                 "url": {
                   "description": "The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
@@ -988,6 +1002,7 @@
               "type": "object"
             },
             "TextContent": {
+              "description": "A text",
               "properties": {
                 "text": {
                   "description": "The text",
@@ -1002,6 +1017,7 @@
               "type": "object"
             }
           },
+          "description": "The content of a page of a document, comprising text and linked images and an optional page view image",
           "properties": {
             "text_and_images": {
               "$ref": "#/$defs/TextAndImagesContent",
@@ -1023,14 +1039,17 @@
           "required": [
             "text_and_images"
           ],
-          "title": "PageContent",
+          "title": "native.Page",
           "type": "object"
         }
       },
       "number_in": {
         "concept_ref": "native.Number",
-        "optional": false,
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
         "json_schema": {
+          "description": "A number",
           "properties": {
             "number": {
               "anyOf": [
@@ -1048,15 +1067,17 @@
           "required": [
             "number"
           ],
-          "title": "NumberContent",
+          "title": "native.Number",
           "type": "object"
         }
       },
       "date_in": {
         "concept_ref": "native.Date",
-        "optional": false,
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
         "json_schema": {
-          "description": "A calendar date, optionally with a time of day — as precise as its source states.\n\nThe optional ``time`` carries the UTC offset on its ``tzinfo`` when the source states one\n(fidelity, not normalization). Invalid states are unrepresentable by construction: no time\nwithout a date, no offset without a time.",
+          "description": "A calendar date, optionally with a time of day — as precise as its source states.",
           "properties": {
             "date": {
               "description": "The calendar date, in ISO 8601 (e.g. 2026-07-07). Always required.",
@@ -1082,15 +1103,17 @@
           "required": [
             "date"
           ],
-          "title": "DateContent",
+          "title": "native.Date",
           "type": "object"
         }
       },
       "time_in": {
         "concept_ref": "native.Time",
-        "optional": false,
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
         "json_schema": {
-          "description": "A time of day, optionally with a UTC offset — as precise as its source states.\n\nThe ``time`` carries the UTC offset on its ``tzinfo`` when the source states one\n(fidelity, not normalization). A time of day is not an instant: it has no date to\nattach to, so it never converts to a datetime on its own.",
+          "description": "A time of day, optionally with a UTC offset — as precise as its source states.",
           "properties": {
             "time": {
               "description": "The time of day, in ISO 8601 (e.g. 15:40:00, or 15:40:00+02:00 with a UTC offset).",
@@ -1102,14 +1125,17 @@
           "required": [
             "time"
           ],
-          "title": "TimeContent",
+          "title": "native.Time",
           "type": "object"
         }
       },
       "html_in": {
         "concept_ref": "native.Html",
-        "optional": false,
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
         "json_schema": {
+          "description": "HTML content",
           "properties": {
             "inner_html": {
               "description": "The inner HTML of the content",
@@ -1126,14 +1152,17 @@
             "inner_html",
             "css_class"
           ],
-          "title": "HtmlContent",
+          "title": "native.Html",
           "type": "object"
         }
       },
       "yesno_in": {
         "concept_ref": "native.YesNo",
-        "optional": false,
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
         "json_schema": {
+          "description": "The answer to a yes/no question",
           "properties": {
             "yes_no": {
               "description": "Whether the answer is yes (true) or no (false).",
@@ -1144,7 +1173,7 @@
           "required": [
             "yes_no"
           ],
-          "title": "YesNoContent",
+          "title": "native.YesNo",
           "type": "object"
         }
       }
@@ -1152,6 +1181,7 @@
     "output": {
       "concept_ref": "native.Text",
       "multiplicity": "single",
+      "item_count": null,
       "optional": false
     }
   },
@@ -1159,10 +1189,13 @@
     "inputs": {
       "opt": {
         "concept_ref": "input_semantics_probe.Widget",
-        "optional": true,
+        "presence": "optional",
+        "multiplicity": "single",
+        "item_count": null,
         "json_schema": {
           "$defs": {
             "ImageContent": {
+              "description": "An image",
               "properties": {
                 "url": {
                   "description": "The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
@@ -1375,12 +1408,6 @@
               "default": "PROBE_default_motto",
               "description": "PROBE_desc_field_motto: text with default",
               "title": "Motto"
-            },
-            "titled_default": {
-              "default": "PROBE_default_titled",
-              "description": "PROBE_desc_field_titled_default: required AND default together",
-              "title": "Titled Default",
-              "type": "string"
             },
             "count": {
               "anyOf": [
@@ -1666,18 +1693,21 @@
             "title",
             "main_gadget"
           ],
-          "title": "input_semantics_probe__Widget",
+          "title": "input_semantics_probe.Widget",
           "type": "object"
         }
       },
       "many": {
         "concept_ref": "input_semantics_probe.Widget",
-        "optional": false,
+        "presence": "plain",
+        "multiplicity": "variable",
+        "item_count": null,
         "json_schema": {
           "type": "array",
           "items": {
             "$defs": {
               "ImageContent": {
+                "description": "An image",
                 "properties": {
                   "url": {
                     "description": "The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
@@ -1890,12 +1920,6 @@
                 "default": "PROBE_default_motto",
                 "description": "PROBE_desc_field_motto: text with default",
                 "title": "Motto"
-              },
-              "titled_default": {
-                "default": "PROBE_default_titled",
-                "description": "PROBE_desc_field_titled_default: required AND default together",
-                "title": "Titled Default",
-                "type": "string"
               },
               "count": {
                 "anyOf": [
@@ -2181,14 +2205,16 @@
               "title",
               "main_gadget"
             ],
-            "title": "input_semantics_probe__Widget",
+            "title": "input_semantics_probe.Widget",
             "type": "object"
           }
         }
       },
       "two": {
         "concept_ref": "input_semantics_probe.Gadget",
-        "optional": false,
+        "presence": "plain",
+        "multiplicity": "fixed",
+        "item_count": 2,
         "json_schema": {
           "type": "array",
           "items": {
@@ -2232,15 +2258,20 @@
             "required": [
               "name"
             ],
-            "title": "input_semantics_probe__Gadget",
+            "title": "input_semantics_probe.Gadget",
             "type": "object"
-          }
+          },
+          "minItems": 2,
+          "maxItems": 2
         }
       },
       "forced": {
         "concept_ref": "native.Text",
-        "optional": false,
+        "presence": "force",
+        "multiplicity": "single",
+        "item_count": null,
         "json_schema": {
+          "description": "A text",
           "properties": {
             "text": {
               "description": "The text",
@@ -2251,7 +2282,7 @@
           "required": [
             "text"
           ],
-          "title": "TextContent",
+          "title": "native.Text",
           "type": "object"
         }
       }
@@ -2259,6 +2290,7 @@
     "output": {
       "concept_ref": "native.Text",
       "multiplicity": "single",
+      "item_count": null,
       "optional": false
     }
   },
@@ -2266,7 +2298,9 @@
     "inputs": {
       "refdoc": {
         "concept_ref": "input_semantics_probe.RefinedDoc",
-        "optional": false,
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
         "json_schema": {
           "description": "PROBE_desc_concept_RefinedDoc: refinement of a native concept",
           "properties": {
@@ -2344,13 +2378,15 @@
           "required": [
             "url"
           ],
-          "title": "input_semantics_probe__RefinedDoc",
+          "title": "input_semantics_probe.RefinedDoc",
           "type": "object"
         }
       },
       "special": {
         "concept_ref": "input_semantics_probe.SpecialEntity",
-        "optional": false,
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
         "json_schema": {
           "description": "PROBE_desc_concept_SpecialEntity: refines a custom concept",
           "properties": {
@@ -2363,13 +2399,15 @@
           "required": [
             "ident"
           ],
-          "title": "input_semantics_probe__SpecialEntity",
+          "title": "input_semantics_probe.SpecialEntity",
           "type": "object"
         }
       },
       "extra": {
         "concept_ref": "input_semantics_probe.ExtraSpecialEntity",
-        "optional": false,
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
         "json_schema": {
           "description": "PROBE_desc_concept_ExtraSpecialEntity: second link of the refinement chain",
           "properties": {
@@ -2382,14 +2420,17 @@
           "required": [
             "ident"
           ],
-          "title": "input_semantics_probe__ExtraSpecialEntity",
+          "title": "input_semantics_probe.ExtraSpecialEntity",
           "type": "object"
         }
       },
       "classbacked": {
         "concept_ref": "input_semantics_probe.ClassBacked",
-        "optional": false,
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
         "json_schema": {
+          "description": "PROBE_desc_concept_ClassBacked: structure declared as an existing class name",
           "properties": {
             "text": {
               "description": "The text",
@@ -2400,13 +2441,15 @@
           "required": [
             "text"
           ],
-          "title": "TextContent",
+          "title": "input_semantics_probe.ClassBacked",
           "type": "object"
         }
       },
       "stringnote": {
         "concept_ref": "input_semantics_probe.StringNote",
-        "optional": false,
+        "presence": "plain",
+        "multiplicity": "single",
+        "item_count": null,
         "json_schema": {
           "description": "PROBE_desc_concept_StringNote: a concept declared as a bare string",
           "properties": {
@@ -2419,7 +2462,7 @@
           "required": [
             "text"
           ],
-          "title": "input_semantics_probe__StringNote",
+          "title": "input_semantics_probe.StringNote",
           "type": "object"
         }
       }
@@ -2427,6 +2470,7 @@
     "output": {
       "concept_ref": "native.Text",
       "multiplicity": "single",
+      "item_count": null,
       "optional": false
     }
   }

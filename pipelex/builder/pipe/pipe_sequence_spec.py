@@ -63,7 +63,7 @@ class PipeSequenceSpec(PipeSpec):
         core_steps = [step.to_blueprint() for step in self.steps]
         return PipeSequenceBlueprint(
             description=base_blueprint.description,
-            inputs=base_blueprint.inputs,
+            inputs=base_blueprint.inputs_concept_specs,
             output=base_blueprint.output,
             steps=core_steps,
         )

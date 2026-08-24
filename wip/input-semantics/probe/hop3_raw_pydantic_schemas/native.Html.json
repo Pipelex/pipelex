@@ -1,4 +1,5 @@
 {
+  "description": "HTML content",
   "properties": {
     "inner_html": {
       "description": "The inner HTML of the content",

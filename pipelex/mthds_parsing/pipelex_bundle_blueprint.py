@@ -282,7 +282,7 @@ class PipelexBundleBlueprint(BaseModel):
 
         # Check inputs
         if pipe_blueprint.inputs:
-            for input_name, input_concept_spec in pipe_blueprint.inputs.items():
+            for input_name, input_concept_spec in (pipe_blueprint.inputs_concept_specs or {}).items():
                 local_ref = parse_concept_with_multiplicity(input_concept_spec).concept_ref_or_code
                 local_refs.append((local_ref, f"pipe.{pipe_code}.inputs.{input_name}"))
 

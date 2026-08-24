@@ -26,13 +26,14 @@ library's window, beside `build_pipe_io_contracts`: class-backed reflection read
 registry, and bundle-defined classes are only reliably current while their library is loaded.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from enum import StrEnum
 from typing import Any
 
 from annotated_types import Ge, Gt, Le, Lt, MaxLen, MinLen
 from pydantic import BaseModel, Field, SerializerFunctionWrapHandler, model_serializer, model_validator
 from pydantic.fields import FieldInfo
+from pydantic_core import PydanticUndefined
 from typing_extensions import Self
 
 from pipelex.codegen.native_expansion import reflect_structure_class
@@ -41,11 +42,13 @@ from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBl
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.native.pinned_blueprints import make_pinned_native_blueprint
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
-from pipelex.core.pipes.variable_multiplicity import PresenceMarker
+from pipelex.core.pipes.variable_multiplicity import PresenceMarker, fixed_item_count
 from pipelex.interpreter_hub import get_current_library, get_library_manager
+from pipelex.language.intent_hints import HintSiteValueKind, IntentWord, applicable_intent, merge_hints
 from pipelex.libraries.crate_qualification import qualify_crate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
+from pipelex.pipe_machinery.pipe_blueprint import InputSlotBlueprint
 from pipelex.system.registries.class_registry_access import get_class_registry
 
 
@@ -125,11 +128,15 @@ class InputFormField(BaseModel):
 
     default_value: Any | None = None
     """The value applied when the caller omits the field — present only when a default was authored,
-    never the emission's `null`-for-optional artifact. May sit beside `required: true`."""
+    never the emission's `null`-for-optional artifact. Always beside `required: false`: the blueprint
+    rejects `required = true` with a default, and a reflected default makes the field not required."""
 
     examples: list[Any] | None = None
-    hints: dict[str, Any] | None = None
-    """Reserved for MTHDS intent hints; vocabulary deliberately undesigned here."""
+    hints: dict[str, str] | None = None
+    """The node's effective MTHDS intent hints (spec: intent-hints.md): the key-by-key merge of the
+    concept's refinement chain and the site's own hints, nearer/site layer winning. Flat
+    string-to-string by contract. Everything well-formed rides here, unknown entries included; an
+    applicable `intent` word additionally feeds `kind` (never competes with it)."""
 
     # `text` / `prose` constraint slots.
     min_length: int | None = None
@@ -212,12 +219,26 @@ def build_input_form(pipes: Sequence[PipeAbstract]) -> dict[str, PipeInputFormDe
         `pipe_ref` → `PipeInputFormDescriptor` for every given pipe.
     """
     crate = get_library_manager().get_crate(library_id=get_current_library()) or LibraryCrateFactory.make_from_blueprints([])
-    deriver = InputFormDeriver(concepts=qualify_crate(crate).concepts)
+    qualified = qualify_crate(crate)
+    deriver = InputFormDeriver(concepts=qualified.concepts)
     input_form: dict[str, PipeInputFormDescriptor] = {}
     for pipe in pipes:
-        fields = [deriver.derive_slot(name=var_name, stuff_spec=stuff_spec) for var_name, stuff_spec in pipe.inputs.root.items()]
+        # Slot hints come from the qualified blueprint, not the runtime spec: `StuffSpec` stays
+        # hint-free by design (structural non-normativity). A pipe with no blueprint in the crate
+        # (the fallback path) derives with no hints.
+        blueprint = qualified.pipes.get(pipe.pipe_ref)
+        blueprint_inputs: Mapping[str, str | InputSlotBlueprint] = blueprint.inputs if blueprint is not None and blueprint.inputs else {}
+        fields = [
+            deriver.derive_slot(name=var_name, stuff_spec=stuff_spec, slot_hints=_slot_hints_of(blueprint_inputs.get(var_name)))
+            for var_name, stuff_spec in pipe.inputs.root.items()
+        ]
         input_form[pipe.pipe_ref] = PipeInputFormDescriptor(fields=fields)
     return input_form
+
+
+def _slot_hints_of(slot_value: "str | InputSlotBlueprint | None") -> dict[str, str] | None:
+    """The authored hints of an input-slot value; only the expanded table form carries any."""
+    return slot_value.hints if isinstance(slot_value, InputSlotBlueprint) else None
 
 
 class InputFormDeriver:
@@ -228,12 +249,19 @@ class InputFormDeriver:
 
     # ---- Pipe slots -------------------------------------------------------------------------------
 
-    def derive_slot(self, *, name: str, stuff_spec: StuffSpec) -> InputFormField:
-        """A top-level field: the concept node, list-wrapped when multiple, stamped with slot facts."""
+    def derive_slot(self, *, name: str, stuff_spec: StuffSpec, slot_hints: dict[str, str] | None = None) -> InputFormField:
+        """A top-level field: the concept node, list-wrapped when multiple, stamped with slot facts.
+
+        `slot_hints` are the slot's authored hints from the qualified blueprint; the site-over-concept
+        merge happens here (the concept node already carries the concept's effective hints).
+        """
         node = self._concept_node(name=name, concept_ref=stuff_spec.concept.concept_ref, seen=frozenset())
+        effective_hints = merge_hints([node.hints, slot_hints])
         if stuff_spec.is_multiple():
-            multiplicity = stuff_spec.multiplicity
-            item_count = multiplicity if isinstance(multiplicity, int) and not isinstance(multiplicity, bool) else None
+            item_count = fixed_item_count(multiplicity=stuff_spec.multiplicity)
+            # A plural slot's merged hints ride the `list` node AND its `item` (the `concept_ref`
+            # duplication precedent): applicability is judged per item, and a renderer reading
+            # either node finds the same answer.
             node = InputFormField(
                 kind=FieldKind.LIST,
                 name=name,
@@ -241,9 +269,12 @@ class InputFormDeriver:
                 refines=node.refines,
                 description=node.description,
                 required=True,
-                item=node,
+                hints=effective_hints,
+                item=_with_effective_hints(node=node, hints=effective_hints),
                 item_count=item_count,
             )
+        else:
+            node = _with_effective_hints(node=node, hints=effective_hints)
         presence = stuff_spec.presence
         required = not presence.is_optional
         gating = required and not (node.kind.is_list and node.item_count is None)
@@ -253,7 +284,8 @@ class InputFormDeriver:
 
     def derive_concept(self, *, name: str, concept_ref: str) -> InputFormField:
         """The descriptor of a concept-typed node on its own, with no pipe-slot facts."""
-        return self._concept_node(name=name, concept_ref=concept_ref, seen=frozenset())
+        node = self._concept_node(name=name, concept_ref=concept_ref, seen=frozenset())
+        return _with_effective_hints(node=node, hints=node.hints)
 
     def _concept_node(self, *, name: str, concept_ref: str, seen: frozenset[str]) -> InputFormField:
         """The descriptor of a concept-typed node (no slot facts); `seen` is the concept-ref path."""
@@ -273,6 +305,26 @@ class InputFormDeriver:
 
     def _blueprint_node(self, *, name: str, concept_ref: str, blueprint: ConceptBlueprint, seen: frozenset[str]) -> InputFormField:
         chain = self._refines_chain(concept_ref=concept_ref)
+        node = self._blueprint_node_for_chain(name=name, concept_ref=concept_ref, blueprint=blueprint, chain=chain, seen=seen)
+        # The concept's effective hints: its refinement chain merged nearer-wins, computed with the
+        # same `_refines_chain` walk the structure merge uses. Carried on the node WITHOUT feeding
+        # `kind` yet: this node may still receive a site layer (a slot's or a field's hints), and
+        # the kind flip must read the final merge — see `_with_effective_hints` at the terminals.
+        effective_hints = self._effective_hints(concept_ref=concept_ref, chain=chain)
+        return node.model_copy(update={"hints": effective_hints}) if effective_hints else node
+
+    def _effective_hints(self, *, concept_ref: str, chain: list[str]) -> dict[str, str] | None:
+        """The concept's effective hints along its refinement chain (natives contribute nothing)."""
+        layers: list[dict[str, str] | None] = []
+        for ref in [*reversed(chain), concept_ref]:
+            entry = self._concepts.get(ref)
+            if isinstance(entry, ConceptBlueprint):
+                layers.append(entry.hints)
+        return merge_hints(layers)
+
+    def _blueprint_node_for_chain(
+        self, *, name: str, concept_ref: str, blueprint: ConceptBlueprint, chain: list[str], seen: frozenset[str]
+    ) -> InputFormField:
         refines = chain or None
         merged_structure = self._merged_structure(concept_ref=concept_ref, chain=chain)
         if merged_structure:
@@ -300,6 +352,12 @@ class InputFormDeriver:
                 refines=refines,
                 seen=seen,
             )
+        if chain and self._concepts.get(chain[-1]) is None:
+            # The chain ends at a base this crate does not hold — a cross-package `alias->…` refines,
+            # whose concepts live in an isolated child library and never enter the crate. The engine
+            # backs such a concept with a field-less `StructuredContent` subclass, so its shape is
+            # genuinely unknown: the same answer `_concept_node` gives for an absent concept.
+            return _unknown_node(name=name, concept_ref=concept_ref, description=blueprint.description, refines=refines)
         return _prose_promoted_node(name=name, concept_ref=concept_ref, description=blueprint.description, chain=chain)
 
     def _native_node(
@@ -423,12 +481,17 @@ class InputFormDeriver:
     # ---- Structure fields -------------------------------------------------------------------------
 
     def _structure_field(self, *, name: str, field: ConceptStructureBlueprintType, seen: frozenset[str]) -> InputFormField:
-        """A nested field from its structure blueprint: authored facts only, never slot facts."""
+        """A nested field from its structure blueprint: authored facts only, never slot facts.
+
+        A field is a terminal hint site: the field's own hints merge over the referenced concept's
+        effective hints (concept-typed and concept-item fields only — scalar fields have no concept
+        layer), and the final merge is stamped here, feeding `kind` where applicable.
+        """
         if isinstance(field, str):
             # The shorthand `field = "description"` form declares a required text field.
             return InputFormField(kind=FieldKind.TEXT, name=name, description=field, required=True)
         if field.choices:
-            return InputFormField(
+            enum_node = InputFormField(
                 kind=FieldKind.ENUM,
                 name=name,
                 description=field.description,
@@ -436,14 +499,19 @@ class InputFormDeriver:
                 choices=list(field.choices),
                 default_value=field.default_value,
             )
+            return _with_effective_hints(node=enum_node, hints=field.hints)
         match field.type:
             case ConceptStructureBlueprintFieldType.CONCEPT:
                 if field.concept_ref is None:
                     return _unknown_node(name=name, description=field.description, required=field.required)
                 node = self._concept_node(name=name, concept_ref=field.concept_ref, seen=seen)
+                node = _with_effective_hints(node=node, hints=merge_hints([node.hints, field.hints]))
                 return node.model_copy(update={"description": field.description, "required": field.required})
             case ConceptStructureBlueprintFieldType.LIST:
                 item = self._list_item(name=name, field=field, seen=seen)
+                # The merged hints ride the `list` node AND its `item` (the `concept_ref`
+                # duplication precedent); a concept item already carries its concept layer.
+                effective_hints = merge_hints([item.hints, field.hints])
                 return InputFormField(
                     kind=FieldKind.LIST,
                     name=name,
@@ -452,10 +520,12 @@ class InputFormDeriver:
                     description=field.description,
                     required=field.required,
                     default_value=field.default_value,
-                    item=item,
+                    hints=effective_hints,
+                    item=_with_effective_hints(node=item, hints=effective_hints),
                 )
             case ConceptStructureBlueprintFieldType.DICT | None:
-                return _unknown_node(name=name, description=field.description, required=field.required, default_value=field.default_value)
+                unknown = _unknown_node(name=name, description=field.description, required=field.required, default_value=field.default_value)
+                return _with_effective_hints(node=unknown, hints=field.hints)
             case (
                 ConceptStructureBlueprintFieldType.TEXT
                 | ConceptStructureBlueprintFieldType.INTEGER
@@ -465,9 +535,10 @@ class InputFormDeriver:
                 | ConceptStructureBlueprintFieldType.DATETIME
                 | ConceptStructureBlueprintFieldType.TIME
             ):
-                return _scalar_field(
+                scalar = _scalar_field(
                     field_type=field.type, name=name, description=field.description, required=field.required, default_value=field.default_value
                 )
+                return _with_effective_hints(node=scalar, hints=field.hints)
 
     def _list_item(self, *, name: str, field: ConceptStructureBlueprint, seen: frozenset[str]) -> InputFormField:
         """The element node of a list field; the inner type of a nested list is inexpressible in the blueprint."""
@@ -493,6 +564,60 @@ class InputFormDeriver:
                 | ConceptStructureBlueprintFieldType.TIME
             ):
                 return _scalar_field(field_type=item_type, name=name, required=True)
+
+
+def _with_effective_hints(*, node: InputFormField, hints: dict[str, str] | None) -> InputFormField:
+    """Stamp a node's FINAL effective hints; an applicable `intent` word feeds `kind`, never competes.
+
+    Call exactly once per node, at the terminal where the full merge is known (slot, field, or bare
+    concept). `node.kind` is still the no-hint default there, so an absent, unknown, or inapplicable
+    intent leaves it untouched — and `rating` / `quantity` never change `kind` at all (both map to
+    `number`; the union has no finer kind). Inapplicable and unknown content still rides the slot as
+    preserved content (the advisory lint already warned).
+    """
+    if not hints:
+        return node
+    updates: dict[str, Any] = {"hints": hints}
+    match applicable_intent(hints, site_kind=_node_site_kind(node)):
+        case IntentWord.PROSE:
+            updates["kind"] = FieldKind.PROSE
+        case IntentWord.LABEL:
+            updates["kind"] = FieldKind.TEXT
+        case IntentWord.RATING | IntentWord.QUANTITY | None:
+            pass
+    return node.model_copy(update=updates)
+
+
+def _node_site_kind(node: InputFormField) -> HintSiteValueKind:
+    """The node's site value-kind for intent applicability (spec: intent-hints.md, Applicability).
+
+    Recomputed from node facts, mirroring the lint's structural judgment (the known divergences are
+    recorded in wip/engine-hints/deferred.md): `number` nodes come only from `integer`/`number`
+    fields and `native.Number` chains, so the kind IS the judgment; `text`/`prose` nodes are
+    text-valued EXCEPT a time-formatted text (`type = "time"` is neither) and an `Html`-backed node
+    (`prose` presentation, but the chain reaches `native.Html`, not `native.Text`).
+    """
+    match node.kind:
+        case FieldKind.NUMBER:
+            return HintSiteValueKind.NUMBER_VALUED
+        case FieldKind.TEXT | FieldKind.PROSE:
+            if node.format is not None:
+                return HintSiteValueKind.OTHER
+            html_ref = NativeConceptCode.HTML.concept_ref
+            if node.concept_ref == html_ref or (node.refines is not None and html_ref in node.refines):
+                return HintSiteValueKind.OTHER
+            return HintSiteValueKind.TEXT_VALUED
+        case (
+            FieldKind.DATE
+            | FieldKind.BOOLEAN
+            | FieldKind.ENUM
+            | FieldKind.DOCUMENT
+            | FieldKind.IMAGE
+            | FieldKind.OBJECT
+            | FieldKind.LIST
+            | FieldKind.UNKNOWN
+        ):
+            return HintSiteValueKind.OTHER
 
 
 def _scalar_field(
@@ -543,12 +668,22 @@ def _scalar_field(
 
 
 def _with_reflected_constraints(*, node: InputFormField, field_info: FieldInfo) -> InputFormField:
-    """Stamp the constraints a registered class states on a field (`Field(gt=..., max_length=..., pattern=...)`).
+    """Stamp the facts a registered class states on a field: presence, default, and constraints.
 
-    Only the slots that apply to the node's kind are read: bounds on a `number`, length and pattern
-    on a `text`. Anything else the class may declare is not a form fact and is left out.
+    A pydantic default on a reflected class is an authored fact (the S2 ruling closing the D2
+    deferral): the class author wrote it, validation applies it on absence exactly like a blueprint
+    `default_value`, so `field_info.is_required()` is the source of truth for `required` and a
+    defaulted field is never required — the same invariant the blueprint side enforces (E3). A
+    `None` default is the emission artifact of optionality, never reported as a `default_value`.
+
+    Constraint slots read only what applies to the node's kind: bounds on a `number`, length and
+    pattern on a `text`. Anything else the class may declare is not a form fact and is left out.
     """
     constraints: dict[str, Any] = {}
+    if field_info.is_required() != node.required:
+        constraints["required"] = field_info.is_required()
+    if field_info.default is not PydanticUndefined and field_info.default is not None:
+        constraints["default_value"] = field_info.default
     match node.kind:
         case FieldKind.NUMBER:
             for constraint in field_info.metadata:

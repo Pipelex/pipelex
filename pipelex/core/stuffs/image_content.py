@@ -17,6 +17,8 @@ from pipelex.tools.uri.uri_resolver import describe_uri, extract_filename_from_u
 
 
 class ImageContent(StuffContent):
+    """An image"""
+
     url: str = Field(..., description="The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL")
 
     public_url: str | None = Field(default=None, description="The public URL of the image")

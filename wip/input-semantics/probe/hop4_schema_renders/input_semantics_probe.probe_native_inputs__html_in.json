@@ -1,6 +1,7 @@
 {
   "concept": "native.Html",
   "content": {
+    "description": "HTML content",
     "properties": {
       "inner_html": {
         "description": "The inner HTML of the content",
@@ -17,7 +18,7 @@
       "inner_html",
       "css_class"
     ],
-    "title": "HtmlContent",
+    "title": "native.Html",
     "type": "object"
   }
 }

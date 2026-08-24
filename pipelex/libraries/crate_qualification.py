@@ -35,7 +35,7 @@ makes that contradiction unrepresentable and costs the callers nothing — both 
 crate to read the envelope from, and `normalize_crate` builds a fresh one anyway.
 """
 
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprintType
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -50,6 +50,9 @@ from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeCond
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
+
+if TYPE_CHECKING:
+    from pipelex.pipe_machinery.pipe_blueprint import InputSlotBlueprint
 
 _ConceptEntry = ConceptBlueprint | str
 
@@ -135,10 +138,19 @@ def _qualify_concept_ref(concept_ref_or_code: str, *, domain: str) -> str:
 # --------------------------------------------------------------------------------------------------
 
 
+def _qualify_slot_value(slot_value: "str | InputSlotBlueprint", *, domain: str) -> "str | InputSlotBlueprint":
+    """Qualify a slot's concept through the same marker-preserving rewrite in both arms; a table
+    arm's hints pass through untouched (a hints table contains no refs).
+    """
+    if isinstance(slot_value, str):
+        return _qualify_io_ref(slot_value, domain=domain)
+    return slot_value.model_copy(update={"concept": _qualify_io_ref(slot_value.concept, domain=domain)})
+
+
 def _qualify_pipe_blueprint(blueprint: PipeBlueprintUnion, *, owner_domain: str) -> PipeBlueprintUnion:
     updates: dict[str, object] = {}
     if blueprint.inputs:
-        updates["inputs"] = {name: _qualify_io_ref(ref, domain=owner_domain) for name, ref in blueprint.inputs.items()}
+        updates["inputs"] = {name: _qualify_slot_value(value, domain=owner_domain) for name, value in blueprint.inputs.items()}
     if blueprint.output:
         updates["output"] = _qualify_io_ref(blueprint.output, domain=owner_domain)
 

@@ -20,30 +20,13 @@ from pipelex.core.concepts.concept_representation_generator import (
 )
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
-from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+from pipelex.core.pipes.variable_multiplicity import is_multiple_multiplicity
 from pipelex.interpreter_hub import get_concept_library
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.runtime_hub import get_class_registry
 
 STRUCTURES_MODULE = "structures.structures"
 """Module path of the emitted types projection, relative to the generated script's directory."""
-
-
-def _is_multiple(multiplicity: VariableMultiplicity | None) -> bool:
-    """Check if the multiplicity indicates multiple items.
-
-    Args:
-        multiplicity: The multiplicity value (None, bool, or int)
-
-    Returns:
-        True if multiple items are expected
-    """
-    if multiplicity is None:
-        return False
-    if isinstance(multiplicity, bool):
-        return multiplicity
-    # int means specific count, which is multiple
-    return multiplicity > 1
 
 
 def _format_representation_as_python(representation: dict[str, Any], *, is_multiple: bool = False) -> str:
@@ -226,11 +209,11 @@ def generate_runner_code(
     if not pipe.inputs.is_empty:
         input_entries: list[str] = []
         for var_name, input_req in pipe.inputs.root.items():
-            is_multiple = _is_multiple(input_req.multiplicity)
+            is_multiple = is_multiple_multiplicity(multiplicity=input_req.multiplicity)
             result, _ = input_req.concept.render_concept_representation(
                 structure_class=get_concept_library().get_structure_class(concept=input_req.concept),
                 output_format=ConceptRepresentationFormat.PYTHON,
-                is_multiple=is_multiple,
+                multiplicity=input_req.multiplicity,
                 class_name_overrides=overrides,
             )
             python_code = _format_representation_as_python(result, is_multiple=is_multiple)

@@ -1,6 +1,7 @@
 {
   "concept": "native.Document",
   "content": {
+    "description": "A document",
     "properties": {
       "url": {
         "description": "The document URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
@@ -76,7 +77,7 @@
     "required": [
       "url"
     ],
-    "title": "DocumentContent",
+    "title": "native.Document",
     "type": "object"
   }
 }

@@ -1,0 +1,11 @@
+domain      = "input_semantics_rejected"
+description = "REJECTED probe: unknown keys in a structure-field table are rejected (E7) — the field table's keys are strict, like an input slot table's"
+
+[concept.Constrained]
+description = "Holder of a field carrying hopeful constraint keys the language does not define"
+
+[concept.Constrained.structure]
+constrained_count = { type = "integer", description = "integer carrying unknown constraint keys", minimum = 0, maximum = 100, examples = [
+  1,
+  2,
+], unit = "items" }

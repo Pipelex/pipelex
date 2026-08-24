@@ -156,7 +156,7 @@ The Python format generates class instantiation code:
 
 ### Schema Format
 
-The schema format generates JSON Schema definitions, ideal for generating TypeScript interfaces or Zod schemas:
+The schema format generates JSON Schema definitions, ideal for generating TypeScript interfaces or Zod schemas. The schema's top-level `title` is the concept ref, and its top-level `description` is the concept's authored description:
 
 ```json
 {
@@ -168,12 +168,13 @@ The schema format generates JSON Schema definitions, ideal for generating TypeSc
       "key_points": { "type": "string", "title": "Key Points" }
     },
     "required": ["title", "key_points"],
-    "title": "MyOutputConcept"
+    "title": "my_domain.MyOutputConcept",
+    "description": "The concept's description, as authored in the bundle"
   }
 }
 ```
 
-**Array outputs** (e.g., `MyType[5]`) are properly represented as JSON Schema arrays:
+**Array outputs** are represented as JSON Schema arrays, with the concept identity kept on `items`. A fixed count (e.g., `MyType[5]`) additionally emits `minItems`/`maxItems` bounds; a variable-length list (`MyType[]`) carries no bounds:
 
 ```json
 {
@@ -187,8 +188,11 @@ The schema format generates JSON Schema definitions, ideal for generating TypeSc
         "description": { "type": "string", "title": "Description" }
       },
       "required": ["name", "description"],
-      "title": "Item"
-    }
+      "title": "my_domain.Item",
+      "description": "An item of the collection"
+    },
+    "minItems": 5,
+    "maxItems": 5
   }
 }
 ```

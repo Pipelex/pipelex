@@ -116,10 +116,6 @@ rationale = "Verb-object: collects imports for the pipe inputs; single operand."
 param = "representation"
 rationale = "Verb-object: formats the representation dict as Python; is_multiple stays keyword."
 
-["pipelex/builder/runner_code.py::_is_multiple"]
-param = "multiplicity"
-rationale = "Predicate on the multiplicity value; single operand."
-
 ["pipelex/builder/runner_code.py::generate_runner_code"]
 param = "pipe"
 rationale = "Verb-object: generates runner code for the pipe; single obvious operand."
@@ -3500,6 +3496,22 @@ rationale = "Verb-object: the repo root being cleaned; options stay keyword."
 param = "repo_root"
 rationale = "Verb-object: the repo root being updated; options stay keyword."
 
+["pipelex/language/intent_hints.py::applicable_intent"]
+param = "hints"
+rationale = "Verb-object read: applicable_intent(hints) judges the hints table, the single obvious operand."
+
+["pipelex/language/intent_hints.py::intent_word_applies"]
+param = "word"
+rationale = "Predicate on its single operand: intent_word_applies(word), the site kind being a keyword modifier."
+
+["pipelex/language/intent_hints.py::is_intent_word_known"]
+param = "word"
+rationale = "Predicate on its single operand: is_intent_word_known(word)."
+
+["pipelex/language/intent_hints.py::merge_hints"]
+param = "layers"
+rationale = "Verb-object read: merge_hints(layers) merges the hint layers, the single obvious operand."
+
 ["pipelex/language/mthds_factory.py::MthdsFactory.add_spaces_to_inline_tables"]
 param = "toml_string"
 rationale = "Verb-object: transforms the TOML string; single operand."
@@ -3675,6 +3687,10 @@ rationale = "Single-operand qualification of the pipe blueprint; owner_domain is
 ["pipelex/libraries/crate_qualification.py::_qualify_pipe_ref"]
 param = "pipe_ref"
 rationale = "Single-operand transformation of the ref; domain is context."
+
+["pipelex/libraries/crate_qualification.py::_qualify_slot_value"]
+param = "slot_value"
+rationale = "Verb-object read, matching sibling _qualify_io_ref: qualifies the one slot value."
 
 ["pipelex/libraries/crate_qualification.py::_qualify_structure_field"]
 param = "field_blueprint"
@@ -4051,6 +4067,10 @@ rationale = "Predicate on the category string; single operand."
 ["pipelex/pipe_machinery/pipe_blueprint.py::explicit_signature_tag_migration_message"]
 param = "pipe_code"
 rationale = "Noun-named derivation: the migration message for the given pipe code; single operand."
+
+["pipelex/pipe_machinery/pipe_blueprint.py::slot_concept_spec"]
+param = "slot_value"
+rationale = "Verb-object read: slot_concept_spec(slot_value) projects the one slot value to its concept spec string."
 
 ["pipelex/pipe_machinery/rendering/input_renderer.py::_delighten_entry"]
 param = "entry"
@@ -4551,6 +4571,38 @@ rationale = "Verb-object: plans the fix for the error data; single operand."
 ["pipelex/pipeline/fixes/planner.py::plan_fix_for_pipe_validation_error"]
 param = "error_data"
 rationale = "Verb-object: plans the fix for the error data; single operand."
+
+["pipelex/pipeline/hint_warnings.py::_HintLinter._concept_site_kind"]
+param = "concept_ref"
+rationale = "Verb-object read with a single obvious operand: the site or ref being classified/linted."
+
+["pipelex/pipeline/hint_warnings.py::_HintLinter._field_site_kind"]
+param = "field"
+rationale = "Verb-object read with a single obvious operand: the site or ref being classified/linted."
+
+["pipelex/pipeline/hint_warnings.py::_HintLinter._resolve_concept_kind"]
+param = "concept_ref"
+rationale = "Verb-object read with a single obvious operand: the site or ref being classified/linted."
+
+["pipelex/pipeline/hint_warnings.py::_HintLinter._slot_site_kind"]
+param = "concept_spec"
+rationale = "Verb-object read with a single obvious operand: the site or ref being classified/linted."
+
+["pipelex/pipeline/hint_warnings.py::_HintLinter._split_ref"]
+param = "qualified_ref"
+rationale = "Verb-object read with a single obvious operand: the site or ref being classified/linted."
+
+["pipelex/pipeline/hint_warnings.py::build_hint_warnings"]
+param = "qualified"
+rationale = "Verb-object read with one obvious operand: the qualified crate content being swept."
+
+["pipelex/pipeline/input_form.py::_node_site_kind"]
+param = "node"
+rationale = "Verb-object read: the node whose site value-kind is judged."
+
+["pipelex/pipeline/input_form.py::_slot_hints_of"]
+param = "slot_value"
+rationale = "Verb-object read: the slot value whose hints are extracted."
 
 ["pipelex/pipeline/input_form.py::build_input_form"]
 param = "pipes"

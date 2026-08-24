@@ -57,7 +57,7 @@ class PipeStructureSpec(PipeSpec):
 
         return PipeStructureBlueprint(
             description=base_blueprint.description,
-            inputs=base_blueprint.inputs,
+            inputs=base_blueprint.inputs_concept_specs,
             output=base_blueprint.output,
             model=self.model,
         )

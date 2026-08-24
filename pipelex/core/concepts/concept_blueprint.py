@@ -1,7 +1,7 @@
 import keyword
 from typing import Any, cast
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, SerializerFunctionWrapHandler, field_validator, model_serializer, model_validator
 
 from pipelex.core.concepts.concept_structure_blueprint import RESERVED_FIELD_NAMES, ConceptStructureBlueprint
 from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
@@ -18,6 +18,29 @@ class ConceptBlueprint(BaseModel):
     structure: str | dict[str, ConceptStructureBlueprintType] | None = None
     # TODO: restore possibility of multiple refiles
     refines: str | None = None
+    hints: dict[str, str] | None = None
+    """MTHDS intent hints (spec: intent-hints.md) — non-normative presentation intent. Shape is
+    strict (flat string->string table), content is lenient (unknown entries preserved, advisory
+    lint warns). An empty table is equivalent to no hints and normalizes to absence."""
+
+    @field_validator("hints", mode="after")
+    @classmethod
+    def normalize_empty_hints(cls, hints: dict[str, str] | None) -> dict[str, str] | None:
+        # Sorted here so every serialization is canonical (spec: hints entries emitted sorted by
+        # key); hint key order is not semantic, unlike structure-field order.
+        return dict(sorted(hints.items())) if hints else None
+
+    @model_serializer(mode="wrap")
+    def serialize_without_absent_hints(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        """Absent hints are an absent member — never `null` (spec rule; keeps hint-free crate
+        fingerprints byte-identical to before hints existed). Deliberately NOT a blanket
+        `exclude_none`: the crate spec's general absent-members canonicalization is a separate
+        forward contract whose adoption would migrate every existing fingerprint.
+        """
+        dumped: dict[str, Any] = handler(self)
+        if dumped.get("hints") is None:
+            dumped.pop("hints", None)
+        return dumped
 
     @field_validator("refines", mode="before")
     @classmethod

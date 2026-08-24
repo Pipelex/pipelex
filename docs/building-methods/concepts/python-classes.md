@@ -227,6 +227,17 @@ Product = "A product in the catalog"
 
 **4. Test your pipeline** - The behavior should be identical, plus your custom validation.
 
+### Constraints and defaults are authored facts
+
+A hand-written class is also the only place to express a constraint. An inline structure field accepts a closed set of keys, so an authored `minimum = 0` or `max_length = 8` is rejected rather than silently dropped — on a class, the same intent goes on the pydantic field, where Pipelex reads it:
+
+```python
+price: float = Field(ge=0, description="Product price")
+sku: str = Field(max_length=8, pattern=r"^[A-Z]+$", description="Stock keeping unit")
+```
+
+That metadata is not merely enforced at runtime — it is carried onto the [input-form descriptor](../../under-the-hood/input-form-descriptor.md), so a form renderer sees the bound. A pydantic default counts the same way: `in_stock: bool = Field(default=True, ...)` is reported as a field that is *not* required, carrying `True` as its default. Requiring a field and giving it a default are contradictory in both worlds — inline, the pair is rejected outright; on a class, a field with a default is simply not required.
+
 ## Recommendations
 
 ### The Recommended Workflow
@@ -245,6 +256,7 @@ Product = "A product in the catalog"
 | Type hints in Python | `pipelex build structures` |
 | IDE autocomplete | `pipelex build structures` |
 | Custom validation | Hand-written Python class |
+| Field constraints (`gt`, `max_length`, `pattern`) | Hand-written Python class |
 | Computed properties | Hand-written Python class |
 | Business methods | Hand-written Python class |
 

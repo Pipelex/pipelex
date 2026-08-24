@@ -1,0 +1,42 @@
+domain      = "input_semantics_hinted"
+description = "HINTED probe: sibling of probe_bundle exercising intent hints at all three sites — keep probe_bundle.mthds hint-free forever (its fingerprints are pinned)"
+main_pipe   = "hinted_slots"
+
+[concept.Essay]
+description = "HINTED_concept_Essay: description-only concept carrying a concept-level hint"
+hints       = { intent = "prose" }
+
+[concept.Badge]
+description = "HINTED_concept_Badge: base of a hinted refinement chain"
+hints       = { intent = "label" }
+
+[concept.SpecialBadge]
+description = "HINTED_concept_SpecialBadge: refines Badge and overrides the inherited intent"
+refines     = "Badge"
+hints       = { intent = "prose" }
+
+[concept.PlainBadge]
+description = "HINTED_concept_PlainBadge: refines Badge with no hints of its own — inherits the base's"
+refines     = "Badge"
+
+[concept.Review]
+description = "HINTED_concept_Review: structured concept with field-level hints"
+
+[concept.Review.structure]
+headline = { type = "text", description = "HINTED_field_headline: text field hinted as a label", hints = { intent = "label" } }
+body     = { type = "text", description = "HINTED_field_body: text field hinted as prose", required = true, hints = { intent = "prose" } }
+stars    = { type = "integer", description = "HINTED_field_stars: integer field hinted as a rating", hints = { intent = "rating" } }
+plain    = { type = "text", description = "HINTED_field_plain: hint-free field beside hinted ones" }
+quirk    = { type = "text", description = "HINTED_field_quirk: field carrying an unknown hint key (content-lenient, preserved)", hints = { emphasis = "HINTED_unknown_value" } }
+
+[pipe.hinted_slots]
+type = "PipeLLM"
+description = "HINTED_pipe_hinted_slots: every slot spelling — plain string, collapsing table, hinted table, hinted table with markers"
+inputs = { plain = "Essay", expanded_plain = { concept = "Essay" }, hinted = { concept = "Review", hints = { intent = "prose" } }, hinted_marked = { concept = "Badge[]", hints = { intent = "label" } } }
+output = "Text"
+prompt = """
+@plain
+@expanded_plain
+@hinted
+@hinted_marked
+"""

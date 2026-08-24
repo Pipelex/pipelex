@@ -6,8 +6,9 @@ Covers the two combinations the hosted builder it was ported from never saw:
   ``allow_signatures=True`` gets an IO-contract entry like any concrete pipe (its declared
   contract is exactly what a top-down build needs), keyed by its namespaced ``pipe_ref``.
 - **Multiplicity entry shapes** — a single output reports ``multiplicity="single"``, a
-  list output (``Concept[]``) reports ``multiplicity="variable"`` with an array JSON Schema
-  on list-typed inputs.
+  variable list output (``Concept[]``) reports ``multiplicity="variable"``, and a fixed-count
+  output (``Concept[N]``) reports ``multiplicity="fixed"`` with ``item_count=N``; list-typed
+  inputs carry the same projection plus an array JSON Schema.
 
 The builder runs against the open validation library (`validate_bundle` leaves it loaded on
 success), mirroring how the protocol wrapper consumes it.
@@ -21,6 +22,7 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import PydanticUserError
 
+from pipelex.core.pipes.variable_multiplicity import PresenceMarker
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipeline.exceptions import PipeIOContractError
 from pipelex.pipeline.pipe_io_contracts import IOMultiplicity, build_pipe_io_contracts
@@ -63,6 +65,20 @@ description = "Make many items"
 inputs = { docs = "Text[]" }
 output = "Item[]"
 prompt = "Make items from:\\n@docs"
+
+[pipe.make_two]
+type = "PipeLLM"
+description = "Make exactly two items"
+inputs = { docs = "Text[2]" }
+output = "Item[2]"
+prompt = "Make two items from:\\n@docs"
+
+[pipe.make_from_one]
+type = "PipeLLM"
+description = "Make an item from a [1]-declared doc"
+inputs = { docs = "Text[1]" }
+output = "Item"
+prompt = "Make an item from:\\n@docs"
 """
 
 
@@ -76,10 +92,10 @@ description = "A verdict"
 [pipe.assess]
 type = "PipeLLM"
 description = "Assess with an optional hint"
-inputs = { doc = "Text", hint = "Text?" }
+inputs = { doc = "Text", hint = "Text?", brief = "Text!" }
 output = "Verdict"
 prompt = '''
-Assess $doc.
+Assess $doc following $brief.
 @?hint
 '''
 
@@ -106,7 +122,7 @@ go = "check"
 @pytest.mark.asyncio(loop_scope="class")
 class TestBuildPipeIOContracts:
     async def test_optional_markers_reported_on_contracts(self, load_empty_library: Callable[[], str]) -> None:
-        """A `?`-declared input/output reports optional=True on its contract; plain ones False."""
+        """A `?`-declared input reports presence=optional; plain ones plain; a `?` output optional=True."""
         outer_library_id = load_empty_library()
         try:
             result = await validate_bundle(mthds_contents=[_OPTIONAL_MTHDS])
@@ -115,8 +131,9 @@ class TestBuildPipeIOContracts:
             _teardown_validation_library(outer_library_id)
 
         assess = io_contracts["optional_contracts_test.assess"]
-        assert assess.inputs["doc"].optional is False
-        assert assess.inputs["hint"].optional is True
+        assert assess.inputs["doc"].presence == PresenceMarker.PLAIN
+        assert assess.inputs["hint"].presence == PresenceMarker.OPTIONAL
+        assert assess.inputs["brief"].presence == PresenceMarker.FORCE
         assert assess.output.optional is False
 
         gate = io_contracts["optional_contracts_test.gate"]
@@ -131,19 +148,53 @@ class TestBuildPipeIOContracts:
         finally:
             _teardown_validation_library(outer_library_id)
 
-        assert set(io_contracts) == {"structures_test.make_one", "structures_test.make_many"}
+        assert set(io_contracts) == {
+            "structures_test.make_one",
+            "structures_test.make_many",
+            "structures_test.make_two",
+            "structures_test.make_from_one",
+        }
 
         make_one = io_contracts["structures_test.make_one"]
         assert make_one.output.concept_ref == "structures_test.Item"
         assert make_one.output.multiplicity == IOMultiplicity.SINGLE
+        assert make_one.output.item_count is None
         assert make_one.inputs["doc"].concept_ref == "native.Text"
+        assert make_one.inputs["doc"].multiplicity == IOMultiplicity.SINGLE
+        assert make_one.inputs["doc"].item_count is None
         assert make_one.inputs["doc"].json_schema
 
         make_many = io_contracts["structures_test.make_many"]
         assert make_many.output.concept_ref == "structures_test.Item"
         assert make_many.output.multiplicity == IOMultiplicity.VARIABLE
-        # A list-typed input renders an array JSON Schema.
-        assert make_many.inputs["docs"].json_schema.get("type") == "array"
+        assert make_many.output.item_count is None
+        assert make_many.inputs["docs"].multiplicity == IOMultiplicity.VARIABLE
+        assert make_many.inputs["docs"].item_count is None
+        # A list-typed input renders an array JSON Schema, unbounded on the variable arm.
+        docs_schema = make_many.inputs["docs"].json_schema
+        assert docs_schema.get("type") == "array"
+        assert "minItems" not in docs_schema
+        assert "maxItems" not in docs_schema
+
+        make_two = io_contracts["structures_test.make_two"]
+        assert make_two.output.multiplicity == IOMultiplicity.FIXED
+        assert make_two.output.item_count == 2
+        assert make_two.inputs["docs"].multiplicity == IOMultiplicity.FIXED
+        assert make_two.inputs["docs"].item_count == 2
+        # The fixed-count input renders a bounded array JSON Schema.
+        two_schema = make_two.inputs["docs"].json_schema
+        assert two_schema.get("type") == "array"
+        assert two_schema.get("minItems") == 2
+        assert two_schema.get("maxItems") == 2
+
+        # A `[1]` input projects to single: no count, no array framing — and the schema memo
+        # must not serve it another arm's schema (the memo key normalizes multiplicity because
+        # `hash(True) == hash(1)` would collide `Text[]` with `Text[1]` under a raw key).
+        make_from_one = io_contracts["structures_test.make_from_one"]
+        assert make_from_one.inputs["docs"].multiplicity == IOMultiplicity.SINGLE
+        assert make_from_one.inputs["docs"].item_count is None
+        one_schema = make_from_one.inputs["docs"].json_schema
+        assert one_schema.get("type") != "array"
 
     async def test_schema_render_failure_converts_to_structured_error(
         self,

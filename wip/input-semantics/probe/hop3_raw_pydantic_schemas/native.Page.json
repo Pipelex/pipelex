@@ -1,6 +1,7 @@
 {
   "$defs": {
     "ImageContent": {
+      "description": "An image",
       "properties": {
         "url": {
           "description": "The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL",
@@ -168,6 +169,7 @@
       "type": "object"
     },
     "TextContent": {
+      "description": "A text",
       "properties": {
         "text": {
           "description": "The text",
@@ -182,6 +184,7 @@
       "type": "object"
     }
   },
+  "description": "The content of a page of a document, comprising text and linked images and an optional page view image",
   "properties": {
     "text_and_images": {
       "$ref": "#/$defs/TextAndImagesContent",

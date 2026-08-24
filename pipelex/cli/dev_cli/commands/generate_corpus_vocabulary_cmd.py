@@ -21,7 +21,13 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.pipe_machinery.pipe_blueprint import PipeCategory, PipeType
 from pipelex.runtime_hub import get_console
 from pipelex.test_extras.mthds_corpus.vocabulary import ValidationLayer, vocabulary_path
-from pipelex.validation_error_types import VALIDATION_ERROR_TYPES, PipeFactoryErrorType, PipeValidationErrorType, ValidationErrorType
+from pipelex.validation_error_types import (
+    VALIDATION_ERROR_TYPES,
+    HintLintErrorType,
+    PipeFactoryErrorType,
+    PipeValidationErrorType,
+    ValidationErrorType,
+)
 
 _ACRONYM_BOUNDARY_RE = re.compile(r"(?<=[A-Z0-9])(?=[A-Z][a-z])")
 _WORD_BOUNDARY_RE = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
@@ -42,6 +48,13 @@ _HEADER = """# The MTHDS Test Corpus tag vocabulary — the closed set an entry'
 # https://docs.pipelex.com/contribute/mthds-test-corpus/ — which in turn points at the
 # cross-repo contract, `docs/specs/mthds-test-corpus.md` in the Pipelex workspace repo.
 """
+
+_ADVISORY_HINT_LINT_EXCLUSION = (
+    "Advisory-only: the intent-hints lint rides the validation report's `warnings` array and never makes a "
+    "verdict invalid (hints are non-normative; well-formed unknown content is preserved). Same shape problem "
+    "as `optional_force_redundant`: an entry contract keyed on `expected_error` has nowhere to put a warning "
+    "on a valid entry. Revisit if the manifest ever grows a warnings axis."
+)
 
 # A code is excluded when no standalone focused entry could meaningfully exercise it. Exclusions
 # are visible decisions, one reason each: an excluded tag stays in the vocabulary and stays usable
@@ -92,6 +105,11 @@ _FEATURE_TAGS: dict[str, str] = {
         "Bare caller values — a string, a number, a dict, a list — interpreted top-down against the entry "
         "pipe's declared signature, so a caller need not wrap each one in its concept envelope."
     ),
+    "intent_hints": (
+        "An `intent` hint authored in a `hints` table — on a concept, a structure field, or an expanded "
+        "input slot — carrying non-normative presentation intent (`prose`, `label`, `rating`, `quantity`) "
+        "that renderers may honor and every other consumer safely ignores."
+    ),
     "multi_file_library": (
         "A method split across several `.mthds` files in one directory and merged additively behind a "
         "`bundle.mthds` entry point, so a pipe can be forward-declared as a signature in one file and "
@@ -140,6 +158,9 @@ _ERROR_TYPE_EXCLUSIONS: dict[ValidationErrorType, str] = {
         "valid one, so there is no shape a focused entry could take. Revisit if the manifest ever grows a "
         "warnings axis."
     ),
+    HintLintErrorType.HINT_UNKNOWN_KEY: _ADVISORY_HINT_LINT_EXCLUSION,
+    HintLintErrorType.HINT_UNKNOWN_INTENT: _ADVISORY_HINT_LINT_EXCLUSION,
+    HintLintErrorType.HINT_INAPPLICABLE_INTENT: _ADVISORY_HINT_LINT_EXCLUSION,
     PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR: (
         "The generic fallback for a validation failure that matched no specific code. Reaching it on purpose "
         "would mean authoring a bundle that breaks in a way the categorizer does not recognize — which is a "

@@ -218,7 +218,7 @@ class PipeComposeSpec(PipeSpec):
             return PipeComposeBlueprint.model_validate(
                 {
                     "description": base_blueprint.description,
-                    "inputs": base_blueprint.inputs,
+                    "inputs": base_blueprint.inputs_concept_specs,
                     "output": base_blueprint.output,
                     "construct": self.construct_spec,
                 }
@@ -239,7 +239,7 @@ class PipeComposeSpec(PipeSpec):
 
             return PipeComposeBlueprint(
                 description=base_blueprint.description,
-                inputs=base_blueprint.inputs,
+                inputs=base_blueprint.inputs_concept_specs,
                 output=base_blueprint.output,
                 template=template_blueprint,
             )

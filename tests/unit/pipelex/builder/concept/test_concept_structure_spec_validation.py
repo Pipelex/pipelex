@@ -34,6 +34,23 @@ class TestConceptStructureSpecValidation:
         assert spec.type == ConceptStructureSpecFieldType.CONCEPT
         assert spec.concept_ref == "myapp.Customer"
 
+    def test_required_with_default_is_rejected_at_spec_level(self):
+        """The E3 pair is rejected on the authoring surface itself, with the same two-remedies
+        message as the blueprint — a builder agent must not validate green and then die on its
+        own emitted TOML.
+        """
+        with pytest.raises(ValidationError) as exc_info:
+            ConceptStructureSpec(
+                the_field_name="title",
+                description="A title",
+                type=ConceptStructureSpecFieldType.TEXT,
+                required=True,
+                default_value="Untitled",
+            )
+        error_str = str(exc_info.value)
+        assert "required" in error_str
+        assert "default_value" in error_str
+
     def test_concept_type_cannot_have_default_value(self):
         """CONCEPT type cannot have default_value set."""
         with pytest.raises(ValidationError) as exc_info:

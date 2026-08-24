@@ -1,6 +1,7 @@
 {
   "concept": "native.Number",
   "content": {
+    "description": "A number",
     "properties": {
       "number": {
         "anyOf": [
@@ -18,7 +19,7 @@
     "required": [
       "number"
     ],
-    "title": "NumberContent",
+    "title": "native.Number",
     "type": "object"
   }
 }

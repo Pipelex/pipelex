@@ -2,7 +2,7 @@
 
 Every valid `validate` report carries, beside `pipe_io_contracts`, an **input-form descriptor** per pipe: an ordered list of field descriptors a renderer can turn into a fill-in form with no schema heuristics, no hardcoded concept tables, and no description matching. The wire contract is the MTHDS spec `docs/specs/mthds-input-form-descriptor.md` at the workspace root; this page documents Pipelex's reference derivation of it.
 
-The descriptor exists because the emitted `json_schema` is a *payload* contract, and the projection that produces it loses facts a form needs: which concept a node is, what it refines, whether `!` or plain was authored, a fixed `[N]` count, an authored default beside `required`, a one-member choice list. The descriptor reports those facts from where they still exist — the authored blueprints — and leaves the payload shape to the schema. It is presentation; it never changes what a caller submits.
+The descriptor exists because the emitted `json_schema` is a *payload* contract, and the projection that produces it loses facts a form needs: which concept a node is, what it refines, whether `!` or plain was authored, a fixed `[N]` count, an authored default, a one-member choice list. The descriptor reports those facts from where they still exist — the authored blueprints — and leaves the payload shape to the schema. It is presentation; it never changes what a caller submits.
 
 ## Where it lives
 
@@ -17,7 +17,7 @@ The report always carries the field. Whether it travels on the HTTP wire is the 
 
 The derivation reads two things and nothing else:
 
-- **Slot facts** from the loaded pipes' `StuffSpec`s: the authored input order, the three-valued presence marker (`plain` / `optional` / `force`), and the multiplicity including a fixed `[N]` count. Iterating the same loaded pipes as `build_pipe_io_contracts` — `PipeSignature` placeholders and controller-inferred inputs included — is what makes the two key sets equal by construction.
+- **Slot facts** from the loaded pipes' `StuffSpec`s: the authored input order, the three-valued presence marker (`plain` / `optional` / `force`), and the multiplicity including a fixed `[N]` count. Iterating the same loaded pipes as `build_pipe_io_contracts` — `PipeSignature` placeholders included — is what makes the two key sets equal by construction.
 - **Concept facts** from the *qualified* library crate built from the parsed blueprints: descriptions, refinement links, structure fields with their defaults, choices, required-ness and nested concept refs. Qualified, not normalized: normalization flattens in-crate refinement, and the descriptor must report the `refines` chain as a list. Native concepts contribute their pinned blueprints; class-backed concepts (`structure = "ClassName"`) are reflected from the class registry, which is why the derivation must run while the validation library is still loaded.
 
 The derivation is total. A node it cannot map honestly reports `kind: "unknown"`, the renderer's raw escape hatch against the sibling `json_schema`; nothing raises.
@@ -33,6 +33,8 @@ Kinds are decided by chain membership and declared types — never by sniffing a
 
 The crate the deriver reads is the current library's accumulated one, which holds the validated bundle and every `library_dirs` bundle loaded beside it — so a concept from a library dir, or a local concept refining one, follows the same rules as a local concept. A concept absent from that crate altogether is `unknown`.
 
+The table and rules above ARE the no-hint kind assignment — stated rules, not heuristics: with no applicable intent hint, a node's kind is exactly what they produce. An applicable authored `intent` (spec: MTHDS `intent-hints.md`) *feeds* that assignment, never competes with it: on a **text-valued** node — one whose site is a `text` field, a `native.Text`-chained or description-only concept, judged per item on plural sites — an effective `intent = "prose"` yields `kind: "prose"` and `intent = "label"` yields `kind: "text"`; an absent, unknown, or inapplicable intent leaves the no-hint kind untouched. On a **number-valued** node, `rating` and `quantity` never change `kind` (both are `number`; the union has no finer kind) — they ride the `hints` slot for the renderer to honor. A time-formatted `text` node and an `Html`-backed `prose` node are *not* text-valued sites, so no intent word applies to them.
+
 | Native concept | Kind |
 |---|---|
 | `Text`, `Html` | `prose` |
@@ -47,7 +49,11 @@ The crate the deriver reads is the current library's accumulated one, which hold
 
 Nested structure fields map by their declared type: `text` → `text`; `integer` → `number` with `integer: true`; `number` → `number`; `boolean` → `boolean`; `date` → `date`; `datetime` → `date` with `datetime: true`; `time` → `text` with `format: "time"`; a field with `choices` → `enum` (choices win over `type`, matching the structure generator); `concept` → the concept's node, carrying its namespaced `concept_ref`; `list` → `list` whose `item` comes from `item_type` / `item_concept_ref` (a nested list's inner item is inexpressible and reports `unknown`); `dict` → `unknown`. The shorthand `field = "description"` form is a required `text`. Nested fields take the blueprint field's description and `required` over the concept's; a scalar flattened at the top level keeps the concept's description.
 
-Constraint slots (`minimum`, `exclusive_minimum`, `min_length`, `pattern`, …) come only from reflected classes: the blueprint parser drops keys it does not know, so an authored `minimum = 0` never reaches the deriver, whereas a registered class's `Field(gt=0, max_length=8, pattern=...)` is read from the pydantic field metadata and stamped on the matching `number` or `text` node.
+Constraint slots (`minimum`, `exclusive_minimum`, `min_length`, `pattern`, …) come only from reflected classes: the language cannot author constraint keys (an authored `minimum = 0` is rejected as an unknown structure-field key), whereas a registered class's `Field(gt=0, max_length=8, pattern=...)` is read from the pydantic field metadata and stamped on the matching `number` or `text` node. A pydantic default on a reflected class is an authored fact: `field_info.is_required()` decides the node's `required` and a non-`None` default is reported as its `default_value` — a defaulted field is never required, the same invariant blueprint validation enforces by rejecting the `required = true` + `default_value` pair. (Authored `hints` are a parsed blueprint field with its own leniency rules; see below.)
+
+## Hints
+
+Every node carries an optional `hints` slot: the node's **effective** MTHDS intent hints — the key-by-key merge of the concept's refinement chain (nearer declaration winning) with the site's own hints (a field's or a slot's, the site layer winning). Everything well-formed rides it, unknown keys and words included (the advisory validation lint has already warned about them; the descriptor preserves them for consumers that know more than this version does). On a plural node the merged hints appear on the `list` node *and* its `item` — the `concept_ref` duplication precedent: applicability is judged per item, and a renderer reading either node finds the same answer. A node with no effective hints has no `hints` member, so hint-free methods produce byte-identical descriptors to before hints existed. The slot is flat `string → string` by contract.
 
 ## Required, presence and gating
 
@@ -59,4 +65,4 @@ Inapplicable slots are absent, never JSON `null`: the report's valid arm is dump
 
 ## Seeing it
 
-`pipelex-dev trace-input-semantics` captures the descriptors as `hop5_input_form.json` beside `hop5_pipe_io_contracts.json`, so an authored fact can be checked on both projections at once — see [Tracing Input Semantics](../contribute/trace-input-semantics.md). The assignment table is pinned by `tests/integration/pipelex/pipeline/test_input_form.py` over the committed probe bundle, the wire models by `tests/unit/pipelex/pipeline/test_input_form_models.py`, and the escape hatches the library loader keeps unreachable (concept cycles, unregistered classes) by `tests/unit/pipelex/pipeline/test_input_form_deriver.py`.
+`pipelex-dev trace-input-semantics` captures the descriptors as `hop5_input_form.json` beside `hop5_pipe_io_contracts.json`, so an authored fact can be checked on both projections at once — see [Tracing Input Semantics](../contribute/trace-input-semantics.md). The assignment table is pinned by `tests/integration/pipelex/pipeline/test_input_form.py` over the committed probe bundle (and the hints behavior over its hinted sibling, `hinted_bundle.mthds`), the wire models by `tests/unit/pipelex/pipeline/test_input_form_models.py`, the hint merges and kind-feeding by `tests/unit/pipelex/pipeline/test_input_form_hints.py`, and the escape hatches the library loader keeps unreachable (concept cycles, unregistered classes) by `tests/unit/pipelex/pipeline/test_input_form_deriver.py`.

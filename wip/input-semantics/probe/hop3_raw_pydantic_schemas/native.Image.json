@@ -1,4 +1,5 @@
 {
+  "description": "An image",
   "properties": {
     "url": {
       "description": "The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL",

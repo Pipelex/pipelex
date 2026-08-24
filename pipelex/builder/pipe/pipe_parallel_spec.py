@@ -77,7 +77,7 @@ class PipeParallelSpec(PipeSpec):
         core_branches = [branch.to_blueprint() for branch in self.branches]
         return PipeParallelBlueprint(
             description=base_blueprint.description,
-            inputs=base_blueprint.inputs,
+            inputs=base_blueprint.inputs_concept_specs,
             output=base_blueprint.output,
             type=self.type,
             pipe_category=self.pipe_category,

@@ -58,7 +58,7 @@ class TestConceptGenerateInputRepresentationJson:
         result, _ = concept.render_concept_representation(
             structure_class=ConceptLibrary.make_empty().get_structure_class(concept=concept),
             output_format=ConceptRepresentationFormat.JSON,
-            is_multiple=True,
+            multiplicity=True,
         )
         assert result["concept"] == "native.Document"
         assert "content" in result
@@ -114,9 +114,9 @@ class TestConceptGenerateInputRepresentationPython:
         result, imports = concept.render_concept_representation(
             structure_class=ConceptLibrary.make_empty().get_structure_class(concept=concept),
             output_format=ConceptRepresentationFormat.PYTHON,
-            is_multiple=True,
+            multiplicity=True,
         )
-        # For Python format, is_multiple doesn't wrap content (caller handles it)
+        # For Python format, a multiple multiplicity doesn't wrap content (caller handles it)
         assert result["concept"] == "native.Document"
         assert "DocumentContent" in result["content"]
         assert "DocumentContent" in imports

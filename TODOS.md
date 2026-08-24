@@ -1,111 +1,107 @@
-# D2 — Input-form descriptor: reference derivation + report carriage
+# S2 — Enrich: implementation tracker
 
-Implements `/Users/lchoquel/repos/Pipelex/wip/inbox/2026-08-22-pipelex-d2-input-form-descriptor-derivation.md` on the stacked branch `feature/Input-semantics-D2` (program branch `feature/Input-semantics`; no PR to `dev`, per the program's branch ruling).
+Seeded from [`wip/enrich/design.md`](wip/enrich/design.md) §7 (the design stays authoritative for rationale; this file tracks live progress). Milestone branch: `feature/Enrich`.
 
-**Contract:** `docs/specs/mthds-input-form-descriptor.md` (workspace root) — every section. **Gate:** the skip-gated skeletons in `conformance/tests/pipelex_api/test_validate_input_form.py` de-gated and green against the booted sibling `pipelex-api`, plus the per-kind assignment coverage. The two live absent-by-default tests must keep passing untouched. The de-gating itself rides the `pipelex-api` inbox item (Phase 6) because the sibling boots a **pinned PyPI runtime** — this repo's deliverable is the derivation, the report carriage, the pinned assignment table, and the follow-up filings.
+## Decisions ratified (Phase 0, 2026-08-23, by Louis)
 
-## Settled design decisions (read before implementing)
+1. **E3 — reject the pair.** A structure field declaring both `required = true` and a `default_value` is a validation error (breaking; mthds spec sentence via inbox; the sole fixture instance moves to `rejected/`).
+2. **E5/E9 — replace, not add.** Input contract `presence: "plain" | "optional" | "force"` **replaces** `optional`; `multiplicity` goes three-valued (`single`/`variable`/`fixed`) with `item_count` exactly when `fixed`, on input and output contracts. Output keeps its two-valued `optional`. Breaking protocol change, spec-first, rides the release cascade.
+3. **Reflected defaults are authored facts.** A pydantic default on a reflected class field reports `required: false` + its `default_value` in the descriptor; `field_info.is_required()` is the single source of truth.
 
-- **Derivation input = loaded pipes + the qualified (NOT normalized) crate.** The slot key space and slot list come from the loaded pipes (`result.pipes` → `pipe.inputs.root` `StuffSpec`s), guaranteeing key-set equality with `pipe_io_contracts` by construction (same iteration, including `PipeSignature` placeholders and controller-inferred inputs). Concept facts (description, `refines`, structure fields) come from a crate built as `qualify_crate(LibraryCrateFactory.make_from_blueprints(result.blueprints))` — **not** `normalize_crate`, because normalization flattens in-crate refinement and drops the `refines` links the descriptor must report as a chain (`crate_normalization.py` step 3 vs spec's `refines` slot). Never read the emitted JSON Schema (the whole point — the E1/E2/E3/E4 losses live downstream of the blueprint).
-- **Fact sources per node:** authored concepts → their `ConceptBlueprint.structure` (`ConceptStructureBlueprint` retains `default_value`, `choices`, `required`, descriptions, `concept_ref`/`item_concept_ref` — everything the schema loses); natives → `materialize_native_concept` pinned blueprints; class-backed concepts (`structure = "ClassName"`) → class-registry reflection (generalize the faithful-or-absent approach of `codegen/native_expansion.reflect_native_structure`), falling back to `kind: "unknown"` when unmappable. A pipe slot whose concept is absent from the crate (e.g. loaded from `library_dirs`) still gets a descriptor: slot facts from the loaded `StuffSpec`, concept payload via natives/reflection/`unknown`.
-- **Slot facts from `StuffSpec`:** `presence: PresenceMarker` is already the spec's exact three-valued wire vocabulary (`plain`/`optional`/`force`) — reuse it. `multiplicity: VariableMultiplicity | None` keeps the fixed `[N]` int (E4's fact) — `None` → single node, `True` → `list` (no `item_count`), int → `list` with `item_count`.
-- **Derived booleans (in the deriver, per spec):** top-level `required = presence != optional`; `gating = required and not (kind == "list" and item_count is None)`. Fixed-count lists gate. Nested fields carry neither `presence` nor `gating`.
-- **E3 honesty:** a field authored `required = true` **and** `default_value` reports both — read from the blueprint, so the hop-2 accident never enters. `default_value` emitted only when authored (never the emission's `null`-for-optional artifact).
-- **E10:** `choices` always a list on the wire, even one member.
-- **Report carriage:** `PipelexValidationReport.input_form: dict[str, PipeInputFormDescriptor]` as a **required** field, `build_validation_report(..., input_form=...)` as a **required** kwarg. No default — the pipelex-server worker path must fail loudly at its next pipelex bump (shared-assembly rule: populated everywhere or nowhere), fixed by its own inbox item. The report always carries it; absence-by-default on the HTTP wire is the route's pop (the `rendered_markdown` precedent), which is `pipelex-api`'s item.
-- **Wire absence of inapplicable slots:** the valid arm is dumped **without** `exclude_none`, so a flat model with `None`s would leak `"presence": null` everywhere. Give the field model a None-dropping `@model_serializer` (no slot legitimately carries JSON `null`: TOML cannot author a null default). Flat recursive model + per-kind validators, not a discriminated union — simpler, and D4 owns the TS types.
-- **`title`: omitted in D2** (slot exists on the model; renderer falls back to `name` — never the mangled class name). H2 refines.
-- **`description` for a flattened scalar:** the concept's authored description, else the payload field's. This is the E6 fix on the descriptor side: class-backed and native concepts get their blueprint/pinned description.
-- **Cycle guard:** track the concept-ref path while recursing objects/lists; on revisit emit `unknown` (json_schema's `$ref`s keep the payload contract; the descriptor stays finite).
-- **`refines` chain:** walk authored links immediate-parent-first to the end, qualified. A string-described / description-only concept reports `kind: "prose"` with `refines: ["native.Text"]` — this engine's stated fact (it generates a `TextContent` subclass and its `json_schema` is `{text}`), not shape invention.
-- **Kind assignment table** (pinned by tests in Phase 3; chain-membership decides, never shape sniffing):
-  - chain bottoms at / is `native.Text` (incl. string-promoted concepts) → `prose`; `native.Html` → `prose`; `native.Number` → `number` (`integer: false`); `native.YesNo` → `boolean`; `native.Date` → `date` (`datetime: false`); `native.Time` → `text` + `format: "time"`; `native.Document` → `document`; `native.Image` → `image`; `native.Page`, `native.TextAndImages`, `native.SearchResult` → `object` (pinned-blueprint fields); `native.Dynamic`, `native.Anything`, `native.JSON`, `native.Composite` → `unknown`.
-  - structured concept → `object` (fields in declared order, recursing); nested field types: `text`→`text`, `integer`→`number`(`integer: true`), `number`→`number`, `boolean`→`boolean`, `date`→`date`(`datetime: false`), `datetime`→`date`(`datetime: true`), `time`→`text`+`format:"time"`, `choices` present → `enum` (choices win over `type`, matching the generator), `concept`→ recurse (with `concept_ref` — the E1 fact), `list`→`list` (item from `item_type`/`item_concept_ref`; inner `list` item → `unknown`), `dict`→`unknown`.
-  - multi-field custom concept never flattens; flattening applies only via the native-chain rules above.
-- **No new error class** — the derivation is total (`unknown` is the escape hatch); no `gei`/`gep` needed.
-- **Keyword-only rule:** new functions keyword-only; if `build_input_form(pipes, ...)` keeps a positional subject, record the grant (`make sgr`) BEFORE running `make agent-check` (the auto-fixer silently keyword-onlys ungranted subjects).
-- Rich ready-made fixture for tests: `tests/data/input_semantics/probe_bundle.mthds` (chains, class-backed, natives, defaults, single choice, `[N]`, `!`, `?`).
+## Phase 0 — ratify and sweep
 
-## Session state (updated 2026-08-22 at close-out — resume here after /compact or cold start)
+- [x] Decisions §6 confirmed by Louis (see above)
+- [x] Sweep at head: hopeful extra keys in structure-field tables across fixtures, corpus entries, and cookbook-adjacent test data (E7 fallout list)
+- [x] Sweep at head: `required = true` + `default_value` pairs across the same surfaces (E3 fallout list)
+- [x] Inventory captures that pin emitted schema bytes (codegen/validate parity corpora, conformance captures, characterization tests) so Phase 2 re-baselines are deliberate
+- [x] Record the fixture-fallout list for Phases 1–2 below
 
-**All phases done.** What landed where:
+### Phase 0 findings
 
-- `pipelex/pipeline/input_form.py` — wire models, `build_input_form`, `InputFormDeriver`; `pipelex/codegen/native_expansion.py` — `reflect_structure_class`; `pipelex/pipeline/validation_report.py` + `validate_in_process.py` — the required `input_form` carriage.
-- Tests: `tests/integration/pipelex/pipeline/test_input_form.py` (probe bundle + kind-table bundle), `tests/unit/pipelex/pipeline/test_input_form_models.py`, `tests/unit/pipelex/pipeline/test_input_form_deriver.py`, plus the carriage sweep and the trace-harness test.
-- Docs: `docs/under-the-hood/input-form-descriptor.md` (nav'd), `docs/contribute/trace-input-semantics.md` (the `hop5_input_form.json` capture), the `## [Unreleased]` changelog entry.
-- Sibling repos: `conformance/` branch `feature/Input-form-kind-table` (per-kind skeletons, skip-gated); workspace root `dev` (the spec's two new `> Verified by:` lines).
-- Inbox: `../wip/inbox/2026-08-22-pipelex-api-validate-views-input-form.md` (the `views` opt-in + OpenAPI + the de-gating of the whole conformance module once the pin moves — this closes D2's gate) and `../wip/inbox/2026-08-22-pipelex-server-worker-input-form-carriage.md` (`temporal/`: carry `input_form` on `DryValidateResult`; rides the D3 pin cascade, fails loudly until then by design).
+- **Structure-field sweep (2026-08-23, at head of `feature/Enrich`):** parsed every `.mthds`/concept-bearing `.toml` under this worktree, `pipelex-cookbook`, and `pipelex-starter-python`. The ONLY unknown-key carrier is the probe bundle's `constrained_count` (`tests/data/input_semantics/probe_bundle.mthds:61` — extras `minimum`, `maximum`, `examples`, `unit`), and the ONLY `required`+`default_value` pair is the probe bundle's `titled_default` (`probe_bundle.mthds:30`). No fallout anywhere else; both fields are handled by the design's own plan (extras: E7 flip keeps them as deliberate rejected-case material; `titled_default` moves to a `rejected/` fixture in Phase 4).
+- **Schema-byte capture inventory (very thorough sweep):** NOTHING under `tests/` pins schema bytes — every schema assertion is key-presence or single-value, so Phase 2's render changes are test-green without re-baselining (no snapshot framework exists in the repo). The only committed full-schema payloads are the S1 audit captures under `wip/input-semantics/probe/` (hop3 raw schemas, hop4 renders, hop5 contracts), re-baselined by one command: `.venv/bin/pipelex-dev trace-input-semantics tests/data/input_semantics/probe_bundle.mthds -o wip/input-semantics/probe`. Hand edits Phase 2 owes: `docs/tools/cli/build/output.md:161-239` (its example `--format schema` output shows the class-name `title`, no top-level `description`, and a `MyType[5]` array with no `minItems`/`maxItems` — falsified by all three enrichments). Digest surfaces checked (migration fingerprints, crate fingerprints, codegen stamps): none hashes rendered schema. Conformance (sibling repo) pins nothing schema-byte-wise; it becomes relevant only at Phase 3. Natural home for new seam unit tests: `tests/unit/pipelex/core/concepts/test_concept_representation_generator.py`; for integration assertions: `tests/integration/pipelex/cli/test_trace_input_semantics_cmd.py`.
 
-**Waiting on:** a `pipelex` release carrying the derivation, then the two inbox items. Nothing else in this repo.
+## Phase 1 — loudness (E7, E8)
 
-Decisions taken while implementing (beyond the settled list above):
+- [x] E7: `extra="forbid"` on `ConceptStructureBlueprint` (`pipelex/core/concepts/concept_structure_blueprint.py`) — field-table *keys* strict; hint *content* stays lenient (unknown hint keys still warn + preserve)
+- [x] E8: builder writes `default_value`, not `default` (`pipelex/builder/operations/concept_ops.py`)
+- [x] E8: write-then-validate round-trip test for builder-authored defaults (`tests/unit/pipelex/builder/operations/test_concept_spec_to_toml.py` — two existing assertions had pinned the buggy `default` key and were fixed too)
+- [x] Regenerate `mthds_schema.json` — `ConceptStructureBlueprint` now carries `additionalProperties: false` (schema is generated + gitignored; downstream copies sync at release per the filed inbox item)
+- [x] Apply Phase 0 fixture fallout: probe bundle's `constrained_count` lost its hopeful extras (its description string kept byte-identical — it is hashed by the fingerprint pins); the extras live on in the new `tests/data/input_semantics/rejected/unknown_structure_field_key.mthds_invalid`
+- [x] Unit tests: forbid rejection + hint leniency (`tests/unit/pipelex/core/concepts/concept_blueprint/test_concept_structure_blueprint_extra_keys.py`)
+- [x] H2 fingerprint invariant check: `test_fingerprint_pins.py` green with UNCHANGED pins
+- [x] Changelog (Unreleased): E7 breaking (Changed) + E8 fix (Fixed)
+- [x] Deliver + remove inbox item `../wip/inbox/2026-08-21-pipelex-builder-default-key-dropped.md` (deleted; fix, round trip, and forbid all delivered)
 
-- **Signature is `build_input_form(pipes, *, blueprints)`**, not `crate=`: the deriver builds the qualified crate itself (`qualify_crate(LibraryCrateFactory.make_from_blueprints(...))`) so both assembly paths hand it the same thing they already hold. The `pipes` subject is granted in `subject_grants.toml`. The deriver class is public (`InputFormDeriver`, with `derive_slot` and `derive_concept`) so its escape hatches can be unit-tested on a hand-built crate without private access.
-- **Inheritance of structure along a chain.** A refining concept with no structure of its own (`SpecialEntity refines BaseEntity`) is an `object` whose fields are the merged authored structures along its chain, base fields first, a refining concept overriding its parents' — because the validator requires `fields` on `object` and the test pins `object` for exactly this case. Precedence per node: merged dict structure → `object`; else the first `structure = "ClassName"` on the chain (self first) → class-backed; else a chain bottoming at a native → that native's kind with the concept's own `concept_ref`/description/`refines`; else prose promotion (`refines` = chain + `["native.Text"]`).
-- **Class-backed reflection** goes through a new public `reflect_structure_class(*, structure_class)` in `pipelex/codegen/native_expansion.py` (the native probe now delegates to it). A native class name maps by identity (`TextContent` → the `native.Text` rules); any other registered `BaseModel` is reflected into blueprint form and rendered as `object`; unregistered or unmappable → `unknown`. A concept absent from the crate (a `library_dirs` load) takes the same path with the class named by its code.
-- **Constraint slots come only from reflected classes.** The blueprint parser drops unknown keys (E7), so an authored `minimum = 0` never reaches the deriver; a registered class's `Field(gt=, ge=, lt=, le=, min_length=, max_length=, pattern=)` does, read from `FieldInfo.metadata` and stamped on `number` (bounds) and `text` (length/pattern) nodes only.
-- **`[1]` is a single node.** The parser keeps `multiplicity = 1`, but `StuffSpec.is_multiple()` is `count > 1`, so the runtime takes one value, not a one-element list — the descriptor says the same (no `item`, no `item_count`, `gating: true`).
-- **The cycle guard is unreachable from a bundle**: the library loader rejects concept cycles (`Cycle detected in concept references`) before `build_input_form` runs. It stays, because the derivation must be total on any crate handed to it, and is pinned at the deriver level.
-- **Remaining natives as inputs** (`TextAndImages`, `SearchResult`, `Dynamic`, `Anything`, `JSON`) are exercised through a `PipeCompose`, because a PipeLLM's dry run treats a `Dynamic` input as an image. `Composite` is not a pipe input and has no row.
-- **Nested concept fields** take the blueprint field's `description` and `required` over the concept's (the author described the field); a flattened scalar at the top level keeps the concept's description (E6).
-- **Item nodes** reuse the parent field's `name` and report `required: true` (a list element is a value); nested `list` nodes copy the element's `concept_ref`/`refines` per the spec.
-- **Enum comparisons** go through properties (`PresenceMarker.is_optional`, a new `FieldKind.is_list`) per the house match/case rule; the scalar-type mapping is one exhaustive `match` in `_scalar_field`.
-- `make agent-check`'s keyword-only auto-fixer silently rewrote an internal helper's positional parameter mid-session — the helper was replaced by a keyword-only one; nothing else was touched by it.
+**Checkpoint 1** — authoring loop honest, nothing wire-visible changed yet.
 
-## Phase 1 — Wire models + derivation (`pipelex/pipeline/input_form.py`)
+- [x] Checkpoint 1: tracker updated, `make agent-check` green, targeted tests green (concepts + builder + fingerprint pins + input-form integration)
 
-- [x] TDD red: derivation + model tests written (see Session state above; paths differ slightly from the original sketch — integration tests live in `tests/integration/pipelex/pipeline/test_input_form.py`, model tests in `tests/unit/pipelex/pipeline/test_input_form_models.py`): key set equals `build_pipe_io_contracts`'s; authored slot order preserved; presence three-valued (`!` ≠ plain — E5); `required`/`gating` incl. the divergence (plain scalar `gating: true` vs plain `Concept[]` `required: true, gating: false`) and `?` (`required: false, gating: false`); `[N]` → `item_count` + `gating: true` (E4); empty-inputs pipe → `{ "fields": [] }`; namespaced `concept_ref` on every concept node incl. nested (E1); `refines` chain walked to the end, absent when nothing refined (E2); E3 both-facts; single-member `choices` list (E10); serialization drops inapplicable slots (no `null`s in `model_dump(mode="json")`).
-- [x] Models: `FieldKind` StrEnum (closed union), recursive `InputFormField` (common slots + per-kind slots + reserved `examples`/`hints`), `PipeInputFormDescriptor` (`fields: list[InputFormField]`), all snake_case wire names per the spec's common-slots table (MTHDS-owned artifact — no `pipelex_` prefixes), None-dropping serializer, per-kind validators (`datetime` required on `date`, `choices` on `enum`, `fields` on `object`, `item` on `list`, `integer` on `number`).
-- [x] Deriver: `build_input_form(pipes, *, blueprints) -> dict[str, PipeInputFormDescriptor]` — one public function per the spec's shared-assembly rule; internals per the decisions above.
-- [x] Green + `make agent-check`.
+### Checkpoint 1 state (for cold start)
 
-## Phase 2 — Report carriage (both in-repo assembly points)
+Decisions all ratified (§ above). Phase 1 delivered E7+E8 entirely inside: `concept_structure_blueprint.py` (forbid), `concept_ops.py` (key fix), probe bundle + new rejected fixture, three test modules touched. Note for Phase 4: removing `titled_default` from the probe bundle WILL move the pinned hint-free fingerprints in `tests/unit/pipelex/libraries/test_fingerprint_pins.py` — that is a legitimate fixture-content change, not a model leak; the pins must be recomputed then, against the test docstring's usual advice, or the pin test moved onto a stable fixture. The check-mthds PostToolUse hook flags the probe bundle with a stale bundled schema — `plxt lint` with the regenerated `derived/mthds_schema.json` is the authority and passes.
 
-- [x] `PipelexValidationReport.input_form` (required field, docstringed per house style) + required `input_form` kwarg on `build_validation_report`.
-- [x] `validate_in_process.py`: build the qualified crate and call `build_input_form` inside the library window, right beside `build_pipe_io_contracts` (the descriptor must be assembled before teardown for the same class-registry reason).
-- [x] Sweep other report producers/consumers in-repo: `tests/unit/pipelex/pipeline/test_validation_report.py`, `test_runner_validate_plumbing.py`, `test_direct_bundle_validator.py`, `test_protocol_validate.py`, the agent-CLI validate envelope, `format_validate_markdown` — update constructions; nothing renders the descriptor in Markdown (it is a structured view, not text).
-- [x] Integration assertion in `test_protocol_validate.py` (or a sibling): the in-process report carries `input_form` keyed like `pipe_io_contracts`.
+## Phase 2 — schema enrichment (E6, E1-title, E4)
 
-**CP1 — DONE (commit "D2 CP1: input-form descriptor derivation + report carriage"):** models + derivation + carriage, `make agent-check` and the pipeline/codegen suites green. Decisions recorded in the session state above.
+- [x] E6: `_render_schema_representation` (`pipelex/core/concepts/concept.py`) injects the concept's authored description as top-level `description` (no-op for generated classes; authored fact for class-backed; pinned native blueprint description for native direct inputs)
+- [x] E6: docstrings on native content classes lacking one (`TextContent`, `ImageContent`, `DocumentContent`, `PageContent`, `NumberContent`, `HtmlContent`, `YesNoContent`) — pinned description text verbatim; the pinned-consistency test (`tests/unit/pipelex/codegen/test_native_expansion.py`) compares factory descriptions, not docstrings, so no interference
+- [x] E1: top-level `title` becomes the concept ref at the same render seam (nested identity stays descriptor-only; no `$defs` renames)
+- [x] E4: `render_concept_representation` takes real multiplicity (not a boolean) — threaded through `render_stuff_spec`; new helpers `is_multiple_multiplicity` / `fixed_item_count` in `variable_multiplicity.py`; `StuffSpec.is_multiple()` delegates; `runner_code.py` local `_is_multiple` deleted in favor of the shared helper
+- [x] E4: array wrap emits `minItems`/`maxItems` = N when fixed; variable `[]` gets neither bound; `[1]` stays single (no wrap, no bounds)
+- [x] E4: contract memo key normalized to `(concept_ref, is_multiple, fixed_count)` (avoids the `hash(True) == hash(1)` collision between `Concept[]` and `Concept[1]`)
+- [x] Guard: `DocumentContent.url` field-description wording untouched (class gained only a docstring)
+- [x] Probe bundle + trace harness: no extension needed — the existing fixtures already exercise class-backed (`probe_refined.classbacked`), native-direct (`probe_native_inputs`), and fixed-count (`probe_markers.two = Gadget[2]`) inputs; all three enrichments verified present in the regenerated captures
+- [x] Re-baseline the Phase 0-inventoried schema-byte captures: `wip/input-semantics/probe/` regenerated; `docs/tools/cli/build/output.md` schema examples hand-updated (concept-ref title, top-level description, `minItems`/`maxItems`)
+- [x] Unit tests at the render seams: four new tests in `TestSchemaRepresentationWithMultiple` (title/description injection, array identity on items, fixed-count bounds, `[1]` stays single) + `tests/unit/pipelex/core/pipes/test_multiplicity_helpers.py` for the two helpers
+- [x] Changelog (Unreleased): additive schema enrichments
 
-## Phase 3 — Pin the full kind-assignment table (pipelex tests)
+**Checkpoint 2** — the "zero client changes" half complete and measurable.
 
-- [x] Extend the unit tests with the complete per-native ruling (every `NativeConceptCode` as a direct input → its kind above), string-promoted concept → `prose` + `refines: ["native.Text"]`, class-backed reflection (e.g. `structure = "TextContent"` → flattened `prose` carrying the concept description — E6) and the unmappable → `unknown` fallback, nested `dict`/inner-list → `unknown`, `datetime`/`time` formats, cycle guard.
-- [x] Pin whatever the parser does for `[1]` (an `is_multiple()` edge) in one test, reporting it as authored.
-- [x] Constraint slots: populate from reflected `FieldInfo` metadata where the engine states them (`Gt`/`Ge`/`Lt`/`Le`/`MinLen`/`MaxLen`/pattern → `exclusive_minimum` etc.); test on a registered class with a constrained field (the `ImageContent.width` precedent).
+- [x] Checkpoint 2: tracker updated, checks green
 
-**CP2 — DONE (commit "D2 CP2: pin the kind-assignment table and reflected constraint slots"):** assignment table pinned; `make agent-check` + full `make agent-test` green.
+### Checkpoint 2 state (for cold start)
 
-## Phase 4 — Conformance: per-kind coverage (sibling repo `conformance/`, own commit there)
+Phase 2 delivered entirely inside: `concept.py` (render seam: multiplicity param + title/description injection + array bounds), `variable_multiplicity.py` (two new helpers), `stuff_spec.py` (delegation + pass-through), `runner_code.py` (shared helper), `pipe_io_contracts.py` (normalized memo key), seven native content classes (docstrings), plus tests, probe re-baseline, and the docs example. Signature change is breaking for direct callers of `render_concept_representation` (`is_multiple` → `multiplicity`) — all in-repo callers and tests updated. Phase 3 recon (from the paused-note, still valid): `PresenceMarker` in `variable_multiplicity.py` is exactly the contract's `presence` vocabulary; contract models to replace are `pipe_io_contracts.py` (`IOMultiplicity`, `PipeInputContract`, `PipeOutputContract`). Note for Phase 4 (unchanged): removing `titled_default` from the probe bundle WILL move the pinned hint-free fingerprints in `test_fingerprint_pins.py` — recompute the pins then.
 
-- [x] Add per-kind skeleton tests to `conformance/tests/pipelex_api/test_validate_input_form.py`, skip-gated with the same `SKELETON_REASON` (the sibling boots a pinned PyPI runtime that predates the derivation): one bundle exercising the assignment table end to end (prose/document/image/number/boolean/single-member-enum/object-with-nested-concept_ref/list-with-`[N]`-item_count/date/unknown-dict), asserting kinds, `refines` membership, `presence`, E3 both-facts, and no-`null` inapplicable slots.
-- [x] Do NOT touch the two live absent-by-default tests.
-- [x] `make check-spec-links` in `conformance/` (new tests join the already-linked module; verify nothing drifted). Follow that repo's branch/PR convention for the commit.
+## Phase 3 — contract reshaping (E5, E9) — protocol change, spec-first
 
-**CP3 — DONE:** `conformance/` branch `feature/Input-form-kind-table` (commit "Pin the kind-assignment table skeletons in the input-form descriptor module", `make agent-check` green there) plus the spec's two new `> Verified by:` lines under *Field kinds* and *Structured multiplicity*, committed on the workspace root's `dev` ("Link the field-kinds and structured-multiplicity sections to their conformance skeletons"). The kind-table bundle was derived locally on this branch before the assertions were written, so the skeletons state what the deriver already produces.
+- [x] Spec: `../docs/specs/pipelex-mthds-protocol.md` — `pipe_io_contracts` row, "Optional IO contracts and liftable pipes" section, Verified-by line, and the abridged `ValidReport` example all updated to `presence` / three-valued `multiplicity` + `item_count`
+- [x] Spec: one sentence documenting `json_schema` as pydantic-canonical, single-choice enums as `const` (E10's documentation half) — appended to the `pipe_io_contracts` row
+- [x] Conformance: assertions reshaped in `conformance/tests/pipelex_api/test_validate_optionals.py` — the gate is shape-detected (`presence` absent → skip), so it arms automatically when `pipelex-api` re-pins at the cascade; the fixed-count arm stays pinned in pipelex's own suite (the shared optionals fixture has no `[N]` slot, deliberately not extended)
+- [x] `make check-spec-links` in `conformance/` — green (note: `make agent-check` there also surfaced PRE-EXISTING vendored-corpus drift on `vocabulary.toml` from H2, covered by the filed release-time sync inbox item — not this branch's to fix)
+- [x] Engine: `PipeInputContract.presence` replaces `optional` (reuses `PresenceMarker` — same wire values as the descriptor); input + output gain three-valued `IOMultiplicity` (+`FIXED`) and `item_count` via the new `make_io_multiplicity` projection; output `optional` unchanged
+- [x] Emission threads real multiplicity (retired `IOMultiplicity`'s fixed-reports-as-variable ruling)
+- [x] Tests on the contract fields: `tests/integration/pipelex/pipeline/test_pipe_io_contracts.py` reshaped + new `make_two` fixed-count pipe pinning `fixed`/`item_count=2` on input and output plus the bounded array schema
+- [x] Changelog (Unreleased): breaking protocol reshape
+- [x] Probe hop5 capture re-baselined (same regen command); verified `opt/many/two/forced` report exactly (`optional`,`single`) / (`plain`,`variable`) / (`plain`,`fixed`,2) / (`force`,`single`)
 
-## Phase 5 — Docs + changelog (this repo)
+**Checkpoint 3** — the protocol change contained in one reviewable unit.
 
-- [x] New docs page documenting the descriptor derivation: where it lives, the fact sources, the kind-assignment table, the gating rule, pointer to the workspace spec as the contract. Link it from the docs nav where natural (MkDocs conventions: blank line before lists).
-- [x] `docs/contribute/trace-input-semantics.md` + harness: add the descriptor as a trace artifact (a hop beside `hop5_pipe_io_contracts.json`) so a mangled authored fact localizes into the new projection too — small, per the keep-useful-harnesses rule.
-- [x] `CHANGELOG.md` under `## [Unreleased]`: bold-label condensed entry (breaking: `build_validation_report` requires `input_form`; the report gains the field).
+- [x] Checkpoint 3: tracker updated, checks green (`make check` exit 0; the full suite surfaced ONE stale assertion — `test_trace_input_semantics_cmd.py` still pinned the pre-reshape `inputs.hint.optional` — fixed to `presence`/`multiplicity`; full-suite green rides Phase 4's final gate)
 
-## Phase 6 — File the two cross-repo follow-ups (workspace `wip/inbox/`, from here `../wip/inbox/`)
+## Phase 4 — semantics and close (E3, reflected defaults)
 
-- [x] `YYYY-MM-DD-pipelex-api-validate-views-input-form.md` (use `_TEMPLATE.md`): add `views: list[str]` beside `render` with identical lenient mechanics (`validate.py:31/:59` precedent), resolve-then-attach-or-pop `input_form` on the valid arm only, regenerate the committed OpenAPI, bump the `pipelex` pin once released, then **de-gate the whole conformance module** (this closes D2's gate). Carry the evidence pointers (spec section, skeleton file/lines, this branch's derivation site).
-- [x] `YYYY-MM-DD-pipelex-server-worker-input-form-carriage.md`: carry `input_form` on `DryValidateResult` inside the library window (`act_dry_validate.py:52`) and hand it to `build_validation_report` (`temporal_bundle_validator.py:107`); state plainly that the next pipelex bump fails loudly on the missing kwarg by design (shared-assembly rule) — rides D3's cascade. Name the member (`temporal/`) in the body.
+- [x] E3: model validator on `ConceptStructureBlueprint` rejecting `required = true` + `default_value` (message names both remedies) + unit seam `test_concept_structure_blueprint_required_default.py`
+- [x] E3: generator's accidental branch replaced by an explicit raising invariant (`ConceptStructureGeneratorError`) + unit seam `test_structure_generator_required_default_invariant.py`
+- [x] E3: probe bundle's `titled_default` moved to `rejected/required_with_default.mthds_invalid`; pair-sweep fallout applied (builder fixture `test_data.py` had authored the pair — `age` keeps `required`, drops the default); `test_input_form.py` now pins `motto` (`required: false` beside its default); fingerprint pins legitimately recomputed (fixture-content change, recorded in the pin module's docstring)
+- [x] Reflected defaults: `_with_reflected_constraints` reads `field_info.is_required()` + `field_info.default` (a `None` default is the optionality artifact, never reported); kind-table row via the new `retries` field on `InputFormConstrainedPayload`
+- [x] Descriptor spec touch-up: the "may carry both" sentence retired (`default_value` row now states the rejection), the "Facts over emission accidents" bullet notes the founding case resolved, the Verified-by line follows; the D2 conformance skeleton's fixture + assertions moved with it (`required = true` dropped from its `title` field) — `make check-spec-links` green
+- [x] Survival table updated with before/after closure rows (E3, E4, E5, E6/E1, E7, E9) against regenerated `wip/input-semantics/probe/` captures (`titled_default` gone from all hops)
+- [x] Findings addendum §F: per-entry closure evidence table
+- [x] Roadmap Track S closure bullet: in-engine close now, hosted-wire half at the cascade
+- [x] Changelog (Unreleased): E3 breaking + reflected-defaults ruling (Changed)
+- [x] Cross-repo inbox filings (§8): `2026-08-23-mthds-structure-field-validation-sentences.md`, `2026-08-23-pipelex-js-mirror-schema-enrichments-and-contract-reshape.md`, `2026-08-23-mthds-js-protocol-types-contract-reshape.md`
+- [x] In-repo docs swept: `inline-structures.md` gains the `required` bullet + the pair rule; `under-the-hood/input-form-descriptor.md` constraint paragraph updated (E7 made the "parser drops unknown constraint keys" claim false) + reflected-defaults sentence
+- [x] Final: `make agent-check` + full `make agent-test` green (suite exit 0)
 
-## Phase 7 — Close out
+## PR #1149 review loop
 
-- [x] Full `make agent-check` + `make agent-test` (the full suite — new test modules only get seen there).
-- [x] Commit remaining work on `feature/Input-semantics-D2` with the CP structure above; no PR to `dev` (program ruling) — the PR is stacked on `feature/Input-semantics`.
-- [x] Final checkpoint note in this file: what landed where, decisions taken, what the two inbox items are waiting on.
-- [x] PR #1146 review round (stacked on `feature/Input-semantics`): greptile's one finding (library-dir concepts degraded to `unknown`) led to deriving over the library's accumulated crate instead of the bundle blueprints — `build_input_form(pipes)` no longer takes `blueprints`; the gstack pre-landing review's two clear wins (description-only and refining library-dir concepts) are covered by the same change and its test; its two decision-first items are deferred in `wip/input-semantics/deferred-descriptor-reflection-and-roundtrip.md`. cubic and Codex were out of quota for this PR.
-- [x] `make check` + serial `make test` before the PR: one order-dependent failure in a `pipe_func` workdir test, unrelated to D2 (passes alone and under `agent-test`); deferred to `wip/input-semantics/deferred-serial-make-test-flake.md`.
+- [x] PR created (`feature/Enrich` → `dev`), CI fully green on first push
+- [x] Bot reviews (Greptile + codex): both converged on ONE finding — `item_count: null` for non-fixed multiplicity "violates the contract". REJECTED after verification: the protocol spec, its wire example, and `conformance/tests/pipelex_api/test_validate_optionals.py` all pin `item_count: null` off the fixed arm for `pipe_io_contracts` (the omit-when-absent convention belongs to the input-form descriptor; the two artifacts deliberately differ). Replied with evidence, resolved both threads; the misleading docstring wording disambiguated
+- [x] gstack `/review @TODOS.md` (fresh context): verdict SHIP, no P1. Clear wins applied: spec-layer E3 validator on `ConceptStructureSpec` (same two-remedies message; an authoring agent no longer validates green then dies on its own TOML) + spec-level test; stale `default_value` docstring in `input_form.py` fixed; inline duplicate of `fixed_item_count` in `derive_slot` replaced by the helper; parser-level tests wiring both new `rejected/` fixtures (`test_parser_rejected_structure_fields.py`); `force` presence pinned on the wire contract (`brief = "Text!"`); `Text[1]`→single contract projection + memo-key collision pinned (`make_from_one`); reflected `default_factory` (no fabricated default) and falsy default (`False` survives the None guard) pinned; wire-level `item_count`-always-present pinned in the trace test; changelog extended with the spec-layer half
+- [x] Deferred (review findings short of clear wins): `wip/enrich/deferred.md` — non-serializable reflected default, `_peel_multiplicity` `[1]`-as-list divergence (pre-existing), `_with_reflected_constraints` naming, double multiplicity normalization, mostly-inert `rejected/` corpus audit. Skipped outright: 0/negative-count helper rows (unreachable from bundles)
+- [x] Cross-repo: `../wip/inbox/2026-08-23-mthds-form-contract-reshape.md` filed — `mthds-form` still gates the Run button on the retired input `optional` and lacks the `fixed` multiplicity arm; no reshape item covered it
 
-## Deliberately out of scope (do not widen the diff)
+## Out of scope (per design §9)
 
-- The `pipelex-api` route change (`views`) — Phase 6 item 1.
-- The `pipelex-server/temporal/` worker carriage — Phase 6 item 2.
-- Any S2 emission fix (E1–E10 in the schema chain): the descriptor reports authored intent from the blueprint, so none are prerequisites.
-- The kernel swap (M1), SDK types (D4), hints (H1/H2), `@pipelex/runtime` parity (E1-track).
+Language ceiling (S1 §B) syntax, app-side fixes (M1), corpus widening, `const`→`enum` render rewrite, descriptor wire-model round-trip alias (D4).
