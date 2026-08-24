@@ -427,7 +427,7 @@ By understanding and using multiplicity effectively, you can build pipelines tha
 
 ## How Multiplicity Crosses the Wire
 
-A validate report tells a consumer exactly what you declared. On both the input and the output side of [`pipe_io_contracts`](../../tools/cli/agent-cli.md#validate), `multiplicity` is three-valued — `single`, `variable`, or `fixed` — and a `fixed` slot carries its exact count in `item_count`. A fixed count is also stamped on the emitted JSON Schema as `minItems`/`maxItems`; a variable list carries no bounds. `Concept[1]` is reported as `single`, with no list framing, exactly as it behaves at run time.
+A validate report tells a consumer exactly what you declared. On both the input and the output side of [`pipe_io_contracts`](../../under-the-hood/pipe-io-contracts.md), `multiplicity` is three-valued — `single`, `variable`, or `fixed` — and a `fixed` slot carries its exact count in `item_count`. Input entries additionally carry a JSON Schema, where a fixed count is stamped as `minItems`/`maxItems` on the array wrap and a variable list carries no bounds; the output entry reports the concept and the count without a schema. `Concept[1]` is reported as `single`, with no list framing, exactly as it behaves at run time.
 
 ## Related Documentation
 

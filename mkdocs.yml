@@ -319,6 +319,7 @@ plugins:
         - under-the-hood/build-time-elaboration.md: "Build-time Elaboration"
         - under-the-hood/codegen-projections.md: "Codegen Projections"
         - under-the-hood/input-form-descriptor.md: "Input-Form Descriptor"
+        - under-the-hood/pipe-io-contracts.md: "Per-Pipe IO Contracts"
         - under-the-hood/dry-run-mock-generation.md: "Dry Run Mock Generation"
         - under-the-hood/execution-graph-tracing.md: "Execution Graph Tracing"
         - under-the-hood/tokens-usage-wire-records.md: "TokensUsage Wire Records"
@@ -568,6 +569,7 @@ nav:
       - Build-time Elaboration: under-the-hood/build-time-elaboration.md
       - Codegen Projections: under-the-hood/codegen-projections.md
       - Input-Form Descriptor: under-the-hood/input-form-descriptor.md
+      - Per-Pipe IO Contracts: under-the-hood/pipe-io-contracts.md
       - Dry Run Mock Generation: under-the-hood/dry-run-mock-generation.md
       - Execution Graph Tracing: under-the-hood/execution-graph-tracing.md
       - TokensUsage Wire Records: under-the-hood/tokens-usage-wire-records.md

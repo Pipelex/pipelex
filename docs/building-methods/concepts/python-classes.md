@@ -232,7 +232,7 @@ Product = "A product in the catalog"
 A hand-written class is also the only place to express a constraint. An inline structure field accepts a closed set of keys, so an authored `minimum = 0` or `max_length = 8` is rejected rather than silently dropped — on a class, the same intent goes on the pydantic field, where Pipelex reads it:
 
 ```python
-price: float = Field(gt=0, description="Product price")
+price: float = Field(ge=0, description="Product price")
 sku: str = Field(max_length=8, pattern=r"^[A-Z]+$", description="Stock keeping unit")
 ```
 
