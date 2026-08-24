@@ -1,6 +1,6 @@
 # Per-Pipe IO Contracts
 
-Every valid `validate` report carries a **`pipe_io_contracts`** map: for each pipe, the typed contract of what it takes in and what it produces. It sits beside the [input-form descriptor](input-form-descriptor.md) on the same report, and the two are keyed identically — by the namespaced `pipe_ref` (`domain.code`) — over exactly the same set of pipes, `PipeSignature` placeholders and controller-inferred inputs included.
+Every valid `validate` report carries a **`pipe_io_contracts`** map: for each pipe, the typed contract of what it takes in and what it produces. It sits beside the [input-form descriptor](input-form-descriptor.md) on the same report, and the two are keyed identically — by the namespaced `pipe_ref` (`domain.code`) — over exactly the same set of pipes, `PipeSignature` placeholders included.
 
 Reach for `pipe_io_contracts` when you need the schema and the declared contract; reach for `input_form` when you are building a form and want field kinds, defaults, and choices without reading schemas.
 

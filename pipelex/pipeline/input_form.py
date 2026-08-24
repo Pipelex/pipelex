@@ -352,6 +352,12 @@ class InputFormDeriver:
                 refines=refines,
                 seen=seen,
             )
+        if chain and self._concepts.get(chain[-1]) is None:
+            # The chain ends at a base this crate does not hold — a cross-package `alias->…` refines,
+            # whose concepts live in an isolated child library and never enter the crate. The engine
+            # backs such a concept with a field-less `StructuredContent` subclass, so its shape is
+            # genuinely unknown: the same answer `_concept_node` gives for an absent concept.
+            return _unknown_node(name=name, concept_ref=concept_ref, description=blueprint.description, refines=refines)
         return _prose_promoted_node(name=name, concept_ref=concept_ref, description=blueprint.description, chain=chain)
 
     def _native_node(

@@ -438,9 +438,11 @@ class ConceptFactory:
 
         qualified_class_name = make_qualified_structure_class_name(domain_code=domain_code, concept_code=concept_code)
 
-        # Cross-package refines: base class isn't available locally, so generate
-        # a standalone TextContent subclass. The refinement relationship is tracked
-        # in the concept model's refines field for runtime compatibility checks.
+        # Cross-package refines: base class isn't available locally, so generate a standalone,
+        # field-less StructuredContent subclass (no base_class_name is passed). The refinement
+        # relationship is tracked in the concept model's refines field for runtime compatibility
+        # checks. Because no local fact describes the base's shape, the input-form descriptor
+        # reports such a concept as `unknown` rather than promoting it to prose.
         if QualifiedRef.has_cross_package_prefix(current_refine):
             try:
                 _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(

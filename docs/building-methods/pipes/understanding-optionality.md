@@ -120,4 +120,4 @@ Two more optionality facts surface on the **valid** report (`pipelex validate`, 
 - [PipeParallel](pipe-controllers/PipeParallel.md) — combining under absence
 - [PipeBatch](pipe-controllers/PipeBatch.md) — compaction of absent branch results
 - [Execution Graph Tracing](../../under-the-hood/execution-graph-tracing.md) — skipped nodes, `skip_reason`, and optional data edges
-- [Per-Pipe IO Contracts](../../under-the-hood/pipe-io-contracts.md) — how the marker is reported on `pipe_io_contracts` as the three-valued `presence`
+- [Per-Pipe IO Contracts](../../under-the-hood/pipe-io-contracts.md) — how an input's marker is reported on `pipe_io_contracts` as the three-valued `presence`, and an output's as the two-valued `optional`

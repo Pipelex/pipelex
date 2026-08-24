@@ -17,7 +17,7 @@ The report always carries the field. Whether it travels on the HTTP wire is the 
 
 The derivation reads two things and nothing else:
 
-- **Slot facts** from the loaded pipes' `StuffSpec`s: the authored input order, the three-valued presence marker (`plain` / `optional` / `force`), and the multiplicity including a fixed `[N]` count. Iterating the same loaded pipes as `build_pipe_io_contracts` — `PipeSignature` placeholders and controller-inferred inputs included — is what makes the two key sets equal by construction.
+- **Slot facts** from the loaded pipes' `StuffSpec`s: the authored input order, the three-valued presence marker (`plain` / `optional` / `force`), and the multiplicity including a fixed `[N]` count. Iterating the same loaded pipes as `build_pipe_io_contracts` — `PipeSignature` placeholders included — is what makes the two key sets equal by construction.
 - **Concept facts** from the *qualified* library crate built from the parsed blueprints: descriptions, refinement links, structure fields with their defaults, choices, required-ness and nested concept refs. Qualified, not normalized: normalization flattens in-crate refinement, and the descriptor must report the `refines` chain as a list. Native concepts contribute their pinned blueprints; class-backed concepts (`structure = "ClassName"`) are reflected from the class registry, which is why the derivation must run while the validation library is still loaded.
 
 The derivation is total. A node it cannot map honestly reports `kind: "unknown"`, the renderer's raw escape hatch against the sibling `json_schema`; nothing raises.

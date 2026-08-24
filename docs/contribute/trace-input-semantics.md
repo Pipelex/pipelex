@@ -1,6 +1,6 @@
 # Tracing Input Semantics
 
-`pipelex-dev trace-input-semantics` is an internal capture harness that answers one question with evidence instead of code-reading: **what does each hop of the input-schema emission chain do to every fact a method author writes?** Given one or more `.mthds` bundle files, it loads them through the validation library and dumps one artifact per hop of the chain that turns authored structure syntax into the `json_schema` emitted on `pipe_io_contracts`.
+`pipelex-dev trace-input-semantics` is an internal capture harness that answers one question with evidence instead of code-reading: **what does each hop of the input-schema emission chain do to every fact a method author writes?** Given one or more `.mthds` bundle files, it loads them through the validation library and dumps per-hop captures of the chain that turns authored structure syntax into the `json_schema` emitted on `pipe_io_contracts`.
 
 ```bash
 .venv/bin/pipelex-dev trace-input-semantics path/to/bundle.mthds -o output_dir
@@ -8,7 +8,7 @@
 
 ## What it captures
 
-The chain has five hops, and the output directory holds one artifact per hop, so a lost or mangled fact is localized to exactly one:
+Each hop of the chain writes its captures into the output directory, so a lost or mangled fact is localized to exactly one hop:
 
 - `hop1_bundle_blueprints.json` — **parse**: the `PipelexBundleBlueprint` dumps, i.e. what survived TOML.
 - `hop2_generated_sources/` — **resolve + generate**: the structure-class source the runtime generates per concept, re-derived with the same `StructureGenerator` calls the concept factory issues at load time. Saved as `.py.txt` so captures stay inert to linters.
