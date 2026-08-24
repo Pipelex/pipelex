@@ -3372,7 +3372,7 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 invoice_stuff = StuffFactory.make_from_concept_ref(
     concept_ref="finance.Invoice",  # domain_code.ConceptName
     name="invoice_123",
-    content=invoice_data
+    content=invoice_data,
 )
 ```
 
@@ -3613,12 +3613,21 @@ Each field can specify:
 
 - **type**: The data type (required for detailed definitions)
 - **description**: Human-readable description
-- **default_value**: Default value if not provided
+- **required**: Whether the field must be present in the payload (defaults to `false`)
+- **default_value**: Default value applied when the field is omitted. A field cannot declare both `required = true` and a `default_value` — a default makes absence legal, which contradicts requiring the field, so the pair is rejected at validation
 - **choices**: For `enum`-like fields, a list of valid values
 - **item_type**: For `list` fields, the type of list items
 - **key_type** and **value_type**: For `dict` fields, the types of keys and values
+- **concept_ref** and **item_concept_ref**: For `concept` fields (and `list` fields whose items are concepts), the concept being referenced
+- **hints**: Non-normative presentation intent for this field — see [Intent Hints](intent-hints.md)
 
 Field names must be valid Python identifiers and cannot be Python keywords; generated Python projections use them as model attributes.
+
+!!! warning "The key set is closed"
+
+    The keys above are the only ones a structure field accepts, and anything else is rejected at validation. A typo (`descrption`), a hopeful constraint the language does not carry (`minimum = 0`, `unit = "kg"`), or a misspelled `hints` all fail the bundle instead of being dropped.
+
+    This is deliberate: a silently discarded key is authored intent that vanishes without a trace, and you only find out when the value it was supposed to govern comes back wrong. If you need a numeric bound or another constraint, express it on a Python class instead — see [Python Classes](python-classes.md), whose pydantic `Field(...)` metadata is read as an authored fact. Note that hint *content* stays lenient: an unknown key inside a `hints` table warns and is preserved, rather than failing the bundle.
 
 ## Supported Field Types
 
@@ -3913,9 +3922,10 @@ Most structured data needs are covered by inline structures + `pipelex build str
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
 
+
 class Invoice(StructuredContent):
     """A commercial invoice."""
-    
+
     invoice_number: str = Field(description="Unique invoice identifier")
     issue_date: datetime = Field(description="Date the invoice was issued")
     total_amount: float = Field(ge=0, description="Total invoice amount")
@@ -3936,20 +3946,21 @@ Classes inheriting from `StructuredContent` are automatically discovered and reg
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field, field_validator
 
+
 class Invoice(StructuredContent):
     """A commercial invoice with validation."""
-    
+
     total_amount: float = Field(ge=0, description="Total invoice amount")
     tax_amount: float = Field(ge=0, description="Tax amount")
     net_amount: float = Field(ge=0, description="Net amount before tax")
-    
-    @field_validator('tax_amount')
+
+    @field_validator("tax_amount")
     @classmethod
     def validate_tax(cls, v, info):
         """Ensure tax doesn't exceed total."""
-        total = info.data.get('total_amount', 0)
+        total = info.data.get("total_amount", 0)
         if v > total:
-            raise ValueError('Tax amount cannot exceed total amount')
+            raise ValueError("Tax amount cannot exceed total amount")
         return v
 ```
 
@@ -3960,18 +3971,19 @@ from datetime import datetime
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
 
+
 class Subscription(StructuredContent):
     """A subscription with computed properties."""
-    
+
     start_date: datetime = Field(description="Subscription start date")
     end_date: datetime = Field(description="Subscription end date")
     monthly_price: float = Field(ge=0, description="Monthly subscription price")
-    
+
     @property
     def duration_days(self) -> int:
         """Calculate subscription duration in days."""
         return (self.end_date - self.start_date).days
-    
+
     @property
     def total_cost(self) -> float:
         """Calculate total subscription cost."""
@@ -4032,13 +4044,13 @@ from .structures import UserProfile
 class ValidatedUserProfile(UserProfile):
     """A user profile with email validation."""
 
-    @field_validator('email')
+    @field_validator("email")
     @classmethod
     def validate_email(cls, v):
         """Validate email format."""
-        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         if not re.match(pattern, v):
-            raise ValueError('Invalid email format')
+            raise ValueError("Invalid email format")
         return v
 ```
 
@@ -4073,6 +4085,7 @@ in_stock = { type = "boolean", description = "Stock availability", default_value
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field, field_validator
 
+
 class Product(StructuredContent):
     """A product in the catalog."""
 
@@ -4081,14 +4094,14 @@ class Product(StructuredContent):
     price: float = Field(ge=0, description="Product price")
     in_stock: bool = Field(default=True, description="Stock availability")
 
-    @field_validator('price')
+    @field_validator("price")
     @classmethod
     def validate_price(cls, v):
         """Ensure price is positive and reasonable."""
         if v < 0:
-            raise ValueError('Price cannot be negative')
+            raise ValueError("Price cannot be negative")
         if v > 1_000_000:
-            raise ValueError('Price seems unreasonably high')
+            raise ValueError("Price seems unreasonably high")
         return v
 
     @property
@@ -4110,6 +4123,17 @@ Product = "A product in the catalog"
 
 **4. Test your pipeline** - The behavior should be identical, plus your custom validation.
 
+### Constraints and defaults are authored facts
+
+A hand-written class is also the only place to express a constraint. An inline structure field accepts a closed set of keys, so an authored `minimum = 0` or `max_length = 8` is rejected rather than silently dropped — on a class, the same intent goes on the pydantic field, where Pipelex reads it:
+
+```python
+price: float = Field(ge=0, description="Product price")
+sku: str = Field(max_length=8, pattern=r"^[A-Z]+$", description="Stock keeping unit")
+```
+
+That metadata is not merely enforced at runtime — it is carried onto the [input-form descriptor](../../under-the-hood/input-form-descriptor.md), so a form renderer sees the bound. A pydantic default counts the same way: `in_stock: bool = Field(default=True, ...)` is reported as a field that is *not* required, carrying `True` as its default. Requiring a field and giving it a default are contradictory in both worlds — inline, the pair is rejected outright; on a class, a field with a default is simply not required.
+
 ## Recommendations
 
 ### The Recommended Workflow
@@ -4128,6 +4152,7 @@ Product = "A product in the catalog"
 | Type hints in Python | `pipelex build structures` |
 | IDE autocomplete | `pipelex build structures` |
 | Custom validation | Hand-written Python class |
+| Field constraints (`gt`, `max_length`, `pattern`) | Hand-written Python class |
 | Computed properties | Hand-written Python class |
 | Business methods | Hand-written Python class |
 
@@ -5002,8 +5027,95 @@ refines = "Customer"
 - [Native Concepts](native-concepts.md) - Complete guide to native concepts
 - [Inline Structures](inline-structures.md) - Add structure to concepts
 - [Python StructuredContent Classes](python-classes.md) - Advanced customization
+- [Intent Hints](intent-hints.md) - Non-normative presentation intent, inherited along the refinement chain
 - [Packages](../packages.md) - Package system, dependencies, and cross-package references
 
+
+
+## Intent Hints
+
+# Intent Hints
+
+Intent hints let a method author state, in the method itself, how a value is *meant to be presented* — that a text is flowing prose rather than a short label, that a number is a subjective rating rather than a measured quantity. They are part of the MTHDS standard (spec: `intent-hints.md` in the MTHDS spec) and they are strictly **non-normative**: hints never change what a pipe accepts, produces, or validates. They travel through the library crate and surface on the input-form descriptor, where a form renderer can honor them.
+
+## Authoring
+
+A `hints` table is a flat table of string keys to string values. This version of the standard defines one key, `intent`, with a closed vocabulary:
+
+| `intent` | Applies to | Declares |
+|---|---|---|
+| `prose` | text-valued sites | Flowing natural language, written and read as running text. |
+| `label` | text-valued sites | A short designation — a name, a title; a few words on one line. |
+| `rating` | number-valued sites | A subjective score on a scale — a judgment, not a measurement. |
+| `quantity` | number-valued sites | An amount — a count or a measured magnitude. |
+
+Hints attach at three sites:
+
+**On a concept:**
+
+```toml
+[concept.Essay]
+description = "A short essay"
+hints = { intent = "prose" }
+```
+
+**On a structure field:**
+
+```toml
+[concept.Review.structure]
+headline = { type = "text", description = "the headline", hints = { intent = "label" } }
+stars = { type = "integer", description = "the stars", hints = { intent = "rating" } }
+```
+
+**On a pipe input slot**, using the expanded slot form — `concept` carries exactly the grammar the plain string form does, markers included:
+
+```toml
+[pipe.write_review]
+type = "PipeLLM"
+description = "Write a review"
+inputs = { topic = { concept = "Text", hints = { intent = "prose" } }, refs = { concept = "Reference[]", hints = { intent = "label" } } }
+output = "Review"
+prompt = "Write a review of @topic"
+```
+
+A slot table with no `hints` is the same slot as the plain string: `x = { concept = "Text" }` and `x = "Text"` parse to identical blueprints and hash identically in the crate.
+
+## Shape is strict, content is lenient
+
+The *shape* of a `hints` table is enforced: it must be a flat string-to-string table, and the expanded slot form admits only `concept` and `hints` — anything else (a non-table `hints`, a number value, a nested table, an unknown slot-table key like `description`) is a structural validation error.
+
+The *content* is lenient: an unknown hint key or an unknown `intent` word parses, is preserved through the crate and onto the descriptor, and is only **warned** about. Validation emits advisory warnings (never errors) on the report's `warnings` array for three findings, each naming its site: an unknown hint key (`hint_unknown_key`), an unknown `intent` word (`hint_unknown_intent`), and a known word on a site it does not apply to (`hint_inapplicable_intent`) — for example `rating` on a text field. This is what lets the vocabulary grow between standard versions without breaking older validators.
+
+## Precedence and inheritance
+
+Effective hints merge **key by key**, and a nearer declaration wins:
+
+- Along a refinement chain, a refining concept's hints override its base's, key by key; keys the refiner does not set are inherited. A hint can be overridden but never cleared.
+- At a site, the site's hints (a field's, a slot's) win over the concept's effective hints, key by key.
+
+```toml
+[concept.Badge]
+description = "A badge"
+hints = { intent = "label" }
+
+[concept.SpecialBadge]
+description = "A special badge"
+refines = "Badge"
+hints = { intent = "prose" }   # overrides the inherited label
+```
+
+## Where hints surface
+
+Hints ride the library crate (a concept's effective hints are assembled during normalization; field and slot hints travel as authored) and land on the [input-form descriptor](../../under-the-hood/input-form-descriptor.md): every node's `hints` slot carries its final effective merge, and an applicable `intent` word feeds the node's `kind` — `prose` and `label` select between the `prose` and `text` kinds on text-valued nodes; `rating` and `quantity` ride the slot for the renderer without changing `kind`. On a plural site (a `Concept[]` slot, a list field), applicability is judged per item, and the merged hints appear on both the `list` node and its `item`.
+
+Because hints are non-normative, the runtime never reads them: execution, validation verdicts, and pipe contracts are identical with and without them — and a method that authors no hints keeps its crate fingerprint, byte for byte.
+
+## Related Documentation
+
+- [Refining Concepts](refining-concepts.md) - How hints inherit along a refinement chain
+- [Inline Structures](inline-structures.md) - Attaching hints to a structure field
+- [Designing Pipelines](../pipes/index.md#understanding-the-pipe-contract) - The expanded input slot form
+- [Input-Form Descriptor](../../under-the-hood/input-form-descriptor.md) - Where effective hints surface for a renderer
 
 
 ## Overview
@@ -5091,6 +5203,14 @@ Every pipe defines a **contract** through its `inputs` and `output` fields. This
 
 *   **`inputs`**: This dictionary defines the **mandatory and necessary** data that must be present in the [Working Memory](working-memory.md) before the pipe can execute. Each key in the dictionary becomes a variable name that you can reference in your pipe's logic (e.g., in prompts), and each value specifies the concept type that the data must conform to. If any required input is missing or doesn't match the expected concept, the pipeline will fail a clear error message.
 You can specify multiple inputs by using a list of concepts. For example, `inputs = { description = "ProductDescription", keywords = "Keyword[]" }` will require a `ProductDescription` and a list of `Keyword`s. (See more about [Understanding Multiplicity](./understanding-multiplicity.md) for details.)
+
+    Each input slot can be written in two equivalent ways. The **plain form** gives the concept as a string — `topic = "Text"` — and is what you want almost always. The **expanded form** gives a table instead, so the slot can carry [intent hints](../concepts/intent-hints.md) beside its concept:
+
+    ```toml
+    inputs = { topic = { concept = "Text", hints = { intent = "prose" } } }
+    ```
+
+    The `concept` key takes exactly the grammar the plain string does, presence markers and multiplicity included (`"Note?"`, `"Keyword[]"`). The table is closed — `concept` and `hints` are the only keys it accepts, and anything else is a validation error. A slot table with no hints is the same slot as the plain string: `x = { concept = "Text" }` and `x = "Text"` parse to identical blueprints, so reach for the expanded form only when you have hints to attach.
 
 *   **`output`**: This field declares what the pipe will produce. The output will always be an instance of the specified concept. The structure and type of the output depend on the concept definition (See more about concepts [here](../concepts/native-concepts.md)).
     *   You can specify **multiple outputs** using bracket notation (e.g., `Keyword[]` for a variable list, or `Image[3]` for exactly 3 images)
@@ -6069,11 +6189,9 @@ inputs = {
     # Light values, shaped against the signature
     "topic": "A robot learning to love",
     "priority": 3,
-
     # Native content objects (typed directly)
     "photo": ImageContent(url="photo.jpg"),
     "contract": DocumentContent(url="nda.pdf"),
-
     # Explicit envelope with a custom concept
     "draft_tweet": {
         "concept": "social.DraftTweet",
@@ -6760,10 +6878,7 @@ from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # Execute a pipe with multiple outputs
 runner = PipelexMTHDSProtocol()
-response = await runner.execute(
-    pipe_code="extract_line_items",
-    inputs={"invoice_text": "Your invoice text here..."}
-)
+response = await runner.execute(pipe_code="extract_line_items", inputs={"invoice_text": "Your invoice text here..."})
 pipe_output = response.pipe_output
 
 # Get the list of line items
@@ -6790,7 +6905,7 @@ response = await runner.execute(
             TextContent(text="Document 2 content..."),
             TextContent(text="Document 3 content..."),
         ]
-    }
+    },
 )
 pipe_output = response.pipe_output
 ```
@@ -6806,6 +6921,15 @@ Multiplicity in Pipelex gives you precise control over how many items flow throu
 - **Fixed multiplicity** (`[N]`) for exact requirements
 
 By understanding and using multiplicity effectively, you can build pipelines that handle both single items and collections with clarity and type safety.
+
+## How Multiplicity Crosses the Wire
+
+A validate report tells a consumer exactly what you declared. On both the input and the output side of [`pipe_io_contracts`](../../under-the-hood/pipe-io-contracts.md), `multiplicity` is three-valued — `single`, `variable`, or `fixed` — and a `fixed` slot carries its exact count in `item_count`. Input entries additionally carry a JSON Schema, where a fixed count is stamped as `minItems`/`maxItems` on the array wrap and a variable list carries no bounds; the output entry reports the concept and the count without a schema. `Concept[1]` is reported as `single`, with no list framing, exactly as it behaves at run time.
+
+## Related Documentation
+
+- [Understanding Optionality](understanding-optionality.md) — the other axis of a slot's shape
+- [Intent Hints](../concepts/intent-hints.md) — how a hint on a plural slot applies per item
 
 
 
@@ -6833,6 +6957,8 @@ Two grammar rules keep the model coherent:
 - **Outputs take only `?`.** A force marker on an output has no meaning (a pipe cannot assert its own output into existence).
 
 Concept definitions, `refines`, and structure-field references never carry markers — presence is a property of a pipe's contract, not of a concept.
+
+Markers work the same way in the [expanded slot form](index.md#understanding-the-pipe-contract): the `concept` key takes the identical grammar, so `notes = { concept = "Note?", hints = { intent = "prose" } }` is an optional input carrying a hint.
 
 ## The Runtime Trichotomy: Skip, Run, or Fail
 
@@ -6927,6 +7053,7 @@ Two more optionality facts surface on the **valid** report (`pipelex validate`, 
 - [PipeParallel](pipe-controllers/PipeParallel.md) — combining under absence
 - [PipeBatch](pipe-controllers/PipeBatch.md) — compaction of absent branch results
 - [Execution Graph Tracing](../../under-the-hood/execution-graph-tracing.md) — skipped nodes, `skip_reason`, and optional data edges
+- [Per-Pipe IO Contracts](../../under-the-hood/pipe-io-contracts.md) — how an input's marker is reported on `pipe_io_contracts` as the three-valued `presence`, and an output's as the two-valued `optional`
 
 
 ## Overview
@@ -8341,6 +8468,7 @@ Here is an example of an eligible function:
 from pipelex.system.registries.func_registry import pipe_func
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.text_content import TextContent
+
 
 @pipe_func()  # Required decorator for auto-discovery
 async def concatenate_texts(working_memory: WorkingMemory) -> TextContent:
@@ -11050,15 +11178,12 @@ When a pipe's output has multiplicity (returns multiple items), the content is a
 The Python format generates class instantiation code:
 
 ```python
-{
-  "concept": "my_domain.MyOutputConcept",
-  "content": "MyOutputConcept(title=\"title_value\", key_points=\"key_points_value\")"
-}
+{"concept": "my_domain.MyOutputConcept", "content": 'MyOutputConcept(title="title_value", key_points="key_points_value")'}
 ```
 
 ### Schema Format
 
-The schema format generates JSON Schema definitions, ideal for generating TypeScript interfaces or Zod schemas:
+The schema format generates JSON Schema definitions, ideal for generating TypeScript interfaces or Zod schemas. The schema's top-level `title` is the concept ref, and its top-level `description` is the concept's authored description:
 
 ```json
 {
@@ -11070,12 +11195,13 @@ The schema format generates JSON Schema definitions, ideal for generating TypeSc
       "key_points": { "type": "string", "title": "Key Points" }
     },
     "required": ["title", "key_points"],
-    "title": "MyOutputConcept"
+    "title": "my_domain.MyOutputConcept",
+    "description": "The concept's description, as authored in the bundle"
   }
 }
 ```
 
-**Array outputs** (e.g., `MyType[5]`) are properly represented as JSON Schema arrays:
+**Array outputs** are represented as JSON Schema arrays, with the concept identity kept on `items`. A fixed count (e.g., `MyType[5]`) additionally emits `minItems`/`maxItems` bounds; a variable-length list (`MyType[]`) carries no bounds:
 
 ```json
 {
@@ -11089,8 +11215,11 @@ The schema format generates JSON Schema definitions, ideal for generating TypeSc
         "description": { "type": "string", "title": "Description" }
       },
       "required": ["name", "description"],
-      "title": "Item"
-    }
+      "title": "my_domain.Item",
+      "description": "An item of the collection"
+    },
+    "minItems": 5,
+    "maxItems": 5
   }
 }
 ```
@@ -11235,7 +11364,7 @@ For `bundle`, additional options are available:
     On a successful run, the envelope also carries `pending_signatures` — the library-wide list of pipes still declared as `PipeSignature` (unimplemented forward declarations), each namespaced by `pipe_ref` (`domain.code`). In JSON it is a `pending_signatures` array, in markdown a "Pending signatures" section. A top-down build reads it to see exactly which headers remain to implement. The envelope also carries a derived `is_runnable` boolean (`true` ⇔ `pending_signatures` is empty), and the markdown states the runnability verdict in plain English — runnable when complete, NOT yet runnable above the "Pending signatures" section otherwise. `validate bundle`, `validate method`, and `validate pipe --all` carry them and gate on them: without `--allow-signatures`, the command exits non-zero when `is_runnable` is false. Bare `validate pipe <code>` omits them, and a `--pipe` slice surfaces them for information without gating.
 
 !!! note "Advisory warnings on validate"
-    Whole-bundle and whole-library validate surfaces (`validate bundle`, `validate method`, `validate pipe --all`) also carry a `warnings` array — advisory optionality lints on a VALID bundle that never flip the verdict or the exit code. Each entry has the **same shape as a validation error item** (`category`, `error_type`, `pipe_code`, `domain_code`, `variable_names`, `message`) — this is a different shape from the `init`/`doctor` setup `warnings` (`{type, message}`) documented under Output Contract below. The first occupant is the useless-`!` lint (`optional_force_redundant`): a `!` (force) input whose slot is guaranteed present in every analyzed flow, so the assertion can never fire. In markdown, warnings render as a "Warnings" section. The array is empty when there is nothing to report; single-pipe `validate pipe` omits it (no flow context to lint in).
+    Whole-bundle and whole-library validate surfaces (`validate bundle`, `validate method`, `validate pipe --all`) also carry a `warnings` array — advisory optionality lints on a VALID bundle that never flip the verdict or the exit code. Each entry has the **same shape as a validation error item** (`category`, `error_type`, `pipe_code`, `domain_code`, `variable_names`, `message`) — this is a different shape from the `init`/`doctor` setup `warnings` (`{type, message}`) documented under Output Contract below. The first occupant is the useless-`!` lint (`optional_force_redundant`): a `!` (force) input whose slot is guaranteed present in every analyzed flow, so the assertion can never fire. The [intent-hint](../../building-methods/concepts/intent-hints.md) lints (`hint_unknown_key`, `hint_unknown_intent`, `hint_inapplicable_intent`) ride the same `warnings` shape on the protocol validation report; they are not wired into this CLI's array. In markdown, warnings render as a "Warnings" section. The array is empty when there is nothing to report; single-pipe `validate pipe` omits it (no flow context to lint in).
 
 ### Fix
 
@@ -13362,9 +13491,7 @@ from pipelex.pipelex import Pipelex
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # Set instance-level defaults at initialization
-Pipelex.make(
-    library_dirs=["/path/to/shared_pipes", "/path/to/project_pipes"]
-)
+Pipelex.make(library_dirs=["/path/to/shared_pipes", "/path/to/project_pipes"])
 
 # All PipelexMTHDSProtocol.execute() calls will use these directories by default
 runner = PipelexMTHDSProtocol()
@@ -13384,9 +13511,7 @@ from pipelex.pipelex import Pipelex
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # Initialize with default directories
-Pipelex.make(
-    library_dirs=["/path/to/default_pipes"]
-)
+Pipelex.make(library_dirs=["/path/to/default_pipes"])
 
 # Use the default directories
 runner1 = PipelexMTHDSProtocol()
@@ -13649,6 +13774,7 @@ from pipelex.system.registries.func_registry import pipe_func
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.text_content import TextContent
 
+
 @pipe_func()
 async def my_custom_function(working_memory: WorkingMemory) -> TextContent:
     """
@@ -13657,6 +13783,7 @@ async def my_custom_function(working_memory: WorkingMemory) -> TextContent:
     input_data = working_memory.get_stuff("input_name")
     # Process data
     return TextContent(text=f"Processed: {input_data.content.text}")
+
 
 # Optional: specify a custom name
 @pipe_func(name="custom_processor")
@@ -14230,10 +14357,7 @@ Inject at boot, by passing your implementation to `Pipelex.make()`:
 from pipelex.pipelex import Pipelex
 
 pipelex = Pipelex.make(
-    reporting_delegate=MyReportingDelegate(),
-    secrets_provider=MySecretsProvider(),
-    content_generator=MyContentGenerator(),
-    pipe_router=MyPipeRouter()
+    reporting_delegate=MyReportingDelegate(), secrets_provider=MySecretsProvider(), content_generator=MyContentGenerator(), pipe_router=MyPipeRouter()
 )
 ```
 
@@ -14352,6 +14476,7 @@ from typing import Any, Protocol
 
 PayloadType = dict[str, Any]
 
+
 class ObserverProtocol(Protocol):
     async def observe_before_run(self, payload: PayloadType) -> None:
         """Process and store the payload before the run"""
@@ -14382,8 +14507,8 @@ payload = {
 ```python
 payload = {
     "pipeline_run_id": str,  # Identifier of the pipeline run
-    "pipe_job": PipeJob,     # Initial job information
-    "pipe_output": PipeOutput, # Results and final working memory
+    "pipe_job": PipeJob,  # Initial job information
+    "pipe_output": PipeOutput,  # Results and final working memory
 }
 ```
 
@@ -14392,7 +14517,7 @@ payload = {
 payload = {
     "pipeline_run_id": str,  # Identifier of the pipeline run
     "pipe_job": PipeJob,  # Initial job information
-    "error": Exception,   # The exception that caused the failure
+    "error": Exception,  # The exception that caused the failure
 }
 ```
 
@@ -14404,6 +14529,7 @@ payload = {
 import os
 from typing import Optional
 from pipelex.observer.observer_protocol import ObserverProtocol, PayloadType
+
 
 class MyCustomObserver(ObserverProtocol):
     def __init__(self, config_param: str = "default_value"):
@@ -14488,6 +14614,7 @@ import asyncio
 import aiohttp
 from pipelex.observer.observer_protocol import ObserverProtocol, PayloadType
 
+
 class DatabaseObserver(ObserverProtocol):
     def __init__(self, db_connection_string: str):
         self.db_connection = db_connection_string
@@ -14543,6 +14670,7 @@ For automatic observer setup, integrate with your Pipelex initialization:
 from pipelex.pipelex import Pipelex
 
 from my_project.observers import MyCustomObserver
+
 
 def setup_pipelex():
     # Initialize Pipelex with the observer wired in from the start
@@ -14922,7 +15050,9 @@ summary = extract_main_content(memory=result.memory, content_type=Summary)
 Reach for the list pair whenever the call asked for several — `is_multiple_output=True` or `fixed_nb_output=n`:
 
 ```python
-result = await kernel.llm_object(memory=memory, output_class=Summary, concept=summary_concept, model=model, user="Summarize $topic", result="summaries", is_multiple_output=True)
+result = await kernel.llm_object(
+    memory=memory, output_class=Summary, concept=summary_concept, model=model, user="Summarize $topic", result="summaries", is_multiple_output=True
+)
 summaries = extract_main_content_as_list(memory=result.memory, item_type=Summary).items
 ```
 
@@ -15271,13 +15401,138 @@ Generated code is never edited — hand edits are overwritten on regeneration, a
     # my_types_ext.py
     from .structures import Report
 
-    class MyReport(Report):
-        ...
+
+    class MyReport(Report): ...
     ```
 
 - **TypeScript** — augment the generated type from a sibling module via declaration merging.
 
 Every generated file carries an `AUTOGENERATED — DO NOT EDIT` header naming its projection and pointing at this mechanism.
+
+
+## Input-Form Descriptor
+
+# Input-Form Descriptor
+
+Every valid `validate` report carries, beside `pipe_io_contracts`, an **input-form descriptor** per pipe: an ordered list of field descriptors a renderer can turn into a fill-in form with no schema heuristics, no hardcoded concept tables, and no description matching. The wire contract is the MTHDS spec `docs/specs/mthds-input-form-descriptor.md` at the workspace root; this page documents Pipelex's reference derivation of it.
+
+The descriptor exists because the emitted `json_schema` is a *payload* contract, and the projection that produces it loses facts a form needs: which concept a node is, what it refines, whether `!` or plain was authored, a fixed `[N]` count, an authored default, a one-member choice list. The descriptor reports those facts from where they still exist — the authored blueprints — and leaves the payload shape to the schema. It is presentation; it never changes what a caller submits.
+
+## Where it lives
+
+- `pipelex/pipeline/input_form.py` — the wire models (`FieldKind`, `InputFormField`, `PipeInputFormDescriptor`), the one public derivation `build_input_form(pipes)`, and the `InputFormDeriver` behind it.
+- `PipelexValidationReport.input_form` (`pipelex/pipeline/validation_report.py`) — a **required** field, keyed exactly like `pipe_io_contracts`. `build_validation_report` requires it as a keyword: the shared-assembly rule says a report field is populated on every backend or none, so a backend that forgets it fails loudly instead of shipping an empty view.
+- `pipelex/pipeline/validate_in_process.py` — the in-process assembly derives it inside the validation library's window, right beside `build_pipe_io_contracts`.
+- `pipelex/codegen/native_expansion.py` — `reflect_structure_class`, the faithful-or-absent reflection of a registered structure class into blueprint form, shared with the native consistency probe.
+
+The report always carries the field. Whether it travels on the HTTP wire is the route's decision (absent unless a caller opts in), which belongs to the API.
+
+## Fact sources
+
+The derivation reads two things and nothing else:
+
+- **Slot facts** from the loaded pipes' `StuffSpec`s: the authored input order, the three-valued presence marker (`plain` / `optional` / `force`), and the multiplicity including a fixed `[N]` count. Iterating the same loaded pipes as `build_pipe_io_contracts` — `PipeSignature` placeholders included — is what makes the two key sets equal by construction.
+- **Concept facts** from the *qualified* library crate built from the parsed blueprints: descriptions, refinement links, structure fields with their defaults, choices, required-ness and nested concept refs. Qualified, not normalized: normalization flattens in-crate refinement, and the descriptor must report the `refines` chain as a list. Native concepts contribute their pinned blueprints; class-backed concepts (`structure = "ClassName"`) are reflected from the class registry, which is why the derivation must run while the validation library is still loaded.
+
+The derivation is total. A node it cannot map honestly reports `kind: "unknown"`, the renderer's raw escape hatch against the sibling `json_schema`; nothing raises.
+
+## Kind assignment
+
+Kinds are decided by chain membership and declared types — never by sniffing a schema shape. Per node, in precedence order:
+
+1. A concept with authored structure fields anywhere along its refinement chain is an `object`; its fields are the merged structures along the chain, base fields first, a refining concept overriding its parents'.
+2. Otherwise, the first `structure = "ClassName"` on the chain decides: a native class name (`TextContent`, `ImageContent`, …) maps by identity to that native's row; any other registered class is reflected field by field into an `object`; an unregistered or unmappable class is `unknown`.
+3. Otherwise, a chain bottoming at a native concept takes that native's row, keeping the concept's own `concept_ref`, description and `refines`.
+4. Otherwise — a description-only or string-described concept — `prose` with `refines` ending in `native.Text`: this engine backs such a concept with a `TextContent` subclass, so that is a stated fact, not shape invention.
+
+The crate the deriver reads is the current library's accumulated one, which holds the validated bundle and every `library_dirs` bundle loaded beside it — so a concept from a library dir, or a local concept refining one, follows the same rules as a local concept. A concept absent from that crate altogether is `unknown`.
+
+The table and rules above ARE the no-hint kind assignment — stated rules, not heuristics: with no applicable intent hint, a node's kind is exactly what they produce. An applicable authored `intent` (spec: MTHDS `intent-hints.md`) *feeds* that assignment, never competes with it: on a **text-valued** node — one whose site is a `text` field, a `native.Text`-chained or description-only concept, judged per item on plural sites — an effective `intent = "prose"` yields `kind: "prose"` and `intent = "label"` yields `kind: "text"`; an absent, unknown, or inapplicable intent leaves the no-hint kind untouched. On a **number-valued** node, `rating` and `quantity` never change `kind` (both are `number`; the union has no finer kind) — they ride the `hints` slot for the renderer to honor. A time-formatted `text` node and an `Html`-backed `prose` node are *not* text-valued sites, so no intent word applies to them.
+
+| Native concept | Kind |
+|---|---|
+| `Text`, `Html` | `prose` |
+| `Number` | `number` with `integer: false` |
+| `YesNo` | `boolean` |
+| `Date` | `date` with `datetime: false` |
+| `Time` | `text` with `format: "time"` |
+| `Document` | `document` |
+| `Image` | `image` |
+| `Page`, `TextAndImages`, `SearchResult` | `object` over the pinned blueprint's fields |
+| `Dynamic`, `Anything`, `JSON` | `unknown` |
+
+Nested structure fields map by their declared type: `text` → `text`; `integer` → `number` with `integer: true`; `number` → `number`; `boolean` → `boolean`; `date` → `date`; `datetime` → `date` with `datetime: true`; `time` → `text` with `format: "time"`; a field with `choices` → `enum` (choices win over `type`, matching the structure generator); `concept` → the concept's node, carrying its namespaced `concept_ref`; `list` → `list` whose `item` comes from `item_type` / `item_concept_ref` (a nested list's inner item is inexpressible and reports `unknown`); `dict` → `unknown`. The shorthand `field = "description"` form is a required `text`. Nested fields take the blueprint field's description and `required` over the concept's; a scalar flattened at the top level keeps the concept's description.
+
+Constraint slots (`minimum`, `exclusive_minimum`, `min_length`, `pattern`, …) come only from reflected classes: the language cannot author constraint keys (an authored `minimum = 0` is rejected as an unknown structure-field key), whereas a registered class's `Field(gt=0, max_length=8, pattern=...)` is read from the pydantic field metadata and stamped on the matching `number` or `text` node. A pydantic default on a reflected class is an authored fact: `field_info.is_required()` decides the node's `required` and a non-`None` default is reported as its `default_value` — a defaulted field is never required, the same invariant blueprint validation enforces by rejecting the `required = true` + `default_value` pair. (Authored `hints` are a parsed blueprint field with its own leniency rules; see below.)
+
+## Hints
+
+Every node carries an optional `hints` slot: the node's **effective** MTHDS intent hints — the key-by-key merge of the concept's refinement chain (nearer declaration winning) with the site's own hints (a field's or a slot's, the site layer winning). Everything well-formed rides it, unknown keys and words included (the advisory validation lint has already warned about them; the descriptor preserves them for consumers that know more than this version does). On a plural node the merged hints appear on the `list` node *and* its `item` — the `concept_ref` duplication precedent: applicability is judged per item, and a renderer reading either node finds the same answer. A node with no effective hints has no `hints` member, so hint-free methods produce byte-identical descriptors to before hints existed. The slot is flat `string → string` by contract.
+
+## Required, presence and gating
+
+On a top-level field, `required` is `presence != "optional"`, and `gating` — whether the run is blocked until the caller provides content — is `required` and not a variable-multiplicity list. A plain `Concept[]` slot is therefore `required: true, gating: false`: its empty form is the legitimate value `[]`. A fixed-count `Concept[N]` slot is a `list` with `item_count: N` that gates like any scalar. `Concept[1]` is a single node, because the runtime takes one value there (`StuffSpec.is_multiple()` is `count > 1`), and the descriptor says what the runtime accepts. Nested fields carry neither `presence` nor `gating`; their `required` is the payload fact.
+
+## Wire shape
+
+Inapplicable slots are absent, never JSON `null`: the report's valid arm is dumped without `exclude_none`, so `InputFormField` owns its wire shape through a serializer that drops `None` values and writes the `date` kind's flag under its spec name `datetime`. Applicable falsy values (`required: false`, `integer: false`, `gating: false`) are kept. Per-kind validators keep a node honest at construction (`enum` needs `choices`, `object` needs `fields`, `list` needs `item`, `number` needs `integer`, `date` needs `datetime`).
+
+## Seeing it
+
+`pipelex-dev trace-input-semantics` captures the descriptors as `hop5_input_form.json` beside `hop5_pipe_io_contracts.json`, so an authored fact can be checked on both projections at once — see [Tracing Input Semantics](../contribute/trace-input-semantics.md). The assignment table is pinned by `tests/integration/pipelex/pipeline/test_input_form.py` over the committed probe bundle (and the hints behavior over its hinted sibling, `hinted_bundle.mthds`), the wire models by `tests/unit/pipelex/pipeline/test_input_form_models.py`, the hint merges and kind-feeding by `tests/unit/pipelex/pipeline/test_input_form_hints.py`, and the escape hatches the library loader keeps unreachable (concept cycles, unregistered classes) by `tests/unit/pipelex/pipeline/test_input_form_deriver.py`.
+
+
+## Per-Pipe IO Contracts
+
+# Per-Pipe IO Contracts
+
+Every valid `validate` report carries a **`pipe_io_contracts`** map: for each pipe, the typed contract of what it takes in and what it produces. It sits beside the [input-form descriptor](input-form-descriptor.md) on the same report, and the two are keyed identically — by the namespaced `pipe_ref` (`domain.code`) — over exactly the same set of pipes, `PipeSignature` placeholders included.
+
+Reach for `pipe_io_contracts` when you need the schema and the declared contract; reach for `input_form` when you are building a form and want field kinds, defaults, and choices without reading schemas.
+
+## Where it lives
+
+- `pipelex/pipeline/pipe_io_contracts.py` — the wire models (`PipeInputContract`, `PipeOutputContract`, `IOMultiplicity`) and the one public derivation, `build_pipe_io_contracts(pipes)`.
+- `PipelexValidationReport.pipe_io_contracts` (`pipelex/pipeline/validation_report.py`) — where the artifact travels.
+- `pipelex/pipeline/validate_in_process.py` — the in-process assembly derives it inside the validation library's window, right beside `build_input_form`. Iterating the same loaded pipes is what makes the two key sets equal by construction.
+
+## What an entry carries
+
+Each pipe gets an `inputs` map and one `output`.
+
+An **input entry** carries the `concept_ref`, the JSON Schema of its content (`json_schema`), and two facts about the slot as declared:
+
+- `presence` — the authored marker, verbatim: `plain`, `optional` (`?`, the caller may omit it and the pipe handles absence itself), or `force` (`!`, must be provided, and the author asserted so). `plain` and `force` are both required; the distinction is the assertion, which lint and graph surfaces read.
+- `multiplicity` — `single`, `variable` (`Concept[]`, unbounded), or `fixed` (`Concept[N]`), with `item_count` carrying the exact N on the `fixed` arm and `null` otherwise. `Concept[1]` is `single`: no list framing.
+
+An **output entry** carries `concept_ref`, the same `multiplicity` / `item_count` pair, and a two-valued `optional` — `!` is rejected on outputs, so there is nothing three-valued to report. It carries **no `json_schema`**: the schema render runs per input only. A consumer that wants the output's payload shape gets it from [`build output --format schema`](../tools/cli/build/output.md), not from this contract.
+
+## Where the concept identity sits on the schema
+
+The JSON Schema on an input names its concept: `title` is the `concept_ref`, `description` the concept's authored description. On a `single` slot those sit at the top level; on `variable` and `fixed` slots the schema is an array wrap that keeps them on `items`, and a fixed count adds `minItems`/`maxItems` on the wrap itself. A variable list carries no bounds.
+
+```json
+{
+  "type": "array",
+  "items": { "type": "object", "title": "my_domain.Gadget", "description": "…", "properties": { "…": "…" } },
+  "minItems": 2,
+  "maxItems": 2
+}
+```
+
+## Which surfaces carry it
+
+The protocol `validate` operation carries `pipe_io_contracts` on its report. The [Agent CLI](../tools/cli/agent-cli.md#validate) does not: `pipelex-agent validate` emits the verdict, `pending_signatures`, `is_runnable`, and its own advisory `warnings` array, and stops there — the typed contracts are not part of its envelope.
+
+## Seeing it
+
+`pipelex-dev trace-input-semantics` captures the contracts as `hop5_pipe_io_contracts.json` beside `hop5_input_form.json`, so an authored fact can be checked on both projections at once — see [Tracing Input Semantics](../contribute/trace-input-semantics.md). The emitted shapes are pinned by `tests/integration/pipelex/pipeline/test_pipe_io_contracts.py`.
+
+## Related Documentation
+
+- [Input-Form Descriptor](input-form-descriptor.md) — the renderer-facing view of the same inputs
+- [Understanding Optionality](../building-methods/pipes/understanding-optionality.md) — the markers behind `presence`
+- [Understanding Multiplicity](../building-methods/pipes/understanding-multiplicity.md) — the bracket notation behind `multiplicity`
 
 
 ## Dry Run Mock Generation
@@ -15295,7 +15550,8 @@ Pydantic models in Pipelex often enforce format constraints via `field_validator
 ```python
 class BundleHeaderSpec(StructuredContent):
     domain_code: str  # Must be snake_case
-    main_pipe: str    # Must be snake_case, must exist in pipe dict
+    main_pipe: str  # Must be snake_case, must exist in pipe dict
+
 
 class ConceptSpec(StructuredContent):
     concept_code: str  # Must be PascalCase
@@ -15381,8 +15637,7 @@ class DryRunFactory:
         *,
         snake_case_field_names: set[str] | None = None,
         pascal_case_field_names: set[str] | None = None,
-    ) -> type[ModelFactory[BaseModelTypeVar]]:
-        ...
+    ) -> type[ModelFactory[BaseModelTypeVar]]: ...
 ```
 
 ---
@@ -15409,12 +15664,10 @@ The `DryRunFactory` auto-detects format constraints from Pydantic `Field` defini
 from pydantic import Field
 from pipelex.cogt.content_generation.dry_run_factory import MockFormat
 
+
 class ConceptStructureSpec(StructuredContent):
     # Snake case field
-    the_field_name: str = Field(
-        description="Field name. Must be snake_case.",
-        json_schema_extra={"mock_format": MockFormat.SNAKE_CASE}
-    )
+    the_field_name: str = Field(description="Field name. Must be snake_case.", json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
 
     # Concept reference field (domain.ConceptCode format)
     concept_ref: str | None = Field(
@@ -15424,10 +15677,7 @@ class ConceptStructureSpec(StructuredContent):
     )
 
     # Field to ignore during mock generation (use default/None)
-    default_value: Any | None = Field(
-        default=None,
-        json_schema_extra={"mock_format": MockFormat.IGNORE}
-    )
+    default_value: Any | None = Field(default=None, json_schema_extra={"mock_format": MockFormat.IGNORE})
 ```
 
 ---
@@ -15443,6 +15693,7 @@ class ConceptSpec(StructuredContent):
         default=None,
         examples=["Text", "Image", "Document", "TextAndImages", "Number", "Page"],
     )
+
 
 class PipeComposeSpec(PipeSpec):
     # Target format should be a valid TargetFormat value
@@ -15576,10 +15827,7 @@ There is one fallback: when composition fails with a `StructuredContentComposerV
 
 ```python
 class MySpec(StructuredContent):
-    my_kebab_field: str = Field(
-        description="A kebab-case identifier",
-        json_schema_extra={"mock_format": MockFormat.KEBAB_CASE}
-    )
+    my_kebab_field: str = Field(description="A kebab-case identifier", json_schema_extra={"mock_format": MockFormat.KEBAB_CASE})
 ```
 
 !!! warning "Field name matching is exact"
@@ -15896,10 +16144,10 @@ TraceContext is a serializable context that flows through pipe execution:
 
 ```python
 class TraceContext(BaseModel):
-    graph_id: str                           # Unique graph identifier
-    parent_node_id: str | None              # Parent pipe's node ID
-    node_sequence: int                      # Counter for generating node IDs
-    data_inclusion: DataInclusionConfig     # What data to capture
+    graph_id: str  # Unique graph identifier
+    parent_node_id: str | None  # Parent pipe's node ID
+    node_sequence: int  # Counter for generating node IDs
+    data_inclusion: DataInclusionConfig  # What data to capture
 
     def copy_for_child(self, child_node_id: str, *, next_sequence: int) -> TraceContext:
         """Create context for nested pipe execution."""
@@ -16072,16 +16320,16 @@ IOSpec captures input/output data for nodes:
 
 ```python
 class IOSpec(BaseModel):
-    name: str                    # Variable name
-    concept: str | None          # Concept code
-    content_type: str | None     # MIME type
-    preview: str | None          # Truncated preview (max 200 chars)
-    size: int | None             # Content size
-    digest: str | None           # Unique identifier for data flow
+    name: str  # Variable name
+    concept: str | None  # Concept code
+    content_type: str | None  # MIME type
+    preview: str | None  # Truncated preview (max 200 chars)
+    size: int | None  # Content size
+    digest: str | None  # Unique identifier for data flow
     data: str | dict[str, Any] | list[str] | list[dict[str, Any]] | None  # Full serialized content
-    data_text: str | None        # ASCII text representation
-    data_html: str | None        # HTML representation
-    extra: dict[str, Any]        # Extra markers, e.g. `optional` set on a declared-optional (`?`) output
+    data_text: str | None  # ASCII text representation
+    data_html: str | None  # HTML representation
+    extra: dict[str, Any]  # Extra markers, e.g. `optional` set on a declared-optional (`?`) output
 ```
 
 !!! warning "Preview Truncation"
@@ -16500,11 +16748,8 @@ Given a `Page` with text and images:
 
 ```python
 PageContent(
-    text_and_images=TextAndImagesContent(
-        text=TextContent(text="Welcome to the guide"),
-        images=[ImageContent(url="...")]
-    ),
-    page_view=ImageContent(url="...")
+    text_and_images=TextAndImagesContent(text=TextContent(text="Welcome to the guide"), images=[ImageContent(url="...")]),
+    page_view=ImageContent(url="..."),
 )
 ```
 
@@ -16570,19 +16815,9 @@ When a PipeLLM is created from a blueprint, the `TemplateImageAnalyzer` examines
 ```python
 # Stored in PipeLLM after analysis
 user_image_references = [
-    ImageReference(
-        variable_path="page",
-        kind=ImageReferenceKind.NESTED,
-        nested_image_paths=["text_and_images.images", "page_view"]
-    )
+    ImageReference(variable_path="page", kind=ImageReferenceKind.NESTED, nested_image_paths=["text_and_images.images", "page_view"])
 ]
-system_image_references = [
-    ImageReference(
-        variable_path="context_image",
-        kind=ImageReferenceKind.DIRECT,
-        nested_image_paths=None
-    )
-]
+system_image_references = [ImageReference(variable_path="context_image", kind=ImageReferenceKind.DIRECT, nested_image_paths=None)]
 ```
 
 ### Runtime: Image Collection
@@ -16696,6 +16931,7 @@ The `with_images` filter uses the `ImageRenderable` protocol to handle StuffArte
 # StuffArtefact implements ImageRenderable
 if isinstance(value, ImageRenderable):
     return value.render_with_images(registry=registry, text_format=text_format)
+
 
 # StuffArtefact.render_with_images() delegates to content
 def render_with_images(self, *, registry, text_format) -> str:
@@ -17392,11 +17628,16 @@ def __getattribute__(self, key: str) -> Any:
 
     # 3. Metadata accessors
     match key:
-        case "_stuff_name": return stuff.stuff_name
-        case "_content_class": return content.__class__.__name__
-        case "_concept_code": return stuff.concept.code
-        case "_stuff_code": return stuff.stuff_code
-        case "_content": return content
+        case "_stuff_name":
+            return stuff.stuff_name
+        case "_content_class":
+            return content.__class__.__name__
+        case "_concept_code":
+            return stuff.concept.code
+        case "_stuff_code":
+            return stuff.stuff_code
+        case "_content":
+            return content
 
     # 4. Fallback to normal lookup
     return object.__getattribute__(self, key)
@@ -17426,6 +17667,7 @@ StuffArtefact supports bracket notation and iteration:
 
 ```python
 from typing import Protocol, runtime_checkable
+
 
 @runtime_checkable
 class ImageRenderable(Protocol):
@@ -17832,9 +18074,9 @@ This file contains:
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 LLM_COMBOS: list[ModelCombo] = [
-    ModelCombo('claude-4.5-haiku', 'pipelex_gateway'),
-    ModelCombo('gemini-2.5-flash-lite', 'pipelex_gateway'),
-    ModelCombo('gpt-4o-mini', 'pipelex_gateway'),
+    ModelCombo("claude-4.5-haiku", "pipelex_gateway"),
+    ModelCombo("gemini-2.5-flash-lite", "pipelex_gateway"),
+    ModelCombo("gpt-4o-mini", "pipelex_gateway"),
 ]
 
 IMG_GEN_COMBOS: list[ModelCombo] = [...]
@@ -18577,7 +18819,7 @@ The router is selected during `Pipelex.setup()` by resolving the hub's `PIPE_ROU
 # boot_orchestrator == its own name; otherwise this default runs.
 effective_pipe_router = self._resolve_hub_slot(
     slot=HubSlot.PIPE_ROUTER,
-    default=lambda: PipeRouter(observer=multi_observer),   # Direct, in-process
+    default=lambda: PipeRouter(observer=multi_observer),  # Direct, in-process
 )
 ```
 
@@ -18825,8 +19067,9 @@ A plugin is any object satisfying the `@runtime_checkable` `PipelexPlugin` proto
 
 ```python
 class PipelexPlugin(Protocol):
-    name: str            # unique, lowercase identifier (e.g. "openai")
-    targets_api: int     # must equal PLUGIN_API_VERSION
+    name: str  # unique, lowercase identifier (e.g. "openai")
+    targets_api: int  # must equal PLUGIN_API_VERSION
+
     def register(self, registrar: PluginRegistrar) -> None: ...
 ```
 
@@ -18842,9 +19085,9 @@ A backend plugin's `register` calls one menu method per `(family, sdk)` it serve
 
 ```python
 registrar.add_inference_backend(
-    family=InferenceFamily.LLM,         # LLM | IMG_GEN | EXTRACT | SEARCH
-    sdk="acme",                          # the model's `sdk` string
-    make_worker=_make_acme_worker,       # a MakeWorkerFn (a plain callable)
+    family=InferenceFamily.LLM,  # LLM | IMG_GEN | EXTRACT | SEARCH
+    sdk="acme",  # the model's `sdk` string
+    make_worker=_make_acme_worker,  # a MakeWorkerFn (a plain callable)
 )
 ```
 
@@ -18865,8 +19108,7 @@ def _make_acme_worker(
     backend: InferenceBackend,
     sdk_clients: SdkClientRegistry,
     reporting_delegate: ReportingProtocol | None,
-) -> InferenceWorkerAbstract:
-    ...
+) -> InferenceWorkerAbstract: ...
 ```
 
 The factory always passes all four keyword arguments. A stateless backend simply ignores the ones it doesn't need (`# noqa: ARG001` on the unused parameter — see the built-in `pypdfium2` and `azure_rest` plugins).
@@ -19149,8 +19391,8 @@ The plugin bridges that gap by contributing a **framework-agnostic mapper** — 
 
 ```python
 registrar.add_http_error_mapper(
-    exc_type_provider=lambda: TemporalError,      # SDK imported only when a host resolves the mappers, never at register
-    to_error_report=lambda exc: ErrorReport(...), # classified transient / RUNTIME
+    exc_type_provider=lambda: TemporalError,  # SDK imported only when a host resolves the mappers, never at register
+    to_error_report=lambda exc: ErrorReport(...),  # classified transient / RUNTIME
 )
 ```
 
@@ -19174,7 +19416,7 @@ Not every orchestrator goes this far. A per-call-only plugin — our Mistral Wor
 
 ```python
 if registrar.boot_orchestrator == self.name:
-    registrar.claim_content_generator(_make_temporal_content_generator)   # a thunk, not an instance
+    registrar.claim_content_generator(_make_temporal_content_generator)  # a thunk, not an instance
     registrar.claim_task_manager(_setup_temporal_task_manager)
     registrar.claim_pipe_router(_make_temporal_pipe_router)
     registrar.claim_pipe_run(_make_temporal_pipe_run)
@@ -19713,9 +19955,9 @@ Membership means a value is *reachable on the wire*, not that it is a useful thi
 
 ```python
 report = exc.to_error_report()
-report.to_dict()         # {"error_type": "LLMCompletionError", "message": "...", ...}
-ErrorReport.from_dict(d) # strict inverse — raises ValidationError on a malformed dict
-report.http_status       # 422 / 429 / 500 — for HTTP adapters
+report.to_dict()  # {"error_type": "LLMCompletionError", "message": "...", ...}
+ErrorReport.from_dict(d)  # strict inverse — raises ValidationError on a malformed dict
+report.http_status  # 422 / 429 / 500 — for HTTP adapters
 ```
 
 !!! warning "`ErrorReport` is `extra="forbid"`"
@@ -19790,7 +20032,7 @@ Defined in `pipelex/base_exceptions.py`. Set as a class-level attribute on the e
 
 ```python
 class PipelexConfigError(PipelexError):
-    error_domain = ErrorDomain.CONFIG     # class-level — every instance carries it
+    error_domain = ErrorDomain.CONFIG  # class-level — every instance carries it
 ```
 
 ---
@@ -19838,7 +20080,7 @@ class ProviderErrorMetadata(BaseModel):
     request_id: str | None = None
     retry_after_seconds: float | None = None
     provider_error_code: str | None = None
-    body: Any | None = Field(default=None, exclude=True)   # may carry secrets
+    body: Any | None = Field(default=None, exclude=True)  # may carry secrets
 ```
 
 !!! warning "`body` is excluded from serialization"
@@ -19872,7 +20114,7 @@ def _enrich_error_report_from_cause(self, report: ErrorReport) -> ErrorReport:
         return report
     cause_report = cause.to_error_report()
     return ErrorReport(
-        error_type=report.error_type,                                  # keep own identity
+        error_type=report.error_type,  # keep own identity
         message=report.message,
         error_category=report.error_category or cause_report.error_category,
         error_domain=report.error_domain or cause_report.error_domain,
@@ -20020,19 +20262,19 @@ The "outcome" exceptions (`LLMCompletionError`, `ImgGenGenerationError`, `Extrac
 
 ```python
 # Produce a report from any PipelexError
-report = exc.to_error_report()          # enriched from the __cause__ chain
-payload = report.to_dict()              # None-free dict for serialization
+report = exc.to_error_report()  # enriched from the __cause__ chain
+payload = report.to_dict()  # None-free dict for serialization
 
 # Consume a report
-report.http_status                      # 422 / 429 / 500
-report.user_action_detail()             # free-form advice text, or None
-report.error_category                   # "transient" / "capacity" / ...
+report.http_status  # 422 / 429 / 500
+report.user_action_detail()  # free-form advice text, or None
+report.error_category  # "transient" / "capacity" / ...
 
 # Round-trip across a boundary
-ErrorReport.from_dict(payload)           # strict inverse of to_dict()
+ErrorReport.from_dict(payload)  # strict inverse of to_dict()
 
 # Retry decision
-InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
+InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 ```
 
 ### File → Purpose
@@ -20129,10 +20371,10 @@ A `LibraryCrate` (`pipelex/libraries/library_crate.py`) is a flat, serializable 
 ```python
 class LibraryCrate(BaseModel):
     concepts: dict[str, ConceptBlueprint | str]  # concept ref -> blueprint or description
-    pipes: dict[str, PipeBlueprintUnion]          # pipe ref -> blueprint
-    domains: dict[str, DomainBlueprint]           # domain code -> domain metadata
-    source_map: dict[str, str]                    # ref -> source file (error traceability)
-    fingerprint: str                              # SHA256 of serialized content
+    pipes: dict[str, PipeBlueprintUnion]  # pipe ref -> blueprint
+    domains: dict[str, DomainBlueprint]  # domain code -> domain metadata
+    source_map: dict[str, str]  # ref -> source file (error traceability)
+    fingerprint: str  # SHA256 of serialized content
 ```
 
 Domain is encoded in the dictionary keys (e.g., `scoring.WeightedScore`, `scoring.compute_score`), not in a structural container. `source_map` lets error messages trace back to origin files. The `fingerprint` enables idempotent loading — a worker that already loaded a crate with the same fingerprint skips the reload. The crate is a plain Pydantic model, so a host runtime serializes it as structured JSON in the job input — fully inspectable, not opaque bytes.
@@ -20284,7 +20526,7 @@ Reconstruction is the *boundary* answer, and only that. An in-process run never 
 On the worker, `SchemaToModelFactory.make_from_json_schema(schema, *, class_name)` (`pipelex/cogt/content_generation/schema_to_model_factory.py`) rebuilds a live Pydantic class from the embedded schema:
 
 ```python
-source_code = cls._generate_source_from_schema(schema)        # datamodel-code-generator
+source_code = cls._generate_source_from_schema(schema)  # datamodel-code-generator
 reconstructed_class = cls._exec_and_extract_class(source_code, class_name=class_name)  # exec()
 reconstructed_class.__kajson_class_source__ = source_code  # attached for downstream use
 ```
@@ -20564,8 +20806,8 @@ This is the canonical convention for keyword-only function parameters across the
 A function or method must place a bare `*` separator in its signature so that every parameter after the subject is keyword-only. The compliant shapes are:
 
 ```python
-def f(*, opt1, opt2): ...            # fully keyword-only — always compliant, no registry entry needed
-def f(subject, *, opt1, opt2): ...   # positional subject — compliant ONLY under a recorded subject grant
+def f(*, opt1, opt2): ...  # fully keyword-only — always compliant, no registry entry needed
+def f(subject, *, opt1, opt2): ...  # positional subject — compliant ONLY under a recorded subject grant
 ```
 
 The first non-`self`/`cls` parameter — the subject — may stay positional-or-keyword **only when a subject grant for that def is recorded in `subject_grants.toml`** (see the next section). We deliberately do NOT use the positional-only `/` separator anywhere; a granted subject may be passed positionally or by keyword, at the caller's discretion.
@@ -20697,19 +20939,19 @@ A subject plus options — the canonical shape, legal only with a grant:
 
 ```python
 # subject_grants.toml carries: ["pipelex/builder/build.py::build_pipe"] param = "spec" rationale = "…"
-def build_pipe(spec, *, dry_run, retries, validate): ...   # build_pipe(my_spec, dry_run=True, retries=3, validate=False)
+def build_pipe(spec, *, dry_run, retries, validate): ...  # build_pipe(my_spec, dry_run=True, retries=3, validate=False)
 ```
 
 A single subject and nothing else — needs a grant too (strict-all scope; lone-subject defs are not implicitly exempt):
 
 ```python
-def render(node): ...   # render(my_node) — granted: verb–object, single operand
+def render(node): ...  # render(my_node) — granted: verb–object, single operand
 ```
 
 All parameters named, including the first — always compliant, no registry entry, and often the most readable choice:
 
 ```python
-def copy_payload(*, source, target): ...   # copy_payload(source=a, target=b)
+def copy_payload(*, source, target): ...  # copy_payload(source=a, target=b)
 ```
 
 Even a single defaulted option must be named — this is the common case the convention fixes, not an exception to it:
@@ -20733,7 +20975,7 @@ def doctor_cmd(*, fix: bool): ...
 A symmetric tuple on the allowlist — exempt entirely, stays positional:
 
 ```python
-def set_env(key: str, value: str) -> None: ...   # set_env("PIPELEX_ENV", "prod")
+def set_env(key: str, value: str) -> None: ...  # set_env("PIPELEX_ENV", "prod")
 ```
 
 A directional pair with a trailing option — neither operand is "the object", and a whole-function allowlist exemption would let the option go positional too, so the whole signature becomes keyword-only:
@@ -20751,13 +20993,13 @@ An override — skipped because of `@override`; fix (and grant) the base signatu
 
 ```python
 @override
-def _store(self, data, *, key, content_type): ...   # base StorageProviderAbstract._store defines the contract and holds any grant
+def _store(self, data, *, key, content_type): ...  # base StorageProviderAbstract._store defines the contract and holds any grant
 ```
 
 A dunder — skipped by name; the interpreter owns the calling convention:
 
 ```python
-def __format__(self, format_spec: str) -> str: ...   # called positionally by format()/f-strings
+def __format__(self, format_spec: str) -> str: ...  # called positionally by format()/f-strings
 ```
 
 A pydantic validator — skipped by decorator; pydantic owns the positional protocol:
@@ -21510,6 +21752,41 @@ The corpus is the single source for language-level `.mthds` methods in this repo
 !!! note "The entries are data, never auto-loaded"
 
     Nothing boots the corpus into the standard library — libraries load only from explicitly passed `library_dirs`. Be aware, though, that `pipelex/libraries/library_utils.py::get_pipelex_mthds_files_from_package()` recursively sweeps every `.mthds` file under the installed package. It has no callers today; wiring one up would pull the whole corpus into the standard library, so it would need to exclude the corpus tree first.
+
+
+## Tracing Input Semantics
+
+# Tracing Input Semantics
+
+`pipelex-dev trace-input-semantics` is an internal capture harness that answers one question with evidence instead of code-reading: **what does each hop of the input-schema emission chain do to every fact a method author writes?** Given one or more `.mthds` bundle files, it loads them through the validation library and dumps per-hop captures of the chain that turns authored structure syntax into the `json_schema` emitted on `pipe_io_contracts`.
+
+```bash
+.venv/bin/pipelex-dev trace-input-semantics path/to/bundle.mthds -o output_dir
+```
+
+## What it captures
+
+Each hop of the chain writes its captures into the output directory, so a lost or mangled fact is localized to exactly one hop:
+
+- `hop1_bundle_blueprints.json` — **parse**: the `PipelexBundleBlueprint` dumps, i.e. what survived TOML.
+- `hop2_generated_sources/` — **resolve + generate**: the structure-class source the runtime generates per concept, re-derived with the same `StructureGenerator` calls the concept factory issues at load time. Saved as `.py.txt` so captures stay inert to linters.
+- `hop3_raw_pydantic_schemas/` — raw `model_json_schema()` per structure class, before any Pipelex render wrapping.
+- `hop4_schema_renders/` — the `SCHEMA` representation per pipe input: the `{"concept", "content"}` envelope, with array wrapping when the input is multiple.
+- `hop5_pipe_io_contracts.json` — the final wire contracts from `build_pipe_io_contracts`.
+- `hop5_input_form.json` — the input-form descriptors from `build_input_form`, the sibling projection that reads the authored blueprints directly instead of the emitted schema (see [Input-Form Descriptor](../under-the-hood/input-form-descriptor.md)). Captured beside the contracts so a fact can be checked on both sides: lost in the schema, stated in the descriptor.
+- `trace_manifest.json` — the capture inventory plus the wire framing per pipe input: authored ref string, resolved concept ref, multiplicity, presence marker.
+
+The tool is a tracer, not a report generator: it never mutates the loaded library, and any analysis of the captures (diffing hops, building a survival table) stays with the caller. Rerunning into the same output directory replaces the `hop2_generated_sources/`, `hop3_raw_pydantic_schemas/`, and `hop4_schema_renders/` capture directories wholesale, so no artifact from a removed or renamed concept, pipe, or input lingers from an earlier trace.
+
+## When to reach for it
+
+Use it whenever a change touches the emission chain — the structure blueprint, the structure generator, the schema render, the contract builder, or the input-form deriver — and you want to see what actually reaches the wire rather than reason about it. The committed probe bundle at `tests/data/input_semantics/probe_bundle.mthds` exercises every construct the language accepts (all field types, choices, defaults, required both ways, nesting, refinements, native concepts, and the `?` / `!` / `[]` / `[N]` input markers), and `tests/data/input_semantics/rejected/` holds deliberately-invalid fixtures pinning what the language refuses:
+
+```bash
+.venv/bin/pipelex-dev trace-input-semantics tests/data/input_semantics/probe_bundle.mthds -o /tmp/probe-trace
+```
+
+The harness was built for the S1 input-semantics audit; its measured survival table and findings live with that audit's working documents. The integration test at `tests/integration/pipelex/cli/test_trace_input_semantics_cmd.py` keeps the per-hop capture format honest.
 
 
 ## Migration Ledger
