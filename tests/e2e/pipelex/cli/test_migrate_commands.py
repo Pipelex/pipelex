@@ -584,7 +584,7 @@ class TestAPreReshapeMachine:
         assert plan["summary"]["files_written"] == 0
         stepped = {plan_dict["file_path"]: [step["title"] for step in plan_dict["steps"]] for plan_dict in plan["plans"] if plan_dict["steps"]}
         assert stepped == {
-            str(global_file): ["The configuration reshape: one scheme for the root"],
+            str(global_file): ["The configuration reshape: one scheme for the root", "The gateway test override goes"],
             str(project_file): ["The configuration reshape: one scheme for the root"],
         }
         assert existing_backups_of(path=global_file) == [], "a plan is not a write"
@@ -698,7 +698,10 @@ class TestAPreReshapeMachine:
         block: dict[str, Any] = envelope["migration"]
         assert block["remedy"] == "pipelex migrate"
         assert block["needs_attention"] is True
-        assert [step["title"] for plan in block["plans"] for step in plan["steps"]] == ["The configuration reshape: one scheme for the root"]
+        assert [step["title"] for plan in block["plans"] for step in plan["steps"]] == [
+            "The configuration reshape: one scheme for the root",
+            "The gateway test override goes",
+        ]
         assert [found["path"] for plan in block["plans"] for found in plan["unexplained"]] == ["posthog_project_key"]
 
         assert planted not in boot.stdout
@@ -707,7 +710,7 @@ class TestAPreReshapeMachine:
 
 
 class TestAPrePromptingStyleMachine:
-    """Two entries on one file, in the order that makes the first one's paths exist.
+    """Several entries on one file, in the order that makes the earliest one's paths exist.
 
     `pipelex-config@2` is the other half of the templating change: `#1104` deleted
     `prompting_config` from the model and from the packaged file, and — because `pipelex init` never
@@ -718,7 +721,7 @@ class TestAPrePromptingStyleMachine:
     `[interpreter.prompting_config]` — a table the model refuses, on a machine the tool has just
     reported as migrated.
 
-    So the property here is not "the entry works" but "the two entries compose": one machine, one
+    So the property here is not "the entry works" but "the entries compose": one machine, one
     run, and a file that arrives at exactly what the package ships today.
     """
 
@@ -741,7 +744,7 @@ class TestAPrePromptingStyleMachine:
 
         # The whole document, against the live packaged one: the tuned per-target map is gone, the
         # default it sat beside travels to where the reshape puts templating, and nothing else about
-        # a file that crossed two entries in one run came out different.
+        # a file that crossed every applicable entry in one run came out different.
         assert load_toml_from_path(path=global_file) == _todays_pipelex_config_document()
 
         backups = existing_backups_of(path=global_file)
@@ -778,6 +781,7 @@ class TestAPrePromptingStyleMachine:
             str(global_file): [
                 "Prompting styles become a templating default",
                 "The configuration reshape: one scheme for the root",
+                "The gateway test override goes",
             ]
         }
 

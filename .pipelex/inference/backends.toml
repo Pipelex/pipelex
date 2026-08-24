@@ -98,7 +98,7 @@ enabled = true
 # proxy accepts and forwards to Bedrock — a 200 carrying an UnknownOperationException, not a 404.
 endpoint = "http://localhost:8787"
 api_key = "${PIG_SERVICE_TOKEN}"
-auth_header = "x-portkey-api-key"       # pig authenticates on this, never on the SDK's x-api-key
+auth_header = "x-portkey-api-key"  # pig authenticates on this, never on the SDK's x-api-key
 
 [portkey]
 display_name = "Portkey"
