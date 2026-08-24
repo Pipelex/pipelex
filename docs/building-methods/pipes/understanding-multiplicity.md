@@ -425,3 +425,12 @@ Multiplicity in Pipelex gives you precise control over how many items flow throu
 
 By understanding and using multiplicity effectively, you can build pipelines that handle both single items and collections with clarity and type safety.
 
+## How Multiplicity Crosses the Wire
+
+A validate report tells a consumer exactly what you declared. On both the input and the output side of [`pipe_io_contracts`](../../under-the-hood/pipe-io-contracts.md), `multiplicity` is three-valued — `single`, `variable`, or `fixed` — and a `fixed` slot carries its exact count in `item_count`. Input entries additionally carry a JSON Schema, where a fixed count is stamped as `minItems`/`maxItems` on the array wrap and a variable list carries no bounds; the output entry reports the concept and the count without a schema. `Concept[1]` is reported as `single`, with no list framing, exactly as it behaves at run time.
+
+## Related Documentation
+
+- [Understanding Optionality](understanding-optionality.md) — the other axis of a slot's shape
+- [Intent Hints](../concepts/intent-hints.md) — how a hint on a plural slot applies per item
+

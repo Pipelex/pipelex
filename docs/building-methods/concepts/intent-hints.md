@@ -48,7 +48,7 @@ A slot table with no `hints` is the same slot as the plain string: `x = { concep
 
 The *shape* of a `hints` table is enforced: it must be a flat string-to-string table, and the expanded slot form admits only `concept` and `hints` — anything else (a non-table `hints`, a number value, a nested table, an unknown slot-table key like `description`) is a structural validation error.
 
-The *content* is lenient: an unknown hint key or an unknown `intent` word parses, is preserved through the crate and onto the descriptor, and is only **warned** about. Validation emits advisory warnings (never errors) for three findings, each naming its site: an unknown hint key (`hint_unknown_key`), an unknown `intent` word (`hint_unknown_intent`), and a known word on a site it does not apply to (`hint_inapplicable_intent`) — for example `rating` on a text field. This is what lets the vocabulary grow between standard versions without breaking older validators.
+The *content* is lenient: an unknown hint key or an unknown `intent` word parses, is preserved through the crate and onto the descriptor, and is only **warned** about. Validation emits advisory warnings (never errors) on the report's `warnings` array for three findings, each naming its site: an unknown hint key (`hint_unknown_key`), an unknown `intent` word (`hint_unknown_intent`), and a known word on a site it does not apply to (`hint_inapplicable_intent`) — for example `rating` on a text field. This is what lets the vocabulary grow between standard versions without breaking older validators.
 
 ## Precedence and inheritance
 
@@ -73,3 +73,10 @@ hints = { intent = "prose" }   # overrides the inherited label
 Hints ride the library crate (a concept's effective hints are assembled during normalization; field and slot hints travel as authored) and land on the [input-form descriptor](../../under-the-hood/input-form-descriptor.md): every node's `hints` slot carries its final effective merge, and an applicable `intent` word feeds the node's `kind` — `prose` and `label` select between the `prose` and `text` kinds on text-valued nodes; `rating` and `quantity` ride the slot for the renderer without changing `kind`. On a plural site (a `Concept[]` slot, a list field), applicability is judged per item, and the merged hints appear on both the `list` node and its `item`.
 
 Because hints are non-normative, the runtime never reads them: execution, validation verdicts, and pipe contracts are identical with and without them — and a method that authors no hints keeps its crate fingerprint, byte for byte.
+
+## Related Documentation
+
+- [Refining Concepts](refining-concepts.md) - How hints inherit along a refinement chain
+- [Inline Structures](inline-structures.md) - Attaching hints to a structure field
+- [Designing Pipelines](../pipes/index.md#understanding-the-pipe-contract) - The expanded input slot form
+- [Input-Form Descriptor](../../under-the-hood/input-form-descriptor.md) - Where effective hints surface for a renderer

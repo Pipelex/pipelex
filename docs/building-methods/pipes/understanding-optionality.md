@@ -25,6 +25,8 @@ Two grammar rules keep the model coherent:
 
 Concept definitions, `refines`, and structure-field references never carry markers — presence is a property of a pipe's contract, not of a concept.
 
+Markers work the same way in the [expanded slot form](index.md#understanding-the-pipe-contract): the `concept` key takes the identical grammar, so `notes = { concept = "Note?", hints = { intent = "prose" } }` is an optional input carrying a hint.
+
 ## The Runtime Trichotomy: Skip, Run, or Fail
 
 At run time, a value slot resolves to a value **or a recorded absence** — never a silent hole. When a pipe is about to run and one of its inputs is absent, the marker decides what happens:
@@ -118,3 +120,4 @@ Two more optionality facts surface on the **valid** report (`pipelex validate`, 
 - [PipeParallel](pipe-controllers/PipeParallel.md) — combining under absence
 - [PipeBatch](pipe-controllers/PipeBatch.md) — compaction of absent branch results
 - [Execution Graph Tracing](../../under-the-hood/execution-graph-tracing.md) — skipped nodes, `skip_reason`, and optional data edges
+- [Per-Pipe IO Contracts](../../under-the-hood/pipe-io-contracts.md) — how the marker is reported on `pipe_io_contracts` as the three-valued `presence`

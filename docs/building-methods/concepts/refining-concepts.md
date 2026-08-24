@@ -408,5 +408,6 @@ refines = "Customer"
 - [Native Concepts](native-concepts.md) - Complete guide to native concepts
 - [Inline Structures](inline-structures.md) - Add structure to concepts
 - [Python StructuredContent Classes](python-classes.md) - Advanced customization
+- [Intent Hints](intent-hints.md) - Non-normative presentation intent, inherited along the refinement chain
 - [Packages](../packages.md) - Package system, dependencies, and cross-package references
 
