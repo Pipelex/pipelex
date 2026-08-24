@@ -61,8 +61,16 @@ Each field can specify:
 - **choices**: For `enum`-like fields, a list of valid values
 - **item_type**: For `list` fields, the type of list items
 - **key_type** and **value_type**: For `dict` fields, the types of keys and values
+- **concept_ref** and **item_concept_ref**: For `concept` fields (and `list` fields whose items are concepts), the concept being referenced
+- **hints**: Non-normative presentation intent for this field — see [Intent Hints](intent-hints.md)
 
 Field names must be valid Python identifiers and cannot be Python keywords; generated Python projections use them as model attributes.
+
+!!! warning "The key set is closed"
+
+    The keys above are the only ones a structure field accepts, and anything else is rejected at validation. A typo (`descrption`), a hopeful constraint the language does not carry (`minimum = 0`, `unit = "kg"`), or a misspelled `hints` all fail the bundle instead of being dropped.
+
+    This is deliberate: a silently discarded key is authored intent that vanishes without a trace, and you only find out when the value it was supposed to govern comes back wrong. If you need a numeric bound or another constraint, express it on a Python class instead — see [Python Classes](python-classes.md), whose pydantic `Field(...)` metadata is read as an authored fact. Note that hint *content* stays lenient: an unknown key inside a `hints` table warns and is preserved, rather than failing the bundle.
 
 ## Supported Field Types
 
