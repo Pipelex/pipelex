@@ -1,5 +1,27 @@
 # Changelog
 
+## [v0.53.0] - 2026-08-25
+
+### Added
+
+- **Vacuous-presence lint (`input_presence_vacuous`)**: New advisory warning that fires when a required method input (declared without `?`) points to a concept with no required fields, since an empty object `{}` already satisfies it. Scoped strictly to entry pipes (the bundle's declared `main_pipe`), the message suggests either marking the input optional (`?`) or adding a required field to the concept. See [Understanding optionality](building-methods/pipes/understanding-optionality.md) and [Inline structures](building-methods/concepts/inline-structures.md).
+- **Unified advisory-warnings module** (`pipelex/pipeline/advisory_warnings.py`): A single composition point that assembles all advisory warnings (optionality, vacuous-presence, and intent-hints) in a fixed, deterministic order.
+- **Corpus vocabulary exclusion**: Added the `input_presence_vacuous` exclusion to the corpus vocabulary generator (`generate_corpus_vocabulary_cmd.py`).
+- **Documentation**: Updated the user guides ([Inline structures](building-methods/concepts/inline-structures.md), [Understanding optionality](building-methods/pipes/understanding-optionality.md), [validate](tools/cli/validate.md)) to cover the new lint, its remedies, and the unified warning channels.
+
+### Changed
+
+- **Consistent warnings across all channels**: Every whole-bundle validate channel (protocol report, agent CLI, builder operations, and the bare CLI's `validate bundle` and `validate --all`) now carries the exact same set of advisory warnings. Previously, channels showed different subsets — intent-hints were missing from the CLI, for instance. To keep output manageable, intent-hint findings are capped per site (five before collapsing into an "...and N more" message) and long authored tokens are elided at sixty characters.
+- **Library manager interface (Breaking)**: `LibraryManagerAbstract` gained a new abstract method `get_accumulated_blueprints()`, which the collector reads to find the entry pipes. Any custom library manager injected via `Pipelex.setup(library_manager=...)` must implement it or fail loudly at construction.
+
+### Fixed
+
+- **Bare CLI warning visibility**: The bare CLI's `validate bundle` command now prints its advisory warnings before the strict pending-signature gate exits. Previously, a bundle with an unimplemented placeholder would exit non-zero and swallow the warnings — which is exactly the state an author is in while building a method.
+- **Empty structure table parsing**: An authored but empty `[concept.X.structure]` table is now correctly parsed as an `object` with an empty `fields` list, instead of falling through a truthiness check and being described as `prose` refining `native.Text`.
+- **Field-less structure class reflection**: A registered Python class declaring no fields is now reflected as an empty object rather than `unknown`. Genuinely unmappable annotations still correctly report as `unknown`.
+- **Domain splitting in locators**: Hierarchical domains such as `legal.contracts` are now split at the last dot rather than the first when building advisory-warning locators.
+- **Release workflow no longer loses the tag when signing fails**: The GitHub Release is created, and the dists attached, before the Sigstore step, which is now allowed to fail without failing the job. The tag exists only as a side effect of creating the release, so a refreshed Sigstore trust root previously cost the tag and the release page while PyPI published normally — as happened to v0.52.0. The action is also bumped to a version carrying a current trust root, and release creation is idempotent so the manual retry path works.
+
 ## [v0.52.0] - 2026-08-24
 
 ### Highlights

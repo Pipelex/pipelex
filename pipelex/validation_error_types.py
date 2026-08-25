@@ -9,10 +9,10 @@ whatever diagnostics it happens to have seen.
 
 The registry is a **union of the enums the runtime already raises**, never a second list beside
 them. ``PipeValidationErrorType`` and ``PipeFactoryErrorType`` are the two vocabularies the
-validation stages produce, and :class:`ValidationResidualErrorType` names the one residual
-channel that has no stage enum of its own. Deriving the registry from them is what stops it
-from drifting: a member added to any of the three is in the registry the moment it is declared,
-with nothing here to remember to update.
+validation stages produce, :class:`ValidationResidualErrorType` names the one residual channel
+that has no stage enum of its own, and :class:`HintLintErrorType` carries the intent-hint lints.
+Deriving the registry from them is what stops it from drifting: a member added to any of them is
+in the registry the moment it is declared, with nothing here to remember to update.
 
 **Two spellings live in one vocabulary, deliberately.** The stage enums are snake_case codes
 (``missing_input_variable``), while the dry-run residual is ``DryRunError`` — the name of the
@@ -76,6 +76,11 @@ class PipeValidationErrorType(StrEnum):
     # assertion can never fire.
     OPTIONAL_FORCE_REDUNDANT = "optional_force_redundant"
 
+    # Advisory-only (rides the validation report's `warnings` array, never raised as an error):
+    # a gating input of an entry pipe whose concept declares no required field — the empty object
+    # satisfies the declaration, so "the caller must supply this" can enforce nothing.
+    INPUT_PRESENCE_VACUOUS = "input_presence_vacuous"
+
     # Blueprint parse-time concept error: a bundle declares a concept whose code collides with a
     # native Pipelex concept (`Text`, `Number`, …). Structurally suppressible — set only at the
     # single `validate_concept_keys` raise site — so the fix planner keys on it safely.
@@ -114,6 +119,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
                 | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
                 | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
+                | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS
                 | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
                 | PipeValidationErrorType.UNRESOLVED_CONCEPT
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
@@ -143,6 +149,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
                 | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
                 | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
+                | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS
                 | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
                 | PipeValidationErrorType.UNRESOLVED_CONCEPT
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
@@ -179,6 +186,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
                 | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
                 | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
+                | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS
                 | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
                 | PipeValidationErrorType.UNRESOLVED_CONCEPT
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
@@ -210,6 +218,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
                 | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
                 | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
+                | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS
                 | PipeValidationErrorType.UNRESOLVED_CONCEPT
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
@@ -244,6 +253,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
                 | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
                 | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
+                | PipeValidationErrorType.INPUT_PRESENCE_VACUOUS
                 | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
                 | PipeValidationErrorType.UNRESOLVED_CONCEPT
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
@@ -304,7 +314,7 @@ ValidationErrorType: TypeAlias = PipeValidationErrorType | PipeFactoryErrorType 
 """The type of a bundle-validation diagnostic's ``error_type``.
 
 ``ValidationErrorItem.error_type`` is typed against this alias, which is what makes the registry
-*closed* rather than merely documented: a value outside these three enums cannot be constructed
+*closed* rather than merely documented: a value outside these enums cannot be constructed
 onto the wire, so the enumeration below and the values a consumer actually observes cannot
 disagree.
 """
@@ -321,7 +331,7 @@ Ordered by contributing enum, then by declaration order within it — so a gener
 on this registry (the MTHDS Test Corpus tag vocabulary is the first) is stable across runs and a
 new member shows up as one added line rather than a reshuffle.
 
-The three enums are value-disjoint, and that is a property worth stating rather than assuming:
+The contributing enums are value-disjoint, and that is a property worth stating rather than assuming:
 were two of them to share a wire value, ``error_type`` would stop identifying the fault and the
 alias above would resolve it to whichever enum pydantic tried first. It is gated by
 ``tests/unit/pipelex/errors/test_validation_error_types.py``.

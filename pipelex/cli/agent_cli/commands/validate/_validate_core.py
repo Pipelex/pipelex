@@ -13,10 +13,10 @@ from pipelex.interpreter_hub import (
     resolve_library_dirs,
     set_current_library,
 )
+from pipelex.pipeline.advisory_warnings import collect_advisory_warnings, collect_current_library_entry_pipe_refs
+from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs
 from pipelex.pipeline.bundle_validator import BundleValidator
-from pipelex.pipeline.controller_taint import collect_controller_taint_analyses
 from pipelex.pipeline.execution_seams import acquire_library
-from pipelex.pipeline.optionality_warnings import build_optionality_warnings
 from pipelex.pipeline.validate_bundle import build_pending_signatures, build_validated_pipes, validate_bundle
 
 if TYPE_CHECKING:
@@ -57,7 +57,10 @@ async def validate_all_core(*, library_dirs: list[Path] | None = None, allow_sig
         pending_signatures = build_pending_signatures(get_pipe_library().get_pipes_dict())
         # warnings: same advisory lint channel as the bundle surfaces — `validate all` has the
         # whole library loaded, which is all the flow context the cross-flow aggregation needs.
+        # Its entry pipes come off the blueprints the library manager accumulated on the way in;
+        # there is no `ValidateBundleResult` on this path to read a `main_pipe` from.
         library_pipes = list(get_pipe_library().get_pipes_dict().values())
+        warnings = collect_advisory_warnings(pipes=library_pipes, entry_pipe_refs=collect_current_library_entry_pipe_refs())
         return {
             "success": True,
             "is_valid": True,
@@ -65,9 +68,7 @@ async def validate_all_core(*, library_dirs: list[Path] | None = None, allow_sig
             "total_pipes": len(dry_run_results),
             "pending_signatures": pending_signatures,
             "is_runnable": not pending_signatures,
-            "warnings": [
-                warning.model_dump(exclude_none=True) for warning in build_optionality_warnings(collect_controller_taint_analyses(library_pipes))
-            ],
+            "warnings": [warning.model_dump(exclude_none=True) for warning in warnings],
         }
     finally:
         # Restore the caller's outer current-library FIRST (so the guarantee survives a teardown
@@ -119,7 +120,8 @@ async def validate_bundle_core(
         "pending_signatures": result.pending_signatures,
         "is_runnable": not result.pending_signatures,
         "warnings": [
-            warning.model_dump(exclude_none=True) for warning in build_optionality_warnings(collect_controller_taint_analyses(result.pipes))
+            warning.model_dump(exclude_none=True)
+            for warning in collect_advisory_warnings(pipes=result.pipes, entry_pipe_refs=collect_entry_pipe_refs(result.blueprints))
         ],
     }
 
@@ -230,6 +232,7 @@ async def validate_pipe_in_bundle_core(
         "pending_signatures": result.pending_signatures,
         "is_runnable": not result.pending_signatures,
         "warnings": [
-            warning.model_dump(exclude_none=True) for warning in build_optionality_warnings(collect_controller_taint_analyses(result.pipes))
+            warning.model_dump(exclude_none=True)
+            for warning in collect_advisory_warnings(pipes=result.pipes, entry_pipe_refs=collect_entry_pipe_refs(result.blueprints))
         ],
     }

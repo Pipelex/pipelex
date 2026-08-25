@@ -161,6 +161,10 @@ fails_at = "runtime"
 code = "optional_force_redundant"
 excluded = "Advisory-only: it rides the validation report's `warnings` array and never makes a verdict invalid. An entry contract that models one `expected_error` on an invalid entry has nowhere to put a warning on a valid one, so there is no shape a focused entry could take. Revisit if the manifest ever grows a warnings axis."
 
+[error.input_presence_vacuous]
+code = "input_presence_vacuous"
+excluded = "Advisory-only, for the same reason as `optional_force_redundant`: the entry-pipe vacuous-presence lint rides the validation report's `warnings` array and never makes a verdict invalid. The bundle it fires on is VALID — a gating input whose concept declares no required field is legal, merely undefinable for a caller — so there is no `expected_error` an entry could carry. Revisit if the manifest ever grows a warnings axis."
+
 [error.native_concept_redeclaration]
 code = "native_concept_redeclaration"
 fails_at = "runtime"

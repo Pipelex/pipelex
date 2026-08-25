@@ -51,3 +51,28 @@ def select_primary_blueprint(blueprints: Sequence[PipelexBundleBlueprint]) -> Pr
             main_pipe_ref = PipeFactory.make_pipe_ref_with_domain(domain_code=blueprint.domain, pipe_code=blueprint.main_pipe)
             return PrimaryBlueprintSelection(blueprint=blueprint, main_pipe_ref=main_pipe_ref)
     return PrimaryBlueprintSelection(blueprint=blueprints[0], main_pipe_ref=None)
+
+
+def collect_entry_pipe_refs(blueprints: Sequence[PipelexBundleBlueprint]) -> list[str]:
+    """The domain-qualified ``main_pipe`` of every blueprint in a batch, in declaration order.
+
+    An *entry pipe* is where a method meets its caller — a human, a form, an API client — which is
+    the boundary the advisory entry-pipe lints are scoped to. A blueprint that declares no
+    ``main_pipe`` contributes nothing, so a batch with none yields an empty list rather than
+    guessing at one.
+
+    Distinct from :func:`select_primary_blueprint`, which picks the ONE main pipe a batch is
+    canonically about (its graph target, its dry-run target). Both qualify a ``main_pipe`` the same
+    way, but a lint that must judge every declared entry point cannot use a rule that returns one.
+
+    Args:
+        blueprints: The batch's blueprints, in declaration order.
+
+    Returns:
+        The qualified entry-pipe refs, in the same order.
+    """
+    return [
+        PipeFactory.make_pipe_ref_with_domain(domain_code=blueprint.domain, pipe_code=blueprint.main_pipe)
+        for blueprint in blueprints
+        if blueprint.main_pipe
+    ]

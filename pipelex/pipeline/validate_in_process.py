@@ -27,12 +27,11 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexError, ValidationErrorItem
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipe_run.dry_run_in_process import best_effort_graph_spec
-from pipelex.pipeline.blueprint_selection import select_primary_blueprint
+from pipelex.pipeline.advisory_warnings import build_advisory_warnings
+from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs, select_primary_blueprint
 from pipelex.pipeline.controller_taint import collect_controller_taint_analyses
-from pipelex.pipeline.hint_warnings import build_current_library_hint_warnings
-from pipelex.pipeline.input_form import PipeInputFormDescriptor, build_input_form
+from pipelex.pipeline.input_form import PipeInputFormDescriptor, build_input_form, qualify_current_library_crate
 from pipelex.pipeline.liftable_pipes import LiftablePipeEntry, build_liftable_pipes
-from pipelex.pipeline.optionality_warnings import build_optionality_warnings
 from pipelex.pipeline.pipe_io_contracts import PipeIOContract, build_pipe_io_contracts
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validation_report import PipelexValidationReport, build_validation_report
@@ -108,11 +107,18 @@ async def validate_bundles_in_process(
         # something inside the window later moves the contextvar.
         validation_library_id = get_current_library_id_or_none()
         pipe_io_contracts: dict[str, PipeIOContract] = build_pipe_io_contracts(result.pipes)
-        input_form: dict[str, PipeInputFormDescriptor] = build_input_form(result.pipes)
+        # One crate qualification per validate pass — the descriptors and the hint lint read the same one.
+        qualified_crate = qualify_current_library_crate()
+        input_form: dict[str, PipeInputFormDescriptor] = build_input_form(result.pipes, qualified_crate=qualified_crate)
         # One taint walk per validate pass — both report projections read the same analyses.
         taint_analyses = collect_controller_taint_analyses(result.pipes)
         liftable_pipes: list[LiftablePipeEntry] = build_liftable_pipes(taint_analyses)
-        warnings: list[ValidationErrorItem] = build_optionality_warnings(taint_analyses) + build_current_library_hint_warnings()
+        warnings: list[ValidationErrorItem] = build_advisory_warnings(
+            taint_analyses=taint_analyses,
+            input_form=input_form,
+            entry_pipe_refs=collect_entry_pipe_refs(result.blueprints),
+            qualified_crate=qualified_crate,
+        )
         graph_target_ref = graph_pipe_code if graph_pipe_code is not None else select_primary_blueprint(result.blueprints).main_pipe_ref
         graph_spec: GraphSpec | None = await best_effort_graph_spec(
             pipe_ref=graph_target_ref,
