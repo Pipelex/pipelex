@@ -1,0 +1,19 @@
+TODOS.md
+  s_8e3cab32b9b17b::t_7cfa7ad6a3b6e1 98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "73148235abd60e4e1d75ee6e88df4bf71491275e",
+  "prompts": {},
+  "sessions": {
+    "s_8e3cab32b9b17b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "719fa054-f455-4d98-8c2a-628f8e2e219e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Louis Choquel <louis@pipelex.com>"
+    }
+  }
+}
