@@ -37,3 +37,13 @@ The shared `load_empty_library` fixture (`tests/conftest.py`) is `scope="class"`
 Left alone deliberately. Fixing it in one module means that module stops matching every neighbour that shares the fixture, which is the worse outcome for a reader; fixing it properly means changing a fixture the whole suite depends on, which is not a lint's business and wants its own run of the full suite to justify. Nothing observable is at stake — the leak is bounded by the class, and it is memory, not state that any assertion can see.
 
 **If it is picked up:** make `_load` tear down the library it is replacing before opening the next one (the `prev_library_id` capture already guards against resurrecting a torn-down binding), then run the full suite — the modules calling it a dozen-plus times per class are where a wrong teardown order would surface.
+
+## A `@model_validator` can reject `{}` that the descriptor calls satisfiable
+
+Raised in review: a class-backed concept whose pydantic model defaults every field but carries an `@model_validator` demanding at least one value has no required field by reflection, so the lint fires and the message's "an empty object satisfies it" clause is untrue for it — `model_validate({})` would raise.
+
+The premise is right. The remedy is not, in either shape it was offered. Restricting the lint to authored inline structures would delete its class-backed coverage, which is a documented capability with its own tests, to guard a shape nothing in this repo or the cookbook uses. Proving the model accepts `{}` means calling `model_validate({})` from inside a lint — running author-supplied validator code, with its side effects and its exceptions, during validation.
+
+What settles it is whose blind spot this is. `InputFormDeriver` reads `field_info.is_required()` and never consults validators, and that reading is load-bearing well beyond the lint: the input form is rendered from the same descriptor, so the form offers an empty object for this concept whether or not the lint says anything. The lint is reporting what the form will actually do. The author who acts on either remedy — making a field required, or marking the input `?` — ends up with a better method in that scenario too. Only the one clause is imprecise, and rewording it to hedge would cost every ordinary reader clarity to serve a case none of them are in.
+
+**If it is picked up:** it belongs on the descriptor rather than the lint — a `constraints` note when a structure class declares a model validator, which the form kernel could surface too. That is a change to the wire contract in `docs/specs/mthds-input-form-descriptor.md` and wants the form-kernel side in the conversation.
