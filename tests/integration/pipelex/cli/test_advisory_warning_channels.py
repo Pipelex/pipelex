@@ -278,13 +278,14 @@ class TestAdvisoryWarningChannels:
         gate; `validate bundle` used to echo after it, so the warnings were unreachable exactly when
         they were most useful.
         """
-        with pytest.raises(typer.Exit):
+        with pytest.raises(typer.Exit) as exit_info:
             asyncio.run(
                 _validate_pipe_or_bundle(
                     bundle_path=pending_signature_bundle_dir / "bundle.mthds",
                     library_dirs=[pending_signature_bundle_dir],
                 )
             )
+        assert exit_info.value.exit_code == 1
 
         echoed = [line for line in capsys.readouterr().out.splitlines() if line.startswith("Warning: ")]
         assert [line for line in echoed if "Input 'opts' of pipe 'advisory_pending.run'" in line]
@@ -298,8 +299,9 @@ class TestAdvisoryWarningChannels:
         pinned it there — so a future edit could move it behind the gate on this path exactly as one
         had on the other, and every test would stay green.
         """
-        with pytest.raises(typer.Exit):
+        with pytest.raises(typer.Exit) as exit_info:
             do_validate_all_libraries_and_dry_run(library_dirs=[pending_signature_bundle_dir])
+        assert exit_info.value.exit_code == 1
 
         echoed = [line for line in capsys.readouterr().out.splitlines() if line.startswith("Warning: ")]
         assert [line for line in echoed if "Input 'opts' of pipe 'advisory_pending.run'" in line]
