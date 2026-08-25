@@ -11,7 +11,7 @@ from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipeBlueprintUnion
 from pipelex.pipe_machinery.pipe_blueprint import InputSlotBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
-from pipelex.pipeline.hint_warnings import build_hint_warnings
+from pipelex.pipeline.hint_warnings import MAX_AUTHORED_TOKEN_LENGTH, MAX_HINT_FINDINGS_PER_SITE, build_hint_warnings
 from pipelex.validation_error_types import HintLintErrorType
 
 
@@ -217,3 +217,61 @@ class TestHintLintOrdering:
         second = [(w.error_type, w.concept_code) for w in _lint(crate)]
         assert first == second
         assert [code for _, code in first] == ["Alpha", "Beta"]
+
+
+class TestHintLintPayloadBounds:
+    """Authored hint content is interpolated raw into `message`, and one finding fires per unknown
+    key — so a site that names many keys, or one very long value, could inflate the warning payload
+    of a channel an author invokes casually. Both are bounded.
+    """
+
+    def test_undefined_keys_beyond_the_cap_collapse_into_one_tail(self):
+        hints = {f"key_{index:02d}": "value" for index in range(MAX_HINT_FINDINGS_PER_SITE + 4)}
+        warnings = _lint(_crate({"docs.Essay": ConceptBlueprint(description="an essay", hints=hints)}))
+
+        assert len(warnings) == MAX_HINT_FINDINGS_PER_SITE + 1
+        assert all(warning.error_type == HintLintErrorType.HINT_UNKNOWN_KEY for warning in warnings)
+        assert warnings[-1].message.startswith("...and 4 more hint key(s) on concept 'docs.Essay'")
+
+    def test_exactly_the_cap_reports_every_key_with_no_tail(self):
+        hints = {f"key_{index:02d}": "value" for index in range(MAX_HINT_FINDINGS_PER_SITE)}
+        warnings = _lint(_crate({"docs.Essay": ConceptBlueprint(description="an essay", hints=hints)}))
+
+        assert len(warnings) == MAX_HINT_FINDINGS_PER_SITE
+        assert not any("more hint key(s)" in warning.message for warning in warnings)
+
+    def test_the_cap_is_per_site_not_per_crate(self):
+        hints = {f"key_{index:02d}": "value" for index in range(MAX_HINT_FINDINGS_PER_SITE)}
+        warnings = _lint(
+            _crate(
+                {
+                    "docs.Essay": ConceptBlueprint(description="an essay", hints=hints),
+                    "docs.Memo": ConceptBlueprint(description="a memo", hints=hints),
+                }
+            )
+        )
+        assert len(warnings) == 2 * MAX_HINT_FINDINGS_PER_SITE
+
+    def test_a_long_authored_key_is_elided_in_the_message(self):
+        long_key = "k" * (MAX_AUTHORED_TOKEN_LENGTH + 50)
+        warnings = _lint(_crate({"docs.Essay": ConceptBlueprint(description="an essay", hints={long_key: "value"})}))
+
+        assert len(warnings) == 1
+        assert long_key not in warnings[0].message
+        assert f"'{'k' * MAX_AUTHORED_TOKEN_LENGTH}...'" in warnings[0].message
+
+    def test_a_long_authored_intent_value_is_elided_in_the_message(self):
+        long_word = "w" * (MAX_AUTHORED_TOKEN_LENGTH + 50)
+        warnings = _lint(_crate({"docs.Essay": ConceptBlueprint(description="an essay", hints={"intent": long_word})}))
+
+        assert len(warnings) == 1
+        assert warnings[0].error_type == HintLintErrorType.HINT_UNKNOWN_INTENT
+        assert long_word not in warnings[0].message
+        assert f"'{'w' * MAX_AUTHORED_TOKEN_LENGTH}...'" in warnings[0].message
+
+    def test_a_token_at_the_length_limit_is_quoted_whole(self):
+        exact_key = "k" * MAX_AUTHORED_TOKEN_LENGTH
+        warnings = _lint(_crate({"docs.Essay": ConceptBlueprint(description="an essay", hints={exact_key: "value"})}))
+
+        assert f"'{exact_key}'" in warnings[0].message
+        assert "..." not in warnings[0].message

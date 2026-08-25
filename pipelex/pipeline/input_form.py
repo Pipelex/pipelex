@@ -45,7 +45,7 @@ from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import PresenceMarker, fixed_item_count
 from pipelex.interpreter_hub import get_current_library, get_library_manager
 from pipelex.language.intent_hints import HintSiteValueKind, IntentWord, applicable_intent, merge_hints
-from pipelex.libraries.crate_qualification import qualify_crate
+from pipelex.libraries.crate_qualification import QualifiedCrateContent, qualify_crate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_machinery.pipe_blueprint import InputSlotBlueprint
@@ -203,7 +203,7 @@ class PipeInputFormDescriptor(BaseModel):
     """One field descriptor per input slot, in authored input order. Empty for a pipe with no inputs."""
 
 
-def build_input_form(pipes: Sequence[PipeAbstract]) -> dict[str, PipeInputFormDescriptor]:
+def build_input_form(pipes: Sequence[PipeAbstract], *, qualified_crate: QualifiedCrateContent | None = None) -> dict[str, PipeInputFormDescriptor]:
     """Derive the `input_form` descriptors of loaded pipes from the authored blueprints of the current library.
 
     Works on any loaded `PipeAbstract`, `PipeSignature` placeholders included, iterating exactly
@@ -214,12 +214,15 @@ def build_input_form(pipes: Sequence[PipeAbstract]) -> dict[str, PipeInputFormDe
 
     Args:
         pipes: The loaded pipes to describe (typically `ValidateBundleResult.pipes`).
+        qualified_crate: The current library's already-qualified crate, when the caller holds one.
+            Qualification is a whole-crate walk, and a caller that runs several artifacts over the
+            same window (the advisory-warnings collector) would otherwise pay for it twice. Omit it
+            and the crate is read and qualified here, as before.
 
     Returns:
         `pipe_ref` → `PipeInputFormDescriptor` for every given pipe.
     """
-    crate = get_library_manager().get_crate(library_id=get_current_library()) or LibraryCrateFactory.make_from_blueprints([])
-    qualified = qualify_crate(crate)
+    qualified = qualified_crate if qualified_crate is not None else qualify_current_library_crate()
     deriver = InputFormDeriver(concepts=qualified.concepts)
     input_form: dict[str, PipeInputFormDescriptor] = {}
     for pipe in pipes:
@@ -234,6 +237,18 @@ def build_input_form(pipes: Sequence[PipeAbstract]) -> dict[str, PipeInputFormDe
         ]
         input_form[pipe.pipe_ref] = PipeInputFormDescriptor(fields=fields)
     return input_form
+
+
+def qualify_current_library_crate() -> QualifiedCrateContent:
+    """The current library's accumulated crate, qualified — empty when the library holds none.
+
+    The single place that knows how to reach the authored facts of the open validation window, so
+    the artifacts derived from them (the descriptors, the advisory lints) cannot read different
+    facts. Requires a current library, like every other artifact built inside the window; a library
+    that accumulated no blueprints yields an empty crate, from which every consumer derives nothing.
+    """
+    crate = get_library_manager().get_crate(library_id=get_current_library()) or LibraryCrateFactory.make_from_blueprints([])
+    return qualify_crate(crate)
 
 
 def _slot_hints_of(slot_value: "str | InputSlotBlueprint | None") -> dict[str, str] | None:

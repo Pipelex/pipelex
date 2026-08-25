@@ -12,9 +12,9 @@ from pipelex.interpreter_hub import (
     resolve_library_dirs,
     set_current_library,
 )
+from pipelex.pipeline.advisory_warnings import collect_advisory_warnings
+from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs
 from pipelex.pipeline.bundle_validator import BundleValidator
-from pipelex.pipeline.controller_taint import collect_controller_taint_analyses
-from pipelex.pipeline.optionality_warnings import build_optionality_warnings
 from pipelex.pipeline.validate_bundle import build_validated_pipes, validate_bundle
 
 if TYPE_CHECKING:
@@ -84,7 +84,8 @@ async def validate_bundle_file(
         "pending_signatures": result.pending_signatures,
         "is_runnable": not result.pending_signatures,
         "warnings": [
-            warning.model_dump(exclude_none=True) for warning in build_optionality_warnings(collect_controller_taint_analyses(result.pipes))
+            warning.model_dump(exclude_none=True)
+            for warning in collect_advisory_warnings(pipes=result.pipes, entry_pipe_refs=collect_entry_pipe_refs(result.blueprints))
         ],
     }
 
@@ -117,7 +118,7 @@ async def validate_bundle_content(
         "is_runnable": not validate_bundle_result.pending_signatures,
         "warnings": [
             warning.model_dump(exclude_none=True)
-            for warning in build_optionality_warnings(collect_controller_taint_analyses(validate_bundle_result.pipes))
+            for warning in collect_advisory_warnings(pipes=validate_bundle_result.pipes, entry_pipe_refs=collect_entry_pipe_refs(blueprints))
         ],
     }
 
@@ -211,6 +212,7 @@ async def validate_pipe_in_bundle(
         "pending_signatures": result.pending_signatures,
         "is_runnable": not result.pending_signatures,
         "warnings": [
-            warning.model_dump(exclude_none=True) for warning in build_optionality_warnings(collect_controller_taint_analyses(result.pipes))
+            warning.model_dump(exclude_none=True)
+            for warning in collect_advisory_warnings(pipes=result.pipes, entry_pipe_refs=collect_entry_pipe_refs(result.blueprints))
         ],
     }

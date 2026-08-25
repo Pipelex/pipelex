@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **The vacuous-presence lint (`input_presence_vacuous`)**: A method input declared without `?` says the caller must supply it, but when the concept behind it declares no required field the empty object already satisfies the declaration — nothing is actually demanded, and a form, an API client or a person filling it in has no way to tell what to put there. Validation now names that on the report's advisory `warnings` array, so the bundle stays valid and the verdict never moves. The message states both remedies: mark the input optional if the method can run without it, or give the concept a required field. It is scoped to **entry pipes** — the bundle's declared `main_pipe`, where a method meets its caller — because on an inner pipe the slot is fed by dataflow and an all-optional structure is a legitimate producer shape. The lint reads the input-form descriptor, so class-backed concepts whose pydantic fields all carry defaults are judged exactly as authored all-optional structures are. See [Understanding optionality](building-methods/pipes/understanding-optionality.md) and [Inline structures](building-methods/concepts/inline-structures.md).
+
+### Changed
+
+- **Every whole-bundle validate channel now carries the same advisory warnings**: The `warnings` array used to be assembled site by site, and the sites disagreed — the protocol validation report carried the optionality and intent-hint lints, while the agent CLI, the builder operations and the bare CLI each carried the optionality lint alone, so which advisories an author saw depended on which command they typed. One composition point now builds all three families in one fixed order and every channel calls it, which brings the intent-hint lints to the CLI and builder surfaces for the first time. Riding along is the bound those lints needed before reaching a channel invoked casually: a site naming many undefined hint keys reports the first few and then how many more there were, and a long authored key or value is elided in the message rather than interpolated whole.
+
 ## [v0.52.0] - 2026-08-24
 
 ### Highlights

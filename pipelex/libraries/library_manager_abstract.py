@@ -98,6 +98,26 @@ class LibraryManagerAbstract(ABC):
         """
 
     @abstractmethod
+    def get_accumulated_blueprints(self, library_id: str) -> list[PipelexBundleBlueprint]:
+        """The bundle blueprints accumulated into a library, in load order.
+
+        The blueprint-derived load path (``load_libraries`` → ``load_from_blueprints``) retains what
+        it loaded so ``get_crate`` can rebuild the crate from it; this accessor hands the same list
+        to callers that need the *authored* batch facts a crate no longer carries — the declared
+        ``main_pipe`` of each bundle above all, which is what scopes the entry-pipe advisory lints
+        on the library-wide ``validate all`` path.
+
+        Empty for an unknown library, and empty on the transported-crate path (a direct
+        ``load_from_crate``, used by the Temporal workflow), which never accumulates blueprints.
+
+        Args:
+            library_id: The library to read the accumulated blueprints of
+
+        Returns:
+            The accumulated blueprints, or an empty list
+        """
+
+    @abstractmethod
     def load_from_crate(self, *, library_id: str, crate: LibraryCrate) -> list[PipeAbstract]:
         """Load a LibraryCrate into a live Library.
 

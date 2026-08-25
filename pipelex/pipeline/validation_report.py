@@ -104,7 +104,7 @@ def build_validation_report(
         pending_signatures: Library-wide unsatisfied signature refs.
         graph_spec: Best-effort graph of the declared main pipe, when one was produced.
         liftable_pipes: Entries from `build_liftable_pipes`, when the caller computed them.
-        warnings: Advisory items from `build_optionality_warnings`, when the caller computed them.
+        warnings: Advisory items from `build_advisory_warnings`, when the caller computed them.
 
     Returns:
         The canonical report.

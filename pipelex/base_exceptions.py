@@ -299,7 +299,7 @@ class ValidationErrorItem(BaseModel):
     (``ValidateBundleError.to_error_report``) call — so the CLI's structured
     output and the API's 422 ``validation_errors`` can never drift. The same
     item type also carries the report's advisory ``warnings``, built by
-    ``pipelex.pipeline.optionality_warnings``: a warning is the same shape of
+    ``pipelex.pipeline.advisory_warnings``: a warning is the same shape of
     diagnostic, differing only in that it does not make the verdict invalid.
 
     ``source`` is the declaring file path (CLI) or the per-content source the API

@@ -104,7 +104,11 @@ You never discover an unhandled absence at run time. Validation walks every cont
 Two more optionality facts surface on the **valid** report (`pipelex validate`, the agent CLI, and the API):
 
 - **`liftable_pipes`** — every pipe that may be silently skipped at run time, with the slots whose absence triggers the skip and where that absence can come from. Implicit lifting is acceptable *because* it is visible at build time.
-- **`warnings`** — advisory lints that never flip the verdict. The first is `optional_force_redundant`: a `!` whose slot is guaranteed present in every analyzed flow — the assertion can never fire, so the marker is dead weight.
+- **`warnings`** — advisory lints that never flip the verdict. Every whole-bundle validate channel carries the same set:
+
+    - `optional_force_redundant` — a `!` whose slot is guaranteed present in every analyzed flow, so the assertion can never fire and the marker is dead weight.
+    - `input_presence_vacuous` — a **method input** (an input of the bundle's declared `main_pipe`) that must be supplied, but whose concept declares no required field. The empty object satisfies it, so the declaration enforces nothing and a caller cannot tell what to fill in. Either mark the input `?`, or give the concept a required field. See [Inline Structures](../concepts/inline-structures.md#all-optional-structures-and-the-input_presence_vacuous-lint).
+    - `hint_unknown_key`, `hint_unknown_intent`, `hint_inapplicable_intent` — the intent-hints lints: a hint key this version of the standard does not define, an `intent` word outside the vocabulary, and a known word on a site it does not apply to. Hints are non-normative, so the entry is preserved and only named.
 
 ## Best Practices
 
