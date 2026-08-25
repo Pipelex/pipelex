@@ -20,6 +20,7 @@
 - **Empty structure table parsing**: An authored but empty `[concept.X.structure]` table is now correctly parsed as an `object` with an empty `fields` list, instead of falling through a truthiness check and being described as `prose` refining `native.Text`.
 - **Field-less structure class reflection**: A registered Python class declaring no fields is now reflected as an empty object rather than `unknown`. Genuinely unmappable annotations still correctly report as `unknown`.
 - **Domain splitting in locators**: Hierarchical domains such as `legal.contracts` are now split at the last dot rather than the first when building advisory-warning locators.
+- **Release workflow no longer loses the tag when signing fails**: The GitHub Release is created, and the dists attached, before the Sigstore step, which is now allowed to fail without failing the job. The tag exists only as a side effect of creating the release, so a refreshed Sigstore trust root previously cost the tag and the release page while PyPI published normally — as happened to v0.52.0. The action is also bumped to a version carrying a current trust root, and release creation is idempotent so the manual retry path works.
 
 ## [v0.52.0] - 2026-08-24
 

@@ -158,13 +158,14 @@ jobs:
         with:
           name: python-package-distributions
           path: dist/
-      - name: Sign the dists with Sigstore
-        uses: sigstore/gh-action-sigstore-python@f514d46b907ebcd5bedc05145c03b69c1edd8b46 # v3.0.0
-        with:
-          inputs: >-
-            ./dist/*.tar.gz
-            ./dist/*.whl
-      - name: Create GitHub Release
+      # Ordering is deliberate: the release is created BEFORE the dists are signed,
+      # and signing is allowed to fail. The tag exists only as a side effect of
+      # `gh release create`, so while signing sat ahead of this step a Sigstore
+      # outage cost us the GitHub Release *and* the tag — v0.52.0 published to PyPI
+      # and then vanished from this repo when the pinned action died on a refreshed
+      # trust root ("root was signed by 0/3 keys"). Attestation is a nice-to-have;
+      # the tag is the record of what shipped.
+      - name: Create or update the GitHub Release
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -177,21 +178,51 @@ jobs:
           fi
 
           if [ -n "$CHANGELOG_NOTES" ]; then
-            gh release create "v$VERSION" \
+            NOTES="$CHANGELOG_NOTES"
+          else
+            NOTES="Release v$VERSION"
+          fi
+
+          # `create` fails outright when the release already exists, which made the
+          # workflow_dispatch retry path above unusable precisely when it was needed.
+          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release v$VERSION already exists — updating it."
+            gh release edit "v$VERSION" \
               --repo "$GITHUB_REPOSITORY" \
               --title "v$VERSION$TITLE_SUFFIX" \
-              --generate-notes \
-              --notes "$CHANGELOG_NOTES" \
+              --notes "$NOTES" \
               $PRERELEASE_FLAG
           else
             gh release create "v$VERSION" \
               --repo "$GITHUB_REPOSITORY" \
               --title "v$VERSION$TITLE_SUFFIX" \
               --generate-notes \
-              --notes "Release v$VERSION" \
+              --notes "$NOTES" \
               $PRERELEASE_FLAG
           fi
+      # Attach the artifacts straight away, so a signing failure cannot leave the
+      # release standing empty next to a populated PyPI page.
+      - name: Upload the dists to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          gh release upload
+          "v$VERSION" dist/*.whl dist/*.tar.gz
+          --repo "$GITHUB_REPOSITORY"
+          --clobber
+      - name: Sign the dists with Sigstore
+        id: sign
+        # A Sigstore trust-root refresh is outside our control and must not fail a
+        # release that has already published. The signatures are uploaded below only
+        # when this succeeds, and a skipped signing is reported as a warning.
+        continue-on-error: true
+        uses: sigstore/gh-action-sigstore-python@790bc6befb9d733738f18d8f895854b453640ec9 # v3.5.0
+        with:
+          inputs: >-
+            ./dist/*.tar.gz
+            ./dist/*.whl
       - name: Upload artifact signatures to GitHub Release
+        if: steps.sign.outcome == 'success'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         # Upload to GitHub Release using the `gh` CLI.
@@ -201,3 +232,10 @@ jobs:
           gh release upload
           "v$VERSION" dist/**
           --repo "$GITHUB_REPOSITORY"
+          --clobber
+      - name: Report an unsigned release
+        if: steps.sign.outcome != 'success'
+        run: >-
+          echo "::warning::Sigstore signing failed. v$VERSION is released and its
+          dists are attached, but it carries no signature bundles. Re-run this
+          workflow once Sigstore is healthy to attach them."
