@@ -7,10 +7,25 @@ from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs, In
 
 
 class GatewayConfig(BaseModel):
+    """One managed gateway backend's slice of the fetched artifact.
+
+    There is one of these per declared managed backend, built from that backend's named section of
+    the single fetched artifact. They are held in a `dict[backend_name, GatewayConfig]` rather than
+    merged, because the two services are two services: a handle that one serves and the other does
+    not is a legitimate configuration, not a conflict to resolve.
+    """
+
     model_config = ConfigDict(extra="forbid")
 
-    model_specs: BackendModelSpecs = Field(description="Model specifications for Pipelex Gateway (model_name -> spec dict)")
-    aws_region: str = Field(description="AWS region")
+    model_specs: BackendModelSpecs = Field(description="Model specifications for this managed gateway (model_name -> spec dict)")
+    aws_region: str | None = Field(
+        default=None,
+        description=(
+            "AWS region, threaded into the backend's extra_config. Optional because it is a top-level key of the artifact rather than "
+            "a property of a section, and only a direct-SDK Bedrock backend ever reads it back — nothing on the manifold path does, "
+            "because Bedrock credentials live gateway-side. A managed config built without one simply contributes no region."
+        ),
+    )
 
 
 def drop_unknown_gateway_defaults(*, gateway_model_specs: BackendModelSpecs) -> BackendModelSpecs:

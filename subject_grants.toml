@@ -2020,10 +2020,6 @@ rationale = "Keyed accessor by the key; single operand."
 param = "model_name"
 rationale = "Keyed accessor by the model_name; single operand."
 
-["pipelex/cogt/model_backends/backend.py::PipelexBackend.is_gateway_backend"]
-param = "backend_name"
-rationale = "Predicate on the backend_name; single operand."
-
 ["pipelex/cogt/model_backends/backend_credentials.py::BackendCredentialsErrorMsgFactory.make_comprehensive_error_msg"]
 param = "backend_credential_reports"
 rationale = "Factory from source: builds the result from the backend_credential_reports; single operand."
@@ -2233,8 +2229,8 @@ param = "deck"
 rationale = "Keyed accessor by the deck; single operand."
 
 ["pipelex/cogt/models/model_manager.py::ModelManager._enforce_gateway_model_membership"]
-param = "gateway_config"
-rationale = "Operates on the gateway_config; single operand (qualifiers keyword-only)."
+param = "managed_gateway_configs"
+rationale = "Operates on the managed gateway configs; single operand (qualifiers keyword-only)."
 
 ["pipelex/cogt/models/model_manager.py::ModelManager._extract_choice_handle"]
 param = "choice"
@@ -5556,6 +5552,10 @@ rationale = "Verb-object: merges the gateway model specs; merge context stays ke
 param = "gateway_api_key"
 rationale = "Derivation: hashes the gateway API key into a distinct id; single operand."
 
+["pipelex/system/pipelex_service/pipelex_service_config.py::enabled_managed_gateway_sections"]
+param = "backends_file_path"
+rationale = "Derivation inspecting the backends file at the path; single operand, mirroring is_pipelex_gateway_enabled."
+
 ["pipelex/system/pipelex_service/pipelex_service_config.py::is_pipelex_gateway_enabled"]
 param = "backends_file_path"
 rationale = "Predicate inspecting the backends file at the path; single operand."
@@ -5563,6 +5563,10 @@ rationale = "Predicate inspecting the backends file at the path; single operand.
 ["pipelex/system/pipelex_service/pipelex_service_config.py::load_pipelex_service_config_if_exists"]
 param = "config_dir"
 rationale = "Verb-object: loads from the config dir; single operand."
+
+["pipelex/system/pipelex_service/remote_config.py::RemoteConfig.get_model_specs_section"]
+param = "section_name"
+rationale = "Keyed accessor by the section_name; single operand."
 
 ["pipelex/system/pipelex_service/remote_config_cache.py::RemoteConfigCache.store"]
 param = "remote_config_payload"

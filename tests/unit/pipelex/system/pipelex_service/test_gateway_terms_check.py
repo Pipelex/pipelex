@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from pipelex.cogt.model_backends.backend import LEGACY_GATEWAY_MODEL_SPECS_SECTION, PipelexBackend
 from pipelex.pipelex import Pipelex
 from pipelex.system.pipelex_service.exceptions import GatewayTermsNotAcceptedError, InferenceSetupRequiredError
 from pipelex.system.pipelex_service.pipelex_service_agreement import PipelexServiceAgreement, PipelexServiceOnboarding
@@ -33,7 +34,10 @@ class TestGatewayTermsCheck:
     @pytest.fixture
     def _gateway_enabled_no_config(self, mocker: MockerFixture) -> None:
         """Configure mocks: gateway is enabled but no service config exists (first run)."""
-        mocker.patch(f"{RUNTIME_BOOT_MODULE}.is_pipelex_gateway_enabled", return_value=True)
+        mocker.patch(
+            f"{RUNTIME_BOOT_MODULE}.enabled_managed_gateway_sections",
+            return_value={PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION},
+        )
         mocker.patch(f"{RUNTIME_BOOT_MODULE}.load_pipelex_service_config_if_exists", return_value=None)
 
     @pytest.fixture
@@ -43,7 +47,10 @@ class TestGatewayTermsCheck:
             agreement=PipelexServiceAgreement(terms_accepted=False),
             onboarding=PipelexServiceOnboarding(inference_setup_completed=True),
         )
-        mocker.patch(f"{RUNTIME_BOOT_MODULE}.is_pipelex_gateway_enabled", return_value=True)
+        mocker.patch(
+            f"{RUNTIME_BOOT_MODULE}.enabled_managed_gateway_sections",
+            return_value={PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION},
+        )
         mocker.patch(f"{RUNTIME_BOOT_MODULE}.load_pipelex_service_config_if_exists", return_value=config)
 
     @pytest.mark.usefixtures("_gateway_enabled_no_config")

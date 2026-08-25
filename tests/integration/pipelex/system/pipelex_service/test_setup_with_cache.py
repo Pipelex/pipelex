@@ -24,6 +24,7 @@ import httpx
 import pytest
 
 from pipelex import log
+from pipelex.cogt.model_backends.backend import LEGACY_GATEWAY_MODEL_SPECS_SECTION, PipelexBackend
 from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import ConfigLoader
 from pipelex.system.pipelex_service.exceptions import (
@@ -104,7 +105,10 @@ class TestSetupWithCache:
         session_result = RemoteConfigFetcher.fetch_remote_config()  # patched to session cache
         RemoteConfigCache.store(session_result.config.model_dump(mode="json"))
 
-        mocker.patch(f"{RUNTIME_BOOT_MODULE}.is_pipelex_gateway_enabled", return_value=True)
+        mocker.patch(
+            f"{RUNTIME_BOOT_MODULE}.enabled_managed_gateway_sections",
+            return_value={PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION},
+        )
         mocker.patch(
             f"{RUNTIME_BOOT_MODULE}.load_pipelex_service_config_if_exists",
             return_value=_accepted_service_config(),
@@ -145,7 +149,10 @@ class TestSetupWithCache:
         """
         Pipelex.teardown_if_needed()
 
-        mocker.patch(f"{RUNTIME_BOOT_MODULE}.is_pipelex_gateway_enabled", return_value=True)
+        mocker.patch(
+            f"{RUNTIME_BOOT_MODULE}.enabled_managed_gateway_sections",
+            return_value={PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION},
+        )
         mocker.patch(
             f"{RUNTIME_BOOT_MODULE}.load_pipelex_service_config_if_exists",
             return_value=_accepted_service_config(),
@@ -187,7 +194,10 @@ class TestSetupWithCache:
             cached_at=datetime.now(tz=UTC),
         )
 
-        mocker.patch(f"{RUNTIME_BOOT_MODULE}.is_pipelex_gateway_enabled", return_value=True)
+        mocker.patch(
+            f"{RUNTIME_BOOT_MODULE}.enabled_managed_gateway_sections",
+            return_value={PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION},
+        )
         mocker.patch(
             f"{RUNTIME_BOOT_MODULE}.load_pipelex_service_config_if_exists",
             return_value=_accepted_service_config(),
@@ -218,7 +228,7 @@ class TestSetupWithCache:
         """
         Pipelex.teardown_if_needed()
 
-        mocker.patch(f"{RUNTIME_BOOT_MODULE}.is_pipelex_gateway_enabled", return_value=False)
+        mocker.patch(f"{RUNTIME_BOOT_MODULE}.enabled_managed_gateway_sections", return_value={})
         mocker.patch(
             "pipelex.system.runtime.RuntimeManager.is_in_codex_cloud",
             new_callable=mocker.PropertyMock,

@@ -36,7 +36,6 @@ from pipelex.cogt.exceptions import (
 )
 from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsErrorMsgFactory
 from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport, InferenceBackendLibrary
-from pipelex.cogt.model_backends.gateway_config import GatewayConfig
 from pipelex.cogt.models.deck_manifest import DeckFileStatus, DeckSyncReport, compute_deck_sync_report, status_rich_label
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.config import get_config
@@ -53,8 +52,9 @@ from pipelex.system.pipelex_service.exceptions import (
     RemoteConfigUnavailableError,
     RemoteConfigValidationError,
 )
+from pipelex.system.pipelex_service.managed_gateway_configs import build_managed_gateway_configs
 from pipelex.system.pipelex_service.pipelex_service_config import (
-    is_pipelex_gateway_enabled,
+    enabled_managed_gateway_sections,
     load_pipelex_service_config_if_exists,
 )
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
@@ -70,6 +70,7 @@ from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from pipelex.cogt.model_backends.gateway_config import GatewayConfig
     from pipelex.system.pipelex_service.types import RemoteConfigSource
 
 
@@ -1079,7 +1080,7 @@ def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str
             msg = f"Backend configuration error: {first_error}"
             return False, msg, backend_file_reports
 
-    # Fetch gateway model specs if Gateway is enabled.
+    # Fetch the managed gateways' model specs if any managed gateway backend is enabled.
     # Probe the same backends.toml / pipelex_service.toml the doctor is reporting on
     # (project-vs-global) instead of always defaulting to the global path — otherwise
     # --global on a machine with a project-local backends.toml would mis-report gateway
@@ -1087,9 +1088,10 @@ def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str
     # to the project file.
     backends_file_path = config_dir / "inference" / "backends.toml" if config_dir is not None else None
     service_config_dir = config_dir if config_dir is not None else config_manager.global_config_dir
-    gateway_config: GatewayConfig | None = None
+    managed_gateway_configs: dict[str, GatewayConfig] | None = None
     gateway_config_source: RemoteConfigSource | None = None
-    if is_pipelex_gateway_enabled(backends_file_path=backends_file_path):
+    managed_gateway_sections = enabled_managed_gateway_sections(backends_file_path=backends_file_path)
+    if managed_gateway_sections:
         pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=service_config_dir)
         if pipelex_service_config is None:
             return False, "Pipelex Gateway is enabled but service configuration is missing", backend_file_reports
@@ -1097,11 +1099,10 @@ def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str
             return False, "Pipelex Gateway is enabled but terms have not been accepted", backend_file_reports
         try:
             result = RemoteConfigFetcher.fetch_remote_config()
-            remote_config = result.config
             gateway_config_source = result.source
-            gateway_config = GatewayConfig(
-                model_specs=remote_config.backend_model_specs,
-                aws_region=remote_config.aws_region,
+            managed_gateway_configs = build_managed_gateway_configs(
+                remote_config=result.config,
+                managed_gateway_sections=managed_gateway_sections,
             )
         except (RemoteConfigUnavailableError, RemoteConfigValidationError) as exc:
             return False, f"Failed to fetch Pipelex Gateway remote configuration: {exc}", backend_file_reports
@@ -1118,7 +1119,7 @@ def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str
     try:
         models_manager.setup(
             secrets_provider=secrets_provider,
-            gateway_config=gateway_config,
+            managed_gateway_configs=managed_gateway_configs,
             gateway_config_source=gateway_config_source,
             backends_library_path=backends_library_override,
             backends_dir_path=backends_dir_override,

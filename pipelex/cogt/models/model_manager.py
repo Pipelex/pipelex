@@ -66,7 +66,7 @@ class ModelManager(ModelManagerAbstract):
         self,
         *,
         secrets_provider: SecretsProviderAbstract,
-        gateway_config: GatewayConfig | None,
+        managed_gateway_configs: dict[str, GatewayConfig] | None,
         gateway_config_source: RemoteConfigSource | None,
         needs_inference: bool = True,
         backends_library_path: str | None = None,
@@ -80,7 +80,7 @@ class ModelManager(ModelManagerAbstract):
             secrets_provider=secrets_provider,
             backends_library_path=backends_library_path or str(config_manager.backends_file_path),
             backends_dir_path=backends_dir_path or str(config_manager.backends_dir_path),
-            gateway_config=gateway_config,
+            managed_gateway_configs=managed_gateway_configs,
             lenient=not needs_inference,
         )
         # The loader parks its stale-configuration warning rather than logging it, so that the
@@ -100,17 +100,19 @@ class ModelManager(ModelManagerAbstract):
         self.model_deck = self.build_deck(enabled_backends=enabled_backends, model_deck_blueprint=deck_blueprint)
 
         self._enforce_gateway_model_membership(
-            gateway_config=gateway_config,
+            managed_gateway_configs=managed_gateway_configs,
             gateway_config_source=gateway_config_source,
+            enabled_backends=enabled_backends,
         )
 
     def _enforce_gateway_model_membership(
         self,
-        gateway_config: GatewayConfig | None,
+        managed_gateway_configs: dict[str, GatewayConfig] | None,
         *,
         gateway_config_source: RemoteConfigSource | None,
+        enabled_backends: list[str],
     ) -> None:
-        """Fail loudly when the deck references a handle the gateway should provide but cannot.
+        """Fail loudly when a handle routed to a managed gateway is absent from that gateway's specs.
 
         Runs even when ``missing_presets_reaction = "log"`` (the default), because a missing
         gateway model is a distinct failure mode from a generic preset mismatch: it means the
@@ -118,8 +120,22 @@ class ModelManager(ModelManagerAbstract):
         declared. Surfacing this as ``GatewayUnknownModelError`` lets the agent CLI hint at
         cache-refresh remediation when the config was sourced from the on-disk fallback.
 
-        We only fire the check when both ``gateway_config`` and ``gateway_config_source`` are
-        set — that is, when the gateway is actually live in this setup pass.
+        We only fire the check when both the configs and ``gateway_config_source`` are set — that
+        is, when a managed gateway is actually live in this setup pass.
+
+        **One check per live managed service, run separately — not a union across them.** With two
+        services the old shape breaks in two directions at once. It was a union membership test
+        ("is this handle in the deck *or* in the one gateway's specs?"), which with two sections
+        would pass a handle that neither service can actually serve as long as the *other* one can.
+        And ``_collect_deck_referenced_handles`` walks the whole deck, so running the old check
+        separately against both would demand every deck handle appear in *both* sections — which
+        the mixed profile cannot satisfy and the parked families contradict.
+
+        **The resolution is the routing profile.** Each per-service check validates only the deck
+        handles the active profile actually routes to that service. A handle legitimately absent
+        from one section is then not an error, the mixed profile stays expressible, and the case
+        that matters — the profile routes a handle to a service whose section does not carry it —
+        still fails loudly at boot.
 
         Waterfall semantics: a waterfall reference is "known" if AT LEAST ONE of its
         fallbacks resolves to a known handle. At runtime the deck walks the list and uses
@@ -127,24 +143,45 @@ class ModelManager(ModelManagerAbstract):
         so a deck like ``["future-model", "current-model"]`` is perfectly valid as long as
         ``current-model`` is in the gateway specs.
         """
-        if gateway_config is None or gateway_config_source is None:
+        if not managed_gateway_configs or gateway_config_source is None:
             return
         deck = self.get_model_deck()
-        gateway_spec_names = {name for name in gateway_config.model_specs if name != "defaults"}
+        referenced_handles = self._collect_deck_referenced_handles(deck)
 
-        for handle, model_type in self._collect_deck_referenced_handles(deck):
-            try:
-                ref = ModelReference.parse(handle)
-            except ModelReferenceParseError:
-                continue
-            candidates = self._resolve_terminal_candidates(deck=deck, ref=ref, model_type=model_type)
-            if not candidates:
-                continue
-            if any(candidate in deck.inference_models or candidate in gateway_spec_names for candidate in candidates):
-                continue
-            # No candidate resolves to a known handle. Report the first one — it's the
-            # primary the user is asking for; subsequent entries are fallbacks.
-            raise GatewayUnknownModelError(model_name=candidates[0], source=gateway_config_source)
+        for backend_name, gateway_config in managed_gateway_configs.items():
+            gateway_spec_names = {name for name in gateway_config.model_specs if name != "defaults"}
+            for handle, model_type in referenced_handles:
+                try:
+                    ref = ModelReference.parse(handle)
+                except ModelReferenceParseError:
+                    continue
+                candidates = self._resolve_terminal_candidates(deck=deck, ref=ref, model_type=model_type)
+                # Only the candidates this service is responsible for. A candidate the profile sends
+                # to a BYOK backend, to the internal one, or to the *other* managed service is not
+                # this check's business; the generic missing-handle path covers those.
+                routed_here = [
+                    candidate
+                    for candidate in candidates
+                    if self._routes_to_backend(candidate=candidate, backend_name=backend_name, enabled_backends=enabled_backends)
+                ]
+                if not routed_here:
+                    continue
+                # ``deck.inference_models`` is still consulted, and not redundantly: a DEFAULT match
+                # may have resolved the handle from a fallback backend, which makes it genuinely
+                # usable even though this service's section does not name it.
+                if any(candidate in deck.inference_models or candidate in gateway_spec_names for candidate in routed_here):
+                    continue
+                # No candidate resolves to a known handle. Report the first one — it's the
+                # primary the user is asking for; subsequent entries are fallbacks.
+                raise GatewayUnknownModelError(model_name=routed_here[0], backend_name=backend_name, source=gateway_config_source)
+
+    def _routes_to_backend(self, *, candidate: str, backend_name: str, enabled_backends: list[str]) -> bool:
+        """Whether the active routing profile sends this handle to this backend."""
+        backend_match = self.routing_profile.get_backend_match_for_model(
+            enabled_backends=enabled_backends,
+            model_name=candidate,
+        )
+        return backend_match is not None and backend_match.backend_name == backend_name
 
     @classmethod
     def _collect_deck_referenced_handles(cls, deck: ModelDeck) -> list[tuple[str, ModelType]]:

@@ -66,7 +66,6 @@ from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.model_backends.backend_credentials import (
     BackendCredentialsErrorMsgFactory,
 )
-from pipelex.cogt.model_backends.gateway_config import GatewayConfig
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
@@ -100,8 +99,9 @@ from pipelex.system.pipelex_service.exceptions import (
     InferenceSetupRequiredError,
     RemoteConfigStaleWarning,
 )
+from pipelex.system.pipelex_service.managed_gateway_configs import build_managed_gateway_configs
 from pipelex.system.pipelex_service.pipelex_service_config import (
-    is_pipelex_gateway_enabled,
+    enabled_managed_gateway_sections,
     load_pipelex_service_config_if_exists,
 )
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
@@ -128,6 +128,7 @@ from pipelex.urls import URLs
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from pipelex.cogt.model_backends.gateway_config import GatewayConfig
     from pipelex.plugins.contract import PipelexPlugin
     from pipelex.plugins.plugin_group import PluginGroup
     from pipelex.system.pipelex_service.remote_config import RemoteConfig
@@ -376,23 +377,25 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         # --- Pipelex Service and Telemetry --------------------------------------------------
 
-        # Check if Pipelex Gateway is enabled
-        # for now the only servic is the Pipelex Gateway
-        is_pipelex_service_enabled = is_pipelex_gateway_enabled()
+        # Which Pipelex-managed gateway backends are enabled, and which section of the published
+        # artifact each takes its model specs from. More than one can be live at once — the Portkey
+        # cloud service and the manifold one are two services, sharing this one artifact, this one
+        # fetch and its one cache, and nothing else.
+        managed_gateway_sections = enabled_managed_gateway_sections()
+        is_pipelex_service_enabled = bool(managed_gateway_sections)
 
         effective_needs_model_specs = needs_model_specs if needs_model_specs is not None else needs_inference
 
         remote_config: RemoteConfig | None = None
-        gateway_config: GatewayConfig | None = None
+        managed_gateway_configs: dict[str, GatewayConfig] | None = None
         gateway_config_source: RemoteConfigSource | None = None
         if is_pipelex_service_enabled:
             if not effective_needs_model_specs:
                 # Use dummy config when inference is not needed (for testing without network access)
                 remote_config = RemoteConfigFetcher.make_dummy_remote_config()
-                gateway_model_specs = remote_config.backend_model_specs
-                gateway_config = GatewayConfig(
-                    model_specs=gateway_model_specs,
-                    aws_region=remote_config.aws_region,
+                managed_gateway_configs = build_managed_gateway_configs(
+                    remote_config=remote_config,
+                    managed_gateway_sections=managed_gateway_sections,
                 )
                 # Keep ``gateway_config_source`` as ``None``: the dummy specs are an empty
                 # placeholder, not real Gateway data. ``ModelManager._enforce_gateway_model_membership``
@@ -404,6 +407,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 # Terms acceptance is only required for actual inference usage, not for
                 # read-only operations like fetching model specs for validation.
                 # Also skip for CI mode — automated pipelines don't require human consent.
+                #
+                # **One gate, for any managed gateway backend.** The terms are the Pipelex service's
+                # terms, not one dialect's: a boot that reaches the service at all passes through
+                # here, whichever managed backend asked for it.
                 if needs_inference and integration_mode.requires_terms_acceptance:
                     pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
                     # First-run check: fires if inference has never been configured
@@ -423,10 +430,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 remote_config = remote_config_result.config
                 gateway_config_source = remote_config_result.source
                 log.verbose(f"Successfully fetched Pipelex Gateway remote configuration (source={gateway_config_source})")
-                gateway_model_specs = remote_config.backend_model_specs
-                gateway_config = GatewayConfig(
-                    model_specs=gateway_model_specs,
-                    aws_region=remote_config.aws_region,
+                managed_gateway_configs = build_managed_gateway_configs(
+                    remote_config=remote_config,
+                    managed_gateway_sections=managed_gateway_sections,
                 )
                 # Stale operation: warn loudly so machine consumers can re-surface the provenance.
                 # Emission lives at this orchestration layer (not in the fetcher) so the fetcher
@@ -559,7 +565,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             # this; do not read ``config_dir`` as "only this directory is read" for inference.
             self.models_manager.setup(
                 secrets_provider=secrets_provider,
-                gateway_config=gateway_config,
+                managed_gateway_configs=managed_gateway_configs,
                 gateway_config_source=gateway_config_source,
                 needs_inference=needs_inference,
             )

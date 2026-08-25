@@ -13,6 +13,10 @@ class InferenceBackendBlueprint(ConfigModel):
     enabled: bool = True
     endpoint: str | None = None
     api_key: str | None = None
+    # Naming a remote-config section is what declares this backend a *managed gateway* backend: its
+    # model specs arrive from the Pipelex service's published artifact rather than from a local
+    # per-backend TOML. See `resolve_model_specs_section`, which is the only reader.
+    model_specs_section: str | None = None
     listed_constraints: list[ListedConstraint] = Field(default_factory=empty_list_factory_of(ListedConstraint))
     valued_constraints: dict[ValuedConstraint, Any] = Field(default_factory=empty_dict_factory_of(ValuedConstraint))
     extra_config: dict[str, Any] = Field(default_factory=dict)

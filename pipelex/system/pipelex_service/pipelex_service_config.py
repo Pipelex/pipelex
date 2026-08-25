@@ -4,7 +4,7 @@ from typing import Any, cast
 from pydantic import Field, ValidationError
 
 from pipelex import log
-from pipelex.cogt.model_backends.backend import PipelexBackend
+from pipelex.cogt.model_backends.backend import PipelexBackend, resolve_model_specs_section
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.configuration.config_surface import (
@@ -75,8 +75,54 @@ def _service_config_the_ledger_can_explain(*, config_path: Path) -> PipelexServi
     return service_config
 
 
+def enabled_managed_gateway_sections(backends_file_path: Path | None = None) -> dict[str, str]:
+    """The enabled managed gateway backends, each mapped to the remote-config section its specs come from.
+
+    A *managed gateway backend* is one whose model specs arrive from the Pipelex service's published
+    artifact rather than from a local per-backend TOML, and naming a section is what declares it one
+    — see `resolve_model_specs_section`, which also explains why `pipelex_gateway` resolves to a
+    section it never declared. There can now be more than one, which is why the boot asks this
+    question rather than the single-name one below.
+
+    Read here, off the raw TOML, for the same reason `is_pipelex_gateway_enabled` is: the boot needs
+    the answer *before* it can load the backend library, because what it fetches is the input to
+    that load. It applies the same truthiness reading of `enabled`, for the same reason.
+
+    Args:
+        backends_file_path: Explicit path to the ``backends.toml`` file to inspect. When ``None``
+            (default), uses the layered/project-preferred path, exactly as below.
+
+    Returns:
+        ``{backend_name: section_name}``, empty when no managed gateway backend is enabled.
+    """
+    resolved_path = backends_file_path if backends_file_path is not None else config_manager.backends_file_path
+    backends_toml = load_toml_from_path_if_exists(resolved_path)
+    if backends_toml is None:
+        return {}
+
+    sections: dict[str, str] = {}
+    for backend_name, backend_table in backends_toml.items():
+        if not isinstance(backend_table, dict):
+            continue
+        backend_dict = cast("dict[str, Any]", backend_table)
+        if not bool(backend_dict.get("enabled", True)):
+            continue
+        declared_section = backend_dict.get("model_specs_section")
+        section = resolve_model_specs_section(
+            backend_name=backend_name,
+            declared_section=declared_section if isinstance(declared_section, str) else None,
+        )
+        if section is not None:
+            sections[backend_name] = section
+    return sections
+
+
 def is_pipelex_gateway_enabled(backends_file_path: Path | None = None) -> bool:
     """Check if pipelex_gateway is enabled in the backends configuration.
+
+    Narrower than `enabled_managed_gateway_sections` on purpose, and still the right question for
+    the callers that ask it: `pipelex init`, its cache priming and the doctor's gateway probe are
+    about the Portkey-cloud service specifically, not about managed backends in general.
 
     This reads the backends.toml file directly without loading the full backend library.
 
