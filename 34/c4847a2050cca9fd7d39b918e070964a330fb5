@@ -1,0 +1,19 @@
+pipelex/pipeline/advisory_warnings.py
+  s_0474bee7e1d6c4::t_3ab66d8aed4576 101-109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "34c4847a2050cca9fd7d39b918e070964a330fb5",
+  "prompts": {},
+  "sessions": {
+    "s_0474bee7e1d6c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6668cead-7c73-4d5c-aac5-314532a24edd",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Louis Choquel <louis@pipelex.com>"
+    }
+  }
+}
