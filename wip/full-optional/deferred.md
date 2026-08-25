@@ -21,3 +21,11 @@ Both are stated in the design (`design.md` §7) rather than here, because they a
 The lint keys on `gating`, which the design argues for on the grounds that the renderer keys on the same fact. That argument stands, but it buys nothing observable today: `InputFormDeriver.derive_slot` computes `gating = required and not (node.kind.is_list and node.item_count is None)`, so on an `object` node — the only kind the lint looks at — `gating` is exactly `required`. The distinction is only visible on a hand-built descriptor, which is where `test_a_non_gating_object_slot_is_silent_even_when_required` pins it.
 
 Nothing to do about it. It is recorded because a future reader may otherwise "simplify" the lint to read `required` and find every test still green — the unit case is the only thing standing in the way, and it is worth knowing that is on purpose.
+
+## The hint lint sweeps the whole accumulated crate, and that is now visible on more channels
+
+`build_hint_warnings` runs over the current library's *accumulated* crate — the validated bundle plus every bundle loaded beside it from `library_dirs`. The vacuous-presence lint does not: its entry refs come from `result.blueprints`, the validated batch alone, so it never comments on a library you merely depend on.
+
+That asymmetry is the hint lint's own pre-existing scope decision, unchanged here. What changed is who sees it: the lint used to reach only the protocol validation report, and now rides every validate channel. So `pipelex validate bundle mine.mthds -L shared/` can report hint findings that belong to `shared/`, which an author cannot act on from where they are standing.
+
+Left alone deliberately. Narrowing the hint lint to the validated batch is a change to that lint's contract, with its own question behind it (a library author does want the findings, on their own validate run), and folding it into a PR about a different lint would hide the decision. If it turns out to be noisy in practice, the fix is to scope `build_hint_warnings` by the batch's domains the way the vacuous lint is scoped by its blueprints — the composition point already holds both ingredients, so it is a small change once the decision is made.
