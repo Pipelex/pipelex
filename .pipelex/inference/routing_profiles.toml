@@ -28,6 +28,10 @@ active = "all_pipelex_gateway"
 description = "Use Pipelex Gateway for all its supported models"
 default = "pipelex_gateway"
 
+[profiles.all_pipelex_manifold]
+description = "Use Pipelex Manifold (private beta) for all its supported models"
+default = "pipelex_manifold"
+
 [profiles.all_anthropic]
 description = "Use Anthropic backend for all its supported models"
 default = "anthropic"

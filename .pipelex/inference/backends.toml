@@ -15,6 +15,28 @@ display_name = "⭐ Pipelex Gateway"
 enabled = true                         # Enable after accepting terms via `pipelex init config`
 api_key = "${PIPELEX_GATEWAY_API_KEY}"
 
+# The Pipelex-operated inference service, currently in private beta. Shipped declared and OFF: it is
+# the one backend whose `enabled` is read before any variable is resolved — the boot asks which
+# managed backends are live in order to know which sections of the published configuration to slice
+# — so an enabled-by-default manifold backend would warn about a missing section on every boot of
+# every installation that has not joined the beta. Turn it on when you have the two variables.
+#
+# `endpoint` is the service ORIGIN — scheme, host and port, with no `/v1` and no trailing path. Each
+# SDK appends what it expects beneath it, so a `/v1` written here would be sent twice. Never a
+# literal URL: the service moves, and the environment is where that is recorded.
+#
+# `auth_header` names where the service reads the key from. It matters for the models this backend
+# serves over Anthropic's own protocol: the Anthropic SDK puts its key on `x-api-key`, which the
+# service never looks at, so without this line every Claude call reaches it anonymous and comes back
+# 401. The OpenAI-substrate SDKs get the same header from the manifold factories directly.
+[pipelex_manifold]
+display_name = "Pipelex Manifold (private beta)"
+enabled = false
+endpoint = "${PIPELEX_MANIFOLD_ENDPOINT}"
+api_key = "${PIPELEX_MANIFOLD_API_KEY}"
+model_specs_section = "manifold_model_specs"
+auth_header = "x-portkey-api-key"
+
 [anthropic]
 enabled = true
 api_key = "${ANTHROPIC_API_KEY}"
