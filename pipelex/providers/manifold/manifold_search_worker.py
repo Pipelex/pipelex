@@ -102,7 +102,15 @@ class ManifoldSearchWorker(SearchWorkerAbstract):
         # which has nowhere to put sources. The envelope is recognised *structurally* rather than
         # demanded, so the day the gateway stops asking for sources this worker keeps working on the
         # bare payload it then returns.
-        payload = extract_structured_search_payload(response=response_body, schema=schema)
+        #
+        # `usage` is dropped first, and that line is load-bearing. On this route usage sits *beside*
+        # the envelope rather than inside a chat completion the way the costume put it, and the
+        # recognition is by the key set being exactly {data, sources} — so leaving a third key there
+        # makes the whole response look like the payload, which then validates against an output
+        # class whose fields have defaults and returns an all-defaults object with no error
+        # anywhere. Usage has already been recorded by the time this runs.
+        envelope = {key: value for key, value in response_body.items() if key != "usage"}
+        payload = extract_structured_search_payload(response=envelope, schema=schema)
         if payload is not None:
             return payload
         # The response was an object but carried no structured payload: the search ran and found
