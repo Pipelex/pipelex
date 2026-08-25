@@ -96,7 +96,7 @@ All-optional structure, plain input:
 
 > Input 'opts' of pipe 'demo.run' must be supplied (declared without '?'), but concept 'demo.RunOptions' declares no required field — an empty object satisfies it, so a caller cannot tell what to fill in. Mark the input optional (`opts = "demo.RunOptions?"`) if the pipe can run without it, or make at least one field of 'demo.RunOptions' required.
 
-`!` input: the parenthesis reads "(declared with a force marker '!')". Field-less structure: "declares no field at all — only an empty object fits it", and the second remedy reads "or give 'demo.RunOptions' a required field". The concept is always the descriptor's qualified `concept_ref`. The message carries no authored free text (no descriptions), so it needs no eliding.
+`!` input: the parenthesis reads "(declared with a force marker '!')". Field-less structure: "declares no field at all — any object satisfies it and none of it is read" (pydantic's inherited `extra="ignore"` accepts and drops anything a caller sends, so the exclusivity the first draft claimed was never true), and the second remedy reads "or give 'demo.RunOptions' a required field". The concept is always the descriptor's qualified `concept_ref`. The message carries no authored free text (no descriptions), so it needs no eliding.
 
 ## 5. Blast radius
 

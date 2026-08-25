@@ -97,7 +97,7 @@ def _message(*, pipe_ref: str, slot: InputFormField, concept_ref: str) -> str:
         defect = f"concept '{concept_ref}' declares no required field — an empty object satisfies it"
         second_remedy = f"make at least one field of '{concept_ref}' required"
     else:
-        defect = f"concept '{concept_ref}' declares no field at all — only an empty object fits it"
+        defect = f"concept '{concept_ref}' declares no field at all — any object satisfies it and none of it is read"
         second_remedy = f"give '{concept_ref}' a required field"
     return (
         f"Input '{slot.name}' of pipe '{pipe_ref}' must be supplied ({marker_desc}), but {defect}, "
