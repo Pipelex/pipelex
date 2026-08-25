@@ -10,8 +10,11 @@ the builder-ops envelopes, and the bare CLI's yellow echo.
 know which pipes are entry pipes (it holds no `ValidateBundleResult` of its own), so its case here
 doubles as the proof that the `acquire_library` load path really does accumulate them.
 
-One channel is deliberately absent: the builder's `validate_all`, which carries no `warnings` key
-at all and never did — see `wip/full-optional/deferred.md`.
+Two surfaces are deliberately absent. The builder's `validate_all` carries no `warnings` key at all
+and never did — see `wip/full-optional/deferred.md`. And the bare CLI's single-pipe `validate
+<PIPE_CODE>` echoes none of them: it makes no bundle-wide claim, and neither lint has anything to say
+about one pipe in isolation (the vacuous lint is scoped to entry pipes, the optionality lint
+aggregates across flows).
 """
 
 from __future__ import annotations
@@ -29,6 +32,7 @@ from pipelex.cli.commands.validate._validate_core import (
     _validate_pipe_or_bundle,  # pyright: ignore[reportPrivateUsage]
     do_validate_all_libraries_and_dry_run,
 )
+from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipeline.validation_render import format_validate_markdown
 from pipelex.validation_error_types import HintLintErrorType, PipeValidationErrorType
 
@@ -112,6 +116,26 @@ def all_families_bundle_dir() -> Iterator[Path]:
         directory = Path(temp_dir)
         _write_bundle(contents=_ALL_FAMILIES_MTHDS, directory=directory)
         yield directory
+
+
+@pytest.fixture(autouse=True)
+def restore_the_outer_library() -> Iterator[None]:
+    """Tear down whatever library a channel left current, and restore the one the test started in.
+
+    Two channels here hand teardown to a caller this test does not run: `validate_bundle` leaves its
+    validation library open on success (that is what lets the advisory lints resolve pipes), and
+    `do_validate_all_libraries_and_dry_run` leaves the loaded library current for the command that
+    owns `Pipelex` teardown. Called directly, both leak into whatever test runs next.
+    """
+    outer_library_id = get_current_library_id_or_none()
+    yield
+    leaked_library_id = get_current_library_id_or_none()
+    if leaked_library_id is not None and leaked_library_id != outer_library_id:
+        get_library_manager().teardown(library_id=leaked_library_id)
+    if outer_library_id is not None:
+        set_current_library(library_id=outer_library_id)
+    else:
+        clear_current_library()
 
 
 def _error_types(warnings: list[dict[str, Any]]) -> list[str]:

@@ -1,6 +1,6 @@
 # Vacuous presence lint — design
 
-**Status:** design settled on 2026-08-25, implementation not started. Tracker: [`TODOS.md`](../../TODOS.md) at the repo root. Origin: the cross-repo request [`wip/inbox/2026-08-25-pipelex-warn-required-input-all-optional-concept.md`](../../../wip/inbox/2026-08-25-pipelex-warn-required-input-all-optional-concept.md), filed from `mthds-form`.
+**Status:** design settled on 2026-08-25 and implemented as designed on the same day — every phase of the tracker is done, and §9's three decisions were ratified rather than revised. What is left is follow-up rather than design: the items in §8 and the four entries in [`deferred.md`](deferred.md). Tracker: [`TODOS.md`](../../TODOS.md) at the repo root, which carries the running log and the deviations. Origin: a cross-repo request filed from the form-kernel side, queued in the workspace inbox as `2026-08-25-pipelex-warn-required-input-all-optional-concept.md` (not linked — it lives outside this repo).
 
 ## 1. The problem
 
@@ -102,7 +102,7 @@ All-optional structure, plain input:
 
 Runtime:
 
-- `pipelex/validation_error_types.py` — the new member and its comment; the two exhaustive `match` properties.
+- `pipelex/validation_error_types.py` — the new member and its comment; every exhaustive `match` property over the type union.
 - `pipelex/pipeline/vacuous_presence_warnings.py` — new: the pure lint over descriptors.
 - `pipelex/pipeline/advisory_warnings.py` — new: the composition point (D6).
 - `pipelex/pipeline/hint_warnings.py` — token eliding and the per-site cap (D6's prerequisite).

@@ -21,6 +21,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.pipeline.controller_taint import ControllerTaintAnalysis
 from pipelex.validation_error_types import PipeValidationErrorType
 
@@ -57,7 +58,9 @@ def build_optionality_warnings(taint_analyses: Sequence[ControllerTaintAnalysis]
         if consumption_key in asserted:
             continue
         pipe_ref, variable_name = consumption_key
-        domain_code, _, pipe_code = pipe_ref.partition(".")
+        # Split on the LAST dot: a domain is a dotted path ('legal.contracts'), so a leading-dot split
+        # would hand the locator a truncated domain and a pipe code carrying the rest of it.
+        locator = QualifiedRef.parse(pipe_ref)
         flow_refs = sorted({observation.within_pipe_ref for observation in redundant[consumption_key]})
         flows_desc = ", ".join(f"'{flow_ref}'" for flow_ref in flow_refs)
         message = (
@@ -69,8 +72,8 @@ def build_optionality_warnings(taint_analyses: Sequence[ControllerTaintAnalysis]
             ValidationErrorItem(
                 category=ValidationErrorCategory.PIPE_VALIDATION,
                 error_type=PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT,
-                pipe_code=pipe_code,
-                domain_code=domain_code,
+                pipe_code=locator.local_code,
+                domain_code=locator.domain_path,
                 variable_names=[variable_name],
                 message=message,
             )

@@ -98,6 +98,13 @@ class TestVacuousPresenceWarnings:
         assert warning.variable_names == ["opts"]
         assert warning.concept_code is None
 
+    def test_a_hierarchical_domain_keeps_its_full_path_in_the_locator(self):
+        """A domain is a dotted path, so the ref splits at its LAST dot, not its first."""
+        warning = _lint(slots=[_object_slot()], pipe_ref="legal.contracts.run", entry_pipe_refs=["legal.contracts.run"])[0]
+
+        assert warning.domain_code == "legal.contracts"
+        assert warning.pipe_code == "run"
+
     # ---- Silent -----------------------------------------------------------------------------
 
     def test_one_required_field_is_silent(self):

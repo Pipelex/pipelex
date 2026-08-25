@@ -101,10 +101,10 @@ You never discover an unhandled absence at run time. Validation walks every cont
 | `optional_input_unguarded` | An unguarded template reference to a declared-optional input. |
 | `optional_branch_required_field` | A maybe-absent parallel branch feeding a required structure field. |
 
-Two more optionality facts surface on the **valid** report (`pipelex validate`, the agent CLI, and the API):
+Two more facts surface on the **valid** report (`pipelex validate`, the agent CLI, and the API) — the first about optionality, the second a mixed bag of advisories that the same report carries:
 
 - **`liftable_pipes`** — every pipe that may be silently skipped at run time, with the slots whose absence triggers the skip and where that absence can come from. Implicit lifting is acceptable *because* it is visible at build time.
-- **`warnings`** — advisory lints that never flip the verdict. Every whole-bundle validate channel carries the same set:
+- **`warnings`** — advisory lints that never flip the verdict, spanning optionality and the intent-hint vocabulary alike. Every whole-bundle validate channel carries the same set — the protocol report, the agent CLI, the builder's per-bundle operations, and the bare CLI's `validate bundle` and `validate --all`. (`pipelex validate <PIPE_CODE>` makes no bundle-wide claim and prints none of them; neither does the builder's `validate_all`, which carries no `warnings` key at all.)
 
     - `optional_force_redundant` — a `!` whose slot is guaranteed present in every analyzed flow, so the assertion can never fire and the marker is dead weight.
     - `input_presence_vacuous` — a **method input** (an input of the bundle's declared `main_pipe`) that must be supplied, but whose concept declares no required field. The empty object satisfies it, so the declaration enforces nothing and a caller cannot tell what to fill in. Either mark the input `?`, or give the concept a required field. See [Inline Structures](../concepts/inline-structures.md#all-optional-structures-and-the-input_presence_vacuous-lint).

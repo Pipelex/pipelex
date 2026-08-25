@@ -29,6 +29,7 @@ from collections.abc import Iterable, Mapping
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.core.pipes.variable_multiplicity import PresenceMarker
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.pipeline.input_form import FieldKind, InputFormField, PipeInputFormDescriptor
 from pipelex.validation_error_types import PipeValidationErrorType
 
@@ -73,12 +74,14 @@ def _warning_for_slot(*, pipe_ref: str, slot: InputFormField) -> ValidationError
         # No concept to name, hence no honest message to state: the lint's whole claim is about
         # what a named concept declares.
         return None
-    domain_code, _, pipe_code = pipe_ref.partition(".")
+    # Split on the LAST dot: a domain is a dotted path ('legal.contracts'), so a leading-dot split
+    # would hand the locator a truncated domain and a pipe code carrying the rest of it.
+    locator = QualifiedRef.parse(pipe_ref)
     return ValidationErrorItem(
         category=ValidationErrorCategory.PIPE_VALIDATION,
         error_type=PipeValidationErrorType.INPUT_PRESENCE_VACUOUS,
-        pipe_code=pipe_code,
-        domain_code=domain_code,
+        pipe_code=locator.local_code,
+        domain_code=locator.domain_path,
         variable_names=[slot.name],
         message=_message(pipe_ref=pipe_ref, slot=slot, concept_ref=concept_ref),
     )

@@ -134,7 +134,7 @@ See [Fix Commands](fix.md) for `pipelex fix bundle`, including the `--diff` prev
 
 ## Advisory Warnings
 
-A bundle can be valid and still be worth commenting on. When it is, `pipelex validate` prints one yellow `Warning:` line per finding beside the success message — advisory only: a warning never changes the verdict or the exit code. Three families are reported, always in this order:
+A bundle can be valid and still be worth commenting on. When it is, `pipelex validate bundle` and `pipelex validate --all` print one yellow `Warning:` line per finding beside the success message — advisory only: a warning never changes the verdict or the exit code. Three families are reported, always in this order:
 
 - `optional_force_redundant` — a `!` (force) input whose slot is guaranteed present in every analyzed flow, so the assertion can never fire.
 - `input_presence_vacuous` — a method input (an input of the bundle's declared `main_pipe`) that must be supplied, but whose concept declares no required field: the empty object satisfies it, so a caller cannot tell what to fill in.
