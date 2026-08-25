@@ -75,7 +75,7 @@ class TestVacuousPresenceWarnings:
         assert len(warnings) == 1
         message = warnings[0].message
         assert "declares no field at all" in message
-        assert "any object satisfies it and none of it is read" in message
+        assert "an empty object satisfies it" in message
         assert f"give '{OPTIONS_CONCEPT_REF}' a required field" in message
 
     def test_plain_input_message_names_the_absent_marker_and_both_remedies(self):

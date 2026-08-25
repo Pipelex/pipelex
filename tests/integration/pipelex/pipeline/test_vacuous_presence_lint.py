@@ -189,7 +189,7 @@ class VacuousAllDefaultedPayload(StructuredContent):
 
 
 class VacuousFieldLessPayload(StructuredContent):
-    """A hand-written structure class declaring no field at all — any object satisfies it, and none of it is read."""
+    """A hand-written structure class declaring no field at all — the empty object satisfies it."""
 
 
 def _vacuous(warnings: list[ValidationErrorItem]) -> list[ValidationErrorItem]:
@@ -239,7 +239,7 @@ class TestVacuousPresenceLint:
         assert _vacuous(warnings) == []
 
     async def test_an_empty_structure_table_warns_with_the_field_less_wording(self, load_empty_library: Callable[[], str]) -> None:
-        """The design's second row: a concept declaring no field at all, which any object satisfies.
+        """The design's second row: a concept declaring no field at all, which the empty object satisfies.
 
         It is reachable because the deriver branches on `structure is not None` the way `ConceptFactory`
         does — the truthiness test it used to run reported such a concept as `prose`, which this lint
