@@ -102,6 +102,7 @@ from pipelex.system.pipelex_service.exceptions import (
 from pipelex.system.pipelex_service.managed_gateway_configs import build_managed_gateway_configs
 from pipelex.system.pipelex_service.pipelex_service_config import (
     enabled_managed_gateway_sections,
+    is_pipelex_gateway_enabled,
     load_pipelex_service_config_if_exists,
 )
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
@@ -498,11 +499,21 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             secrets_provider = secrets_provider_registry.get_required(method=secrets_config.method)(secrets_config)
 
         # Disable Pipelex telemetry when:
+        # - the legacy gateway backend is not enabled, OR
         # - inference is not needed (no live runs to track), OR
         # - the gateway config came from the cache (stale specs imply potentially stale model
         #   identities; phoning home about pipe runs in that state would pollute metrics).
+        #
+        # **The first condition asks about `pipelex_gateway` specifically, not about managed backends
+        # in general**, and the distinct id is why: it is derived from `PIPELEX_GATEWAY_API_KEY`, which
+        # a manifold backend neither has nor can stand in for — its own key is, for the private beta,
+        # one token shared by every participant, so keying on it would produce a single indistinguishable
+        # user rather than an identity. Asked the general way, a manifold-only installation would be
+        # required to hold a gateway key it has no other use for and would fail to boot without one.
+        # The common beta case is unaffected: a participant who keeps `pipelex_gateway` enabled has a
+        # real gateway key, and their manifold runs are tracked under it like everything else.
         gateway_source_is_cached = gateway_config_source is not None and gateway_config_source.is_cached
-        is_pipelex_telemetry_enabled = is_pipelex_service_enabled and needs_inference and not gateway_source_is_cached
+        is_pipelex_telemetry_enabled = is_pipelex_gateway_enabled() and needs_inference and not gateway_source_is_cached
         self.telemetry_manager = TelemetryFactory.make_telemetry_manager(
             secrets_provider=secrets_provider,
             integration_mode=integration_mode,

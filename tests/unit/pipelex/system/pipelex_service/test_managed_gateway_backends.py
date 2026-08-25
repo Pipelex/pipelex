@@ -10,6 +10,9 @@ is what declares it one.
   input;
 - `build_managed_gateway_configs` cuts the single fetched artifact into one configuration per
   managed backend, keeping them apart rather than merging them.
+
+And the narrower question `is_pipelex_gateway_enabled` answers, which is not a special case of the
+broad one and must not be folded into it — the last class here is why.
 """
 
 from __future__ import annotations
@@ -25,7 +28,7 @@ from pipelex.cogt.model_backends.backend import (
     resolve_model_specs_section,
 )
 from pipelex.system.pipelex_service.managed_gateway_configs import build_managed_gateway_configs
-from pipelex.system.pipelex_service.pipelex_service_config import enabled_managed_gateway_sections
+from pipelex.system.pipelex_service.pipelex_service_config import enabled_managed_gateway_sections, is_pipelex_gateway_enabled
 from pipelex.system.pipelex_service.remote_config import PipelexPosthogConfig, RemoteConfig
 
 if TYPE_CHECKING:
@@ -94,6 +97,42 @@ class TestEnabledManagedGatewaySections:
 
     def test_a_missing_file_is_no_managed_backends_rather_than_a_refusal(self, tmp_path: Path) -> None:
         assert enabled_managed_gateway_sections(backends_file_path=tmp_path / "absent.toml") == {}
+
+
+class TestTheTwoQuestionsAreNotTheSameQuestion:
+    """Which managed backends are live, and whether the *legacy gateway* is — the boot asks both.
+
+    They came apart the moment a second managed backend existed, and the boot line that must keep
+    asking the narrow one is the telemetry decision: the distinct id is derived from
+    `PIPELEX_GATEWAY_API_KEY`, which a manifold-only installation has no reason to hold. Asked the
+    broad way, such an installation is required to produce a gateway key it does not have and fails
+    to boot on `GatewayApiKeyMissingError` — a refusal with nothing in it naming manifold.
+
+    The beta's own key cannot stand in either, and that is the second half of the verdict: for the
+    private beta it is one token shared by every participant, so keying on it would report a single
+    indistinguishable user rather than an identity.
+    """
+
+    def test_a_manifold_only_installation_is_managed_but_is_not_the_gateway(self, tmp_path: Path) -> None:
+        backends_file = _write_backends(
+            tmp_path,
+            f"[pipelex_gateway]\nenabled = false\n\n"
+            f'[pipelex_manifold]\nmodel_specs_section = "{MANIFOLD_MODEL_SPECS_SECTION}"\nendpoint = "https://mf.example.com"\n',
+        )
+
+        assert enabled_managed_gateway_sections(backends_file_path=backends_file) == {PipelexBackend.MANIFOLD: MANIFOLD_MODEL_SPECS_SECTION}
+        assert not is_pipelex_gateway_enabled(backends_file_path=backends_file)
+
+    def test_the_common_beta_case_keeps_both(self, tmp_path: Path) -> None:
+        """A participant who leaves the legacy gateway on has a real key, and manifold runs ride on it."""
+        backends_file = _write_backends(
+            tmp_path,
+            f'[pipelex_gateway]\napi_key = "pk-x"\n\n'
+            f'[pipelex_manifold]\nmodel_specs_section = "{MANIFOLD_MODEL_SPECS_SECTION}"\nendpoint = "https://mf.example.com"\n',
+        )
+
+        assert set(enabled_managed_gateway_sections(backends_file_path=backends_file)) == {PipelexBackend.GATEWAY, PipelexBackend.MANIFOLD}
+        assert is_pipelex_gateway_enabled(backends_file_path=backends_file)
 
 
 class TestBuildManagedGatewayConfigs:
