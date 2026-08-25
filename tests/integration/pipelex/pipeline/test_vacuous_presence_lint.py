@@ -143,6 +143,23 @@ output = "Text"
 prompt = "Run with $settings"
 """
 
+_FIELD_LESS_CLASS_MTHDS = """
+domain = "vacuous_field_less"
+description = "Entry pipe demanding a class-backed concept whose class declares no field"
+main_pipe = "run"
+
+[concept.Settings]
+description = "Settings backed by a class with no field"
+structure = "VacuousFieldLessPayload"
+
+[pipe.run]
+type = "PipeLLM"
+description = "The entry pipe"
+inputs = { settings = "Settings" }
+output = "Text"
+prompt = "Run with $settings"
+"""
+
 _HINTED_MTHDS = """
 domain = "vacuous_hinted"
 description = "The warnable shape beside a warnable hint"
@@ -169,6 +186,10 @@ class VacuousAllDefaultedPayload(StructuredContent):
 
     tone: str = Field(default="neutral", description="The tone to use")
     depth: int | None = Field(default=None, description="How deep to go")
+
+
+class VacuousFieldLessPayload(StructuredContent):
+    """A hand-written structure class declaring no field at all — an empty object is all that fits it."""
 
 
 def _vacuous(warnings: list[ValidationErrorItem]) -> list[ValidationErrorItem]:
@@ -244,6 +265,22 @@ class TestVacuousPresenceLint:
         assert len(vacuous) == 1
         assert vacuous[0].variable_names == ["settings"]
         assert "vacuous_class.Settings" in vacuous[0].message
+
+    async def test_a_field_less_class_backed_concept_warns_with_the_field_less_wording(self, load_empty_library: Callable[[], str]) -> None:
+        """A registered class declaring no field demands nothing, exactly as an empty structure table does.
+
+        The descriptor used to call such a concept `unknown` — the kind reserved for a payload it
+        genuinely cannot read — which the object-only guard then silenced. Zero fields is a reading,
+        not a failure to read, so the form says `object` and the lint has something honest to say.
+        """
+        get_class_registry().register_class(VacuousFieldLessPayload)
+        warnings = await self._warnings(mthds=_FIELD_LESS_CLASS_MTHDS, load_empty_library=load_empty_library)
+
+        vacuous = _vacuous(warnings)
+        assert len(vacuous) == 1
+        assert vacuous[0].variable_names == ["settings"]
+        assert "declares no field at all" in vacuous[0].message
+        assert "give 'vacuous_field_less.Settings' a required field" in vacuous[0].message
 
     async def test_the_hint_lint_still_rides_beside_it(self, load_empty_library: Callable[[], str]) -> None:
         warnings = await self._warnings(mthds=_HINTED_MTHDS, load_empty_library=load_empty_library)

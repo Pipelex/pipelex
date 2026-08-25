@@ -86,6 +86,25 @@ class FieldKind(StrEnum):
             ):
                 return False
 
+    @property
+    def is_object(self) -> bool:
+        match self:
+            case FieldKind.OBJECT:
+                return True
+            case (
+                FieldKind.TEXT
+                | FieldKind.PROSE
+                | FieldKind.NUMBER
+                | FieldKind.BOOLEAN
+                | FieldKind.DATE
+                | FieldKind.ENUM
+                | FieldKind.DOCUMENT
+                | FieldKind.IMAGE
+                | FieldKind.LIST
+                | FieldKind.UNKNOWN
+            ):
+                return False
+
 
 class InputFormField(BaseModel):
     """One field descriptor: a recursive node discriminated on `kind`.
@@ -448,7 +467,14 @@ class InputFormDeriver:
             return _unknown_node(name=name, concept_ref=concept_ref, description=description, refines=refines)
         reflected = reflect_structure_class(structure_class=structure_class)
         if reflected is None:
-            return _unknown_node(name=name, concept_ref=concept_ref, description=description, refines=refines)
+            if structure_class.model_fields:
+                # A field this reflection could not map: the payload's shape is genuinely opaque here.
+                return _unknown_node(name=name, concept_ref=concept_ref, description=description, refines=refines)
+            # A class declaring no field at all is not opaque — it states a payload that demands
+            # nothing, the class-backed twin of an empty authored structure table, and the form says
+            # so. (`reflect_structure_class` collapses both into `None` because its other consumer,
+            # the native consistency probe, reads `None` as "structureless by design".)
+            reflected = {}
         fields = [
             _with_reflected_constraints(
                 node=self._structure_field(name=field_name, field=field, seen=seen), field_info=structure_class.model_fields[field_name]

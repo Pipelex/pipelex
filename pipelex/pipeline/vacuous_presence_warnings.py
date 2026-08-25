@@ -28,9 +28,8 @@ a lint whose boundary is arguable is a lint that gets ignored).
 from collections.abc import Iterable, Mapping
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
-from pipelex.core.pipes.variable_multiplicity import PresenceMarker
 from pipelex.core.qualified_ref import QualifiedRef
-from pipelex.pipeline.input_form import FieldKind, InputFormField, PipeInputFormDescriptor
+from pipelex.pipeline.input_form import InputFormField, PipeInputFormDescriptor
 from pipelex.validation_error_types import PipeValidationErrorType
 
 
@@ -65,7 +64,7 @@ def build_vacuous_presence_warnings(
 
 def _warning_for_slot(*, pipe_ref: str, slot: InputFormField) -> ValidationErrorItem | None:
     """The item a top-level slot earns, or `None` when the slot is silent."""
-    if not slot.gating or slot.kind != FieldKind.OBJECT:
+    if not slot.gating or not slot.kind.is_object:
         return None
     if any(field.required for field in slot.fields or []):
         return None
@@ -93,7 +92,7 @@ def _message(*, pipe_ref: str, slot: InputFormField, concept_ref: str) -> str:
     Carries no authored free text (no descriptions), so it needs no eliding — unlike the hint lint,
     which interpolates authored content.
     """
-    marker_desc = "declared with a force marker '!'" if slot.presence == PresenceMarker.FORCE else "declared without '?'"
+    marker_desc = "declared with a force marker '!'" if slot.presence is not None and slot.presence.is_force else "declared without '?'"
     if slot.fields:
         defect = f"concept '{concept_ref}' declares no required field — an empty object satisfies it"
         second_remedy = f"make at least one field of '{concept_ref}' required"
