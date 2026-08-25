@@ -139,7 +139,7 @@ Each is an `wip/inbox/` item filed from this repo when the implementation lands,
 - **`pipelex-starter-js`** — `docs/input-form.md`'s "shape to avoid" paragraph can point at the lint once a release carries it.
 - **Corpus consumers** (`conformance`, `mthds-ui`, `vscode-pipelex`) re-vendor `vocabulary.toml` through the sync plugin at the next release; nothing to file, the drift gates say so.
 
-## 9. Decisions to ratify before implementation
+## 9. The decisions that were ratified before implementation
 
 1. Entry-pipe scope (D2) rather than every pipe — the one that changes what authors see most.
 2. The wire name `input_presence_vacuous` (D5).

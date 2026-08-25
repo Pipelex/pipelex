@@ -24,7 +24,7 @@ Nothing to do about it. It is recorded because a future reader may otherwise "si
 
 ## The hint lint sweeps the whole accumulated crate, and that is now visible on more channels
 
-`build_hint_warnings` runs over the current library's *accumulated* crate — the validated bundle plus every bundle loaded beside it from `library_dirs`. The vacuous-presence lint does not: its entry refs come from `result.blueprints`, the validated batch alone, so it never comments on a library you merely depend on.
+`build_hint_warnings` runs over the current library's *accumulated* crate — the validated bundle plus every bundle loaded beside it from `library_dirs`. The vacuous-presence lint is narrower on the bundle channels: there its entry refs come from `result.blueprints`, the validated batch alone, so it never comments on a library you merely depend on. On `validate all` it is not narrower — that channel takes its entry refs from `collect_current_library_entry_pipe_refs()`, which reads the same accumulated blueprints, so a bundle loaded only to satisfy a dependency is linted there too. That is the intended reading of `validate all` (the whole library is the batch), but it means the asymmetry below is a property of the bundle channels rather than of the lint.
 
 That asymmetry is the hint lint's own pre-existing scope decision, unchanged here. What changed is who sees it: the lint used to reach only the protocol validation report, and now rides every validate channel. So `pipelex validate bundle mine.mthds -L shared/` can report hint findings that belong to `shared/`, which an author cannot act on from where they are standing.
 
