@@ -153,6 +153,13 @@ LinkupError | Linkup | https://docs.pipelex.com/latest/errors/linkup-error/
 LinkupSearchEmptyResultError | Linkup search empty result | https://docs.pipelex.com/latest/errors/linkup-search-empty-result-error/
 LinkupSearchResponseError | Linkup search response | https://docs.pipelex.com/latest/errors/linkup-search-response-error/
 ListWhereSingularError | List where singular | https://docs.pipelex.com/latest/errors/list-where-singular-error/
+ManifoldCredentialsError | Manifold credentials | https://docs.pipelex.com/latest/errors/manifold-credentials-error/
+ManifoldEndpointError | Manifold endpoint | https://docs.pipelex.com/latest/errors/manifold-endpoint-error/
+ManifoldError | Manifold | https://docs.pipelex.com/latest/errors/manifold-error/
+ManifoldExtractResponseError | Manifold extract response | https://docs.pipelex.com/latest/errors/manifold-extract-response-error/
+ManifoldFactoryError | Manifold factory | https://docs.pipelex.com/latest/errors/manifold-factory-error/
+ManifoldSearchEmptyResultError | Manifold search empty result | https://docs.pipelex.com/latest/errors/manifold-search-empty-result-error/
+ManifoldSearchResponseError | Manifold search response | https://docs.pipelex.com/latest/errors/manifold-search-response-error/
 MigrationError | Migration error | https://docs.pipelex.com/latest/errors/migration-error/
 MigrationGoldenError | Migration golden error | https://docs.pipelex.com/latest/errors/migration-golden-error/
 MigrationLedgerError | Migration ledger error | https://docs.pipelex.com/latest/errors/migration-ledger-error/

@@ -698,6 +698,60 @@ def extract_huggingface_metadata(exc: BaseException) -> ProviderErrorMetadata:
     )
 
 
+def extract_manifold_metadata(exc: BaseException) -> ProviderErrorMetadata:
+    """Distill a raw-httpx failure against the Pipelex Manifold service into metadata.
+
+    The manifold plugin's native routes (``/v1/pipelex/extract``, ``/v1/pipelex/search``) are not
+    OpenAI-shaped, so they are called with plain ``httpx`` rather than through a vendor SDK. That
+    leaves two exception shapes to distill:
+
+    - ``httpx.HTTPStatusError``, which carries the whole ``response`` — status, headers, and a body
+      this reads as JSON on a best-effort basis, since the service renders its refusals as
+      ``{status, message, type, code}``;
+    - ``httpx.RequestError`` (connect, timeout, read), which carries only a request; every
+      status-related field comes back as ``None``, and the class name is what the classify step
+      matches on to call it a network failure.
+
+    **It reports ``ProviderName.GATEWAY``**, and that is a decision rather than an oversight: the
+    manifold service *is* the same gateway codebase, so it phrases quota exhaustion and rate
+    limiting identically, and every ``match`` on ``ProviderName`` would need a second arm with the
+    same body to say otherwise. Which of the two services answered is already carried by the error's
+    model handle and backend name.
+    """
+    response = getattr(exc, "response", None)
+    status_code = getattr(response, "status_code", None)
+    if not isinstance(status_code, int):
+        status_code = None
+    headers = getattr(response, "headers", None)
+    request_id: str | None = None
+    retry_after_seconds: float | None = None
+    if headers is not None:
+        request_id_value = headers.get("x-request-id") or headers.get("x-portkey-trace-id")
+        if isinstance(request_id_value, str):
+            request_id = request_id_value
+        retry_after_seconds = _parse_retry_after_seconds(headers.get("retry-after"))
+    body: Any | None = None
+    if response is not None:
+        try:
+            body = response.json()
+        except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
+            # A refusal the service did not render as JSON is still a refusal; the status code and
+            # the message carry it, and insisting on a body here would trade a classified error for
+            # a decode error raised while classifying one.
+            body = None
+    provider_error_code = _provider_error_code_from_body(body) or _provider_error_code_from_flat_body(body)
+    return ProviderErrorMetadata(
+        provider=ProviderName.GATEWAY,
+        sdk_exception_type=type(exc).__name__,
+        message=str(exc),
+        status_code=status_code,
+        request_id=request_id,
+        retry_after_seconds=retry_after_seconds,
+        provider_error_code=provider_error_code,
+        body=body,
+    )
+
+
 def extract_gateway_metadata(exc: BaseException) -> ProviderErrorMetadata:
     """Distill a Portkey/Gateway SDK exception into a ``ProviderErrorMetadata``.
 

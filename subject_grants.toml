@@ -1840,6 +1840,10 @@ rationale = "Extracts from the exc; single operand."
 param = "exc"
 rationale = "Extracts from the exc; single operand."
 
+["pipelex/cogt/inference/error_classification.py::extract_manifold_metadata"]
+param = "exc"
+rationale = "Extracts from the exc; single operand."
+
 ["pipelex/cogt/inference/error_classification.py::extract_mistral_metadata"]
 param = "exc"
 rationale = "Extracts from the exc; single operand."
@@ -5071,6 +5075,58 @@ rationale = "Plugin protocol register: the registrar is the sole sink the plugin
 ["pipelex/providers/linkup/linkup_search_worker.py::LinkupSearchWorker._parse_date"]
 param = "date_str"
 rationale = "Parses/consumes the date_str; single operand."
+
+["pipelex/providers/manifold/manifold_completions_factory.py::ManifoldCompletionsFactory.make_openai_client_for_completions"]
+param = "model_handle"
+rationale = "Factory from source: builds the result from the model_handle; single operand."
+
+["pipelex/providers/manifold/manifold_constants.py::ManifoldOpenAISdkVariant.is_completions"]
+param = "sdk"
+rationale = "Predicate on the sdk; single operand."
+
+["pipelex/providers/manifold/manifold_constants.py::ManifoldOpenAISdkVariant.is_responses"]
+param = "sdk"
+rationale = "Predicate on the sdk; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory._make_gemini_image_config"]
+param = "inference_model"
+rationale = "Factory from source: builds the result from the inference_model; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.get_api_key"]
+param = "backend"
+rationale = "Derives the value from the backend config; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.get_base_url"]
+param = "backend"
+rationale = "Derives the value from the backend config; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.get_origin"]
+param = "backend"
+rationale = "Derives the value from the backend config; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.is_debug_enabled"]
+param = "backend"
+rationale = "Predicate: reports whether debug logging is enabled for the backend; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.make_auth_headers"]
+param = "backend"
+rationale = "Factory from source: builds the result from the backend; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.make_extras"]
+param = "inference_model"
+rationale = "Factory from source: builds the result from the inference_model; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.make_portkey_client"]
+param = "backend"
+rationale = "Factory from source: builds the result from the backend; single operand."
+
+["pipelex/providers/manifold/manifold_plugin.py::ManifoldPlugin.register"]
+param = "registrar"
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
+
+["pipelex/providers/manifold/manifold_responses_factory.py::ManifoldResponsesFactory.make_openai_client_for_responses"]
+param = "model_handle"
+rationale = "Factory from source: builds the result from the model_handle; single operand."
 
 ["pipelex/providers/mistral/mistral_config.py::MistralConfig.get_reasoning_level"]
 param = "effort"

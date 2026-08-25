@@ -33,6 +33,16 @@ class AnthropicSdkVariant(StrEnum):
     BEDROCK_ANTHROPIC = "bedrock_anthropic"
 
 
+class AnthropicExtraField(StrEnum):
+    AUTH_HEADER = "auth_header"
+
+
+# The anthropic SDK refuses to build a client without a non-empty api_key, so a backend that
+# authenticates on a header of its own still needs something in that slot. Same workaround, and
+# same wording, as the OpenAI-substrate factories.
+_PLACEHOLDER_API_KEY = "unused-auth-via-backend-header"
+
+
 class AnthropicFactory:
     @staticmethod
     def make_anthropic_client(
@@ -52,6 +62,23 @@ class AnthropicFactory:
 
         match sdk_variant:
             case AnthropicSdkVariant.ANTHROPIC:
+                auth_header_config = backend.get_extra_config(AnthropicExtraField.AUTH_HEADER)
+                if auth_header_config is not None:
+                    # The backend speaks the Anthropic protocol but authenticates on a header of
+                    # its own rather than on `x-api-key`. The Pipelex Manifold service is the case
+                    # this exists for: it reads `x-portkey-api-key` (or an `Authorization` bearer)
+                    # and never looks at `x-api-key`, so a key left in the SDK's own slot reaches
+                    # it as an anonymous request. Carry it in the named header instead — the same
+                    # move the manifold OpenAI-substrate factories already make.
+                    if not backend.api_key:
+                        msg = f"Backend '{backend.name}' sets '{AnthropicExtraField.AUTH_HEADER}' but carries no api_key"
+                        raise AnthropicFactoryError(msg)
+                    return AsyncAnthropic(
+                        api_key=_PLACEHOLDER_API_KEY,
+                        base_url=backend.endpoint,
+                        max_retries=transport_max_retries,
+                        default_headers={str(auth_header_config): backend.api_key},
+                    )
                 return AsyncAnthropic(
                     api_key=backend.api_key,
                     base_url=backend.endpoint,
