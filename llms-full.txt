@@ -3629,6 +3629,27 @@ Field names must be valid Python identifiers and cannot be Python keywords; gene
 
     This is deliberate: a silently discarded key is authored intent that vanishes without a trace, and you only find out when the value it was supposed to govern comes back wrong. If you need a numeric bound or another constraint, express it on a Python class instead — see [Python Classes](python-classes.md), whose pydantic `Field(...)` metadata is read as an authored fact. Note that hint *content* stays lenient: an unknown key inside a `hints` table warns and is preserved, rather than failing the bundle.
 
+## All-Optional Structures and the `input_presence_vacuous` Lint
+
+`required` defaults to **`false`** in the long form, and this is the difference between the two spellings that is easiest to miss:
+
+```toml
+[concept.RunOptions.structure]
+tone  = "The tone to use"                                        # shorthand: a REQUIRED text field
+depth = { type = "integer", description = "How deep to go" }     # long form: OPTIONAL, because required defaults to false
+```
+
+A structure written entirely in the long form with no `required = true` anywhere is **all-optional**: its payload admits `{}`. That is perfectly legal, and often exactly right — an extraction concept that records whatever a document happens to state should not demand any particular field. A structure table holding *no* field at all is the degenerate case of the same thing — its payload admits only `{}` — and the lint below names it in its own words.
+
+It becomes a problem at one place only: when such a concept is named by a **method input that must be supplied** — an input of the bundle's declared `main_pipe`, written without a `?`. The declaration says "the caller must provide this", but since the empty object satisfies the concept, the only thing it can enforce is that the caller provides `{}`. Nothing is actually demanded, and a form, an API client or a person filling the input in has no way to tell what to put there. Validation reports this as the advisory `input_presence_vacuous` warning — the bundle stays **valid**, the warning never flips the verdict.
+
+There are two remedies, and which one is right depends on what you meant:
+
+- **The method can run without it.** Mark the input optional: `opts = "RunOptions?"`. Now absence is a declared, handled outcome rather than an empty object.
+- **The method genuinely needs something in it.** Give the concept at least one required field — either `required = true` on the field that matters, or the shorthand form, which is required by definition.
+
+The lint looks one level deep and only at entry pipes. A slot on an inner pipe is fed by dataflow, not by a caller, so it is never warned about; and a required field that is *itself* an all-optional concept is not warned about either.
+
 ## Supported Field Types
 
 Inline structures support these field types:
@@ -7034,10 +7055,14 @@ You never discover an unhandled absence at run time. Validation walks every cont
 | `optional_input_unguarded` | An unguarded template reference to a declared-optional input. |
 | `optional_branch_required_field` | A maybe-absent parallel branch feeding a required structure field. |
 
-Two more optionality facts surface on the **valid** report (`pipelex validate`, the agent CLI, and the API):
+Two more facts surface on the **valid** report (`pipelex validate`, the agent CLI, and the API) — the first about optionality, the second a mixed bag of advisories that the same report carries:
 
 - **`liftable_pipes`** — every pipe that may be silently skipped at run time, with the slots whose absence triggers the skip and where that absence can come from. Implicit lifting is acceptable *because* it is visible at build time.
-- **`warnings`** — advisory lints that never flip the verdict. The first is `optional_force_redundant`: a `!` whose slot is guaranteed present in every analyzed flow — the assertion can never fire, so the marker is dead weight.
+- **`warnings`** — advisory lints that never flip the verdict, spanning optionality and the intent-hint vocabulary alike. Every whole-bundle validate channel carries the same set — the protocol report, the agent CLI, the builder's per-bundle operations, and the bare CLI's `validate bundle` and `validate --all`. (`pipelex validate <PIPE_CODE>` makes no bundle-wide claim and prints none of them; neither does the builder's `validate_all`, which carries no `warnings` key at all.)
+
+    - `optional_force_redundant` — a `!` whose slot is guaranteed present in every analyzed flow, so the assertion can never fire and the marker is dead weight.
+    - `input_presence_vacuous` — a **method input** (an input of the bundle's declared `main_pipe`) that must be supplied, but whose concept declares no required field. The empty object satisfies it, so the declaration enforces nothing and a caller cannot tell what to fill in. Either mark the input `?`, or give the concept a required field. See [Inline Structures](../concepts/inline-structures.md#all-optional-structures-and-the-input_presence_vacuous-lint).
+    - `hint_unknown_key`, `hint_unknown_intent`, `hint_inapplicable_intent` — the intent-hints lints: a hint key this version of the standard does not define, an `intent` word outside the vocabulary, and a known word on a site it does not apply to. Hints are non-normative, so the entry is preserved and only named.
 
 ## Best Practices
 
@@ -10081,6 +10106,16 @@ When a validation error has a deterministic safe fix, the error output includes 
 
 See [Fix Commands](fix.md) for `pipelex fix bundle`, including the `--diff` preview.
 
+## Advisory Warnings
+
+A bundle can be valid and still be worth commenting on. When it is, `pipelex validate bundle` and `pipelex validate --all` print one yellow `Warning:` line per finding — advisory only: a warning never changes the verdict or the exit code. The lines come out ahead of the success message, and ahead of the strict pending-signature gate too, so a method still holding an unimplemented `PipeSignature` placeholder shows its warnings even though the command exits non-zero. Three families are reported, always in this order:
+
+- `optional_force_redundant` — a `!` (force) input whose slot is guaranteed present in every analyzed flow, so the assertion can never fire.
+- `input_presence_vacuous` — a method input (an input of the bundle's declared `main_pipe`) that must be supplied, but whose concept declares no required field: the empty object satisfies it, so a caller cannot tell what to fill in.
+- `hint_unknown_key`, `hint_unknown_intent`, `hint_inapplicable_intent` — the [intent-hint](../../building-methods/concepts/intent-hints.md) lints. Hints are non-normative, so the entry is preserved and only named.
+
+The same findings ride the `warnings` array of the [agent CLI](agent-cli.md)'s JSON envelope and of the validation report, built from one composition point, so the surfaces cannot disagree. See [Understanding Optionality](../../building-methods/pipes/understanding-optionality.md) for what each one means for your method.
+
 ## What Validation Checks
 
 All validation commands check:
@@ -11364,7 +11399,7 @@ For `bundle`, additional options are available:
     On a successful run, the envelope also carries `pending_signatures` — the library-wide list of pipes still declared as `PipeSignature` (unimplemented forward declarations), each namespaced by `pipe_ref` (`domain.code`). In JSON it is a `pending_signatures` array, in markdown a "Pending signatures" section. A top-down build reads it to see exactly which headers remain to implement. The envelope also carries a derived `is_runnable` boolean (`true` ⇔ `pending_signatures` is empty), and the markdown states the runnability verdict in plain English — runnable when complete, NOT yet runnable above the "Pending signatures" section otherwise. `validate bundle`, `validate method`, and `validate pipe --all` carry them and gate on them: without `--allow-signatures`, the command exits non-zero when `is_runnable` is false. Bare `validate pipe <code>` omits them, and a `--pipe` slice surfaces them for information without gating.
 
 !!! note "Advisory warnings on validate"
-    Whole-bundle and whole-library validate surfaces (`validate bundle`, `validate method`, `validate pipe --all`) also carry a `warnings` array — advisory optionality lints on a VALID bundle that never flip the verdict or the exit code. Each entry has the **same shape as a validation error item** (`category`, `error_type`, `pipe_code`, `domain_code`, `variable_names`, `message`) — this is a different shape from the `init`/`doctor` setup `warnings` (`{type, message}`) documented under Output Contract below. The first occupant is the useless-`!` lint (`optional_force_redundant`): a `!` (force) input whose slot is guaranteed present in every analyzed flow, so the assertion can never fire. The [intent-hint](../../building-methods/concepts/intent-hints.md) lints (`hint_unknown_key`, `hint_unknown_intent`, `hint_inapplicable_intent`) ride the same `warnings` shape on the protocol validation report; they are not wired into this CLI's array. In markdown, warnings render as a "Warnings" section. The array is empty when there is nothing to report; single-pipe `validate pipe` omits it (no flow context to lint in).
+    Whole-bundle and whole-library validate surfaces (`validate bundle`, `validate method`, `validate pipe --all`) also carry a `warnings` array — advisory optionality lints on a VALID bundle that never flip the verdict or the exit code. Each entry has the **same shape as a validation error item** (`category`, `error_type`, `pipe_code`, `domain_code`, `variable_names`, `message`) — this is a different shape from the `init`/`doctor` setup `warnings` (`{type, message}`) documented under Output Contract below. Three families ride the array, always in this order: the useless-`!` lint (`optional_force_redundant`), a `!` (force) input whose slot is guaranteed present in every analyzed flow, so the assertion can never fire; the vacuous-presence lint (`input_presence_vacuous`), an entry-pipe input that must be supplied but whose concept declares no required field, so the empty object satisfies it and a caller cannot tell what to fill in (see [Understanding Optionality](../../building-methods/pipes/understanding-optionality.md)); and the [intent-hint](../../building-methods/concepts/intent-hints.md) lints (`hint_unknown_key`, `hint_unknown_intent`, `hint_inapplicable_intent`). Every whole-bundle validate channel — this CLI, the bare CLI, the builder ops and the protocol validation report — assembles them from one composition point, so which advisories you see does not depend on which command you typed. Hint findings are bounded per site: a site naming many undefined keys reports the first few and then how many more there were, and a long authored key or value is elided in the message. In markdown, warnings render as a "Warnings" section. The array is empty when there is nothing to report; `validate pipe` omits it (no flow context to lint in). `validate bundle`/`validate method` with `--pipe` keep it, and it stays bundle-wide there — the slice narrows the dry run, not the validation.
 
 ### Fix
 
@@ -15440,7 +15475,7 @@ The derivation is total. A node it cannot map honestly reports `kind: "unknown"`
 
 Kinds are decided by chain membership and declared types — never by sniffing a schema shape. Per node, in precedence order:
 
-1. A concept with authored structure fields anywhere along its refinement chain is an `object`; its fields are the merged structures along the chain, base fields first, a refining concept overriding its parents'.
+1. A concept with an authored structure *table* anywhere along its refinement chain is an `object`; its fields are the merged structures along the chain, base fields first, a refining concept overriding its parents'. The table decides even when it is empty — the engine backs an empty `[concept.X.structure]` with a field-less structured model, not with `TextContent`, so the descriptor reports `object` with an empty `fields` list rather than falling through to rule 4.
 2. Otherwise, the first `structure = "ClassName"` on the chain decides: a native class name (`TextContent`, `ImageContent`, …) maps by identity to that native's row; any other registered class is reflected field by field into an `object`; an unregistered or unmappable class is `unknown`.
 3. Otherwise, a chain bottoming at a native concept takes that native's row, keeping the concept's own `concept_ref`, description and `refines`.
 4. Otherwise — a description-only or string-described concept — `prose` with `refines` ending in `native.Text`: this engine backs such a concept with a `TextContent` subclass, so that is a stated fact, not shape invention.
@@ -15472,6 +15507,8 @@ Every node carries an optional `hints` slot: the node's **effective** MTHDS inte
 ## Required, presence and gating
 
 On a top-level field, `required` is `presence != "optional"`, and `gating` — whether the run is blocked until the caller provides content — is `required` and not a variable-multiplicity list. A plain `Concept[]` slot is therefore `required: true, gating: false`: its empty form is the legitimate value `[]`. A fixed-count `Concept[N]` slot is a `list` with `item_count: N` that gates like any scalar. `Concept[1]` is a single node, because the runtime takes one value there (`StuffSpec.is_multiple()` is `count > 1`), and the descriptor says what the runtime accepts. Nested fields carry neither `presence` nor `gating`; their `required` is the payload fact.
+
+`gating` is also what the **vacuous-presence lint** is stated on. When a gating slot of an entry pipe names an `object` node whose `fields` carry no `required: true`, validation reports the advisory `input_presence_vacuous` warning: the caller is told the slot must be supplied, but the empty object satisfies it, so nothing is actually demanded. Keying the lint on `gating` rather than on `presence` is deliberate — `gating` is the fact a renderer blocks Run on, so the lint and the form cannot disagree about which slots demand content, and the variable-multiplicity exclusion falls out of the rule above instead of being restated. See [Understanding Optionality](../building-methods/pipes/understanding-optionality.md) for the author-facing description and its two remedies.
 
 ## Wire shape
 
@@ -19945,11 +19982,11 @@ Besides `category` and `message`, each item carries whatever identity fields its
 
 An item's `error_type` names the fault it reports, and that vocabulary is closed: `pipelex/validation_error_types.py` holds it in full, enumerated as `VALIDATION_ERROR_TYPES`. A consumer that needs to know which faults the language surface can report — a coverage gate, a test corpus, a client mapping errors onto its own UI — reads that registry instead of collecting strings from whichever diagnostics it happens to have seen.
 
-The registry is the union of the enums the runtime already raises, never a second list beside them: `PipeValidationErrorType` and `PipeFactoryErrorType` are the two stage vocabularies, and `ValidationResidualErrorType` names the one residual channel with no stage enum of its own. A member added to any of the three is in the registry the moment it is declared. `ValidationErrorItem.error_type` is typed against their union, so an unregistered string cannot be constructed or parsed onto an item — which is what makes the enumeration *closed* rather than merely documented, and what publishes the vocabulary into the OpenAPI schema `pipelex-api` serves for `/validate`.
+The registry is the union of the enums validation already reports through, never a second list beside them — "reports through", not "raises", because the advisory members ride `warnings` and are never raised as an exception at all: `PipeValidationErrorType` and `PipeFactoryErrorType` are the two stage vocabularies, `ValidationResidualErrorType` names the one residual channel with no stage enum of its own, and `HintLintErrorType` carries the intent-hint lints (which attach to concepts and structure fields too, so the pipe enum is the wrong home for them). A member added to any of them is in the registry the moment it is declared. `ValidationErrorItem.error_type` is typed against their union, so an unregistered string cannot be constructed or parsed onto an item — which is what makes the enumeration *closed* rather than merely documented, and what publishes the vocabulary into the OpenAPI schema `pipelex-api` serves for `/validate`.
 
 Two spellings live in that one vocabulary, deliberately. The stage enums are snake_case codes (`missing_input_variable`); the dry-run residual is `DryRunError`, the name of the exception that produced it, because that residual is raised as an error object rather than classified into a code. Normalizing it would be a wire break across every consumer that pins the string, and it would buy nothing — the enumeration is closed either way.
 
-Membership means a value is *reachable on the wire*, not that it is a useful thing to exercise. `optional_force_redundant` rides `warnings` and never an invalid verdict, and the two `unknown_*` fallbacks fire on states no author can ask for. A consumer building coverage over the registry excludes those on its own side with a stated reason, rather than pruning them from the runtime truth here — that is what the [MTHDS Test Corpus](../contribute/mthds-test-corpus.md) vocabulary generator will do when its `error.*` namespace arrives with this registry.
+Membership means a value is *reachable on the wire*, not that it is a useful thing to exercise. Several members are advisory-only — `optional_force_redundant`, `input_presence_vacuous`, and the three `hint_*` lints — riding `warnings` and never an invalid verdict, and the two `unknown_*` fallbacks fire on states no author can ask for. A consumer building coverage over the registry excludes those on its own side with a stated reason, rather than pruning them from the runtime truth here — which is what the [MTHDS Test Corpus](../contribute/mthds-test-corpus.md) vocabulary generator already does, excluding each with its reason as it generates the `error.*` namespace from this registry.
 
 `validation_errors` is one of the fields kept under STRICT disclosure (it is in `_STRICT_KEPT_FIELDS`): the items describe the caller's *own* submitted bundle, not server internals, so redacting them would gut the hosted path's diagnostics.
 
@@ -20283,7 +20320,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 |------|---------|
 | `pipelex/base_exceptions.py` | `PipelexError`, `ErrorReport`, `ErrorDomain`, `ValidationErrorItem`, `error_domain_to_http_status()` |
 | `pipelex/pipeline/validation_errors.py` | `build_validation_error_items()` — shared CLI/API structured bundle-validation builder |
-| `pipelex/validation_error_types.py` | The closed `error_type` registry — `VALIDATION_ERROR_TYPES`, `PipeValidationErrorType`, `PipeFactoryErrorType`, `ValidationResidualErrorType` |
+| `pipelex/validation_error_types.py` | The closed `error_type` registry — `VALIDATION_ERROR_TYPES`, `PipeValidationErrorType`, `PipeFactoryErrorType`, `ValidationResidualErrorType`, `HintLintErrorType` |
 | `pipelex/cogt/exceptions.py` | `CogtError`, `InferenceErrorCategory` |
 | `pipelex/cogt/inference/error_classification.py` | Extract — `ProviderErrorMetadata`, `SDKErrorEnvelope`, `UserAction`, `UserActionKind`, per-provider `extract_*_metadata` functions, pure discriminators |
 | `pipelex/cogt/inference/error_classify.py` | Classify — `classify_inference_error()`, `ClassificationResult` |
@@ -21702,7 +21739,7 @@ An **exclusion** marks a registry code that no standalone focused entry could me
 
 No native concept is excluded — every one of them turned out to support a real entry. `PipeFunc` is excluded: it names a Python function that the runtime resolves against its function registry *at validation time*, so an entry declaring one fails with `Function '<name>' not found in registry` in every consumer that has not registered that exact function — and a cross-language consumer cannot register a Python function at all. Exercise `PipeFunc` in a consumer's own fixtures, where the function exists.
 
-`error.*` carries the rest of the exclusions, and the distinction they turn on is worth stating: **membership in the registry means a value is reachable on the wire, never that a focused entry can produce it.** A corpus entry is a `.mthds` bundle validated through `validate bundle`, so a fault the validate path cannot reach is excluded here rather than pruned from the runtime's own truth. Two are unreachable by construction — `circular_dependency_error` is raised only by the pipe sorter, which runs on the builder's spec-to-blueprint conversion and never on a parsed `.mthds` file, and `unknown_concept` fires in the pipe factory under exactly the condition the earlier concept-reference resolution has already rejected as `unresolved_concept`. One has no shape an entry could take: `optional_force_redundant` rides the validation report's `warnings` array and never makes a verdict invalid, and the manifest models no warnings axis. The two `unknown_*` fallbacks are excluded because an entry pinning one would be pinning the absence of a diagnosis, and would have to be rewritten the moment the fault got a code of its own.
+`error.*` carries the rest of the exclusions, and the distinction they turn on is worth stating: **membership in the registry means a value is reachable on the wire, never that a focused entry can produce it.** A corpus entry is a `.mthds` bundle validated through `validate bundle`, so a fault the validate path cannot reach is excluded here rather than pruned from the runtime's own truth. Two are unreachable by construction — `circular_dependency_error` is raised only by the pipe sorter, which runs on the builder's spec-to-blueprint conversion and never on a parsed `.mthds` file, and `unknown_concept` fires in the pipe factory under exactly the condition the earlier concept-reference resolution has already rejected as `unresolved_concept`. Several have no shape an entry could take: the advisory-only codes — `optional_force_redundant`, `input_presence_vacuous`, and the three `hint_*` lints — ride the validation report's `warnings` array and never make a verdict invalid, so the bundle they fire on is valid and has no `expected_error` to carry, and the manifest models no warnings axis. The two `unknown_*` fallbacks are excluded because an entry pinning one would be pinning the absence of a diagnosis, and would have to be rewritten the moment the fault got a code of its own.
 
 **Measure an exclusion, do not reason your way to one.** Every `error.*` exclusion reason above was established by writing the bundle that ought to trigger it and reading what the runtime actually said — which is how the first two turned out to be shadowed rather than merely awkward, and how the two the registry made look unreachable (`missing_pipe_type`, `native_concept_redeclaration`) turned out to have entries after all.
 
