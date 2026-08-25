@@ -84,7 +84,7 @@ A new module `pipelex/pipeline/advisory_warnings.py` owns the assembly:
 - `build_advisory_warnings(*, taint_analyses, input_form, entry_pipe_refs, qualified_crate)` — pure over precomputed ingredients; concatenates the families in a fixed order (optionality, presence vacuity, hints), each family in its own deterministic order. The protocol path calls this with the ingredients it already computes.
 - `collect_advisory_warnings(*, pipes, entry_pipe_refs)` — gathers the ingredients inside the open validation window (the taint walk, the descriptor, the current library's crate qualified once) and calls the pure builder. The CLI and builder channels call this.
 
-Every site that assembles `warnings` today switches to one of the two, and the bare CLI's yellow echo renders whatever the builder returns. The invalid arm and the single-pipe surfaces stay warning-less, as the protocol spec states.
+Every site that assembles `warnings` today switches to one of the two, and the bare CLI's yellow echo renders whatever the builder returns. The invalid arm and the bare single-pipe surfaces stay warning-less, as the protocol spec states; a `--pipe` slice of `validate bundle` is not a single-pipe surface in that sense — it validates the whole bundle and narrows only the dry run, so it keeps the bundle-wide array.
 
 This brings the hint lints onto the CLI and builder channels, which is the engine-hints deferral. Its stated prerequisite is taken on here: hint messages interpolate authored content raw and unbounded, one item per unknown key, so before that lint reaches a channel an author invokes casually, the lint elides long tokens and caps findings per site (a short "and N more" tail). This is small and it is the honest price of a single composition point.
 

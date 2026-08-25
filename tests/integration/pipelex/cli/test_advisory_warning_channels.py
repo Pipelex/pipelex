@@ -288,3 +288,18 @@ class TestAdvisoryWarningChannels:
 
         echoed = [line for line in capsys.readouterr().out.splitlines() if line.startswith("Warning: ")]
         assert [line for line in echoed if "Input 'opts' of pipe 'advisory_pending.run'" in line]
+
+    def test_bare_cli_validate_all_echo_survives_the_signature_gate(
+        self, pending_signature_bundle_dir: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """The twin of the test above on the other bare-CLI path.
+
+        `validate --all` has echoed ahead of its gate since before this lint existed, but nothing
+        pinned it there — so a future edit could move it behind the gate on this path exactly as one
+        had on the other, and every test would stay green.
+        """
+        with pytest.raises(typer.Exit):
+            do_validate_all_libraries_and_dry_run(library_dirs=[pending_signature_bundle_dir])
+
+        echoed = [line for line in capsys.readouterr().out.splitlines() if line.startswith("Warning: ")]
+        assert [line for line in echoed if "Input 'opts' of pipe 'advisory_pending.run'" in line]
