@@ -5,7 +5,7 @@ site it does not apply to — cannot live in pydantic validators: a validator ca
 these must never reject. Well-formed unknown content is preserved into the crate and the
 descriptor untouched; the lint only names it. One advisory `ValidationErrorItem` per finding on
 the report's `warnings` array, never flipping `is_valid` — composed with the other advisory
-families in `advisory_warnings.py`, which is what every validate channel calls.
+families in `advisory_warnings.py`, which is what every advisory-bearing validate channel calls.
 
 Site applicability follows the spec's Applicability section: text-valued and number-valued sites
 are judged structurally over the qualified crate (description-only concepts are text-valued;
@@ -39,7 +39,7 @@ MAX_HINT_FINDINGS_PER_SITE = 5
 
 The unknown-key rule emits one finding per undefined key, so a site's finding count is bounded only
 by how many keys the author wrote. That was tolerable while the lint reached the API path alone; it
-now rides every validate channel an author invokes casually, so a site that names fifty keys reports
+now rides every advisory-bearing validate channel, including ones an author invokes casually, so a site that names fifty keys reports
 the first few and then says how many more there were."""
 
 MAX_AUTHORED_TOKEN_LENGTH = 60
