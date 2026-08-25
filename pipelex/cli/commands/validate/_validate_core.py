@@ -137,6 +137,13 @@ async def _validate_pipe_or_bundle(
                 library_dirs=library_dirs,
                 allow_signatures=allow_signatures,
             )
+            # Advisory lints, printed BEFORE the signature gate below exits non-zero — same ordering
+            # as `validate --all`. A method with an unimplemented placeholder is the state an author
+            # is most often in while building, and it is exactly then that the advisories help.
+            # validate_bundle leaves its validation library open on success, so the taint walk behind
+            # the lints can still resolve the bundle's pipes.
+            _echo_advisory_warnings(pipes=bundle_result.pipes, entry_pipe_refs=collect_entry_pipe_refs(bundle_result.blueprints))
+
             # Gate-from-report (D-B consumer-decides): signatures are never a validation error, but a
             # bundle with unsatisfied PipeSignature placeholders is valid yet NOT runnable. The CLI
             # exits non-zero on `not is_runnable` unless --allow-signatures tolerates the placeholders.
@@ -154,9 +161,6 @@ async def _validate_pipe_or_bundle(
                 f"Successfully validated bundle '{bundle_path}'{_format_signatures_summary_suffix(signature_count=signature_count)}",
                 fg=typer.colors.GREEN,
             )
-            # validate_bundle leaves its validation library open on success, so the taint walk
-            # behind the advisory lints can still resolve the bundle's pipes.
-            _echo_advisory_warnings(pipes=bundle_result.pipes, entry_pipe_refs=collect_entry_pipe_refs(bundle_result.blueprints))
         except FileNotFoundError as exc:
             get_console().print(Traceback())
             typer.secho(

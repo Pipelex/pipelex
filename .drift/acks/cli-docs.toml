@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:b458a7ca61833ab0388111b5cb37c08589c865d438fde40adb931087049f74ed"
+digest = "sha256:c3043b7ae643783145bc6b481ead8e5c866c80017fff0d339e6aaa052f148b8b"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-25T07:40:01Z"
-rationale = "Both validate cores switched from the optionality-only warning assembly to the shared advisory composition point, which is a real change to what those commands emit: the intent-hint lints now ride the agent-CLI warnings array and the bare CLI yellow echo for the first time, and a new family (input_presence_vacuous) joins them. Reviewed and updated every target - the agent-CLI advisory note in docs/tools/cli/agent-cli.md now lists all three families in their fixed order and drops the sentence saying the hint lints were not wired into this CLI, docs/tools/cli/validate.md gained an Advisory Warnings section for the bare CLI yellow echo it never described, and the agent-CLI contract doc now names the composition point as the place a new family is added. No command, option, argument, exit code or error type moved."
+reviewed_at = "2026-08-25T09:27:54Z"
+rationale = "The bare CLI's validate bundle now echoes its advisory warnings before the strict pending-signature gate rather than after it, matching validate --all. Reviewed both targets: docs/tools/cli/validate.md said the warnings print beside the success message, which is no longer where they appear and hid the case that motivated the change, so its Advisory Warnings section now states the ordering and that a bundle with an unimplemented placeholder still shows them while exiting non-zero. The agent-CLI contract doc needed no ordering change (its envelope is JSON) but its composition-point sentence was overstating the channel scope and now says advisory-bearing, naming the surfaces that carry none. No command, option, argument or exit code moved."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -120,7 +120,7 @@ rationale = "Both validate cores switched from the optionality-only warning asse
 "pipelex/cli/commands/show_cmd.py" = "blob:7974d91404ea93f05b16b05b9aef3c1a540b965d"
 "pipelex/cli/commands/update_cmd.py" = "blob:06100ec3b9d6c66ca89a8c1536aa27983ae409ca"
 "pipelex/cli/commands/validate/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
-"pipelex/cli/commands/validate/_validate_core.py" = "blob:e911e57165b43ac986afba0c70c1077fcea2f536"
+"pipelex/cli/commands/validate/_validate_core.py" = "blob:3294c9c716ac616a89213c7356d38a8eff62da40"
 "pipelex/cli/commands/validate/app.py" = "blob:309061423af13f2f6c496a024306ad696af567ab"
 "pipelex/cli/commands/validate/bundle_cmd.py" = "blob:1fbf3e0cf695db39101c83160a724df6468988e9"
 "pipelex/cli/commands/validate/method_cmd.py" = "blob:2cb68d5c371a5b45841fce9c26da5e4622e6b042"

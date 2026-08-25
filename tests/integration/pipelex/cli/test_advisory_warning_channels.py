@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
+import typer
 
 from pipelex.builder.operations import validate_ops
 from pipelex.cli.agent_cli.commands.validate._validate_core import validate_all_core, validate_bundle_core
@@ -56,6 +57,30 @@ description = "Run with options"
 inputs = { opts = "RunOptions" }
 output = "Text"
 prompt = "Run with $opts"
+"""
+
+_VACUOUS_WITH_PENDING_SIGNATURE_MTHDS = """
+domain = "advisory_pending"
+description = "Bundle whose main pipe is vacuous and whose step is still a placeholder"
+main_pipe = "run"
+
+[concept.RunOptions]
+description = "Options for the run"
+
+[concept.RunOptions.structure]
+tone = { type = "text", description = "The tone to use" }
+
+[pipe.run]
+type = "PipeSequence"
+description = "Run with options through a step that is not implemented yet"
+inputs = { opts = "RunOptions" }
+output = "Text"
+steps = [ { pipe = "step_sig", result = "out" } ]
+
+[pipe.step_sig]
+description = "Signature placeholder for the step."
+inputs = { opts = "RunOptions" }
+output = "Text"
 """
 
 _ALL_FAMILIES_MTHDS = """
@@ -108,6 +133,14 @@ def vacuous_bundle_dir() -> Iterator[Path]:
         directory = Path(temp_dir)
         _write_bundle(contents=_VACUOUS_MTHDS, directory=directory)
         yield directory
+
+
+@pytest.fixture
+def pending_signature_bundle_dir() -> Iterator[Path]:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        path = Path(temp_dir)
+        (path / "bundle.mthds").write_text(_VACUOUS_WITH_PENDING_SIGNATURE_MTHDS)
+        yield path
 
 
 @pytest.fixture
@@ -236,3 +269,22 @@ class TestAdvisoryWarningChannels:
         echoed = [line for line in capsys.readouterr().out.splitlines() if line.startswith("Warning: ")]
         assert len(echoed) == 1
         assert "Input 'opts' of pipe 'advisory_channels.run'" in echoed[0]
+
+    def test_bare_cli_bundle_echo_survives_the_signature_gate(self, pending_signature_bundle_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """A pending placeholder must not swallow the advisories, on either bare-CLI path.
+
+        A half-implemented method is the state an author is most often in while building, and the
+        strict signature gate exits non-zero from it. `validate --all` has always echoed before that
+        gate; `validate bundle` used to echo after it, so the warnings were unreachable exactly when
+        they were most useful.
+        """
+        with pytest.raises(typer.Exit):
+            asyncio.run(
+                _validate_pipe_or_bundle(
+                    bundle_path=pending_signature_bundle_dir / "bundle.mthds",
+                    library_dirs=[pending_signature_bundle_dir],
+                )
+            )
+
+        echoed = [line for line in capsys.readouterr().out.splitlines() if line.startswith("Warning: ")]
+        assert [line for line in echoed if "Input 'opts' of pipe 'advisory_pending.run'" in line]
