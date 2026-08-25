@@ -1,0 +1,21 @@
+CHANGELOG.md
+  s_bdcd847f78929f::t_4467b6b190c1dd 23
+.github/workflows/publish-pypi.yml
+  s_bdcd847f78929f::t_0983896b2ed546 161-168,181-190,193,200,203-223,225,235-241
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "c9d712023d2df8d99de48e31d7add115141a4e37",
+  "prompts": {},
+  "sessions": {
+    "s_bdcd847f78929f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d6ed38fb-64c0-46c3-ad16-4d71de19fff5",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Louis Choquel <louis@pipelex.com>"
+    }
+  }
+}
