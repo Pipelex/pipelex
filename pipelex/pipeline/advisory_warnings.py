@@ -98,5 +98,14 @@ def collect_current_library_entry_pipe_refs() -> list[str]:
     declared `main_pipe`s come off the blueprints the library manager retained on the way in.
     Returns nothing for a library loaded straight from a transported crate, which accumulates no
     blueprints — the same silence as a batch that declares no `main_pipe`.
+
+    A dependency package's own `main_pipe` is deliberately NOT an entry ref here. Only the bundles
+    the author is validating are accumulated onto the library; a dependency's blueprints load into
+    an isolated child library instead, so its `main_pipe` never reaches this list. That is the
+    scoping the entry-pipe lints want on both counts: the remedies they state (mark the input
+    optional, give the concept a required field) are edits to a package the author does not own,
+    and a dependency's concepts never enter this library's crate anyway — every slot of a
+    dependency pipe derives an `unknown` node, which those lints skip. Including the refs would
+    add findings nobody can act on, or no findings at all.
     """
     return collect_entry_pipe_refs(get_library_manager().get_accumulated_blueprints(get_current_library()))
