@@ -269,6 +269,10 @@ class LibraryManager(LibraryManagerAbstract):
         return None
 
     @override
+    def get_accumulated_blueprints(self, library_id: str) -> list[PipelexBundleBlueprint]:
+        return list(self._blueprints.get(library_id, []))
+
+    @override
     def get_crate(self, library_id: str) -> LibraryCrate | None:
         cached = self._crate_cache.get(library_id)
         if cached is not None:

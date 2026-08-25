@@ -26,7 +26,7 @@ The derivation is total. A node it cannot map honestly reports `kind: "unknown"`
 
 Kinds are decided by chain membership and declared types — never by sniffing a schema shape. Per node, in precedence order:
 
-1. A concept with authored structure fields anywhere along its refinement chain is an `object`; its fields are the merged structures along the chain, base fields first, a refining concept overriding its parents'.
+1. A concept with an authored structure *table* anywhere along its refinement chain is an `object`; its fields are the merged structures along the chain, base fields first, a refining concept overriding its parents'. The table decides even when it is empty — the engine backs an empty `[concept.X.structure]` with a field-less structured model, not with `TextContent`, so the descriptor reports `object` with an empty `fields` list rather than falling through to rule 4.
 2. Otherwise, the first `structure = "ClassName"` on the chain decides: a native class name (`TextContent`, `ImageContent`, …) maps by identity to that native's row; any other registered class is reflected field by field into an `object`; an unregistered or unmappable class is `unknown`.
 3. Otherwise, a chain bottoming at a native concept takes that native's row, keeping the concept's own `concept_ref`, description and `refines`.
 4. Otherwise — a description-only or string-described concept — `prose` with `refines` ending in `native.Text`: this engine backs such a concept with a `TextContent` subclass, so that is a stated fact, not shape invention.
@@ -58,6 +58,8 @@ Every node carries an optional `hints` slot: the node's **effective** MTHDS inte
 ## Required, presence and gating
 
 On a top-level field, `required` is `presence != "optional"`, and `gating` — whether the run is blocked until the caller provides content — is `required` and not a variable-multiplicity list. A plain `Concept[]` slot is therefore `required: true, gating: false`: its empty form is the legitimate value `[]`. A fixed-count `Concept[N]` slot is a `list` with `item_count: N` that gates like any scalar. `Concept[1]` is a single node, because the runtime takes one value there (`StuffSpec.is_multiple()` is `count > 1`), and the descriptor says what the runtime accepts. Nested fields carry neither `presence` nor `gating`; their `required` is the payload fact.
+
+`gating` is also what the **vacuous-presence lint** is stated on. When a gating slot of an entry pipe names an `object` node whose `fields` carry no `required: true`, validation reports the advisory `input_presence_vacuous` warning: the caller is told the slot must be supplied, but the empty object satisfies it, so nothing is actually demanded. Keying the lint on `gating` rather than on `presence` is deliberate — `gating` is the fact a renderer blocks Run on, so the lint and the form cannot disagree about which slots demand content, and the variable-multiplicity exclusion falls out of the rule above instead of being restated. See [Understanding Optionality](../building-methods/pipes/understanding-optionality.md) for the author-facing description and its two remedies.
 
 ## Wire shape
 

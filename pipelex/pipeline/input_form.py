@@ -45,7 +45,7 @@ from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import PresenceMarker, fixed_item_count
 from pipelex.interpreter_hub import get_current_library, get_library_manager
 from pipelex.language.intent_hints import HintSiteValueKind, IntentWord, applicable_intent, merge_hints
-from pipelex.libraries.crate_qualification import qualify_crate
+from pipelex.libraries.crate_qualification import QualifiedCrateContent, qualify_crate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_machinery.pipe_blueprint import InputSlotBlueprint
@@ -82,6 +82,25 @@ class FieldKind(StrEnum):
                 | FieldKind.DOCUMENT
                 | FieldKind.IMAGE
                 | FieldKind.OBJECT
+                | FieldKind.UNKNOWN
+            ):
+                return False
+
+    @property
+    def is_object(self) -> bool:
+        match self:
+            case FieldKind.OBJECT:
+                return True
+            case (
+                FieldKind.TEXT
+                | FieldKind.PROSE
+                | FieldKind.NUMBER
+                | FieldKind.BOOLEAN
+                | FieldKind.DATE
+                | FieldKind.ENUM
+                | FieldKind.DOCUMENT
+                | FieldKind.IMAGE
+                | FieldKind.LIST
                 | FieldKind.UNKNOWN
             ):
                 return False
@@ -203,7 +222,7 @@ class PipeInputFormDescriptor(BaseModel):
     """One field descriptor per input slot, in authored input order. Empty for a pipe with no inputs."""
 
 
-def build_input_form(pipes: Sequence[PipeAbstract]) -> dict[str, PipeInputFormDescriptor]:
+def build_input_form(pipes: Sequence[PipeAbstract], *, qualified_crate: QualifiedCrateContent | None = None) -> dict[str, PipeInputFormDescriptor]:
     """Derive the `input_form` descriptors of loaded pipes from the authored blueprints of the current library.
 
     Works on any loaded `PipeAbstract`, `PipeSignature` placeholders included, iterating exactly
@@ -214,12 +233,15 @@ def build_input_form(pipes: Sequence[PipeAbstract]) -> dict[str, PipeInputFormDe
 
     Args:
         pipes: The loaded pipes to describe (typically `ValidateBundleResult.pipes`).
+        qualified_crate: The current library's already-qualified crate, when the caller holds one.
+            Qualification is a whole-crate walk, and a caller that runs several artifacts over the
+            same window (the advisory-warnings collector) would otherwise pay for it twice. Omit it
+            and the crate is read and qualified here, as before.
 
     Returns:
         `pipe_ref` → `PipeInputFormDescriptor` for every given pipe.
     """
-    crate = get_library_manager().get_crate(library_id=get_current_library()) or LibraryCrateFactory.make_from_blueprints([])
-    qualified = qualify_crate(crate)
+    qualified = qualified_crate if qualified_crate is not None else qualify_current_library_crate()
     deriver = InputFormDeriver(concepts=qualified.concepts)
     input_form: dict[str, PipeInputFormDescriptor] = {}
     for pipe in pipes:
@@ -234,6 +256,18 @@ def build_input_form(pipes: Sequence[PipeAbstract]) -> dict[str, PipeInputFormDe
         ]
         input_form[pipe.pipe_ref] = PipeInputFormDescriptor(fields=fields)
     return input_form
+
+
+def qualify_current_library_crate() -> QualifiedCrateContent:
+    """The current library's accumulated crate, qualified — empty when the library holds none.
+
+    The single place that knows how to reach the authored facts of the open validation window, so
+    the artifacts derived from them (the descriptors, the advisory lints) cannot read different
+    facts. Requires a current library, like every other artifact built inside the window; a library
+    that accumulated no blueprints yields an empty crate, from which every consumer derives nothing.
+    """
+    crate = get_library_manager().get_crate(library_id=get_current_library()) or LibraryCrateFactory.make_from_blueprints([])
+    return qualify_crate(crate)
 
 
 def _slot_hints_of(slot_value: "str | InputSlotBlueprint | None") -> dict[str, str] | None:
@@ -327,7 +361,7 @@ class InputFormDeriver:
     ) -> InputFormField:
         refines = chain or None
         merged_structure = self._merged_structure(concept_ref=concept_ref, chain=chain)
-        if merged_structure:
+        if merged_structure is not None:
             fields = [self._structure_field(name=field_name, field=field, seen=seen) for field_name, field in merged_structure.items()]
             return InputFormField(
                 kind=FieldKind.OBJECT,
@@ -433,7 +467,14 @@ class InputFormDeriver:
             return _unknown_node(name=name, concept_ref=concept_ref, description=description, refines=refines)
         reflected = reflect_structure_class(structure_class=structure_class)
         if reflected is None:
-            return _unknown_node(name=name, concept_ref=concept_ref, description=description, refines=refines)
+            if structure_class.model_fields:
+                # A field this reflection could not map: the payload's shape is genuinely opaque here.
+                return _unknown_node(name=name, concept_ref=concept_ref, description=description, refines=refines)
+            # A class declaring no field at all is not opaque — it states a payload that demands
+            # nothing, the class-backed twin of an empty authored structure table, and the form says
+            # so. (`reflect_structure_class` collapses both into `None` because its other consumer,
+            # the native consistency probe, reads `None` as "structureless by design".)
+            reflected = {}
         fields = [
             _with_reflected_constraints(
                 node=self._structure_field(name=field_name, field=field, seen=seen), field_info=structure_class.model_fields[field_name]
@@ -462,13 +503,20 @@ class InputFormDeriver:
             current = self._concepts.get(link)
         return chain
 
-    def _merged_structure(self, *, concept_ref: str, chain: list[str]) -> dict[str, ConceptStructureBlueprintType]:
-        """The authored structure fields along the chain, base fields first, a refining concept overriding its parents'."""
-        merged: dict[str, ConceptStructureBlueprintType] = {}
+    def _merged_structure(self, *, concept_ref: str, chain: list[str]) -> dict[str, ConceptStructureBlueprintType] | None:
+        """The authored structure fields along the chain, base fields first, a refining concept overriding its parents'.
+
+        `None` when no concept along the chain authors a structure table at all; `{}` when one does and
+        that table is empty. The distinction is the engine's own: `ConceptFactory` branches on
+        `structure is not None`, so an authored-but-empty table is backed by a field-less structured
+        model with an empty object schema — not by `TextContent`. Testing truthiness here would report
+        that concept as `prose` with a `native.Text` refines link nobody authored.
+        """
+        merged: dict[str, ConceptStructureBlueprintType] | None = None
         for ref in [*reversed(chain), concept_ref]:
             entry = self._concepts.get(ref)
             if isinstance(entry, ConceptBlueprint) and isinstance(entry.structure, dict):
-                merged.update(entry.structure)
+                merged = {**(merged or {}), **entry.structure}
         return merged
 
     def _first_class_structure(self, *, concept_ref: str, chain: list[str]) -> str | None:

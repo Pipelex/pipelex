@@ -72,6 +72,27 @@ Field names must be valid Python identifiers and cannot be Python keywords; gene
 
     This is deliberate: a silently discarded key is authored intent that vanishes without a trace, and you only find out when the value it was supposed to govern comes back wrong. If you need a numeric bound or another constraint, express it on a Python class instead — see [Python Classes](python-classes.md), whose pydantic `Field(...)` metadata is read as an authored fact. Note that hint *content* stays lenient: an unknown key inside a `hints` table warns and is preserved, rather than failing the bundle.
 
+## All-Optional Structures and the `input_presence_vacuous` Lint
+
+`required` defaults to **`false`** in the long form, and this is the difference between the two spellings that is easiest to miss:
+
+```toml
+[concept.RunOptions.structure]
+tone  = "The tone to use"                                        # shorthand: a REQUIRED text field
+depth = { type = "integer", description = "How deep to go" }     # long form: OPTIONAL, because required defaults to false
+```
+
+A structure written entirely in the long form with no `required = true` anywhere is **all-optional**: its payload admits `{}`. That is perfectly legal, and often exactly right — an extraction concept that records whatever a document happens to state should not demand any particular field. A structure table holding *no* field at all is the degenerate case of the same thing — its payload admits only `{}` — and the lint below names it in its own words.
+
+It becomes a problem at one place only: when such a concept is named by a **method input that must be supplied** — an input of the bundle's declared `main_pipe`, written without a `?`. The declaration says "the caller must provide this", but since the empty object satisfies the concept, the only thing it can enforce is that the caller provides `{}`. Nothing is actually demanded, and a form, an API client or a person filling the input in has no way to tell what to put there. Validation reports this as the advisory `input_presence_vacuous` warning — the bundle stays **valid**, the warning never flips the verdict.
+
+There are two remedies, and which one is right depends on what you meant:
+
+- **The method can run without it.** Mark the input optional: `opts = "RunOptions?"`. Now absence is a declared, handled outcome rather than an empty object.
+- **The method genuinely needs something in it.** Give the concept at least one required field — either `required = true` on the field that matters, or the shorthand form, which is required by definition.
+
+The lint looks one level deep and only at entry pipes. A slot on an inner pipe is fed by dataflow, not by a caller, so it is never warned about; and a required field that is *itself* an all-optional concept is not warned about either.
+
 ## Supported Field Types
 
 Inline structures support these field types:

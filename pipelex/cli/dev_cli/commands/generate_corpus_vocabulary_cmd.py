@@ -158,6 +158,13 @@ _ERROR_TYPE_EXCLUSIONS: dict[ValidationErrorType, str] = {
         "valid one, so there is no shape a focused entry could take. Revisit if the manifest ever grows a "
         "warnings axis."
     ),
+    PipeValidationErrorType.INPUT_PRESENCE_VACUOUS: (
+        "Advisory-only, for the same reason as `optional_force_redundant`: the entry-pipe vacuous-presence lint "
+        "rides the validation report's `warnings` array and never makes a verdict invalid. The bundle it fires "
+        "on is VALID — a gating input whose concept declares no required field is legal, merely undefinable for "
+        "a caller — so there is no `expected_error` an entry could carry. Revisit if the manifest ever grows a "
+        "warnings axis."
+    ),
     HintLintErrorType.HINT_UNKNOWN_KEY: _ADVISORY_HINT_LINT_EXCLUSION,
     HintLintErrorType.HINT_UNKNOWN_INTENT: _ADVISORY_HINT_LINT_EXCLUSION,
     HintLintErrorType.HINT_INAPPLICABLE_INTENT: _ADVISORY_HINT_LINT_EXCLUSION,

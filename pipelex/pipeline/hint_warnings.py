@@ -3,9 +3,9 @@
 The spec's SHOULD-warn rules — an unknown hint key, an unknown `intent` word, a known word on a
 site it does not apply to — cannot live in pydantic validators: a validator can only raise, and
 these must never reject. Well-formed unknown content is preserved into the crate and the
-descriptor untouched; the lint only names it. Same channel as `build_optionality_warnings`: one
-advisory `ValidationErrorItem` per finding on the report's `warnings` array, never flipping
-`is_valid`.
+descriptor untouched; the lint only names it. One advisory `ValidationErrorItem` per finding on
+the report's `warnings` array, never flipping `is_valid` — composed with the other advisory
+families in `advisory_warnings.py`, which is what every advisory-bearing validate channel calls.
 
 Site applicability follows the spec's Applicability section: text-valued and number-valued sites
 are judged structurally over the qualified crate (description-only concepts are text-valued;
@@ -19,7 +19,6 @@ from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBl
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.core.qualified_ref import QualifiedRef
-from pipelex.interpreter_hub import get_current_library_id_or_none, get_library_manager
 from pipelex.language.intent_hints import (
     INTENT_HINT_KEY,
     KNOWN_HINT_KEYS,
@@ -28,12 +27,34 @@ from pipelex.language.intent_hints import (
     intent_word_applies,
     is_intent_word_known,
 )
-from pipelex.libraries.crate_qualification import QualifiedCrateContent, qualify_crate
+from pipelex.libraries.crate_qualification import QualifiedCrateContent
 from pipelex.pipe_machinery.pipe_blueprint import InputSlotBlueprint
 from pipelex.validation_error_types import HintLintErrorType
 
 _NATIVE_TEXT_REF = NativeConceptCode.TEXT.concept_ref
 _NATIVE_NUMBER_REF = NativeConceptCode.NUMBER.concept_ref
+
+MAX_HINT_FINDINGS_PER_SITE = 5
+"""How many undefined hint keys one site reports individually before the rest collapse into a tail.
+
+The unknown-key rule emits one finding per undefined key, so a site's finding count is bounded only
+by how many keys the author wrote. That was tolerable while the lint reached the API path alone; it
+now rides every advisory-bearing validate channel, including ones an author invokes casually, so a site that names fifty keys reports
+the first few and then says how many more there were."""
+
+MAX_AUTHORED_TOKEN_LENGTH = 60
+"""How much of an authored hint key or value a message quotes before eliding the rest.
+
+Hint keys and values are free strings, interpolated raw into the finding's `message`. Long enough to
+identify the entry the author wrote, short enough that a whole document pasted into a hint value
+cannot inflate the warning payload."""
+
+
+def elide_authored_token(*, token: str) -> str:
+    """An authored token, cut to a length a diagnostic can quote (an elided one ends in an ellipsis)."""
+    if len(token) <= MAX_AUTHORED_TOKEN_LENGTH:
+        return token
+    return f"{token[:MAX_AUTHORED_TOKEN_LENGTH]}..."
 
 
 def _native_class_value_kind(*, class_name: str) -> HintSiteValueKind:
@@ -66,19 +87,6 @@ def _native_class_value_kind(*, class_name: str) -> HintSiteValueKind:
             | None
         ):
             return HintSiteValueKind.OTHER
-
-
-def build_current_library_hint_warnings() -> list[ValidationErrorItem]:
-    """Hint lint over the current library's accumulated crate.
-
-    Same window contract as `build_input_form`; with no current library or no crate the sweep
-    is empty (the fallback path derives nothing to lint).
-    """
-    library_id = get_current_library_id_or_none()
-    crate = get_library_manager().get_crate(library_id=library_id) if library_id else None
-    if crate is None:
-        return []
-    return build_hint_warnings(qualify_crate(crate))
 
 
 def build_hint_warnings(qualified: QualifiedCrateContent) -> list[ValidationErrorItem]:
@@ -166,18 +174,25 @@ class _HintLinter:
         variable_names: list[str] | None = None,
     ) -> list[ValidationErrorItem]:
         findings: list[tuple[HintLintErrorType, str]] = []
-        for key in hints:
-            if key not in KNOWN_HINT_KEYS:
-                unknown_key_message = (
-                    f"Hint key '{key}' on {site_desc} is not defined by this version of the standard "
-                    f"(known keys: {', '.join(sorted(KNOWN_HINT_KEYS))}). The entry is preserved; consumers ignore it."
-                )
-                findings.append((HintLintErrorType.HINT_UNKNOWN_KEY, unknown_key_message))
+        unknown_keys = [key for key in hints if key not in KNOWN_HINT_KEYS]
+        for key in unknown_keys[:MAX_HINT_FINDINGS_PER_SITE]:
+            unknown_key_message = (
+                f"Hint key '{elide_authored_token(token=key)}' on {site_desc} is not defined by this version of the standard "
+                f"(known keys: {', '.join(sorted(KNOWN_HINT_KEYS))}). The entry is preserved; consumers ignore it."
+            )
+            findings.append((HintLintErrorType.HINT_UNKNOWN_KEY, unknown_key_message))
+        overflow = len(unknown_keys) - MAX_HINT_FINDINGS_PER_SITE
+        if overflow > 0:
+            overflow_message = (
+                f"...and {overflow} more hint key(s) on {site_desc} are not defined by this version of the standard. "
+                f"The entries are preserved; consumers ignore them."
+            )
+            findings.append((HintLintErrorType.HINT_UNKNOWN_KEY, overflow_message))
         intent_word = hints.get(INTENT_HINT_KEY)
         if intent_word is not None:
             if not is_intent_word_known(intent_word):
                 unknown_intent_message = (
-                    f"Intent word '{intent_word}' on {site_desc} is not in this version's vocabulary "
+                    f"Intent word '{elide_authored_token(token=intent_word)}' on {site_desc} is not in this version's vocabulary "
                     f"(prose, label, rating, quantity). The entry is preserved; consumers ignore it."
                 )
                 findings.append((HintLintErrorType.HINT_UNKNOWN_INTENT, unknown_intent_message))
@@ -188,7 +203,7 @@ class _HintLinter:
                     case IntentWord.RATING | IntentWord.QUANTITY:
                         needed_kind = "number"
                 inapplicable_message = (
-                    f"Intent word '{intent_word}' does not apply to {site_desc} (the site is not "
+                    f"Intent word '{elide_authored_token(token=intent_word)}' does not apply to {site_desc} (the site is not "
                     f"{needed_kind}-valued). The entry is preserved; consumers ignore it there."
                 )
                 findings.append((HintLintErrorType.HINT_INAPPLICABLE_INTENT, inapplicable_message))

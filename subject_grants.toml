@@ -3828,6 +3828,10 @@ rationale = "Predicate-style check on the version constraint; single operand."
 param = "blueprints"
 rationale = "Derivation: finds dirs from the blueprints; single operand."
 
+["pipelex/libraries/library_manager_abstract.py::LibraryManagerAbstract.get_accumulated_blueprints"]
+param = "library_id"
+rationale = "Manager getter keyed by the library id; single operand."
+
 ["pipelex/libraries/library_manager_abstract.py::LibraryManagerAbstract.get_crate"]
 param = "library_id"
 rationale = "Manager getter keyed by the library id; single operand."
@@ -4399,6 +4403,10 @@ rationale = "Verb-object: walks from the root pipe; accumulators stay keyword."
 ["pipelex/pipe_signature/signature_walk.py::collect_signature_refs"]
 param = "pipe"
 rationale = "Verb-object: walks from the root pipe; visited set stays keyword."
+
+["pipelex/pipeline/blueprint_selection.py::collect_entry_pipe_refs"]
+param = "blueprints"
+rationale = "Derivation: collects the entry refs from the batch's blueprints; single operand."
 
 ["pipelex/pipeline/blueprint_selection.py::select_primary_blueprint"]
 param = "blueprints"

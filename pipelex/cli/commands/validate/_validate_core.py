@@ -27,11 +27,11 @@ from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundErro
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_signature.signature_walk import collect_signature_refs
 from pipelex.pipelex import Pipelex
+from pipelex.pipeline.advisory_warnings import collect_advisory_warnings, collect_current_library_entry_pipe_refs
+from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs
 from pipelex.pipeline.bundle_validator import BundleValidator
-from pipelex.pipeline.controller_taint import collect_controller_taint_analyses
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.execution_seams import load_libraries_and_activate
-from pipelex.pipeline.optionality_warnings import build_optionality_warnings
 from pipelex.pipeline.validate_bundle import build_pending_signatures, validate_bundle
 from pipelex.runtime_hub import get_console, get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
@@ -47,13 +47,14 @@ if TYPE_CHECKING:
 COMMAND = "validate"
 
 
-def _echo_optionality_warnings(*, pipes: list[PipeAbstract]) -> None:
-    """Render the advisory optionality lints (e.g. the useless-`!` lint) in yellow.
+def _echo_advisory_warnings(*, pipes: list[PipeAbstract], entry_pipe_refs: list[str]) -> None:
+    """Render every advisory lint family in yellow, in the composition point's fixed order.
 
-    Advisory only — a warning never changes the validation verdict or the exit code. Requires
-    the validation library to still be loaded (the taint walk resolves child pipes via the hub).
+    Advisory only — a warning never changes the validation verdict or the exit code. Requires the
+    validation library to still be loaded: the taint walk resolves child pipes via the hub, and the
+    descriptors and the hint lint read the library's accumulated crate.
     """
-    for warning in build_optionality_warnings(collect_controller_taint_analyses(pipes)):
+    for warning in collect_advisory_warnings(pipes=pipes, entry_pipe_refs=entry_pipe_refs):
         typer.secho(f"Warning: {warning.message}", fg=typer.colors.YELLOW)
 
 
@@ -94,9 +95,10 @@ def do_validate_all_libraries_and_dry_run(*, library_dirs: list[Path] | None = N
             # event — sweeping the library we just loaded, without teardown.
             asyncio.run(BundleValidator().validate_current_library(allow_signatures=allow_signatures))
 
-            # Advisory optionality lints over the whole loaded library (the lint's cross-flow
-            # aggregation needs every flow) — printed even when the signature gate below exits non-zero.
-            _echo_optionality_warnings(pipes=all_pipes)
+            # Advisory lints over the whole loaded library (the optionality lint's cross-flow
+            # aggregation needs every flow) — printed even when the signature gate below exits
+            # non-zero. The entry pipes come off the blueprints the library manager accumulated.
+            _echo_advisory_warnings(pipes=all_pipes, entry_pipe_refs=collect_current_library_entry_pipe_refs())
 
             # Gate-from-report (D-B consumer-decides): signatures are never a validation error, but a
             # library with unsatisfied PipeSignature placeholders is valid yet NOT runnable. `validate
@@ -135,6 +137,13 @@ async def _validate_pipe_or_bundle(
                 library_dirs=library_dirs,
                 allow_signatures=allow_signatures,
             )
+            # Advisory lints, printed BEFORE the signature gate below exits non-zero — same ordering
+            # as `validate --all`. A method with an unimplemented placeholder is the state an author
+            # is most often in while building, and it is exactly then that the advisories help.
+            # validate_bundle leaves its validation library open on success, so the taint walk behind
+            # the lints can still resolve the bundle's pipes.
+            _echo_advisory_warnings(pipes=bundle_result.pipes, entry_pipe_refs=collect_entry_pipe_refs(bundle_result.blueprints))
+
             # Gate-from-report (D-B consumer-decides): signatures are never a validation error, but a
             # bundle with unsatisfied PipeSignature placeholders is valid yet NOT runnable. The CLI
             # exits non-zero on `not is_runnable` unless --allow-signatures tolerates the placeholders.
@@ -152,9 +161,6 @@ async def _validate_pipe_or_bundle(
                 f"Successfully validated bundle '{bundle_path}'{_format_signatures_summary_suffix(signature_count=signature_count)}",
                 fg=typer.colors.GREEN,
             )
-            # validate_bundle leaves its validation library open on success, so the taint walk
-            # behind the advisory lints can still resolve the bundle's pipes.
-            _echo_optionality_warnings(pipes=bundle_result.pipes)
         except FileNotFoundError as exc:
             get_console().print(Traceback())
             typer.secho(

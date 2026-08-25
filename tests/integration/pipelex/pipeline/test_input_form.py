@@ -452,6 +452,10 @@ class InputFormConstrainedPayload(StructuredContent):
     tags: list[str] = Field(default_factory=list, description="PROBE_desc_reflected_tags")
 
 
+class InputFormFieldLessPayload(StructuredContent):
+    """A registered structure class declaring no field — a payload that demands nothing."""
+
+
 class InputFormUnmappablePayload(StructuredContent):
     """A structure class whose field has no single blueprint shape — reflection must stay absent, never guess."""
 
@@ -470,11 +474,24 @@ structure = "InputFormConstrainedPayload"
 description = "PROBE_desc_concept_Unmappable: class-backed by a class reflection cannot map"
 structure = "InputFormUnmappablePayload"
 
+[concept.FieldLess]
+description = "PROBE_desc_concept_FieldLess: class-backed by a class declaring no field"
+structure = "InputFormFieldLessPayload"
+
 [concept.Gadget]
 description = "PROBE_desc_concept_Gadget"
 
 [concept.Gadget.structure]
 name = { type = "text", description = "PROBE_desc_field_gadget_name", required = true }
+
+[concept.EmptyStruct]
+description = "PROBE_desc_concept_EmptyStruct: an authored structure table holding no field"
+
+[concept.EmptyStruct.structure]
+
+[concept.RefinesEmpty]
+description = "PROBE_desc_concept_RefinesEmpty: refines the empty-structure base and adds nothing"
+refines = "EmptyStruct"
 
 [pipe.remaining_natives]
 type = "PipeCompose"
@@ -483,15 +500,23 @@ inputs = { tai_in = "TextAndImages", search_result_in = "SearchResult", dynamic_
 output = "Text"
 template = "$tai_in $search_result_in $dynamic_in $anything_in $json_in"
 
+[pipe.empty_structures]
+type = "PipeCompose"
+description = "Concepts whose authored structure table is empty, directly and through a refines link"
+inputs = { empty_in = "EmptyStruct", refining_in = "RefinesEmpty" }
+output = "Text"
+template = "$empty_in $refining_in"
+
 [pipe.edges]
 type = "PipeLLM"
 description = "Fixed-count-of-one multiplicity and class-backed reflection"
-inputs = { one = "Gadget[1]", constrained = "Constrained", unmappable = "Unmappable" }
+inputs = { one = "Gadget[1]", constrained = "Constrained", unmappable = "Unmappable", field_less = "FieldLess" }
 output = "Text"
 prompt = \"\"\"
 @one
 @constrained
 @unmappable
+@field_less
 \"\"\"
 """
 
@@ -504,6 +529,7 @@ class TestKindAssignmentTable:
             registry = get_class_registry()
             registry.register_class(InputFormConstrainedPayload)
             registry.register_class(InputFormUnmappablePayload)
+            registry.register_class(InputFormFieldLessPayload)
             result = await validate_bundle(mthds_contents=[_KIND_TABLE_MTHDS])
             return build_input_form(result.pipes)
         finally:
@@ -540,6 +566,26 @@ class TestKindAssignmentTable:
         assert one.item_count is None
         assert one.required is True
         assert one.gating is True
+
+    async def test_an_authored_but_empty_structure_table_is_an_object_with_no_fields(self, load_empty_library: Callable[[], str]) -> None:
+        """The engine branches on `structure is not None` (`ConceptFactory`), so an empty `[concept.X.structure]`
+        table is backed by a field-less structured model whose schema is `{"type": "object", "properties": {}}`.
+        The descriptor states that same fact: testing truthiness instead would report the concept as `prose`
+        with a `native.Text` refinement link nobody authored, contradicting the schema beside it.
+        """
+        input_form = await self._derive_kind_table(load_empty_library)
+        empties = input_form["input_form_kinds.empty_structures"]
+
+        empty = _field_by_name(empties, "empty_in")
+        assert empty.kind == FieldKind.OBJECT
+        assert empty.fields == []
+        assert empty.refines is None, "Nothing was authored to refine, and nothing is invented"
+        assert empty.model_dump()["fields"] == [], "An empty `fields` is applicable, so the wire keeps it"
+
+        refining = _field_by_name(empties, "refining_in")
+        assert refining.kind == FieldKind.OBJECT, "The dict structure sits one link up the chain, and still decides"
+        assert refining.fields == []
+        assert refining.refines == ["input_form_kinds.EmptyStruct"], "The authored chain, with nothing appended to it"
 
     async def test_custom_class_reflects_to_object_with_constraints(self, load_empty_library: Callable[[], str]) -> None:
         """A hand-written structure class is reflected field by field, with the constraints the engine states."""
@@ -588,6 +634,22 @@ class TestKindAssignmentTable:
         tags = by_name["tags"]
         assert tags.required is False, "A default_factory makes the field not required"
         assert tags.default_value is None, "A default_factory has no reportable value — no default_value is fabricated"
+
+    async def test_a_field_less_class_is_an_object_with_no_fields(self, load_empty_library: Callable[[], str]) -> None:
+        """`reflect_structure_class` answers `None` for two different things, and only one is opaque.
+
+        A class declaring no field states a payload that demands nothing — the class-backed twin of an
+        empty authored structure table — so the form reports `object` with an empty `fields` list. A
+        field reflection could not map stays `unknown`, which the sibling case below pins.
+        """
+        input_form = await self._derive_kind_table(load_empty_library)
+        field_less = _field_by_name(input_form["input_form_kinds.edges"], "field_less")
+
+        assert field_less.kind == FieldKind.OBJECT
+        assert field_less.fields == []
+        assert field_less.concept_ref == "input_form_kinds.FieldLess"
+        assert field_less.required is True
+        assert field_less.gating is True
 
     async def test_unmappable_class_falls_back_to_unknown(self, load_empty_library: Callable[[], str]) -> None:
         """Reflection is faithful-or-absent: a class with an unmappable field yields `unknown`, with identity kept."""
