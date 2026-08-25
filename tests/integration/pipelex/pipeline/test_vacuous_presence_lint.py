@@ -108,6 +108,24 @@ output = "Text"
 prompt = "Run with $opts"
 """
 
+_EMPTY_STRUCTURE_MTHDS = """
+domain = "vacuous_empty"
+description = "Entry pipe demanding a concept whose authored structure table holds no field"
+main_pipe = "run"
+
+[concept.RunOptions]
+description = "Options for the run"
+
+[concept.RunOptions.structure]
+
+[pipe.run]
+type = "PipeLLM"
+description = "The entry pipe"
+inputs = { opts = "RunOptions" }
+output = "Text"
+prompt = "Run with $opts"
+"""
+
 _CLASS_BACKED_MTHDS = """
 domain = "vacuous_class"
 description = "Entry pipe demanding a class-backed concept whose fields all carry defaults"
@@ -198,6 +216,21 @@ class TestVacuousPresenceLint:
         warnings = await self._warnings(mthds=_NO_MAIN_PIPE_MTHDS, load_empty_library=load_empty_library)
 
         assert _vacuous(warnings) == []
+
+    async def test_an_empty_structure_table_warns_with_the_field_less_wording(self, load_empty_library: Callable[[], str]) -> None:
+        """The design's second row: a concept declaring no field at all, which only an empty object fits.
+
+        It is reachable because the deriver branches on `structure is not None` the way `ConceptFactory`
+        does — the truthiness test it used to run reported such a concept as `prose`, which this lint
+        never looks at, so the wording below was unreachable from any bundle an author can write.
+        """
+        warnings = await self._warnings(mthds=_EMPTY_STRUCTURE_MTHDS, load_empty_library=load_empty_library)
+
+        vacuous = _vacuous(warnings)
+        assert len(vacuous) == 1
+        assert vacuous[0].variable_names == ["opts"]
+        assert "declares no field at all" in vacuous[0].message
+        assert "give 'vacuous_empty.RunOptions' a required field" in vacuous[0].message
 
     async def test_a_class_backed_concept_with_all_defaulted_fields_warns(self, load_empty_library: Callable[[], str]) -> None:
         """The lint reads the descriptor, so class-backed reflection is covered for free: a pydantic

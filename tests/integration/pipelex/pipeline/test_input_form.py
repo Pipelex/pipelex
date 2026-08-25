@@ -476,12 +476,28 @@ description = "PROBE_desc_concept_Gadget"
 [concept.Gadget.structure]
 name = { type = "text", description = "PROBE_desc_field_gadget_name", required = true }
 
+[concept.EmptyStruct]
+description = "PROBE_desc_concept_EmptyStruct: an authored structure table holding no field"
+
+[concept.EmptyStruct.structure]
+
+[concept.RefinesEmpty]
+description = "PROBE_desc_concept_RefinesEmpty: refines the empty-structure base and adds nothing"
+refines = "EmptyStruct"
+
 [pipe.remaining_natives]
 type = "PipeCompose"
 description = "The native concepts the probe bundle does not exercise as direct inputs"
 inputs = { tai_in = "TextAndImages", search_result_in = "SearchResult", dynamic_in = "Dynamic", anything_in = "Anything", json_in = "JSON" }
 output = "Text"
 template = "$tai_in $search_result_in $dynamic_in $anything_in $json_in"
+
+[pipe.empty_structures]
+type = "PipeCompose"
+description = "Concepts whose authored structure table is empty, directly and through a refines link"
+inputs = { empty_in = "EmptyStruct", refining_in = "RefinesEmpty" }
+output = "Text"
+template = "$empty_in $refining_in"
 
 [pipe.edges]
 type = "PipeLLM"
@@ -540,6 +556,26 @@ class TestKindAssignmentTable:
         assert one.item_count is None
         assert one.required is True
         assert one.gating is True
+
+    async def test_an_authored_but_empty_structure_table_is_an_object_with_no_fields(self, load_empty_library: Callable[[], str]) -> None:
+        """The engine branches on `structure is not None` (`ConceptFactory`), so an empty `[concept.X.structure]`
+        table is backed by a field-less structured model whose schema is `{"type": "object", "properties": {}}`.
+        The descriptor states that same fact: testing truthiness instead would report the concept as `prose`
+        with a `native.Text` refinement link nobody authored, contradicting the schema beside it.
+        """
+        input_form = await self._derive_kind_table(load_empty_library)
+        empties = input_form["input_form_kinds.empty_structures"]
+
+        empty = _field_by_name(empties, "empty_in")
+        assert empty.kind == FieldKind.OBJECT
+        assert empty.fields == []
+        assert empty.refines is None, "Nothing was authored to refine, and nothing is invented"
+        assert empty.model_dump()["fields"] == [], "An empty `fields` is applicable, so the wire keeps it"
+
+        refining = _field_by_name(empties, "refining_in")
+        assert refining.kind == FieldKind.OBJECT, "The dict structure sits one link up the chain, and still decides"
+        assert refining.fields == []
+        assert refining.refines == ["input_form_kinds.EmptyStruct"], "The authored chain, with nothing appended to it"
 
     async def test_custom_class_reflects_to_object_with_constraints(self, load_empty_library: Callable[[], str]) -> None:
         """A hand-written structure class is reflected field by field, with the constraints the engine states."""

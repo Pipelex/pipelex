@@ -342,7 +342,7 @@ class InputFormDeriver:
     ) -> InputFormField:
         refines = chain or None
         merged_structure = self._merged_structure(concept_ref=concept_ref, chain=chain)
-        if merged_structure:
+        if merged_structure is not None:
             fields = [self._structure_field(name=field_name, field=field, seen=seen) for field_name, field in merged_structure.items()]
             return InputFormField(
                 kind=FieldKind.OBJECT,
@@ -477,13 +477,20 @@ class InputFormDeriver:
             current = self._concepts.get(link)
         return chain
 
-    def _merged_structure(self, *, concept_ref: str, chain: list[str]) -> dict[str, ConceptStructureBlueprintType]:
-        """The authored structure fields along the chain, base fields first, a refining concept overriding its parents'."""
-        merged: dict[str, ConceptStructureBlueprintType] = {}
+    def _merged_structure(self, *, concept_ref: str, chain: list[str]) -> dict[str, ConceptStructureBlueprintType] | None:
+        """The authored structure fields along the chain, base fields first, a refining concept overriding its parents'.
+
+        `None` when no concept along the chain authors a structure table at all; `{}` when one does and
+        that table is empty. The distinction is the engine's own: `ConceptFactory` branches on
+        `structure is not None`, so an authored-but-empty table is backed by a field-less structured
+        model with an empty object schema — not by `TextContent`. Testing truthiness here would report
+        that concept as `prose` with a `native.Text` refines link nobody authored.
+        """
+        merged: dict[str, ConceptStructureBlueprintType] | None = None
         for ref in [*reversed(chain), concept_ref]:
             entry = self._concepts.get(ref)
             if isinstance(entry, ConceptBlueprint) and isinstance(entry.structure, dict):
-                merged.update(entry.structure)
+                merged = {**(merged or {}), **entry.structure}
         return merged
 
     def _first_class_structure(self, *, concept_ref: str, chain: list[str]) -> str | None:

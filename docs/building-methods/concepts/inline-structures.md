@@ -82,7 +82,7 @@ tone  = "The tone to use"                                        # shorthand: a 
 depth = { type = "integer", description = "How deep to go" }     # long form: OPTIONAL, because required defaults to false
 ```
 
-A structure written entirely in the long form with no `required = true` anywhere is **all-optional**: its payload admits `{}`. That is perfectly legal, and often exactly right — an extraction concept that records whatever a document happens to state should not demand any particular field.
+A structure written entirely in the long form with no `required = true` anywhere is **all-optional**: its payload admits `{}`. That is perfectly legal, and often exactly right — an extraction concept that records whatever a document happens to state should not demand any particular field. A structure table holding *no* field at all is the degenerate case of the same thing — its payload admits only `{}` — and the lint below names it in its own words.
 
 It becomes a problem at one place only: when such a concept is named by a **method input that must be supplied** — an input of the bundle's declared `main_pipe`, written without a `?`. The declaration says "the caller must provide this", but since the empty object satisfies the concept, the only thing it can enforce is that the caller provides `{}`. Nothing is actually demanded, and a form, an API client or a person filling the input in has no way to tell what to put there. Validation reports this as the advisory `input_presence_vacuous` warning — the bundle stays **valid**, the warning never flips the verdict.
 

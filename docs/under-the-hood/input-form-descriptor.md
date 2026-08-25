@@ -26,7 +26,7 @@ The derivation is total. A node it cannot map honestly reports `kind: "unknown"`
 
 Kinds are decided by chain membership and declared types — never by sniffing a schema shape. Per node, in precedence order:
 
-1. A concept with authored structure fields anywhere along its refinement chain is an `object`; its fields are the merged structures along the chain, base fields first, a refining concept overriding its parents'.
+1. A concept with an authored structure *table* anywhere along its refinement chain is an `object`; its fields are the merged structures along the chain, base fields first, a refining concept overriding its parents'. The table decides even when it is empty — the engine backs an empty `[concept.X.structure]` with a field-less structured model, not with `TextContent`, so the descriptor reports `object` with an empty `fields` list rather than falling through to rule 4.
 2. Otherwise, the first `structure = "ClassName"` on the chain decides: a native class name (`TextContent`, `ImageContent`, …) maps by identity to that native's row; any other registered class is reflected field by field into an `object`; an unregistered or unmappable class is `unknown`.
 3. Otherwise, a chain bottoming at a native concept takes that native's row, keeping the concept's own `concept_ref`, description and `refines`.
 4. Otherwise — a description-only or string-described concept — `prose` with `refines` ending in `native.Text`: this engine backs such a concept with a `TextContent` subclass, so that is a stated fact, not shape invention.
