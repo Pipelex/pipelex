@@ -8,11 +8,13 @@ concept tables, and no description matching. It is keyed by the same namespaced 
 construction.
 
 **The wire shapes belong to the standard, not to this engine.** `FieldKind`, the per-kind field
-models, their `InputFormField` union and `PipeInputFormDescriptor` are the models of
+models, their two unions and `PipeInputFormDescriptor` are the models of
 `mthds.protocol.input_form`, mirroring the standard's `input-form-descriptor` page; they are
 imported and re-exported here so this module keeps its callers, and this engine holds no second
-declaration of them. What stays here is the derivation: how an authored library becomes a
-descriptor. Because a node's kind IS its model, the deriver constructs the per-kind model rather
+declaration of them. The union a node belongs to is decided by its position, not by its content:
+every named position holds an `InputFormField`, while a `list`'s `item` holds the nameless
+`InputFormItem`, whose per-kind models declare no `name` at all. What stays here is the
+derivation: how an authored library becomes a descriptor. Because a node's kind IS its model, the deriver constructs the per-kind model rather
 than passing a `kind`, and the models' own parse-time invariants — the closed shapes, the rule
 that `presence` and `gating` are stated on every top-level field and nowhere below it, the rule
 that a fixed `item_count` is at least two — gate this emission at derivation time rather than on
@@ -43,24 +45,36 @@ from typing import Any
 from annotated_types import Ge, Gt, Le, Lt, MaxLen, MinLen
 from mthds.protocol.input_form import (
     BooleanField,
+    BooleanItem,
     DateField,
+    DateItem,
     DocumentField,
+    DocumentItem,
     EnumField,
+    EnumItem,
     FieldKind,
     ImageField,
+    ImageItem,
     InputForm,
     InputFormField,
-    InputFormFieldBase,
+    InputFormItem,
+    InputFormItemBase,
     ListField,
+    ListItem,
     NumberField,
+    NumberItem,
     ObjectField,
+    ObjectItem,
     PipeInputFormDescriptor,
     ProseField,
+    ProseItem,
     TextField,
-    TextValuedFieldBase,
+    TextItem,
+    TextValuedItemBase,
     UnknownField,
+    UnknownItem,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
@@ -81,23 +95,35 @@ from pipelex.system.registries.class_registry_access import get_class_registry
 
 __all__ = [
     "BooleanField",
+    "BooleanItem",
     "DateField",
+    "DateItem",
     "DocumentField",
+    "DocumentItem",
     "EnumField",
+    "EnumItem",
     "FieldKind",
     "ImageField",
+    "ImageItem",
     "InputForm",
     "InputFormDeriver",
     "InputFormField",
-    "InputFormFieldBase",
+    "InputFormItem",
+    "InputFormItemBase",
     "ListField",
+    "ListItem",
     "NumberField",
+    "NumberItem",
     "ObjectField",
+    "ObjectItem",
     "PipeInputFormDescriptor",
     "ProseField",
+    "ProseItem",
     "TextField",
-    "TextValuedFieldBase",
+    "TextItem",
+    "TextValuedItemBase",
     "UnknownField",
+    "UnknownItem",
     "build_input_form",
     "qualify_current_library_crate",
 ]
@@ -481,14 +507,25 @@ class InputFormDeriver:
                 return _scalar_field(field_type=item_type, name=name, required=True)
 
 
-def _as_list_item(*, node: InputFormField) -> InputFormField:
+_LIST_ITEM_ADAPTER: TypeAdapter[InputFormItem] = TypeAdapter(InputFormItem)
+"""Parses a node's slots into its nameless counterpart, picked by the union's own `kind` discriminator.
+
+Going through the union rather than a kind-to-model table here keeps the standard's kind list in
+one place: a kind added upstream lands in `InputFormItem` and needs no entry on this side.
+"""
+
+
+def _as_list_item(*, node: InputFormField) -> InputFormItem:
     """A node in `item` position: a list's `item` has no authored name and carries no `name` member.
 
     The spec states the absence outright (the index labels items, and a sentinel would be a value
-    two producers could pick differently), so the element node built from the list's own facts
-    drops the name it was derived under.
+    two producers could pick differently), and the standard makes it structural — the two layers
+    are separate unions, and none of the item models declares `name`. So the element node derived
+    under the list's own name is rebuilt one layer down from the same slots, rather than having its
+    name blanked: `model_copy(update=...)` does not validate, and blanking would leave a required
+    `str` slot holding `None` — right on the wire, wrong on the type, and unnoticed at runtime.
     """
-    return node.model_copy(update={"name": None})
+    return _LIST_ITEM_ADAPTER.validate_python({slot: value for slot, value in node if slot != "name"})
 
 
 def _with_effective_hints(*, node: InputFormField, hints: dict[str, str] | None) -> InputFormField:
@@ -519,7 +556,7 @@ def _recast_text_kind(*, node: InputFormField, hints: dict[str, str], to_prose: 
     and `label` apply nowhere else — so the source is always a `text` or `prose` node and its own
     extra slots are the shared text constraints, which carry over unchanged.
     """
-    if not isinstance(node, TextValuedFieldBase):
+    if not isinstance(node, TextValuedItemBase):
         # Unreachable while `_node_site_kind` reports text-valued for the text kinds alone; stated
         # rather than asserted, so a future kind that reports text-valued degrades to a hint stamp.
         return node.model_copy(update={"hints": hints})

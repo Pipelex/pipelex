@@ -18,7 +18,7 @@ from pipelex.pipeline.input_form import (
     InputFormField,
     ListField,
     NumberField,
-    ObjectField,
+    ObjectItem,
     PipeInputFormDescriptor,
     ProseField,
     TextField,
@@ -77,7 +77,7 @@ class TestInputFormSerialization:
                     presence=PresenceMarker.PLAIN,
                     gating=True,
                     item_count=2,
-                    item=ObjectField(
+                    item=ObjectItem(
                         concept_ref="demo.Gadget",
                         required=True,
                         fields=[TextField(name="label", required=True)],

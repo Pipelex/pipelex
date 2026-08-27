@@ -105,7 +105,7 @@ prompt = "Write a haiku."
 
 
 def _field_by_name(descriptor: PipeInputFormDescriptor, name: str) -> InputFormField:
-    by_name = {field.name: field for field in descriptor.fields if field.name is not None}
+    by_name = {field.name: field for field in descriptor.fields}
     assert name in by_name, f"Expected a field named {name!r}, got {sorted(by_name)}"
     return by_name[name]
 
