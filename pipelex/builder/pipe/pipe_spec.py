@@ -14,6 +14,8 @@ from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.pipes.variable_multiplicity import (
     MULTIPLICITY_PATTERN,
     is_force_presence,
+    is_multiple_multiplicity,
+    multiplicity_from_bracket_content,
     parse_concept_with_multiplicity,
     presence_from_symbol,
     presence_symbol,
@@ -150,10 +152,16 @@ class PipeSpec(StructuredContent):
                 )
                 raise ValueError(msg)
 
-            # Mirror the blueprint grammar rule (D1, D4): presence markers never combine with multiplicity
             bracket_content = match.group(2)
+            if bracket_content and int(bracket_content) <= 0:
+                msg = f"Invalid input '{input_name}': '{concept_spec}'. Multiplicity must be at least 1."
+                raise ValueError(msg)
+
+            # Mirror the blueprint grammar rule (D1, D4): presence markers never combine with
+            # multiplicity — and `[1]` is the single form, not multiplicity, so it takes a marker.
             presence = presence_from_symbol(symbol=match.group(3))
-            if not presence.is_plain and bracket_content is not None:
+            multiplicity = multiplicity_from_bracket_content(bracket_content=bracket_content)
+            if not presence.is_plain and is_multiple_multiplicity(multiplicity=multiplicity):
                 msg = (
                     f"Invalid input '{input_name}': '{concept_spec}'. "
                     f"The presence marker '{presence_symbol(presence=presence)}' cannot be combined with multiplicity: "

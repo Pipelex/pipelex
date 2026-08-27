@@ -209,18 +209,17 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         log.verbose(f"Using img_gen handle: {img_gen_setting.model}")
 
         nb_images: int
-        if isinstance(applied_output_multiplicity, bool):
-            if self.output_multiplicity is True:
-                msg = "Cannot guess how many images to generate if multiplicity is just True."
-                msg += f" Got PipeImgGen.output_multiplicity = {self.output_multiplicity},"
-                msg += f" and pipe_run_params.output_multiplicity = {pipe_run_params.output_multiplicity}."
-                msg += f" Tried to apply applied_output_multiplicity = {applied_output_multiplicity}."
-                raise PipeRunParamsError(msg)
+        if applied_output_multiplicity is True:
+            # Only a RESOLVED "model decides" is unguessable — a forced-single resolution (False),
+            # e.g. from an override of 1, is one image even when the pipe declares `Image[]`.
+            msg = "Cannot guess how many images to generate if multiplicity is just True."
+            msg += f" Got PipeImgGen.output_multiplicity = {self.output_multiplicity},"
+            msg += f" and pipe_run_params.output_multiplicity = {pipe_run_params.output_multiplicity}."
+            raise PipeRunParamsError(msg)
+        if isinstance(applied_output_multiplicity, bool) or applied_output_multiplicity is None:
             nb_images = 1
-        elif isinstance(applied_output_multiplicity, int):
-            nb_images = applied_output_multiplicity
         else:
-            nb_images = 1
+            nb_images = applied_output_multiplicity
 
         # Resolved here rather than inside the kernel: turning a concept into a class is a library's
         # business, and handing the class over is what spares the kernel a registry read.
