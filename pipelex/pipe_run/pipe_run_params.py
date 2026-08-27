@@ -43,9 +43,9 @@ def output_multiplicity_to_apply(
             - int: Specific number of outputs (1 forces the single form, like False)
 
     Returns:
-        OutputMultiplicityResolution: Structured result containing:
+        VariableMultiplicityResolution: Structured result containing:
             - resolved_multiplicity: The final multiplicity value to use
-            - enable_multiple_outputs: True if multiple outputs should be generated
+            - is_multiple_outputs_enabled: True if multiple outputs should be generated
             - specific_output_count: Exact number of outputs if specified, None otherwise
 
     Resolution Logic:
@@ -53,16 +53,17 @@ def output_multiplicity_to_apply(
         - If override is False: Force single output regardless of base
         - If override is True: Enable multiple outputs, preserve base count if it's int
         - If override is int: Use override count, enable multiple outputs
+        - If base or override is 1: the single form — a count of one is not a list
 
     Examples:
         >>> result = output_multiplicity_to_apply(base_multiplicity=None, override_multiplicity=None)
-        >>> (result.resolved_multiplicity, result.enable_multiple_outputs, result.specific_output_count)
+        >>> (result.resolved_multiplicity, result.is_multiple_outputs_enabled, result.specific_output_count)
         (None, False, None)
         >>> result = output_multiplicity_to_apply(base_multiplicity=True, override_multiplicity=None)
-        >>> (result.resolved_multiplicity, result.enable_multiple_outputs, result.specific_output_count)
+        >>> (result.resolved_multiplicity, result.is_multiple_outputs_enabled, result.specific_output_count)
         (True, True, None)
         >>> result = output_multiplicity_to_apply(base_multiplicity=3, override_multiplicity=None)
-        >>> (result.resolved_multiplicity, result.enable_multiple_outputs, result.specific_output_count)
+        >>> (result.resolved_multiplicity, result.is_multiple_outputs_enabled, result.specific_output_count)
         (3, True, 3)
 
     """

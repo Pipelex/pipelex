@@ -131,11 +131,11 @@ def make_variable_multiplicity(*, nb_items: int | None, multiple_items: bool | N
         3
         >>> make_variable_multiplicity(nb_items=None, multiple_items=True)
         True
-        >>> make_variable_multiplicity(nb_items=None, multiple_items=False)
+        >>> print(make_variable_multiplicity(nb_items=None, multiple_items=False))
         None
         >>> make_variable_multiplicity(nb_items=0, multiple_items=True)
         True
-        >>> make_variable_multiplicity(nb_items=1, multiple_items=True)  # a count of one is the single form
+        >>> print(make_variable_multiplicity(nb_items=1, multiple_items=True))  # a count of one is the single form
         None
 
     """
@@ -251,8 +251,9 @@ def is_multiplicity_compatible(*, source_multiplicity: VariableMultiplicity | No
     Compatibility rules:
     - A fixed count of one is normalized to the single form on both sides before any of the rules below
     - If target is None (single item), source must also be None
-    - If target is True (variable list), source can be True OR any positive integer
-      (a fixed count is compatible with a variable-length expectation)
+    - If target is True (variable list), source can be True OR any integer N >= 2
+      (a fixed count is compatible with a variable-length expectation; a count of one is the
+      single form and does not fulfill a list expectation)
     - If target is an integer N (fixed count), source must be exactly N
 
     Args:
@@ -279,6 +280,8 @@ def is_multiplicity_compatible(*, source_multiplicity: VariableMultiplicity | No
         False
         >>> is_multiplicity_compatible(source_multiplicity=1, target_multiplicity=None)  # `[1]` IS the single form
         True
+        >>> is_multiplicity_compatible(source_multiplicity=1, target_multiplicity=True)  # ...so it is not a list
+        False
     """
     # `[1]` is the single form (`normalize_variable_multiplicity`), so it must compare as one on both
     # sides: a `[1]` step output fulfills a bare single declaration, and vice versa. Normalizing here

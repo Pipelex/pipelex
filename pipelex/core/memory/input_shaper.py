@@ -301,7 +301,7 @@ class InputShaper:
                 inputs_base_dir=inputs_base_dir,
             )
 
-        # Singular (multiplicity is None). A list here is ambiguous — hard error (D2).
+        # Singular (no multiplicity, or a count of one). A list here is ambiguous — hard error (D2).
         if isinstance(value, list):
             raise ListWhereSingularError.make(
                 variable_name=variable_name,

@@ -10,7 +10,7 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
-from pipelex.core.pipes.variable_multiplicity import PresenceMarker, is_multiplicity_compatible
+from pipelex.core.pipes.variable_multiplicity import PresenceMarker, VariableMultiplicity, is_multiplicity_compatible
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.interpreter_hub import get_concept_library, get_optional_pipe, get_required_pipe
 from pipelex.pipe_controllers.absence_taint import (
@@ -25,7 +25,7 @@ from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sequence.exceptions import PipeSequenceValueError
 from pipelex.pipe_controllers.sub_pipe import SubPipe
-from pipelex.pipe_run.pipe_run_params import PipeRunParams
+from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -76,21 +76,37 @@ class PipeSequence(PipeController):
             return
         last_step_pipe = get_required_pipe(pipe_code=last_step_pipe_code)
 
-        effective_last_step_output_multiplicity = last_sub_pipe.output_multiplicity
-        if not effective_last_step_output_multiplicity:
-            effective_last_step_output_multiplicity = last_step_pipe.output.multiplicity
+        # The step's effective output, resolved exactly the way the run path resolves it (declared
+        # multiplicity + the step-level override), so this static promise cannot rule a count
+        # differently from the execution it describes. Reading the two apart — an override tested for
+        # truthiness, a declaration tested for `is None` — is what let a `nb_output = 1` step read as
+        # plural here while the runtime made it single.
+        multiplicity_resolution = output_multiplicity_to_apply(
+            base_multiplicity=last_step_pipe.output.multiplicity,
+            override_multiplicity=last_sub_pipe.output_multiplicity,
+        )
+        is_plural_last_step_output = multiplicity_resolution.is_multiple_outputs_enabled
+        # A declaration spells a singular slot with no suffix at all; `resolved_multiplicity` spells a
+        # forced single as `False`, which is override vocabulary and renders as nothing an author writes.
+        effective_last_step_output_multiplicity: VariableMultiplicity | None
+        if not is_plural_last_step_output:
+            effective_last_step_output_multiplicity = None
+        elif multiplicity_resolution.specific_output_count is not None:
+            effective_last_step_output_multiplicity = multiplicity_resolution.specific_output_count
+        else:
+            effective_last_step_output_multiplicity = True
 
         taint_analysis = self.analyze_taint()
 
         # The last step's effective output in bundle representation — what the sequence's declared
         # output should be. This is the enriched semantic fact the fix planner needs, rendered the
-        # way an author in the sequence's domain would write it, with the effective multiplicity
-        # (sub-pipe override wins) and boundary presence. A singular sequence boundary remains
+        # way an author in the sequence's domain would write it, with the resolved multiplicity
+        # and boundary presence. A singular sequence boundary remains
         # optional when its declaration, last step, or taint propagation says it may be absent.
         # Plural outputs must stay plain because the grammar forbids combining multiplicity with
         # a presence marker and represents an absent plural result as an empty list.
         expected_output_presence = PresenceMarker.PLAIN
-        if effective_last_step_output_multiplicity is None and (
+        if not is_plural_last_step_output and (
             self.output.presence.is_optional or last_step_pipe.output.presence.is_optional or taint_analysis.output_taint is not None
         ):
             expected_output_presence = PresenceMarker.OPTIONAL

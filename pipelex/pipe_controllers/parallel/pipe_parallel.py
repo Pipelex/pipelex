@@ -34,7 +34,7 @@ from pipelex.pipe_controllers.absence_taint import (
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_machinery.pipe_abstract import CompanionSlot
-from pipelex.pipe_run.pipe_run_params import PipeRunParams
+from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -371,7 +371,7 @@ class PipeParallel(PipeController):
 
         Conservative by design: fields whose annotation is not a plain StuffContent
         subclass (primitives from .mthds-generated structures, Optionals, unions) and
-        list-producing branches are skipped rather than guessed at.
+        branches whose RESOLVED result is plural are skipped rather than guessed at.
         """
         for sub_pipe in self.parallel_sub_pipes:
             if not sub_pipe.output_name or sub_pipe.output_name not in structure_class.model_fields:
@@ -380,8 +380,14 @@ class PipeParallel(PipeController):
             if not isinstance(field_annotation, type) or not issubclass(field_annotation, StuffContent):
                 continue
             branch_pipe = get_required_pipe(pipe_code=sub_pipe.pipe_code)
-            if branch_pipe.output.multiplicity is not None:
-                # A list-producing branch combines as a ListContent, not as the item class.
+            if output_multiplicity_to_apply(
+                base_multiplicity=branch_pipe.output.multiplicity,
+                override_multiplicity=sub_pipe.output_multiplicity,
+            ).is_multiple_outputs_enabled:
+                # A list-producing branch combines as a ListContent, not as the item class. Plurality
+                # is the run path's answer (declaration + step override), not the declaration alone:
+                # a `nb_output = 1` step on a plural branch yields the single form, and reading only
+                # the declaration would skip a check the runtime then fails in `combine_stuffs`.
                 continue
             try:
                 branch_structure_class = get_concept_library().get_structure_class(concept=branch_pipe.output.concept)
