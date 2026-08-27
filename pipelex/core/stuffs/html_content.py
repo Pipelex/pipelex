@@ -12,7 +12,7 @@ class HtmlContent(StuffContent):
     """HTML content"""
 
     inner_html: str = Field(..., description="The inner HTML of the content")
-    css_class: str = Field(..., description="The CSS class of the content")
+    css_class: str | None = Field(default=None, description="The CSS class of the content")
 
     @property
     @override
@@ -44,4 +44,6 @@ class HtmlContent(StuffContent):
 
     @override
     def rendered_json(self) -> str:
+        if self.css_class is None:
+            return json.dumps({"html": self.inner_html})
         return json.dumps({"html": self.inner_html, "css_class": self.css_class})

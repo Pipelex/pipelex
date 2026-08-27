@@ -184,7 +184,7 @@ class InputFormDeriver:
                 description=node.description,
                 required=True,
                 hints=effective_hints,
-                item=_with_effective_hints(node=node, hints=effective_hints),
+                item=_as_list_item(node=_with_effective_hints(node=node, hints=effective_hints)),
                 item_count=item_count,
             )
         else:
@@ -288,21 +288,25 @@ class InputFormDeriver:
         node_ref = concept_ref or native_code.concept_ref
         text = description or pinned.description
         match native_code:
-            case NativeConceptCode.TEXT | NativeConceptCode.HTML:
+            case NativeConceptCode.TEXT:
                 return ProseField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True)
             case NativeConceptCode.NUMBER:
                 return NumberField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True, integer=False)
             case NativeConceptCode.YES_NO:
                 return BooleanField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True)
-            case NativeConceptCode.DATE:
-                return DateField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True, datetime=False)
             case NativeConceptCode.TIME:
                 return TextField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True, format="time")
             case NativeConceptCode.DOCUMENT:
                 return DocumentField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True)
             case NativeConceptCode.IMAGE:
                 return ImageField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True)
-            case NativeConceptCode.PAGE | NativeConceptCode.TEXT_AND_IMAGES | NativeConceptCode.SEARCH_RESULT:
+            case (
+                NativeConceptCode.DATE
+                | NativeConceptCode.HTML
+                | NativeConceptCode.PAGE
+                | NativeConceptCode.TEXT_AND_IMAGES
+                | NativeConceptCode.SEARCH_RESULT
+            ):
                 pinned_structure = pinned.structure if isinstance(pinned.structure, dict) else {}
                 return ObjectField(
                     name=name,
@@ -375,7 +379,7 @@ class InputFormDeriver:
         that table is empty. The distinction is the engine's own: `ConceptFactory` branches on
         `structure is not None`, so an authored-but-empty table is backed by a field-less structured
         model with an empty object schema — not by `TextContent`. Testing truthiness here would report
-        that concept as `prose` with a `native.Text` refines link nobody authored.
+        that concept as `prose`, contradicting the object schema the engine emits beside it.
         """
         merged: dict[str, ConceptStructureBlueprintType] | None = None
         for ref in [*reversed(chain), concept_ref]:
@@ -432,7 +436,7 @@ class InputFormDeriver:
                     required=field.required,
                     default_value=field.default_value,
                     hints=effective_hints,
-                    item=_with_effective_hints(node=item, hints=effective_hints),
+                    item=_as_list_item(node=_with_effective_hints(node=item, hints=effective_hints)),
                 )
             case ConceptStructureBlueprintFieldType.DICT | None:
                 unknown = _unknown_node(name=name, description=field.description, required=field.required, default_value=field.default_value)
@@ -475,6 +479,16 @@ class InputFormDeriver:
                 | ConceptStructureBlueprintFieldType.TIME
             ):
                 return _scalar_field(field_type=item_type, name=name, required=True)
+
+
+def _as_list_item(*, node: InputFormField) -> InputFormField:
+    """A node in `item` position: a list's `item` has no authored name and carries no `name` member.
+
+    The spec states the absence outright (the index labels items, and a sentinel would be a value
+    two producers could pick differently), so the element node built from the list's own facts
+    drops the name it was derived under.
+    """
+    return node.model_copy(update={"name": None})
 
 
 def _with_effective_hints(*, node: InputFormField, hints: dict[str, str] | None) -> InputFormField:
@@ -535,17 +549,15 @@ def _node_site_kind(node: InputFormField) -> HintSiteValueKind:
     Recomputed from node facts, mirroring the lint's structural judgment (the known divergences are
     recorded in wip/engine-hints/deferred.md): `number` nodes come only from `integer`/`number`
     fields and `native.Number` chains, so the kind IS the judgment; `text`/`prose` nodes are
-    text-valued EXCEPT a time-formatted text (`type = "time"` is neither) and an `Html`-backed node
-    (`prose` presentation, but the chain reaches `native.Html`, not `native.Text`).
+    text-valued EXCEPT a time-formatted text (`type = "time"` is neither). A `native.Html` chain
+    derives an `object` node since the standard put it on the object arm, so it never reaches the
+    text-valued case.
     """
     match node:
         case NumberField():
             return HintSiteValueKind.NUMBER_VALUED
         case TextField() | ProseField():
             if node.format is not None:
-                return HintSiteValueKind.OTHER
-            html_ref = NativeConceptCode.HTML.concept_ref
-            if node.concept_ref == html_ref or (node.refines is not None and html_ref in node.refines):
                 return HintSiteValueKind.OTHER
             return HintSiteValueKind.TEXT_VALUED
         case DateField() | BooleanField() | EnumField() | DocumentField() | ImageField() | ObjectField() | ListField() | UnknownField():
@@ -631,11 +643,16 @@ def _with_reflected_constraints(*, node: InputFormField, field_info: FieldInfo) 
 
 
 def _prose_promoted_node(*, name: str, concept_ref: str, description: str, chain: list[str]) -> InputFormField:
-    """A description-only or string-described concept: this engine backs it with a `TextContent` subclass."""
+    """A description-only or string-described concept: this engine backs it with a `TextContent` subclass.
+
+    `refines` is the authored chain alone, terminating wherever it actually terminates — the spec
+    forbids reconstructing links the producer does not hold, so no `native.Text` link is appended.
+    Text-valuedness reaches the wire as `kind: "prose"`.
+    """
     return ProseField(
         name=name,
         concept_ref=concept_ref,
-        refines=[*chain, NativeConceptCode.TEXT.concept_ref],
+        refines=chain or None,
         description=description,
         required=True,
     )

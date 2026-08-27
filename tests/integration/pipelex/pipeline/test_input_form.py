@@ -204,7 +204,7 @@ class TestBuildInputForm:
         stringnote = _field_by_name(refined, "stringnote")
         assert stringnote.kind == FieldKind.PROSE
         assert stringnote.concept_ref == "input_semantics_probe.StringNote"
-        assert stringnote.refines == ["native.Text"], "A string-described concept is this engine's TextContent fact"
+        assert stringnote.refines is None, "No refines was authored, and none is reconstructed — text-valuedness is `kind: prose`"
 
         note = _field_by_name(input_form["input_semantics_probe.probe_single"], "note")
         assert note.kind == FieldKind.PROSE
@@ -300,14 +300,32 @@ class TestBuildInputForm:
         number_in = _field_by_name(natives, "number_in")
         assert number_in.kind == FieldKind.NUMBER
         assert number_in.integer is False
-        date_in = _field_by_name(natives, "date_in")
-        assert date_in.kind == FieldKind.DATE
-        assert date_in.datetime is False
         time_in = _field_by_name(natives, "time_in")
         assert time_in.kind == FieldKind.TEXT
         assert time_in.format == "time"
-        assert _field_by_name(natives, "html_in").kind == FieldKind.PROSE
         assert _field_by_name(natives, "yesno_in").kind == FieldKind.BOOLEAN
+
+        # `native.Date` and `native.Html` sit on the standard's object arm: fields from the pinned
+        # definition, like the other structured natives.
+        date_in = _field_by_name(natives, "date_in")
+        assert date_in.kind == FieldKind.OBJECT
+        date_fields = fields_by_name(date_in)
+        assert list(date_fields) == ["date", "time"], "Pinned-blueprint fields, in pinned order"
+        assert date_fields["date"].kind == FieldKind.DATE
+        assert date_fields["date"].datetime is False
+        assert date_fields["date"].required is True
+        assert date_fields["time"].kind == FieldKind.TEXT
+        assert date_fields["time"].format == "time"
+        assert date_fields["time"].required is False
+
+        html_in = _field_by_name(natives, "html_in")
+        assert html_in.kind == FieldKind.OBJECT
+        html_fields = fields_by_name(html_in)
+        assert list(html_fields) == ["inner_html", "css_class"], "Pinned-blueprint fields, in pinned order"
+        assert html_fields["inner_html"].kind == FieldKind.TEXT
+        assert html_fields["inner_html"].required is True
+        assert html_fields["css_class"].kind == FieldKind.TEXT
+        assert html_fields["css_class"].required is False
         for field in natives.fields:
             assert field.concept_ref is not None
             assert field.concept_ref.startswith("native."), f"{field.name} states its native ref, got {field.concept_ref!r}"
@@ -346,7 +364,7 @@ class TestBuildInputForm:
         memo = _field_by_name(descriptor, "memo")
         assert memo.kind == FieldKind.PROSE
         assert memo.description == "A short memo"
-        assert memo.refines == ["native.Text"]
+        assert memo.refines is None, "A description-only concept authored no refines, and none is fabricated"
 
         special = _field_by_name(descriptor, "special")
         assert special.kind == FieldKind.OBJECT
@@ -569,8 +587,8 @@ class TestKindAssignmentTable:
     async def test_an_authored_but_empty_structure_table_is_an_object_with_no_fields(self, load_empty_library: Callable[[], str]) -> None:
         """The engine branches on `structure is not None` (`ConceptFactory`), so an empty `[concept.X.structure]`
         table is backed by a field-less structured model whose schema is `{"type": "object", "properties": {}}`.
-        The descriptor states that same fact: testing truthiness instead would report the concept as `prose`
-        with a `native.Text` refinement link nobody authored, contradicting the schema beside it.
+        The descriptor states that same fact: testing truthiness instead would report the concept as `prose`,
+        contradicting the object schema beside it.
         """
         input_form = await self._derive_kind_table(load_empty_library)
         empties = input_form["input_form_kinds.empty_structures"]

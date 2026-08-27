@@ -78,7 +78,6 @@ class TestInputFormSerialization:
                     gating=True,
                     item_count=2,
                     item=ObjectField(
-                        name="gadgets",
                         concept_ref="demo.Gadget",
                         required=True,
                         fields=[TextField(name="label", required=True)],
@@ -92,5 +91,6 @@ class TestInputFormSerialization:
         item_node = list_node["item"]
         assert "presence" not in item_node, "Nested fields never carry pipe-slot facts"
         assert "gating" not in item_node
+        assert "name" not in item_node, "A list's item has no authored name and carries no name member"
         nested = item_node["fields"][0]
         assert nested == {"kind": "text", "name": "label", "required": True}
