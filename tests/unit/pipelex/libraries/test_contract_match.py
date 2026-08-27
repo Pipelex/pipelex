@@ -50,3 +50,19 @@ class TestContractsMatchPresenceMarkers:
         existing = _make_blueprint(output="Brief[]")
         incoming = _make_blueprint(output="Brief[1]")
         assert not contracts_match(existing=existing, incoming=incoming, domain_code="thisdomain")
+
+    def test_a_fixed_count_of_one_matches_the_bare_spelling(self):
+        """`Brief[1]` and `Brief` denote the same slot, so a header and its definition may spell it either way.
+
+        The suffix is compared as text here rather than parsed (`True == 1` would conflate `[]` with a
+        count), so the `[1]`-is-single ruling has to be applied to the text too.
+        """
+        existing = _make_blueprint(output="Brief")
+        incoming = _make_blueprint(output="Brief[1]")
+        assert contracts_match(existing=existing, incoming=incoming, domain_code="thisdomain")
+
+    def test_a_fixed_count_of_one_keeps_its_marker_distinct(self):
+        """Collapsing the count must not swallow the presence marker beside it."""
+        existing = _make_blueprint(output="Brief[1]?")
+        incoming = _make_blueprint(output="Brief")
+        assert not contracts_match(existing=existing, incoming=incoming, domain_code="thisdomain")

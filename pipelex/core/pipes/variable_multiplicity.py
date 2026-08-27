@@ -19,6 +19,8 @@ __all__ = [
     "is_multiple_multiplicity",
     "is_multiplicity_compatible",
     "make_variable_multiplicity",
+    "multiplicity_from_bracket_content",
+    "normalize_variable_multiplicity",
     "parse_concept_with_multiplicity",
     "presence_from_symbol",
     "presence_symbol",
@@ -31,6 +33,40 @@ VariableMultiplicity = bool | int
 # Group 1: concept ref or code; group 2: bracket content (None / "" / digits); group 3: presence
 # marker symbol (None / "?" / "!").
 MULTIPLICITY_PATTERN = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)(?:\[(\d*)\])?([?!])?$"
+
+
+def normalize_variable_multiplicity(*, multiplicity: VariableMultiplicity | None) -> VariableMultiplicity | None:
+    """Collapse a fixed count of one onto the single form the language says it already is.
+
+    `Concept[1]` declares the same slot as `Concept` — a count of one is a way of spelling the count
+    out, not a distinct multiplicity, and nothing wraps such a value in a list. Applying that here, at
+    every site that builds a multiplicity from authored syntax or from caller arguments, is what makes
+    the value `1` unrepresentable downstream: no consumer has to remember the rule, and none of them
+    can re-derive it differently.
+
+    `True` is left alone. `bool` is a subclass of `int` and `True == 1`, so a variable-length `[]` would
+    otherwise collapse the way `[1]` does. An out-of-range count (`0`, from a caller that did not go
+    through the parser) is left alone too: it is invalid, and silently repairing it would hide that.
+    """
+    if multiplicity is None or isinstance(multiplicity, bool):
+        return multiplicity
+    return None if multiplicity == 1 else multiplicity
+
+
+def multiplicity_from_bracket_content(*, bracket_content: str | None) -> VariableMultiplicity | None:
+    """The multiplicity an io-ref's bracket suffix denotes, already normalized.
+
+    The three arms of the suffix grammar: no brackets is a single item, `[]` a variable-length list,
+    `[N]` a fixed count — and `[1]` the single form, per `normalize_variable_multiplicity`. This is the
+    only place bracket text becomes a multiplicity value; `parse_concept_with_multiplicity` layers the
+    `N >= 1` rule on top, and callers that have already matched `MULTIPLICITY_PATTERN` themselves use
+    this rather than re-deriving the arms.
+    """
+    if bracket_content is None:
+        return None
+    if bracket_content == "":
+        return True
+    return normalize_variable_multiplicity(multiplicity=int(bracket_content))
 
 
 def presence_from_symbol(*, symbol: str | None) -> PresenceMarker:
@@ -95,10 +131,12 @@ def make_variable_multiplicity(*, nb_items: int | None, multiple_items: bool | N
         3
         >>> make_variable_multiplicity(nb_items=None, multiple_items=True)
         True
-        >>> make_variable_multiplicity(nb_items=None, multiple_items=False)
+        >>> print(make_variable_multiplicity(nb_items=None, multiple_items=False))
         None
         >>> make_variable_multiplicity(nb_items=0, multiple_items=True)
         True
+        >>> print(make_variable_multiplicity(nb_items=1, multiple_items=True))  # a count of one is the single form
+        None
 
     """
     variable_multiplicity: VariableMultiplicity | None
@@ -108,7 +146,7 @@ def make_variable_multiplicity(*, nb_items: int | None, multiple_items: bool | N
         variable_multiplicity = True
     else:
         variable_multiplicity = None
-    return variable_multiplicity
+    return normalize_variable_multiplicity(multiplicity=variable_multiplicity)
 
 
 def is_multiple_multiplicity(*, multiplicity: VariableMultiplicity | None) -> bool:
@@ -149,6 +187,7 @@ def parse_concept_with_multiplicity(concept_ref_or_code: str) -> MultiplicityPar
     - "ConceptName" -> (ConceptName, None, plain)
     - "ConceptName[]" -> (ConceptName, True, plain)
     - "ConceptName[5]" -> (ConceptName, 5, plain)
+    - "ConceptName[1]" -> (ConceptName, None, plain) — a count of one IS the single form
     - "ConceptName?" -> (ConceptName, None, optional)
     - "ConceptName!" -> (ConceptName, None, force)
     - "domain.ConceptName" and any of the suffixes above on a qualified ref
@@ -156,6 +195,11 @@ def parse_concept_with_multiplicity(concept_ref_or_code: str) -> MultiplicityPar
     The parser accepts multiplicity + presence combinations ("ConceptName[]?") so that callers with
     context (blueprint input vs output validation) can reject them with a precise, typed error; the
     D1 v1 rule that markers are mutually exclusive with multiplicity is NOT enforced here.
+
+    A fixed count of one collapses to the single form here (see `normalize_variable_multiplicity`), so
+    the value `1` never leaves the parser and no consumer downstream can frame a `[1]` slot as a
+    one-item list. The collapse is canonicalizing, not lossy in meaning: re-rendering a parsed
+    "ConceptName[1]" yields "ConceptName", the other spelling of the same slot.
 
     Args:
         concept_ref_or_code: Concept specification string with optional multiplicity brackets
@@ -183,19 +227,12 @@ def parse_concept_with_multiplicity(concept_ref_or_code: str) -> MultiplicityPar
     bracket_content = match.group(2)
     marker_symbol = match.group(3)
 
-    multiplicity: int | bool | None
-    if bracket_content is None:
-        # No brackets - single item
-        multiplicity = None
-    elif bracket_content == "":
-        # Empty brackets [] - variable list
-        multiplicity = True
-    else:
-        # Number in brackets [N] - fixed count
-        multiplicity = int(bracket_content)
-        if multiplicity <= 0:
-            msg = f"Invalid multiplicity value in '{concept_ref_or_code}': multiplicity must be at least 1. A pipe must produce at least one output."
-            raise PipeVariableMultiplicityError(msg)
+    # Group 2 is `\d*`: None (no brackets), "" (`[]`), or digits (`[N]`). Only the digit arm can be out
+    # of range, and it is refused before the suffix is projected onto a multiplicity.
+    if bracket_content and int(bracket_content) <= 0:
+        msg = f"Invalid multiplicity value in '{concept_ref_or_code}': multiplicity must be at least 1. A pipe must produce at least one output."
+        raise PipeVariableMultiplicityError(msg)
+    multiplicity = multiplicity_from_bracket_content(bracket_content=bracket_content)
 
     return MultiplicityParseResult(
         concept_ref_or_code=extracted_concept,
@@ -212,9 +249,11 @@ def is_multiplicity_compatible(*, source_multiplicity: VariableMultiplicity | No
     compatible with the sequence's declared output multiplicity (target).
 
     Compatibility rules:
+    - A fixed count of one is normalized to the single form on both sides before any of the rules below
     - If target is None (single item), source must also be None
-    - If target is True (variable list), source can be True OR any positive integer
-      (a fixed count is compatible with a variable-length expectation)
+    - If target is True (variable list), source can be True OR any integer N >= 2
+      (a fixed count is compatible with a variable-length expectation; a count of one is the
+      single form and does not fulfill a list expectation)
     - If target is an integer N (fixed count), source must be exactly N
 
     Args:
@@ -239,7 +278,18 @@ def is_multiplicity_compatible(*, source_multiplicity: VariableMultiplicity | No
         False
         >>> is_multiplicity_compatible(source_multiplicity=None, target_multiplicity=True)  # Single cannot fulfill list expectation
         False
+        >>> is_multiplicity_compatible(source_multiplicity=1, target_multiplicity=None)  # `[1]` IS the single form
+        True
+        >>> is_multiplicity_compatible(source_multiplicity=1, target_multiplicity=True)  # ...so it is not a list
+        False
     """
+    # `[1]` is the single form (`normalize_variable_multiplicity`), so it must compare as one on both
+    # sides: a `[1]` step output fulfills a bare single declaration, and vice versa. Normalizing here
+    # rather than trusting the parser keeps this helper's answer the same for a caller that built the
+    # value itself.
+    source_multiplicity = normalize_variable_multiplicity(multiplicity=source_multiplicity)
+    target_multiplicity = normalize_variable_multiplicity(multiplicity=target_multiplicity)
+
     # Case 1: Target expects single item (None)
     if target_multiplicity is None:
         return source_multiplicity is None

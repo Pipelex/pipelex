@@ -126,8 +126,8 @@ OUTPUT_MULTIPLICITY_TO_APPLY_TEST_CASES: list[
     (
         5,
         1,
-        VariableMultiplicityResolution(resolved_multiplicity=1, is_multiple_outputs_enabled=True, specific_output_count=1),
-        "base=5, override=1 - override takes precedence",
+        VariableMultiplicityResolution(resolved_multiplicity=False, is_multiple_outputs_enabled=False, specific_output_count=None),
+        "base=5, override=1 - a requested count of one is a request for the single form",
     ),
     # Edge cases with negative numbers
     (

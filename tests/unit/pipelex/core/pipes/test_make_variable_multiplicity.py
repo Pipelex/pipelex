@@ -27,8 +27,9 @@ class TestMakeVariableMultiplicity:
         result = make_variable_multiplicity(nb_items=3, multiple_items=True)
         assert result == 3
 
+        # A count of one is the single form, so nb_items=1 yields no multiplicity at all
         result = make_variable_multiplicity(nb_items=1, multiple_items=False)
-        assert result == 1
+        assert result is None
 
         # When nb_items is falsy (0), multiple_items should be used
         result = make_variable_multiplicity(nb_items=0, multiple_items=True)

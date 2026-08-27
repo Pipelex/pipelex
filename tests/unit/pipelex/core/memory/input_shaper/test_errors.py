@@ -32,6 +32,10 @@ ERROR_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, type[InputSh
     ("null-top-level", "native.Text", None, None, NullInputError, "null"),
     # D2 a list where a singular is declared is ambiguous.
     ("list-where-singular", "shaper_test.Question", None, ["a", "b"], ListWhereSingularError, "single"),
+    # `[1]` IS the singular declaration, so it refuses a list on the same grounds — including a
+    # one-item list, which would otherwise look like it "fits" the count.
+    ("list-where-fixed-count-one", "shaper_test.Question", 1, ["a", "b"], ListWhereSingularError, "single"),
+    ("one-item-list-where-fixed-count-one", "shaper_test.Question", 1, ["solo"], ListWhereSingularError, "single"),
     # D2 fixed-count mismatch — too few, and a single value for [2].
     ("count-mismatch-list-too-few", "shaper_test.Question", 2, ["a"], MultiplicityCountMismatchError, "exactly 2"),
     ("count-mismatch-single-for-two", "shaper_test.Question", 2, "solo", MultiplicityCountMismatchError, "exactly 2"),

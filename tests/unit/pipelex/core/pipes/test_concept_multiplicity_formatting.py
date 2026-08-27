@@ -77,3 +77,19 @@ class TestFormatConceptWithMultiplicity:
             )
             == spec
         )
+
+    def test_a_fixed_count_of_one_round_trips_to_the_bare_spelling(self):
+        """`Text[1]` is canonicalized, not preserved: the parse collapses it and the format renders `Text`.
+
+        This is the one place the `[1]`-is-single ruling is visible to an author — a re-rendered ref
+        drops the count. The two spellings denote the same slot, so the canonical one is what survives.
+        """
+        parsed = parse_concept_with_multiplicity("Text[1]")
+        assert (
+            format_concept_with_multiplicity(
+                parsed.concept_ref_or_code,
+                multiplicity=parsed.multiplicity,
+                presence=parsed.presence,
+            )
+            == "Text"
+        )

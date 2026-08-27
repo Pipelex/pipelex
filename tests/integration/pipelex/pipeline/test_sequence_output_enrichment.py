@@ -174,6 +174,30 @@ steps = [
 ]
 """
 
+_ONE_COUNT_STEP_ON_TAINTED_BOUNDARY_MTHDS = """
+domain = "seqfix_one_count_boundary"
+main_pipe = "make_summary"
+
+[concept]
+Summary = "A summary."
+
+[pipe.write_summary]
+type = "PipeLLM"
+description = "Summarize text."
+inputs = { text = "Text" }
+output = "Summary"
+prompt = "Summarize $text"
+
+[pipe.make_summary]
+type = "PipeSequence"
+description = "Lift over optional input, last step carrying a count of one, wrong output concept."
+inputs = { text = "Text?" }
+output = "Number?"
+steps = [
+  { pipe = "write_summary", result = "summary", nb_output = 1 },
+]
+"""
+
 
 async def _enriched_error_data_for(
     mthds_content: str,
@@ -269,3 +293,22 @@ class TestSequenceOutputEnrichment:
         )
         assert error_data.pipe_code == "make_ideas"
         assert error_data.expected_output_ref == "Idea[3]"
+
+    async def test_a_one_count_step_keeps_the_optional_boundary_in_expected_ref(
+        self,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """`nb_output = 1` is the single form, so the hint must read `Summary?`, never `Summary[1]`.
+
+        The count is resolved the way the run path resolves it, so this step is singular and its
+        boundary keeps the `?` the taint requires. Reading the override as plural — which testing it
+        for `is None` did — produced a `Summary[1]` the fix planner writes straight into the bundle
+        (`SetKeyOp` on `output`), dropping the marker and leaving the repaired bundle invalid.
+        """
+        load_empty_library()
+        error_data = await _enriched_error_data_for(
+            _ONE_COUNT_STEP_ON_TAINTED_BOUNDARY_MTHDS,
+            error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+        )
+        assert error_data.pipe_code == "make_summary"
+        assert error_data.expected_output_ref == "Summary?"

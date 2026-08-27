@@ -4,11 +4,14 @@ import pytest
 
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.interpreter_hub import get_pipe_router
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
+from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata
@@ -91,3 +94,65 @@ class TestPipeImgGenRun:
         await get_pipe_router().run(
             pipe_job=pipe_job,
         )
+
+    async def test_pipe_img_gen_variable_output_single_override(
+        self,
+        job_metadata: JobMetadata,
+        pipe_run_mode: PipeRunMode,
+        img_gen_combo: ModelCombo,
+        load_empty_library: Callable[[], None],
+    ):
+        """An `Image[]` pipe run with `output_multiplicity=1` produces one image in the single form."""
+        load_empty_library()
+        pipe_img_gen_blueprint = PipeImgGenBlueprint(
+            description="Image generation test",
+            model=img_gen_combo.handle,
+            output=f"{NativeConceptCode.IMAGE}[]",
+            prompt="A lighthouse on a cliff at dusk",
+        )
+
+        pipe_job = PipeJobFactory.make_pipe_job(
+            pipe=PipeFactory[PipeImgGen].make_from_blueprint(
+                domain_code="generic",
+                pipe_code="adhoc_for_test_pipe_img_gen",
+                blueprint=pipe_img_gen_blueprint,
+            ),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode, output_multiplicity=1),
+            job_metadata=job_metadata,
+        )
+        pipe_output = await get_pipe_router().run(
+            pipe_job=pipe_job,
+        )
+        content = pipe_output.main_stuff.content
+        assert isinstance(content, ImageContent)
+        assert not isinstance(content, ListContent)
+
+    async def test_pipe_img_gen_variable_output_without_count_rejected(
+        self,
+        job_metadata: JobMetadata,
+        pipe_run_mode: PipeRunMode,
+        img_gen_combo: ModelCombo,
+        load_empty_library: Callable[[], None],
+    ):
+        """An `Image[]` pipe run with no count at all stays unguessable: the guard must hold."""
+        load_empty_library()
+        pipe_img_gen_blueprint = PipeImgGenBlueprint(
+            description="Image generation test",
+            model=img_gen_combo.handle,
+            output=f"{NativeConceptCode.IMAGE}[]",
+            prompt="A lighthouse on a cliff at dusk",
+        )
+
+        pipe_job = PipeJobFactory.make_pipe_job(
+            pipe=PipeFactory[PipeImgGen].make_from_blueprint(
+                domain_code="generic",
+                pipe_code="adhoc_for_test_pipe_img_gen",
+                blueprint=pipe_img_gen_blueprint,
+            ),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            job_metadata=job_metadata,
+        )
+        with pytest.raises(PipeRunParamsError, match="Cannot guess how many images"):
+            await get_pipe_router().run(
+                pipe_job=pipe_job,
+            )

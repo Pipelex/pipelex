@@ -8,7 +8,7 @@ from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.pipes.inputs.exceptions import InputStuffSpecsFactoryError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, PipeInputsRoot
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
-from pipelex.core.pipes.variable_multiplicity import presence_from_symbol
+from pipelex.core.pipes.variable_multiplicity import multiplicity_from_bracket_content, presence_from_symbol
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
@@ -55,6 +55,7 @@ class InputStuffSpecsFactory:
         - "domain.ConceptCode[]" -> multiplicity = True
         - "domain.ConceptCode" -> multiplicity = None (single item, default)
         - "ConceptCode[5]" -> multiplicity = 5 (resolved with domain)
+        - "ConceptCode[1]" -> multiplicity = None (a count of one IS the single form)
 
         Args:
             concept_provider: Resolves the parsed concept ref. Injected rather than looked up so this
@@ -95,15 +96,9 @@ class InputStuffSpecsFactory:
             concept_ref_or_code=concept_ref_or_code,
         )
 
-        # Determine multiplicity
-        multiplicity: VariableMultiplicity | None = None
-
-        if multiplicity_str is not None:  # Brackets were present
-            if multiplicity_str == "":  # Empty brackets []
-                multiplicity = True
-            else:  # Number in brackets [5]
-                multiplicity = int(multiplicity_str)
-        # else: No brackets, multiplicity stays None
+        # The bracket suffix becomes a multiplicity in exactly one place, shared with the io-ref parser,
+        # so this factory cannot rule a `[N]` slot differently from the rest of the chain.
+        multiplicity: VariableMultiplicity | None = multiplicity_from_bracket_content(bracket_content=multiplicity_str)
 
         concept = concept_provider.get_required_concept(concept_ref=concept_ref_with_domain)
         return StuffSpec(concept=concept, multiplicity=multiplicity, presence=presence_from_symbol(symbol=marker_symbol))
