@@ -34,7 +34,7 @@ from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs
 from pipelex.pipeline.controller_taint import ControllerTaintAnalysis, collect_controller_taint_analyses
 from pipelex.pipeline.hint_warnings import build_hint_warnings
-from pipelex.pipeline.input_form import PipeInputFormDescriptor, build_input_form, qualify_current_library_crate
+from pipelex.pipeline.input_form import InputForm, build_input_form, qualify_current_library_crate
 from pipelex.pipeline.optionality_warnings import build_optionality_warnings
 from pipelex.pipeline.vacuous_presence_warnings import build_vacuous_presence_warnings
 
@@ -42,7 +42,7 @@ from pipelex.pipeline.vacuous_presence_warnings import build_vacuous_presence_wa
 def build_advisory_warnings(
     *,
     taint_analyses: Sequence[ControllerTaintAnalysis],
-    input_form: dict[str, PipeInputFormDescriptor],
+    input_form: InputForm,
     entry_pipe_refs: Iterable[str],
     qualified_crate: QualifiedCrateContent,
 ) -> list[ValidationErrorItem]:

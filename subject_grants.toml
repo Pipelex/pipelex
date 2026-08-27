@@ -2928,10 +2928,6 @@ rationale = "Type-directed accessor: the target item type; single operand."
 param = "item_type"
 rationale = "Type-directed accessor: the target item type; single operand."
 
-["pipelex/core/pipes/variable_multiplicity.py::PresenceMarker.from_symbol"]
-param = "symbol"
-rationale = "Factory from source: parses the symbol; single operand."
-
 ["pipelex/core/pipes/variable_multiplicity.py::format_concept_with_multiplicity"]
 param = "concept_code_or_string"
 rationale = "Transforms the concept string; multiplicity stays keyword."

@@ -6,7 +6,8 @@ Reach for `pipe_io_contracts` when you need the schema and the declared contract
 
 ## Where it lives
 
-- `pipelex/pipeline/pipe_io_contracts.py` — the wire models (`PipeInputContract`, `PipeOutputContract`, `IOMultiplicity`) and the one public derivation, `build_pipe_io_contracts(pipes)`.
+- `mthds.protocol.pipe_io_contracts` — **the wire models** (`PipeInputContract`, `PipeOutputContract`, `PipeIOContract`, `IOMultiplicity`, `PresenceMarker`), declared by the MTHDS standard's Python client and mirroring its `pipe-io-contracts` page. Pipelex does not declare a second copy of them.
+- `pipelex/pipeline/pipe_io_contracts.py` — the one public derivation, `build_pipe_io_contracts(pipes)`, which imports and re-exports those models. Because it constructs the standard's own closed shapes, a projection that drifted from the standard fails at derivation rather than on the wire.
 - `PipelexValidationReport.pipe_io_contracts` (`pipelex/pipeline/validation_report.py`) — where the artifact travels.
 - `pipelex/pipeline/validate_in_process.py` — the in-process assembly derives it inside the validation library's window, right beside `build_input_form`. Iterating the same loaded pipes is what makes the two key sets equal by construction.
 

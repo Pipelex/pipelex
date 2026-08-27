@@ -5,7 +5,8 @@ duplication, and preserved-content riding.
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
-from pipelex.pipeline.input_form import FieldKind, InputFormDeriver
+from pipelex.pipeline.input_form import FieldKind, InputFormDeriver, NumberField
+from tests.helpers.input_form import as_kind, as_list, fields_by_name
 
 _CONCEPTS: dict[str, ConceptBlueprint | str] = {
     # Description-only concept: text-valued, no-hint kind is `prose`.
@@ -76,7 +77,7 @@ class TestConceptEffectiveHints:
 class TestStructureFieldHints:
     def test_field_hints_stamped_and_feed_kind(self):
         card = _deriver().derive_concept(name="card", concept_ref="docs.Card")
-        fields = {field.name: field for field in card.fields or []}
+        fields = fields_by_name(card)
         assert fields["title"].kind is FieldKind.TEXT
         assert fields["title"].hints == {"intent": "label"}
         assert fields["body"].hints is None
@@ -84,25 +85,23 @@ class TestStructureFieldHints:
 
     def test_rating_on_integer_field_rides_without_changing_kind(self):
         card = _deriver().derive_concept(name="card", concept_ref="docs.Card")
-        fields = {field.name: field for field in card.fields or []}
-        assert fields["stars"].kind is FieldKind.NUMBER
-        assert fields["stars"].integer is True
-        assert fields["stars"].hints == {"intent": "rating"}
+        fields = fields_by_name(card)
+        stars = as_kind(fields["stars"], NumberField)
+        assert stars.integer is True
+        assert stars.hints == {"intent": "rating"}
 
     def test_concept_typed_field_site_wins_over_concept_layer(self):
         card = _deriver().derive_concept(name="card", concept_ref="docs.Card")
-        fields = {field.name: field for field in card.fields or []}
+        fields = fields_by_name(card)
         # Essay's concept layer says prose; the field site says label — the site wins.
         assert fields["essay"].hints == {"intent": "label"}
         assert fields["essay"].kind is FieldKind.TEXT
 
     def test_list_field_hints_ride_list_and_item(self):
         card = _deriver().derive_concept(name="card", concept_ref="docs.Card")
-        fields = {field.name: field for field in card.fields or []}
-        tags = fields["tags"]
-        assert tags.kind is FieldKind.LIST
+        fields = fields_by_name(card)
+        tags = as_list(fields["tags"])
         assert tags.hints == {"intent": "label"}
-        assert tags.item is not None
         assert tags.item.hints == {"intent": "label"}
         # The item is the text-valued site: the label intent flips ITS kind.
         assert tags.item.kind is FieldKind.TEXT

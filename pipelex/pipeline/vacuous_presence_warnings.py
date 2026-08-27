@@ -28,8 +28,9 @@ a lint whose boundary is arguable is a lint that gets ignored).
 from collections.abc import Iterable, Mapping
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
+from pipelex.core.pipes.variable_multiplicity import is_force_presence
 from pipelex.core.qualified_ref import QualifiedRef
-from pipelex.pipeline.input_form import InputFormField, PipeInputFormDescriptor
+from pipelex.pipeline.input_form import InputFormField, ObjectField, PipeInputFormDescriptor
 from pipelex.validation_error_types import PipeValidationErrorType
 
 
@@ -64,14 +65,21 @@ def build_vacuous_presence_warnings(
 
 def _warning_for_slot(*, pipe_ref: str, slot: InputFormField) -> ValidationErrorItem | None:
     """The item a top-level slot earns, or `None` when the slot is silent."""
-    if not slot.gating or not slot.kind.is_object:
+    if not slot.gating:
         return None
-    if any(field.required for field in slot.fields or []):
+    if not isinstance(slot, ObjectField):
+        # The lint's claim is about what a concept's payload declares, which only an object node has.
+        return None
+    if any(field.required for field in slot.fields):
         return None
     concept_ref = slot.concept_ref
     if concept_ref is None:
         # No concept to name, hence no honest message to state: the lint's whole claim is about
         # what a named concept declares.
+        return None
+    if slot.name is None:
+        # A top-level field always states its name — only a list's item omits one — but the wire
+        # model keeps the slot optional, and a finding with nothing to point at would not be one.
         return None
     # Split on the LAST dot: a domain is a dotted path ('legal.contracts'), so a leading-dot split
     # would hand the locator a truncated domain and a pipe code carrying the rest of it.
@@ -86,13 +94,13 @@ def _warning_for_slot(*, pipe_ref: str, slot: InputFormField) -> ValidationError
     )
 
 
-def _message(*, pipe_ref: str, slot: InputFormField, concept_ref: str) -> str:
+def _message(*, pipe_ref: str, slot: ObjectField, concept_ref: str) -> str:
     """The finding's prose: what was declared, why it enforces nothing, and the two remedies.
 
     Carries no authored free text (no descriptions), so it needs no eliding — unlike the hint lint,
     which interpolates authored content.
     """
-    marker_desc = "declared with a force marker '!'" if slot.presence is not None and slot.presence.is_force else "declared without '?'"
+    marker_desc = "declared with a force marker '!'" if is_force_presence(presence=slot.presence) else "declared without '?'"
     if slot.fields:
         defect = f"concept '{concept_ref}' declares no required field — an empty object satisfies it"
         second_remedy = f"make at least one field of '{concept_ref}' required"

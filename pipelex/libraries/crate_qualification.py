@@ -40,7 +40,7 @@ from typing import TYPE_CHECKING, NamedTuple
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprintType
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
-from pipelex.core.pipes.variable_multiplicity import MultiplicityParseResult, parse_concept_with_multiplicity
+from pipelex.core.pipes.variable_multiplicity import MultiplicityParseResult, parse_concept_with_multiplicity, presence_symbol
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.libraries.exceptions import CrateNormalizationError
 from pipelex.libraries.library_crate import LibraryCrate
@@ -207,7 +207,7 @@ def _render_ref_with_markers(concept_ref: str, *, parsed: MultiplicityParseResul
         suffix = f"[{parsed.multiplicity}]"
     else:
         suffix = ""
-    return f"{concept_ref}{suffix}{parsed.presence.symbol}"
+    return f"{concept_ref}{suffix}{presence_symbol(presence=parsed.presence)}"
 
 
 def _qualify_pipe_ref(pipe_ref: str, *, owner_domain: str) -> str:
