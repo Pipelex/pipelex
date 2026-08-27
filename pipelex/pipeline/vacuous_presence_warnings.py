@@ -77,10 +77,6 @@ def _warning_for_slot(*, pipe_ref: str, slot: InputFormField) -> ValidationError
         # No concept to name, hence no honest message to state: the lint's whole claim is about
         # what a named concept declares.
         return None
-    if slot.name is None:
-        # A top-level field always states its name — only a list's item omits one — but the wire
-        # model keeps the slot optional, and a finding with nothing to point at would not be one.
-        return None
     # Split on the LAST dot: a domain is a dotted path ('legal.contracts'), so a leading-dot split
     # would hand the locator a truncated domain and a pipe code carrying the rest of it.
     locator = QualifiedRef.parse(pipe_ref)

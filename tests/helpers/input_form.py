@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from typing import TypeVar
 
-from pipelex.pipeline.input_form import InputFormField, InputFormFieldBase, ListField, ObjectField
+from pipelex.pipeline.input_form import InputFormField, InputFormItemBase, ListField, ObjectField
 
-FieldModelType = TypeVar("FieldModelType", bound=InputFormFieldBase)
+FieldModelType = TypeVar("FieldModelType", bound=InputFormItemBase)
 
 
 def as_kind(node: InputFormField, kind_model: type[FieldModelType]) -> FieldModelType:
@@ -35,4 +35,4 @@ def as_list(node: InputFormField) -> ListField:
 
 def fields_by_name(node: InputFormField) -> dict[str, InputFormField]:
     """An object node's payload fields keyed by their authored name."""
-    return {field.name: field for field in as_object(node).fields if field.name is not None}
+    return {field.name: field for field in as_object(node).fields}
