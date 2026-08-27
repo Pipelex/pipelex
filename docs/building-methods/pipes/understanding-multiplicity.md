@@ -105,7 +105,7 @@ The pipe will extract however many line items appear in the invoice. A simple in
 
 **3. Fixed output (bracket notation `[N]`)**
 
-Use a number in brackets to generate an exact number of items:
+Use a number in brackets to generate an exact number of items (a real list starts at `[2]` — see the note on `[1]` under the input side):
 
 ```toml
 [concept]
@@ -231,6 +231,10 @@ Compare these two images in detail:
 Describe their similarities, differences, and relative strengths.
 """
 ```
+
+!!! note "A count of one is not a list"
+
+    `Concept[1]` declares a **single** instance, not a one-item list — it is the same slot as `Concept`, with the count written out. Nothing wraps such a value in an array, so a fixed count only ever means a real list when it is 2 or more. This holds everywhere the count appears: on an input, on an output, in the validate report, and at run time, where a `[1]` input takes the value itself and refuses a list exactly as a bare declaration does. `Concept[0]` is invalid.
 
 ## Practical Use Cases
 

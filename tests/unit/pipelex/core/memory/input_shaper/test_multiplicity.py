@@ -12,8 +12,8 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.interpreter_hub import get_concept_library
 from tests.unit.pipelex.core.memory.input_shaper.data import Deadline, Question, ShaperPerson, build_input_specs
 
-# (test_name, concept_ref, multiplicity, provided_value, expected_concept_ref, expected_list_content)
-MULTIPLICITY_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, str, ListContent[StuffContent]]] = [
+# (test_name, concept_ref, multiplicity, provided_value, expected_concept_ref, expected_content)
+MULTIPLICITY_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, str, StuffContent]] = [
     # Variable list, element-wise shaping into ListContent[declared].
     (
         "variable-list-refining",
@@ -49,7 +49,7 @@ MULTIPLICITY_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, str, 
         "shaper_test.Question",
         ListContent(items=[]),
     ),
-    # Fixed count [N] validates the count; a single value satisfies [1].
+    # Fixed count [N] validates the count.
     (
         "fixed-count-two",
         "shaper_test.Question",
@@ -58,13 +58,15 @@ MULTIPLICITY_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, str, 
         "shaper_test.Question",
         ListContent(items=[Question(text="a"), Question(text="b")]),
     ),
+    # `[1]` is the single form, not a one-item list: the shaper builds the item itself, and a list
+    # payload is refused there exactly as it is under a bare declaration.
     (
-        "fixed-count-one-single",
+        "fixed-count-one-is-single",
         "shaper_test.Question",
         1,
         "solo",
         "shaper_test.Question",
-        ListContent(items=[Question(text="solo")]),
+        Question(text="solo"),
     ),
     # A list of dicts shapes element-wise into a structured list, no envelope.
     (
@@ -91,7 +93,7 @@ MULTIPLICITY_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, str, 
 
 class TestInputShaperMultiplicity:
     @pytest.mark.parametrize(
-        ("test_name", "concept_ref", "multiplicity", "provided_value", "expected_concept_ref", "expected_list_content"),
+        ("test_name", "concept_ref", "multiplicity", "provided_value", "expected_concept_ref", "expected_content"),
         MULTIPLICITY_CASES,
     )
     def test_multiplicity_case(
@@ -101,7 +103,7 @@ class TestInputShaperMultiplicity:
         multiplicity: VariableMultiplicity | None,
         provided_value: Any,
         expected_concept_ref: str,
-        expected_list_content: ListContent[StuffContent],
+        expected_content: StuffContent,
     ) -> None:
         log.info(f"Testing multiplicity case: {test_name}")
         input_specs = build_input_specs([("my_input", concept_ref, multiplicity)])
@@ -112,4 +114,4 @@ class TestInputShaperMultiplicity:
         pretty_print(stuff, title=f"Result for {test_name}")
         assert stuff.concept.concept_ref == expected_concept_ref, f"Wrong concept for {test_name}"
         # Equality subsumes the type check: a ListContent never equals a non-ListContent content.
-        assert stuff.content == expected_list_content, f"Wrong list content for {test_name}"
+        assert stuff.content == expected_content, f"Wrong content for {test_name}"

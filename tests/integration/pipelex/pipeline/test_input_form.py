@@ -25,10 +25,19 @@ from typing import TYPE_CHECKING, Any, cast
 import pytest
 from pydantic import Field
 
+from pipelex.core.memory.exceptions import ListWhereSingularError
+from pipelex.core.memory.input_shaper import InputShaper, PipelineInputs
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
+from pipelex.interpreter_hub import (
+    clear_current_library,
+    get_concept_library,
+    get_current_library_id_or_none,
+    get_library_manager,
+    set_current_library,
+)
 from pipelex.pipeline.input_form import FieldKind, InputFormField, build_input_form
-from pipelex.pipeline.pipe_io_contracts import build_pipe_io_contracts
+from pipelex.pipeline.pipe_io_contracts import IOMultiplicity, build_pipe_io_contracts
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.registries.class_registry_access import get_class_registry
 from tests.helpers.input_form import fields_by_name
@@ -540,6 +549,27 @@ prompt = \"\"\"
 """
 
 
+_ONE_SLOT_MTHDS = """
+domain = "one_slot"
+description = "A single `[1]` slot, for pinning that every surface rules it the same way"
+
+[concept.Gadget]
+description = "A gadget"
+
+[concept.Gadget.structure]
+name = { type = "text", description = "The gadget name", required = true }
+
+[pipe.take_one]
+type = "PipeLLM"
+description = "Take exactly one gadget"
+inputs = { one = "Gadget[1]" }
+output = "Text"
+prompt = \"\"\"
+@one
+\"\"\"
+"""
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestKindAssignmentTable:
     async def _derive_kind_table(self, load_empty_library: Callable[[], str]) -> dict[str, PipeInputFormDescriptor]:
@@ -583,6 +613,44 @@ class TestKindAssignmentTable:
         assert one.concept_ref == "input_form_kinds.Gadget"
         assert one.required is True
         assert one.gating is True
+
+    async def test_a_fixed_count_of_one_is_ruled_the_same_way_by_every_surface(self, load_empty_library: Callable[[], str]) -> None:
+        """The descriptor, the wire contract and the memory shaper agree that a `[1]` slot is single.
+
+        They once did not: the descriptor and the contract published `single` while the shaper framed
+        the payload as a one-item list, so a form rendered faithfully on the descriptor submitted a value
+        the shaper refused. Each surface pinned on its own can drift into that again and stay green,
+        which is why the agreement is asserted here in one place. The payload is exactly what the
+        descriptor node describes.
+        """
+        outer_library_id = load_empty_library()
+        try:
+            result = await validate_bundle(mthds_contents=[_ONE_SLOT_MTHDS])
+
+            descriptor_node = _field_by_name(build_input_form(result.pipes)["one_slot.take_one"], "one")
+            contract_input = build_pipe_io_contracts(result.pipes)["one_slot.take_one"].inputs["one"]
+            take_one_pipe = {pipe.pipe_ref: pipe for pipe in result.pipes}["one_slot.take_one"]
+
+            assert descriptor_node.kind == FieldKind.OBJECT, "the descriptor asks for one value"
+            assert contract_input.multiplicity == IOMultiplicity.SINGLE, "the contract publishes the single arm"
+            assert contract_input.item_count is None
+
+            # The shaper takes what those two describe: the object itself, with no list around it.
+            working_memory = InputShaper.shape(
+                {"one": {"name": "widget"}},
+                input_specs=take_one_pipe.inputs,
+                concept_provider=get_concept_library(),
+            )
+            content = working_memory.root["one"].content
+            assert not isinstance(content, ListContent), "the runtime frames a `[1]` slot as the item, never a one-item list"
+            assert content.model_dump() == {"name": "widget"}
+
+            # And it refuses a list there on the same grounds a bare declaration does.
+            list_payload = cast("PipelineInputs", {"one": [{"name": "widget"}]})
+            with pytest.raises(ListWhereSingularError):
+                InputShaper.shape(list_payload, input_specs=take_one_pipe.inputs, concept_provider=get_concept_library())
+        finally:
+            _teardown_validation_library(outer_library_id)
 
     async def test_an_authored_but_empty_structure_table_is_an_object_with_no_fields(self, load_empty_library: Callable[[], str]) -> None:
         """The engine branches on `structure is not None` (`ConceptFactory`), so an empty `[concept.X.structure]`

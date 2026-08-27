@@ -40,7 +40,7 @@ from pipelex.core.memory.exceptions import (
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
-from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, fixed_item_count, is_multiple_multiplicity
 from pipelex.core.stuffs.exceptions import StuffContentFactoryError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -248,14 +248,13 @@ class InputShaper:
     def _peel_multiplicity(cls, multiplicity: VariableMultiplicity | None) -> tuple[bool, int | None]:
         """Peel a declared multiplicity into ``(is_list, fixed_count)`` (D2).
 
-        ``VariableMultiplicity`` is ``None | bool | int``; parsing only ever yields ``None`` (single),
-        ``True`` (``X[]`` variable list), or an ``int N>=1`` (``X[N]`` fixed count). A genuine int is a
-        fixed-count list, ``True`` a variable list, ``None`` singular. ``bool`` is a subclass of ``int``,
-        so the int check must exclude it explicitly.
+        Both halves are the shared projection, not a local re-derivation: ``[]`` is a variable list,
+        ``[N]`` for ``N >= 2`` a fixed-count list carrying its count, and ``None`` — like ``[1]``, which
+        is the single form with its count written out — is singular. Deriving it here again is exactly
+        how this function once came to frame a ``[1]`` slot as a one-item list while the contract, the
+        schema and the descriptor beside it all ruled it single.
         """
-        fixed_count = multiplicity if isinstance(multiplicity, int) and not isinstance(multiplicity, bool) else None
-        is_list = multiplicity is True or fixed_count is not None
-        return is_list, fixed_count
+        return is_multiple_multiplicity(multiplicity=multiplicity), fixed_item_count(multiplicity=multiplicity)
 
     @classmethod
     def _shape_with_multiplicity(
