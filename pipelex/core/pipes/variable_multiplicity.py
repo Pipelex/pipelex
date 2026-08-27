@@ -1,11 +1,28 @@
 from __future__ import annotations
 
 import re
-from enum import StrEnum
 
+from mthds.protocol.pipe_io_contracts import PresenceMarker
 from pydantic import BaseModel, Field
 
 from pipelex.core.pipes.exceptions import PipeVariableMultiplicityError
+
+__all__ = [
+    "MULTIPLICITY_PATTERN",
+    "MultiplicityParseResult",
+    "PresenceMarker",
+    "VariableMultiplicity",
+    "VariableMultiplicityResolution",
+    "fixed_item_count",
+    "format_concept_with_multiplicity",
+    "is_force_presence",
+    "is_multiple_multiplicity",
+    "is_multiplicity_compatible",
+    "make_variable_multiplicity",
+    "parse_concept_with_multiplicity",
+    "presence_from_symbol",
+    "presence_symbol",
+]
 
 VariableMultiplicity = bool | int
 
@@ -16,61 +33,43 @@ VariableMultiplicity = bool | int
 MULTIPLICITY_PATTERN = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)(?:\[(\d*)\])?([?!])?$"
 
 
-class PresenceMarker(StrEnum):
-    """Presence of a value in a declared slot: plain (always present), optional (`?` — the slot may
-    legitimately hold no value), or force (`!` — a use-site assertion that the value must be present).
+def presence_from_symbol(*, symbol: str | None) -> PresenceMarker:
+    """The presence marker an io-ref suffix symbol denotes: nothing is `plain`, `?` optional, `!` force.
+
+    The symbol grammar is this engine's parser, not the standard's wire vocabulary, so it lives here
+    beside `MULTIPLICITY_PATTERN` rather than on the enum the standard declares.
     """
+    match symbol:
+        case None | "":
+            return PresenceMarker.PLAIN
+        case "?":
+            return PresenceMarker.OPTIONAL
+        case "!":
+            return PresenceMarker.FORCE
+        case _:
+            msg = f"Invalid presence marker symbol: '{symbol}'. Expected '?', '!', or nothing."
+            raise PipeVariableMultiplicityError(msg)
 
-    PLAIN = "plain"
-    OPTIONAL = "optional"
-    FORCE = "force"
 
-    @classmethod
-    def from_symbol(cls, symbol: str | None) -> PresenceMarker:
-        match symbol:
-            case None | "":
-                return PresenceMarker.PLAIN
-            case "?":
-                return PresenceMarker.OPTIONAL
-            case "!":
-                return PresenceMarker.FORCE
-            case _:
-                msg = f"Invalid presence marker symbol: '{symbol}'. Expected '?', '!', or nothing."
-                raise PipeVariableMultiplicityError(msg)
+def presence_symbol(*, presence: PresenceMarker) -> str:
+    """The io-ref suffix symbol a presence marker renders as — the inverse of `presence_from_symbol`."""
+    match presence:
+        case PresenceMarker.PLAIN:
+            return ""
+        case PresenceMarker.OPTIONAL:
+            return "?"
+        case PresenceMarker.FORCE:
+            return "!"
 
-    @property
-    def symbol(self) -> str:
-        match self:
-            case PresenceMarker.PLAIN:
-                return ""
-            case PresenceMarker.OPTIONAL:
-                return "?"
-            case PresenceMarker.FORCE:
-                return "!"
 
-    @property
-    def is_optional(self) -> bool:
-        match self:
-            case PresenceMarker.OPTIONAL:
-                return True
-            case PresenceMarker.PLAIN | PresenceMarker.FORCE:
-                return False
+def is_force_presence(*, presence: PresenceMarker | None) -> bool:
+    """Whether a marker is the force assertion (`!`), an unstated marker included as not forced.
 
-    @property
-    def is_force(self) -> bool:
-        match self:
-            case PresenceMarker.FORCE:
-                return True
-            case PresenceMarker.PLAIN | PresenceMarker.OPTIONAL:
-                return False
-
-    @property
-    def is_plain(self) -> bool:
-        match self:
-            case PresenceMarker.PLAIN:
-                return True
-            case PresenceMarker.OPTIONAL | PresenceMarker.FORCE:
-                return False
+    The standard's enum answers `is_optional` and `is_plain`, the two questions a wire consumer asks.
+    The force assertion is the authored claim this engine's lints and blueprint checks read, so the
+    third question is answered here.
+    """
+    return presence is PresenceMarker.FORCE
 
 
 class VariableMultiplicityResolution(BaseModel):
@@ -201,7 +200,7 @@ def parse_concept_with_multiplicity(concept_ref_or_code: str) -> MultiplicityPar
     return MultiplicityParseResult(
         concept_ref_or_code=extracted_concept,
         multiplicity=multiplicity,
-        presence=PresenceMarker.from_symbol(marker_symbol),
+        presence=presence_from_symbol(symbol=marker_symbol),
     )
 
 
@@ -305,4 +304,4 @@ def format_concept_with_multiplicity(
     else:
         # Fixed-length list - brackets with number
         multiplicity_suffix = f"[{multiplicity}]"
-    return f"{concept_code_or_string}{multiplicity_suffix}{presence.symbol}"
+    return f"{concept_code_or_string}{multiplicity_suffix}{presence_symbol(presence=presence)}"

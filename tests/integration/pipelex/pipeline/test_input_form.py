@@ -31,6 +31,7 @@ from pipelex.pipeline.input_form import FieldKind, InputFormField, build_input_f
 from pipelex.pipeline.pipe_io_contracts import build_pipe_io_contracts
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.registries.class_registry_access import get_class_registry
+from tests.helpers.input_form import fields_by_name
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -104,7 +105,7 @@ prompt = "Write a haiku."
 
 
 def _field_by_name(descriptor: PipeInputFormDescriptor, name: str) -> InputFormField:
-    by_name = {field.name: field for field in descriptor.fields}
+    by_name = {field.name: field for field in descriptor.fields if field.name is not None}
     assert name in by_name, f"Expected a field named {name!r}, got {sorted(by_name)}"
     return by_name[name]
 
@@ -241,9 +242,9 @@ class TestBuildInputForm:
         assert by_name["enabled"].kind == FieldKind.BOOLEAN
 
         assert by_name["released_on"].kind == FieldKind.DATE
-        assert by_name["released_on"].datetime_flag is False
+        assert by_name["released_on"].datetime is False
         assert by_name["launched_at"].kind == FieldKind.DATE
-        assert by_name["launched_at"].datetime_flag is True
+        assert by_name["launched_at"].datetime is True
         daily_at = by_name["daily_at"]
         assert daily_at.kind == FieldKind.TEXT
         assert daily_at.format == "time"
@@ -301,7 +302,7 @@ class TestBuildInputForm:
         assert number_in.integer is False
         date_in = _field_by_name(natives, "date_in")
         assert date_in.kind == FieldKind.DATE
-        assert date_in.datetime_flag is False
+        assert date_in.datetime is False
         time_in = _field_by_name(natives, "time_in")
         assert time_in.kind == FieldKind.TEXT
         assert time_in.format == "time"
@@ -391,8 +392,8 @@ class TestBuildInputForm:
         finally:
             _teardown_validation_library(outer_library_id)
 
-        review = {field.name: field for field in input_form["input_semantics_hinted.hinted_slots"].fields}["hinted"]
-        review_fields = {field.name: field for field in review.fields or []}
+        review = _field_by_name(input_form["input_semantics_hinted.hinted_slots"], "hinted")
+        review_fields = fields_by_name(review)
         assert review_fields["headline"].hints == {"intent": "label"}
         assert review_fields["headline"].kind is FieldKind.TEXT
         assert review_fields["body"].hints == {"intent": "prose"}
@@ -560,10 +561,8 @@ class TestKindAssignmentTable:
         input_form = await self._derive_kind_table(load_empty_library)
         one = _field_by_name(input_form["input_form_kinds.edges"], "one")
 
-        assert one.kind == FieldKind.OBJECT
+        assert one.kind == FieldKind.OBJECT, "A `[1]` slot is the concept's own node, never a list wrapper"
         assert one.concept_ref == "input_form_kinds.Gadget"
-        assert one.item is None
-        assert one.item_count is None
         assert one.required is True
         assert one.gating is True
 
@@ -660,4 +659,3 @@ class TestKindAssignmentTable:
         assert unmappable.concept_ref == "input_form_kinds.Unmappable"
         assert unmappable.description is not None
         assert "PROBE_desc_concept_Unmappable" in unmappable.description
-        assert unmappable.fields is None

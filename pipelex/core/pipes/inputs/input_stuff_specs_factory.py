@@ -8,7 +8,7 @@ from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.pipes.inputs.exceptions import InputStuffSpecsFactoryError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, PipeInputsRoot
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
-from pipelex.core.pipes.variable_multiplicity import PresenceMarker
+from pipelex.core.pipes.variable_multiplicity import presence_from_symbol
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
@@ -106,4 +106,4 @@ class InputStuffSpecsFactory:
         # else: No brackets, multiplicity stays None
 
         concept = concept_provider.get_required_concept(concept_ref=concept_ref_with_domain)
-        return StuffSpec(concept=concept, multiplicity=multiplicity, presence=PresenceMarker.from_symbol(marker_symbol))
+        return StuffSpec(concept=concept, multiplicity=multiplicity, presence=presence_from_symbol(symbol=marker_symbol))

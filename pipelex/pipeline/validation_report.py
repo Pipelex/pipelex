@@ -22,9 +22,9 @@ from pipelex.graph.graphspec import GraphSpec
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.bundle_validator import DryRunOutput
-from pipelex.pipeline.input_form import PipeInputFormDescriptor
+from pipelex.pipeline.input_form import InputForm
 from pipelex.pipeline.liftable_pipes import LiftablePipeEntry
-from pipelex.pipeline.pipe_io_contracts import PipeIOContract
+from pipelex.pipeline.pipe_io_contracts import PipeIOContracts
 from pipelex.pipeline.validate_bundle import ValidatedPipeEntry, build_validated_pipes
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
@@ -46,10 +46,10 @@ class PipelexValidationReport(ValidationReport):
     bundle_blueprint: PipelexBundleBlueprint
     """The batch's primary blueprint: first declaring `main_pipe`, else first."""
 
-    pipe_io_contracts: dict[str, PipeIOContract] = Field(default_factory=dict)
+    pipe_io_contracts: PipeIOContracts = Field(default_factory=dict)
     """Per-pipe input/output contracts, keyed by namespaced `pipe_ref` (`domain.code`)."""
 
-    input_form: dict[str, PipeInputFormDescriptor]
+    input_form: InputForm
     """Per-pipe input-form descriptors (the MTHDS input-form descriptor, derived from authored
     facts — never from `json_schema`), keyed exactly like `pipe_io_contracts`. Required, no
     default: the shared-assembly rule says a report field is populated on every backend or none,
@@ -82,8 +82,8 @@ class PipelexValidationReport(ValidationReport):
 def build_validation_report(
     *,
     blueprints: Sequence[PipelexBundleBlueprint],
-    pipe_io_contracts: dict[str, PipeIOContract],
-    input_form: dict[str, PipeInputFormDescriptor],
+    pipe_io_contracts: PipeIOContracts,
+    input_form: InputForm,
     dry_run_result: dict[str, DryRunOutput],
     pending_signatures: list[str],
     graph_spec: GraphSpec | None = None,

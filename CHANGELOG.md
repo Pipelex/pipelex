@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The input-form descriptor and the pipe I/O contracts are typed by the standard now (Breaking for importers)**: The wire models of both artifacts are declared once, by the MTHDS standard's Python client, and Pipelex imports them instead of restating them. `pipelex/pipeline/pipe_io_contracts.py` re-exports `PipeInputContract`, `PipeOutputContract`, `PipeIOContract` and `IOMultiplicity` from `mthds.protocol.pipe_io_contracts`; `pipelex/pipeline/input_form.py` re-exports `FieldKind`, `PipeInputFormDescriptor` and the field models from `mthds.protocol.input_form`; and `pipelex/core/pipes/variable_multiplicity.py` re-exports `PresenceMarker` from the contracts module, since the marker is part of the contract's wire vocabulary. **The wire is unchanged** — every field name, every value, and every absent-versus-null rule is the one the engine already emitted, and the derivation is the same derivation. What moved is which package declares the shape. Importers are affected in three ways: a field descriptor is now one model per kind (`TextField`, `ProseField`, `DateField`, `NumberField`, `BooleanField`, `EnumField`, `DocumentField`, `ImageField`, `ObjectField`, `ListField`, `UnknownField`) under an `InputFormField` union discriminated on `kind`, so a node is narrowed with `isinstance` or a `match` on its class rather than read off a flat model; `FieldKind.is_list` and `FieldKind.is_object` are gone with that narrowing; and the `date` kind's Python attribute is now `datetime`, the name it always had on the wire, rather than `datetime_flag`. Because the engine constructs the standard's own closed shapes, a drift between what it emits and what the standard defines now fails at derivation instead of silently on the wire. See [Input-form descriptor](under-the-hood/input-form-descriptor.md) and [Pipe I/O contracts](under-the-hood/pipe-io-contracts.md).
+- **`PresenceMarker`'s symbol grammar moved off the enum (Breaking)**: The marker enum is the standard's, so the three helpers that are this engine's `.mthds` suffix grammar rather than wire vocabulary became module-level functions in `pipelex/core/pipes/variable_multiplicity.py`: `PresenceMarker.from_symbol(...)` is `presence_from_symbol(symbol=...)`, `marker.symbol` is `presence_symbol(presence=marker)`, and `marker.is_force` is `is_force_presence(presence=marker)`, all keyword-only per this repo's convention. `is_optional` and `is_plain` stay properties on the enum, which the standard declares.
+- **Minimum `mthds` version**: The floor moves to `mthds>=0.9.0`, the release that carries `mthds/protocol/pipe_io_contracts.py` and `mthds/protocol/input_form.py`.
+
 ## [v0.53.0] - 2026-08-25
 
 ### Added

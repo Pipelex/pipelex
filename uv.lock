@@ -2552,7 +2552,7 @@ wheels = [
 
 [[package]]
 name = "mthds"
-version = "0.8.2"
+version = "0.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -2561,9 +2561,9 @@ dependencies = [
     { name = "tomlkit" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ed/87/9fefbf352f2f2794336ae6fa1f72ea7d7a74ce78524e3bce734bea83aa02/mthds-0.8.2.tar.gz", hash = "sha256:1ac24a415f5a4942e93309066ed6b65a553ca379578e2da93f492bc63342b0b6", size = 130890, upload-time = "2026-08-21T10:49:37.05Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/52/f3/e585dd38f4be879347702d2792c01b571fac607fdc5c520d8ed4d4592b90/mthds-0.9.0.tar.gz", hash = "sha256:2386f52d4bf40e13dbe793cbc9d45ab16981d3de8f846b42ad49f4a7412ea55a", size = 159117, upload-time = "2026-08-26T22:40:50.699Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b7/85/051bf842ead495c9126e04a940cbfd3fada2474599b89be27b6d73e73158/mthds-0.8.2-py3-none-any.whl", hash = "sha256:13d314523afc5f774b7f19f65b94ce32e753a617298aae8d6d11315448bbea9f", size = 58167, upload-time = "2026-08-21T10:49:35.804Z" },
+    { url = "https://files.pythonhosted.org/packages/ec/17/6163b570259974bca8dacf8e0b4f0e83649eebae1f5dbbe16603a5e5d749/mthds-0.9.0-py3-none-any.whl", hash = "sha256:226410499aef67847519d994e4cf0fb1ac9b9621b96e34bc17bfa719dd856013", size = 68740, upload-time = "2026-08-26T22:40:49.33Z" },
 ]
 
 [[package]]
@@ -3472,7 +3472,7 @@ requires-dist = [
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "mkdocs-redirects", marker = "extra == 'docs'", specifier = "==1.2.2" },
     { name = "moto", extras = ["dynamodb", "s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "mthds", specifier = ">=0.8.2" },
+    { name = "mthds", specifier = ">=0.9.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=2.0.0" },
