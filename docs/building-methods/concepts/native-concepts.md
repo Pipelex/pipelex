@@ -36,7 +36,7 @@ Here are all the native concepts you can use out of the box:
 | `Page` | A document page with text, images, and optional page view | `PageContent` |
 | `Dynamic` | A dynamic concept that adapts to context | `DynamicContent` |
 | `JSON` | A JSON object | `JSONContent` |
-| `Html` | HTML content with inner HTML and CSS class | `HtmlContent` |
+| `Html` | HTML content with inner HTML and optional CSS class | `HtmlContent` |
 | `SearchResult` | A web search result with answer and sources | `SearchResultContent` |
 | `Composite` | A named composition of contents | `CompositeContent` |
 | `Anything` | Any type of content | *No specific implementation* |
@@ -247,13 +247,13 @@ Represents HTML content with styling:
 ```python
 class HtmlContent(StuffContent):
     inner_html: str
-    css_class: str
+    css_class: str | None = None
 ```
 
 **Fields:**
 
 - `inner_html`: The inner HTML of the content
-- `css_class`: The CSS class applied to the wrapping element
+- `css_class`: The CSS class applied to the wrapping element, optional — content that needs no wrapper simply omits it, and the HTML rendering then returns the raw `inner_html` with no wrapping `div`
 
 **Use for:** Rendered HTML fragments, styled content blocks, HTML-based reports.
 

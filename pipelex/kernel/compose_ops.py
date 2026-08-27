@@ -58,7 +58,7 @@ def build_composed_content(*, output_class: type[StuffContent], rendered_text: s
     the `ValidationError` a mismatch raises, are identical either way.
     """
     if issubclass(output_class, HtmlContent):
-        return output_class.model_validate({"inner_html": rendered_text, "css_class": ""})
+        return output_class.model_validate({"inner_html": rendered_text})
     return output_class.model_validate({"text": rendered_text})
 
 

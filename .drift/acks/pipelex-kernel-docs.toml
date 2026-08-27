@@ -1,12 +1,12 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:72913ee5d4505143e4919037ef9dd8012392f895197ea56513caec82dd42b85a"
+digest = "sha256:835a768141c5702b53e3924ae1b50d218d89cbf2038049432b7d610738a2123d"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-21T09:18:48Z"
-rationale = "Trigger fired on a lint-comment migration only. The ruff 0.16 upgrade rewrote two suppressions in tests/unit/pipelex/kernel/test_kernel_boot_contract.py from '# noqa: S404/S603' to the new '# ruff: ignore[suspicious-subprocess-import]' / '# ruff: ignore[subprocess-without-shell-equals-true]' spelling; the diff on that file is those two comments and nothing else. No kernel surface moved: PipelexKernel.make, llm_text, llm_object and make_step_metadata are untouched in name and signature, and the boot contract the test asserts is unchanged. docs/under-the-hood/pipelex-kernel.md therefore cannot have gone stale from this change and needs no edit. The page was touched in the same sweep, but only by ruff 0.16's new formatting of Python code blocks inside Markdown (blank lines and trailing-comment spacing) - no prose or code semantics changed."
+reviewed_at = "2026-08-27T08:35:00Z"
+rationale = "Reviewed docs/under-the-hood/pipelex-kernel.md against the compose_ops.py change: build_composed_content no longer fabricates an empty css_class for an Html-shaped output class (native.Html made css_class optional per MTHDS v0.9.0). The doc names the function in the surface table only and does not describe the fabricated value, so nothing is stale and no edit is needed."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
-"pipelex/kernel/compose_ops.py" = "blob:d89a27422da1ec41685a93fc7e3e4ab53d2f72bc"
+"pipelex/kernel/compose_ops.py" = "blob:ccd8ba141246380eb5e9d55e693fa6fedf38233a"
 "pipelex/kernel/compose_results.py" = "blob:a837ae9680c7d4d0eb4dee37d4657c410e5b5cea"
 "pipelex/kernel/exceptions.py" = "blob:45e9ad60c2699f7b57cad0a46c13f0b07b4cfbc9"
 "pipelex/kernel/extract_ops.py" = "blob:cd596c03e45ab57eccca6fe1bf332e5977d1f2b2"

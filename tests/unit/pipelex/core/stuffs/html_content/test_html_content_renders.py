@@ -27,10 +27,20 @@ class TestHtmlContentRenders:
         content = HtmlContent(inner_html=TestData.SAMPLE_INNER_HTML, css_class=TestData.XSS_CSS_CLASS)
         assert content.rendered_html() == TestData.EXPECTED_XSS_PROTECTED_HTML
 
+    def test_rendered_html_without_css_class(self):
+        """An unset css_class renders the raw inner_html with no wrapping div."""
+        content = HtmlContent(inner_html=TestData.SAMPLE_INNER_HTML)
+        assert content.rendered_html() == TestData.EXPECTED_RENDERED_HTML_NO_CLASS
+
     def test_rendered_json(self):
         """Verify rendered_json returns JSON string with html and css_class keys."""
         content = HtmlContent(inner_html=TestData.SAMPLE_INNER_HTML, css_class=TestData.SAMPLE_CSS_CLASS)
         assert content.rendered_json() == TestData.EXPECTED_RENDERED_JSON
+
+    def test_rendered_json_without_css_class(self):
+        """An unset css_class is omitted from the JSON rendering, never emitted as null."""
+        content = HtmlContent(inner_html=TestData.SAMPLE_INNER_HTML)
+        assert content.rendered_json() == TestData.EXPECTED_RENDERED_JSON_NO_CLASS
 
     def test_rendered_for_prompt(self):
         """Verify rendered_for_prompt returns markdown format (which is inner_html for HtmlContent)."""
