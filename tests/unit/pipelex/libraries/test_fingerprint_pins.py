@@ -22,8 +22,12 @@ _PROBE_BUNDLE_PATH = Path(__file__).parents[3] / "data" / "input_semantics" / "p
 # recomputed once on feature/Enrich when the bundle itself changed content: its `titled_default`
 # field moved to a rejected/ fixture (E3 outlaws the required+default pair) — a fixture-content
 # change, not a model leak, so the recompute is the legitimate exception to the note above.
+# The normalized pin was recomputed again when MTHDS v0.9.0 made `native.Html`'s `css_class`
+# optional: normalization materializes the pinned natives into the crate, so a standard change to
+# a pinned definition legitimately moves every conforming implementation's normalized digest — the
+# content pin, which hashes only authored content, did not move.
 _PINNED_CONTENT_FINGERPRINT = "053d3ce1a1963feffcea1aaea21e6329a7d2d2371cecdb92eb4a1e51269b0043"
-_PINNED_NORMALIZED_FINGERPRINT = "0a2aac25fe00afb191d52eb12bed7a778a4cab6687bbd1c0455b016e7eae1847"
+_PINNED_NORMALIZED_FINGERPRINT = "8d6fd88088228beb4f5fdad5b204a30146e8fcfc9392df93caa7df37d4ed471a"
 
 _MTHDS_TEST_VERSION = "0.0.0-test"
 

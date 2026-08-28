@@ -1,5 +1,37 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **Blueprint serialization schemas**: `ConceptBlueprint`, `ConceptStructureBlueprint`, `InputSlotBlueprint` and `ConstructBlueprint` publish their real shape again in serialization mode. Each carries a `@model_serializer(mode="wrap")` annotated `-> dict[str, Any]`, and pydantic turns a serializer's return annotation into the model's serialization JSON Schema in preference to the one it would generate — so all four came back as an opaque `{"type": "object", "additionalProperties": true}` with no properties, no `required` and no closed shape. This is the same annotation `mthds` 0.11.1 dropped for the input-form field descriptors. Nothing here noticed, because validation-mode schemas and `model_dump()` were both correct throughout; the damage landed in consumers that generate response-model schemas, which FastAPI always does, so a downstream OpenAPI artifact regains its field-level detail on its next `pipelex` bump. A new sweep test holds every Pipelex model to the rule, and the agent rules now scope "every function return must be typed" so a serializer's return stays unannotated.
+
+## [v0.54.0] - 2026-08-28
+
+### Added
+
+- **MTHDS standard conformance CI**: A new test holds the pinned native-concept set (`pinned_blueprints.py`) to the standard's own `native-concepts.md`, read from a sibling `mthds` checkout — definition for definition, field for field, order included. The `mthds-standard-check.yml` workflow checks the standard out at its default branch and runs it on every pull request, so the day the standard moves a definition this repo goes red instead of a downstream port.
+- **`bump-mthds` Claude skill**: A skill (with its `upstream_notes.py` helper) that automates moving the `mthds` dependency: it finds the latest release, re-locks, adapts the engine source to what the release broke, runs the checks and drafts the changelog entry.
+
+### Changed
+
+- **`mthds` is pinned exactly to `==0.11.1`** (previously `>=0.8.2`). Everyone downstream of Pipelex inherits that exact version, so a consumer that also depends on `mthds` must now move in step with Pipelex rather than resolving its own. (Breaking)
+- **Multiplicity `[1]` is strictly singular**: a count of one (e.g. `Concept[1]`) is universally the single form, not a one-item list. A `[1]` input takes the value itself and refuses a list, a `[1]` output produces one object rather than a `ListContent` of one, a re-rendered ref canonicalizes back to `Concept`, and a presence marker beside a count of one (`Concept[1]?`) is accepted on inputs as it already was on outputs. A sequence declaring a plural output whose last step yields one no longer validates, and `Concept[0]` is rejected at parse time with a validation error instead of surfacing later. See [Understanding multiplicity](building-methods/pipes/understanding-multiplicity.md). (Breaking)
+- **`native.Html.css_class` is now optional** (`str | None`), matching MTHDS v0.9.0. An `Html` value is its markup, and the class is presentation a producer states when it has one — composed HTML and JSON rendering no longer fabricate an empty `css_class`, and structured output no longer forces a generating LLM to invent it. (Breaking)
+- **Input-form descriptors and pipe I/O contracts are typed by the standard now**: both artifacts' wire models are imported from `mthds.protocol` instead of being restated here, and re-exported from `pipelex/pipeline/input_form.py` and `pipelex/pipeline/pipe_io_contracts.py`. The wire is unchanged; what moved is which package declares the shape. Importers are affected three ways: a field descriptor is one model per kind (`TextField`, `ObjectField`, …) under an `InputFormField` union discriminated on `kind`, narrowed with `isinstance` or `match` rather than read off a flat model, so `FieldKind.is_list` and `FieldKind.is_object` are gone; the `date` kind's Python attribute is now `datetime`, the name it always had on the wire, rather than `datetime_flag`; and the item layer is a distinct `InputFormItem` union (`TextItem`, `ObjectItem`, …) that structurally forbids the `name` a list item never had, renaming `InputFormFieldBase` to `InputFormItemBase` and `TextValuedFieldBase` to `TextValuedItemBase`. See [Input-form descriptor](under-the-hood/input-form-descriptor.md) and [Pipe I/O contracts](under-the-hood/pipe-io-contracts.md). (Breaking)
+- **`native.Date` and `native.Html` are `object` nodes in the input-form descriptor**, with `fields` derived from their pinned definitions, rather than the former `date` and `prose` scalars — which reported shapes the slots' own schemas rejected. (Breaking)
+- **`PresenceMarker` is imported from the standard**, so the three helpers that are this engine's `.mthds` suffix grammar rather than wire vocabulary became module-level functions in `pipelex/core/pipes/variable_multiplicity.py`: `presence_from_symbol`, `presence_symbol` and `is_force_presence`, all keyword-only. `is_optional` and `is_plain` stay properties on the enum. (Breaking)
+- **Input-form descriptor conformance**: a description-only concept's `refines` now carries only the authored chain and no longer fabricates the `native.Text` link the spec forbids reconstructing — text-valuedness still reaches the wire as `kind: "prose"`.
+- **`TypeAdapter` agent rule refined** (`pipelex/kit/agent_rules/python_standards.md`): the flat ban becomes a scoped one. Don't design shapes that need a `TypeAdapter`, but validating into a top-level union or container owned by an external contract — a standard's wire model, a log stream of one-of-many event types — is its sanctioned use, as a module-level singleton.
+- **Bumped `pyright` to `1.1.411`.** The release narrows `hasattr()` on an `Any` or `type[Any]` operand to `type[object]` instead of leaving it wide, which turned two duck-typed guards into type errors; both now test what they mean — `issubclass(..., BaseModel)` before calling `model_validate`, and `typing.get_origin` instead of reaching for `__origin__`.
+
+### Fixed
+
+- **Input-form field serialization**: `mthds` 0.11.1 drops the `-> dict[str, Any]` return annotation from the wrap serializer every field descriptor shares. Pydantic preferred that annotation over the schema it would generate, so `TextField.model_json_schema(mode="serialization")` and each of its siblings came back as an opaque `{"type": "object", "additionalProperties": true}` — the mode a server generating response-model schemas asks for, so a FastAPI consumer embedding `PipeInputFormDescriptor` published a `kind`-discriminated union whose arms described nothing. The per-kind shapes are back.
+- **Sequence output enrichment**: a sequence step with `nb_output = 1` on an optional boundary no longer drops the optional marker (`?`) during fix planning.
+- **Parallel pipe output validation**: a plural branch with `nb_output = 1` no longer bypasses type checking, which previously let an incompatible singular result through to crash at run time.
+- **Image generation multiplicity**: `PipeImgGen` honors an `output_multiplicity=1` run-time override, generating a single image instead of refusing it as unresolved.
+
 ## [v0.53.0] - 2026-08-25
 
 ### Added

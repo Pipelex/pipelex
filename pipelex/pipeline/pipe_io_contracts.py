@@ -1,11 +1,20 @@
 """Per-pipe input/output contracts (`pipe_io_contracts`) for the validate surfaces.
 
-This is the canonical builder for the `pipe_io_contracts` artifact reported by the MTHDS
+This is the reference builder for the `pipe_io_contracts` artifact reported by the MTHDS
 Protocol `validate` operation (local runtime and hosted API alike). It projects loaded
 pipes into typed `PipeIOContract` entries — for each pipe, the JSON-Schema view of its
 declared inputs and the concept/multiplicity of its output — keyed by the namespaced
 `pipe_ref` (`domain.code`), the one identity convention shared by every validate artifact
 (`validated_pipes`, `pending_signatures`).
+
+**The wire shapes belong to the standard, not to this engine.** `IOMultiplicity`,
+`PipeInputContract`, `PipeOutputContract` and `PipeIOContract` are the models of
+`mthds.protocol.pipe_io_contracts`, mirroring the standard's `pipe-io-contracts` page;
+they are imported and re-exported here so this module keeps its callers, and this engine
+holds no second declaration of them. What stays here is the projection: how a loaded pipe
+becomes a contract. The models are closed shapes that check their own cross-field
+invariants at construction, so a projection that ever drifted from the standard fails
+here, at the derivation, rather than silently on the wire.
 
 Callers must invoke the builder against loaded pipes INSIDE the validation library's
 window, before teardown — the builder now says so itself rather than degrading. It asks
@@ -19,70 +28,27 @@ the library that defined them. They still do — what changed is that this build
 reaches them behind the library's back. (Registry teardown hygiene is tracked separately.)
 """
 
-from enum import StrEnum
 from typing import Any, Sequence
 
-from pydantic import BaseModel, Field, PydanticUndefinedAnnotation, PydanticUserError
+from mthds.protocol.pipe_io_contracts import IOMultiplicity, PipeInputContract, PipeIOContract, PipeIOContracts, PipeOutputContract
+from pydantic import PydanticUndefinedAnnotation, PydanticUserError
 
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.concepts.exceptions import ConceptValueError
-from pipelex.core.pipes.variable_multiplicity import PresenceMarker, VariableMultiplicity, fixed_item_count, is_multiple_multiplicity
+from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, fixed_item_count, is_multiple_multiplicity
 from pipelex.interpreter_hub import get_concept_library
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipeline.exceptions import PipeIOContractError
 
-
-class IOMultiplicity(StrEnum):
-    """Wire value for a slot's multiplicity: one item, a variable-length list, or a fixed count.
-
-    A fixed-count slot (`Concept[N]`) reports `fixed` and carries the exact count in the
-    contract's `item_count`; a variable-length slot (`Concept[]`) reports `variable` with no
-    count. `Concept[1]` is single — no list framing.
-    """
-
-    SINGLE = "single"
-    VARIABLE = "variable"
-    FIXED = "fixed"
-
-
-class PipeInputContract(BaseModel):
-    """One declared input: the concept it expects and the JSON Schema of its content."""
-
-    concept_ref: str
-    presence: PresenceMarker = PresenceMarker.PLAIN
-    """The declared presence marker, verbatim: `optional` (`?`) means the caller may omit the
-    input and the pipe handles absence itself; `plain` and `force` (`!`) both must be provided —
-    the distinction is the authored assertion, which lint and graph surfaces read."""
-
-    multiplicity: IOMultiplicity = IOMultiplicity.SINGLE
-    item_count: int | None = None
-    """The exact item count, non-null exactly when `multiplicity` is `fixed`. The slot is always
-    on the wire — `null` off the fixed arm, per the protocol spec (the input-form descriptor makes
-    the opposite choice and omits it; the two artifacts deliberately differ)."""
-
-    json_schema: dict[str, Any] = Field(default_factory=dict)
-
-
-class PipeOutputContract(BaseModel):
-    """The pipe's output: the concept it produces and how many items it resolves to."""
-
-    concept_ref: str
-    multiplicity: IOMultiplicity
-    item_count: int | None = None
-    """The exact item count, non-null exactly when `multiplicity` is `fixed`. Always on the wire,
-    `null` off the fixed arm — see `PipeInputContract.item_count`."""
-
-    optional: bool = False
-    """`True` when the output is declared optional (`?`): the pipe may resolve it as a recorded
-    absence instead of a value — a successful run with an absent result. Genuinely two-valued:
-    `!` is rejected on outputs."""
-
-
-class PipeIOContract(BaseModel):
-    """The input/output contract of one pipe — a `pipe_io_contracts` entry."""
-
-    inputs: dict[str, PipeInputContract] = Field(default_factory=dict)
-    output: PipeOutputContract
+__all__ = [
+    "IOMultiplicity",
+    "PipeIOContract",
+    "PipeIOContracts",
+    "PipeInputContract",
+    "PipeOutputContract",
+    "build_pipe_io_contracts",
+    "make_io_multiplicity",
+]
 
 
 def make_io_multiplicity(*, multiplicity: VariableMultiplicity | None) -> tuple[IOMultiplicity, int | None]:
@@ -99,7 +65,7 @@ def make_io_multiplicity(*, multiplicity: VariableMultiplicity | None) -> tuple[
     return IOMultiplicity.SINGLE, None
 
 
-def build_pipe_io_contracts(pipes: Sequence[PipeAbstract]) -> dict[str, PipeIOContract]:
+def build_pipe_io_contracts(pipes: Sequence[PipeAbstract]) -> PipeIOContracts:
     """Project loaded pipes into `pipe_io_contracts` entries keyed by namespaced `pipe_ref`.
 
     Works on any loaded `PipeAbstract` — including `PipeSignature` placeholders, whose
@@ -129,7 +95,7 @@ def build_pipe_io_contracts(pipes: Sequence[PipeAbstract]) -> dict[str, PipeIOCo
     # `Concept[1]` and serve one's schema for the other.
     schema_memo: dict[tuple[str, bool, int | None], dict[str, Any]] = {}
     concept_provider = get_concept_library()
-    io_contracts: dict[str, PipeIOContract] = {}
+    io_contracts: PipeIOContracts = {}
     for pipe in pipes:
         pipe_inputs: dict[str, PipeInputContract] = {}
         for var_name, stuff_spec in pipe.inputs.root.items():

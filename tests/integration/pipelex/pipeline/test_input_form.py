@@ -25,12 +25,22 @@ from typing import TYPE_CHECKING, Any, cast
 import pytest
 from pydantic import Field
 
+from pipelex.core.memory.exceptions import ListWhereSingularError
+from pipelex.core.memory.input_shaper import InputShaper, PipelineInputs
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
+from pipelex.interpreter_hub import (
+    clear_current_library,
+    get_concept_library,
+    get_current_library_id_or_none,
+    get_library_manager,
+    set_current_library,
+)
 from pipelex.pipeline.input_form import FieldKind, InputFormField, build_input_form
-from pipelex.pipeline.pipe_io_contracts import build_pipe_io_contracts
+from pipelex.pipeline.pipe_io_contracts import IOMultiplicity, build_pipe_io_contracts
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.registries.class_registry_access import get_class_registry
+from tests.helpers.input_form import fields_by_name
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -203,7 +213,7 @@ class TestBuildInputForm:
         stringnote = _field_by_name(refined, "stringnote")
         assert stringnote.kind == FieldKind.PROSE
         assert stringnote.concept_ref == "input_semantics_probe.StringNote"
-        assert stringnote.refines == ["native.Text"], "A string-described concept is this engine's TextContent fact"
+        assert stringnote.refines is None, "No refines was authored, and none is reconstructed — text-valuedness is `kind: prose`"
 
         note = _field_by_name(input_form["input_semantics_probe.probe_single"], "note")
         assert note.kind == FieldKind.PROSE
@@ -241,9 +251,9 @@ class TestBuildInputForm:
         assert by_name["enabled"].kind == FieldKind.BOOLEAN
 
         assert by_name["released_on"].kind == FieldKind.DATE
-        assert by_name["released_on"].datetime_flag is False
+        assert by_name["released_on"].datetime is False
         assert by_name["launched_at"].kind == FieldKind.DATE
-        assert by_name["launched_at"].datetime_flag is True
+        assert by_name["launched_at"].datetime is True
         daily_at = by_name["daily_at"]
         assert daily_at.kind == FieldKind.TEXT
         assert daily_at.format == "time"
@@ -299,14 +309,32 @@ class TestBuildInputForm:
         number_in = _field_by_name(natives, "number_in")
         assert number_in.kind == FieldKind.NUMBER
         assert number_in.integer is False
-        date_in = _field_by_name(natives, "date_in")
-        assert date_in.kind == FieldKind.DATE
-        assert date_in.datetime_flag is False
         time_in = _field_by_name(natives, "time_in")
         assert time_in.kind == FieldKind.TEXT
         assert time_in.format == "time"
-        assert _field_by_name(natives, "html_in").kind == FieldKind.PROSE
         assert _field_by_name(natives, "yesno_in").kind == FieldKind.BOOLEAN
+
+        # `native.Date` and `native.Html` sit on the standard's object arm: fields from the pinned
+        # definition, like the other structured natives.
+        date_in = _field_by_name(natives, "date_in")
+        assert date_in.kind == FieldKind.OBJECT
+        date_fields = fields_by_name(date_in)
+        assert list(date_fields) == ["date", "time"], "Pinned-blueprint fields, in pinned order"
+        assert date_fields["date"].kind == FieldKind.DATE
+        assert date_fields["date"].datetime is False
+        assert date_fields["date"].required is True
+        assert date_fields["time"].kind == FieldKind.TEXT
+        assert date_fields["time"].format == "time"
+        assert date_fields["time"].required is False
+
+        html_in = _field_by_name(natives, "html_in")
+        assert html_in.kind == FieldKind.OBJECT
+        html_fields = fields_by_name(html_in)
+        assert list(html_fields) == ["inner_html", "css_class"], "Pinned-blueprint fields, in pinned order"
+        assert html_fields["inner_html"].kind == FieldKind.TEXT
+        assert html_fields["inner_html"].required is True
+        assert html_fields["css_class"].kind == FieldKind.TEXT
+        assert html_fields["css_class"].required is False
         for field in natives.fields:
             assert field.concept_ref is not None
             assert field.concept_ref.startswith("native."), f"{field.name} states its native ref, got {field.concept_ref!r}"
@@ -345,7 +373,7 @@ class TestBuildInputForm:
         memo = _field_by_name(descriptor, "memo")
         assert memo.kind == FieldKind.PROSE
         assert memo.description == "A short memo"
-        assert memo.refines == ["native.Text"]
+        assert memo.refines is None, "A description-only concept authored no refines, and none is fabricated"
 
         special = _field_by_name(descriptor, "special")
         assert special.kind == FieldKind.OBJECT
@@ -391,8 +419,8 @@ class TestBuildInputForm:
         finally:
             _teardown_validation_library(outer_library_id)
 
-        review = {field.name: field for field in input_form["input_semantics_hinted.hinted_slots"].fields}["hinted"]
-        review_fields = {field.name: field for field in review.fields or []}
+        review = _field_by_name(input_form["input_semantics_hinted.hinted_slots"], "hinted")
+        review_fields = fields_by_name(review)
         assert review_fields["headline"].hints == {"intent": "label"}
         assert review_fields["headline"].kind is FieldKind.TEXT
         assert review_fields["body"].hints == {"intent": "prose"}
@@ -521,6 +549,27 @@ prompt = \"\"\"
 """
 
 
+_ONE_SLOT_MTHDS = """
+domain = "one_slot"
+description = "A single `[1]` slot, for pinning that every surface rules it the same way"
+
+[concept.Gadget]
+description = "A gadget"
+
+[concept.Gadget.structure]
+name = { type = "text", description = "The gadget name", required = true }
+
+[pipe.take_one]
+type = "PipeLLM"
+description = "Take exactly one gadget"
+inputs = { one = "Gadget[1]" }
+output = "Text"
+prompt = \"\"\"
+@one
+\"\"\"
+"""
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestKindAssignmentTable:
     async def _derive_kind_table(self, load_empty_library: Callable[[], str]) -> dict[str, PipeInputFormDescriptor]:
@@ -560,18 +609,54 @@ class TestKindAssignmentTable:
         input_form = await self._derive_kind_table(load_empty_library)
         one = _field_by_name(input_form["input_form_kinds.edges"], "one")
 
-        assert one.kind == FieldKind.OBJECT
+        assert one.kind == FieldKind.OBJECT, "A `[1]` slot is the concept's own node, never a list wrapper"
         assert one.concept_ref == "input_form_kinds.Gadget"
-        assert one.item is None
-        assert one.item_count is None
         assert one.required is True
         assert one.gating is True
+
+    async def test_a_fixed_count_of_one_is_ruled_the_same_way_by_every_surface(self, load_empty_library: Callable[[], str]) -> None:
+        """The descriptor, the wire contract and the memory shaper agree that a `[1]` slot is single.
+
+        They once did not: the descriptor and the contract published `single` while the shaper framed
+        the payload as a one-item list, so a form rendered faithfully on the descriptor submitted a value
+        the shaper refused. Each surface pinned on its own can drift into that again and stay green,
+        which is why the agreement is asserted here in one place. The payload is exactly what the
+        descriptor node describes.
+        """
+        outer_library_id = load_empty_library()
+        try:
+            result = await validate_bundle(mthds_contents=[_ONE_SLOT_MTHDS])
+
+            descriptor_node = _field_by_name(build_input_form(result.pipes)["one_slot.take_one"], "one")
+            contract_input = build_pipe_io_contracts(result.pipes)["one_slot.take_one"].inputs["one"]
+            take_one_pipe = {pipe.pipe_ref: pipe for pipe in result.pipes}["one_slot.take_one"]
+
+            assert descriptor_node.kind == FieldKind.OBJECT, "the descriptor asks for one value"
+            assert contract_input.multiplicity == IOMultiplicity.SINGLE, "the contract publishes the single arm"
+            assert contract_input.item_count is None
+
+            # The shaper takes what those two describe: the object itself, with no list around it.
+            working_memory = InputShaper.shape(
+                {"one": {"name": "widget"}},
+                input_specs=take_one_pipe.inputs,
+                concept_provider=get_concept_library(),
+            )
+            content = working_memory.root["one"].content
+            assert not isinstance(content, ListContent), "the runtime frames a `[1]` slot as the item, never a one-item list"
+            assert content.model_dump() == {"name": "widget"}
+
+            # And it refuses a list there on the same grounds a bare declaration does.
+            list_payload = cast("PipelineInputs", {"one": [{"name": "widget"}]})
+            with pytest.raises(ListWhereSingularError):
+                InputShaper.shape(list_payload, input_specs=take_one_pipe.inputs, concept_provider=get_concept_library())
+        finally:
+            _teardown_validation_library(outer_library_id)
 
     async def test_an_authored_but_empty_structure_table_is_an_object_with_no_fields(self, load_empty_library: Callable[[], str]) -> None:
         """The engine branches on `structure is not None` (`ConceptFactory`), so an empty `[concept.X.structure]`
         table is backed by a field-less structured model whose schema is `{"type": "object", "properties": {}}`.
-        The descriptor states that same fact: testing truthiness instead would report the concept as `prose`
-        with a `native.Text` refinement link nobody authored, contradicting the schema beside it.
+        The descriptor states that same fact: testing truthiness instead would report the concept as `prose`,
+        contradicting the object schema beside it.
         """
         input_form = await self._derive_kind_table(load_empty_library)
         empties = input_form["input_form_kinds.empty_structures"]
@@ -660,4 +745,3 @@ class TestKindAssignmentTable:
         assert unmappable.concept_ref == "input_form_kinds.Unmappable"
         assert unmappable.description is not None
         assert "PROBE_desc_concept_Unmappable" in unmappable.description
-        assert unmappable.fields is None

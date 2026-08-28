@@ -40,7 +40,11 @@ class SubPipe(BaseModel):
         sub_pipe_run_params: PipeRunParams,
         library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
-        if self.output_multiplicity:
+        # `is not None`, not truthiness: `False` (force single) and `0` are overrides a step can
+        # carry, and dropping them here would let the run path inherit the caller's multiplicity
+        # while `is_plural_step_result` — which hands this same value to the shared resolution —
+        # promised the step's own answer.
+        if self.output_multiplicity is not None:
             sub_pipe_run_params.output_multiplicity = self.output_multiplicity
 
         sub_pipe = get_required_pipe(pipe_code=self.pipe_code)

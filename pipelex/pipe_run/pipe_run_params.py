@@ -7,7 +7,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from pipelex import log
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams, check_mock_usage_requires_dry
 from pipelex.core.memory.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF_NAME
-from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, VariableMultiplicityResolution
+from pipelex.core.pipes.variable_multiplicity import (
+    VariableMultiplicity,
+    VariableMultiplicityResolution,
+    normalize_variable_multiplicity,
+)
 from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.pipe_run_param_key import PipeRunParamKey
@@ -29,18 +33,19 @@ def output_multiplicity_to_apply(
     Args:
         base_multiplicity: Base multiplicity setting (from pipe definition).
             - None: Single output (default)
+            - 1: Single output — a count of one is the single form, not a one-item list
             - True: Multiple outputs (LLM decides count)
             - int: Specific number of outputs
         override_multiplicity: Override multiplicity setting (from runtime params).
             - None: Use base value
             - True: Enable multiple outputs
             - False: Force single output (disable multiplicity)
-            - int: Specific number of outputs
+            - int: Specific number of outputs (1 forces the single form, like False)
 
     Returns:
-        OutputMultiplicityResolution: Structured result containing:
+        VariableMultiplicityResolution: Structured result containing:
             - resolved_multiplicity: The final multiplicity value to use
-            - enable_multiple_outputs: True if multiple outputs should be generated
+            - is_multiple_outputs_enabled: True if multiple outputs should be generated
             - specific_output_count: Exact number of outputs if specified, None otherwise
 
     Resolution Logic:
@@ -48,19 +53,27 @@ def output_multiplicity_to_apply(
         - If override is False: Force single output regardless of base
         - If override is True: Enable multiple outputs, preserve base count if it's int
         - If override is int: Use override count, enable multiple outputs
+        - If base or override is 1: the single form — a count of one is not a list
 
     Examples:
         >>> result = output_multiplicity_to_apply(base_multiplicity=None, override_multiplicity=None)
-        >>> (result.resolved_multiplicity, result.enable_multiple_outputs, result.specific_output_count)
+        >>> (result.resolved_multiplicity, result.is_multiple_outputs_enabled, result.specific_output_count)
         (None, False, None)
         >>> result = output_multiplicity_to_apply(base_multiplicity=True, override_multiplicity=None)
-        >>> (result.resolved_multiplicity, result.enable_multiple_outputs, result.specific_output_count)
+        >>> (result.resolved_multiplicity, result.is_multiple_outputs_enabled, result.specific_output_count)
         (True, True, None)
         >>> result = output_multiplicity_to_apply(base_multiplicity=3, override_multiplicity=None)
-        >>> (result.resolved_multiplicity, result.enable_multiple_outputs, result.specific_output_count)
+        >>> (result.resolved_multiplicity, result.is_multiple_outputs_enabled, result.specific_output_count)
         (3, True, 3)
 
     """
+    # `[1]` is the single form, so a base count of one is no multiplicity at all.
+    base_multiplicity = normalize_variable_multiplicity(multiplicity=base_multiplicity)
+    # A caller asking at run time for exactly one output is asking for that same single form — spelled
+    # `False` (force single) on this side, since `None` here means "no override" instead.
+    if override_multiplicity is not None and normalize_variable_multiplicity(multiplicity=override_multiplicity) is None:
+        override_multiplicity = False
+
     # Case 1: No override provided - use base value as-is
     if override_multiplicity is None:
         if isinstance(base_multiplicity, bool):

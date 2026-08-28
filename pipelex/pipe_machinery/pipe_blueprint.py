@@ -12,8 +12,12 @@ from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.variable_multiplicity import (
     MULTIPLICITY_PATTERN,
     PipeVariableMultiplicityError,
-    PresenceMarker,
+    is_force_presence,
+    is_multiple_multiplicity,
+    multiplicity_from_bracket_content,
     parse_concept_with_multiplicity,
+    presence_from_symbol,
+    presence_symbol,
 )
 from pipelex.pipe_machinery.validation import validate_input_name
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -201,10 +205,13 @@ class InputSlotBlueprint(BaseModel):
         return dict(sorted(hints.items())) if hints else None
 
     @model_serializer(mode="wrap")
-    def serialize_without_absent_hints(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+    def serialize_without_absent_hints(self, handler: SerializerFunctionWrapHandler):
         """Absent hints are an absent member — never `null` (spec rule). Unreachable for a
         hint-free slot in practice (the parse-time collapse leaves it a plain string), kept so any
         directly-constructed instance still serializes canonically.
+
+        The return is deliberately unannotated — see `ConceptBlueprint.serialize_without_absent_hints`:
+        an annotation here becomes the model's serialization JSON Schema and erases its shape.
         """
         dumped: dict[str, Any] = handler(self)
         if dumped.get("hints") is None:
@@ -367,14 +374,22 @@ class PipeBlueprint(ABC, BaseModel):
                     )
                     raise ValueError(msg)
 
-                # D1/D4: presence markers are mutually exclusive with multiplicity — a plural slot's
-                # "nothing" is the empty list, so there is nothing for `?` or `!` to say.
                 bracket_content = match.group(2)
-                presence = PresenceMarker.from_symbol(match.group(3))
-                if not presence.is_plain and bracket_content is not None:
+                if bracket_content and int(bracket_content) <= 0:
+                    msg = f"Invalid input '{input_name}': '{concept_spec}'. Multiplicity must be at least 1."
+                    raise ValueError(msg)
+
+                # D1/D4: presence markers are mutually exclusive with multiplicity — a plural slot's
+                # "nothing" is the empty list, so there is nothing for `?` or `!` to say. A `[1]` slot
+                # is not plural: it is the single form with its count written out, so it takes a marker
+                # exactly as a bare ref does. Reading the projection rather than the bracket text is
+                # what keeps this in step with the output half, which parses before it decides.
+                presence = presence_from_symbol(symbol=match.group(3))
+                multiplicity = multiplicity_from_bracket_content(bracket_content=bracket_content)
+                if not presence.is_plain and is_multiple_multiplicity(multiplicity=multiplicity):
                     msg = (
                         f"Invalid input '{input_name}': '{concept_spec}'. "
-                        f"The presence marker '{presence.symbol}' cannot be combined with multiplicity: "
+                        f"The presence marker '{presence_symbol(presence=presence)}' cannot be combined with multiplicity: "
                         f"a plural slot is never absent — when nothing is found, it is the empty list."
                     )
                     raise PipeValidationError(
@@ -403,7 +418,7 @@ class PipeBlueprint(ABC, BaseModel):
             raise ValueError(msg) from exc
 
         # D1: `!` is a use-site assertion — it is meaningless on outputs (a producer doesn't unwrap).
-        if output_parse_result.presence.is_force:
+        if is_force_presence(presence=output_parse_result.presence):
             msg = (
                 f"Invalid output: '{self.output}'. The force marker '!' is not allowed on outputs — "
                 f"it is a use-site assertion for inputs. To declare that this pipe may produce no value, use '?'."

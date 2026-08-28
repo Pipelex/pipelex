@@ -93,6 +93,20 @@ class TestMakeInputRequirementsFromString:
         assert result.multiplicity == expected_multiplicity, f"Failed for {stuff_spec_str}"
         assert result.concept.concept_ref == expected_concept_ref
 
+    def test_fixed_count_of_one_is_the_single_form(self, load_empty_library: Callable[[], None]):
+        """`Concept[1]` builds a single-item spec, exactly as a bare `Concept` does.
+
+        This factory parses input specs with its own regex rather than the shared parser, so it is the
+        second place the `[1]`-is-single ruling has to hold — and the one the memory shaper reads.
+        """
+        load_empty_library()
+        result = InputStuffSpecsFactory.make_from_string(
+            domain_code="native", stuff_spec_str="native.Image[1]", concept_provider=get_concept_library()
+        )
+        assert result.concept.concept_ref == "native.Image"
+        assert result.multiplicity is None
+        assert result.is_multiple() is False
+
     @pytest.mark.parametrize(
         ("domain_code", "stuff_spec_str", "expected_concept_ref"),
         DIFFERENT_CONCEPT_CODES_TEST_CASES,

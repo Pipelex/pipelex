@@ -47,7 +47,7 @@ class TestBuildValidationReport:
         pipe_io_contracts = {
             "beta.do_it": PipeIOContract(
                 inputs={},
-                output=PipeOutputContract(concept_ref="native.Text", multiplicity=IOMultiplicity.SINGLE),
+                output=PipeOutputContract(concept_ref="native.Text", multiplicity=IOMultiplicity.SINGLE, item_count=None, optional=False),
             ),
         }
         dry_run_result: dict[str, DryRunOutput] = {

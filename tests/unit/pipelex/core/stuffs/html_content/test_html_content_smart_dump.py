@@ -16,15 +16,21 @@ class TestHtmlContentSmartDump:
         assert result == TestData.EXPECTED_SMART_DUMP
         assert isinstance(result, dict)
 
+    def test_smart_dump_without_css_class(self):
+        """An unset optional css_class dumps as None — the field stays in the payload, unset."""
+        content = HtmlContent(inner_html=TestData.SAMPLE_INNER_HTML)
+        assert content.smart_dump() == TestData.EXPECTED_SMART_DUMP_NO_CLASS
+
     @pytest.mark.parametrize(
         ("inner_html", "css_class", "expected_output"),
         [
             ("", "", {"inner_html": "", "css_class": ""}),
             ("<div>test</div>", "container", {"inner_html": "<div>test</div>", "css_class": "container"}),
             ("plain text", "highlight", {"inner_html": "plain text", "css_class": "highlight"}),
+            ("<p>bare</p>", None, {"inner_html": "<p>bare</p>", "css_class": None}),
         ],
     )
-    def test_smart_dump_various_inputs(self, inner_html: str, css_class: str, expected_output: dict[str, Any]):
+    def test_smart_dump_various_inputs(self, inner_html: str, css_class: str | None, expected_output: dict[str, Any]):
         """Verify smart_dump handles various inputs correctly."""
         content = HtmlContent(inner_html=inner_html, css_class=css_class)
         result = content.smart_dump()

@@ -87,12 +87,19 @@ class TestOutputMultiplicityToApply:
         assert result.is_multiple_outputs_enabled is True
         assert result.specific_output_count is None
 
-        # Base int -> preserve count, enable multiple
-        for base_int in [1, 3, 5, 10]:
+        # Base count -> preserve count, enable multiple
+        for base_int in [3, 5, 10]:
             result = output_multiplicity_to_apply(base_multiplicity=base_int, override_multiplicity=True)
             assert result.resolved_multiplicity == base_int
             assert result.is_multiple_outputs_enabled is True
             assert result.specific_output_count == base_int
+
+        # Base [1] is the single form, so there is no count to preserve: the override enables a
+        # variable-length list and leaves the count to the model.
+        result = output_multiplicity_to_apply(base_multiplicity=1, override_multiplicity=True)
+        assert result.resolved_multiplicity is None
+        assert result.is_multiple_outputs_enabled is True
+        assert result.specific_output_count is None
 
     def test_override_int_uses_override_count(self):
         """Test that override int uses the override count and enables multiple outputs."""
@@ -211,3 +218,28 @@ class TestOutputMultiplicityToApply:
         assert result.resolved_multiplicity == 4  # Preserves base count
         assert result.is_multiple_outputs_enabled is True
         assert result.specific_output_count == 4
+
+    def test_a_base_count_of_one_is_the_single_form(self):
+        """A pipe declaring `output = "Concept[1]"` produces one object, not a one-item list.
+
+        The parser collapses the count before it ever reaches here, so this pins the arm rather than
+        the path: handed the value 1 directly, the resolution must still be the single form.
+        """
+        result = output_multiplicity_to_apply(base_multiplicity=1, override_multiplicity=None)
+        assert result.resolved_multiplicity is None
+        assert result.is_multiple_outputs_enabled is False
+        assert result.specific_output_count is None
+
+    def test_a_requested_count_of_one_forces_the_single_form(self):
+        """A caller asking at run time for exactly one output is asking for the single form.
+
+        Unlike the base, an override genuinely arrives from outside (an SDK or API caller may pass
+        `output_multiplicity=1`), so this arm is reachable and must not enable a one-item list.
+        """
+        result = output_multiplicity_to_apply(base_multiplicity=True, override_multiplicity=1)
+        assert result.is_multiple_outputs_enabled is False
+        assert result.specific_output_count is None
+
+        result = output_multiplicity_to_apply(base_multiplicity=5, override_multiplicity=1)
+        assert result.is_multiple_outputs_enabled is False
+        assert result.specific_output_count is None

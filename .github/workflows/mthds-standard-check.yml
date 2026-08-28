@@ -1,0 +1,69 @@
+name: MTHDS standard conformance
+
+# Holds this repo's pinned native-concept set against the standard's own page,
+# `mthds/docs/spec/native-concepts.md`, read from a fresh checkout of the standard's repository.
+#
+# The standard is checked out UNPINNED, at its default branch, on purpose: the page is the
+# authority this implementation answers to, and reading a pinned copy would only re-assert that
+# two files this repo controls still match. The consequence is deliberate and worth stating
+# loudly, because this repo has heavy PR traffic:
+#
+#   A RED HERE CAN ARRIVE WITH NO PIPELEX COMMIT INVOLVED. When the standard ships a
+#   definition change, this check goes red on every PR until the pinned set catches up.
+#   That red means "the standard moved" — it is not the PR's fault. The remedy is a
+#   dedicated change bringing pinned_blueprints.py (and the matching runtime content
+#   class) to the page, never a tweak to whatever PR happened to be open.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  natives-vs-standard:
+    name: "Pinned natives vs the standard's page (a red with no pinned-set change in this PR means the standard moved)"
+    runs-on: ubuntu-latest
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/pipelex/.venv
+      ENV: dev
+    # The documented workspace layout, reproduced on the runner: this repo and the standard as
+    # siblings, so the test's `../mthds` path resolves exactly as it does on a developer machine.
+    # `actions/checkout` refuses a path outside $GITHUB_WORKSPACE, so the sibling can only exist
+    # if this repo stops being the workspace root; `defaults.run` moves `run:` steps back into it.
+    defaults:
+      run:
+        working-directory: pipelex
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: pipelex
+
+      # The MTHDS standard's own repository — public, so GITHUB_TOKEN is credential enough.
+      - uses: actions/checkout@v4
+        with:
+          repository: mthds-ai/mthds
+          path: mthds
+          fetch-depth: 1
+          persist-credentials: false
+
+      # The conformance test names its own absence and skips when the sibling is missing — right
+      # for a contributor's machine, wrong here, where running it is this job's whole purpose. A
+      # missing page must be THIS loud step failing, never a green run full of skips.
+      - name: Refuse to run without the standard's page
+        run: test -f ../mthds/docs/spec/native-concepts.md
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pipelex/uv.lock"
+
+      - name: Install dependencies
+        run: PYTHON_VERSION=3.11 make install
+
+      - name: Hold the pinned natives to the standard's page
+        run: .venv/bin/pytest tests/unit/pipelex/core/concepts/test_pinned_natives_vs_standard.py -v

@@ -6,7 +6,11 @@ pinned set: crate materialization looks definitions up here instead of reflectin
 content classes, so two independent implementations byte-agree on materialized natives (and
 therefore on crate fingerprints). Any edit here is a standard change and must land in the spec
 page first; the consistency test in `tests/unit/pipelex/codegen/` proves each runtime content
-class still matches its pinned blueprint, so the two can never drift silently.
+class still matches its pinned blueprint, so the two can never drift silently — and
+`tests/unit/pipelex/core/concepts/test_pinned_natives_vs_standard.py` holds this set to the
+standard's page itself, read live from the sibling `mthds/` checkout (the `MTHDS standard
+conformance` CI workflow runs it against a fresh checkout on every pull request), so the day the
+standard moves a definition, this repo goes red instead of a downstream port.
 
 The set below is the MTHDS 1.0.0 pinned set. Version-keyed lookup can come when a second
 standard version exists; today `mthds_version` on the crate records which set was used.
@@ -98,7 +102,7 @@ def _pinned_structure(native_code: NativeConceptCode) -> dict[str, ConceptStruct
         case NativeConceptCode.HTML:
             return {
                 "inner_html": _text_field(description="The inner HTML of the content", required=True),
-                "css_class": _text_field(description="The CSS class of the content", required=True),
+                "css_class": _text_field(description="The CSS class of the content"),
             }
         case NativeConceptCode.TEXT_AND_IMAGES:
             return {

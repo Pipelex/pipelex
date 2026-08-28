@@ -41,6 +41,12 @@ class TestPipeBlueprintPresenceMarkers:
         blueprint = _make_blueprint(inputs={"the_var": input_spec})
         assert blueprint.inputs == {"the_var": input_spec}
 
+    @pytest.mark.parametrize("input_spec", ["Text[1]?", "Text[1]!", "domain.Concept[1]?"])
+    def test_marker_on_count_of_one_input_accepted(self, input_spec: str):
+        """`[1]` is the single form with its count written out, so it takes a marker like a bare ref."""
+        blueprint = _make_blueprint(inputs={"the_var": input_spec})
+        assert blueprint.inputs == {"the_var": input_spec}
+
     @pytest.mark.parametrize("output_spec", ["Text?", "domain.Concept?"])
     def test_optional_output_accepted(self, output_spec: str):
         blueprint = _make_blueprint(output=output_spec)
@@ -72,6 +78,11 @@ class TestPipeBlueprintPresenceMarkers:
         assert wrapped.error_type == PipeValidationErrorType.OPTIONAL_MARKER_INVALID
 
     # ---- rejected forms: plain syntax errors ----
+
+    @pytest.mark.parametrize("input_spec", ["Text[0]", "Text[0]?", "Text[0]!", "domain.Concept[0]"])
+    def test_zero_count_input_rejected(self, input_spec: str):
+        with pytest.raises(ValidationError, match="at least 1"):
+            _make_blueprint(inputs={"the_var": input_spec})
 
     @pytest.mark.parametrize("input_spec", ["Text??", "Text?[]", "?Text"])
     def test_malformed_marker_input_syntax_rejected(self, input_spec: str):

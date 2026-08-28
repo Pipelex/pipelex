@@ -24,6 +24,7 @@ from pydantic.dataclasses import dataclass
 from pipelex.core.pipes.inputs.input_stuff_specs import NamedStuffSpec
 from pipelex.core.pipes.variable_multiplicity import PresenceMarker, VariableMultiplicity
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
+from pipelex.pipe_run.pipe_run_params import output_multiplicity_to_apply
 
 
 @dataclass(frozen=True)
@@ -140,8 +141,17 @@ def is_plural_step_result(
 ) -> bool:
     """Whether a step's result slot is plural — a plural result is never tainted (D4:
     a lifted plural output is the empty list; a batched step compacts).
+
+    Plurality is resolved exactly like the run path resolves it (declared multiplicity + the
+    step-level override), so the static promise matches what a lifted execution records: a count
+    of one — on either side — is the single form, not a one-item list.
     """
-    return has_batch_params or step_output_multiplicity is not None or pipe.output.multiplicity is not None
+    if has_batch_params:
+        return True
+    return output_multiplicity_to_apply(
+        base_multiplicity=pipe.output.multiplicity,
+        override_multiplicity=step_output_multiplicity,
+    ).is_multiple_outputs_enabled
 
 
 def effective_consumption_presence(*, pipe: PipeAbstract, named_stuff_spec: NamedStuffSpec) -> PresenceMarker:

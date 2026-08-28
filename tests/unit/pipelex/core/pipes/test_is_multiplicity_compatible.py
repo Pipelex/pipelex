@@ -16,17 +16,18 @@ class TestIsMultiplicityCompatible:
             # Case 2: Target expects variable-length list (True)
             (True, True, True),
             (3, True, True),  # Fixed count fulfills variable expectation
-            (1, True, True),  # Even count of 1 is multiple items
+            (1, True, False),  # `[1]` is the single form, and a single cannot fulfill a list expectation
             (None, True, False),  # Single cannot fulfill list expectation
             # Case 3: Target expects fixed count (integer)
             (3, 3, True),
             (5, 5, True),
-            (1, 1, True),  # Fixed count of 1 matches itself
+            (1, 1, True),  # Both collapse to the single form
+            (1, None, True),  # `[1]` fulfills a bare single expectation - it is the same slot
             (3, 5, False),  # Different fixed counts are incompatible
             (True, 3, False),  # Variable cannot fulfill fixed expectation
-            (True, 1, False),  # Variable (True) cannot fulfill fixed count of 1 (edge case: True == 1 in Python)
+            (True, 1, False),  # A variable list cannot fulfill the single form (and True == 1 must not conflate them)
             (None, 3, False),
-            (None, 1, False),  # Single item cannot fulfill fixed count of 1
+            (None, 1, True),  # A bare single fulfills `[1]` - it is the same slot
         ],
     )
     def test_multiplicity_compatibility(
