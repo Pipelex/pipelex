@@ -205,10 +205,13 @@ class InputSlotBlueprint(BaseModel):
         return dict(sorted(hints.items())) if hints else None
 
     @model_serializer(mode="wrap")
-    def serialize_without_absent_hints(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+    def serialize_without_absent_hints(self, handler: SerializerFunctionWrapHandler):
         """Absent hints are an absent member — never `null` (spec rule). Unreachable for a
         hint-free slot in practice (the parse-time collapse leaves it a plain string), kept so any
         directly-constructed instance still serializes canonically.
+
+        The return is deliberately unannotated — see `ConceptBlueprint.serialize_without_absent_hints`:
+        an annotation here becomes the model's serialization JSON Schema and erases its shape.
         """
         dumped: dict[str, Any] = handler(self)
         if dumped.get("hints") is None:

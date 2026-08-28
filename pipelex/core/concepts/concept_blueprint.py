@@ -31,11 +31,17 @@ class ConceptBlueprint(BaseModel):
         return dict(sorted(hints.items())) if hints else None
 
     @model_serializer(mode="wrap")
-    def serialize_without_absent_hints(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+    def serialize_without_absent_hints(self, handler: SerializerFunctionWrapHandler):
         """Absent hints are an absent member — never `null` (spec rule; keeps hint-free crate
         fingerprints byte-identical to before hints existed). Deliberately NOT a blanket
         `exclude_none`: the crate spec's general absent-members canonicalization is a separate
         forward contract whose adoption would migrate every existing fingerprint.
+
+        The return is deliberately unannotated, and stays that way. Pydantic turns a serializer's
+        return annotation into the model's serialization JSON Schema and prefers it over the schema
+        it would generate, so a `-> dict[str, Any]` here publishes this model as an opaque
+        `{"type": "object", "additionalProperties": true}` — no properties, no `required`, no
+        closed shape — for every consumer that generates response schemas (FastAPI always does).
         """
         dumped: dict[str, Any] = handler(self)
         if dumped.get("hints") is None:
