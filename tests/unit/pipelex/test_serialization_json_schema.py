@@ -53,22 +53,19 @@ REMEDY = (
 )
 
 
-def _import_every_pipelex_module() -> tuple[int, list[str]]:
-    """Import every `pipelex.*` module, returning how many loaded and the failures.
+def _import_every_pipelex_module() -> int:
+    """Import every `pipelex.*` module and return how many loaded.
 
-    Failures are returned rather than swallowed: a sweep that quietly skips what it cannot import
-    is a guard that has gone quiet exactly where the tree got interesting.
+    Nothing is caught. A module that fails to import takes the sweep down with its own traceback,
+    which is the root cause; recording it as a string and carrying on would both discard that
+    traceback and leave the sweep running over a partially imported package — a guard gone quiet
+    exactly where the tree got interesting.
     """
     imported = 0
-    failures: list[str] = []
     for module_info in pkgutil.walk_packages(pipelex.__path__, prefix=f"{pipelex.__name__}."):
-        try:
-            importlib.import_module(module_info.name)
-        except Exception as exc:
-            failures.append(f"{module_info.name}: {type(exc).__name__}: {exc}")
-        else:
-            imported += 1
-    return imported, failures
+        importlib.import_module(module_info.name)
+        imported += 1
+    return imported
 
 
 def _discover_pipelex_models() -> list[type[BaseModel]]:
@@ -153,8 +150,7 @@ class TestSerializationJsonSchema:
         Deliberately not parametrized — pytest reports `got empty parameter set` and exits 0 on an
         empty list, so the guard would be unreachable exactly when it matters.
         """
-        imported, failures = _import_every_pipelex_module()
-        assert not failures, "Modules failed to import, so the sweep below is silently narrower than it looks:\n" + "\n".join(failures)
+        imported = _import_every_pipelex_module()
         assert imported, "No pipelex module imported — the sweep would compare two empty sets and pass vacuously."
 
         models = _discover_pipelex_models()
