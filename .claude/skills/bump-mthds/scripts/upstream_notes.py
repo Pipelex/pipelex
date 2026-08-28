@@ -12,7 +12,7 @@ Three boundaries this exists to get right:
   error about what the upgrade contains -- and in this pairing it is a live
   hazard rather than a theoretical one, because `mthds-python`'s working tree is
   routinely ahead of PyPI.
-- The old floor's own section is excluded (it was already in effect) while the
+- The old pin's own section is excluded (it was already in effect) while the
   new one's is included.
 - A checkout that predates the target release cannot answer, and says so instead
   of printing a plausible-looking short range.
@@ -81,7 +81,7 @@ def split_sections(text: str) -> list[tuple[str, str]]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("old_version", help="the floor currently declared, excluded from the output")
+    parser.add_argument("old_version", help="the version currently pinned, excluded from the output")
     parser.add_argument("new_version", help="the version being adopted, included in the output")
     parser.add_argument(
         "--changelog",
@@ -122,7 +122,7 @@ def main() -> int:
     print("\n\n".join(body for _, body in wanted))
     if low not in known:
         print(
-            f"\nNote: no section for the old floor {args.old_version} in this checkout, so the range may start earlier than the true gap.",
+            f"\nNote: no section for the old pin {args.old_version} in this checkout, so the range may start earlier than the true gap.",
             file=sys.stderr,
         )
     return 0
