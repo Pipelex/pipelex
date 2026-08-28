@@ -2552,7 +2552,7 @@ wheels = [
 
 [[package]]
 name = "mthds"
-version = "0.11.0"
+version = "0.11.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -2561,9 +2561,9 @@ dependencies = [
     { name = "tomlkit" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/77/56/56b183589d379effac8af3e319a54907b767e8bd0f2114adacade72a8fde/mthds-0.11.0.tar.gz", hash = "sha256:26bc0fbac97e2ac2b92d7dbde4ef22fc952f3b7f0526987094a8c334b951855e", size = 165653, upload-time = "2026-08-27T12:01:42.887Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/44/9a/93d688320010ad14a31c863c3882fabc2f8637622f69fd8e4aed64a3f2bb/mthds-0.11.1.tar.gz", hash = "sha256:5f52b703835abe9e40a000d76023e2bd29124655c049b1ef9eeab4a8761b6e2c", size = 170790, upload-time = "2026-08-28T11:17:02.146Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c1/39/df15725a1b461814d92467ec86b702e1211036782561e2bbd7f6e1b45a74/mthds-0.11.0-py3-none-any.whl", hash = "sha256:78897422a4da0b767cd0a0218fb44eba9fb325839085a4227588b52e1214431e", size = 71591, upload-time = "2026-08-27T12:01:41.686Z" },
+    { url = "https://files.pythonhosted.org/packages/e5/1c/74abc1b8b63813c0de69218b003e777cc92a7327d21b90911c10502b2e69/mthds-0.11.1-py3-none-any.whl", hash = "sha256:760cd7d3f7e86b8f962e1d3a4e87e6146b94968b9422ddfc22e006a3fc305ba3", size = 71954, upload-time = "2026-08-28T11:17:00.67Z" },
 ]
 
 [[package]]
@@ -3303,7 +3303,7 @@ wheels = [
 
 [[package]]
 name = "pipelex"
-version = "0.53.0"
+version = "0.54.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -3472,7 +3472,7 @@ requires-dist = [
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "mkdocs-redirects", marker = "extra == 'docs'", specifier = "==1.2.2" },
     { name = "moto", extras = ["dynamodb", "s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "mthds", specifier = "==0.11.0" },
+    { name = "mthds", specifier = "==0.11.1" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=2.0.0" },
@@ -3492,7 +3492,7 @@ requires-dist = [
     { name = "pylint", marker = "extra == 'dev'", specifier = "==4.0.4" },
     { name = "pymdown-extensions", marker = "extra == 'docs'", specifier = ">=10.21.3" },
     { name = "pypdfium2", specifier = ">=4.30.0,!=4.30.1,<5.0.0" },
-    { name = "pyright", marker = "extra == 'dev'", specifier = "==1.1.410" },
+    { name = "pyright", marker = "extra == 'dev'", specifier = "==1.1.411" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.3" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.1.1" },
@@ -4058,15 +4058,15 @@ wheels = [
 
 [[package]]
 name = "pyright"
-version = "1.1.410"
+version = "1.1.411"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "nodeenv" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/10/53/e4d8ea1391bd4355231be6f91bf239479aa0014260ed3fb5526eeb12a1f2/pyright-1.1.410.tar.gz", hash = "sha256:07a073b8ba6749826773c1269773efa11b93440d9a6aa60419d9a3172d6dc488", size = 4062013, upload-time = "2026-06-01T17:35:48.894Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7e/ab/265f7dc69d28113ebba19092e57b075f41543b2ed048429c5f56e2b88eac/pyright-1.1.411.tar.gz", hash = "sha256:d885a0551f2e763b089a02702174e7f4ba77548cddabc972ab86d1f7f1b0f998", size = 4112861, upload-time = "2026-06-25T02:14:06.37Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d7/33/288b5868fa00846dacf249633719d747893e54aebd196b9968ac1878a5d3/pyright-1.1.410-py3-none-any.whl", hash = "sha256:5e961bed37cacf96b3f7cd7b1da39b350a9239aa2e69138d0e88f728cfaf296c", size = 6082448, upload-time = "2026-06-01T17:35:46.387Z" },
+    { url = "https://files.pythonhosted.org/packages/0a/49/385be530a6a5b78d1cbcd5c2e38debc8959a2fc6bdb716f4e581002979fc/pyright-1.1.411-py3-none-any.whl", hash = "sha256:dc7c72a8e2700c55baa127554040e067041ea53ccfd50bf96308cc4291c7d5d9", size = 6181526, upload-time = "2026-06-25T02:14:04.691Z" },
 ]
 
 [[package]]

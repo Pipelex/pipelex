@@ -1,7 +1,7 @@
 import inspect
 import logging
 from collections.abc import Callable
-from typing import Any, TypeVar, cast, get_type_hints
+from typing import Any, TypeVar, cast, get_origin, get_type_hints
 
 from pydantic import Field, PrivateAttr, RootModel
 from typing_extensions import override
@@ -289,10 +289,9 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
             if inspect.isclass(return_type) and issubclass(return_type, StuffContent):
                 return True
             # Handle generic types like ListContent[SomeType]
-            if hasattr(return_type, "__origin__"):
-                origin = return_type.__origin__
-                if inspect.isclass(origin) and issubclass(origin, StuffContent):
-                    return True
+            origin = get_origin(return_type)
+            if inspect.isclass(origin) and issubclass(origin, StuffContent):
+                return True
         except TypeError:
             # Handle cases where issubclass fails on generic types
             pass
@@ -364,10 +363,9 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
             if inspect.isclass(return_type) and issubclass(return_type, StuffContent):
                 return None  # Eligible
             # Handle generic types like ListContent[SomeType]
-            if hasattr(return_type, "__origin__"):
-                origin = return_type.__origin__
-                if inspect.isclass(origin) and issubclass(origin, StuffContent):
-                    return None  # Eligible
+            origin = get_origin(return_type)
+            if inspect.isclass(origin) and issubclass(origin, StuffContent):
+                return None  # Eligible
         except TypeError:
             pass
 

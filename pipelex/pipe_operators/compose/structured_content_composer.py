@@ -2,7 +2,7 @@ import datetime
 import inspect
 from typing import Any, NamedTuple, TypeAlias, cast, get_args, get_origin
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from pipelex import log
 from pipelex.cogt.templating.template_rendering import render_template
@@ -733,7 +733,7 @@ class StructuredContentComposer:
         log.verbose(f"     Item[{idx}]: Validating conversion {actual_type.__name__} -> {expected_type_name}")
         item_dict = item.model_dump(exclude_none=False, serialize_as_any=True)
 
-        if hasattr(expected_type, "model_validate"):
+        if inspect.isclass(expected_type) and issubclass(expected_type, BaseModel):
             try:
                 expected_type.model_validate(item_dict)
             except ValidationError as exc:
