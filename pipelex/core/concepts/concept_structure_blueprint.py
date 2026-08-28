@@ -82,9 +82,12 @@ class ConceptStructureBlueprint(BaseModel):
         return dict(sorted(hints.items())) if hints else None
 
     @model_serializer(mode="wrap")
-    def serialize_without_absent_hints(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+    def serialize_without_absent_hints(self, handler: SerializerFunctionWrapHandler):
         """Absent hints are an absent member — never `null` (spec rule; keeps hint-free crate
         fingerprints byte-identical to before hints existed).
+
+        The return is deliberately unannotated — see `ConceptBlueprint.serialize_without_absent_hints`:
+        an annotation here becomes the model's serialization JSON Schema and erases its shape.
         """
         dumped: dict[str, Any] = handler(self)
         if dumped.get("hints") is None:

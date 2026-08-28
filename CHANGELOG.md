@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **Blueprint serialization schemas**: `ConceptBlueprint`, `ConceptStructureBlueprint`, `InputSlotBlueprint` and `ConstructBlueprint` publish their real shape again in serialization mode. Each carries a `@model_serializer(mode="wrap")` annotated `-> dict[str, Any]`, and pydantic turns a serializer's return annotation into the model's serialization JSON Schema in preference to the one it would generate — so all four came back as an opaque `{"type": "object", "additionalProperties": true}` with no properties, no `required` and no closed shape. This is the same annotation `mthds` 0.11.1 dropped for the input-form field descriptors. Nothing here noticed, because validation-mode schemas and `model_dump()` were both correct throughout; the damage landed in consumers that generate response-model schemas, which FastAPI always does, so a downstream OpenAPI artifact regains its field-level detail on its next `pipelex` bump. A new sweep test holds every Pipelex model to the rule, and the agent rules now scope "every function return must be typed" so a serializer's return stays unannotated.
+
 ## [v0.54.0] - 2026-08-28
 
 ### Added
