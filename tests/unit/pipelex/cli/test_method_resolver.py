@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -11,14 +12,14 @@ from mthds.package.exceptions import VCSFetchError
 
 from pipelex.cli.method_resolver import (
     is_local_path,
+    method_output_base_dir,
     resolve_method_from_path,
     resolve_method_from_ref,
     resolve_method_target,
 )
+from pipelex.methods.exceptions import MethodFetchError, MethodPackageNotFoundError, MethodRefParseError
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from pytest_mock import MockerFixture
 
 FAKE_SHA = "0123456789abcdef0123456789abcdef01234567"
@@ -85,28 +86,68 @@ class TestResolveMethodTarget:
         assert method.name == "remote_method"
 
     def test_resolve_method_from_ref_clone_failure(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """A VCSFetchError during clone raises typer.Exit."""
+        """A VCSFetchError during clone propagates as the typed MethodFetchError — presentation is the caller's concern."""
         mocker.patch("pipelex.methods.fetching.clone_default_branch", side_effect=VCSFetchError("connection refused"))
         mocker.patch("pipelex.cli.method_resolver.tempfile.mkdtemp", return_value=str(tmp_path / "dest"))
 
-        with pytest.raises(typer.Exit):
+        with pytest.raises(MethodFetchError):
             resolve_method_from_ref("github.com/test/broken-repo")
 
     def test_resolve_method_from_ref_no_matching_package(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """A clone whose packages match no requested address raises typer.Exit."""
+        """A clone whose packages match no requested address propagates the typed not-found error."""
         self._mock_clone(mocker, tmp_path / "cloned")
 
-        with pytest.raises(typer.Exit):
+        with pytest.raises(MethodPackageNotFoundError):
             resolve_method_from_ref("github.com/test/other-address")
 
     def test_resolve_method_from_ref_parse_error(self, mocker: MockerFixture) -> None:
-        """An invalid reference raises typer.Exit without attempting a clone."""
+        """An invalid reference propagates the typed parse error without attempting a clone."""
         clone_spy = mocker.patch("pipelex.methods.fetching.clone_default_branch")
 
-        with pytest.raises(typer.Exit):
+        with pytest.raises(MethodRefParseError):
             resolve_method_from_ref("github.com/only-owner")
 
         assert clone_spy.call_count == 0
+
+    def test_resolve_method_target_renders_ref_error_as_exit(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """The human-CLI default renders a reference failure and exits — no raw traceback."""
+        mocker.patch("pipelex.methods.fetching.clone_default_branch", side_effect=VCSFetchError("connection refused"))
+        mocker.patch("pipelex.cli.method_resolver.tempfile.mkdtemp", return_value=str(tmp_path / "dest"))
+        secho_spy = mocker.patch("pipelex.cli.method_resolver.typer.secho")
+
+        with pytest.raises(typer.Exit) as exc_info:
+            resolve_method_target("github.com/test/broken-repo")
+
+        assert exc_info.value.exit_code == 1
+        rendered = [call for call in secho_spy.call_args_list if "connection refused" in str(call)]
+        assert len(rendered) == 1
+
+    def test_resolve_method_target_propagates_ref_error_when_requested(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """With raise_ref_errors=True the typed error propagates, so the agent CLI can shape its envelope."""
+        mocker.patch("pipelex.methods.fetching.clone_default_branch", side_effect=VCSFetchError("connection refused"))
+        mocker.patch("pipelex.cli.method_resolver.tempfile.mkdtemp", return_value=str(tmp_path / "dest"))
+
+        with pytest.raises(MethodFetchError):
+            resolve_method_target("github.com/test/broken-repo", raise_ref_errors=True)
+
+    def test_method_output_base_dir_local_method_anchors_in_method_dir(self, tmp_path: Path) -> None:
+        """An installed or local-path method (no provenance) anchors default outputs in its own directory."""
+        method_dir = tmp_path / "local-method"
+        _write_method_package(method_dir)
+        method = resolve_method_from_path(str(method_dir))
+
+        assert method_output_base_dir(method=method) == method_dir
+
+    def test_method_output_base_dir_fetched_method_anchors_in_cwd(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """A fetched method's clone dies at process exit, so default outputs anchor in the caller's CWD instead."""
+        clone_dir = tmp_path / "cloned"
+        self._mock_clone(mocker, clone_dir)
+        method = resolve_method_from_ref("github.com/test/remote-method")
+
+        base_dir = method_output_base_dir(method=method)
+
+        assert base_dir == Path.cwd()
+        assert not base_dir.is_relative_to(clone_dir)
 
     def test_resolve_method_from_ref_warns_on_structures(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """Hosted-parity: a fetched package declaring StructuredContent subclasses resolves locally with a warning."""
