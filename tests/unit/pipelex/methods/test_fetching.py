@@ -83,12 +83,14 @@ class TestFetchMethodPackage:
 
         clone_at_tag = mocker.patch("pipelex.methods.fetching.clone_at_version", side_effect=fake_clone)
         clone_default = mocker.patch("pipelex.methods.fetching.clone_default_branch")
+        tag_check = mocker.patch("pipelex.methods.fetching.ensure_cloned_at_tag")
         mocker.patch("pipelex.methods.fetching.resolve_head_commit_sha", return_value=FAKE_SHA)
 
         fetched = fetch_method_package(ref=parse_method_ref("github.com/Pipelex/methods/documents@v0.2.0"), dest_dir=tmp_path)
 
         assert clone_at_tag.call_count == 1
         assert clone_default.call_count == 0
+        assert tag_check.call_count == 1
         assert fetched.provenance.tag == "v0.2.0"
 
     def test_clone_failure_is_a_method_fetch_error(self, mocker: MockerFixture, tmp_path: Path) -> None:

@@ -84,6 +84,42 @@ def resolve_head_commit_sha(*, clone_dir: Path) -> str:
     return result.stdout.strip()
 
 
+def ensure_cloned_at_tag(*, clone_dir: Path, ref: MethodRef) -> None:
+    """Verify that a `@<tag>` clone actually checked out a tag, not a branch.
+
+    `git clone --branch` accepts branch names too, so `@main` would otherwise silently pin
+    a moving branch. A depth-1 clone at a tag carries `refs/tags/<tag>`; a clone at a
+    branch does not — so the ref's presence in the clone is the discriminator.
+
+    Args:
+        clone_dir: The clone's root directory.
+        ref: The method reference whose tag was cloned.
+
+    Raises:
+        MethodFetchError: If the cloned name is not a tag (or git fails).
+    """
+    try:
+        result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
+            ["git", "-C", str(clone_dir), "rev-parse", "--verify", "--quiet", f"refs/tags/{ref.tag}"],  # ruff: ignore[start-process-with-partial-path]
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=GIT_REV_PARSE_TIMEOUT_SECONDS,
+        )
+    except FileNotFoundError as exc:
+        msg = "git is not installed or not found on PATH"
+        raise MethodFetchError(msg) from exc
+    except subprocess.TimeoutExpired as exc:
+        msg = f"Timed out verifying tag '{ref.tag}' in '{clone_dir}'"
+        raise MethodFetchError(msg) from exc
+    if result.returncode != 0:
+        msg = (
+            f"'{ref.tag}' in method reference '{ref.ref_str}' does not name a git tag on the repository — "
+            f"`@<tag>` pins a git tag (recommended form vX.Y.Z); branch names are not accepted."
+        )
+        raise MethodFetchError(msg)
+
+
 def ensure_package_within_bounds(*, package_dir: Path, package_address: str) -> None:
     """Reject a selected package that exceeds the fetched-package ceilings.
 
@@ -137,7 +173,7 @@ def fetch_method_package(
         The fetched package with its provenance.
 
     Raises:
-        MethodFetchError: If the clone or commit resolution fails.
+        MethodFetchError: If the clone fails, `@<tag>` does not name a tag, or commit resolution fails.
         MethodPackageNotFoundError: If no package matches the requested address.
         MethodPackageAmbiguityError: If more than one package matches.
         MethodPackageTooLargeError: If the selected package exceeds the ceilings.
@@ -153,6 +189,9 @@ def fetch_method_package(
     except VCSFetchError as exc:
         msg = f"Failed to fetch method '{ref.ref_str}': {exc.message}"
         raise MethodFetchError(msg) from exc
+
+    if ref.tag:
+        ensure_cloned_at_tag(clone_dir=dest_dir, ref=ref)
 
     commit_sha = resolve_head_commit_sha(clone_dir=dest_dir)
     located = locate_package_in_clone(clone_root=dest_dir, requested_address=ref.address)

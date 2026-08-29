@@ -147,6 +147,7 @@ class TestResolveMethodTarget:
             _write_method_package(destination)
 
         mocker.patch("pipelex.methods.fetching.clone_at_version", side_effect=fake_clone)
+        mocker.patch("pipelex.methods.fetching.ensure_cloned_at_tag")
         mocker.patch("pipelex.methods.fetching.resolve_head_commit_sha", return_value=FAKE_SHA)
         mocker.patch("pipelex.cli.method_resolver.tempfile.mkdtemp", return_value=str(tmp_path / "tagged"))
 

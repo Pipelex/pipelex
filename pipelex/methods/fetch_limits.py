@@ -10,6 +10,8 @@ from pipelex.system.environment import get_optional_env
 
 DEFAULT_MAX_FETCHED_PACKAGE_FILES = 256
 DEFAULT_MAX_FETCHED_PACKAGE_TOTAL_KIB = 8 * 1024  # 8 MiB across the selected package
+DEFAULT_MAX_MANIFEST_FILE_KIB = 256  # per METHODS.toml read during package location
+DEFAULT_MAX_SCANNED_MANIFESTS = 100  # METHODS.toml files considered per fetched repository
 
 
 def _read_positive_int(*, env_var: str, default: int) -> int:
@@ -31,3 +33,5 @@ MAX_FETCHED_PACKAGE_FILES = _read_positive_int(env_var="PIPELEX_MAX_FETCHED_PACK
 MAX_FETCHED_PACKAGE_TOTAL_BYTES = (
     _read_positive_int(env_var="PIPELEX_MAX_FETCHED_PACKAGE_TOTAL_KIB", default=DEFAULT_MAX_FETCHED_PACKAGE_TOTAL_KIB) * 1024
 )
+MAX_MANIFEST_FILE_BYTES = _read_positive_int(env_var="PIPELEX_MAX_MANIFEST_FILE_KIB", default=DEFAULT_MAX_MANIFEST_FILE_KIB) * 1024
+MAX_SCANNED_MANIFESTS = _read_positive_int(env_var="PIPELEX_MAX_SCANNED_MANIFESTS", default=DEFAULT_MAX_SCANNED_MANIFESTS)

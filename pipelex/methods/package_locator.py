@@ -18,7 +18,8 @@ from mthds.package.manifest.parser import parse_methods_toml
 from mthds.package.manifest.schema import MethodsManifest
 from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex.methods.exceptions import MethodPackageAmbiguityError, MethodPackageNotFoundError
+from pipelex.methods.exceptions import MethodPackageAmbiguityError, MethodPackageNotFoundError, MethodPackageTooLargeError
+from pipelex.methods.fetch_limits import MAX_MANIFEST_FILE_BYTES, MAX_SCANNED_MANIFESTS
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 _SKIPPED_DIR_NAMES = {".git"}
@@ -52,17 +53,32 @@ class PackageScan(BaseModel):
 def scan_packages_in_clone(*, clone_root: Path) -> PackageScan:
     """Scan a clone for packages, tolerating unparseable manifests.
 
+    The scan is bounded — the repository is fetched content: at most
+    ``MAX_SCANNED_MANIFESTS`` manifests are considered, and a manifest larger than
+    ``MAX_MANIFEST_FILE_BYTES`` is skipped (and reported) rather than read.
+
     Args:
         clone_root: The root directory of the fetched clone.
 
     Returns:
         The scan result: valid candidates and a note for each manifest that failed to parse.
+
+    Raises:
+        MethodPackageTooLargeError: If the repository contains more manifests than the scan ceiling.
     """
     candidates: list[PackageCandidate] = []
     invalid_manifests: list[str] = []
+    manifest_count = 0
     for manifest_path in sorted(clone_root.rglob(MANIFEST_FILENAME)):
         relative_parts = manifest_path.relative_to(clone_root).parts
         if any(part in _SKIPPED_DIR_NAMES for part in relative_parts):
+            continue
+        manifest_count += 1
+        if manifest_count > MAX_SCANNED_MANIFESTS:
+            msg = f"The fetched repository contains more than {MAX_SCANNED_MANIFESTS} {MANIFEST_FILENAME} manifests; refusing to scan further."
+            raise MethodPackageTooLargeError(msg)
+        if manifest_path.stat().st_size > MAX_MANIFEST_FILE_BYTES:
+            invalid_manifests.append(f"{'/'.join(relative_parts)}: exceeds the manifest size ceiling of {MAX_MANIFEST_FILE_BYTES} bytes, skipped")
             continue
         try:
             manifest = parse_methods_toml(manifest_path.read_text(encoding="utf-8"))
@@ -73,11 +89,14 @@ def scan_packages_in_clone(*, clone_root: Path) -> PackageScan:
     return PackageScan(candidates=candidates, invalid_manifests=invalid_manifests)
 
 
-def _matches(*, candidate: PackageCandidate, requested: str) -> bool:
+def _matches(*, candidate: PackageCandidate, requested: str, clone_root: Path) -> bool:
     folded = requested.casefold()
-    if candidate.manifest.address.casefold() == folded:
+    if candidate.manifest.name and candidate.full_address.casefold() == folded:
+        # Library-repo identity: address + "/" + name, wherever the package sits in the tree.
         return True
-    return candidate.full_address.casefold() == folded
+    # Address-only identity belongs to a repo-root package: a nested package's identity is
+    # address + "/" + name, so a bare repository address must not silently select it.
+    return candidate.manifest.address.casefold() == folded and candidate.package_dir.resolve() == clone_root.resolve()
 
 
 def locate_package_in_clone(*, clone_root: Path, requested_address: str) -> PackageCandidate:
@@ -96,7 +115,7 @@ def locate_package_in_clone(*, clone_root: Path, requested_address: str) -> Pack
         MethodPackageAmbiguityError: If more than one package matches; the message lists them.
     """
     scan = scan_packages_in_clone(clone_root=clone_root)
-    matches = [candidate for candidate in scan.candidates if _matches(candidate=candidate, requested=requested_address)]
+    matches = [candidate for candidate in scan.candidates if _matches(candidate=candidate, requested=requested_address, clone_root=clone_root)]
 
     if len(matches) == 1:
         return matches[0]

@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from pipelex.methods.exceptions import MethodFetchError
 from pipelex.methods.fetching import fetch_method_package
 from pipelex.methods.method_ref import parse_method_ref
 
@@ -60,7 +61,7 @@ def seed_repo_fixture(tmp_path: Path) -> tuple[Path, str, str]:
     _git(repo_dir, "config", "user.name", "Test")
     _git(repo_dir, "add", "-A")
     _git(repo_dir, "commit", "-m", "v1")
-    _git(repo_dir, "tag", "v0.1.0")
+    _git(repo_dir, "tag", "-a", "v0.1.0", "-m", "release v0.1.0")
     tagged_sha = _git(repo_dir, "rev-parse", "HEAD")
 
     (package_dir / "documents.mthds").write_text("# v2 placeholder", encoding="utf-8")
@@ -103,3 +104,14 @@ class TestFetchAtTag:
         assert fetched.commit_sha != tagged_sha
         assert fetched.provenance.tag is None
         assert (fetched.package_dir / "documents.mthds").read_text(encoding="utf-8") == "# v2 placeholder"
+
+    def test_branch_name_is_refused_as_a_tag(self, seed_repo: tuple[Path, str, str], tmp_path: Path) -> None:
+        """`@<name>` naming a branch, not a tag, is refused — only tags pin a revision."""
+        repo_dir, _, _ = seed_repo
+
+        with pytest.raises(MethodFetchError, match="does not name a git tag"):
+            fetch_method_package(
+                ref=parse_method_ref("github.com/Pipelex/methods/documents@main"),
+                dest_dir=tmp_path / "clone-at-branch",
+                clone_url=f"file://{repo_dir}",
+            )

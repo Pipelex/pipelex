@@ -7,11 +7,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipelex.methods.exceptions import MethodPackageAmbiguityError, MethodPackageNotFoundError
+from pipelex.methods.exceptions import MethodPackageAmbiguityError, MethodPackageNotFoundError, MethodPackageTooLargeError
 from pipelex.methods.package_locator import locate_package_in_clone, scan_packages_in_clone
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from pytest_mock import MockerFixture
 
 
 def _write_manifest(package_dir: Path, *, address: str, name: str | None = None, main_pipe: str | None = None) -> None:
@@ -86,16 +88,47 @@ class TestPackageLocator:
             locate_package_in_clone(clone_root=tmp_path, requested_address="github.com/Pipelex/methods/documents")
 
     def test_bare_library_repo_address_lists_its_packages(self, tmp_path: Path) -> None:
-        """Requesting a library repo's bare address matches every package that shares it — ambiguous, listing them."""
+        """Requesting a library repo's bare address matches no nested package — a loud miss listing them."""
         _write_manifest(tmp_path / "methods" / "documents", address="github.com/Pipelex/methods", name="documents")
         _write_manifest(tmp_path / "methods" / "imaging", address="github.com/Pipelex/methods", name="image_generation")
 
-        with pytest.raises(MethodPackageAmbiguityError) as exc_info:
+        with pytest.raises(MethodPackageNotFoundError) as exc_info:
             locate_package_in_clone(clone_root=tmp_path, requested_address="github.com/Pipelex/methods")
 
         message = str(exc_info.value)
         assert "github.com/Pipelex/methods/documents" in message
         assert "github.com/Pipelex/methods/image_generation" in message
+
+    def test_single_nested_package_does_not_match_bare_repo_address(self, tmp_path: Path) -> None:
+        """Address-only identity belongs to repo-root packages: one nested library package is not
+        silently selected by the bare repository address — the miss lists its full address.
+        """
+        _write_manifest(tmp_path / "methods" / "documents", address="github.com/Pipelex/methods", name="documents")
+
+        with pytest.raises(MethodPackageNotFoundError, match=re.escape("github.com/Pipelex/methods/documents")):
+            locate_package_in_clone(clone_root=tmp_path, requested_address="github.com/Pipelex/methods")
+
+    def test_oversized_manifest_is_skipped_and_reported(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """A manifest larger than the size ceiling is never read; the miss names it."""
+        big_dir = tmp_path / "big"
+        big_dir.mkdir()
+        (big_dir / "METHODS.toml").write_text("# " + "x" * 2048, encoding="utf-8")
+        mocker.patch("pipelex.methods.package_locator.MAX_MANIFEST_FILE_BYTES", 1024)
+        parse_spy = mocker.patch("pipelex.methods.package_locator.parse_methods_toml")
+
+        with pytest.raises(MethodPackageNotFoundError, match="size ceiling"):
+            locate_package_in_clone(clone_root=tmp_path, requested_address="github.com/acme/big")
+
+        assert parse_spy.call_count == 0
+
+    def test_manifest_scan_count_is_bounded(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """A repository with more manifests than the scan ceiling is rejected."""
+        for index_pkg in range(4):
+            _write_manifest(tmp_path / f"pkg_{index_pkg}", address="github.com/acme/many", name=f"pkg_{index_pkg}")
+        mocker.patch("pipelex.methods.package_locator.MAX_SCANNED_MANIFESTS", 3)
+
+        with pytest.raises(MethodPackageTooLargeError, match="refusing to scan"):
+            locate_package_in_clone(clone_root=tmp_path, requested_address="github.com/acme/many/pkg_0")
 
     def test_invalid_manifest_is_reported_on_miss(self, tmp_path: Path) -> None:
         """A manifest that fails to parse is skipped but named when the location misses."""

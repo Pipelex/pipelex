@@ -23,7 +23,7 @@ A method reference is `<address>[@<tag>]`:
 
 - **The address** is `github.com/<owner>/<repo>[/<selector>]` (GitHub only for now). The first two path segments name the repository — the clone URL is derived as `https://github.com/<owner>/<repo>.git` — and anything after them selects a package *within* the repository.
 - **A bare address** (no `@<tag>`) means the repository's default branch at HEAD.
-- **`@<tag>`** pins the repository at that git tag. The recommended form is `vX.Y.Z` (e.g. `@v0.2.0`).
+- **`@<tag>`** pins the repository at that git tag. The recommended form is `vX.Y.Z` (e.g. `@v0.2.0`). The name must be a tag — a branch name after `@` is refused, so only tags pin a revision.
 
 Full browser URLs keep working: `https://github.com/owner/repo` (with or without `.git`) is normalized into the address form, and a `/tree/<branch>/...` deep link is accepted with the branch segment discarded — only tags pin a revision.
 
@@ -54,7 +54,7 @@ What decides whether Python in a method is acceptable is **where it would execut
 
 ## Bounds
 
-Fetched packages are bounded: the clone has a fixed timeout, and the selected package is capped in file count and total bytes (tunable via the `PIPELEX_MAX_FETCHED_PACKAGE_FILES` and `PIPELEX_MAX_FETCHED_PACKAGE_TOTAL_KIB` environment variables). A package exceeding the caps is rejected with a clear error.
+Fetched packages are bounded: the clone has a fixed timeout, and the selected package is capped in file count and total bytes (tunable via the `PIPELEX_MAX_FETCHED_PACKAGE_FILES` and `PIPELEX_MAX_FETCHED_PACKAGE_TOTAL_KIB` environment variables). The manifest scan that locates the package is bounded too: at most `PIPELEX_MAX_SCANNED_MANIFESTS` manifests are considered per repository, and a `METHODS.toml` larger than `PIPELEX_MAX_MANIFEST_FILE_KIB` is skipped and reported rather than read. Content exceeding the caps is rejected with a clear error.
 
 ## Related Documentation
 

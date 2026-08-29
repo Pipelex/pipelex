@@ -19,7 +19,7 @@ class MethodRefParseError(MethodRefError):
 
 
 class MethodFetchError(MethodRefError):
-    """Fetching the repository behind a method reference failed (clone or commit resolution)."""
+    """Fetching the repository behind a method reference failed (clone, tag verification, or commit resolution)."""
 
 
 class MethodPackageNotFoundError(MethodRefError):
@@ -31,7 +31,7 @@ class MethodPackageAmbiguityError(MethodRefError):
 
 
 class MethodPackageTooLargeError(MethodRefError):
-    """The selected package exceeds the fetched-package ceilings (file count or total bytes)."""
+    """Fetched content exceeds a ceiling: the selected package's file count or total bytes, or the repository's manifest scan."""
 
 
 class MethodStructuresRefusedError(MethodRefError):
