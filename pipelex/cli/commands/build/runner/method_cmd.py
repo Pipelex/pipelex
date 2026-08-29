@@ -6,7 +6,7 @@ from typing import Annotated
 import typer
 
 from pipelex.cli.commands.build.runner._runner_core import execute_prepare_runner
-from pipelex.cli.method_resolver import resolve_method_target
+from pipelex.cli.method_resolver import method_output_base_dir, resolve_method_target
 
 
 def build_runner_method_cmd(
@@ -51,11 +51,11 @@ def build_runner_method_cmd(
         raise typer.Exit(1)
 
     bundle_path = method.mthds_files[0]
-    # Default output to a results/ folder inside the method's directory
+    # Default output to a results/ folder under the method's output base (the caller's CWD for fetched methods)
     if output_path:
         output_path_path: Path | None = Path(output_path)
     else:
-        output_path_path = Path(method_library_dirs[0]) / "results" / f"run_{pipe_code}.py"
+        output_path_path = method_output_base_dir(method=method) / "results" / f"run_{pipe_code}.py"
 
     library_dirs_paths = [Path(lib_dir) for lib_dir in method_library_dirs]
     if library_dirs:

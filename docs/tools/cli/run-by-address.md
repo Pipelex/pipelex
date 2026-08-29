@@ -44,6 +44,10 @@ No match, or more than one, is a loud error listing the packages the clone does 
 
 The pipe to run defaults to the manifest's `main_pipe`; `--pipe <code>` overrides it. A method with no `main_pipe` requires `--pipe`.
 
+## Where outputs land
+
+The fetched clone is temporary: it lives in a system temp directory and is deleted when the CLI process exits. Default outputs therefore anchor in **your current working directory** — `pipelex run method <ref>` writes into `./results/`, and the `pipelex build` method commands write their generated files there too, so nothing you produced disappears with the clone. An explicit `--output-dir` / `--output` is honored verbatim. For an installed method or a local path, defaults stay inside the method's own directory, as before.
+
 ## Python in fetched methods: the hosted rule
 
 What decides whether Python in a method is acceptable is **where it would execute**:

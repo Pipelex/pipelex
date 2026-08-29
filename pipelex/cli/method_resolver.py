@@ -15,7 +15,7 @@ from pipelex.cli.installed_methods import (
     discover_method_at,
     find_method_by_name,
 )
-from pipelex.methods.exceptions import MethodRefError, MethodRefParseError
+from pipelex.methods.exceptions import MethodRefError
 from pipelex.methods.fetching import fetch_method_package
 from pipelex.methods.method_ref import looks_like_method_ref, parse_method_ref
 from pipelex.methods.structures_check import (
@@ -116,7 +116,10 @@ def resolve_method_from_ref(ref_str: str) -> InstalledMethod:
     classes that hosted execution would refuse.
 
     Uses a temporary directory that persists for the duration of the CLI process, so the
-    fetched files remain available for subsequent steps.
+    fetched files remain available for subsequent steps. Failures raise the typed
+    ``MethodRefError`` family — presentation is the caller's concern: the human CLI
+    renders them through ``resolve_method_target``, the agent CLI shapes them into its
+    structured error envelope.
 
     Args:
         ref_str: The method reference string.
@@ -125,22 +128,15 @@ def resolve_method_from_ref(ref_str: str) -> InstalledMethod:
         The discovered ``InstalledMethod``, carrying the fetch provenance.
 
     Raises:
-        typer.Exit: On a parse, fetch, location, or bounds failure.
+        MethodRefError: On a parse, fetch, location, bounds, or refusal failure
+            (the concrete subclass names which).
     """
-    try:
-        method_ref = parse_method_ref(ref_str)
-    except MethodRefParseError as exc:
-        typer.secho(str(exc), fg=typer.colors.RED, err=True)
-        raise typer.Exit(1) from exc
+    method_ref = parse_method_ref(ref_str)
 
     dest = Path(tempfile.mkdtemp(prefix="mthds_remote_"))
     atexit.register(shutil.rmtree, dest, True)
 
-    try:
-        fetched = fetch_method_package(ref=method_ref, dest_dir=dest)
-    except MethodRefError as exc:
-        typer.secho(str(exc), fg=typer.colors.RED, err=True)
-        raise typer.Exit(1) from exc
+    fetched = fetch_method_package(ref=method_ref, dest_dir=dest)
 
     typer.secho(
         f"Fetched {fetched.full_address}{f'@{method_ref.tag}' if method_ref.tag else ''} at commit {fetched.commit_sha}",
@@ -173,6 +169,7 @@ def resolve_method_target(
     *,
     pipe_override: str | None = None,
     library_dirs: list[str] | None = None,
+    raise_ref_errors: bool = False,
 ) -> tuple[str, list[str], InstalledMethod]:
     """Resolve a method name, address, URL, or local path to (pipe_code, library_dirs, method).
 
@@ -186,16 +183,28 @@ def resolve_method_target(
         method_name: The installed method name, method reference, or local path to resolve.
         pipe_override: Optional pipe code override (takes precedence over main_pipe).
         library_dirs: Additional directories to search for methods.
+        raise_ref_errors: When True, a method-reference failure propagates as its typed
+            ``MethodRefError`` instead of being rendered and turned into ``typer.Exit`` —
+            the agent CLI commands pass True so their structured error envelope (not
+            plain red text) reports the failure.
 
     Returns:
         A tuple of (pipe_code, library_dirs, installed_method) for execution.
 
     Raises:
         typer.Exit: On resolution errors with user-friendly messages.
+        MethodRefError: On a method-reference failure, when ``raise_ref_errors`` is True.
     """
     method: InstalledMethod
     if looks_like_method_ref(method_name):
-        method = resolve_method_from_ref(method_name)
+        if raise_ref_errors:
+            method = resolve_method_from_ref(method_name)
+        else:
+            try:
+                method = resolve_method_from_ref(method_name)
+            except MethodRefError as exc:
+                typer.secho(str(exc), fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from exc
     elif is_local_path(method_name):
         method = resolve_method_from_path(method_name)
     else:
@@ -234,6 +243,25 @@ def resolve_method_target(
     library_dirs = [str(method.path)]
 
     return pipe_code, library_dirs, method
+
+
+def method_output_base_dir(*, method: InstalledMethod) -> Path:
+    """Base directory anchoring a method target's default output paths.
+
+    An installed or local-path method anchors its outputs in its own directory. A fetched
+    method's directory is an ephemeral clone deleted at process exit, so anchoring outputs
+    there would silently lose them — a fetched method anchors in the caller's current
+    working directory instead, where a run's results survive the process.
+
+    Args:
+        method: The resolved method target.
+
+    Returns:
+        The directory default output paths should be built under.
+    """
+    if method.provenance is None:
+        return method.path
+    return Path.cwd()
 
 
 def resolve_pipe_from_exports(

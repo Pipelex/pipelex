@@ -42,6 +42,30 @@ class Helper:
     pass
 """
 
+ALIASED_IMPORT_MODULE = """\
+from pipelex.core.stuffs.structured_content import StructuredContent as SC
+
+
+class Invoice(SC):
+    total: float
+"""
+
+ATTRIBUTE_BASE_MODULE = """\
+import pipelex.core.stuffs.structured_content as sc_module
+
+
+class Invoice(sc_module.StructuredContent):
+    total: float
+"""
+
+UNRELATED_ALIAS_MODULE = """\
+from some.other.module import OtherBase as SC
+
+
+class Helper(SC):
+    pass
+"""
+
 
 class TestStructuresCheck:
     """Tests for the AST-based StructuredContent refusal — never gating on mere .py presence."""
@@ -76,6 +100,32 @@ class TestStructuresCheck:
         assert "github.com/acme/bad-package" in message
         assert "Invoice" in message
         assert "MTHDS concepts" in message
+
+    def test_from_import_alias_is_detected(self, tmp_path: Path) -> None:
+        """`from ... import StructuredContent as SC` does not bypass the refusal."""
+        (tmp_path / "aliased.py").write_text(ALIASED_IMPORT_MODULE, encoding="utf-8")
+
+        violations = scan_structured_content_classes(package_dir=tmp_path)
+
+        assert len(violations) == 1
+        assert violations[0].relative_path == "aliased.py"
+        assert violations[0].class_names == ["Invoice"]
+
+    def test_attribute_base_is_detected(self, tmp_path: Path) -> None:
+        """A base reached as `module.StructuredContent` (whatever the module alias) is caught."""
+        (tmp_path / "attribute_base.py").write_text(ATTRIBUTE_BASE_MODULE, encoding="utf-8")
+
+        violations = scan_structured_content_classes(package_dir=tmp_path)
+
+        assert len(violations) == 1
+        assert violations[0].relative_path == "attribute_base.py"
+        assert violations[0].class_names == ["Invoice"]
+
+    def test_unrelated_alias_is_not_flagged(self, tmp_path: Path) -> None:
+        """An alias named `SC` bound to some other class is not a violation — bindings are tracked, not guessed."""
+        (tmp_path / "unrelated.py").write_text(UNRELATED_ALIAS_MODULE, encoding="utf-8")
+
+        assert scan_structured_content_classes(package_dir=tmp_path) == []
 
     def test_unparseable_python_is_skipped(self, tmp_path: Path) -> None:
         """A syntactically invalid .py cannot smuggle a structure class: skipped, like the loader's gate."""

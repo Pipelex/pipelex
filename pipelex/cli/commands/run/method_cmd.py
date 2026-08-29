@@ -7,7 +7,7 @@ import typer
 
 from pipelex.cli.commands.run._inputs_file_loader import resolve_inputs_arg_against_dir
 from pipelex.cli.commands.run._run_core import COMMAND, execute_run, validate_run_flag_combination
-from pipelex.cli.method_resolver import resolve_method_target
+from pipelex.cli.method_resolver import method_output_base_dir, resolve_method_target
 
 
 def run_method_cmd(
@@ -120,7 +120,7 @@ def run_method_cmd(
     validate_run_flag_combination(dry_run=dry_run, mock_usage=mock_usage, mock_inputs=mock_inputs)
 
     # Resolve method name to pipe_code and library dirs
-    pipe_code, method_library_dirs, _ = resolve_method_target(
+    pipe_code, method_library_dirs, method = resolve_method_target(
         method_name=name,
         pipe_override=pipe,
         library_dirs=library_dir,
@@ -128,8 +128,10 @@ def run_method_cmd(
 
     method_dir = Path(method_library_dirs[0])
 
-    # Default output_dir to a results/ folder inside the method's directory
-    effective_output_dir = output_dir or str(method_dir / "results")
+    # Default output_dir to a results/ folder under the method's output base: the method's own
+    # directory for installed/local methods, the caller's CWD for fetched ones (whose package
+    # directory is an ephemeral clone deleted at process exit).
+    effective_output_dir = output_dir or str(method_output_base_dir(method=method) / "results")
 
     # Resolve --inputs relative to the method's directory
     effective_inputs = resolve_inputs_arg_against_dir(inputs, base_dir=method_dir)
