@@ -28,6 +28,9 @@ active = "all_pipelex_gateway"
 description = "Use Pipelex Gateway for all its supported models"
 default = "pipelex_gateway"
 
+# The same model names, served by the Pipelex-operated inference service instead. Switching between
+# this profile and the one above needs no other edit: a model's wire id and sdk are per-backend, so
+# decks, aliases and presets keep naming the same handles.
 [profiles.all_pipelex_manifold]
 description = "Use Pipelex Manifold (private beta) for all its supported models"
 default = "pipelex_manifold"
