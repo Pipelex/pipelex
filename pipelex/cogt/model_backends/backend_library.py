@@ -193,11 +193,14 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     continue
                 if is_managed_gateway:
                     # **Scoped to managed gateway backends, and the scoping is the whole point.**
-                    # A managed backend is one the kit can ship *declared* — the manifold example is
-                    # shipped enabled so joining the beta is setting two variables — so an
-                    # installation that has not joined must not fail to boot over variables it was
-                    # never asked to set. Disabled with a named warning is exactly the posture the
-                    # gateway itself takes toward an integration missing its variables.
+                    # A managed backend is one the kit can ship *declared* — `pipelex_manifold`
+                    # ships declared and disabled, and joining the beta is enabling it and setting
+                    # two variables — so an installation that has enabled one and not yet filled in
+                    # its variables must not fail to boot over them. Disabled with a named warning
+                    # is exactly the posture the gateway itself takes toward an integration missing
+                    # its variables. (An installation that has not joined never reaches here at all:
+                    # a disabled backend is skipped above, and the one loader that asks for disabled
+                    # backends asks leniently.)
                     #
                     # Every BYOK backend keeps today's fatal boot, because widening this would mean
                     # a user who typos ANTHROPIC_API_KEY stops getting a boot failure and starts

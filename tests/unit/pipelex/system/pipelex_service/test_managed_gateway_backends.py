@@ -196,3 +196,61 @@ class TestBuildManagedGatewayConfigs:
         said = str(warning.call_args.args[0])
         assert PipelexBackend.MANIFOLD in said
         assert MANIFOLD_MODEL_SPECS_SECTION in said
+
+
+class TestTheSectionLookupIsConfinedToTheArtifact:
+    """`model_specs_section` is text from the user's own `backends.toml`, so the lookup it drives
+    must only ever reach the artifact's own content.
+
+    A bare `getattr` on the model answers for pydantic's machinery as well, and two of those
+    attributes are plain dicts — so they pass a `isinstance(..., dict)` shape check and travel on as
+    if the service had published them. The failure that produces is not a refusal but a
+    `GatewayConfig` built over pydantic internals, which surfaces much later as an unintelligible
+    model-spec error naming neither the backend nor the mistake.
+    """
+
+    def test_a_published_section_is_found(self) -> None:
+        sections: dict[str, dict[str, object]] = {
+            LEGACY_GATEWAY_MODEL_SPECS_SECTION: {},
+            MANIFOLD_MODEL_SPECS_SECTION: {"claude-4-sonnet": {"model_id": "claude-4-sonnet"}},
+        }
+        remote_config = _remote_config(**sections)
+
+        section = remote_config.get_model_specs_section(MANIFOLD_MODEL_SPECS_SECTION)
+
+        assert section is not None
+        assert set(section) == {"claude-4-sonnet"}
+
+    def test_the_legacy_declared_field_is_found_too(self) -> None:
+        """It is a declared field rather than an extra, and both halves of the lookup must work."""
+        remote_config = _remote_config(**{LEGACY_GATEWAY_MODEL_SPECS_SECTION: {"gpt-5": {"model_id": "gpt-5"}}})
+
+        section = remote_config.get_model_specs_section(LEGACY_GATEWAY_MODEL_SPECS_SECTION)
+
+        assert section is not None
+        assert set(section) == {"gpt-5"}
+
+    @pytest.mark.parametrize("attribute_name", ["model_config", "model_fields"])
+    def test_a_pydantic_internal_is_not_a_section(self, attribute_name: str) -> None:
+        """Both are real dict attributes of any v2 model, and neither is anything the service published."""
+        legacy_only: dict[str, dict[str, object]] = {LEGACY_GATEWAY_MODEL_SPECS_SECTION: {}}
+        remote_config = _remote_config(**legacy_only)
+
+        # Read off the class: instance access to `model_fields` is deprecated in pydantic v2.11,
+        # and the point being made is about the attribute existing as a dict at all.
+        assert isinstance(getattr(RemoteConfig, attribute_name), dict)
+        assert remote_config.get_model_specs_section(attribute_name) is None
+
+    def test_a_declared_field_that_is_not_a_spec_map_is_not_a_section(self) -> None:
+        """`posthog` and `aws_region` are the artifact's own content but the wrong shape."""
+        legacy_only: dict[str, dict[str, object]] = {LEGACY_GATEWAY_MODEL_SPECS_SECTION: {}}
+        remote_config = _remote_config(**legacy_only)
+
+        assert remote_config.get_model_specs_section("posthog") is None
+        assert remote_config.get_model_specs_section("aws_region") is None
+
+    def test_an_unknown_name_is_simply_absent(self) -> None:
+        legacy_only: dict[str, dict[str, object]] = {LEGACY_GATEWAY_MODEL_SPECS_SECTION: {}}
+        remote_config = _remote_config(**legacy_only)
+
+        assert remote_config.get_model_specs_section("no_such_section") is None

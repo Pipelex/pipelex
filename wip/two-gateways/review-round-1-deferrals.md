@@ -33,3 +33,15 @@ Several user-facing strings still name the Portkey-cloud service specifically, o
 - `AGENT_ERROR_HINTS["GatewayTermsNotAcceptedError"]` (`pipelex/cli/agent_cli/commands/agent_output.py:134`) recommends `pipelex init config` to accept the terms and suggests disabling `pipelex_gateway` — the first does not prompt, and the second is already off in the case that produces the error.
 
 This is the same family as the backend attribution the pull request added to `GatewayUnknownModelError`: a message that assumes there is one managed service. It was left out of that change deliberately, as a coherent wording sweep rather than something bundled into a correctness fix, and because the naming a second dialect deserves in user-facing copy is a product decision rather than a mechanical rename.
+
+## D3 — the search worker indexes source dicts raw
+
+`ManifoldSearchWorker._search_sourced_answer` (`pipelex/providers/manifold/manifold_search_worker.py:82-93`) checks `answer` carefully — `isinstance(answer, str)`, then a `ManifoldSearchResponseError` carrying a category and a user action — and then builds `sources` by indexing each entry directly: `source["name"]`, `source["url"]`, `source["snippet"]`, after a `cast` that asserts a shape nothing verified. A `sources` list carrying an entry that is not an object, or an object missing one of those three keys, raises a bare `KeyError` or `TypeError`.
+
+That is precisely the failure mode `ManifoldNativeClient`'s own docstring names as the thing to avoid (`pipelex/providers/manifold/manifold_native_client.py:88-92`): an exception that is neither a `PipelexError` nor annotated with the model escapes the Temporal error bridge and is retried against a search that has already been paid for.
+
+**Two corrections to keep in view.** This is not new and it is not manifold-specific: `GatewaySearchWorker._search_sourced_answer` (`pipelex/providers/gateway/gateway_search_worker.py:86-95`) does the identical thing, and additionally reads `result_dict["answer"]` unguarded where the manifold worker guards it. So the manifold path is strictly the better of the two, and a fix belongs to both or to a shared helper — which is also why it was not bundled into a pull request whose whole shape is "the manifold package imports nothing from the gateway one".
+
+**Why it waited.** It needs a malformed response from our own service to fire, the pull request already raised the bar for the response fields it touched, and the honest fix is a sweep across both workers rather than a patch to the new one — which would leave the shipped path worse than the beta path.
+
+**What the fix looks like.** A `ManifoldSearchSource` pydantic model beside the request schemas in `manifold_schemas.py`, validated per entry, with a malformed entry raising `ManifoldSearchResponseError` the way a missing `answer` already does. The gateway worker gets the same treatment against its own exception class when the sweep happens.

@@ -36,8 +36,20 @@ class RemoteConfig(BaseModel):
         declared in that backend's configuration and the runtime learns it at boot. ``None`` is a
         real answer and not an error here: a backend declaring a section the published artifact does
         not carry is disabled with a named warning, the same posture as a missing variable.
+
+        **The lookup is confined to the artifact's own content** — its declared fields and the extra
+        sections it was published with — rather than being a bare ``getattr`` on the model. The name
+        arrives from `model_specs_section` in the user's own `backends.toml`, and a bare ``getattr``
+        would answer for pydantic's machinery too: ``model_config`` and ``model_fields`` are both
+        plain dicts on a v2 model, so either would pass the shape check below and be carried
+        onwards as if the service had published it. Confined this way, an unmeant name is simply a
+        section the artifact does not carry, and earns the named disabling warning it should.
         """
-        raw = getattr(self, section_name, None)
+        raw: object | None
+        if section_name in type(self).model_fields:
+            raw = getattr(self, section_name)
+        else:
+            raw = (self.__pydantic_extra__ or {}).get(section_name)
         if not isinstance(raw, dict):
             return None
         return cast("BackendModelSpecs", raw)

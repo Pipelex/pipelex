@@ -12,12 +12,18 @@
 #
 # TELEMETRY NOTICE:
 #
-# Using a Pipelex-managed inference backend enables identified telemetry tied to
-# your Pipelex Gateway API key (hashed for security). This is independent from
-# your telemetry.toml settings.
+# Enabling pipelex_gateway alongside this backend enables identified telemetry
+# from your machine, tied to your Pipelex Gateway API key (hashed for security).
+# This is independent from your telemetry.toml settings.
 #
-# We collect only technical data (model names, token counts, latency, error rates).
-# We do NOT collect prompts, completions, pipe codes, or business data.
+# That client-side telemetry follows the gateway key and nothing else, so an
+# installation running Pipelex Manifold ALONE sends none of it. Manifold is a
+# Pipelex-operated service, though, so your usage of it is recorded server-side
+# the way any hosted platform records the calls it serves.
+#
+# Either way we collect only technical data (model names, token counts, latency,
+# error rates). We do NOT collect prompts, completions, pipe codes, or business
+# data.
 #
 # This allows us to monitor service quality, enforce fair usage, and support you.
 #
