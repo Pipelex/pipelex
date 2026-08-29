@@ -35,7 +35,6 @@ from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableErr
 from pipelex.system.pipelex_service.pipelex_service_agreement import update_service_terms_acceptance
 from pipelex.system.pipelex_service.pipelex_service_config import (
     enabled_managed_gateway_sections,
-    is_pipelex_gateway_enabled,
     load_pipelex_service_config_if_exists,
 )
 from pipelex.system.pipelex_service.remote_config_cache import RemoteConfigCache
@@ -50,7 +49,8 @@ class CachePrimingResult(BaseModel):
     afterwards. ``error_message`` is populated when the fetch was attempted but failed (offline at
     init time) *or* when the fetch succeeded but the cache could not be persisted, read back, or
     validated as a usable ``RemoteConfig`` (e.g. a read-only or full cache directory). ``None``
-    means priming was skipped (gateway disabled or terms not accepted) or that it succeeded.
+    means priming was skipped (no managed gateway backend enabled, or terms not accepted) or that
+    it succeeded.
     """
 
     model_config = ConfigDict(extra="forbid", strict=True)
@@ -67,8 +67,12 @@ def attempt_prime_remote_config_cache(*, target_config_dir: Path | None = None) 
     structured JSON field).
 
     Skipped (``primed=False, error_message=None``) when:
-    - the gateway is disabled in ``backends.toml`` (BYOK has nothing to cache), or
-    - gateway terms have not been accepted (we cannot fetch without consent).
+    - no managed gateway backend is enabled in ``backends.toml`` (BYOK has nothing to cache), or
+    - the service terms have not been accepted (we cannot fetch without consent).
+
+    The question is the boot's — *any* managed gateway backend — rather than the Portkey-cloud
+    one's, because what gets cached is the single published configuration carrying every managed
+    backend's section: a manifold-only installation has exactly as much to cache as a gateway one.
 
     Always passes ``require_fresh=True`` to the fetcher: priming's only job is to write a fresh
     cache, so silently accepting an existing cached fallback would be a misleading success. When
@@ -82,7 +86,7 @@ def attempt_prime_remote_config_cache(*, target_config_dir: Path | None = None) 
 
     Args:
         target_config_dir: When set, read the ``backends.toml`` *at that directory* to decide
-            whether the gateway is enabled. ``pipelex init`` and ``pipelex init --local``
+            whether a managed gateway backend is enabled. ``pipelex init`` and ``pipelex init --local``
             target different ``.pipelex/`` directories — using the layered/project-preferred
             config here would let priming branch on the wrong file. ``None`` (default) falls
             back to the layered path. The terms-acceptance check always reads the *global*
@@ -92,7 +96,7 @@ def attempt_prime_remote_config_cache(*, target_config_dir: Path | None = None) 
         backends_file_path = target_config_dir / INFERENCE_DIR_NAME / BACKENDS_FILE_NAME
     else:
         backends_file_path = None
-    if not is_pipelex_gateway_enabled(backends_file_path=backends_file_path):
+    if not enabled_managed_gateway_sections(backends_file_path=backends_file_path):
         return CachePrimingResult(primed=False)
 
     service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
@@ -133,7 +137,7 @@ def prime_remote_config_cache(*, console: Console, target_config_dir: Path | Non
     Prints a yellow warning to the console when a fetch was attempted and failed; otherwise
     silent. Used by ``pipelex init`` so the user knows priming didn't happen and how to retry.
 
-    ``target_config_dir`` is forwarded so the gateway-enabled check inspects the directory
+    ``target_config_dir`` is forwarded so the managed-gateway check inspects the directory
     being initialized rather than the layered config (see ``attempt_prime_remote_config_cache``).
     """
     result = attempt_prime_remote_config_cache(target_config_dir=target_config_dir)

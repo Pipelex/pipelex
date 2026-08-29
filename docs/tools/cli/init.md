@@ -71,7 +71,7 @@ This command creates or resets a Pipelex config directory with:
     Every `init` target replaces the file with the template, so whatever was in it is gone. If a configuration file has simply fallen behind the current schema, [`pipelex migrate`](migrate.md) is the command: it rewrites the file in place and keeps every setting — your PostHog key, your Langfuse credentials, your exporters. `pipelex doctor` tells you which of the two you have.
 
 !!! note "Offline cache priming"
-    When Pipelex Gateway is enabled, `pipelex init` also primes an on-disk copy of the gateway's remote config at `~/.pipelex/cache/remote_config.json`. This lets later setup, validation, and dry-runs work even when the remote config service is briefly unreachable. If you run `pipelex init` while offline, it prints a yellow warning and skips priming — re-run it online to enable offline dry-runs.
+    When any Pipelex-managed gateway backend is enabled, `pipelex init` also primes an on-disk copy of the published remote config at `~/.pipelex/cache/remote_config.json`. This lets later setup, validation, and dry-runs work even when the remote config service is briefly unreachable. If you run `pipelex init` while offline, it prints a yellow warning and skips priming — re-run it online to enable offline dry-runs.
 
 ## Interactive Setup Flow
 

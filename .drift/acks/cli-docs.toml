@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:f23e1d19e73effce6b885b79e9c5b06be817eba741aeb748f4206195c7d8b875"
+digest = "sha256:e1d20ccb8968d72bcb8f9b8390bf90eef3b554c51bc7f4b1146039dfb54216d6"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-29T11:06:02Z"
-rationale = "The init terms prompts moved from asking about pipelex_gateway by name to asking about any Pipelex-managed gateway backend, which is the question the boot already asks; the agent flow no longer drops accept_gateway_terms for a manifold-only request, and pipelex init agreement no longer reports that no acceptance is required on such an install. No command, flag or output-format change, so the agent-CLI contract doc needed nothing. In docs/tools/cli/init.md two lines described the old narrow rule and were corrected: the accept_gateway_terms row now says it is required for any managed gateway backend and that one acceptance covers them all, the backends row lists pipelex_manifold among the example keys, and the init agreement comment now says service terms rather than gateway terms."
+reviewed_at = "2026-08-29T14:45:37Z"
+rationale = "The cache priming step at the end of pipelex init moved from asking whether pipelex_gateway is enabled to asking whether any Pipelex-managed gateway backend is, the question every other init step already asks; the cache is the single published configuration, so a manifold-only install has as much to prime as a gateway one. No command, flag or output-format change, so the agent-CLI contract doc needed nothing. docs/tools/cli/init.md's offline-cache-priming note described the old narrow rule and now says any managed gateway backend and the published remote config."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -91,7 +91,7 @@ rationale = "The init terms prompts moved from asking about pipelex_gateway by n
 "pipelex/cli/commands/graph_cmd.py" = "blob:aa3649ca4ee3d4c9084236f0c3f6b1072803df46"
 "pipelex/cli/commands/init/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/init/backends.py" = "blob:5cd189a02b17fd167059e413e03856078309485e"
-"pipelex/cli/commands/init/command.py" = "blob:30e06e42a11263b7d95aec19521ee1a0f9c84b62"
+"pipelex/cli/commands/init/command.py" = "blob:7f06c1223974b13500de1245e8991d7da4ee38c2"
 "pipelex/cli/commands/init/config_files.py" = "blob:c13be6b8d2a8b211ce9ef0f4889ee131ffc3d2d8"
 "pipelex/cli/commands/init/credentials.py" = "blob:7475c3082b8ee7530a76a52a8ab8bf18a7e21209"
 "pipelex/cli/commands/init/ide_extension.py" = "blob:9f0ec1494c07062246ecc906bc55b7f2cf95c715"

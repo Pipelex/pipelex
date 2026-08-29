@@ -121,14 +121,14 @@ def is_pipelex_gateway_enabled(backends_file_path: Path | None = None) -> bool:
     """Check if pipelex_gateway is enabled in the backends configuration.
 
     Narrower than `enabled_managed_gateway_sections` on purpose, and still the right question for
-    the callers that ask it: `pipelex init`'s cache priming, the telemetry decision and the doctor's
-    gateway probe are about the Portkey-cloud service specifically, not about managed backends in
-    general.
+    the callers that ask it: the boot's telemetry decision and the test-session plugin are about
+    the Portkey-cloud service specifically, not about managed backends in general.
 
-    Terms acceptance is NOT one of those callers, and the distinction is worth stating because it
-    reads like one: the terms are the Pipelex service's terms rather than one dialect's, so every
-    prompt that records them asks the broad question — see `_init_agreement` and
-    `customize_backends_config`.
+    Two callers that read like they belong here do not. Terms acceptance asks the broad question
+    because the terms are the Pipelex service's rather than one dialect's — see `_init_agreement`
+    and `customize_backends_config`. And `pipelex init`'s cache priming asks it because what it
+    caches is the single published configuration carrying every managed backend's section, so a
+    manifold-only installation has exactly as much to prime as a gateway one.
 
     This reads the backends.toml file directly without loading the full backend library.
 
