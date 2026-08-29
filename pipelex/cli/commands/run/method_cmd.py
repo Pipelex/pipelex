@@ -13,7 +13,7 @@ from pipelex.cli.method_resolver import resolve_method_target
 def run_method_cmd(
     name: Annotated[
         str,
-        typer.Argument(help="Name of the installed method to run"),
+        typer.Argument(help="Installed method name, method address (github.com/owner/repo[/name][@tag]), or GitHub URL to run"),
     ],
     pipe: Annotated[
         str | None,
@@ -104,17 +104,18 @@ def run_method_cmd(
         ),
     ] = None,
 ) -> None:
-    """Run an installed method by name.
+    """Run a method by name, address, or URL.
 
-    Resolves the method from ~/.mthds/methods/ or .mthds/methods/,
-    determines the pipe to execute (using --pipe or the method's main_pipe),
-    and runs it.
+    Resolves the method from ~/.mthds/methods/ or .mthds/methods/ (or fetches it
+    by address / GitHub URL, optionally pinned at a git tag), determines the pipe
+    to execute (using --pipe or the method's main_pipe), and runs it.
 
     Examples:
         pipelex run method my-method
         pipelex run method my-method --pipe custom_pipe
         pipelex run method my-method --inputs data.json
         pipelex run method my-method --dry-run
+        pipelex run method github.com/Pipelex/methods/documents@v0.1.0 --pipe extract_document_text
     """
     validate_run_flag_combination(dry_run=dry_run, mock_usage=mock_usage, mock_inputs=mock_inputs)
 

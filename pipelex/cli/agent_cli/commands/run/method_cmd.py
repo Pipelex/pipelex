@@ -29,7 +29,7 @@ def run_method_cmd(
     ctx: typer.Context,
     name: Annotated[
         str,
-        typer.Argument(help="Name of the installed method"),
+        typer.Argument(help="Installed method name, method address (github.com/owner/repo[/name][@tag]), or GitHub URL"),
     ],
     pipe: Annotated[
         str | None,

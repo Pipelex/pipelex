@@ -153,6 +153,13 @@ LinkupError | Linkup | https://docs.pipelex.com/latest/errors/linkup-error/
 LinkupSearchEmptyResultError | Linkup search empty result | https://docs.pipelex.com/latest/errors/linkup-search-empty-result-error/
 LinkupSearchResponseError | Linkup search response | https://docs.pipelex.com/latest/errors/linkup-search-response-error/
 ListWhereSingularError | List where singular | https://docs.pipelex.com/latest/errors/list-where-singular-error/
+MethodFetchError | Method fetch | https://docs.pipelex.com/latest/errors/method-fetch-error/
+MethodPackageAmbiguityError | Method package ambiguity | https://docs.pipelex.com/latest/errors/method-package-ambiguity-error/
+MethodPackageNotFoundError | Method package not found | https://docs.pipelex.com/latest/errors/method-package-not-found-error/
+MethodPackageTooLargeError | Method package too large | https://docs.pipelex.com/latest/errors/method-package-too-large-error/
+MethodRefError | Method reference error | https://docs.pipelex.com/latest/errors/method-ref-error/
+MethodRefParseError | Method ref parse | https://docs.pipelex.com/latest/errors/method-ref-parse-error/
+MethodStructuresRefusedError | Method structures refused | https://docs.pipelex.com/latest/errors/method-structures-refused-error/
 MigrationError | Migration error | https://docs.pipelex.com/latest/errors/migration-error/
 MigrationGoldenError | Migration golden error | https://docs.pipelex.com/latest/errors/migration-golden-error/
 MigrationLedgerError | Migration ledger error | https://docs.pipelex.com/latest/errors/migration-ledger-error/
