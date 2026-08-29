@@ -20,6 +20,7 @@ The Pipelex CLI is organized into several command groups:
 | [**fix**](fix.md) | Apply deterministic safe fixes to a bundle and re-validate |
 | [**show**](show.md) | Inspect configuration, pipes, and AI models |
 | [**run**](run.md) | Execute pipelines |
+| [**run method by address**](run-by-address.md) | Fetch and run a method straight from a public GitHub repository |
 | [**build**](build/index.md) | Generate pipelines, runners, and structures |
 
 ## Global flags

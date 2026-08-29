@@ -45,7 +45,7 @@ commands/
     app.py                     # run_app Typer, subcommand registration
     pipe_cmd.py                # run pipe — execute by pipe code
     bundle_cmd.py              # run bundle — execute from bundle file/directory
-    method_cmd.py              # run method — execute installed method
+    method_cmd.py              # run method — execute method (installed name, address/URL, or path)
     _run_core.py               # Shared async run logic (local runner)
     _run_core_api.py           # Shared async run logic (API runner)
     _output_helpers.py         # Output formatting helpers
@@ -54,7 +54,7 @@ commands/
     app.py                     # validate_app Typer, subcommand registration
     pipe_cmd.py                # validate pipe — validate by code, or --all
     bundle_cmd.py              # validate bundle — validate bundle file/directory (+ --graph)
-    method_cmd.py              # validate method — validate installed method
+    method_cmd.py              # validate method — validate method (installed name, address/URL, or path)
     _validate_core.py          # Shared validation logic
   fix/                         # fix — deterministic in-place bundle fixes
     app.py                     # fix_app Typer, subcommand registration
@@ -63,7 +63,7 @@ commands/
     app.py                     # inputs_app Typer, subcommand registration
     pipe_cmd.py                # inputs pipe — inputs for a pipe by code
     bundle_cmd.py              # inputs bundle — inputs from bundle file/directory
-    method_cmd.py              # inputs method — inputs for installed method
+    method_cmd.py              # inputs method — inputs for method (installed name, address/URL, or path)
     _inputs_core.py            # Shared inputs logic
   codegen/                     # codegen — crate projections + offline drift check
     app.py                     # codegen_app Typer, subcommand registration

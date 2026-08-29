@@ -105,7 +105,7 @@ Validates all pipes in an installed method package.
 
 **Arguments:**
 
-- `NAME` - The name of the installed method to validate
+- `NAME` - The name of the installed method to validate, a method address (`github.com/owner/repo[/name][@tag]`), or a GitHub URL — see [Run a Method by Address](run-by-address.md)
 
 **Options:**
 

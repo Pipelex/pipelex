@@ -123,7 +123,7 @@ Runs a pipeline from an installed method package.
 
 **Arguments:**
 
-- `NAME` - The name of the installed method to run
+- `NAME` - The name of the installed method to run, a method address (`github.com/owner/repo[/name][@tag]`), or a GitHub URL — see [Run a Method by Address](run-by-address.md)
 
 **Options:**
 
@@ -152,6 +152,9 @@ pipelex run method invoice_extractor --pipe extract_amounts
 
 # Run with inputs
 pipelex run method invoice_extractor --inputs invoice_data.json
+
+# Run a method fetched by address from a public GitHub repository, pinned at a tag
+pipelex run method github.com/Pipelex/methods/documents@v0.1.0 --pipe extract_document_text
 ```
 
 ## Input File Formats

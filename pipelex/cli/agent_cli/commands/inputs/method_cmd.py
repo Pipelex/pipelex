@@ -23,7 +23,7 @@ from pipelex.pipeline.exceptions import ValidateBundleError
 def inputs_method_cmd(
     name: Annotated[
         str,
-        typer.Argument(help="Name of the installed method"),
+        typer.Argument(help="Installed method name, method address (github.com/owner/repo[/name][@tag]), or GitHub URL"),
     ],
     pipe: Annotated[
         str | None,
