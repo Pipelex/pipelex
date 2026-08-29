@@ -36,3 +36,15 @@ class MethodPackageTooLargeError(MethodRefError):
 
 class MethodStructuresRefusedError(MethodRefError):
     """The fetched package declares in-process Python structure classes, which hosted execution refuses."""
+
+
+class MethodInstallError(MethodRefError):
+    """Installing a fetched method package into the installed-methods directory failed (occupied target, path escape, or copy failure)."""
+
+
+class MethodFetchDisabledError(MethodRefError):
+    """An address-referenced method is not installed and fetch-on-miss is disabled, so it cannot be fetched."""
+
+
+class MethodDependencyFetchError(MethodRefError):
+    """An address-referenced method is not installed and fetching it failed (or its address is not fetchable)."""

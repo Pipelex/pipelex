@@ -7,7 +7,7 @@ description: "Reference for the `MethodFetchError` Pipelex error class."
 
 # Method fetch
 
-Fetching the repository behind a method reference failed (clone or commit resolution).
+Fetching the repository behind a method reference failed (clone, tag verification, or commit resolution).
 
 | Field | Value |
 |---|---|

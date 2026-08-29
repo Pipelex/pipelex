@@ -543,6 +543,17 @@
       "default": 10,
       "open_node": false
     },
+    "interpreter.methods": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "interpreter.methods.fetch_on_miss": {
+      "value_type": "bool",
+      "required": true,
+      "default": true,
+      "open_node": false
+    },
     "interpreter.mthds": {
       "value_type": "table",
       "required": true,

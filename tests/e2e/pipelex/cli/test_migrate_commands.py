@@ -42,8 +42,10 @@ import subprocess  # ruff: ignore[suspicious-subprocess-import] - invokes the re
 from typing import TYPE_CHECKING, Any
 
 from pipelex.migration.backup import existing_backups_of
+from pipelex.migration.documents import document_paths
+from pipelex.migration.engine import apply_ops_over_text
 from pipelex.migration.goldens import defaults_golden_path, pre_history_document_path
-from pipelex.migration.ledger import packaged_migration_dir
+from pipelex.migration.ledger import load_ledger, packaged_migration_dir
 from pipelex.migration.surfaces import build_config_surface_registry
 from pipelex.system.configuration.config_loader import BACKENDS_DIR_NAME, BACKENDS_FILE_NAME, INFERENCE_DIR_NAME
 from pipelex.system.configuration.config_surface import (
@@ -51,7 +53,7 @@ from pipelex.system.configuration.config_surface import (
     PIPELEX_CONFIG_SURFACE_ID,
     TELEMETRY_CONFIG_SURFACE_ID,
 )
-from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.tools.misc.toml_utils import load_toml_from_content, load_toml_from_path
 from tests.e2e.agent_cli.conftest import REPO_ROOT
 
 if TYPE_CHECKING:
@@ -189,6 +191,38 @@ def _todays_pipelex_config_document() -> dict[str, Any]:
     """
     registry = build_config_surface_registry()
     return registry.surface_for_id(surface_id=PIPELEX_CONFIG_SURFACE_ID).read_defaults_document()
+
+
+def _engine_replay_of_pipelex_config(*, planted_text: str) -> dict[str, Any]:
+    """The packaged ledger's operations, replayed in order over *planted_text*, as a document.
+
+    This is the engine's own answer for what a migration of that text must produce — the reference
+    the command's output is held to. It is deliberately *not* today's packaged document: additive
+    changes never migrate (a key we add is supplied by the defaults layer, see
+    `docs/migration-ledger.md`), so a key added since the chain's last entry is legitimately absent
+    from a migrated file while present in today's document. What the migrated file must NOT carry
+    is any path today's shape does not have — asserted separately, by containment.
+    """
+    ledger = load_ledger(migration_dir=packaged_migration_dir(), surface_id=PIPELEX_CONFIG_SURFACE_ID)
+    text = planted_text
+    for entry in ledger.migration:
+        text = apply_ops_over_text(text=text, ops=entry.ops).text
+    return load_toml_from_content(text)
+
+
+def _assert_migrated_global_file_lands_on_todays_shape(*, global_file: Path, planted_text: str) -> None:
+    """The two halves of the strong assertion on a migrated full-tier file.
+
+    Equality with the engine's own replay proves the *command* did exactly what the engine is
+    already proven (by `make check-migration-schemas`) to do. Path containment in today's packaged
+    document proves the result carries nothing today's shape lacks — a stray table nothing reads
+    would fail here. Today's document may carry more: keys added since the chain's last entry are
+    supplied by the defaults layer, never by a migration.
+    """
+    migrated_document: dict[str, Any] = load_toml_from_path(path=global_file)
+    assert migrated_document == _engine_replay_of_pipelex_config(planted_text=planted_text)
+    stray_paths = document_paths(document=migrated_document) - document_paths(document=_todays_pipelex_config_document())
+    assert stray_paths == set(), f"the migrated file carries paths today's shape does not have: {sorted(stray_paths)}"
 
 
 def _project_config_dir(*, hermetic_home: Path) -> Path:
@@ -514,7 +548,9 @@ class TestAPreReshapeMachine:
     ) -> None:
         """The whole loop through `pipelex migrate`, with the strong assertion on the global file.
 
-        Migrated, it says exactly what the package's own `pipelex.toml` says today.
+        Migrated, it says exactly what the engine's own replay of the ledger says, and carries no
+        path today's packaged `pipelex.toml` lacks (keys added since the chain's last entry are
+        supplied by the defaults layer, never by a migration — so today's document may say more).
         `make check-migration-schemas` already proves the *engine* turns the reference document the
         reshape starts from into the one it lands on; what is proved here is that the *command*
         does — walking two directories,
@@ -537,7 +573,7 @@ class TestAPreReshapeMachine:
         assert str(global_file) in report
         assert str(project_file) in report
 
-        assert load_toml_from_path(path=global_file) == _todays_pipelex_config_document()
+        _assert_migrated_global_file_lands_on_todays_shape(global_file=global_file, planted_text=originals[global_file])
         # The tier keeps its four settings and nothing else — a migration that had quietly folded
         # the package defaults into a user's override would satisfy the assertion above and ruin
         # the layering, since an override is read as "only these, on top of whatever is beneath".
@@ -739,10 +775,11 @@ class TestAPrePromptingStyleMachine:
         assert migrated.returncode == 0, migrated.stdout + migrated.stderr
         assert str(global_file) in migrated.stdout + migrated.stderr
 
-        # The whole document, against the live packaged one: the tuned per-target map is gone, the
-        # default it sat beside travels to where the reshape puts templating, and nothing else about
-        # a file that crossed two entries in one run came out different.
-        assert load_toml_from_path(path=global_file) == _todays_pipelex_config_document()
+        # The whole document, against the engine's own replay of both entries, plus containment in
+        # the live packaged shape: the tuned per-target map is gone, the default it sat beside
+        # travels to where the reshape puts templating, and nothing else about a file that crossed
+        # two entries in one run came out different.
+        _assert_migrated_global_file_lands_on_todays_shape(global_file=global_file, planted_text=original)
 
         backups = existing_backups_of(path=global_file)
         assert len(backups) == 1, f"expected exactly one backup of {global_file}, found {backups}"

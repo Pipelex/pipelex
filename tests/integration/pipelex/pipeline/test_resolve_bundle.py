@@ -139,8 +139,8 @@ class TestResolveCrateFromContents:
     def test_address_dependency_is_rejected_without_filesystem_discovery(self, load_empty_library: Callable[[], str], mocker: MockerFixture) -> None:
         load_empty_library()
         discovery = mocker.patch(
-            "pipelex.libraries.library_manager.find_method_by_full_address",
-            side_effect=AssertionError("in-memory resolve must not discover installed methods"),
+            "pipelex.libraries.library_manager.resolve_address_based_method",
+            side_effect=AssertionError("in-memory resolve must not discover installed methods or fetch by address"),
         )
 
         with pytest.raises(ValidateBundleError, match="address-based dependency"):

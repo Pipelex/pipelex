@@ -293,6 +293,7 @@ plugins:
         - configuration/index.md: "Configuration Overview"
         - configuration/config-pipeline-validation/dry-run-config.md: "Dry Run Configuration"
         - configuration/config-practical/logging-config.md: "Logging Configuration"
+        - configuration/config-practical/methods-config.md: "Methods Configuration"
         - configuration/config-practical/pipe-run-config.md: "Pipe Run Configuration"
         - configuration/config-practical/reporting-config.md: "Reporting Configuration"
         - configuration/config-practical/telemetry-config.md: "Telemetry Configuration"
@@ -547,6 +548,7 @@ nav:
         - Dry Run: configuration/config-pipeline-validation/dry-run-config.md
       - Practical Configuration:
         - Logging: configuration/config-practical/logging-config.md
+        - Methods: configuration/config-practical/methods-config.md
         - Pipe Run: configuration/config-practical/pipe-run-config.md
         - Reporting: configuration/config-practical/reporting-config.md
         - Telemetry: configuration/config-practical/telemetry-config.md

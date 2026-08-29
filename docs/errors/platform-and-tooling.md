@@ -104,7 +104,10 @@ own page. Classes are grouped by subsystem.
 
 ## Methods
 
+- [`MethodDependencyFetchError`](method-dependency-fetch-error.md) — Method dependency fetch
+- [`MethodFetchDisabledError`](method-fetch-disabled-error.md) — Method fetch disabled
 - [`MethodFetchError`](method-fetch-error.md) — Method fetch
+- [`MethodInstallError`](method-install-error.md) — Method install
 - [`MethodPackageAmbiguityError`](method-package-ambiguity-error.md) — Method package ambiguity
 - [`MethodPackageNotFoundError`](method-package-not-found-error.md) — Method package not found
 - [`MethodPackageTooLargeError`](method-package-too-large-error.md) — Method package too large

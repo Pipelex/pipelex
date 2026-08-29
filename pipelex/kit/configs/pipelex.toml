@@ -160,6 +160,17 @@ is_dump_response_enabled = false
 is_dump_error_enabled = false
 
 ####################################################################################################
+# Methods Config
+####################################################################################################
+
+[interpreter.methods]
+# Fetch address-referenced methods (github.com/...->domain.pipe) on a miss and install them into
+# ~/.mthds/methods/. Set to false to forbid network fetches at load time — a miss then raises a
+# diagnostic naming the address and how to install it manually. The PIPELEX_METHODS_FETCH_ON_MISS
+# environment variable (1/0, true/false) overrides this setting when set.
+fetch_on_miss = true
+
+####################################################################################################
 # Scan Config
 ####################################################################################################
 
