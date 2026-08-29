@@ -25,12 +25,16 @@ from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSett
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingChoicesDefaults
+from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.model_backends.gateway_config import GatewayConfig
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
+from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.system.runtime import ProblemReaction
 
@@ -58,7 +62,31 @@ def _specs(*model_names: str) -> BackendModelSpecs:
     return specs  # pyright: ignore[reportReturnType]
 
 
-def _make_deck(*, llm_presets: dict[str, LLMSetting]) -> ModelDeck:
+def _resolved(name: str, *, backend_name: str) -> InferenceModelSpec:
+    """A handle the deck build already resolved — what `deck.inference_models` holds.
+
+    Only the key matters to the membership check; the spec is filled in just enough to be a real
+    model, and its `backend_name` records which backend the profile matched it to.
+    """
+    return InferenceModelSpec(
+        backend_name=backend_name,
+        name=name,
+        sdk="gateway_completions",
+        model_type=ModelType.LLM,
+        model_id=name,
+        costs={CostCategory.INPUT: 0.001, CostCategory.OUTPUT: 0.002},
+        thinking_mode=ThinkingMode.NONE,
+        max_tokens=1000,
+        max_prompt_images=None,
+    )
+
+
+def _make_deck(
+    *,
+    llm_presets: dict[str, LLMSetting],
+    inference_models: dict[str, InferenceModelSpec] | None = None,
+    llm_waterfalls: dict[str, list[str]] | None = None,
+) -> ModelDeck:
     """A minimal real deck whose only variable part is the LLM presets, mirroring the sibling tests."""
     llm_for_text: LLMModelChoice = GATEWAY_HANDLE
     llm_for_object: LLMModelChoice = GATEWAY_HANDLE
@@ -66,11 +94,11 @@ def _make_deck(*, llm_presets: dict[str, LLMSetting]) -> ModelDeck:
     img_gen_choice_default: ImgGenModelChoice = IMG_GEN_HANDLE
     search_choice_default: SearchModelChoice = SEARCH_HANDLE
     return ModelDeck(
-        inference_models={},
+        inference_models=inference_models if inference_models is not None else {},
         # LLM
         llm_default_temperature=0.7,
         llm_aliases={},
-        llm_waterfalls={},
+        llm_waterfalls=llm_waterfalls if llm_waterfalls is not None else {},
         llm_presets=llm_presets,
         llm_choice_defaults=LLMSettingChoicesDefaults(
             default_temperature=0.7,
@@ -97,10 +125,19 @@ def _make_deck(*, llm_presets: dict[str, LLMSetting]) -> ModelDeck:
     )
 
 
-def _make_manager(*, llm_presets: dict[str, LLMSetting] | None = None) -> ModelManager:
+def _make_manager(
+    *,
+    llm_presets: dict[str, LLMSetting] | None = None,
+    inference_models: dict[str, InferenceModelSpec] | None = None,
+    llm_waterfalls: dict[str, list[str]] | None = None,
+) -> ModelManager:
     """A manager holding the fixture deck and the mixed routing profile, with no boot behind it."""
     manager = ModelManager()
-    manager.model_deck = _make_deck(llm_presets=llm_presets if llm_presets is not None else {})
+    manager.model_deck = _make_deck(
+        llm_presets=llm_presets if llm_presets is not None else {},
+        inference_models=inference_models,
+        llm_waterfalls=llm_waterfalls,
+    )
     manager._routing_profile = RoutingProfile(  # pyright: ignore[reportPrivateUsage]  # ruff: ignore[private-member-access]
         name="mixed",
         description="Portkey's cloud by default, Claude through the manifold service, grok direct",
@@ -204,3 +241,54 @@ class TestEnforceGatewayModelMembership:
             gateway_config_source=RemoteConfigSource.FRESH,
             enabled_backends=ENABLED_BACKENDS,
         )
+
+
+class TestAWaterfallSpansBackends:
+    """A waterfall is "try in order, use whatever works" — and the order may cross backends.
+
+    The per-service filter answers "which candidates is *this* section responsible for", which is
+    the right question for the section lookup and the wrong one for `deck.inference_models`. That
+    map is built by routing every handle through the *active profile* and keeping the ones whose
+    matched backend has a spec, so membership in it already means "resolvable under this profile,
+    whichever backend serves it" — exactly what `ModelDeck._resolve_waterfall` consults at runtime.
+    """
+
+    def test_a_waterfall_whose_working_fallback_lives_on_another_service_is_not_an_error(self) -> None:
+        """The primary is absent from the service it routes to, and the fallback resolves elsewhere.
+
+        `claude-4-sonnet` routes to the manifold service, which carries nothing; `gpt-5` routes to
+        the Portkey-cloud one and is already resolved in the deck. At runtime the waterfall walks
+        past the first and uses the second, so the boot has nothing to refuse.
+        """
+        manager = _make_manager(
+            llm_presets={"premium": LLMSetting(model="~premium", temperature=0.5)},
+            llm_waterfalls={"premium": [MANIFOLD_HANDLE, GATEWAY_HANDLE]},
+            inference_models={GATEWAY_HANDLE: _resolved(GATEWAY_HANDLE, backend_name=PipelexBackend.GATEWAY)},
+        )
+
+        _enforce(
+            manager,
+            gateway_specs=_specs(*EVERY_DEFAULT_ROUTED_HANDLE),
+            manifold_specs=_specs(),
+        )
+
+    def test_a_waterfall_no_backend_can_serve_still_raises(self) -> None:
+        """The companion guard: widening the deck half must not make the check stop firing.
+
+        Both entries match `claude-*` and route to the manifold service, neither is in its section,
+        and nothing resolved them — so there is no fallback to walk to and the boot says so.
+        """
+        manager = _make_manager(
+            llm_presets={"premium": LLMSetting(model="~premium", temperature=0.5)},
+            llm_waterfalls={"premium": [MANIFOLD_HANDLE, "claude-9-unknown"]},
+        )
+
+        with pytest.raises(GatewayUnknownModelError) as refused:
+            _enforce(
+                manager,
+                gateway_specs=_specs(*EVERY_DEFAULT_ROUTED_HANDLE),
+                manifold_specs=_specs(),
+            )
+
+        assert refused.value.model_name == MANIFOLD_HANDLE
+        assert refused.value.backend_name == PipelexBackend.MANIFOLD

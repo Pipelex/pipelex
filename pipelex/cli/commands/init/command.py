@@ -11,7 +11,7 @@ from rich.prompt import Confirm
 
 from pipelex.cli.commands.init.backends import (
     customize_backends_config,
-    disable_gateway_backend,
+    disable_managed_gateway_backends,
     get_selected_backend_keys,
 )
 from pipelex.cli.commands.init.config_files import init_config
@@ -26,7 +26,7 @@ from pipelex.cli.commands.init.ui.gateway_ui import (
 )
 from pipelex.cli.commands.init.ui.general_ui import build_initialization_panel
 from pipelex.cli.commands.init.ui.types import InitFocus
-from pipelex.cogt.model_backends.backend import PipelexBackend
+from pipelex.cogt.model_backends.backend import MANAGED_GATEWAY_BACKEND_NAMES
 from pipelex.cogt.models.deck_manifest import compute_kit_manifest, write_manifest
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.runtime_hub import get_console
@@ -34,6 +34,7 @@ from pipelex.system.configuration.config_loader import BACKENDS_FILE_NAME, INFER
 from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError
 from pipelex.system.pipelex_service.pipelex_service_agreement import update_service_terms_acceptance
 from pipelex.system.pipelex_service.pipelex_service_config import (
+    enabled_managed_gateway_sections,
     is_pipelex_gateway_enabled,
     load_pipelex_service_config_if_exists,
 )
@@ -157,7 +158,10 @@ def _check_gateway_terms_if_needed(*, console: Console, backends_toml_path: Path
         return
 
     selected_backend_keys = get_selected_backend_keys(backends_toml_path)
-    if PipelexBackend.GATEWAY not in selected_backend_keys:
+    # Any managed gateway backend puts this installation behind the service terms — the same
+    # question the boot asks. Asking only about the Portkey-cloud one leaves a manifold-only
+    # install unable to record acceptance through any supported step.
+    if not any(backend_name in selected_backend_keys for backend_name in MANAGED_GATEWAY_BACKEND_NAMES):
         return
 
     # Gateway is enabled - check if terms are already accepted (always global)
@@ -176,7 +180,7 @@ def _check_gateway_terms_if_needed(*, console: Console, backends_toml_path: Path
         display_gateway_declined_message(console=console)
         update_service_terms_acceptance(accepted=False, config_dir=config_manager.global_config_dir)
         # Actually disable the gateway in backends.toml
-        disable_gateway_backend(backends_toml_path)
+        disable_managed_gateway_backends(backends_toml_path)
 
 
 def determine_needs(
@@ -427,16 +431,18 @@ def execute_initialization(
 def _init_agreement(*, console: Console) -> None:
     """Handle the agreement-only initialization flow.
 
-    This prompts the user to accept Pipelex Gateway terms without resetting any configuration.
-    If gateway is not enabled, it informs the user that no action is needed.
+    This prompts the user to accept the Pipelex service terms without resetting any configuration,
+    and it is the human CLI's only way to record acceptance after the fact. It therefore asks the
+    same question the boot asks — is ANY managed gateway backend enabled — rather than the narrower
+    gateway-only one, which would report that nothing is needed on an installation the boot refuses
+    to start for want of exactly this.
 
     Args:
         console: Rich Console instance for user interaction.
     """
-    # Check if gateway is even enabled
-    if not is_pipelex_gateway_enabled():
+    if not enabled_managed_gateway_sections():
         console.print()
-        console.print("[green]✓ Pipelex Gateway is not enabled.[/green]")
+        console.print("[green]✓ No Pipelex-managed gateway backend is enabled.[/green]")
         console.print("[dim]No terms acceptance is required.[/dim]")
         console.print()
         return
@@ -470,7 +476,7 @@ def _init_agreement(*, console: Console) -> None:
         # Disable the gateway since terms were declined
         backends_toml_path = config_manager.pipelex_config_dir / "inference" / "backends.toml"
         if backends_toml_path.exists():
-            disable_gateway_backend(backends_toml_path)
+            disable_managed_gateway_backends(backends_toml_path)
 
     console.print()
 

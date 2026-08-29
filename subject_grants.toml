@@ -348,9 +348,9 @@ rationale = "Verb-object: fixes the bundle at bundle_path; options stay keyword.
 param = "input_file"
 rationale = "Renders the input file to a graph; single operand."
 
-["pipelex/cli/commands/init/backends.py::disable_gateway_backend"]
+["pipelex/cli/commands/init/backends.py::disable_managed_gateway_backends"]
 param = "backends_toml_path"
-rationale = "Edits the backends TOML at the path to disable the gateway; single operand."
+rationale = "Edits the backends TOML at the path to disable the managed gateway backends; single operand."
 
 ["pipelex/cli/commands/init/backends.py::get_selected_backend_keys"]
 param = "backends_toml_path"

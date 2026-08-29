@@ -289,3 +289,75 @@ class TestBackendCustomization:
         # The gateway must be disabled since its terms could not be recorded.
         toml_doc = load_toml_with_tomlkit(str(test_backends))
         assert toml_doc[PipelexBackend.GATEWAY]["enabled"] is False  # type: ignore[index]
+
+
+class TestTermsAreAskedForAnyManagedGateway:
+    """The terms are the Pipelex service's terms, not one dialect's.
+
+    The boot gate asks the broad question — any enabled managed gateway backend puts the install
+    behind service-terms acceptance (`runtime_boot`). These prompts have to ask the same question,
+    or selecting the manifold service alone produces a configuration that init calls complete and
+    the next inference boot refuses, with no init step that records acceptance.
+    """
+
+    @staticmethod
+    def _prepare(tmp_path: Path, mocker: MockerFixture) -> Path:
+        inference_dir = tmp_path / ".pipelex" / "inference"
+        inference_dir.mkdir(parents=True)
+        test_backends = inference_dir / "backends.toml"
+        shutil.copy2(Path(str(get_kit_configs_dir())) / "inference" / "backends.toml", test_backends)
+
+        mock_config_manager = mocker.MagicMock()
+        mock_config_manager.pipelex_config_dir = tmp_path / ".pipelex"
+        mock_config_manager.global_config_dir = tmp_path / ".pipelex"
+        mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
+        mocker.patch("pipelex.cli.commands.init.backends.get_console", return_value=mocker.MagicMock())
+        return test_backends
+
+    @staticmethod
+    def _answer(mocker: MockerFixture, *, selection: str, accepts_terms: bool) -> None:
+        prompt_inputs = [selection]
+        confirm_inputs = [accepts_terms]
+
+        def prompt_side_effect(*args: Any, **_kwargs: Any) -> str:
+            if not prompt_inputs:
+                question = str(args[0]) if args else "<unknown prompt>"
+                msg = f"Unexpected prompt without predefined input: {question}"
+                raise AssertionError(msg)
+            return prompt_inputs.pop(0)
+
+        def confirm_side_effect(*args: Any, **_kwargs: Any) -> bool:
+            if not confirm_inputs:
+                question = str(args[0]) if args else "<unknown confirmation>"
+                msg = f"Unexpected confirm without predefined input: {question}"
+                raise AssertionError(msg)
+            return confirm_inputs.pop(0)
+
+        mocker.patch("rich.prompt.Prompt.ask", side_effect=prompt_side_effect)
+        mocker.patch("rich.prompt.Confirm.ask", side_effect=confirm_side_effect)
+
+    def test_selecting_only_the_manifold_service_records_terms_acceptance(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Accepting must persist, exactly as it does for the Portkey-cloud service."""
+        test_backends = self._prepare(tmp_path, mocker)
+        recorded = mocker.patch("pipelex.cli.commands.init.backends.update_service_terms_acceptance")
+        manifold_index = get_backend_indices_helper(str(test_backends), [PipelexBackend.MANIFOLD])[0]
+        self._answer(mocker, selection=str(manifold_index), accepts_terms=True)
+
+        customize_backends_config()
+
+        recorded.assert_called_once()
+        assert recorded.call_args.kwargs["accepted"] is True
+        toml_doc = load_toml_with_tomlkit(str(test_backends))
+        assert toml_doc[PipelexBackend.MANIFOLD]["enabled"] is True  # type: ignore[index]
+
+    def test_declining_removes_the_manifold_service_from_the_selection(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """The same guarantee the gateway decline path gives: refused terms leave nothing enabled."""
+        test_backends = self._prepare(tmp_path, mocker)
+        mocker.patch("pipelex.cli.commands.init.backends.update_service_terms_acceptance")
+        manifold_index = get_backend_indices_helper(str(test_backends), [PipelexBackend.MANIFOLD])[0]
+        self._answer(mocker, selection=str(manifold_index), accepts_terms=False)
+
+        customize_backends_config()
+
+        toml_doc = load_toml_with_tomlkit(str(test_backends))
+        assert toml_doc[PipelexBackend.MANIFOLD]["enabled"] is False  # type: ignore[index]

@@ -20,7 +20,7 @@ from pipelex.cli.commands.init.ui.gateway_ui import (
     display_gateway_declined_message,
     prompt_gateway_acceptance,
 )
-from pipelex.cogt.model_backends.backend import PipelexBackend
+from pipelex.cogt.model_backends.backend import MANAGED_GATEWAY_BACKEND_NAMES
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.runtime_hub import get_console
 from pipelex.system.configuration.config_loader import config_manager
@@ -73,8 +73,12 @@ def get_selected_backend_keys(backends_toml_path: Path) -> list[str]:
     return selected_backends
 
 
-def disable_gateway_backend(backends_toml_path: Path) -> None:
-    """Disable the pipelex_gateway backend in backends.toml.
+def disable_managed_gateway_backends(backends_toml_path: Path) -> None:
+    """Disable every Pipelex-managed gateway backend in backends.toml.
+
+    Declining the service terms, or failing to record acceptance, has to leave *no* managed backend
+    enabled: the terms are the Pipelex service's terms rather than one dialect's, so a boot that
+    reaches the service through any of them is refused for want of the same acceptance.
 
     Args:
         backends_toml_path: Path to the backends.toml file.
@@ -84,8 +88,12 @@ def disable_gateway_backend(backends_toml_path: Path) -> None:
 
     toml_doc = load_toml_with_tomlkit(backends_toml_path)
 
-    if PipelexBackend.GATEWAY in toml_doc:
-        toml_doc[PipelexBackend.GATEWAY]["enabled"] = False  # type: ignore[index]
+    disabled_any = False
+    for backend_name in MANAGED_GATEWAY_BACKEND_NAMES:
+        if backend_name in toml_doc:
+            toml_doc[backend_name]["enabled"] = False  # type: ignore[index]
+            disabled_any = True
+    if disabled_any:
         save_toml_to_path(toml_doc, path=backends_toml_path)
 
 
@@ -138,9 +146,10 @@ def customize_backends_config(*, is_first_time_setup: bool = False, target_confi
             # No stdin available for the install prompt — skip the optional IDE extension suggestion.
             log.debug(f"IDE extension suggestion skipped: {exc}")
 
-        # Check if pipelex_gateway is selected and handle terms acceptance prompt
+        # Any managed gateway backend puts this installation behind the service terms, so the
+        # prompt asks the same question the boot does rather than the narrower gateway-only one.
         gateway_terms_accepted: bool | None = None
-        if PipelexBackend.GATEWAY in selected_backends:
+        if any(backend_name in selected_backends for backend_name in MANAGED_GATEWAY_BACKEND_NAMES):
             gateway_accepted = prompt_gateway_acceptance(console=console)
 
             if gateway_accepted:
@@ -150,8 +159,8 @@ def customize_backends_config(*, is_first_time_setup: bool = False, target_confi
                 display_gateway_declined_message(console=console)
                 gateway_terms_accepted = False
 
-                # Remove pipelex_gateway from selected indices
-                selected_indices = [idx for idx in selected_indices if backend_options[idx][0] != PipelexBackend.GATEWAY]
+                # Declining removes every managed backend, not only the one that raised the prompt.
+                selected_indices = [idx for idx in selected_indices if backend_options[idx][0] not in MANAGED_GATEWAY_BACKEND_NAMES]
 
         # Business logic: Update and save backends.toml first (local operation)
         update_backends_in_toml(toml_doc, selected_indices=selected_indices, backend_options=backend_options)
@@ -171,10 +180,10 @@ def customize_backends_config(*, is_first_time_setup: bool = False, target_confi
                 # terms writer's dict assignment raise TypeError rather than a TOMLKitError.
                 log.warning(f"Could not save gateway terms acceptance to global config: {terms_exc}")
                 if gateway_terms_accepted:
-                    # Gateway enabled in backends.toml but terms not recorded — runtime will fail.
-                    # Disable gateway as a safety measure.
+                    # A managed backend is enabled in backends.toml but terms are not recorded —
+                    # the runtime will fail. Disable them as a safety measure.
                     try:
-                        disable_gateway_backend(backends_toml_path)
+                        disable_managed_gateway_backends(backends_toml_path)
                         console.print("[yellow]⚠ Could not save gateway terms. Gateway has been disabled to prevent errors.[/yellow]")
                     except (OSError, TOMLKitError, TypeError) as disable_exc:
                         log.warning(f"Could not disable gateway backend: {disable_exc}")

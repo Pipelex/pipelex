@@ -50,7 +50,7 @@ pipelex init inference
 # Reconfigure telemetry settings
 pipelex init telemetry
 
-# Review gateway terms
+# Review the Pipelex service terms
 pipelex init agreement
 ```
 
@@ -110,9 +110,9 @@ All fields are optional:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `backends` | `list[str]` | Backend keys to enable (e.g. `openai`, `anthropic`, `pipelex_gateway`). Omit to keep template defaults. |
+| `backends` | `list[str]` | Backend keys to enable (e.g. `openai`, `anthropic`, `pipelex_gateway`, `pipelex_manifold`). Omit to keep template defaults. |
 | `primary_backend` | `str` | Required only when 2+ backends are selected and `pipelex_gateway` is not among them. |
-| `accept_gateway_terms` | `bool` | Required when `pipelex_gateway` is in backends. |
+| `accept_gateway_terms` | `bool` | Required when any Pipelex-managed gateway backend (`pipelex_gateway`, `pipelex_manifold`) is in backends. The terms are the Pipelex service's, so one acceptance covers every managed backend. |
 
 Telemetry is not configured via `--config`: init seeds a `telemetry.toml` from a template (a global init writes an active one; a project init drops a commented-out one).
 

@@ -166,10 +166,17 @@ class ModelManager(ModelManagerAbstract):
                 ]
                 if not routed_here:
                     continue
-                # ``deck.inference_models`` is still consulted, and not redundantly: a DEFAULT match
-                # may have resolved the handle from a fallback backend, which makes it genuinely
-                # usable even though this service's section does not name it.
-                if any(candidate in deck.inference_models or candidate in gateway_spec_names for candidate in routed_here):
+                # ``deck.inference_models`` is consulted over the WHOLE candidate list, not just the
+                # part routed here, and the difference is load-bearing. That map is built by routing
+                # every handle through the active profile and keeping the ones whose matched backend
+                # has a spec, so membership in it already means "resolvable under this profile",
+                # whichever backend serves it — which is exactly what ``_resolve_waterfall`` walks at
+                # runtime. Narrowing this half to ``routed_here`` would refuse a waterfall whose
+                # working fallback lives on another backend, and the runtime would have served it.
+                if any(candidate in deck.inference_models for candidate in candidates):
+                    continue
+                # The section lookup, by contrast, is only about what THIS service carries.
+                if any(candidate in gateway_spec_names for candidate in routed_here):
                     continue
                 # No candidate resolves to a known handle. Report the first one — it's the
                 # primary the user is asking for; subsequent entries are fallbacks.
