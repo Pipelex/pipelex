@@ -1,7 +1,8 @@
-"""Unit tests for GitHub URL and local path support in resolve_method_target."""
+"""Unit tests for method-reference, local-path, and name dispatch in resolve_method_target."""
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -10,18 +11,18 @@ from mthds.package.discovery import MANIFEST_FILENAME
 from mthds.package.exceptions import VCSFetchError
 
 from pipelex.cli.method_resolver import (
-    is_github_url,
     is_local_path,
-    parse_github_url,
+    method_output_base_dir,
     resolve_method_from_path,
-    resolve_method_from_url,
+    resolve_method_from_ref,
     resolve_method_target,
 )
+from pipelex.methods.exceptions import MethodFetchError, MethodPackageNotFoundError, MethodRefParseError
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from pytest_mock import MockerFixture
+
+FAKE_SHA = "0123456789abcdef0123456789abcdef01234567"
 
 MINIMAL_MANIFEST = """\
 [package]
@@ -35,6 +36,14 @@ main_pipe = "test_pipe"
 pipes = ["test_pipe"]
 """
 
+STRUCTURES_MODULE = """\
+from pipelex.core.stuffs.structured_content import StructuredContent
+
+
+class Invoice(StructuredContent):
+    total: float
+"""
+
 
 def _write_method_package(dest: Path) -> None:
     """Write a minimal method package (METHODS.toml + .mthds file) into *dest*."""
@@ -44,132 +53,150 @@ def _write_method_package(dest: Path) -> None:
 
 
 class TestResolveMethodTarget:
-    """Tests for GitHub URL detection, parsing, and resolution in the method resolver."""
+    """Tests for reference detection, fetch-backed resolution, and local-path resolution."""
 
-    @pytest.mark.parametrize(
-        "url",
-        [
-            "https://github.com/org/repo",
-            "https://github.com/org/repo.git",
-            "https://github.com/org/repo/",
-            "http://github.com/org/repo",
-            "https://github.com/org/repo/tree/main/methods/my-method",
-        ],
-    )
-    def test_is_github_url_positive(self, url: str) -> None:
-        """Various valid GitHub URLs are correctly detected."""
-        assert is_github_url(url) is True
-
-    @pytest.mark.parametrize(
-        "target",
-        [
-            "my-method",
-            "some-random-string",
-            "github.com/org/repo",
-            "https://gitlab.com/org/repo",
-            "",
-        ],
-    )
-    def test_is_github_url_negative(self, target: str) -> None:
-        """Method names and non-GitHub strings are not detected as GitHub URLs."""
-        assert is_github_url(target) is False
-
-    @pytest.mark.parametrize(
-        ("url", "expected_clone_url", "expected_sub_path"),
-        [
-            ("https://github.com/org/repo", "https://github.com/org/repo.git", None),
-            ("https://github.com/org/repo/", "https://github.com/org/repo.git", None),
-            ("https://github.com/org/repo.git", "https://github.com/org/repo.git", None),
-            ("http://github.com/org/repo", "http://github.com/org/repo.git", None),
-            (
-                "https://github.com/org/repo/tree/main/methods/my-method",
-                "https://github.com/org/repo.git",
-                "methods/my-method",
-            ),
-            (
-                "https://github.com/org/repo/methods/my-method",
-                "https://github.com/org/repo.git",
-                "methods/my-method",
-            ),
-        ],
-    )
-    def test_parse_github_url(self, url: str, expected_clone_url: str, expected_sub_path: str | None) -> None:
-        """Clone URL and sub-path are correctly extracted from various GitHub URL formats."""
-        clone_url, sub_path = parse_github_url(url)
-        assert clone_url == expected_clone_url
-        assert sub_path == expected_sub_path
-
-    def test_resolve_method_from_url_success(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """A successful clone containing a valid package returns an InstalledMethod."""
-        dest_dir = tmp_path / "cloned"
-
-        def fake_clone(_clone_url: str, destination: Path) -> None:
+    def _mock_clone(self, mocker: MockerFixture, dest_dir: Path) -> None:
+        def fake_clone(*, clone_url: str, destination: Path) -> None:
+            assert clone_url.endswith(".git")
             _write_method_package(destination)
 
-        mocker.patch("pipelex.cli.method_resolver.clone_default_branch", side_effect=fake_clone)
+        mocker.patch("pipelex.methods.fetching.clone_default_branch", side_effect=fake_clone)
+        mocker.patch("pipelex.methods.fetching.resolve_head_commit_sha", return_value=FAKE_SHA)
         mocker.patch("pipelex.cli.method_resolver.tempfile.mkdtemp", return_value=str(dest_dir))
 
-        method = resolve_method_from_url("https://github.com/test/remote-method")
+    def test_resolve_method_from_ref_success(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """A successful fetch containing a matching package returns an InstalledMethod with provenance."""
+        self._mock_clone(mocker, tmp_path / "cloned")
+
+        method = resolve_method_from_ref("github.com/test/remote-method")
 
         assert method.name == "remote_method"
         assert method.manifest.main_pipe == "test_pipe"
         assert len(method.mthds_files) == 1
+        assert method.provenance is not None
+        assert method.provenance.address == "github.com/test/remote-method/remote_method"
+        assert method.provenance.commit_sha == FAKE_SHA
 
-    def test_resolve_method_from_url_with_sub_path(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """A subdirectory URL correctly discovers the method in the sub-path."""
-        dest_dir = tmp_path / "cloned"
+    def test_resolve_method_from_ref_accepts_full_url(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """Full https GitHub URLs keep working, normalized into the address form."""
+        self._mock_clone(mocker, tmp_path / "cloned")
 
-        def fake_clone(_clone_url: str, destination: Path) -> None:
-            destination.mkdir(parents=True, exist_ok=True)
-            _write_method_package(destination / "methods" / "my-method")
-
-        mocker.patch("pipelex.cli.method_resolver.clone_default_branch", side_effect=fake_clone)
-        mocker.patch("pipelex.cli.method_resolver.tempfile.mkdtemp", return_value=str(dest_dir))
-
-        method = resolve_method_from_url("https://github.com/test/repo/methods/my-method")
+        method = resolve_method_from_ref("https://github.com/test/remote-method")
 
         assert method.name == "remote_method"
-        assert method.manifest.main_pipe == "test_pipe"
 
-    def test_resolve_method_from_url_clone_failure(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """A VCSFetchError during clone raises typer.Exit."""
-        mocker.patch(
-            "pipelex.cli.method_resolver.clone_default_branch",
-            side_effect=VCSFetchError("connection refused"),
-        )
+    def test_resolve_method_from_ref_clone_failure(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """A VCSFetchError during clone propagates as the typed MethodFetchError — presentation is the caller's concern."""
+        mocker.patch("pipelex.methods.fetching.clone_default_branch", side_effect=VCSFetchError("connection refused"))
         mocker.patch("pipelex.cli.method_resolver.tempfile.mkdtemp", return_value=str(tmp_path / "dest"))
 
-        with pytest.raises(typer.Exit):
-            resolve_method_from_url("https://github.com/test/broken-repo")
+        with pytest.raises(MethodFetchError):
+            resolve_method_from_ref("github.com/test/broken-repo")
 
-    def test_resolve_method_from_url_no_manifest(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """A clone that contains no METHODS.toml raises typer.Exit."""
-        dest_dir = tmp_path / "empty"
+    def test_resolve_method_from_ref_no_matching_package(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """A clone whose packages match no requested address propagates the typed not-found error."""
+        self._mock_clone(mocker, tmp_path / "cloned")
 
-        def fake_clone(_clone_url: str, destination: Path) -> None:
-            destination.mkdir(parents=True, exist_ok=True)
+        with pytest.raises(MethodPackageNotFoundError):
+            resolve_method_from_ref("github.com/test/other-address")
 
-        mocker.patch("pipelex.cli.method_resolver.clone_default_branch", side_effect=fake_clone)
-        mocker.patch("pipelex.cli.method_resolver.tempfile.mkdtemp", return_value=str(dest_dir))
+    def test_resolve_method_from_ref_parse_error(self, mocker: MockerFixture) -> None:
+        """An invalid reference propagates the typed parse error without attempting a clone."""
+        clone_spy = mocker.patch("pipelex.methods.fetching.clone_default_branch")
 
-        with pytest.raises(typer.Exit):
-            resolve_method_from_url("https://github.com/test/no-manifest")
+        with pytest.raises(MethodRefParseError):
+            resolve_method_from_ref("github.com/only-owner")
 
-    def test_resolve_method_target_dispatches_to_url(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """resolve_method_target dispatches to resolve_method_from_url for GitHub URLs."""
-        dest_dir = tmp_path / "dispatched"
+        assert clone_spy.call_count == 0
 
-        def fake_clone(_clone_url: str, destination: Path) -> None:
+    def test_resolve_method_target_renders_ref_error_as_exit(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """The human-CLI default renders a reference failure and exits — no raw traceback."""
+        mocker.patch("pipelex.methods.fetching.clone_default_branch", side_effect=VCSFetchError("connection refused"))
+        mocker.patch("pipelex.cli.method_resolver.tempfile.mkdtemp", return_value=str(tmp_path / "dest"))
+        secho_spy = mocker.patch("pipelex.cli.method_resolver.typer.secho")
+
+        with pytest.raises(typer.Exit) as exc_info:
+            resolve_method_target("github.com/test/broken-repo")
+
+        assert exc_info.value.exit_code == 1
+        rendered = [call for call in secho_spy.call_args_list if "connection refused" in str(call)]
+        assert len(rendered) == 1
+
+    def test_resolve_method_target_propagates_ref_error_when_requested(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """With raise_ref_errors=True the typed error propagates, so the agent CLI can shape its envelope."""
+        mocker.patch("pipelex.methods.fetching.clone_default_branch", side_effect=VCSFetchError("connection refused"))
+        mocker.patch("pipelex.cli.method_resolver.tempfile.mkdtemp", return_value=str(tmp_path / "dest"))
+
+        with pytest.raises(MethodFetchError):
+            resolve_method_target("github.com/test/broken-repo", raise_ref_errors=True)
+
+    def test_method_output_base_dir_local_method_anchors_in_method_dir(self, tmp_path: Path) -> None:
+        """An installed or local-path method (no provenance) anchors default outputs in its own directory."""
+        method_dir = tmp_path / "local-method"
+        _write_method_package(method_dir)
+        method = resolve_method_from_path(str(method_dir))
+
+        assert method_output_base_dir(method=method) == method_dir
+
+    def test_method_output_base_dir_fetched_method_anchors_in_cwd(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """A fetched method's clone dies at process exit, so default outputs anchor in the caller's CWD instead."""
+        clone_dir = tmp_path / "cloned"
+        self._mock_clone(mocker, clone_dir)
+        method = resolve_method_from_ref("github.com/test/remote-method")
+
+        base_dir = method_output_base_dir(method=method)
+
+        assert base_dir == Path.cwd()
+        assert not base_dir.is_relative_to(clone_dir)
+
+    def test_resolve_method_from_ref_warns_on_structures(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """Hosted-parity: a fetched package declaring StructuredContent subclasses resolves locally with a warning."""
+        dest_dir = tmp_path / "cloned"
+
+        def fake_clone(*, clone_url: str, destination: Path) -> None:
+            assert clone_url.endswith(".git")
             _write_method_package(destination)
+            (destination / "structures.py").write_text(STRUCTURES_MODULE, encoding="utf-8")
 
-        mocker.patch("pipelex.cli.method_resolver.clone_default_branch", side_effect=fake_clone)
+        mocker.patch("pipelex.methods.fetching.clone_default_branch", side_effect=fake_clone)
+        mocker.patch("pipelex.methods.fetching.resolve_head_commit_sha", return_value=FAKE_SHA)
         mocker.patch("pipelex.cli.method_resolver.tempfile.mkdtemp", return_value=str(dest_dir))
+        secho_spy = mocker.patch("pipelex.cli.method_resolver.typer.secho")
 
-        pipe_code, lib_dirs, method = resolve_method_target("https://github.com/test/remote-method")
+        method = resolve_method_from_ref("github.com/test/remote-method")
+
+        assert method.name == "remote_method"
+        warning_calls = [call for call in secho_spy.call_args_list if "hosted execution would refuse" in str(call)]
+        assert len(warning_calls) == 1
+
+    def test_resolve_method_target_dispatches_bare_address(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """A bare github.com address dispatches to the fetch arm, not the local-path arm."""
+        self._mock_clone(mocker, tmp_path / "dispatched")
+
+        pipe_code, lib_dirs, method = resolve_method_target("github.com/test/remote-method")
 
         assert pipe_code == "test_pipe"
         assert method.name == "remote_method"
         assert len(lib_dirs) == 1
+
+    def test_resolve_method_target_dispatches_tagged_address(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """A `@<tag>` address dispatches to the tag-clone arm."""
+
+        def fake_clone(*, clone_url: str, version_tag: str, destination: Path) -> None:
+            assert clone_url == "https://github.com/test/remote-method.git"
+            assert version_tag == "v0.1.0"
+            _write_method_package(destination)
+
+        mocker.patch("pipelex.methods.fetching.clone_at_version", side_effect=fake_clone)
+        mocker.patch("pipelex.methods.fetching.ensure_cloned_at_tag")
+        mocker.patch("pipelex.methods.fetching.resolve_head_commit_sha", return_value=FAKE_SHA)
+        mocker.patch("pipelex.cli.method_resolver.tempfile.mkdtemp", return_value=str(tmp_path / "tagged"))
+
+        pipe_code, _, method = resolve_method_target("github.com/test/remote-method@v0.1.0")
+
+        assert pipe_code == "test_pipe"
+        assert method.provenance is not None
+        assert method.provenance.tag == "v0.1.0"
 
     @pytest.mark.parametrize(
         ("target", "expected"),
@@ -199,6 +226,7 @@ class TestResolveMethodTarget:
         assert method.name == "remote_method"
         assert method.manifest.main_pipe == "test_pipe"
         assert len(method.mthds_files) == 1
+        assert method.provenance is None
 
     def test_resolve_method_from_path_not_a_directory(self, tmp_path: Path) -> None:
         """A non-existent path raises typer.Exit."""

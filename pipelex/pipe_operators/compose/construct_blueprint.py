@@ -279,11 +279,14 @@ class ConstructBlueprint(BaseModel):
         return {field_name: field_bp.to_mthds_dict() for field_name, field_bp in self.fields.items()}
 
     @model_serializer(mode="wrap")
-    def serialize_with_context(self, handler: SerializerFunctionWrapHandler, info: SerializationInfo) -> dict[str, Any]:
+    def serialize_with_context(self, handler: SerializerFunctionWrapHandler, info: SerializationInfo):
         """Serialize with format-aware context.
 
         When context contains {"format": "mthds"}, outputs MTHDS-format dict.
         Otherwise, uses default Pydantic serialization.
+
+        The return is deliberately unannotated — see `ConceptBlueprint.serialize_without_absent_hints`:
+        an annotation here becomes the model's serialization JSON Schema and erases its shape.
         """
         if info.context and info.context.get("format") == "mthds":
             return self.to_mthds_dict()

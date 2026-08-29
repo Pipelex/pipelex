@@ -6,7 +6,7 @@ MAKE_VARIABLE_MULTIPLICITY_TEST_CASES: list[tuple[int | None, bool | None, Varia
     # Test cases where nb_output takes precedence
     (3, None, 3, "nb_output=3, multiple_output=None -> returns 3"),
     (5, False, 5, "nb_output=5, multiple_output=False -> returns 5 (nb_output takes precedence)"),
-    (1, True, 1, "nb_output=1, multiple_output=True -> returns 1 (nb_output takes precedence)"),
+    (1, True, None, "nb_output=1, multiple_output=True -> returns None (a count of one is the single form)"),
     (10, None, 10, "nb_output=10, multiple_output=None -> returns 10"),
     # Test cases where multiple_output=True is used
     (None, True, True, "nb_output=None, multiple_output=True -> returns True"),
@@ -73,7 +73,6 @@ EXPLICIT_DOMAIN_IN_STRING_TEST_CASES: list[tuple[str, str, str, int | bool | Non
 # Format: (domain, requirement_str, expected_concept_ref, expected_multiplicity)
 VARIOUS_FIXED_COUNTS_TEST_CASES: list[tuple[str, str, str, int]] = [
     # Native domain with various counts
-    ("native", "native.Image[1]", "native.Image", 1),
     ("native", "native.Image[2]", "native.Image", 2),
     ("native", "native.Image[10]", "native.Image", 10),
     ("native", "native.Image[100]", "native.Image", 100),

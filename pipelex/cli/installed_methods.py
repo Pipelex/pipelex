@@ -1,18 +1,31 @@
-"""Discovery and lookup of installed methods from the filesystem.
+"""Discovery, lookup, and installation of installed methods on the filesystem.
 
 Scans ~/.mthds/methods/ (global) and .mthds/methods/ (project-local) for
-installed method packages.
+installed method packages, and owns the write path that installs a fetched
+package into that store (one directory per method, `METHODS.toml` at its root —
+the same layout the `mthds` CLI's installer writes).
 """
 
+import shutil
+import tempfile
 from pathlib import Path
 
 from mthds.package.discovery import MANIFEST_FILENAME
 from mthds.package.manifest.parser import parse_methods_toml
 from mthds.package.manifest.schema import MethodsManifest
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
+
+from pipelex.methods.exceptions import MethodInstallError
+from pipelex.methods.fetching import MethodProvenance
 
 GLOBAL_METHODS_DIR = Path.home() / ".mthds" / "methods"
 PROJECT_METHODS_DIR = Path(".mthds") / "methods"
+
+# Written beside METHODS.toml when a method is installed by fetch: the address, the tag when one
+# was named, and the commit SHA of what was actually cloned — tags can move, the SHA explains runs.
+PROVENANCE_FILENAME = ".provenance.json"
+
+_STAGING_SUFFIX = ".staging"
 
 
 class MethodNotFoundError(Exception):
@@ -32,12 +45,31 @@ class DuplicateMethodNameError(Exception):
 
 
 class InstalledMethod(BaseModel):
-    """An installed method discovered from the filesystem."""
+    """An installed method discovered from the filesystem.
+
+    ``provenance`` is set only for methods fetched by reference: the address, the tag when
+    one was named, and the commit SHA of what was actually cloned.
+    """
 
     name: str
     path: Path
     manifest: MethodsManifest
     mthds_files: list[Path]
+    provenance: MethodProvenance | None = None
+
+
+def _read_provenance(*, method_dir: Path) -> MethodProvenance | None:
+    """Read the fetch provenance sidecar of an installed method, if present and parseable."""
+    provenance_path = method_dir / PROVENANCE_FILENAME
+    if not provenance_path.is_file():
+        return None
+    content = provenance_path.read_text(encoding="utf-8")
+    try:
+        return MethodProvenance.model_validate_json(content)
+    except ValidationError:
+        # A hand-edited or stale sidecar must not break discovery — the method is still usable,
+        # it just has no recorded provenance.
+        return None
 
 
 def discover_installed_methods(
@@ -86,6 +118,10 @@ def discover_installed_methods(
         for subdir in sorted(methods_dir.iterdir()):
             if not subdir.is_dir():
                 continue
+            if subdir.name.startswith("."):
+                # Dot-prefixed directories are never methods — this also keeps a leftover
+                # install-staging directory out of discovery.
+                continue
             manifest_path = subdir / MANIFEST_FILENAME
             if not manifest_path.is_file():
                 continue
@@ -103,6 +139,7 @@ def discover_installed_methods(
                     path=subdir,
                     manifest=manifest,
                     mthds_files=mthds_files,
+                    provenance=_read_provenance(method_dir=subdir),
                 )
             )
 
@@ -136,6 +173,7 @@ def discover_method_at(method_dir: Path, *, seen_dirs: set[Path]) -> InstalledMe
         path=resolved,
         manifest=manifest,
         mthds_files=mthds_files,
+        provenance=_read_provenance(method_dir=resolved),
     )
 
 
@@ -192,7 +230,9 @@ def find_method_by_full_address(
     The full address is computed as ``manifest.address + "/" + name`` for each
     discovered installed method. For example, a package with
     ``address = "github.com/Pipelex/methods"`` and ``name = "documents"`` has
-    the full address ``"github.com/Pipelex/methods/documents"``.
+    the full address ``"github.com/Pipelex/methods/documents"``. Matching is
+    case-insensitive, mirroring GitHub's own owner/repository semantics (and the
+    fetch path's manifest-identity matching).
 
     Args:
         full_address: The full package address to search for
@@ -205,9 +245,10 @@ def find_method_by_full_address(
     if methods is None:
         methods = discover_installed_methods(extra_search_dirs=extra_search_dirs)
 
+    folded = full_address.casefold()
     for method in methods:
         candidate_address = f"{method.manifest.address}/{method.name}"
-        if candidate_address == full_address:
+        if candidate_address.casefold() == folded:
             return method
 
     return None
@@ -256,3 +297,102 @@ def find_method_by_name(
         raise DuplicateMethodNameError(msg)
 
     return matches[0]
+
+
+def _resolve_occupied_install_target(*, final_dir: Path, name: str, full_address: str | None) -> InstalledMethod:
+    """Decide what an already-occupied install target means: the same package, or a collision.
+
+    When the occupant is a method package whose full address matches *full_address* (another
+    process won the install race), the occupant is returned and used as-is. Anything else — a
+    package with a different address (two packages sharing the bare name *name*), or content
+    that is not a method package — is a loud collision error; the wrong package is never
+    silently loaded and the occupant is never silently overwritten.
+
+    Raises:
+        MethodInstallError: The occupant is not the same package.
+    """
+    occupant = discover_method_at(final_dir, seen_dirs=set())
+    occupant_address = f"{occupant.manifest.address}/{occupant.name}" if occupant is not None else None
+    if occupant is not None and full_address is not None and occupant_address is not None and occupant_address.casefold() == full_address.casefold():
+        return occupant
+    requested = full_address or name
+    occupant_desc = f"method '{occupant_address}'" if occupant_address else "content that is not a method package"
+    msg = (
+        f"Cannot install method '{requested}': '{final_dir}' is already occupied by {occupant_desc} — "
+        f"two method packages share the directory name '{name}'. Remove '{final_dir}' to let this package install there."
+    )
+    raise MethodInstallError(msg)
+
+
+def install_method_package(
+    *,
+    package_dir: Path,
+    name: str,
+    full_address: str | None = None,
+    provenance: MethodProvenance | None = None,
+    methods_dir: Path | None = None,
+) -> InstalledMethod:
+    """Install a method package directory into the installed-methods store.
+
+    Copies *package_dir* into ``<methods_dir>/<name>/`` (the global
+    ``~/.mthds/methods/`` by default) using a per-attempt unique staging directory
+    and an atomic rename, stripping any ``.git/`` and writing the fetch provenance
+    sidecar when one is given — so a partially-written install is never discovered
+    and concurrent installers never share staging state.
+
+    An already-occupied target is resolved by identity, before and after the copy:
+    an occupant whose full address matches *full_address* (a concurrent install of
+    the same package) is returned and used as-is; any other occupant is a loud
+    collision error — bare directory names are not unique across addresses, and
+    the wrong package must never be silently loaded or overwritten.
+
+    Args:
+        package_dir: The package directory to copy from (e.g. inside a fresh clone).
+        name: The method name — becomes the install directory's name.
+        full_address: The package's full address, used to verify an occupant's identity
+            and to name the package in collision errors.
+        provenance: The fetch provenance to record beside the manifest, if any.
+        methods_dir: Override for the installed-methods root (tests, project-local installs).
+
+    Returns:
+        The installed method, discovered from its final location — freshly written, or a
+        matching occupant a concurrent installer put there first.
+
+    Raises:
+        MethodInstallError: If *name* escapes the methods directory, the target is
+            occupied by a different package, or the copy fails.
+    """
+    target_root = (methods_dir or GLOBAL_METHODS_DIR).resolve()
+    target_root.mkdir(parents=True, exist_ok=True)
+
+    final_dir = (target_root / name).resolve()
+    if final_dir == target_root or final_dir.parent != target_root or name.startswith("."):
+        msg = f"Cannot install method '{name}': the name escapes the methods directory '{target_root}' or is not a valid method directory name."
+        raise MethodInstallError(msg)
+    if final_dir.exists():
+        return _resolve_occupied_install_target(final_dir=final_dir, name=name, full_address=full_address)
+
+    staging_dir = Path(tempfile.mkdtemp(dir=target_root, prefix=f".{name}{_STAGING_SUFFIX}-"))
+    try:
+        shutil.copytree(package_dir, staging_dir, dirs_exist_ok=True)
+        git_dir = staging_dir / ".git"
+        if git_dir.exists():
+            shutil.rmtree(git_dir)
+        if provenance is not None:
+            (staging_dir / PROVENANCE_FILENAME).write_text(provenance.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        staging_dir.rename(final_dir)
+    except OSError as exc:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        if final_dir.exists():
+            # The rename lost a race: someone installed into the target between our existence
+            # check and our rename. Resolve the occupant by identity, exactly as above.
+            return _resolve_occupied_install_target(final_dir=final_dir, name=name, full_address=full_address)
+        msg = f"Failed to install method '{name}' into '{target_root}': {exc}"
+        raise MethodInstallError(msg) from exc
+
+    installed = discover_method_at(final_dir, seen_dirs=set())
+    if installed is None:
+        shutil.rmtree(final_dir, ignore_errors=True)
+        msg = f"Installed method '{name}' at '{final_dir}' carries no {MANIFEST_FILENAME} — the source package was not a method package."
+        raise MethodInstallError(msg)
+    return installed

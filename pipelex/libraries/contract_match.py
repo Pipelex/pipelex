@@ -16,7 +16,7 @@ import re
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.pipes.variable_multiplicity import MULTIPLICITY_PATTERN
+from pipelex.core.pipes.variable_multiplicity import MULTIPLICITY_PATTERN, multiplicity_from_bracket_content
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 
@@ -24,11 +24,16 @@ from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 def _canonical_concept_spec(spec: str, *, domain_code: str) -> str:
     """Normalize a raw concept spec to a canonical identity string.
 
-    The multiplicity suffix is preserved *verbatim as text* (``""`` / ``"[]"`` / ``"[N]"``), so
-    ``Brief[]`` (variable-length list) and ``Brief[1]`` (exactly one item) stay distinct. Comparing
-    the *parsed* multiplicity instead would conflate them: ``parse_concept_with_multiplicity`` maps
-    ``[]`` to ``True`` and ``[1]`` to ``int 1``, and Python evaluates ``True == 1`` as true. Keeping
-    the suffix as text also means a ``[0]`` spec compares as a literal rather than raising.
+    The multiplicity suffix is compared *as text* (``""`` / ``"[]"`` / ``"[N]"``), so ``Brief[]`` (a
+    variable-length list) never conflates with a fixed count. Comparing the *parsed* multiplicity
+    instead would: ``parse_concept_with_multiplicity`` maps ``[]`` to ``True``, and Python evaluates
+    ``True == 1`` as true. Keeping the suffix as text also means a ``[0]`` spec compares as a literal
+    rather than raising.
+
+    The one collapse the text comparison must apply is ``[1]``, which denotes the same slot as the bare
+    spelling — so a header's ``Brief`` and a definition's ``Brief[1]`` are one contract, not a mismatch.
+    The suffix is projected through the shared multiplicity rule to decide that, rather than tested for
+    the literal ``"1"``, so this function cannot come to rule a count differently from the parser.
 
     The presence marker (``"?"`` / ``"!"``) is likewise preserved verbatim, so ``Brief`` and
     ``Brief?`` denote different contracts (D5: method-boundary signatures are explicit about
@@ -51,6 +56,8 @@ def _canonical_concept_spec(spec: str, *, domain_code: str) -> str:
     concept_ref_or_code = match.group(1)
     bracket_content = match.group(2)  # None -> no brackets; "" -> "[]"; digits -> "[N]"
     marker_symbol = match.group(3) or ""  # None -> no marker; "?" / "!" kept verbatim
+    if bracket_content is not None and multiplicity_from_bracket_content(bracket_content=bracket_content) is None:
+        bracket_content = None  # the suffix collapsed: `[1]` IS the bare spelling
     suffix = ("" if bracket_content is None else f"[{bracket_content}]") + marker_symbol
 
     if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code):

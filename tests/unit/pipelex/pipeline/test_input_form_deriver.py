@@ -10,6 +10,7 @@ from __future__ import annotations
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.pipeline.input_form import FieldKind, InputFormDeriver
+from tests.helpers.input_form import as_object
 
 
 def _concept_field(*, concept_ref: str) -> ConceptStructureBlueprint:
@@ -27,9 +28,7 @@ class TestInputFormDeriverEscapeHatches:
         }
         node = InputFormDeriver(concepts=concepts).derive_concept(name="root", concept_ref="demo.Node")
 
-        assert node.kind == FieldKind.OBJECT
-        assert node.fields is not None
-        child = node.fields[1]
+        child = as_object(node).fields[1]
         assert child.name == "child"
         assert child.kind == FieldKind.UNKNOWN
         assert child.concept_ref == "demo.Node"
@@ -41,10 +40,7 @@ class TestInputFormDeriverEscapeHatches:
         }
         left = InputFormDeriver(concepts=concepts).derive_concept(name="left", concept_ref="demo.Left")
 
-        assert left.fields is not None
-        right = left.fields[0]
-        assert right.kind == FieldKind.OBJECT
-        assert right.fields is not None
+        right = as_object(as_object(left).fields[0])
         assert right.fields[0].kind == FieldKind.UNKNOWN
         assert right.fields[0].concept_ref == "demo.Left"
 

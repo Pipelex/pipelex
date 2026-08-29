@@ -53,7 +53,7 @@ pipelex build inputs method <NAME> [OPTIONS]
 
 **Arguments:**
 
-- `NAME` - Name of the installed method
+- `NAME` - Name of the installed method, a method address (`github.com/owner/repo[/name][@tag]`), or a GitHub URL — see [Run a Method by Address](../run-by-address.md)
 
 **Options:**
 

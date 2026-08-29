@@ -1,49 +1,32 @@
-"""Unit-pin the input-form wire models: per-kind slot validators and null-free serialization.
+"""Characterize the wire this engine emits through the standard's input-form models.
 
-The report's valid arm is dumped WITHOUT `exclude_none` on the HTTP surface, so the field model
-owns its own wire shape: inapplicable slots are dropped at serialization (never emitted as JSON
-null), applicable falsy values (`required: false`, `gating: false`, `integer: false`,
-`item_count` on a fixed list) are kept, and the `datetime` wire slot serializes under its spec
-name regardless of the Python attribute that carries it.
+The descriptor's shapes are declared by `mthds.protocol.input_form` and re-exported from
+`pipelex.pipeline.input_form`, so the per-kind slot rules and the closed shapes are the standard's
+own and are pinned in the package that declares them. What this module pins is the engine's side of
+the bargain: the report's valid arm is dumped WITHOUT `exclude_none` on the HTTP surface, so a node
+must render its own wire — inapplicable slots absent rather than JSON null, applicable falsy values
+(`required: false`, `gating: false`, `integer: false`, `item_count` on a fixed list) kept, the
+`datetime` slot under its spec name, and the serializer recursing through a descriptor.
 """
 
 from __future__ import annotations
 
-import pytest
-from pydantic import ValidationError
-
 from pipelex.core.pipes.variable_multiplicity import PresenceMarker
-from pipelex.pipeline.input_form import FieldKind, InputFormField, PipeInputFormDescriptor
+from pipelex.pipeline.input_form import (
+    DateField,
+    EnumField,
+    InputFormField,
+    ListField,
+    NumberField,
+    ObjectItem,
+    PipeInputFormDescriptor,
+    ProseField,
+    TextField,
+)
 
 
 def _prose_field(name: str = "brief") -> InputFormField:
-    return InputFormField(kind=FieldKind.PROSE, name=name, concept_ref="demo.Brief", required=True, presence=PresenceMarker.PLAIN, gating=True)
-
-
-class TestInputFormFieldValidators:
-    def test_enum_requires_choices(self) -> None:
-        with pytest.raises(ValidationError):
-            InputFormField(kind=FieldKind.ENUM, name="tone", required=False)
-
-    def test_object_requires_fields(self) -> None:
-        with pytest.raises(ValidationError):
-            InputFormField(kind=FieldKind.OBJECT, name="widget", required=True)
-
-    def test_list_requires_item(self) -> None:
-        with pytest.raises(ValidationError):
-            InputFormField(kind=FieldKind.LIST, name="notes", required=True)
-
-    def test_number_requires_integer_flag(self) -> None:
-        with pytest.raises(ValidationError):
-            InputFormField(kind=FieldKind.NUMBER, name="count", required=True)
-
-    def test_date_requires_datetime_flag(self) -> None:
-        with pytest.raises(ValidationError):
-            InputFormField(kind=FieldKind.DATE, name="released_on", required=True)
-
-    def test_scalar_kinds_accept_minimal_slots(self) -> None:
-        field = InputFormField(kind=FieldKind.TEXT, name="title", required=True)
-        assert field.kind == FieldKind.TEXT
+    return ProseField(name=name, concept_ref="demo.Brief", required=True, presence=PresenceMarker.PLAIN, gating=True)
 
 
 class TestInputFormSerialization:
@@ -55,13 +38,12 @@ class TestInputFormSerialization:
         assert dumped["required"] is True
         assert dumped["presence"] == "plain"
         assert dumped["gating"] is True
-        for absent in ("title", "refines", "description", "default_value", "examples", "hints", "fields", "item", "item_count", "choices"):
+        for absent in ("title", "refines", "description", "default_value", "examples", "hints", "min_length", "max_length", "pattern", "format"):
             assert absent not in dumped, f"Inapplicable slot {absent!r} must be absent, not null"
         assert None not in dumped.values()
 
     def test_applicable_falsy_values_are_kept(self) -> None:
-        field = InputFormField(
-            kind=FieldKind.NUMBER,
+        field = NumberField(
             name="count",
             concept_ref="demo.Count",
             required=False,
@@ -77,32 +59,28 @@ class TestInputFormSerialization:
         assert dumped["exclusive_minimum"] == 0
 
     def test_datetime_slot_serializes_under_its_wire_name(self) -> None:
-        field = InputFormField(kind=FieldKind.DATE, name="released_on", required=True, datetime_flag=False)
+        field = DateField(name="released_on", required=True, datetime=False)
         dumped = field.model_dump(mode="json")
         assert dumped["datetime"] is False
-        assert "datetime_flag" not in dumped
 
     def test_single_member_choices_stay_a_list(self) -> None:
-        field = InputFormField(kind=FieldKind.ENUM, name="only", required=False, choices=["single"])
+        field = EnumField(name="only", required=False, choices=["single"])
         assert field.model_dump(mode="json")["choices"] == ["single"]
 
     def test_descriptor_dump_recurses_the_serializer(self) -> None:
         descriptor = PipeInputFormDescriptor(
             fields=[
-                InputFormField(
-                    kind=FieldKind.LIST,
+                ListField(
                     name="gadgets",
                     concept_ref="demo.Gadget",
                     required=True,
                     presence=PresenceMarker.PLAIN,
                     gating=True,
                     item_count=2,
-                    item=InputFormField(
-                        kind=FieldKind.OBJECT,
-                        name="gadgets",
+                    item=ObjectItem(
                         concept_ref="demo.Gadget",
                         required=True,
-                        fields=[InputFormField(kind=FieldKind.TEXT, name="label", required=True)],
+                        fields=[TextField(name="label", required=True)],
                     ),
                 )
             ]
@@ -113,5 +91,6 @@ class TestInputFormSerialization:
         item_node = list_node["item"]
         assert "presence" not in item_node, "Nested fields never carry pipe-slot facts"
         assert "gating" not in item_node
+        assert "name" not in item_node, "A list's item has no authored name and carries no name member"
         nested = item_node["fields"][0]
         assert nested == {"kind": "text", "name": "label", "required": True}

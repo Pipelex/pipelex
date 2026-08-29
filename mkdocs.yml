@@ -281,6 +281,7 @@ plugins:
         - tools/cli/validate.md: "CLI Validate"
         - tools/cli/fix.md: "CLI Fix"
         - tools/cli/run.md: "CLI Run"
+        - tools/cli/run-by-address.md: "CLI Run by Address"
         - tools/cli/show.md: "CLI Show"
         - tools/cli/pkg.md: "CLI Pkg"
         - tools/cli/build/index.md: "CLI Build Overview"
@@ -292,6 +293,7 @@ plugins:
         - configuration/index.md: "Configuration Overview"
         - configuration/config-pipeline-validation/dry-run-config.md: "Dry Run Configuration"
         - configuration/config-practical/logging-config.md: "Logging Configuration"
+        - configuration/config-practical/methods-config.md: "Methods Configuration"
         - configuration/config-practical/pipe-run-config.md: "Pipe Run Configuration"
         - configuration/config-practical/reporting-config.md: "Reporting Configuration"
         - configuration/config-practical/telemetry-config.md: "Telemetry Configuration"
@@ -518,6 +520,7 @@ nav:
       - Validate: tools/cli/validate.md
       - Fix: tools/cli/fix.md
       - Run: tools/cli/run.md
+      - Run by Address: tools/cli/run-by-address.md
       - Show: tools/cli/show.md
       - Pkg: tools/cli/pkg.md
       - Build:
@@ -545,6 +548,7 @@ nav:
         - Dry Run: configuration/config-pipeline-validation/dry-run-config.md
       - Practical Configuration:
         - Logging: configuration/config-practical/logging-config.md
+        - Methods: configuration/config-practical/methods-config.md
         - Pipe Run: configuration/config-practical/pipe-run-config.md
         - Reporting: configuration/config-practical/reporting-config.md
         - Telemetry: configuration/config-practical/telemetry-config.md

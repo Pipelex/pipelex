@@ -11,7 +11,15 @@ from pipelex import log
 from pipelex.cogt.content_generation.dry_run_factory import MockFormat
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import validate_concept_ref_or_code
-from pipelex.core.pipes.variable_multiplicity import MULTIPLICITY_PATTERN, PresenceMarker, parse_concept_with_multiplicity
+from pipelex.core.pipes.variable_multiplicity import (
+    MULTIPLICITY_PATTERN,
+    is_force_presence,
+    is_multiple_multiplicity,
+    multiplicity_from_bracket_content,
+    parse_concept_with_multiplicity,
+    presence_from_symbol,
+    presence_symbol,
+)
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint, PipeCategory, PipeType, valid_pipe_type_tags
 from pipelex.tools.misc.pretty import PrettyPrintable
@@ -101,7 +109,7 @@ class PipeSpec(StructuredContent):
         # Extract concept without multiplicity/presence markers for validation
         parse_result = parse_concept_with_multiplicity(output)
         # Mirror the blueprint grammar rules (D1, D4): `!` never on outputs, `?` never with multiplicity
-        if parse_result.presence.is_force:
+        if is_force_presence(presence=parse_result.presence):
             msg = (
                 f"Invalid output: '{output}'. The force marker '!' is not allowed on outputs — "
                 f"it is a use-site assertion for inputs. To declare that this pipe may produce no value, use '?'."
@@ -144,13 +152,19 @@ class PipeSpec(StructuredContent):
                 )
                 raise ValueError(msg)
 
-            # Mirror the blueprint grammar rule (D1, D4): presence markers never combine with multiplicity
             bracket_content = match.group(2)
-            presence = PresenceMarker.from_symbol(match.group(3))
-            if not presence.is_plain and bracket_content is not None:
+            if bracket_content and int(bracket_content) <= 0:
+                msg = f"Invalid input '{input_name}': '{concept_spec}'. Multiplicity must be at least 1."
+                raise ValueError(msg)
+
+            # Mirror the blueprint grammar rule (D1, D4): presence markers never combine with
+            # multiplicity — and `[1]` is the single form, not multiplicity, so it takes a marker.
+            presence = presence_from_symbol(symbol=match.group(3))
+            multiplicity = multiplicity_from_bracket_content(bracket_content=bracket_content)
+            if not presence.is_plain and is_multiple_multiplicity(multiplicity=multiplicity):
                 msg = (
                     f"Invalid input '{input_name}': '{concept_spec}'. "
-                    f"The presence marker '{presence.symbol}' cannot be combined with multiplicity: "
+                    f"The presence marker '{presence_symbol(presence=presence)}' cannot be combined with multiplicity: "
                     f"a plural slot is never absent — when nothing is found, it is the empty list."
                 )
                 raise ValueError(msg)

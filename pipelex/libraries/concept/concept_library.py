@@ -133,7 +133,9 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         except (ClassRegistryNotFoundError, ClassRegistryInheritanceError) as exc:
             msg = (
                 f"Concept '{concept.concept_ref}' declares structure class '{concept.structure_class_name}', "
-                f"which is not a registered subclass of StuffContent: {exc}"
+                f"which is not a registered subclass of StuffContent: {exc}. "
+                f"The class may live in a Python module that was not part of the request — include that module, "
+                f"or express the type as MTHDS concepts."
             )
             raise ConceptStructureClassNotFoundError(msg) from exc
         return cast("type[StuffContent]", structure_class)

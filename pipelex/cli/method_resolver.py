@@ -6,8 +6,6 @@ import tempfile
 from pathlib import Path
 
 import typer
-from mthds.package.exceptions import VCSFetchError
-from mthds.package.vcs_resolver import clone_default_branch
 
 from pipelex.cli.installed_methods import (
     DuplicateMethodNameError,
@@ -16,6 +14,14 @@ from pipelex.cli.installed_methods import (
     discover_installed_methods,
     discover_method_at,
     find_method_by_name,
+)
+from pipelex.methods.exceptions import MethodRefError
+from pipelex.methods.fetching import fetch_method_package
+from pipelex.methods.method_ref import looks_like_method_ref, parse_method_ref
+from pipelex.methods.structures_check import (
+    STRUCTURES_REFUSAL_RULE,
+    describe_structured_content_violations,
+    scan_structured_content_classes,
 )
 
 
@@ -60,70 +66,6 @@ def _find_method_by_exported_pipe(pipe_code: str) -> InstalledMethod:
     return matches[0]
 
 
-def is_github_url(target: str) -> bool:
-    """Return True if *target* looks like a GitHub URL."""
-    return target.startswith(("https://github.com/", "http://github.com/"))
-
-
-def parse_github_url(url: str) -> tuple[str, str | None]:
-    """Extract an HTTPS clone URL and optional sub-path from a GitHub URL.
-
-    Handles plain repo URLs (``https://github.com/org/repo``), repo URLs
-    with a trailing ``.git``, and subdirectory URLs such as
-    ``https://github.com/org/repo/tree/branch/path/to/dir`` or the shorthand
-    ``https://github.com/org/repo/path/to/dir`` that GitHub auto-resolves.
-
-    Args:
-        url: A GitHub URL pointing to a repository or a subdirectory within it.
-
-    Returns:
-        A tuple of (clone_url, sub_path).  *sub_path* is ``None`` when the URL
-        points to the repository root.
-    """
-    clean = url.rstrip("/")
-
-    # Strip .git suffix before parsing
-    if clean.endswith(".git"):
-        return (clean, None)
-
-    # Split off the scheme + github.com prefix
-    # URL looks like https://github.com/owner/repo[/rest...]
-    for prefix in ("https://github.com/", "http://github.com/"):
-        if clean.startswith(prefix):
-            remainder = clean[len(prefix) :]
-            break
-    else:
-        # Should not happen since callers check is_github_url first
-        clone_url = f"{clean}.git"
-        return (clone_url, None)
-
-    parts = remainder.split("/")
-    if len(parts) < 2:
-        clone_url = f"{clean}.git"
-        return (clone_url, None)
-
-    owner = parts[0]
-    repo = parts[1]
-    scheme = "https" if clean.startswith("https") else "http"
-    clone_url = f"{scheme}://github.com/{owner}/{repo}.git"
-
-    # No extra path segments → repo root
-    if len(parts) <= 2:
-        return (clone_url, None)
-
-    # Handle /tree/<branch>/path/... or /blob/<branch>/path/...
-    rest = parts[2:]
-    if rest[0] in {"tree", "blob"} and len(rest) >= 2:
-        # Skip the segment type and branch name
-        sub_parts = rest[2:]
-        sub_path = "/".join(sub_parts) if sub_parts else None
-    else:
-        # Shorthand: https://github.com/owner/repo/path/to/dir
-        sub_path = "/".join(rest)
-
-    return (clone_url, sub_path or None)
-
-
 def is_local_path(target: str) -> bool:
     """Return True if *target* looks like a filesystem path (absolute or relative with separators)."""
     if target.startswith(("https://", "http://")):
@@ -165,63 +107,61 @@ def resolve_method_from_path(method_path: str) -> InstalledMethod:
     return method
 
 
-def resolve_method_from_url(url: str) -> InstalledMethod:
-    """Clone a remote repository and discover the method package inside it.
+def resolve_method_from_ref(ref_str: str) -> InstalledMethod:
+    """Fetch a method by reference (`<address>[@<tag>]` or a GitHub URL) and discover it.
 
-    Supports both repo-root URLs (``https://github.com/org/repo``) and
-    subdirectory URLs (``https://github.com/org/repo/tree/main/path/to/method``
-    or the shorthand ``https://github.com/org/repo/path/to/method``).
+    Clones the repository (at the tag when one is named), locates the package inside the
+    clone by manifest identity, prints the fetch provenance (address, tag, commit SHA),
+    and warns — hosted parity — when the package declares in-process Python structure
+    classes that hosted execution would refuse.
 
-    Uses a temporary directory that persists for the duration of the CLI
-    process, so the cloned files remain available for subsequent steps.
+    Uses a temporary directory that persists for the duration of the CLI process, so the
+    fetched files remain available for subsequent steps. Failures raise the typed
+    ``MethodRefError`` family — presentation is the caller's concern: the human CLI
+    renders them through ``resolve_method_target``, the agent CLI shapes them into its
+    structured error envelope.
 
     Args:
-        url: A GitHub URL pointing to a repository or subdirectory
-            containing a method package.
+        ref_str: The method reference string.
 
     Returns:
-        The discovered ``InstalledMethod``.
+        The discovered ``InstalledMethod``, carrying the fetch provenance.
 
     Raises:
-        typer.Exit: On clone failure or if no method package is found.
+        MethodRefError: On a parse, fetch, location, bounds, or refusal failure
+            (the concrete subclass names which).
     """
-    clone_url, sub_path = parse_github_url(url)
+    method_ref = parse_method_ref(ref_str)
+
     dest = Path(tempfile.mkdtemp(prefix="mthds_remote_"))
     atexit.register(shutil.rmtree, dest, True)
 
-    try:
-        clone_default_branch(clone_url, dest)
-    except VCSFetchError as exc:
+    fetched = fetch_method_package(ref=method_ref, dest_dir=dest)
+
+    typer.secho(
+        f"Fetched {fetched.full_address}{f'@{method_ref.tag}' if method_ref.tag else ''} at commit {fetched.commit_sha}",
+        fg=typer.colors.GREEN,
+        err=True,
+    )
+
+    violations = scan_structured_content_classes(package_dir=fetched.package_dir)
+    if violations:
+        details = describe_structured_content_violations(violations=violations)
         typer.secho(
-            f"Failed to clone repository from '{url}': {exc.message}",
-            fg=typer.colors.RED,
+            f"Warning: this method declares Python structure classes ({details}). It runs locally, but {STRUCTURES_REFUSAL_RULE} — "
+            f"hosted execution would refuse it. Express the types as MTHDS concepts to keep the method hosted-runnable.",
+            fg=typer.colors.YELLOW,
             err=True,
         )
-        raise typer.Exit(1) from exc
 
-    # Determine the method directory (repo root or a sub-path within it)
-    method_dir = dest / sub_path if sub_path else dest
-
-    if not method_dir.is_dir():
-        typer.secho(
-            f"Path '{sub_path}' not found in the cloned repository from '{url}'.",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    # Discover the method package
-    seen_dirs: set[Path] = set()
-    method = discover_method_at(method_dir, seen_dirs=seen_dirs)
-    if method is None:
-        typer.secho(
-            f"No method package (METHODS.toml) found at '{url}'.",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    return method
+    name = fetched.manifest.name or fetched.package_dir.name
+    return InstalledMethod(
+        name=name,
+        path=fetched.package_dir,
+        manifest=fetched.manifest,
+        mthds_files=sorted(fetched.package_dir.rglob("*.mthds")),
+        provenance=fetched.provenance,
+    )
 
 
 def resolve_method_target(
@@ -229,28 +169,42 @@ def resolve_method_target(
     *,
     pipe_override: str | None = None,
     library_dirs: list[str] | None = None,
+    raise_ref_errors: bool = False,
 ) -> tuple[str, list[str], InstalledMethod]:
-    """Resolve a method name or GitHub URL to (pipe_code, library_dirs, method).
+    """Resolve a method name, address, URL, or local path to (pipe_code, library_dirs, method).
 
-    Finds the installed method by name (or clones from a GitHub URL),
-    determines the pipe to run (using pipe_override or main_pipe), and
-    returns the library directories needed to load the method's bundles
+    Finds the installed method by name (or fetches it by method reference — a bare
+    `github.com/...` address, optionally `@<tag>`-pinned, or a full GitHub URL — or
+    discovers it at a local path), determines the pipe to run (using pipe_override or
+    main_pipe), and returns the library directories needed to load the method's bundles
     along with the method itself.
 
     Args:
-        method_name: The installed method name or GitHub URL to resolve.
+        method_name: The installed method name, method reference, or local path to resolve.
         pipe_override: Optional pipe code override (takes precedence over main_pipe).
         library_dirs: Additional directories to search for methods.
+        raise_ref_errors: When True, a method-reference failure propagates as its typed
+            ``MethodRefError`` instead of being rendered and turned into ``typer.Exit`` —
+            the agent CLI commands pass True so their structured error envelope (not
+            plain red text) reports the failure.
 
     Returns:
         A tuple of (pipe_code, library_dirs, installed_method) for execution.
 
     Raises:
         typer.Exit: On resolution errors with user-friendly messages.
+        MethodRefError: On a method-reference failure, when ``raise_ref_errors`` is True.
     """
     method: InstalledMethod
-    if is_github_url(method_name):
-        method = resolve_method_from_url(method_name)
+    if looks_like_method_ref(method_name):
+        if raise_ref_errors:
+            method = resolve_method_from_ref(method_name)
+        else:
+            try:
+                method = resolve_method_from_ref(method_name)
+            except MethodRefError as exc:
+                typer.secho(str(exc), fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from exc
     elif is_local_path(method_name):
         method = resolve_method_from_path(method_name)
     else:
@@ -289,6 +243,25 @@ def resolve_method_target(
     library_dirs = [str(method.path)]
 
     return pipe_code, library_dirs, method
+
+
+def method_output_base_dir(*, method: InstalledMethod) -> Path:
+    """Base directory anchoring a method target's default output paths.
+
+    An installed or local-path method anchors its outputs in its own directory. A fetched
+    method's directory is an ephemeral clone deleted at process exit, so anchoring outputs
+    there would silently lose them — a fetched method anchors in the caller's current
+    working directory instead, where a run's results survive the process.
+
+    Args:
+        method: The resolved method target.
+
+    Returns:
+        The directory default output paths should be built under.
+    """
+    if method.provenance is None:
+        return method.path
+    return Path.cwd()
 
 
 def resolve_pipe_from_exports(

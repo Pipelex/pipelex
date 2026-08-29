@@ -88,6 +88,47 @@ _CONCEPT_DESCRIPTION_ONLY = """
 description = "A description-only concept (implicitly text-shaped)"
 """
 
+# A branch whose declared output is plural but whose step carries a count of one: the resolved
+# result is a single `PvAlt`, which the `tone_result` field (a `PvTone`) cannot hold. Reading the
+# declaration alone skipped this check and let the mismatch reach `combine_stuffs` at run time.
+_ONE_COUNT_PLURAL_BRANCH = """
+[concept.PvTone]
+description = "A tone reading"
+
+[concept.PvTone.structure]
+label = { type = "text", description = "The tone label", required = true }
+
+[concept.PvAlt]
+description = "Something a PvTone field cannot hold"
+
+[concept.PvAlt.structure]
+other = { type = "text", description = "An unrelated field", required = true }
+
+[concept.PvComboTyped]
+description = "Combined results whose fields are concept-typed"
+
+[concept.PvComboTyped.structure]
+tone_result   = { type = "concept", concept_ref = "PvTone", description = "Tone", required = true }
+length_result = { type = "text", description = "Length", required = true }
+
+[pipe.pv_branch_plural_alt]
+type = "PipeLLM"
+description = "Branch declaring a plural output"
+inputs = { item = "PvItem" }
+output = "PvAlt[]"
+prompt = "Describe $item"
+
+[pipe.pv_parallel_one_count]
+type = "PipeParallel"
+description = "Parallel whose plural branch carries a count of one"
+inputs = { item = "PvItem" }
+output = "PvComboTyped"
+branches = [
+  { pipe = "pv_branch_plural_alt", result = "tone_result", nb_output = 1 },
+  { pipe = "pv_branch_length", result = "length_result" },
+]
+"""
+
 
 def _bundle(*, output: str, extra_concepts: str = "") -> str:
     return _BUNDLE_HEADER + extra_concepts + _PARALLEL_TEMPLATE.format(output=output)
@@ -136,3 +177,14 @@ class TestPipeParallelOutputValidation:
         with pytest.raises(PipeValidationError) as exc_info:
             acquire_library(library_id=f"pv_reject_{test_id}", mthds_contents=[mthds_content])
         assert expected_fragment in str(exc_info.value)
+
+    def test_a_one_count_plural_branch_is_type_checked(self):
+        """A plural branch with `nb_output = 1` resolves to the single form, so its type IS checked.
+
+        Plurality is the run path's answer (declaration + step override). Skipping on the
+        declaration alone let an incompatible singular result pass `/validate` and fail later in
+        `StuffFactory.combine_stuffs`.
+        """
+        with pytest.raises(PipeValidationError) as exc_info:
+            acquire_library(library_id="pv_reject_one_count_plural_branch", mthds_contents=[_BUNDLE_HEADER + _ONE_COUNT_PLURAL_BRANCH])
+        assert "tone_result" in str(exc_info.value)

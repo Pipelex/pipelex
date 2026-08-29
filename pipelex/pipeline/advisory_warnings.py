@@ -34,7 +34,7 @@ from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs
 from pipelex.pipeline.controller_taint import ControllerTaintAnalysis, collect_controller_taint_analyses
 from pipelex.pipeline.hint_warnings import build_hint_warnings
-from pipelex.pipeline.input_form import PipeInputFormDescriptor, build_input_form, qualify_current_library_crate
+from pipelex.pipeline.input_form import InputForm, build_input_form, qualify_current_library_crate
 from pipelex.pipeline.optionality_warnings import build_optionality_warnings
 from pipelex.pipeline.vacuous_presence_warnings import build_vacuous_presence_warnings
 
@@ -42,7 +42,7 @@ from pipelex.pipeline.vacuous_presence_warnings import build_vacuous_presence_wa
 def build_advisory_warnings(
     *,
     taint_analyses: Sequence[ControllerTaintAnalysis],
-    input_form: dict[str, PipeInputFormDescriptor],
+    input_form: InputForm,
     entry_pipe_refs: Iterable[str],
     qualified_crate: QualifiedCrateContent,
 ) -> list[ValidationErrorItem]:
@@ -98,5 +98,14 @@ def collect_current_library_entry_pipe_refs() -> list[str]:
     declared `main_pipe`s come off the blueprints the library manager retained on the way in.
     Returns nothing for a library loaded straight from a transported crate, which accumulates no
     blueprints — the same silence as a batch that declares no `main_pipe`.
+
+    A dependency package's own `main_pipe` is deliberately NOT an entry ref here. Only the bundles
+    the author is validating are accumulated onto the library; a dependency's blueprints load into
+    an isolated child library instead, so its `main_pipe` never reaches this list. That is the
+    scoping the entry-pipe lints want on both counts: the remedies they state (mark the input
+    optional, give the concept a required field) are edits to a package the author does not own,
+    and a dependency's concepts never enter this library's crate anyway — every slot of a
+    dependency pipe derives an `unknown` node, which those lints skip. Including the refs would
+    add findings nobody can act on, or no findings at all.
     """
     return collect_entry_pipe_refs(get_library_manager().get_accumulated_blueprints(get_current_library()))

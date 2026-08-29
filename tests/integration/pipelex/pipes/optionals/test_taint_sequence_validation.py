@@ -136,6 +136,41 @@ class TestSequenceTaintValidation:
         assert "source" in str(error)
         assert "?" in str(error)
 
+    def test_one_count_step_result_keeps_the_taint(self, load_empty_library: Callable[[], str]):
+        """`nb_output = 1` is the single form: the step's result is NOT plural, so the taint
+        must reach the boundary exactly as it does with no count at all.
+        """
+        load_empty_library()
+        _register_step_pipes()
+        sequence = _build_sequence(
+            output_ref="Text",
+            inputs={"source": "Text?"},
+            steps=[
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_step_a", result="a_out"),
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_step_b", result="b_out", nb_output=1),
+            ],
+        )
+
+        with pytest.raises(PipeValidationError) as exc_info:
+            sequence.validate_with_libraries()
+        error = exc_info.value
+        assert error.error_type == PipeValidationErrorType.OPTIONAL_NOT_HANDLED
+        assert error.variable_names == ["source"]
+
+    def test_plural_count_step_result_absorbs_the_taint(self, load_empty_library: Callable[[], str]):
+        """A genuine list result (`nb_output = 2`) is never tainted — its "nothing" is the empty list."""
+        load_empty_library()
+        _register_step_pipes()
+        sequence = _build_sequence(
+            output_ref="Text[2]",
+            inputs={"source": "Text?"},
+            steps=[
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_step_a", result="a_out"),
+                SubPipeBlueprint(pipe="test_optionals_taint_seq.taint_step_b", result="b_out", nb_output=2),
+            ],
+        )
+        sequence.validate_with_libraries()
+
     def test_optional_sequence_output_accepts_the_taint(self, load_empty_library: Callable[[], str]):
         load_empty_library()
         _register_step_pipes()

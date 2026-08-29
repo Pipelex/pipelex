@@ -1,6 +1,6 @@
 [project]
 name = "pipelex"
-version = "0.52.0"
+version = "0.55.0"
 description = "Execute composable AI methods declared in the MTHDS open standard"
 authors = [{ name = "Evotis S.A.S.", email = "oss@pipelex.com" }]
 maintainers = [{ name = "Pipelex staff", email = "oss@pipelex.com" }]
@@ -31,7 +31,7 @@ dependencies = [
   "json2html>=1.3.0",
   "kajson==0.7.0",
   "markdown>=3.6",
-  "mthds>=0.8.2",
+  "mthds==0.11.1",
   "networkx>=3.4.2",
   "openai>=2.0.0",
   "opentelemetry-api",
@@ -118,7 +118,7 @@ dev = [
   "moto[dynamodb,s3]>=5.0.0",
   "mypy==1.19.1",
   "pipelex-tools>=0.7.2",
-  "pyright==1.1.410",
+  "pyright==1.1.411",
   "pylint==4.0.4",
   "pytest>=9.0.3",
   "pytest-asyncio>=0.24.0",

@@ -17,8 +17,9 @@ from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core
 from pipelex.cli.agent_cli.commands.run._run_core_api import run_pipeline_core_api
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
 from pipelex.cli.commands.run._inputs_file_loader import resolve_inputs_arg_against_dir
-from pipelex.cli.method_resolver import resolve_method_target
+from pipelex.cli.method_resolver import method_output_base_dir, resolve_method_target
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
+from pipelex.methods.exceptions import MethodRefError
 from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
@@ -29,7 +30,7 @@ def run_method_cmd(
     ctx: typer.Context,
     name: Annotated[
         str,
-        typer.Argument(help="Name of the installed method"),
+        typer.Argument(help="Installed method name, method address (github.com/owner/repo[/name][@tag]), or GitHub URL"),
     ],
     pipe: Annotated[
         str | None,
@@ -89,11 +90,24 @@ def run_method_cmd(
     if mock_inputs and not dry_run:
         agent_error("--mock-inputs requires --dry-run", error_type="ArgumentError")
 
-    pipe_code, method_library_dirs, method = resolve_method_target(
-        method_name=name,
-        pipe_override=pipe,
-        library_dirs=library_dir,
-    )
+    try:
+        pipe_code, method_library_dirs, method = resolve_method_target(
+            method_name=name,
+            pipe_override=pipe,
+            library_dirs=library_dir,
+            raise_ref_errors=True,
+        )
+    except MethodRefError as exc:
+        # Method-reference failure (parse, fetch, location, bounds, refusal): report it through
+        # the structured error envelope instead of the human CLI's plain red text.
+        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
+
+    # A fetched method's package directory is an ephemeral clone deleted at process exit —
+    # anchor run outputs (output JSON, graph files) in a durable location instead.
+    output_dir_override: Path | None = None
+    if method.provenance is not None:
+        output_dir_override = method_output_base_dir(method=method) / "results"
+
     bundle_path: str | None = None
     mthds_content: str | None = None
 
@@ -172,6 +186,7 @@ def run_method_cmd(
                         costs=costs,
                         with_memory=with_memory,
                         inputs_base_dir=parsed_inputs.inputs_base_dir,
+                        output_dir_override=output_dir_override,
                     )
                 )
                 agent_success_formatted(

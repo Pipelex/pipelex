@@ -10,7 +10,21 @@ import pytest
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.core.pipes.variable_multiplicity import PresenceMarker
-from pipelex.pipeline.input_form import FieldKind, InputFormField, PipeInputFormDescriptor
+from pipelex.pipeline.input_form import (
+    BooleanField,
+    DateField,
+    DocumentField,
+    EnumField,
+    ImageField,
+    InputFormField,
+    ListField,
+    NumberField,
+    ObjectField,
+    PipeInputFormDescriptor,
+    ProseField,
+    TextField,
+    UnknownField,
+)
 from pipelex.pipeline.vacuous_presence_warnings import build_vacuous_presence_warnings
 
 ENTRY_PIPE_REF = "demo.run"
@@ -19,7 +33,7 @@ OPTIONS_CONCEPT_REF = "demo.RunOptions"
 
 def _nested(*, name: str, required: bool) -> InputFormField:
     """A structure field inside an object node (no slot facts: no presence, no gating)."""
-    return InputFormField(kind=FieldKind.TEXT, name=name, required=required)
+    return TextField(name=name, required=required)
 
 
 def _object_slot(
@@ -32,8 +46,7 @@ def _object_slot(
     concept_ref: str | None = OPTIONS_CONCEPT_REF,
 ) -> InputFormField:
     """A top-level object slot, defaulting to the all-optional shape the lint fires on."""
-    return InputFormField(
-        kind=FieldKind.OBJECT,
+    return ObjectField(
         name=name,
         concept_ref=concept_ref,
         required=required,
@@ -45,8 +58,7 @@ def _object_slot(
 
 def _object_item() -> InputFormField:
     """The all-optional object as a list's `item` node: a concept node, so no slot facts."""
-    return InputFormField(
-        kind=FieldKind.OBJECT,
+    return ObjectField(
         name="opts",
         concept_ref=OPTIONS_CONCEPT_REF,
         required=True,
@@ -123,8 +135,7 @@ class TestVacuousPresenceWarnings:
 
     def test_variable_multiplicity_list_is_silent(self):
         """`Concept[]` never gates by the descriptor's own rule — `[]` is its legitimate value."""
-        slot = InputFormField(
-            kind=FieldKind.LIST,
+        slot = ListField(
             name="opts",
             concept_ref=OPTIONS_CONCEPT_REF,
             required=True,
@@ -136,8 +147,7 @@ class TestVacuousPresenceWarnings:
 
     def test_fixed_count_list_is_silent(self):
         """`Concept[N]` gates, but the vacuity question is per item — deferred (design §7)."""
-        slot = InputFormField(
-            kind=FieldKind.LIST,
+        slot = ListField(
             name="opts",
             concept_ref=OPTIONS_CONCEPT_REF,
             required=True,
@@ -151,15 +161,15 @@ class TestVacuousPresenceWarnings:
     @pytest.mark.parametrize(
         "slot",
         [
-            InputFormField(kind=FieldKind.TEXT, name="opts", required=True, presence=PresenceMarker.PLAIN, gating=True),
-            InputFormField(kind=FieldKind.PROSE, name="opts", required=True, presence=PresenceMarker.PLAIN, gating=True),
-            InputFormField(kind=FieldKind.NUMBER, name="opts", required=True, presence=PresenceMarker.PLAIN, gating=True, integer=False),
-            InputFormField(kind=FieldKind.BOOLEAN, name="opts", required=True, presence=PresenceMarker.PLAIN, gating=True),
-            InputFormField(kind=FieldKind.DATE, name="opts", required=True, presence=PresenceMarker.PLAIN, gating=True, datetime_flag=False),
-            InputFormField(kind=FieldKind.ENUM, name="opts", required=True, presence=PresenceMarker.PLAIN, gating=True, choices=["a", "b"]),
-            InputFormField(kind=FieldKind.DOCUMENT, name="opts", required=True, presence=PresenceMarker.PLAIN, gating=True),
-            InputFormField(kind=FieldKind.IMAGE, name="opts", required=True, presence=PresenceMarker.PLAIN, gating=True),
-            InputFormField(kind=FieldKind.UNKNOWN, name="opts", required=True, presence=PresenceMarker.PLAIN, gating=True),
+            TextField(name="opts", required=True, presence=PresenceMarker.PLAIN, gating=True),
+            ProseField(name="opts", required=True, presence=PresenceMarker.PLAIN, gating=True),
+            NumberField(name="opts", required=True, presence=PresenceMarker.PLAIN, gating=True, integer=False),
+            BooleanField(name="opts", required=True, presence=PresenceMarker.PLAIN, gating=True),
+            DateField(name="opts", required=True, presence=PresenceMarker.PLAIN, gating=True, datetime=False),
+            EnumField(name="opts", required=True, presence=PresenceMarker.PLAIN, gating=True, choices=["a", "b"]),
+            DocumentField(name="opts", required=True, presence=PresenceMarker.PLAIN, gating=True),
+            ImageField(name="opts", required=True, presence=PresenceMarker.PLAIN, gating=True),
+            UnknownField(name="opts", required=True, presence=PresenceMarker.PLAIN, gating=True),
         ],
         ids=["text", "prose", "number", "boolean", "date", "enum", "document", "image", "unknown"],
     )

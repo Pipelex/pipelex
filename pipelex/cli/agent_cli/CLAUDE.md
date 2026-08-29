@@ -45,7 +45,7 @@ commands/
     app.py                     # run_app Typer, subcommand registration
     pipe_cmd.py                # run pipe — execute by pipe code
     bundle_cmd.py              # run bundle — execute from bundle file/directory
-    method_cmd.py              # run method — execute installed method
+    method_cmd.py              # run method — execute method (installed name, address/URL, or path)
     _run_core.py               # Shared async run logic (local runner)
     _run_core_api.py           # Shared async run logic (API runner)
     _output_helpers.py         # Output formatting helpers
@@ -54,7 +54,7 @@ commands/
     app.py                     # validate_app Typer, subcommand registration
     pipe_cmd.py                # validate pipe — validate by code, or --all
     bundle_cmd.py              # validate bundle — validate bundle file/directory (+ --graph)
-    method_cmd.py              # validate method — validate installed method
+    method_cmd.py              # validate method — validate method (installed name, address/URL, or path)
     _validate_core.py          # Shared validation logic
   fix/                         # fix — deterministic in-place bundle fixes
     app.py                     # fix_app Typer, subcommand registration
@@ -63,7 +63,7 @@ commands/
     app.py                     # inputs_app Typer, subcommand registration
     pipe_cmd.py                # inputs pipe — inputs for a pipe by code
     bundle_cmd.py              # inputs bundle — inputs from bundle file/directory
-    method_cmd.py              # inputs method — inputs for installed method
+    method_cmd.py              # inputs method — inputs for method (installed name, address/URL, or path)
     _inputs_core.py            # Shared inputs logic
   codegen/                     # codegen — crate projections + offline drift check
     app.py                     # codegen_app Typer, subcommand registration
@@ -106,5 +106,6 @@ commands/
 - **The `migration` field on a configuration error**: A `PipelexConfigError` carries one when a scan of this machine's configuration directories found something — and only then, so its presence is the test for whether the migration history has anything to say. Whether a command *repairs* it is the separate `would_write` field: true means the configuration is *old*, and the loop is `pipelex-agent migrate --dry-run --format json`, show the user, then `--yes`; false means the block is a diagnosis its `plans` carry and the command would rewrite nothing, so branching on presence alone sends an agent to a run with nothing to do. Its `plans` are the same shape that command emits under its own `plans` key. `error_domain` stays `config`: a domain the hook specification does not know routes to BLOCK, which would stop an agent instead of telling it what to run. See `docs/migration-ledger.md` → "Reporting a stale configuration on a validation error".
 - **Init**: All commands that need Pipelex use `make_pipelex_for_agent_cli(library_dirs)`. It catches init errors and routes them through `agent_error()`.
 - **Async core**: Run and validate are async — commands use `asyncio.run()`.
-- **File convention**: Generated outputs go to `mthds-wip/` with incremental naming (`pipeline_01/`, `pipeline_02/`).
+- **File convention**: Generated outputs go to `mthds-wip/` with incremental naming (`pipeline_01/`, `pipeline_02/`). Exception: `run method` on a fetched target (a method address or GitHub URL) anchors its run outputs in `results/` under the caller's CWD via `run_pipeline_core`'s `output_dir_override` — the fetched clone is an ephemeral temp dir deleted at process exit, so bundle-adjacent outputs would be lost.
+- **Method-reference failures**: the `run`/`validate`/`inputs` method commands call `resolve_method_target(..., raise_ref_errors=True)` and shape the typed `MethodRefError` subclasses into `agent_error(...)` themselves (validate uses `exit_code=2`, its no-verdict convention) — the human CLI's red-text rendering stays in `resolve_method_target`'s default arm.
 - **TOML handling**: Uses `tomlkit` (not `tomllib`) to preserve formatting and inline tables.

@@ -24,6 +24,24 @@ class TestParseConceptWithMultiplicity:
         assert result.concept_ref_or_code == "Text"
         assert result.multiplicity == 5
 
+    def test_fixed_count_of_one_is_the_single_form(self):
+        """`Concept[1]` declares the same slot as `Concept`, so the parser never yields the value 1.
+
+        The count is authored syntax, not a distinct multiplicity: collapsing it here is what makes
+        `1` unrepresentable downstream, so no consumer can frame a `[1]` slot as a one-item list.
+        """
+        result = parse_concept_with_multiplicity("Text[1]")
+        assert result.concept_ref_or_code == "Text"
+        assert result.multiplicity is None
+
+        assert parse_concept_with_multiplicity("domain.Concept[1]").multiplicity is None
+
+    def test_fixed_count_of_one_keeps_its_presence_marker(self):
+        """The count collapses; the marker beside it does not."""
+        result = parse_concept_with_multiplicity("Text[1]?")
+        assert result.multiplicity is None
+        assert result.presence == PresenceMarker.OPTIONAL
+
     def test_valid_domain_qualified_concept(self):
         """Test parsing domain-qualified concepts."""
         result = parse_concept_with_multiplicity("domain.Concept")

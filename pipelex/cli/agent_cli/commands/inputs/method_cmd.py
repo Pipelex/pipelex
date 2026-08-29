@@ -14,6 +14,7 @@ from pipelex.cli.agent_cli.commands.inputs._inputs_core import emit_inputs_resul
 from pipelex.cli.method_resolver import resolve_method_target
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
+from pipelex.methods.exceptions import MethodRefError
 from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
@@ -23,7 +24,7 @@ from pipelex.pipeline.exceptions import ValidateBundleError
 def inputs_method_cmd(
     name: Annotated[
         str,
-        typer.Argument(help="Name of the installed method"),
+        typer.Argument(help="Installed method name, method address (github.com/owner/repo[/name][@tag]), or GitHub URL"),
     ],
     pipe: Annotated[
         str | None,
@@ -54,11 +55,18 @@ def inputs_method_cmd(
         pipelex-agent inputs method my-method --format toml
         pipelex-agent inputs method my-method --explicit
     """
-    pipe_code, method_library_dirs, method = resolve_method_target(
-        method_name=name,
-        pipe_override=pipe,
-        library_dirs=library_dir,
-    )
+    try:
+        pipe_code, method_library_dirs, method = resolve_method_target(
+            method_name=name,
+            pipe_override=pipe,
+            library_dirs=library_dir,
+            raise_ref_errors=True,
+        )
+    except MethodRefError as exc:
+        # Method-reference failure (parse, fetch, location, bounds, refusal): report it through
+        # the structured error envelope instead of the human CLI's plain red text.
+        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
+
     bundle_path: Path | None = None
     if method.mthds_files:
         bundle_path = method.mthds_files[0]

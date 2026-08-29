@@ -101,6 +101,7 @@ When an input is declared multiple (`Tag[]`, or a fixed count `Tag[3]`), provide
 - An **empty** list is legal and produces an empty collection.
 - A fixed count `Tag[3]` validates the number of items — too few or too many is a clear error.
 - Providing a list where the signature declares a **single** value is a clear error (Pipelex won't silently pick one).
+- A count of one is the single form: `Tag[1]` takes the value itself, and a list there — even a one-item list — is the same error as under a bare `Tag`.
 
 See [Understanding Multiplicity](understanding-multiplicity.md) for the full model of single items versus collections.
 

@@ -33,6 +33,7 @@ async def run_pipeline_core(
     costs: bool = True,
     with_memory: bool = False,
     inputs_base_dir: Path | None = None,
+    output_dir_override: Path | None = None,
 ) -> dict[str, Any]:
     """Core logic for running a pipeline and returning JSON-serializable output.
 
@@ -50,6 +51,9 @@ async def run_pipeline_core(
             return compact concept JSON only (False, default).
         inputs_base_dir: Directory bare relative file paths in ``inputs`` resolve against (Smart
             Inputs D3) — the inputs file's parent when file-loaded, else ``None``.
+        output_dir_override: Directory to write run outputs (output JSON, graph files) into,
+            overriding the bundle-adjacent default. The caller passes one when the bundle lives
+            in a directory that will not survive the process — a fetched method's ephemeral clone.
 
     Returns:
         Dictionary with execution results suitable for JSON serialization.
@@ -107,9 +111,13 @@ async def run_pipeline_core(
         compact_result=compact_result,
     )
 
-    # Determine output directory: next to the bundle, or mthds-wip/ fallback
+    # Determine output directory: an explicit override wins (a fetched method's bundle lives in an
+    # ephemeral clone deleted at process exit, so the caller re-anchors outputs somewhere durable);
+    # otherwise next to the bundle, or mthds-wip/ fallback
     output_dir: Path
-    if bundle_uris and not bundle_uris[0].startswith(("http://", "https://")):
+    if output_dir_override is not None:
+        output_dir = output_dir_override
+    elif bundle_uris and not bundle_uris[0].startswith(("http://", "https://")):
         output_dir = Path(bundle_uris[0]).parent
     else:
         output_dir = Path("mthds-wip")

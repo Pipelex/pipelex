@@ -322,6 +322,18 @@ structure_field_ordering = [
 field_ordering = ["type", "description", "inputs", "output"]
 
 ####################################################################################################
+# Methods config
+####################################################################################################
+
+[interpreter.methods]
+# When a bundle references another method by address (github.com/...->domain.pipe) and no installed
+# method matches, fetch the package by address and install it into ~/.mthds/methods/ so the load can
+# proceed. Set to false to forbid network fetches at load time — a miss then raises a diagnostic
+# telling you the address and how to install it manually. The PIPELEX_METHODS_FETCH_ON_MISS
+# environment variable (1/0, true/false) overrides this setting when set.
+fetch_on_miss = true
+
+####################################################################################################
 # Pipe run config
 ####################################################################################################
 

@@ -95,6 +95,43 @@ steps = [
 
 This runtime-level capability exists separately from the current public `mthds package` CLI workflow documented on this page. If you rely on cross-package references, validate them against the specific runtime setup you are using.
 
+### Include by Address: Fetch-on-Miss
+
+The alias can also be a **full package address**, so a bundle can reference a method from a public GitHub repository directly — the same reference grammar as [running a method by address](../tools/cli/run-by-address.md):
+
+```toml
+[pipe.summarize_report]
+type = "PipeSequence"
+description = "Extract a document then summarize it"
+inputs = { doc = "PDF" }
+output = "Summary"
+steps = [
+    { pipe = "github.com/Pipelex/methods/documents->documents.extract_page_contents_and_views", result = "pages" },
+    { pipe = "summarize_pages" },
+]
+```
+
+An address-based reference resolves against the **installed methods** — `~/.mthds/methods/` (global) and `.mthds/methods/` (project-local), matched by the manifest's `address` + `name`, case-insensitively. When no installed method matches, Pipelex **fetches on miss**: it fetches the package by address — honoring an `@<tag>` pin, through the same grammar, bounds, and tags-only rules as a direct fetch — installs it into `~/.mthds/methods/`, records the fetch provenance (address, tag, and the commit SHA of what was actually cloned) in a `.provenance.json` sidecar beside the manifest, and loads it so resolution proceeds. The next load finds the installed copy and never touches the network again.
+
+A few behaviors worth knowing:
+
+- **Installed wins.** Once a method is installed, it is used as-is — including when a reference pins a different `@<tag>` than what is installed (a warning tells you so). Remove the installed directory to re-fetch.
+- **A miss that cannot be bridged is a loud diagnostic, never a silent pass**: fetch disabled, an unfetchable address, or a failed fetch each raise an error naming the address and the remedy.
+- **Hosted parity warning.** A fetched method declaring Python structure classes runs locally but triggers the same warning as a direct CLI fetch: hosted execution accepts MTHDS concepts and sandboxed PipeFuncs, not in-process Python. On a sandbox-hosted deployment the fetch refuses such a package outright, with the same rule-naming error.
+
+To **disable network fetches at load time**, set the switch in your `pipelex.toml` (or use the environment variable, which takes precedence):
+
+```toml
+[interpreter.methods]
+fetch_on_miss = false
+```
+
+```bash
+export PIPELEX_METHODS_FETCH_ON_MISS=0
+```
+
+With fetching disabled, a miss raises a diagnostic that names the address and how to install the method manually (e.g. `mthds install <address>`, or by copying the package into `~/.mthds/methods/`). See [Methods Configuration](../configuration/config-practical/methods-config.md).
+
 ### Example Layout
 
 ```text

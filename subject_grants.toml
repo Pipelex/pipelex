@@ -872,25 +872,17 @@ rationale = "Looks up from the pipe_code; single operand."
 param = "method"
 rationale = "Looks up from the method; single operand."
 
-["pipelex/cli/method_resolver.py::is_github_url"]
-param = "target"
-rationale = "Operates on the target; single operand."
-
 ["pipelex/cli/method_resolver.py::is_local_path"]
 param = "target"
 rationale = "Operates on the target; single operand."
-
-["pipelex/cli/method_resolver.py::parse_github_url"]
-param = "url"
-rationale = "Parses the url; single operand."
 
 ["pipelex/cli/method_resolver.py::resolve_method_from_path"]
 param = "method_path"
 rationale = "Operates on the method_path; single operand."
 
-["pipelex/cli/method_resolver.py::resolve_method_from_url"]
-param = "url"
-rationale = "Operates on the url; single operand."
+["pipelex/cli/method_resolver.py::resolve_method_from_ref"]
+param = "ref_str"
+rationale = "Operates on the ref string; single operand."
 
 ["pipelex/cli/method_resolver.py::resolve_method_target"]
 param = "method_name"
@@ -2928,10 +2920,6 @@ rationale = "Type-directed accessor: the target item type; single operand."
 param = "item_type"
 rationale = "Type-directed accessor: the target item type; single operand."
 
-["pipelex/core/pipes/variable_multiplicity.py::PresenceMarker.from_symbol"]
-param = "symbol"
-rationale = "Factory from source: parses the symbol; single operand."
-
 ["pipelex/core/pipes/variable_multiplicity.py::format_concept_with_multiplicity"]
 param = "concept_code_or_string"
 rationale = "Transforms the concept string; multiplicity stays keyword."
@@ -3903,6 +3891,14 @@ rationale = "Verb-object: the refs naming the removed pipes; single operand."
 ["pipelex/libraries/visibility_utils.py::_blueprint_to_metadata"]
 param = "blueprint"
 rationale = "Conversion: derives metadata from the blueprint; single operand."
+
+["pipelex/methods/method_ref.py::looks_like_method_ref"]
+param = "target"
+rationale = "Tests the target string; single operand."
+
+["pipelex/methods/method_ref.py::parse_method_ref"]
+param = "ref"
+rationale = "Parses the ref; single operand."
 
 ["pipelex/mthds_parsing/bundle_elaborator.py::BundleElaborator.elaborate"]
 param = "bundle"

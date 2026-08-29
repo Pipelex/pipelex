@@ -102,6 +102,20 @@ own page. Classes are grouped by subsystem.
 - [`CodegenLockError`](codegen-lock-error.md) — Codegen lock error
 - [`CodegenStampError`](codegen-stamp-error.md) — Codegen stamp error
 
+## Methods
+
+- [`MethodDependencyFetchError`](method-dependency-fetch-error.md) — Method dependency fetch
+- [`MethodFetchDisabledError`](method-fetch-disabled-error.md) — Method fetch disabled
+- [`MethodFetchError`](method-fetch-error.md) — Method fetch
+- [`MethodInstallError`](method-install-error.md) — Method install
+- [`MethodPackageAmbiguityError`](method-package-ambiguity-error.md) — Method package ambiguity
+- [`MethodPackageNotFoundError`](method-package-not-found-error.md) — Method package not found
+- [`MethodPackageSymlinkError`](method-package-symlink-error.md) — Method package symlink
+- [`MethodPackageTooLargeError`](method-package-too-large-error.md) — Method package too large
+- [`MethodRefError`](method-ref-error.md) — Method reference error
+- [`MethodRefParseError`](method-ref-parse-error.md) — Method ref parse
+- [`MethodStructuresRefusedError`](method-structures-refused-error.md) — Method structures refused
+
 ## Migration
 
 - [`MigrationError`](migration-error.md) — Migration error
