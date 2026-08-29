@@ -48,6 +48,8 @@ The pipe to run defaults to the manifest's `main_pipe`; `--pipe <code>` override
 
 The fetched clone is temporary: it lives in a system temp directory and is deleted when the CLI process exits. Default outputs therefore anchor in **your current working directory** — `pipelex run method <ref>` writes into `./results/`, and the `pipelex build` method commands write their generated files there too, so nothing you produced disappears with the clone. An explicit `--output-dir` / `--output` is honored verbatim. For an installed method or a local path, defaults stay inside the method's own directory, as before.
 
+`pipelex build runner method <ref>` goes one step further: the generated script embeds the library directory it loads at run time, so the fetched package is copied beside the script (into a directory named after the method) and the script references that copy — a self-contained artifact that still works after the clone is gone.
+
 ## Python in fetched methods: the hosted rule
 
 What decides whether Python in a method is acceptable is **where it would execute**:

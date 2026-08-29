@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Annotated
 
@@ -52,10 +53,22 @@ def build_runner_method_cmd(
 
     bundle_path = method.mthds_files[0]
     # Default output to a results/ folder under the method's output base (the caller's CWD for fetched methods)
+    output_path_path: Path
     if output_path:
-        output_path_path: Path | None = Path(output_path)
+        output_path_path = Path(output_path)
     else:
         output_path_path = method_output_base_dir(method=method) / "results" / f"run_{pipe_code}.py"
+
+    if method.provenance is not None:
+        # The generated script embeds the library dir it loads at run time, and a fetched
+        # package's directory is an ephemeral clone deleted at process exit — so a runner
+        # pointing there would be broken on first use. Materialize the package beside the
+        # generated script and embed that path instead, keeping the artifact self-contained.
+        materialized_dir = output_path_path.parent / method.name
+        shutil.copytree(method.path, materialized_dir, ignore=shutil.ignore_patterns(".git", "__pycache__"), dirs_exist_ok=True)
+        bundle_path = materialized_dir / bundle_path.relative_to(method.path)
+        method_library_dirs = [str(materialized_dir)]
+        typer.secho(f"Copied fetched package into {materialized_dir} (referenced by the generated runner)", fg=typer.colors.BLUE, err=True)
 
     library_dirs_paths = [Path(lib_dir) for lib_dir in method_library_dirs]
     if library_dirs:

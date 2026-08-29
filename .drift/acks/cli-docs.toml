@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:281d5cf0d89a7723f482360195fee20487e724c06c31bbe3ebdab8198e56f1bf"
+digest = "sha256:39e793b298f79da4dbc094804492f81fb91057e696ab1440d4197c3df7bdf44c"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-29T01:35:20Z"
-rationale = "Reviewed docs/tools/cli/ and the agent-CLI CLAUDE.md against the run-by-address hardening: run-by-address.md gained a 'Where outputs land' section, run.md's run-method --output-dir line now states the installed vs fetched defaults, and the agent-CLI CLAUDE.md documents the output_dir_override exception and the method-reference error envelope pattern."
+reviewed_at = "2026-08-29T01:58:32Z"
+rationale = "Reviewed the targets against the build-runner materialization change: build/runner.md and run-by-address.md now document that a fetched target's package is copied beside the generated script and the script references the copy; the agent-CLI contract doc is unaffected (main-CLI-only change)."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -73,7 +73,7 @@ rationale = "Reviewed docs/tools/cli/ and the agent-CLI CLAUDE.md against the ru
 "pipelex/cli/commands/build/runner/_runner_core.py" = "blob:e4745231cb46547de93d83d1ac7a6db28ae81494"
 "pipelex/cli/commands/build/runner/app.py" = "blob:b5aa321ed93dc2cb9b138e4a26bae9eb75c732b7"
 "pipelex/cli/commands/build/runner/bundle_cmd.py" = "blob:5b5ca0628f0595a0c3aae9b539ae4e7e0c92a853"
-"pipelex/cli/commands/build/runner/method_cmd.py" = "blob:73895a61ac97df7828028ab7d760d2ad7541b5e3"
+"pipelex/cli/commands/build/runner/method_cmd.py" = "blob:7d8ff2457569b3efa68830db6cdd031e4c6b9b2d"
 "pipelex/cli/commands/build/structures_cmd.py" = "blob:d13ba3b6fc1433f787e1aa97c6c04a67483ec7ed"
 "pipelex/cli/commands/bundle_path_resolver.py" = "blob:60c6a2994c9b7c6e0ec212702467d668eecb6d50"
 "pipelex/cli/commands/codegen/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"

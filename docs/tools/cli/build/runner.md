@@ -40,6 +40,8 @@ pipelex build runner method <NAME> [OPTIONS]
 - `--output`, `-o` - Path to save the generated Python file
 - `--library-dirs`, `-L` - Directories to search for pipe definitions. Can be specified multiple times.
 
+For a method fetched by address, the package is copied beside the generated script (into a directory named after the method) and the script references that copy — the fetched clone itself is temporary and deleted at process exit, so the generated runner stays self-contained and usable afterwards. See [Run a Method by Address](../run-by-address.md).
+
 ## Examples
 
 **Generate runner from a bundle (uses main_pipe):**
