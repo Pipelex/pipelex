@@ -153,9 +153,13 @@ LinkupError | Linkup | https://docs.pipelex.com/latest/errors/linkup-error/
 LinkupSearchEmptyResultError | Linkup search empty result | https://docs.pipelex.com/latest/errors/linkup-search-empty-result-error/
 LinkupSearchResponseError | Linkup search response | https://docs.pipelex.com/latest/errors/linkup-search-response-error/
 ListWhereSingularError | List where singular | https://docs.pipelex.com/latest/errors/list-where-singular-error/
+MethodDependencyFetchError | Method dependency fetch | https://docs.pipelex.com/latest/errors/method-dependency-fetch-error/
+MethodFetchDisabledError | Method fetch disabled | https://docs.pipelex.com/latest/errors/method-fetch-disabled-error/
 MethodFetchError | Method fetch | https://docs.pipelex.com/latest/errors/method-fetch-error/
+MethodInstallError | Method install | https://docs.pipelex.com/latest/errors/method-install-error/
 MethodPackageAmbiguityError | Method package ambiguity | https://docs.pipelex.com/latest/errors/method-package-ambiguity-error/
 MethodPackageNotFoundError | Method package not found | https://docs.pipelex.com/latest/errors/method-package-not-found-error/
+MethodPackageSymlinkError | Method package symlink | https://docs.pipelex.com/latest/errors/method-package-symlink-error/
 MethodPackageTooLargeError | Method package too large | https://docs.pipelex.com/latest/errors/method-package-too-large-error/
 MethodRefError | Method reference error | https://docs.pipelex.com/latest/errors/method-ref-error/
 MethodRefParseError | Method ref parse | https://docs.pipelex.com/latest/errors/method-ref-parse-error/

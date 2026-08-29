@@ -1,6 +1,13 @@
+from pipelex import log
 from pipelex.plugins.pipe_func_executor_registry import DIRECT_PIPE_FUNC_EXECUTION_MODE
 from pipelex.runtime_hub import get_optional_config, get_required_config
 from pipelex.system.configuration.configs import PipelexConfig
+from pipelex.system.environment import get_optional_env
+
+METHODS_FETCH_ON_MISS_ENV_VAR = "PIPELEX_METHODS_FETCH_ON_MISS"
+
+_ENV_TRUTHY = {"1", "true", "yes", "on"}
+_ENV_FALSY = {"0", "false", "no", "off"}
 
 
 def get_config() -> PipelexConfig:
@@ -25,6 +32,29 @@ def get_pipe_func_execution_mode() -> str:
     if not isinstance(optional_config, PipelexConfig):
         return DIRECT_PIPE_FUNC_EXECUTION_MODE
     return optional_config.interpreter.pipe_func.execution_mode
+
+
+def is_method_fetch_on_miss_enabled() -> bool:
+    """Whether a missed address-based method reference may be fetched from the network (non-raising).
+
+    The ``PIPELEX_METHODS_FETCH_ON_MISS`` environment variable overrides the config when set
+    (``1``/``true``/``yes``/``on`` enables, ``0``/``false``/``no``/``off`` disables; an
+    unrecognized value is warned about and ignored). Otherwise the answer is the config's
+    ``interpreter.methods.fetch_on_miss``, defaulting to enabled when no config is set — safe to
+    call from loading paths that may run before the global config exists.
+    """
+    raw_env = get_optional_env(METHODS_FETCH_ON_MISS_ENV_VAR)
+    if raw_env is not None:
+        normalized = raw_env.strip().lower()
+        if normalized in _ENV_TRUTHY:
+            return True
+        if normalized in _ENV_FALSY:
+            return False
+        log.warning(f"Unrecognized {METHODS_FETCH_ON_MISS_ENV_VAR}={raw_env!r} (expected 1/0, true/false); falling back to the config")
+    optional_config = get_optional_config()
+    if not isinstance(optional_config, PipelexConfig):
+        return True
+    return optional_config.interpreter.methods.fetch_on_miss
 
 
 def is_pipe_func_sandbox_hosted() -> bool:

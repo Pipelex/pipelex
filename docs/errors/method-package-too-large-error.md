@@ -7,7 +7,7 @@ description: "Reference for the `MethodPackageTooLargeError` Pipelex error class
 
 # Method package too large
 
-The selected package exceeds the fetched-package ceilings (file count or total bytes).
+Fetched content exceeds a ceiling: the selected package's file count or total bytes, or the repository's manifest scan.
 
 | Field | Value |
 |---|---|

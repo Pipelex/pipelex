@@ -14,7 +14,6 @@ from typing_extensions import override
 
 import pipelex.builder as builder_pkg  # package import — used for __file__ path
 from pipelex import log
-from pipelex.cli.installed_methods import find_method_by_full_address
 from pipelex.config import is_pipe_func_sandbox_hosted
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -43,6 +42,7 @@ from pipelex.libraries.library_utils import (
 )
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.libraries.visibility_utils import check_visibility_for_blueprints, make_visibility_checker
+from pipelex.methods.fetch_on_miss import resolve_address_based_method
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.handle_pipe_errors import categorize_pipe_validation_error
 from pipelex.mthds_parsing.parser import MthdsParser
@@ -1131,7 +1131,10 @@ class LibraryManager(LibraryManagerAbstract):
         Collects all cross-package pipe references from controller blueprints
         (sequences, batches, conditions, parallels), identifies those whose
         alias contains '/' (i.e. a full package address), and loads each
-        unique address-based dependency.
+        unique address-based dependency. A dependency missing from the
+        installed methods is fetched by address (honoring an ``@<tag>`` pin)
+        and installed when fetch-on-miss is enabled; an unresolvable
+        dependency raises a diagnostic rather than passing silently.
 
         Also searches for .mthds/methods/ directories relative to the bundle
         source path, walking up ancestor directories to find installed methods
@@ -1177,25 +1180,25 @@ class LibraryManager(LibraryManagerAbstract):
         *,
         full_address: str,
         extra_search_dirs: list[Path] | None = None,
-    ) -> bool:
-        """Load an installed method package on demand using its full address.
+    ) -> None:
+        """Load a method package on demand using its full address, fetching it on a miss.
 
-        Discovers the matching installed method, builds a ResolvedDependency,
-        and delegates to _load_single_dependency() to load it as a child
-        library with the full address as alias.
+        Resolves the address to an installed method — fetching and installing the package
+        (honoring an ``@<tag>`` pin) when no installed method matches and fetch-on-miss is
+        enabled — builds a ResolvedDependency, and delegates to _load_single_dependency()
+        to load it as a child library with the full address as alias.
 
         Args:
             library: The main library to load into
             full_address: The full package address (e.g. "github.com/Pipelex/methods/documents")
             extra_search_dirs: Additional .mthds/methods/ directories to scan
 
-        Returns:
-            True if the dependency was successfully loaded, False otherwise
+        Raises:
+            MethodRefError: The address resolves to no installed method and could not be
+                fetched — fetch-on-miss disabled, an unfetchable address, a failed fetch,
+                or a failed install. Never a silent pass.
         """
-        installed = find_method_by_full_address(full_address=full_address, extra_search_dirs=extra_search_dirs)
-        if installed is None:
-            log.warning(f"No installed method found for address '{full_address}'")
-            return False
+        installed = resolve_address_based_method(full_address=full_address, extra_search_dirs=extra_search_dirs)
 
         exported_pipe_codes = determine_exported_pipes(manifest=installed.manifest)
 
@@ -1212,8 +1215,6 @@ class LibraryManager(LibraryManagerAbstract):
             library=library,
             resolved_dep=resolved_dep,
         )
-
-        return True
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
         library = self.get_current_library()
