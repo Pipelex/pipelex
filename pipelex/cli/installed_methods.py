@@ -11,6 +11,8 @@ from mthds.package.manifest.parser import parse_methods_toml
 from mthds.package.manifest.schema import MethodsManifest
 from pydantic import BaseModel
 
+from pipelex.methods.fetching import MethodProvenance
+
 GLOBAL_METHODS_DIR = Path.home() / ".mthds" / "methods"
 PROJECT_METHODS_DIR = Path(".mthds") / "methods"
 
@@ -32,12 +34,17 @@ class DuplicateMethodNameError(Exception):
 
 
 class InstalledMethod(BaseModel):
-    """An installed method discovered from the filesystem."""
+    """An installed method discovered from the filesystem.
+
+    ``provenance`` is set only for methods fetched by reference: the address, the tag when
+    one was named, and the commit SHA of what was actually cloned.
+    """
 
     name: str
     path: Path
     manifest: MethodsManifest
     mthds_files: list[Path]
+    provenance: MethodProvenance | None = None
 
 
 def discover_installed_methods(

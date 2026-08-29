@@ -7,14 +7,14 @@ import typer
 
 from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME, DEFAULT_INPUTS_TOML_FILE_NAME
 from pipelex.cli.commands.build.inputs._inputs_core import execute_generate_inputs
-from pipelex.cli.method_resolver import resolve_method_target
+from pipelex.cli.method_resolver import method_output_base_dir, resolve_method_target
 from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat
 
 
 def build_inputs_method_cmd(
     name: Annotated[
         str,
-        typer.Argument(help="Name of the installed method"),
+        typer.Argument(help="Installed method name, method address (github.com/owner/repo[/name][@tag]), or GitHub URL"),
     ],
     pipe: Annotated[
         str | None,
@@ -50,7 +50,7 @@ def build_inputs_method_cmd(
         pipelex build inputs method my-method --format toml
         pipelex build inputs method my-method --explicit
     """
-    pipe_code, method_library_dirs, _ = resolve_method_target(
+    pipe_code, method_library_dirs, method = resolve_method_target(
         method_name=name,
         pipe_override=pipe,
         library_dirs=library_dir,
@@ -60,7 +60,7 @@ def build_inputs_method_cmd(
     if library_dir:
         effective_library_dir.extend(library_dir)
 
-    # Default output to a results/ folder inside the method's directory
+    # Default output to a results/ folder under the method's output base (the caller's CWD for fetched methods)
     if output_path:
         output_path_path = Path(output_path)
     else:
@@ -70,7 +70,7 @@ def build_inputs_method_cmd(
                 default_file_name = DEFAULT_INPUTS_FILE_NAME
             case InputsTemplateFormat.TOML:
                 default_file_name = DEFAULT_INPUTS_TOML_FILE_NAME
-        output_path_path = Path(method_library_dirs[0]) / "results" / default_file_name
+        output_path_path = method_output_base_dir(method=method) / "results" / default_file_name
 
     execute_generate_inputs(
         pipe_code=pipe_code,

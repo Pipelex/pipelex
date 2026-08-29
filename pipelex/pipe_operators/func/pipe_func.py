@@ -117,7 +117,9 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         if concept_structure_class is None:
             msg = (
                 f"PipeFunc '{self.code}' failed to validate output with library: "
-                f"Concept structure class '{self.output.concept.structure_class_name}' not found in registry."
+                f"Concept structure class '{self.output.concept.structure_class_name}' not found in registry. "
+                f"The class may live in a Python module that was not part of the request — include that module, "
+                f"or express the type as MTHDS concepts."
             )
             raise TypeError(msg)
 

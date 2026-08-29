@@ -123,13 +123,13 @@ Runs a pipeline from an installed method package.
 
 **Arguments:**
 
-- `NAME` - The name of the installed method to run
+- `NAME` - The name of the installed method to run, a method address (`github.com/owner/repo[/name][@tag]`), or a GitHub URL — see [Run a Method by Address](run-by-address.md)
 
 **Options:**
 
 - `--pipe PIPE_CODE` - Run a specific pipe within the method (defaults to the method's main pipe)
 - `--inputs`, `-i` - Path to a JSON or TOML file containing inputs (discriminated by file extension — see [Input File Formats](#input-file-formats))
-- `--output-dir`, `-o` - Directory to save outputs
+- `--output-dir`, `-o` - Directory to save outputs (defaults to `results/` inside the method's directory; for a method fetched by address, `results/` under your current working directory — see [Run a Method by Address](run-by-address.md))
 - `--save-main-stuff` / `--no-save-main-stuff` - Whether to save the main output
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
 - `--working-memory-path` - Custom path for the working memory output file
@@ -152,6 +152,9 @@ pipelex run method invoice_extractor --pipe extract_amounts
 
 # Run with inputs
 pipelex run method invoice_extractor --inputs invoice_data.json
+
+# Run a method fetched by address from a public GitHub repository, pinned at a tag
+pipelex run method github.com/Pipelex/methods/documents@v0.1.0 --pipe extract_document_text
 ```
 
 ## Input File Formats
