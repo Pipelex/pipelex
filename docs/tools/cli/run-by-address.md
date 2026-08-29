@@ -60,7 +60,7 @@ What decides whether Python in a method is acceptable is **where it would execut
 
 ## Bounds
 
-Fetched packages are bounded: the clone has a fixed timeout, and the selected package is capped in file count and total bytes (tunable via the `PIPELEX_MAX_FETCHED_PACKAGE_FILES` and `PIPELEX_MAX_FETCHED_PACKAGE_TOTAL_KIB` environment variables). The manifest scan that locates the package is bounded too: at most `PIPELEX_MAX_SCANNED_MANIFESTS` manifests are considered per repository, and a `METHODS.toml` larger than `PIPELEX_MAX_MANIFEST_FILE_KIB` is skipped and reported rather than read. Content exceeding the caps is rejected with a clear error.
+Fetched packages are bounded: the clone has a fixed timeout, and the selected package is capped in file count and total bytes (tunable via the `PIPELEX_MAX_FETCHED_PACKAGE_FILES` and `PIPELEX_MAX_FETCHED_PACKAGE_TOTAL_KIB` environment variables). The manifest scan that locates the package is bounded too: at most `PIPELEX_MAX_SCANNED_MANIFESTS` manifests are considered per repository, and a `METHODS.toml` larger than `PIPELEX_MAX_MANIFEST_FILE_KIB` is skipped and reported rather than read. Content exceeding the caps is rejected with a clear error. Symlinks are refused outright: a fetched package containing one (file or directory) is rejected, because a link's target would bypass the content scans.
 
 ## Referencing a Method by Address from Your Own Method
 

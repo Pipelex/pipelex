@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import shutil
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -17,7 +19,10 @@ from pipelex.methods.exceptions import MethodInstallError
 from pipelex.methods.fetching import MethodProvenance
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    from pytest_mock import MockerFixture
+
+FULL_ADDRESS = "github.com/pipelex-tests/fom-methods/scoring"
+OTHER_REPO_ADDRESS = "github.com/other-org/other-methods"
 
 MANIFEST = """\
 [package]
@@ -78,14 +83,72 @@ class TestInstallMethodPackage:
         assert installed.provenance is None
         assert not (installed.path / PROVENANCE_FILENAME).exists()
 
-    def test_install_refuses_an_occupied_target(self, tmp_path: Path) -> None:
-        """An existing target directory is never overwritten."""
+    def test_install_refuses_a_target_occupied_by_a_non_package(self, tmp_path: Path) -> None:
+        """An existing target directory that is not a method package is never overwritten."""
         package_dir = _make_package_dir(tmp_path)
         methods_dir = tmp_path / "methods"
         (methods_dir / "scoring").mkdir(parents=True)
 
-        with pytest.raises(MethodInstallError, match="already exists"):
-            install_method_package(package_dir=package_dir, name="scoring", methods_dir=methods_dir)
+        with pytest.raises(MethodInstallError, match="already occupied"):
+            install_method_package(package_dir=package_dir, name="scoring", full_address=FULL_ADDRESS, methods_dir=methods_dir)
+
+    def test_install_refuses_a_target_occupied_by_a_different_address(self, tmp_path: Path) -> None:
+        """Two packages sharing the bare name collide loudly, naming both addresses and the directory."""
+        package_dir = _make_package_dir(tmp_path)
+        methods_dir = tmp_path / "methods"
+        install_method_package(package_dir=package_dir, name="scoring", full_address=FULL_ADDRESS, methods_dir=methods_dir)
+
+        other_source = tmp_path / "other-pkg"
+        other_source.mkdir()
+        (other_source / MANIFEST_FILENAME).write_text(MANIFEST.replace("github.com/pipelex-tests/fom-methods", OTHER_REPO_ADDRESS), encoding="utf-8")
+        (other_source / "scoring.mthds").write_text("# other", encoding="utf-8")
+
+        with pytest.raises(MethodInstallError) as exc_info:
+            install_method_package(package_dir=other_source, name="scoring", full_address=f"{OTHER_REPO_ADDRESS}/scoring", methods_dir=methods_dir)
+
+        message = str(exc_info.value)
+        assert f"{OTHER_REPO_ADDRESS}/scoring" in message
+        assert FULL_ADDRESS in message
+        assert str(methods_dir / "scoring") in message
+        assert (methods_dir / "scoring" / "scoring.mthds").read_text(encoding="utf-8") == "# placeholder", "the occupant was not overwritten"
+
+    def test_install_over_a_matching_occupant_returns_theirs(self, tmp_path: Path) -> None:
+        """A target already holding the same package (by full address) is used as-is, never rewritten."""
+        package_dir = _make_package_dir(tmp_path)
+        methods_dir = tmp_path / "methods"
+        first = install_method_package(package_dir=package_dir, name="scoring", full_address=FULL_ADDRESS, methods_dir=methods_dir)
+        (package_dir / "second-attempt.marker").write_text("mine", encoding="utf-8")
+
+        second = install_method_package(package_dir=package_dir, name="scoring", full_address=FULL_ADDRESS, methods_dir=methods_dir)
+
+        assert second.path == first.path
+        assert not (second.path / "second-attempt.marker").exists(), "the occupant was kept, not overwritten"
+
+    def test_rename_race_lost_to_a_matching_occupant_returns_theirs(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Losing the final-rename race to a concurrent install of the same package uses the winner's copy."""
+        package_dir = _make_package_dir(tmp_path)
+        methods_dir = tmp_path / "methods"
+        winner_source = tmp_path / "winner-pkg"
+        shutil.copytree(package_dir, winner_source)
+        (winner_source / "winner.marker").write_text("won", encoding="utf-8")
+
+        real_rename = Path.rename
+
+        def racing_rename(self_path: Path, target: str | Path) -> Path:
+            target_path = Path(target)
+            if target_path.name == "scoring" and not target_path.exists():
+                # The concurrent installer lands between our existence check and our rename.
+                shutil.copytree(winner_source, target_path)
+            return real_rename(self_path, target)
+
+        mocker.patch.object(Path, "rename", autospec=True, side_effect=racing_rename)
+
+        installed = install_method_package(package_dir=package_dir, name="scoring", full_address=FULL_ADDRESS, methods_dir=methods_dir)
+
+        assert installed.path == (methods_dir / "scoring").resolve()
+        assert (installed.path / "winner.marker").is_file(), "the winner's install was used"
+        leftovers = [entry.name for entry in methods_dir.iterdir() if entry.name != "scoring"]
+        assert leftovers == [], "the loser's staging directory was cleaned up"
 
     @pytest.mark.parametrize("bad_name", ["../evil", ".hidden", ""])
     def test_install_refuses_an_escaping_or_hidden_name(self, tmp_path: Path, bad_name: str) -> None:

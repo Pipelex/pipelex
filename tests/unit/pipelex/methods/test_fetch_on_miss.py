@@ -13,6 +13,7 @@ from pipelex.methods.exceptions import (
     MethodDependencyFetchError,
     MethodFetchDisabledError,
     MethodFetchError,
+    MethodInstallError,
     MethodStructuresRefusedError,
 )
 from pipelex.methods.fetch_on_miss import resolve_address_based_method
@@ -150,6 +151,38 @@ class TestResolveAddressBasedMethod:
         resolved_again = resolve_address_based_method(full_address=FULL_ADDRESS)
         assert resolved_again.path == resolved.path
         assert fetch_mock.call_count == 1
+
+    def test_bare_name_collision_across_addresses_is_a_loud_error(self, isolated_methods_dirs: Path, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Two packages sharing the bare name never silently load or overwrite each other — the collision names both addresses."""
+        package_dir = _make_package_dir(tmp_path)
+        install_method_package(package_dir=package_dir, name="scoring", full_address=FULL_ADDRESS, methods_dir=isolated_methods_dirs)
+
+        other_address = "github.com/other-org/other-methods/scoring"
+        other_manifest = MANIFEST.replace("github.com/pipelex-tests/fom-methods", "github.com/other-org/other-methods")
+        other_dir = tmp_path / "other-pkg"
+        other_dir.mkdir()
+        (other_dir / MANIFEST_FILENAME).write_text(other_manifest, encoding="utf-8")
+        (other_dir / "scoring.mthds").write_text("# other", encoding="utf-8")
+        other_fetched = FetchedMethodPackage(
+            ref=parse_method_ref(other_address),
+            full_address=other_address,
+            commit_sha=COMMIT_SHA,
+            clone_dir=tmp_path,
+            package_dir=other_dir,
+            manifest=parse_methods_toml(other_manifest),
+        )
+        mocker.patch("pipelex.methods.fetch_on_miss.is_method_fetch_on_miss_enabled", return_value=True)
+        mocker.patch("pipelex.methods.fetch_on_miss.fetch_method_package", return_value=other_fetched)
+
+        with pytest.raises(MethodInstallError) as exc_info:
+            resolve_address_based_method(full_address=other_address)
+
+        message = str(exc_info.value)
+        assert other_address in message
+        assert FULL_ADDRESS in message
+        assert str(isolated_methods_dirs / "scoring") in message
+        installed_bundle = (isolated_methods_dirs / "scoring" / "scoring.mthds").read_text(encoding="utf-8")
+        assert installed_bundle == "# placeholder", "the first package's install was not overwritten"
 
     @pytest.mark.usefixtures("isolated_methods_dirs")
     def test_sandbox_hosted_fetch_refuses_structures_and_the_refusal_surfaces_unwrapped(self, mocker: MockerFixture) -> None:

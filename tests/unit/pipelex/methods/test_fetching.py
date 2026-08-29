@@ -8,7 +8,12 @@ from typing import TYPE_CHECKING
 import pytest
 from mthds.package.exceptions import VCSFetchError
 
-from pipelex.methods.exceptions import MethodFetchError, MethodPackageTooLargeError, MethodStructuresRefusedError
+from pipelex.methods.exceptions import (
+    MethodFetchError,
+    MethodPackageSymlinkError,
+    MethodPackageTooLargeError,
+    MethodStructuresRefusedError,
+)
 from pipelex.methods.fetching import ensure_package_within_bounds, fetch_method_package
 from pipelex.methods.method_ref import parse_method_ref
 
@@ -170,3 +175,39 @@ class TestFetchMethodPackage:
         (package_dir / "core.mthds").write_text("# placeholder", encoding="utf-8")
 
         ensure_package_within_bounds(package_dir=package_dir, package_address="github.com/acme/small")
+
+    def test_a_symlinked_file_is_refused(self, tmp_path: Path) -> None:
+        """A package carrying a file symlink is refused — a link's target would bypass the content scans."""
+        package_dir = tmp_path / "pkg"
+        package_dir.mkdir()
+        (package_dir / "core.mthds").write_text("# placeholder", encoding="utf-8")
+        outside_file = tmp_path / "outside.txt"
+        outside_file.write_text("host content", encoding="utf-8")
+        (package_dir / "sneaky.txt").symlink_to(outside_file)
+
+        with pytest.raises(MethodPackageSymlinkError, match=re.escape("sneaky.txt")):
+            ensure_package_within_bounds(package_dir=package_dir, package_address="github.com/acme/sneaky")
+
+    def test_a_symlinked_directory_is_refused(self, tmp_path: Path) -> None:
+        """A package carrying a directory symlink is refused too."""
+        package_dir = tmp_path / "pkg"
+        package_dir.mkdir()
+        (package_dir / "core.mthds").write_text("# placeholder", encoding="utf-8")
+        outside_dir = tmp_path / "outside-dir"
+        outside_dir.mkdir()
+        (outside_dir / "secret.txt").write_text("host content", encoding="utf-8")
+        (package_dir / "vendored").symlink_to(outside_dir, target_is_directory=True)
+
+        with pytest.raises(MethodPackageSymlinkError, match="vendored"):
+            ensure_package_within_bounds(package_dir=package_dir, package_address="github.com/acme/linked")
+
+    def test_a_symlinked_package_dir_is_refused(self, tmp_path: Path) -> None:
+        """A package directory that is itself a symlink is refused before any walk."""
+        real_dir = tmp_path / "real-pkg"
+        real_dir.mkdir()
+        (real_dir / "core.mthds").write_text("# placeholder", encoding="utf-8")
+        linked_dir = tmp_path / "linked-pkg"
+        linked_dir.symlink_to(real_dir, target_is_directory=True)
+
+        with pytest.raises(MethodPackageSymlinkError, match="is a symlink"):
+            ensure_package_within_bounds(package_dir=linked_dir, package_address="github.com/acme/aliased")

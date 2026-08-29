@@ -7,6 +7,7 @@ the same layout the `mthds` CLI's installer writes).
 """
 
 import shutil
+import tempfile
 from pathlib import Path
 
 from mthds.package.discovery import MANIFEST_FILENAME
@@ -298,32 +299,68 @@ def find_method_by_name(
     return matches[0]
 
 
+def _resolve_occupied_install_target(*, final_dir: Path, name: str, full_address: str | None) -> InstalledMethod:
+    """Decide what an already-occupied install target means: the same package, or a collision.
+
+    When the occupant is a method package whose full address matches *full_address* (another
+    process won the install race), the occupant is returned and used as-is. Anything else — a
+    package with a different address (two packages sharing the bare name *name*), or content
+    that is not a method package — is a loud collision error; the wrong package is never
+    silently loaded and the occupant is never silently overwritten.
+
+    Raises:
+        MethodInstallError: The occupant is not the same package.
+    """
+    occupant = discover_method_at(final_dir, seen_dirs=set())
+    occupant_address = f"{occupant.manifest.address}/{occupant.name}" if occupant is not None else None
+    if occupant is not None and full_address is not None and occupant_address is not None and occupant_address.casefold() == full_address.casefold():
+        return occupant
+    requested = full_address or name
+    occupant_desc = f"method '{occupant_address}'" if occupant_address else "content that is not a method package"
+    msg = (
+        f"Cannot install method '{requested}': '{final_dir}' is already occupied by {occupant_desc} — "
+        f"two method packages share the directory name '{name}'. Remove '{final_dir}' to let this package install there."
+    )
+    raise MethodInstallError(msg)
+
+
 def install_method_package(
     *,
     package_dir: Path,
     name: str,
+    full_address: str | None = None,
     provenance: MethodProvenance | None = None,
     methods_dir: Path | None = None,
 ) -> InstalledMethod:
     """Install a method package directory into the installed-methods store.
 
     Copies *package_dir* into ``<methods_dir>/<name>/`` (the global
-    ``~/.mthds/methods/`` by default) using a staging directory and an atomic
-    rename, stripping any ``.git/`` and writing the fetch provenance sidecar
-    when one is given — so a partially-written install is never discovered.
+    ``~/.mthds/methods/`` by default) using a per-attempt unique staging directory
+    and an atomic rename, stripping any ``.git/`` and writing the fetch provenance
+    sidecar when one is given — so a partially-written install is never discovered
+    and concurrent installers never share staging state.
+
+    An already-occupied target is resolved by identity, before and after the copy:
+    an occupant whose full address matches *full_address* (a concurrent install of
+    the same package) is returned and used as-is; any other occupant is a loud
+    collision error — bare directory names are not unique across addresses, and
+    the wrong package must never be silently loaded or overwritten.
 
     Args:
         package_dir: The package directory to copy from (e.g. inside a fresh clone).
         name: The method name — becomes the install directory's name.
+        full_address: The package's full address, used to verify an occupant's identity
+            and to name the package in collision errors.
         provenance: The fetch provenance to record beside the manifest, if any.
         methods_dir: Override for the installed-methods root (tests, project-local installs).
 
     Returns:
-        The freshly installed method, discovered from its final location.
+        The installed method, discovered from its final location — freshly written, or a
+        matching occupant a concurrent installer put there first.
 
     Raises:
-        MethodInstallError: If *name* escapes the methods directory, the target
-            directory is already occupied, or the copy fails.
+        MethodInstallError: If *name* escapes the methods directory, the target is
+            occupied by a different package, or the copy fails.
     """
     target_root = (methods_dir or GLOBAL_METHODS_DIR).resolve()
     target_root.mkdir(parents=True, exist_ok=True)
@@ -333,14 +370,11 @@ def install_method_package(
         msg = f"Cannot install method '{name}': the name escapes the methods directory '{target_root}' or is not a valid method directory name."
         raise MethodInstallError(msg)
     if final_dir.exists():
-        msg = f"Cannot install method '{name}' into '{target_root}': '{final_dir}' already exists. Remove it first if you want to replace it."
-        raise MethodInstallError(msg)
+        return _resolve_occupied_install_target(final_dir=final_dir, name=name, full_address=full_address)
 
-    staging_dir = target_root / f".{name}{_STAGING_SUFFIX}"
+    staging_dir = Path(tempfile.mkdtemp(dir=target_root, prefix=f".{name}{_STAGING_SUFFIX}-"))
     try:
-        if staging_dir.exists():
-            shutil.rmtree(staging_dir)
-        shutil.copytree(package_dir, staging_dir)
+        shutil.copytree(package_dir, staging_dir, dirs_exist_ok=True)
         git_dir = staging_dir / ".git"
         if git_dir.exists():
             shutil.rmtree(git_dir)
@@ -349,6 +383,10 @@ def install_method_package(
         staging_dir.rename(final_dir)
     except OSError as exc:
         shutil.rmtree(staging_dir, ignore_errors=True)
+        if final_dir.exists():
+            # The rename lost a race: someone installed into the target between our existence
+            # check and our rename. Resolve the occupant by identity, exactly as above.
+            return _resolve_occupied_install_target(final_dir=final_dir, name=name, full_address=full_address)
         msg = f"Failed to install method '{name}' into '{target_root}': {exc}"
         raise MethodInstallError(msg) from exc
 

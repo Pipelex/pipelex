@@ -34,6 +34,10 @@ class MethodPackageTooLargeError(MethodRefError):
     """Fetched content exceeds a ceiling: the selected package's file count or total bytes, or the repository's manifest scan."""
 
 
+class MethodPackageSymlinkError(MethodRefError):
+    """The fetched package contains a symlink, which fetched packages must not carry (it would bypass the content scans)."""
+
+
 class MethodStructuresRefusedError(MethodRefError):
     """The fetched package declares in-process Python structure classes, which hosted execution refuses."""
 

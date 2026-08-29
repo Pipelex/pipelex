@@ -19,7 +19,6 @@ from pipelex.config import METHODS_FETCH_ON_MISS_ENV_VAR, is_method_fetch_on_mis
 from pipelex.methods.exceptions import (
     MethodDependencyFetchError,
     MethodFetchDisabledError,
-    MethodInstallError,
     MethodRefError,
     MethodRefParseError,
     MethodStructuresRefusedError,
@@ -81,7 +80,9 @@ def resolve_address_based_method(
             parsed or fetched, or the fetch failed.
         MethodStructuresRefusedError: On a sandbox-hosted deployment, the fetched package
             declares in-process Python structure classes (locally this is a warning instead).
-        MethodInstallError: The fetch succeeded but installing the package failed.
+        MethodInstallError: The fetch succeeded but installing the package failed — including
+            the install target being occupied by a different package that shares the bare
+            directory name (never silently loaded, never silently overwritten).
     """
     ref: MethodRef | None = None
     parse_error: MethodRefParseError | None = None
@@ -143,22 +144,16 @@ def resolve_address_based_method(
             )
 
         name = fetched.manifest.name or fetched.package_dir.name
-        try:
-            installed = install_method_package(
-                package_dir=fetched.package_dir,
-                name=name,
-                provenance=fetched.provenance,
-                methods_dir=methods_dir,
-            )
-        except MethodInstallError:
-            # A concurrent load may have installed the same method between our lookup and our
-            # rename — if a matching install is discoverable now, use it; otherwise the install
-            # failure is the diagnostic.
-            concurrent = find_method_by_full_address(lookup_address, extra_search_dirs=extra_search_dirs)
-            if concurrent is None:
-                raise
-            log.verbose(f"Method '{fetched.full_address}' was installed concurrently at '{concurrent.path}'; using it")
-            return concurrent
+        # An occupied install target is resolved by identity inside install_method_package: a
+        # concurrent install of the same package (by full address) is returned and used, while a
+        # different occupant — two packages sharing the bare name — is a loud collision error.
+        installed = install_method_package(
+            package_dir=fetched.package_dir,
+            name=name,
+            full_address=fetched.full_address,
+            provenance=fetched.provenance,
+            methods_dir=methods_dir,
+        )
     finally:
         shutil.rmtree(clone_dir, ignore_errors=True)
 

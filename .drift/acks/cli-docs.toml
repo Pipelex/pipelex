@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:39e793b298f79da4dbc094804492f81fb91057e696ab1440d4197c3df7bdf44c"
+digest = "sha256:440d54e77c7ab292acb88632345fedf82ad29e2d7c35cc7149fa95f7d12c7b4f"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-29T01:58:32Z"
-rationale = "Reviewed the targets against the build-runner materialization change: build/runner.md and run-by-address.md now document that a fetched target's package is copied beside the generated script and the script references the copy; the agent-CLI contract doc is unaffected (main-CLI-only change)."
+reviewed_at = "2026-08-29T02:36:21Z"
+rationale = "Rebase of the fetch-on-miss branch onto v0.55.0: installed_methods.py now carries the install write path plus the review hardening (occupied-target identity check, unique mkdtemp staging with rename-race tolerance) on top of dev's method_resolver changes. No CLI command, flag, or help text changed; run-by-address.md documents both sides (build-runner materialization from dev, symlink refusal from this branch); the agent-CLI contract doc is unaffected."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -129,6 +129,6 @@ rationale = "Reviewed the targets against the build-runner materialization chang
 "pipelex/cli/deck_notice.py" = "blob:542877125e89e35b02bc969cfee952155b0d7c2c"
 "pipelex/cli/error_handlers.py" = "blob:7a925ef0517bf9b01c3ca4b91ae54a70f57123a6"
 "pipelex/cli/exceptions.py" = "blob:1d51c3a53ddd3f6cf8de566fa2ade3fa75ab7a3a"
-"pipelex/cli/installed_methods.py" = "blob:565b08fdd10efa0682d17619cfd7df252dbf61b5"
+"pipelex/cli/installed_methods.py" = "blob:09197f47baf8d7251d28d148a0544b4a23ee7365"
 "pipelex/cli/method_resolver.py" = "blob:1230dde5f89ac28bbdcbcbbd0c1d485c71803caf"
 "pipelex/cli/readiness.py" = "blob:6d185324ed0784663e1dc78d1194a28312c54798"

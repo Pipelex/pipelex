@@ -14,7 +14,7 @@ from mthds.package.manifest.schema import MethodsManifest
 from mthds.package.vcs_resolver import clone_at_version, clone_default_branch
 from pydantic import BaseModel, ConfigDict
 
-from pipelex.methods.exceptions import MethodFetchError, MethodPackageTooLargeError
+from pipelex.methods.exceptions import MethodFetchError, MethodPackageSymlinkError, MethodPackageTooLargeError
 from pipelex.methods.fetch_limits import MAX_FETCHED_PACKAGE_FILES, MAX_FETCHED_PACKAGE_TOTAL_BYTES
 from pipelex.methods.method_ref import MethodRef
 from pipelex.methods.package_locator import locate_package_in_clone
@@ -121,7 +121,12 @@ def ensure_cloned_at_tag(*, clone_dir: Path, ref: MethodRef) -> None:
 
 
 def ensure_package_within_bounds(*, package_dir: Path, package_address: str) -> None:
-    """Reject a selected package that exceeds the fetched-package ceilings.
+    """Reject a selected package that exceeds the fetched-package ceilings or carries a symlink.
+
+    Symlinks are refused outright: the structures scan and these bounds walk the tree without
+    following links, while a later copy would copy the link's *target* — a scan bypass, and a way
+    to exfiltrate host files into the installed store. Fetched packages have no legitimate use
+    for symlinks.
 
     Args:
         package_dir: The selected package directory.
@@ -129,13 +134,21 @@ def ensure_package_within_bounds(*, package_dir: Path, package_address: str) -> 
 
     Raises:
         MethodPackageTooLargeError: If the package exceeds the file-count or total-bytes cap.
+        MethodPackageSymlinkError: If the package directory, or anything inside it, is a symlink.
     """
+    if package_dir.is_symlink():
+        msg = f"Method package '{package_address}' is a symlink — fetched packages must not contain symlinks."
+        raise MethodPackageSymlinkError(msg)
     file_count = 0
     total_bytes = 0
     for file_path in package_dir.rglob("*"):
         relative_parts = file_path.relative_to(package_dir).parts
         if any(part in _SKIPPED_DIR_NAMES for part in relative_parts):
             continue
+        if file_path.is_symlink():
+            relative = "/".join(relative_parts)
+            msg = f"Method package '{package_address}' contains a symlink ('{relative}') — fetched packages must not contain symlinks."
+            raise MethodPackageSymlinkError(msg)
         if not file_path.is_file():
             continue
         file_count += 1
@@ -177,6 +190,7 @@ def fetch_method_package(
         MethodPackageNotFoundError: If no package matches the requested address.
         MethodPackageAmbiguityError: If more than one package matches.
         MethodPackageTooLargeError: If the selected package exceeds the ceilings.
+        MethodPackageSymlinkError: If the selected package contains a symlink.
         MethodStructuresRefusedError: If *refuse_structures* is set and the package
             declares structure classes.
     """

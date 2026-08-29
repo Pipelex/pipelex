@@ -110,6 +110,7 @@ own page. Classes are grouped by subsystem.
 - [`MethodInstallError`](method-install-error.md) — Method install
 - [`MethodPackageAmbiguityError`](method-package-ambiguity-error.md) — Method package ambiguity
 - [`MethodPackageNotFoundError`](method-package-not-found-error.md) — Method package not found
+- [`MethodPackageSymlinkError`](method-package-symlink-error.md) — Method package symlink
 - [`MethodPackageTooLargeError`](method-package-too-large-error.md) — Method package too large
 - [`MethodRefError`](method-ref-error.md) — Method reference error
 - [`MethodRefParseError`](method-ref-parse-error.md) — Method ref parse
