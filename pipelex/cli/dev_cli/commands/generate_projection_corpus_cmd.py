@@ -89,10 +89,12 @@ DIVERGENCE_REASONS: dict[str, str] = {
         "The engine picks a placeholder by field name, so a text field merely named url or ending in _url "
         "renders as a URL. The projection reads the descriptor's kind instead."
     ),
-    "scalar-vs-structured-native": (
-        "A native whose pinned definition carries an optional field beside its required one — native.Date "
-        "— no longer collapses to a single-key content once the optional field is rendered, so it stays "
-        "an object where the engine unwrapped it to a bare scalar. A consequence of optional-field-included."
+    "object-native-keeps-envelope": (
+        "A native whose pinned definition carries an optional field beside its required one — native.Date — "
+        "renders as an object once the optional field is included, and the shaper's bare-value arm dispatches "
+        "a native on its scalar kind, so the object form is only re-shapable inside its {concept, content} "
+        "envelope. The projection keeps that envelope; the engine unwraps to a bare scalar, which it can only "
+        "do because it drops the optional field. A consequence of optional-field-included."
     ),
 }
 
@@ -101,7 +103,7 @@ DIVERGENCE_REASONS: dict[str, str] = {
 # difference of vantage. Named in the manifest so the corpus records not just that it departs from
 # the engine but what would retire the departure. A class with no entry here is deliberate on both
 # sides: `file-leaf-not-expanded` is the descriptor's vantage rather than an engine bug, and
-# `scalar-vs-structured-native` is a consequence of `optional-field-included` rather than its own.
+# `object-native-keeps-envelope` is a consequence of `optional-field-included` rather than its own.
 DIVERGENCE_ITEMS: dict[str, str] = {
     "text-named-url": "L-260830-dc48bf",
     "fixed-count-honoured": "L-260830-f3de29",
@@ -234,7 +236,7 @@ class _DivergenceCollector:
             self._record(divergence_id="text-named-url", path=path, engine=engine_value, expected=projected_value)
             return
         if isinstance(engine_value, dict) or isinstance(projected_value, dict):
-            self._record(divergence_id="scalar-vs-structured-native", path=path, engine=engine_value, expected=projected_value)
+            self._record(divergence_id="object-native-keeps-envelope", path=path, engine=engine_value, expected=projected_value)
             return
         self.unclassified.append(f"{'.'.join(path)}: engine={engine_value!r} projected={projected_value!r}")
 

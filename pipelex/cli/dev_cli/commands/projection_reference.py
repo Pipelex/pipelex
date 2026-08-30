@@ -98,9 +98,19 @@ def native_code(*, node: InputFormItem) -> str | None:
 
 
 def keeps_envelope(*, node: InputFormItem) -> bool:
-    """Whether this slot's light form keeps the ceremonial envelope instead of unwrapping."""
+    """Whether this slot's light form keeps the ceremonial envelope instead of unwrapping.
+
+    Two ways to earn it, and both mean the same thing — a bare value at this position is not
+    re-shapable, so unwrapping would pin a template that does not run. Either the native is one the
+    shaper cannot build top-down at all, or the descriptor states it as an object: the shaper's
+    bare-value arm dispatches a native on its scalar kind, so it rejects the object outright.
+    `native.Date` is the second case — it is a scalar the shaper knows, until the optional `time`
+    beside its required `date` makes the rendered form an object.
+    """
     code = native_code(node=node)
-    return code is not None and code in OUT_OF_MATRIX_NATIVES
+    if code is None:
+        return False
+    return code in OUT_OF_MATRIX_NATIVES or node.kind is FieldKind.OBJECT
 
 
 def slot_content_key(*, node: InputFormItem) -> str | None:
@@ -170,9 +180,18 @@ def project_value(*, node: InputFormItem, name: str) -> Any:
 
     A scalar-typed node is its bare placeholder; a concept-typed one (`image`, `document`, `object`)
     is the content dict its concept carries, because that is what sits at the field in the payload.
+
+    One case reads as a scalar and is not: a nested node that names a native concept holds that
+    native's own content object, not a bare value — `native.Text` inside a page's text-and-images is
+    a `TextContent`, so the payload carries `{"text": ...}` there. The descriptor states the
+    difference itself, in whether the node carries a `concept_ref`: an authored `type = "text"`
+    structure field carries none and stays bare.
     """
     match node.kind:
         case FieldKind.TEXT | FieldKind.PROSE | FieldKind.DATE | FieldKind.NUMBER | FieldKind.BOOLEAN | FieldKind.ENUM:
+            content_key = slot_content_key(node=node) if native_code(node=node) is not None else None
+            if content_key is not None:
+                return {content_key: _leaf_placeholder(node=node, name=content_key)}
             return _leaf_placeholder(node=node, name=name)
         case FieldKind.IMAGE | FieldKind.DOCUMENT:
             return {FILE_CONTENT_KEY: _leaf_placeholder(node=node, name=FILE_CONTENT_KEY)}

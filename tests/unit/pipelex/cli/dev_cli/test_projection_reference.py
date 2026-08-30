@@ -36,7 +36,17 @@ def _descriptor(*slots: dict[str, Any]) -> PipeInputFormDescriptor:
 
 
 def _text(*, name: str, required: bool = True) -> dict[str, Any]:
-    """A nested text field — no pipe-slot facts, which the descriptor forbids below the top level."""
+    """An authored `type = "text"` structure field: no pipe-slot facts, and no `concept_ref`.
+
+    The absence is the point rather than a shortcut. A field authored as a plain type carries no
+    concept identity in the descriptor, and that is exactly what separates it from one authored as
+    `concept = "native.Text"`, which holds a nested content object instead of a bare value.
+    """
+    return {"kind": "text", "name": name, "required": required}
+
+
+def _native_text(*, name: str, required: bool = True) -> dict[str, Any]:
+    """A text field that names `native.Text`, so the value at it is that native's content object."""
     return {"kind": "text", "name": name, "concept_ref": "native.Text", "required": required}
 
 
@@ -112,7 +122,7 @@ class TestShapes:
         assert project_inputs_template(descriptor=_descriptor(many), explicit=False)["many"] == ["text_value"]
 
     def test_a_scalar_slot_unwraps_in_the_compact_shape_and_keeps_its_key_in_the_explicit_one(self):
-        descriptor = _descriptor(_text(name="note"))
+        descriptor = _descriptor(_native_text(name="note"))
         assert project_inputs_template(descriptor=descriptor, explicit=False)["note"] == "text_value"
         assert project_inputs_template(descriptor=descriptor, explicit=True)["note"] == {
             "concept": "native.Text",
@@ -189,6 +199,39 @@ class TestOutOfMatrixNatives:
         projected = project_inputs_template(descriptor=_descriptor(slot), explicit=False)["payload"]
         assert projected == {"concept": "shelf.Rendered", "content": {"inner": "inner_value"}}
 
+    def test_an_object_shaped_native_keeps_its_envelope_too(self):
+        """`native.Date` renders as an object once its optional `time` is included, and the shaper
+        dispatches a native's bare value on its scalar kind — so the object form only survives a
+        round trip inside its envelope. Unwrapping it would pin a template that does not run.
+        """
+        date_slot = {
+            "kind": "object",
+            "name": "date_in",
+            "concept_ref": "native.Date",
+            "required": True,
+            "fields": [
+                {"kind": "date", "name": "date", "required": True, "datetime": False},
+                {"kind": "text", "name": "time", "required": False, "format": "time"},
+            ],
+        }
+        projected = project_inputs_template(descriptor=_descriptor(date_slot), explicit=False)["date_in"]
+        assert projected == {"concept": "native.Date", "content": {"date": "2026-01-01", "time": "12:00:00"}}
+
+    def test_a_nested_field_naming_a_native_holds_that_native_s_content_object(self):
+        """A nested `native.Text` is a `TextContent`, so the payload carries `{"text": ...}` there —
+        where an authored `type = "text"` field beside it carries the bare value. The descriptor
+        states the difference in whether the node has a `concept_ref`, so the projection reads it.
+        """
+        page = {
+            "kind": "object",
+            "name": "page",
+            "concept_ref": "native.Page",
+            "required": True,
+            "fields": [_native_text(name="body"), _text(name="caption")],
+        }
+        content = project_inputs_template(descriptor=_descriptor(page), explicit=False)["page"]["content"]
+        assert content == {"body": {"text": "text_value"}, "caption": "caption_value"}
+
     def test_an_ordinary_structured_concept_unwraps_to_its_content_dict(self):
         slot = {
             "kind": "object",
@@ -204,7 +247,7 @@ class TestConceptComments:
     """The `# concept: …` line a light TOML rendering carries, rebuilt from the descriptor alone."""
 
     def test_a_plain_slot_states_its_concept(self):
-        assert project_concept_comments(descriptor=_descriptor(_text(name="note"))) == {"note": "concept: native.Text"}
+        assert project_concept_comments(descriptor=_descriptor(_native_text(name="note"))) == {"note": "concept: native.Text"}
 
     def test_a_fixed_count_slot_states_its_count(self):
         pair = {
