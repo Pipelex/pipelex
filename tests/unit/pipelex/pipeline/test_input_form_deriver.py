@@ -36,6 +36,16 @@ class RootBackedPayload(StructuredContent):
     tags: RootBackedTags = Field(description="The tags")
 
 
+# mypy reads the two bases' `model_construct` overloads as incompatible; pydantic builds these classes
+# fine and pyright accepts them, and a class-backed concept over a `RootModel` is what these tests pin.
+class RootBackedSlug(StructuredContent, RootModel[str]):  # type: ignore[misc]
+    """A registered structure class that IS a `RootModel` — the concept's whole payload is the root string."""
+
+
+class RootBackedTagList(StructuredContent, RootModel[list[str]]):  # type: ignore[misc]
+    """A registered structure class that IS a `RootModel` over a list — the payload is the list itself."""
+
+
 def _concept_field(*, concept_ref: str) -> ConceptStructureBlueprint:
     return ConceptStructureBlueprint(description="link", type=ConceptStructureBlueprintFieldType.CONCEPT, concept_ref=concept_ref)
 
@@ -131,3 +141,36 @@ class TestInputFormDeriverEscapeHatches:
         tags = as_list(by_name["tags"])
         assert tags.item.kind == FieldKind.TEXT
         assert tags.description == "The tags", "The field's own description survives the root reflection"
+
+    def test_a_root_model_backed_concept_reports_its_root_annotation(self) -> None:
+        """A class-backed concept whose class IS a `RootModel` states the root's node, never an `object` over `root`."""
+        concepts: dict[str, ConceptBlueprint | str] = {
+            "demo.Slug": ConceptBlueprint(description="A slug", structure="RootBackedSlug"),
+        }
+        registry = get_class_registry()
+        registry.register_class(RootBackedSlug)
+        try:
+            node = InputFormDeriver(concepts=concepts).derive_concept(name="slug", concept_ref="demo.Slug")
+        finally:
+            registry.unregister_class(RootBackedSlug)
+
+        assert node.kind == FieldKind.TEXT, "The payload `model_validate` accepts is the root string itself"
+        assert node.concept_ref == "demo.Slug", "A top-level field states the concept it carries"
+        assert node.description == "A slug"
+
+    def test_a_root_model_backed_concept_over_a_list_is_a_list_node(self) -> None:
+        """The root annotation decides the kind: a list root is a `list` node carrying the concept's own ref."""
+        concepts: dict[str, ConceptBlueprint | str] = {
+            "demo.TagList": ConceptBlueprint(description="The tags", structure="RootBackedTagList"),
+        }
+        registry = get_class_registry()
+        registry.register_class(RootBackedTagList)
+        try:
+            node = InputFormDeriver(concepts=concepts).derive_concept(name="tag_list", concept_ref="demo.TagList")
+        finally:
+            registry.unregister_class(RootBackedTagList)
+
+        tag_list = as_list(node)
+        assert tag_list.item.kind == FieldKind.TEXT
+        assert tag_list.concept_ref == "demo.TagList", "A root-valued concept IS the whole value, so its ref rides the list node"
+        assert tag_list.description == "The tags"

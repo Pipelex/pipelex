@@ -74,7 +74,7 @@ from mthds.protocol.input_form import (
     UnknownField,
     UnknownItem,
 )
-from pydantic import BaseModel, RootModel, TypeAdapter
+from pydantic import BaseModel, TypeAdapter
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
@@ -362,13 +362,31 @@ class InputFormDeriver:
         refines: list[str] | None,
         seen: frozenset[str],
     ) -> InputFormField:
-        """A concept whose payload is stated by a registered class: a native class maps by identity, any other is reflected."""
+        """A concept whose payload is stated by a registered class.
+
+        A native class maps by identity, a `RootModel` IS its root value, any other class is reflected.
+        """
         native_code = next((code for code in NativeConceptCode if code.structure_class_name == class_name), None)
         if native_code is not None:
             return self._native_node(name=name, native_code=native_code, concept_ref=concept_ref, description=description, refines=refines, seen=seen)
         structure_class = get_class_registry().get_class(name=class_name)
         if not (isinstance(structure_class, type) and issubclass(structure_class, BaseModel)):
             return _unknown_node(name=name, concept_ref=concept_ref, description=description, refines=refines)
+        if structure_class.__pydantic_root_model__:
+            # A `RootModel` IS its root value on the wire at the top of a class-backed concept exactly
+            # as it is one field down (`_reflected_node`): an `object` over the synthetic `root` field
+            # would state a shape `model_validate` rejects, and would contradict the `json_schema`
+            # derived from the same class beside it. The concept's own identity is stamped back on the
+            # node it yields — including on a `list` root, whose `concept_ref` names this concept
+            # rather than an element concept, there being none: a top-level field states the concept
+            # it carries, and a root-valued concept IS the whole value.
+            root_node = self._reflected_node(
+                name=name,
+                annotation=_root_annotation_of(root_model_class=structure_class),
+                seen=seen,
+                classes_seen=frozenset({structure_class}),
+            )
+            return root_node.model_copy(update={"concept_ref": concept_ref, "refines": refines, "description": description or root_node.description})
         return ObjectField(
             name=name,
             concept_ref=concept_ref,
@@ -454,11 +472,10 @@ class InputFormDeriver:
             # the same answer the concept walk gives a concept ref it has already seen.
             nested_class: type[BaseModel] = annotation
             deeper: frozenset[type[BaseModel]] = classes_seen | {nested_class}
-            if issubclass(nested_class, RootModel):
+            if nested_class.__pydantic_root_model__:
                 # A `RootModel` IS its root value on the wire, so its node is the root annotation's:
                 # an `object` over the synthetic `root` field would state a shape `model_validate` rejects.
-                root_annotation, _ = strip_optional(annotation=nested_class.model_fields["root"].annotation)
-                return self._reflected_node(name=name, annotation=root_annotation, seen=seen, classes_seen=deeper)
+                return self._reflected_node(name=name, annotation=_root_annotation_of(root_model_class=nested_class), seen=seen, classes_seen=deeper)
             return ObjectField(
                 name=name, required=True, fields=self._reflected_class_fields(structure_class=nested_class, seen=seen, classes_seen=classes_seen)
             )
@@ -620,6 +637,16 @@ def _as_list_item(*, node: InputFormField) -> InputFormItem:
     `str` slot holding `None` — right on the wire, wrong on the type, and unnoticed at runtime.
     """
     return _LIST_ITEM_ADAPTER.validate_python({slot: value for slot, value in node if slot != "name"})
+
+
+def _root_annotation_of(*, root_model_class: type[BaseModel]) -> Any:
+    """The annotation a `RootModel`'s value actually takes: its `root` field's, optionality peeled.
+
+    Callers test `__pydantic_root_model__` — pydantic's own marker — rather than `issubclass(…, RootModel)`,
+    which narrows to an unparameterized generic the type checker then reports as partially unknown.
+    """
+    annotation, _ = strip_optional(annotation=root_model_class.model_fields["root"].annotation)
+    return annotation
 
 
 def _with_effective_hints(*, node: InputFormField, hints: dict[str, str] | None) -> InputFormField:
