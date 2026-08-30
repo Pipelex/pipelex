@@ -349,6 +349,7 @@ plugins:
         - contribute/drift-contracts.md: "Drift Contracts"
         - contribute/mthds-test-corpus.md: "MTHDS Test Corpus"
         - contribute/trace-input-semantics.md: "Tracing Input Semantics"
+        - contribute/generate-projection-corpus.md: "Projection Fixture Corpus"
         - migration-ledger.md: "Migration Ledger"
         - changelog.md: "Changelog"
 
@@ -601,6 +602,7 @@ nav:
     - Drift Contracts: contribute/drift-contracts.md
     - MTHDS Test Corpus: contribute/mthds-test-corpus.md
     - Tracing Input Semantics: contribute/trace-input-semantics.md
+    - Projection Fixture Corpus: contribute/generate-projection-corpus.md
     - Migration Ledger: migration-ledger.md
     - Code of Conduct: CODE_OF_CONDUCT.md
     - License: license.md
