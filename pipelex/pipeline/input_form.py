@@ -74,7 +74,7 @@ from mthds.protocol.input_form import (
     UnknownField,
     UnknownItem,
 )
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel, RootModel, TypeAdapter
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
@@ -428,7 +428,9 @@ class InputFormDeriver:
         answered in descriptor terms: a native content class is that native's node — routed through
         `_concept_node`, so the concept cycle guard covers a pinned native's own fields — a nested
         non-native model is an `object` whose fields are reflected in turn, which is what keeps a
-        file-bearing field one level down visible, and an annotation with no honest node is `unknown`.
+        file-bearing field one level down visible, a `RootModel` is its root annotation's node
+        because the value it accepts is the root value itself, and an annotation with no honest node
+        is `unknown`.
         """
         if is_number_union(annotation=annotation):
             return NumberField(name=name, required=True, integer=False)
@@ -450,8 +452,15 @@ class InputFormDeriver:
         if isinstance(annotation, type) and issubclass(annotation, BaseModel) and annotation not in classes_seen:
             # A nested model already on the path would recurse forever; the revisit is `unknown`,
             # the same answer the concept walk gives a concept ref it has already seen.
+            nested_class: type[BaseModel] = annotation
+            deeper: frozenset[type[BaseModel]] = classes_seen | {nested_class}
+            if issubclass(nested_class, RootModel):
+                # A `RootModel` IS its root value on the wire, so its node is the root annotation's:
+                # an `object` over the synthetic `root` field would state a shape `model_validate` rejects.
+                root_annotation, _ = strip_optional(annotation=nested_class.model_fields["root"].annotation)
+                return self._reflected_node(name=name, annotation=root_annotation, seen=seen, classes_seen=deeper)
             return ObjectField(
-                name=name, required=True, fields=self._reflected_class_fields(structure_class=annotation, seen=seen, classes_seen=classes_seen)
+                name=name, required=True, fields=self._reflected_class_fields(structure_class=nested_class, seen=seen, classes_seen=classes_seen)
             )
         return _unknown_node(name=name)
 

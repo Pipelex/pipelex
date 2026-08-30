@@ -8,14 +8,14 @@ hand-built qualified crate: the derivation must stay total and finite on any cra
 
 from __future__ import annotations
 
-from pydantic import Field
+from pydantic import Field, RootModel
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.pipeline.input_form import FieldKind, InputFormDeriver
 from pipelex.system.registries.class_registry_access import get_class_registry
-from tests.helpers.input_form import as_object, fields_by_name
+from tests.helpers.input_form import as_list, as_object, fields_by_name
 
 
 class SelfReferentialPayload(StructuredContent):
@@ -23,6 +23,17 @@ class SelfReferentialPayload(StructuredContent):
 
     label: str = Field(description="The label")
     child: "SelfReferentialPayload | None" = Field(default=None, description="The nested twin")
+
+
+class RootBackedTags(RootModel[list[str]]):
+    """A `RootModel` field: the value on the wire IS the root list, never an object over a `root` key."""
+
+
+class RootBackedPayload(StructuredContent):
+    """A registered structure class holding a `RootModel` field."""
+
+    label: str = Field(description="The label")
+    tags: RootBackedTags = Field(description="The tags")
 
 
 def _concept_field(*, concept_ref: str) -> ConceptStructureBlueprint:
@@ -102,3 +113,21 @@ class TestInputFormDeriverEscapeHatches:
         assert by_name["label"].kind == FieldKind.TEXT
         assert by_name["child"].kind == FieldKind.UNKNOWN
         assert by_name["child"].required is False, "The self-reference is optional, and cutting the path does not change that"
+
+    def test_a_root_model_field_reports_its_root_annotation(self) -> None:
+        """A `RootModel` is its root value on the wire, so the node is the root's — never an `object` over `root`."""
+        concepts: dict[str, ConceptBlueprint | str] = {
+            "demo.RootBacked": ConceptBlueprint(description="Backed by a class holding a RootModel", structure="RootBackedPayload"),
+        }
+        registry = get_class_registry()
+        registry.register_class(RootBackedPayload)
+        try:
+            node = InputFormDeriver(concepts=concepts).derive_concept(name="root_backed", concept_ref="demo.RootBacked")
+        finally:
+            registry.unregister_class(RootBackedPayload)
+
+        by_name = fields_by_name(node)
+        assert by_name["label"].kind == FieldKind.TEXT
+        tags = as_list(by_name["tags"])
+        assert tags.item.kind == FieldKind.TEXT
+        assert tags.description == "The tags", "The field's own description survives the root reflection"
