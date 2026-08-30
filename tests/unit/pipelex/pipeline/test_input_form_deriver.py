@@ -1,16 +1,28 @@
 """Unit-pin the deriver's escape hatches that the library loader keeps out of reach.
 
-The loader rejects concept cycles (`LibraryLoadingError`) and a `structure = "ClassName"` naming an
-unregistered class before a bundle ever reaches `build_input_form`, so those branches are exercised
-directly on a hand-built qualified crate: the derivation must stay total and finite on any crate.
+The loader rejects concept cycles (`LibraryLoadingError`), a `structure = "ClassName"` naming an
+unregistered class, and a registered class that holds itself (which it reads as a concept cycle),
+before a bundle ever reaches `build_input_form` — so those branches are exercised directly on a
+hand-built qualified crate: the derivation must stay total and finite on any crate.
 """
 
 from __future__ import annotations
 
+from pydantic import Field
+
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.pipeline.input_form import FieldKind, InputFormDeriver
-from tests.helpers.input_form import as_object
+from pipelex.system.registries.class_registry_access import get_class_registry
+from tests.helpers.input_form import as_object, fields_by_name
+
+
+class SelfReferentialPayload(StructuredContent):
+    """A registered structure class that holds itself — reflection must cut the path, not recurse forever."""
+
+    label: str = Field(description="The label")
+    child: "SelfReferentialPayload | None" = Field(default=None, description="The nested twin")
 
 
 def _concept_field(*, concept_ref: str) -> ConceptStructureBlueprint:
@@ -72,3 +84,21 @@ class TestInputFormDeriverEscapeHatches:
         assert node.kind == FieldKind.UNKNOWN
         assert node.refines == ["dep->other.Score"]
         assert node.description == "Refines a dependency's score"
+
+    def test_a_self_referential_class_is_cut_at_the_revisit(self) -> None:
+        """Class reflection terminates: the position that revisits the class is `unknown`, its siblings stated."""
+        concepts: dict[str, ConceptBlueprint | str] = {
+            "demo.Recursive": ConceptBlueprint(description="Backed by a class that holds itself", structure="SelfReferentialPayload"),
+        }
+        registry = get_class_registry()
+        registry.register_class(SelfReferentialPayload)
+        try:
+            node = InputFormDeriver(concepts=concepts).derive_concept(name="recursive", concept_ref="demo.Recursive")
+        finally:
+            registry.unregister_class(SelfReferentialPayload)
+
+        assert node.kind == FieldKind.OBJECT
+        by_name = fields_by_name(node)
+        assert by_name["label"].kind == FieldKind.TEXT
+        assert by_name["child"].kind == FieldKind.UNKNOWN
+        assert by_name["child"].required is False, "The self-reference is optional, and cutting the path does not change that"

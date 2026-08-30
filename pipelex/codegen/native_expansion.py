@@ -19,19 +19,22 @@ annotation has no honest blueprint form at all (e.g. a non-Optional union) makes
 reflected structure absent.
 """
 
-import datetime
-from types import UnionType
-from typing import Any, Union, cast, get_args, get_origin
+from typing import Any, cast, get_origin
 
 from pydantic import BaseModel
 
+from pipelex.core.concepts.annotation_shapes import (
+    is_number_union,
+    is_union,
+    list_item_annotation,
+    native_code_for_content_class,
+    scalar_field_type,
+    strip_optional,
+)
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprintType
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.native.pinned_blueprints import make_pinned_native_blueprint
-from pipelex.core.stuffs.stuff_content import StuffContent
-
-_NATIVE_CLASS_NAME_TO_CODE: dict[str, NativeConceptCode] = {native_code.structure_class_name: native_code for native_code in NativeConceptCode}
 
 
 class _UnmappableAnnotationError(Exception):
@@ -58,16 +61,18 @@ def reflect_native_structure(native_code: NativeConceptCode) -> dict[str, Concep
     structure_class = native_code.structure_class
     if structure_class is None:
         return None
-    return reflect_structure_class(structure_class=cast("type[BaseModel]", structure_class))
+    return _reflect_structure_class(structure_class=cast("type[BaseModel]", structure_class))
 
 
-def reflect_structure_class(*, structure_class: type[BaseModel]) -> dict[str, ConceptStructureBlueprintType] | None:
-    """Reflect a registered structure class into blueprint form, faithful-or-absent.
+def _reflect_structure_class(*, structure_class: type[BaseModel]) -> dict[str, ConceptStructureBlueprintType] | None:
+    """Reflect a content class into blueprint form, faithful-or-absent.
 
-    Same rules as native reflection: every field must map unambiguously to a blueprint field, or
-    the whole reflected structure is absent (`None`) — never a guessed shape. The input-form
-    deriver uses this for class-backed concepts (`structure = "ClassName"`), where the class is
-    the only statement of the payload's fields.
+    Every field must map unambiguously to a blueprint field, or the whole reflected structure is
+    absent (`None`) — never a guessed shape, and never a partial one. That severity is what makes
+    this a probe worth trusting: the pinned blueprint it is compared against is the normative form,
+    so a structure reflected from a class that drifted must not look plausible. The input-form
+    deriver reflects a class-backed concept for a different purpose and answers differently — see
+    `InputFormDeriver._reflected_class_fields`.
     """
     model_fields = structure_class.model_fields
     if not model_fields:
@@ -83,11 +88,11 @@ def reflect_structure_class(*, structure_class: type[BaseModel]) -> dict[str, Co
 
 
 def _annotation_to_blueprint(annotation: Any, *, description: str) -> ConceptStructureBlueprint:
-    inner, required = _strip_optional(annotation)
+    inner, required = strip_optional(annotation=annotation)
 
-    if _is_number_union(inner):
+    if is_number_union(annotation=inner):
         return ConceptStructureBlueprint(description=description, type=ConceptStructureBlueprintFieldType.NUMBER, required=required)
-    if get_origin(inner) in {Union, UnionType}:
+    if is_union(annotation=inner):
         # A union that is not simply Optional[X] nor a number union has no single blueprint shape.
         raise _UnmappableAnnotationError
 
@@ -99,11 +104,11 @@ def _annotation_to_blueprint(annotation: Any, *, description: str) -> ConceptStr
     if origin is list:
         return _list_blueprint(inner, description=description, required=required)
 
-    scalar_type = _scalar_field_type(inner)
+    scalar_type = scalar_field_type(annotation=inner)
     if scalar_type is not None:
         return ConceptStructureBlueprint(description=description, type=scalar_type, required=required)
 
-    native_code = _native_code_for_content_class(inner)
+    native_code = native_code_for_content_class(annotation=inner)
     if native_code is not None:
         return ConceptStructureBlueprint(
             description=description, type=ConceptStructureBlueprintFieldType.CONCEPT, concept_ref=native_code.concept_ref, required=required
@@ -121,12 +126,11 @@ def _annotation_to_blueprint(annotation: Any, *, description: str) -> ConceptStr
 
 
 def _list_blueprint(list_annotation: Any, *, description: str, required: bool) -> ConceptStructureBlueprint:
-    args = get_args(list_annotation)
-    if not args:
+    item_inner = list_item_annotation(annotation=list_annotation)
+    if item_inner is None:
         raise _UnmappableAnnotationError
-    item_inner, _ = _strip_optional(args[0])
 
-    native_code = _native_code_for_content_class(item_inner)
+    native_code = native_code_for_content_class(annotation=item_inner)
     if native_code is not None:
         return ConceptStructureBlueprint(
             description=description,
@@ -135,53 +139,12 @@ def _list_blueprint(list_annotation: Any, *, description: str, required: bool) -
             item_concept_ref=native_code.concept_ref,
             required=required,
         )
-    scalar_type = _scalar_field_type(item_inner)
+    scalar_type = scalar_field_type(annotation=item_inner)
     if scalar_type is not None:
         return ConceptStructureBlueprint(
             description=description, type=ConceptStructureBlueprintFieldType.LIST, item_type=scalar_type, required=required
         )
     raise _UnmappableAnnotationError
-
-
-def _strip_optional(annotation: Any) -> tuple[Any, bool]:
-    """Return (inner, required): peel a single `X | None` into (X, False); otherwise (annotation, True)."""
-    if get_origin(annotation) in {Union, UnionType}:
-        args = get_args(annotation)
-        non_none = [arg for arg in args if arg is not type(None)]
-        if len(non_none) == 1 and len(non_none) != len(args):
-            return non_none[0], False
-    return annotation, True
-
-
-def _is_number_union(annotation: Any) -> bool:
-    if get_origin(annotation) not in {Union, UnionType}:
-        return False
-    return set(get_args(annotation)) == {int, float}
-
-
-def _scalar_field_type(annotation: Any) -> ConceptStructureBlueprintFieldType | None:
-    # Order matters: bool is an int subclass, datetime is a date subclass — check the narrower first.
-    if annotation is bool:
-        return ConceptStructureBlueprintFieldType.BOOLEAN
-    if annotation is int:
-        return ConceptStructureBlueprintFieldType.INTEGER
-    if annotation is float:
-        return ConceptStructureBlueprintFieldType.NUMBER
-    if annotation is str:
-        return ConceptStructureBlueprintFieldType.TEXT
-    if annotation is datetime.datetime:
-        return ConceptStructureBlueprintFieldType.DATETIME
-    if annotation is datetime.date:
-        return ConceptStructureBlueprintFieldType.DATE
-    if annotation is datetime.time:
-        return ConceptStructureBlueprintFieldType.TIME
-    return None
-
-
-def _native_code_for_content_class(annotation: Any) -> NativeConceptCode | None:
-    if not isinstance(annotation, type) or not issubclass(annotation, StuffContent):
-        return None
-    return _NATIVE_CLASS_NAME_TO_CODE.get(annotation.__name__)
 
 
 def _is_nested_model(annotation: Any) -> bool:
