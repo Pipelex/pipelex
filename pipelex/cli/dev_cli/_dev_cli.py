@@ -60,6 +60,7 @@ class PipelexDevCLI(TyperGroup):
             "generate-error-identity",
             "generate-error-pages",
             "generate-mthds-schema",
+            "generate-projection-corpus",
             "kit",
             "preprocess-test-models",
             "refresh-graph-ui-sri",

@@ -37,7 +37,7 @@ The classes it declares today:
 - `file-leaf-not-expanded` — the descriptor states a file-ish node as a leaf whose only fill-in value is a URL; the engine expands the runtime content class and asks whoever fills the template in for a width, a mime type and a caption.
 - `fixed-count-honoured` — a `Concept[N]` slot renders `N` elements. The engine emits one whatever the count, and `InputShaper` then rejects that template with `MultiplicityCountMismatchError`, so the scaffold it produced does not run.
 - `text-named-url` — the engine picks a placeholder by field **name**, so a text field merely named `url` renders as a URL. The projection reads the descriptor's `kind`.
-- `scalar-vs-structured-native` — a native carrying an optional field beside its required one (`native.Date`) no longer collapses to a single-key content once the optional field is rendered, so it stays an object where the engine unwrapped it to a bare scalar. A consequence of `optional-field-included`.
+- `object-native-keeps-envelope` — a native carrying an optional field beside its required one (`native.Date`) renders as an object once the optional field is included, and the shaper's bare-value arm dispatches a native on its scalar kind, so the object form is only re-shapable inside its `{concept, content}` envelope. The projection keeps that envelope; the engine unwraps to a bare scalar, which it can only do because it drops the optional field. A consequence of `optional-field-included`.
 
 Each is a `pipelex` defect filed in the workspace ledger, not a difference of taste; the manifest is what records that the corpus knowingly departs from the engine and why.
 
