@@ -1,0 +1,53 @@
+domain      = "input_semantics_scaffold"
+description = "SCAFFOLD_bundle_desc: the cases a descriptor-driven inputs-template projection must get right and the engine's own renderer does not — every authored fact carries a SCAFFOLD_ sentinel so its survival is greppable in every capture"
+main_pipe   = "scaffold_nesting"
+
+# A structure whose text fields are merely NAMED like URLs. The engine picks a placeholder by
+# field name, so it renders these as `https://mock.invalid/<name>` even though the descriptor
+# states `kind = "text"` at every one of them. That name heuristic is what misclassified a text
+# field as a file position; the projection reads the kind instead.
+[concept.Bookmark]
+description = "SCAFFOLD_desc_concept_Bookmark: a shelf reference whose text fields are named like links"
+
+[concept.Bookmark.structure]
+url          = { type = "text", description = "SCAFFOLD_desc_field_url: a required text field merely NAMED url", required = true }
+homepage_url = { type = "text", description = "SCAFFOLD_desc_field_homepage_url: an optional text field whose name ENDS in _url" }
+label        = { type = "text", description = "SCAFFOLD_desc_field_label: ordinary required text beside them", required = true }
+shelf_note   = { type = "text", description = "SCAFFOLD_desc_field_shelf_note: ordinary optional text beside them" }
+
+# A structure carrying file fields on both sides of the required/optional line. The engine applies
+# its optional filter only at the top level of an input's own structure class, so `cover` and
+# `attachment` vanish from the template it renders while a nested structure's optional fields survive.
+[concept.Dossier]
+description = "SCAFFOLD_desc_concept_Dossier: an archive folder holding required and optional attachments"
+
+[concept.Dossier.structure]
+title      = { type = "text", description = "SCAFFOLD_desc_field_title: required text heading the folder", required = true }
+stamp      = { type = "concept", concept_ref = "native.Image", description = "SCAFFOLD_desc_field_stamp: a REQUIRED nested image", required = true }
+cover      = { type = "concept", concept_ref = "native.Image", description = "SCAFFOLD_desc_field_cover: an OPTIONAL nested image" }
+attachment = { type = "concept", concept_ref = "native.Document", description = "SCAFFOLD_desc_field_attachment: an OPTIONAL nested document" }
+bookmark   = { type = "concept", concept_ref = "Bookmark", description = "SCAFFOLD_desc_field_bookmark: the url-named fields one level deeper" }
+
+[pipe.scaffold_nesting]
+type = "PipeLLM"
+description = "SCAFFOLD_pipe_scaffold_nesting: url-named text fields and optional nested file fields, at two depths"
+inputs = { bookmark = "Bookmark", dossier = "Dossier" }
+output = "Text"
+prompt = """
+Consider the bookmark:
+@bookmark
+And the dossier:
+@dossier
+"""
+
+[pipe.scaffold_fixed_batch]
+type = "PipeLLM"
+description = "SCAFFOLD_pipe_scaffold_fixed_batch: a fixed-count list of a structure carrying optional file fields, beside a variable one"
+inputs = { dossiers = "Dossier[2]", bookmarks = "Bookmark[]" }
+output = "Text"
+prompt = """
+Exactly two dossiers:
+@dossiers
+Any number of bookmarks:
+@bookmarks
+"""
