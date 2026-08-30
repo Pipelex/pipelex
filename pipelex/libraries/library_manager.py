@@ -223,7 +223,13 @@ class LibraryManager(LibraryManagerAbstract):
         startup instead.
         """
         library_class_registry = ClassRegistry()
-        library_class_registry.register_classes_dict(KajsonManager.get_class_registry().get_classes_dict())
+        global_classes = KajsonManager.get_class_registry().get_classes_dict()
+        if global_classes:
+            # Guarded because kajson's register_classes_dict indexes into the values to name the
+            # single class it logs, so an empty dict raises IndexError. The global registry really
+            # is empty before boot registers anything, and a library opened there must still get
+            # its own registry rather than blow up.
+            library_class_registry.register_classes_dict(global_classes)
         return library_class_registry
 
     @override

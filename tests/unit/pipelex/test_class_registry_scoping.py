@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from kajson.class_registry import ClassRegistry
 from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel
@@ -56,6 +58,24 @@ class TestHubClassRegistry:
             assert get_class_registry() is library_registry
         finally:
             clear_current_library()
+            library_manager.teardown(library_id=library_id)
+
+    def test_opening_a_library_against_an_empty_global_registry_still_yields_one(self) -> None:
+        """Seeding must survive an empty process-global registry.
+
+        kajson's ``register_classes_dict`` names the single class it logs by indexing into the
+        values, so handing it an empty dict raises ``IndexError`` rather than registering nothing.
+        The global registry genuinely is empty between a teardown and the next boot, and a library
+        opened there must come out carrying its own empty registry instead of failing to open.
+        """
+        library_manager = get_library_manager()
+        with patch.object(KajsonManager, "get_class_registry", return_value=ClassRegistry()):
+            library_id, library = library_manager.open_library()
+        try:
+            library_registry = library.get_class_registry()
+            assert library_registry is not None
+            assert library_registry.get_classes_dict() == {}
+        finally:
             library_manager.teardown(library_id=library_id)
 
     def test_get_class_registry_with_unknown_library_id_falls_back_to_global(self) -> None:
