@@ -116,12 +116,14 @@ Because delivery renders from the raw dict (`pipelex/pipe_run/delivery_executor.
 
 ## Per-call scoping
 
-A single worker may process many concurrent jobs. If two jobs define a concept named `Result` with different fields, they must not share a `ClassRegistry` or `Library` — otherwise the second registration overwrites the first and silently corrupts data. Each job therefore creates its own scoped state:
+A single process may handle many concurrent jobs — and, in a server, many concurrent requests that are not jobs at all. If two of them define a concept named `Result` with different fields, they must not share a `ClassRegistry` or `Library`: structure classes are registered under a name key, so the second registration overwrites the first and the two silently swap schemas and output types. The isolation is therefore structural rather than something a caller opts into — every `Library` the manager opens carries its own registry:
 
-1. **ClassRegistry** — a fresh `ClassRegistry` pre-seeded from the global registry (which holds the base classes from `PIPELEXPATH`). The crate's dynamic classes register here, never in the global registry.
-2. **Library** — a fresh `Library` (`library_manager.open_fresh_library()`) with that `ClassRegistry` attached, set as current via a `ContextVar` keyed by the run id. Run-id keying (not job/workflow id) is deliberate: a reused workflow id across retries/resets could otherwise let a closed predecessor's cleanup tear down a live successor's library on the same worker.
+1. **ClassRegistry** — `library_manager.open_library()` attaches a fresh `ClassRegistry` to every library it creates, pre-seeded from the global registry (which holds the base classes from `PIPELEXPATH`). A load's dynamic classes register there, never in the global registry, and no caller can forget to ask for it.
+2. **Library** — a fresh `Library` (`library_manager.open_fresh_library()`), set as current via a `ContextVar` keyed by the run id. Run-id keying (not job/workflow id) is deliberate: a reused workflow id across retries/resets could otherwise let a closed predecessor's cleanup tear down a live successor's library on the same worker.
 3. **Lookup chain** — `hub.get_class_registry()` reads the `ContextVar`, returns the scoped library's registry, and falls back to the global registry when no library is set (e.g. a data converter running outside the job scope — which is exactly why output uses deferred hydration).
 4. **Cleanup** — `library_manager.teardown(library_id)` drops the library and its registry; the `ContextVar` is reset. No manual GC needed.
+
+One consequence is worth stating for host code: a structure class registered while a library is current lands in *that library's* registry and is gone when it is torn down. A Python structure class that every load should see must be registered before any library is opened — which is what importing it at boot, or loading it from a library directory into the library that uses it, already does.
 
 The class-registry accessor and its library scoping (`pipelex/runtime_hub.py`, `pipelex/system/registries/class_registry_access.py`, `pipelex/interpreter_hub.py`, `pipelex/libraries/library.py`, `pipelex/libraries/library_manager.py`) is open core — the same machinery serves direct execution, the open runner, and any host-runtime plugin.
 

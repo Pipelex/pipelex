@@ -15,9 +15,9 @@
 
 **Provider-library and registry-library are two reads of one variable.** Every non-forwarding `concept_provider=` source in `pipelex/` is `get_concept_library()`, which is `get_interpreter_hub().get_library().concept_library` → `LibraryManager.get_current_library()` → the same `_library_id` ContextVar that `_resolve_scoped_class_registry` reads. They cannot name different libraries.
 
-**The one place that installs a per-library registry pairs the two.** `runtime_bridge/primitives/rehydration.py` calls `library.set_class_registry(run_registry)` and `set_current_library(library_id=library_id)` in adjacent statements on the same library. Every other `set_class_registry` call is a test, and the integration fixture (`tests/integration/pipelex/fixtures/pipe_job_helpers.py`) pairs them the same way.
+**Every library the manager holds carries a registry.** `LibraryManager.open_library` attaches one at open time, seeded from the process-global registry, so `get_library_class_registry` answers for any library that can become current. (Before that was the default, the pairing argument was narrower: only `runtime_bridge/primitives/rehydration.py` installed a registry, and it set the registry and the ContextVar in adjacent statements on the same library.)
 
-**The only non-hub provider deliberately depends on the ambient read.** `cli/commands/run/_run_core.py`'s `--save-csv` step uses `ConceptLibrary.make_empty()` *after* the run library is torn down, precisely so the lookup lands on the process-global registry that still holds the generated classes. Codex's fix would break that site — an empty library has no registry — unless it re-derived the global fallback `get_class_registry()` already implements. The branch's own boot-free tests depend on the same decoupling.
+**The only non-hub provider used to depend on the ambient read, and no longer does.** `cli/commands/run/_run_core.py`'s `--save-csv` step used `ConceptLibrary.make_empty()` *after* the run library was torn down, precisely so the lookup landed on the process-global registry that still held the generated classes. Once `open_library` began attaching a per-library registry, the generated classes went with the run library, and that site now takes the row model off the produced rows — each is an instance of exactly the class the pipeline structured its output into. The name lookup remains only for an empty result, which has no instance to ask.
 
 That is why the fix was declined: no reachable failure motivates it, it would require inventing a registry for every parentless `ConceptLibrary`, and it would end up re-implementing the fallback it replaced. Also worth noting it is **not a regression** — on `dev`, the removed `Concept.get_structure_class()` and `Concept.are_concept_compatible` called `get_class_registry()` from the same module. PR #1072 moved *where* the call lives, never *which* registry it reads.
 
@@ -30,11 +30,11 @@ The branch asserted a scoping property in three places. Two were docstrings writ
 1. A caller passes `library_manager.get_library(library_id=X).concept_library` as the provider instead of `get_concept_library()`.
 2. A **dependency/child** library's `concept_library` is used as a provider. Child `Library` objects live in `Library.dependency_libraries` and are *not* in `LibraryManager._libraries`, so `get_library_class_registry` structurally cannot see their registry. Today only the cross-package `_concept_resolver` touches them, never `get_structure_class`.
 3. `InterpreterHub.set_concept_library` gains a live writer (it currently has **zero** callers, so its standalone-library fallback branch is dead).
-4. A `set_class_registry` call site appears that is not paired with `set_current_library` on the same library.
+4. ~~A `set_class_registry` call site appears that is not paired with `set_current_library` on the same library.~~ Moot: `open_library` now attaches a registry to every library, so a library that becomes current always has one to resolve. What would revive the concern is a caller that *replaces* a library's registry with one belonging to a different library.
 
 ## The shape of the fix, if it ever lands
 
-Give `ConceptProviderAbstract` a way to name its registry and have `ConceptLibrary` carry the one from its parent `Library`, falling back to `get_class_registry()` when it has no parent — which keeps `make_empty()` and the `--save-csv` path working. One place changes (`ConceptLibrary.get_structure_class`), which is the property the single-seam refactor bought even though it did not use it.
+Give `ConceptProviderAbstract` a way to name its registry and have `ConceptLibrary` carry the one from its parent `Library`, falling back to `get_class_registry()` when it has no parent — which keeps `make_empty()` working. One place changes (`ConceptLibrary.get_structure_class`), which is the property the single-seam refactor bought even though it did not use it.
 
 ## Related, from the same PR's finalize review
 

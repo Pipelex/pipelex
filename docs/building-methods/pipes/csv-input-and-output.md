@@ -102,7 +102,7 @@ pipelex run bundle demo.mthds --save-csv out.csv
 pipelex run method my_method --save-csv out.csv
 ```
 
-The path is **literal and cwd-relative** — it is written exactly where you point it, not under `--output-dir`. Parent directories are created as needed. The output's main stuff must be a flat list; if it is not a list, or its row concept is not flat, you get a clear error rather than a malformed file. The header is derived from the **declared** row concept (not from the first item), so an empty list still writes a correct header-only file. On write, `None` is rendered as an empty cell and booleans as lowercase `true`/`false`, so a value round-trips back through a read unchanged.
+The path is **literal and cwd-relative** — it is written exactly where you point it, not under `--output-dir`. Parent directories are created as needed. The output's main stuff must be a flat list; if it is not a list, or its row concept is not flat, you get a clear error rather than a malformed file. The header is derived from the row concept's structure — the class the run produced its rows with, or, for a run that produced no rows, the declared concept resolved by reloading the method — so an empty list still writes a correct header-only file. On write, `None` is rendered as an empty cell and booleans as lowercase `true`/`false`, so a value round-trips back through a read unchanged.
 
 ## Round-trip example
 

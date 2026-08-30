@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
+from kajson.kajson_manager import KajsonManager
 from pydantic import Field
 
 from pipelex.core.memory.exceptions import ListWhereSingularError
@@ -41,7 +42,6 @@ from pipelex.interpreter_hub import (
 from pipelex.pipeline.input_form import FieldKind, InputFormField, build_input_form
 from pipelex.pipeline.pipe_io_contracts import IOMultiplicity, build_pipe_io_contracts
 from pipelex.pipeline.validate_bundle import validate_bundle
-from pipelex.system.registries.class_registry_access import get_class_registry
 from tests.helpers.input_form import as_list, fields_by_name
 
 if TYPE_CHECKING:
@@ -587,7 +587,12 @@ class TestKindAssignmentTable:
     async def _derive_kind_table(self, load_empty_library: Callable[[], str]) -> dict[str, PipeInputFormDescriptor]:
         outer_library_id = load_empty_library()
         try:
-            registry = get_class_registry()
+            # Register into the *process-global* registry, not the ambient one: these classes stand in
+            # for structure classes a Python module put in the process, and `validate_bundle` opens its
+            # own library, whose registry is seeded from the global one. Registering through
+            # `get_class_registry()` here would put them in the enclosing empty library's registry,
+            # where the validate library cannot see them.
+            registry = KajsonManager.get_class_registry()
             registry.register_class(InputFormConstrainedPayload)
             registry.register_class(InputFormPartlyMappablePayload)
             registry.register_class(InputFormFieldLessPayload)

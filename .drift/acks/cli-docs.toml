@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:440d54e77c7ab292acb88632345fedf82ad29e2d7c35cc7149fa95f7d12c7b4f"
+digest = "sha256:ea8eff045eea80483d2e4554c9ccb034fc2dd40864a5bffc24b74132c1f0cd46"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-29T02:36:21Z"
-rationale = "Rebase of the fetch-on-miss branch onto v0.55.0: installed_methods.py now carries the install write path plus the review hardening (occupied-target identity check, unique mkdtemp staging with rename-race tolerance) on top of dev's method_resolver changes. No CLI command, flag, or help text changed; run-by-address.md documents both sides (build-runner materialization from dev, symlink refusal from this branch); the agent-CLI contract doc is unaffected."
+reviewed_at = "2026-08-30T14:30:14Z"
+rationale = "Reviewed docs/tools/cli/ and the agent-CLI contract doc against the _run_core change. No command, flag, help text or output format moved: --save-csv keeps its documented behaviour, including a header-only file for a run that produced no rows. What changed is only how the row model is recovered now that a run library owns its own class registry (from the produced rows, or by reloading the bundle when the result is empty), which is internal. The one prose sentence that named the old mechanism lives in docs/building-methods/pipes/csv-input-and-output.md, outside this contract's targets, and was corrected in the same change."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -111,7 +111,7 @@ rationale = "Rebase of the fetch-on-miss branch onto v0.55.0: installed_methods.
 "pipelex/cli/commands/run/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/run/_inputs_file_loader.py" = "blob:dde781f846968b667a0acfb4b3e3cea01cef7049"
 "pipelex/cli/commands/run/_inputs_path_resolver.py" = "blob:c8ec89d98718e18af7aaaded44c9f545be60adab"
-"pipelex/cli/commands/run/_run_core.py" = "blob:71434e5eb9dc512a89f582d7f897a5a121b20eec"
+"pipelex/cli/commands/run/_run_core.py" = "blob:eb5d2c4332f94b71e9b507127368ba85b076a16b"
 "pipelex/cli/commands/run/app.py" = "blob:a7090b0ff6bf2f1d47827fa27d2a138096a2e148"
 "pipelex/cli/commands/run/bundle_cmd.py" = "blob:cb420bf4879c863d64c5e20ed535c42732b720a2"
 "pipelex/cli/commands/run/exceptions.py" = "blob:e9552226e597922b6ac0757f7b52eb880a2e1472"

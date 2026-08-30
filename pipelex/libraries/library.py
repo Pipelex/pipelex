@@ -155,6 +155,12 @@ class Library(BaseModel):
         self.concept_library.teardown()
         self.domain_library.teardown()
         self.loaded_mthds_paths = []
+        # Drop this library's dynamically generated structure classes with the library itself.
+        # The registry object would be garbage anyway once the manager forgets the Library, but
+        # a caller holding its own reference must not keep resolving a torn-down library's classes.
+        if self._class_registry is not None:
+            self._class_registry.teardown()
+            self._class_registry = None
 
     def validate_library(self) -> None:
         self.validate_domain_library_with_libraries()
