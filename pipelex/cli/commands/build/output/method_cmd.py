@@ -13,7 +13,7 @@ from pipelex.core.concepts.concept_representation_generator import ConceptRepres
 def build_output_method_cmd(
     name: Annotated[
         str,
-        typer.Argument(help="Installed method name, method address (github.com/owner/repo[/name][@tag]), or GitHub URL"),
+        typer.Argument(help="Installed method name, method address (github.com/owner/repo\\[/name]\\[@tag]), or GitHub URL"),
     ],
     pipe: Annotated[
         str | None,
