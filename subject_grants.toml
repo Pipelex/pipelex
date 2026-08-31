@@ -1152,25 +1152,9 @@ rationale = "Single-operand conversion of the annotation; description stays keyw
 param = "annotation"
 rationale = "Predicate on the annotation; single operand."
 
-["pipelex/codegen/native_expansion.py::_is_number_union"]
-param = "annotation"
-rationale = "Predicate on the annotation; single operand."
-
 ["pipelex/codegen/native_expansion.py::_list_blueprint"]
 param = "list_annotation"
 rationale = "Noun-named derivation from the list annotation; the rest stays keyword."
-
-["pipelex/codegen/native_expansion.py::_native_code_for_content_class"]
-param = "annotation"
-rationale = "Noun-named derivation: inspects the annotation for its native code; single operand."
-
-["pipelex/codegen/native_expansion.py::_scalar_field_type"]
-param = "annotation"
-rationale = "Noun-named derivation: inspects the annotation for its scalar type; single operand."
-
-["pipelex/codegen/native_expansion.py::_strip_optional"]
-param = "annotation"
-rationale = "Single-operand transformation of the annotation."
 
 ["pipelex/codegen/native_expansion.py::collect_native_refs_from_structure"]
 param = "structure"

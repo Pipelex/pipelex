@@ -13,7 +13,7 @@ from pipelex.cli.method_resolver import method_output_base_dir, resolve_method_t
 def build_runner_method_cmd(
     name: Annotated[
         str,
-        typer.Argument(help="Installed method name, method address (github.com/owner/repo[/name][@tag]), or GitHub URL"),
+        typer.Argument(help="Installed method name, method address (github.com/owner/repo\\[/name]\\[@tag]), or GitHub URL"),
     ],
     pipe: Annotated[
         str | None,

@@ -40,7 +40,7 @@ registry, and bundle-defined classes are only reliably current while their libra
 """
 
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, get_origin
 
 from annotated_types import Ge, Gt, Le, Lt, MaxLen, MinLen
 from mthds.protocol.input_form import (
@@ -78,7 +78,14 @@ from pydantic import BaseModel, TypeAdapter
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
-from pipelex.codegen.native_expansion import reflect_structure_class
+from pipelex.core.concepts.annotation_shapes import (
+    is_number_union,
+    is_union,
+    list_item_annotation,
+    native_code_for_content_class,
+    scalar_field_type,
+    strip_optional,
+)
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprintType
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -355,30 +362,134 @@ class InputFormDeriver:
         refines: list[str] | None,
         seen: frozenset[str],
     ) -> InputFormField:
-        """A concept whose payload is stated by a registered class: a native class maps by identity, any other is reflected."""
+        """A concept whose payload is stated by a registered class.
+
+        A native class maps by identity, a `RootModel` IS its root value, any other class is reflected.
+        """
         native_code = next((code for code in NativeConceptCode if code.structure_class_name == class_name), None)
         if native_code is not None:
             return self._native_node(name=name, native_code=native_code, concept_ref=concept_ref, description=description, refines=refines, seen=seen)
         structure_class = get_class_registry().get_class(name=class_name)
         if not (isinstance(structure_class, type) and issubclass(structure_class, BaseModel)):
             return _unknown_node(name=name, concept_ref=concept_ref, description=description, refines=refines)
-        reflected = reflect_structure_class(structure_class=structure_class)
-        if reflected is None:
-            if structure_class.model_fields:
-                # A field this reflection could not map: the payload's shape is genuinely opaque here.
-                return _unknown_node(name=name, concept_ref=concept_ref, description=description, refines=refines)
-            # A class declaring no field at all is not opaque — it states a payload that demands
-            # nothing, the class-backed twin of an empty authored structure table, and the form says
-            # so. (`reflect_structure_class` collapses both into `None` because its other consumer,
-            # the native consistency probe, reads `None` as "structureless by design".)
-            reflected = {}
-        fields = [
-            _with_reflected_constraints(
-                node=self._structure_field(name=field_name, field=field, seen=seen), field_info=structure_class.model_fields[field_name]
+        if structure_class.__pydantic_root_model__:
+            # A `RootModel` IS its root value on the wire at the top of a class-backed concept exactly
+            # as it is one field down (`_reflected_node`): an `object` over the synthetic `root` field
+            # would state a shape `model_validate` rejects, and would contradict the `json_schema`
+            # derived from the same class beside it. The concept's own identity is stamped back on the
+            # node it yields — including on a `list` root, whose `concept_ref` names this concept
+            # rather than an element concept, there being none: a top-level field states the concept
+            # it carries, and a root-valued concept IS the whole value.
+            root_node = self._reflected_node(
+                name=name,
+                annotation=_root_annotation_of(root_model_class=structure_class),
+                seen=seen,
+                classes_seen=frozenset({structure_class}),
             )
-            for field_name, field in reflected.items()
+            return root_node.model_copy(update={"concept_ref": concept_ref, "refines": refines, "description": description or root_node.description})
+        return ObjectField(
+            name=name,
+            concept_ref=concept_ref,
+            refines=refines,
+            description=description,
+            required=True,
+            fields=self._reflected_class_fields(structure_class=structure_class, seen=seen, classes_seen=frozenset()),
+        )
+
+    # ---- Class reflection -------------------------------------------------------------------------
+
+    def _reflected_class_fields(
+        self, *, structure_class: type[BaseModel], seen: frozenset[str], classes_seen: frozenset[type[BaseModel]]
+    ) -> list[InputFormField]:
+        """One node per field the class declares, every annotation mapped on its own.
+
+        Reflection here is **partial**, deliberately unlike the native consistency probe's
+        faithful-or-absent rule (`native_expansion._reflect_structure_class`): an annotation with no
+        honest node makes THAT field `unknown` and leaves its siblings stated. The two answers differ
+        because the purposes do — the probe is compared against a normative pinned form,
+        where a plausible-looking partial answer would be the failure, whereas the descriptor is
+        total by contract. Collapsing the whole payload here hid every `document` and `image`
+        position under a class that one sibling annotation happened to defeat, and a consumer
+        preparing inputs from the descriptor would then pass a local file path through un-uploaded.
+
+        A class declaring no field yields no nodes, and the `object` node built over them says so
+        with an empty `fields` list: a payload that demands nothing — the class-backed twin of an
+        empty authored structure table, not an opaque payload.
+        """
+        classes_seen |= {structure_class}
+        return [
+            _with_reflected_constraints(
+                node=self._reflected_field(
+                    name=field_name,
+                    annotation=field_info.annotation,
+                    description=field_info.description or field_name,
+                    seen=seen,
+                    classes_seen=classes_seen,
+                ),
+                field_info=field_info,
+            )
+            for field_name, field_info in structure_class.model_fields.items()
         ]
-        return ObjectField(name=name, concept_ref=concept_ref, refines=refines, description=description, required=True, fields=fields)
+
+    def _reflected_field(
+        self, *, name: str, annotation: Any, description: str, seen: frozenset[str], classes_seen: frozenset[type[BaseModel]]
+    ) -> InputFormField:
+        """One reflected field: the annotation's node, carrying the field's own description and optionality."""
+        inner, required = strip_optional(annotation=annotation)
+        node = self._reflected_node(name=name, annotation=inner, seen=seen, classes_seen=classes_seen)
+        return node.model_copy(update={"description": description, "required": required})
+
+    def _reflected_node(self, *, name: str, annotation: Any, seen: frozenset[str], classes_seen: frozenset[type[BaseModel]]) -> InputFormField:
+        """The node one annotation maps to, before the field's own facts are stamped on it.
+
+        The shape questions are the blueprint reflection's own (`core/concepts/annotation_shapes.py`),
+        answered in descriptor terms: a native content class is that native's node — routed through
+        `_concept_node`, so the concept cycle guard covers a pinned native's own fields — a nested
+        non-native model is an `object` whose fields are reflected in turn, which is what keeps a
+        file-bearing field one level down visible, a `RootModel` is its root annotation's node
+        because the value it accepts is the root value itself, and an annotation with no honest node
+        is `unknown`.
+        """
+        if is_number_union(annotation=annotation):
+            return NumberField(name=name, required=True, integer=False)
+        if is_union(annotation=annotation):
+            # A union that is neither `X | None` (already peeled) nor a number union has no single node shape.
+            return _unknown_node(name=name)
+        origin = get_origin(annotation)
+        if origin is list:
+            return self._reflected_list_node(name=name, annotation=annotation, seen=seen, classes_seen=classes_seen)
+        if origin is dict:
+            # A mapping with unspecified value types, exactly as a `dict` structure field reports.
+            return _unknown_node(name=name)
+        scalar_type = scalar_field_type(annotation=annotation)
+        if scalar_type is not None:
+            return _scalar_field(field_type=scalar_type, name=name, required=True)
+        native_code = native_code_for_content_class(annotation=annotation)
+        if native_code is not None:
+            return self._concept_node(name=name, concept_ref=native_code.concept_ref, seen=seen)
+        if isinstance(annotation, type) and issubclass(annotation, BaseModel) and annotation not in classes_seen:
+            # A nested model already on the path would recurse forever; the revisit is `unknown`,
+            # the same answer the concept walk gives a concept ref it has already seen.
+            nested_class: type[BaseModel] = annotation
+            deeper: frozenset[type[BaseModel]] = classes_seen | {nested_class}
+            if nested_class.__pydantic_root_model__:
+                # A `RootModel` IS its root value on the wire, so its node is the root annotation's:
+                # an `object` over the synthetic `root` field would state a shape `model_validate` rejects.
+                return self._reflected_node(name=name, annotation=_root_annotation_of(root_model_class=nested_class), seen=seen, classes_seen=deeper)
+            return ObjectField(
+                name=name, required=True, fields=self._reflected_class_fields(structure_class=nested_class, seen=seen, classes_seen=classes_seen)
+            )
+        return _unknown_node(name=name)
+
+    def _reflected_list_node(self, *, name: str, annotation: Any, seen: frozenset[str], classes_seen: frozenset[type[BaseModel]]) -> InputFormField:
+        """A reflected `list[X]`: the element node derived one layer down and carried in `item`."""
+        item_annotation = list_item_annotation(annotation=annotation)
+        item = (
+            _unknown_node(name=name)
+            if item_annotation is None
+            else self._reflected_node(name=name, annotation=item_annotation, seen=seen, classes_seen=classes_seen)
+        )
+        return ListField(name=name, concept_ref=item.concept_ref, refines=item.refines, required=True, item=_as_list_item(node=item))
 
     # ---- Crate walks ------------------------------------------------------------------------------
 
@@ -526,6 +637,16 @@ def _as_list_item(*, node: InputFormField) -> InputFormItem:
     `str` slot holding `None` — right on the wire, wrong on the type, and unnoticed at runtime.
     """
     return _LIST_ITEM_ADAPTER.validate_python({slot: value for slot, value in node if slot != "name"})
+
+
+def _root_annotation_of(*, root_model_class: type[BaseModel]) -> Any:
+    """The annotation a `RootModel`'s value actually takes: its `root` field's, optionality peeled.
+
+    Callers test `__pydantic_root_model__` — pydantic's own marker — rather than `issubclass(…, RootModel)`,
+    which narrows to an unparameterized generic the type checker then reports as partially unknown.
+    """
+    annotation, _ = strip_optional(annotation=root_model_class.model_fields["root"].annotation)
+    return annotation
 
 
 def _with_effective_hints(*, node: InputFormField, hints: dict[str, str] | None) -> InputFormField:
