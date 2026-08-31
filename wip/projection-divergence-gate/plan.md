@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 item: L-260830-2c75b3
 ---
 
@@ -60,3 +60,5 @@ Two smaller shapes the implementation settled. The collector lost its leading un
 - Touch `docs/contribute/generate-projection-corpus.md` if it describes the gate.
 - Changelog under `[Unreleased]`.
 - PR to `dev` with `Closes L-260830-2c75b3` in the body.
+
+> **Landed.** pipelex#1170 merged to `dev` as `4a8e9ad4957b9761743c8a125e64dee64bc3dcf3`, with every CI check green (the eight py3.11 test shards, typecheck, the lint matrix including drift-contracts and keyword-only, `doc-check`, `uv-lock-check`). `L-260830-2c75b3` is closed `fixed`. The merge has not reached `main`: the code ships to exact-version consumers with the next pipelex release, tracked by `L-260828-f4e88c`. The PR carried one unrelated rider, the `bump-kajson` skill and its `upstream_notes.py` helper, which is not part of this campaign.
