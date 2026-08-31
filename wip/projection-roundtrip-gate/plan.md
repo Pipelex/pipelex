@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 item: L-260830-216378
 ---
 
@@ -66,9 +66,13 @@ Gates: `make agent-check`, then `make agent-test` (new tests are unit-level and 
 
 **Checkpoint** — the pipelex half is complete and mergeable here. Open the PR against `dev` with `Closes L-260830-216378` in the body; the re-baseline below can hand off to another session.
 
+**Checkpoint outcome.** Phases 1 through 3 landed as pipelex#1173, merged to `dev` at `cb53920d7fdad4cea3f90d83ec8f5a97350314b1`. The gate shipped as planned: `EXPECTED_UNSHAPEABLE`, the `ShapingGate` collecting one verdict per `(pipe_ref, shape)`, the manifest's `unshapeable` records, and the two refusals. Review added a third refusal the plan had not anticipated — a declared entry the capture never walked, worded apart from the lapsed one because it needs re-keying rather than deletion. Both gate rules were mutation-tested against the real corpus rather than asserted: reverting the projection's nested-native wrapping (the L-260830-8695ba escape verbatim) makes the shaping gate refuse where the divergence gate passes, which is the absorption this campaign existed to close. Phase 4 handed off as planned, one item per consumer repo.
+
 ## Phase 4 — re-baseline the committed corpus in the consumer repos
 
 The only committed-bytes change is `inputs_template/manifest.json` gaining `unshapeable`. Regenerate with the documented bundle order and land the same bytes in `mthds-js/tests/fixtures/protocol/` and `mthds-python/tests/fixtures/protocol/`. Check each repo's manifest parser first — a strict model there must gain the field in the same change. If this session does not do it, file one ledger item per consumer repo linked to L-260830-216378 rather than leaving it implied.
+
+Handed off rather than done here: L-260831-a5a68b (`mthds-js`) and L-260831-dd7460 (`mthds-python`), both released by this campaign's merge.
 
 ## Interplay to keep in mind
 
