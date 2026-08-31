@@ -17,7 +17,11 @@ either declared or shapes cleanly.
 
 from __future__ import annotations
 
+from io import StringIO
+from typing import cast
+
 import pytest
+from rich.console import Console
 
 from pipelex.cli.dev_cli.commands.generate_projection_corpus_cmd import (
     COMPACT_SHAPE,
@@ -76,13 +80,21 @@ class TestTheShapingGateRefusesWhatTheRuntimeWouldReject:
         assert DECLARED_PIPE in str(refusal.value)
 
     def test_a_declared_entry_never_walked_at_all_refuses_the_capture(self) -> None:
-        """Symmetric with the divergence record: a registry keyed on a pipe this capture never met."""
+        """Symmetric with the divergence record: a registry keyed on a pipe this capture never met.
+
+        Worded apart from the lapse above, because the two call for opposite actions. A key that
+        addresses nothing this run produced is a renamed pipe or a run over a subset of the bundles,
+        and telling whoever hits it that the gap closed would have them delete a gap still open.
+        """
         gate = ShapingGate(registry={(DECLARED_PIPE, COMPACT_SHAPE): GAP_ITEM})
 
         gate.record(pipe_ref=CLEAN_PIPE, shape=COMPACT_SHAPE, error=None)
 
-        with pytest.raises(ValueError, match="now shape"):
+        with pytest.raises(ValueError, match="never walked by this capture") as refusal:
             gate.declared()
+        assert DECLARED_PIPE in str(refusal.value)
+        # Never the retire instruction: the entry is not stale, its key is.
+        assert "now shape" not in str(refusal.value)
 
     def test_a_declared_failure_is_stated_in_the_manifest_with_its_ledger_item(self) -> None:
         """Generation is never blocked by the known-open gap: it is declared, recorded and printed."""
@@ -122,6 +134,29 @@ class TestTheShapingGateRefusesWhatTheRuntimeWouldReject:
         with pytest.raises(ValueError, match="no EXPECTED_UNSHAPEABLE entry") as refusal:
             gate.declared()
         assert "Input 'icon' declares concept" in str(refusal.value)
+
+    def test_the_refusal_survives_the_console_that_prints_it(self) -> None:
+        """The refusal is rendered through Rich, which reads a bracketed word as markup and drops it.
+
+        Every other test here reads the exception object, where a swallowed shape is still present —
+        so the suite stayed green while the printed diagnostic named a pipe twice and its shape never.
+        This states the message at the surface a human actually reads it on.
+        """
+        gate = ShapingGate(registry={})
+
+        gate.record(pipe_ref=CLEAN_PIPE, shape=COMPACT_SHAPE, error=_shaping_error(variable_name="icon"))
+        gate.record(pipe_ref=CLEAN_PIPE, shape=EXPLICIT_SHAPE, error=_shaping_error(variable_name="icon"))
+
+        with pytest.raises(ValueError, match="no EXPECTED_UNSHAPEABLE entry") as refusal:
+            gate.declared()
+
+        console = Console(file=StringIO(), width=200, no_color=True)
+        console.print(f"[red]The corpus's own record is out of date:[/red]\n{refusal.value}")
+        rendered = cast("StringIO", console.file).getvalue()
+
+        # Both shapes reach the reader, so the two lines are told apart by the field that differs.
+        assert COMPACT_SHAPE in rendered
+        assert EXPLICIT_SHAPE in rendered
 
     def test_the_passing_count_is_kept_but_never_committed(self) -> None:
         """The corpus is almost entirely passing verdicts, so they are counted rather than listed."""

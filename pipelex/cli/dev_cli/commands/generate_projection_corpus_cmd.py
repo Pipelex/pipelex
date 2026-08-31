@@ -438,8 +438,11 @@ class ShapingGate:
         failures = self.failures
         undeclared = sorted(key for key in failures if key not in self.registry)
         if undeclared:
+            # Parenthesised, not bracketed: this message is printed through the Rich console, which
+            # reads a `[compact]` as markup and eats it — leaving two shapes of one pipe as two
+            # identical lines, each missing the half of the address that says which one failed.
             listed = "\n  ".join(
-                f"{pipe_ref} [{shape}]: {type(failures[pipe_ref, shape]).__name__}: {str(failures[pipe_ref, shape]).splitlines()[0]}"
+                f"{pipe_ref} ({shape}): {type(failures[pipe_ref, shape]).__name__}: {str(failures[pipe_ref, shape]).splitlines()[0]}"
                 for pipe_ref, shape in undeclared
             )
             msg = (
@@ -447,9 +450,23 @@ class ShapingGate:
                 f"fix the projection, or declare the gap and name the item tracking it:\n  {listed}"
             )
             raise ValueError(msg)
-        lapsed = sorted(set(self.registry) - set(failures))
-        if lapsed:
-            msg = f"Declared unshapeable template(s) {lapsed} now shape — delete the EXPECTED_UNSHAPEABLE entry, the gap closed."
+        # Two ways a declaration can go stale, and they call for opposite actions, so they are worded
+        # apart rather than lumped into one "delete the entry". A template that started shaping is a
+        # closed gap; one this capture never walked at all is a key that no longer addresses anything
+        # — a renamed pipe, or a run over a subset of the bundles — and deleting it there would drop
+        # a gap that is still open.
+        shaping_now = sorted(key for key in self.registry if key in self.verdicts and key not in failures)
+        if shaping_now:
+            msg = f"Declared unshapeable template(s) {shaping_now} now shape — delete the EXPECTED_UNSHAPEABLE entry, the gap closed."
+            raise ValueError(msg)
+        unwalked = sorted(key for key in self.registry if key not in self.verdicts)
+        if unwalked:
+            msg = (
+                f"Declared unshapeable template(s) {unwalked} were never walked by this capture — "
+                "the key names no pipe and shape this run produced. Re-key the EXPECTED_UNSHAPEABLE entry "
+                "if the pipe was renamed, or pass every bundle the corpus is generated from; deleting it "
+                "would drop a gap that is still open."
+            )
             raise ValueError(msg)
         return [
             UnshapeableEntry(
