@@ -39,7 +39,7 @@ An error rises through a series of layers. Each layer has exactly one job.
 | **1 — Workers / SDK calls** | `pipelex/providers/*/` | **Catch the SDK exception → classify → raise `CogtError`** |
 | **0 — Third-party SDKs** | OpenAI, Anthropic, Google, … | Raise raw, untyped provider exceptions |
 
-Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they attach context as they catch and re-raise, but the `error_category`, `error_domain`, `model`, and `provider` set at Layer 1 reach Layer 5 unchanged (see [Cause-Chain Enrichment](#cause-chain-enrichment)).
+Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they attach context as they catch and re-raise, but the `error_category`, `error_domain`, `model`, and `provider` set at Layer 1 reach Layer 5 unchanged (see [Cause-Chain Enrichment](#cause-chain-enrichment)). The worker states only the `error_category`; the matching `error_domain` is [derived from it](#the-cogterror-family-derives-its-domain-from-its-category), so a single Layer-1 decision settles both the retry question and the HTTP status.
 
 ---
 
@@ -54,7 +54,7 @@ Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they att
 | `title` | `str` | Stable human-readable summary — the RFC 7807 `title` |
 | `type_uri` | `str` | Per-class documentation URI — the RFC 7807 `type` |
 | `error_category` | `str \| None` | `InferenceErrorCategory` value (inference errors only) |
-| `error_domain` | `str \| None` | `ErrorDomain` value — `input` / `config` / `runtime` |
+| `error_domain` | `str \| None` | `ErrorDomain` value — `input` / `config` / `runtime`. Declared per class, except on the `CogtError` family where it is [derived from `error_category`](#the-cogterror-family-derives-its-domain-from-its-category) |
 | `retryable` | `bool \| None` | Whether a retry could succeed |
 | `user_action` | `UserAction \| None` | Typed advice — `kind` + free-form `detail` |
 | `model` | `str \| None` | Model handle, when the failure is attributable to one |
@@ -139,16 +139,16 @@ Two `StrEnum`s drive every downstream decision.
 
 ### InferenceErrorCategory
 
-Defined in `pipelex/cogt/exceptions.py`. Drives retry decisions — `is_retryable` is `True` only for `TRANSIENT`.
+Defined in `pipelex/cogt/exceptions.py`. It carries two derived properties: `is_retryable` drives retry decisions and is `True` only for `TRANSIENT`; `error_domain` drives the HTTP status the whole `CogtError` family answers with.
 
-| Category | Meaning | Retryable | Typical cause |
-|----------|---------|-----------|---------------|
-| `TRANSIENT` | A brief, self-correcting failure | ✅ | Rate limit, 5xx, connection blip |
-| `CONFIGURATION` | The setup is wrong | ❌ | Bad API key, missing backend |
-| `CONTENT` | The input or prompt is wrong | ❌ | Content-policy violation, bad prompt |
-| `CAPACITY` | Account quota / billing exhausted | ❌ | `insufficient_quota`, HTTP 402 |
-| `AMBIGUOUS` | Outcome unknown — may have committed | ❌ | Connection dropped mid-request |
-| `UNKNOWN` | Could not classify | ❌ | Unrecognized inner exception |
+| Category | Meaning | Retryable | Domain | Typical cause |
+|----------|---------|-----------|--------|---------------|
+| `TRANSIENT` | A brief, self-correcting failure | ✅ | `RUNTIME` | Rate limit, 5xx, connection blip |
+| `CONFIGURATION` | The setup is wrong | ❌ | `CONFIG` | Bad API key, missing backend |
+| `CONTENT` | The input or prompt is wrong | ❌ | **`INPUT`** | Content-policy violation, bad prompt |
+| `CAPACITY` | Account quota / billing exhausted | ❌ | `RUNTIME` | `insufficient_quota`, HTTP 402 |
+| `AMBIGUOUS` | Outcome unknown — may have committed | ❌ | `RUNTIME` | Connection dropped mid-request |
+| `UNKNOWN` | Could not classify | ❌ | *none* | Unrecognized inner exception |
 
 ```python
 class InferenceErrorCategory(StrEnum):
@@ -163,10 +163,22 @@ class InferenceErrorCategory(StrEnum):
                 return True
             case _:  # all other categories
                 return False
+
+    @property
+    def error_domain(self) -> ErrorDomain | None:
+        match self:
+            case InferenceErrorCategory.CONTENT:
+                return ErrorDomain.INPUT
+            case InferenceErrorCategory.CONFIGURATION:
+                return ErrorDomain.CONFIG
+            # ... TRANSIENT / CAPACITY / AMBIGUOUS -> RUNTIME, UNKNOWN -> None ...
 ```
 
 !!! info "`AMBIGUOUS` vs `UNKNOWN`"
     `AMBIGUOUS` means the *error type is known* but the operation may or may not have committed — a blind retry is unsafe for a non-idempotent call. `UNKNOWN` means classification itself failed. Both are non-retryable, for different reasons.
+
+!!! info "`UNKNOWN` maps to no domain at all"
+    `UNKNOWN` means the classification step itself failed, so claiming `RUNTIME` would assert something the code cannot support. An absent `error_domain` already renders 500 (see below), so the honest answer costs nothing at the HTTP boundary and keeps "could not classify" distinguishable from "classified as a server-side fault".
 
 ### ErrorDomain
 
@@ -178,12 +190,25 @@ Defined in `pipelex/base_exceptions.py`. Set as a class-level attribute on the e
 | `CONFIG` | Environment / configuration change needed | **500** | The operator |
 | `RUNTIME` | A failure during execution | **500** | Depends on the cause |
 
-`error_domain_to_http_status()` is the pure mapping table. `ErrorReport.http_status` layers one rule on top: a provider 429 (`provider_metadata.status_code == 429`) takes precedence over the domain, so the API can emit a `Retry-After` header.
+`error_domain_to_http_status()` is the pure mapping table — it maps an unset or unrecognized domain to 500 as well. `ErrorReport.http_status` layers one rule on top: a provider 429 (`provider_metadata.status_code == 429`) takes precedence over the domain, so the API can emit a `Retry-After` header. That precedence is why `CAPACITY -> RUNTIME` does not swallow a rate-limit passthrough.
 
 ```python
 class PipelexConfigError(PipelexError):
     error_domain = ErrorDomain.CONFIG  # class-level — every instance carries it
 ```
+
+#### The `CogtError` family derives its domain from its category
+
+The inference branch is the one place where `error_domain` is **not** declared per class. A worker has already decided whose fault the failure is when it assigns an `InferenceErrorCategory`, so `CogtError.to_error_report()` derives the domain from that category rather than asking several dozen leaf classes to state the same fact twice — which is also what keeps `error_domain` and `error_category` from ever contradicting each other on the wire.
+
+Precedence on the derived field mirrors every other field on that method: an `error_domain` declared explicitly on the leaf class wins, then the category derivation, then whatever the `__cause__` chain surfaced.
+
+```python
+own_domain = self.error_category.error_domain if self.error_category is not None else None
+"error_domain": self.error_domain or own_domain or base_report.error_domain,
+```
+
+The consequence worth knowing at the HTTP boundary: a **content-classified inference failure answers 422, not 500** — a content-policy refusal, a malformed prompt image, a bad prompt parameter are all properties of material the caller submitted. Everything else keeps the status it already had; only the report became truthful about why.
 
 ---
 
@@ -376,7 +401,7 @@ flowchart TB
 
 ### Class Hierarchy
 
-`PipelexError` is the single root. `CogtError` is the inference branch — it overrides `to_error_report()` to add `error_category`, `retryable`, `user_action`, `provider_metadata`, and reads `model_handle` / `backend_name` from the instance.
+`PipelexError` is the single root. `CogtError` is the inference branch — it overrides `to_error_report()` to add `error_category`, `retryable`, `user_action`, `provider_metadata`, and reads `model_handle` / `backend_name` from the instance. It is also where `error_domain` is *derived* rather than declared: the whole subtree gets its domain from its category.
 
 ```
 Exception
@@ -384,15 +409,20 @@ Exception
     ├── PipelexConfigError         → error_domain = CONFIG
     ├── PipelexSetupError          → error_domain = CONFIG
     ├── CogtError                  cogt/exceptions.py — error_category, provider_metadata
-    │   ├── LLMCompletionError      ← per-instance category from the worker
+    │   │                          → error_domain derived from error_category (no per-class declaration)
+    │   ├── LLMCompletionError      ← per-instance category from the worker → per-instance domain
     │   ├── ImgGenGenerationError   ← per-instance category
+    │   ├── LLMPromptSpecError      ← class-level CONTENT → INPUT → HTTP 422
+    │   ├── LLMConfigError          ← class-level CONFIGURATION → CONFIG
     │   ├── ModelNotFoundError      ← sibling family raised on provider HTTP 404
     │   │   ├── LLMModelNotFoundError / ImgGenModelNotFoundError
     │   │   └── ExtractModelNotFoundError / SearchModelNotFoundError
     │   └── ... (see worker classification) ...
-    ├── PipelineExecutionError      pipeline/exceptions.py — error_domain = RUNTIME
+    ├── PipelineExecutionError      pipeline/exceptions.py — error_domain = RUNTIME, but only as a floor
     └── ... (one exceptions.py per package) ...
 ```
+
+`PipelineExecutionError`'s `RUNTIME` is deliberately a *floor*, applied only when the cause chain surfaced no domain — so a `CONTENT`-categorized inference failure now reaches the HTTP boundary as `INPUT` / 422 through every wrapping layer instead of being flattened to the wrapper's generic 500.
 
 ### Factory-time vs Runtime
 
@@ -400,7 +430,7 @@ Exception
 |------|----------------------|-----|
 | **Class definition** | `error_domain`, `error_category` defaults, `user_action` defaults | Class-level attributes — one source of truth per exception type |
 | **Raise time** | Per-instance `error_category`, `user_action`, `provider_metadata` | Constructor args — set by the worker that classified the failure |
-| **Report time** | `model`, `provider`, cause-chain fields | `fill_model_and_provider()` at the worker chokepoint; `_enrich_error_report_from_cause()` on `to_error_report()` |
+| **Report time** | `model`, `provider`, cause-chain fields; `error_domain` on the `CogtError` family | `fill_model_and_provider()` at the worker chokepoint; `InferenceErrorCategory.error_domain` derivation and `_enrich_error_report_from_cause()` on `to_error_report()` |
 
 The "outcome" exceptions (`LLMCompletionError`, `ImgGenGenerationError`, `ExtractJobFailureError`, `SearchJobFailureError`) intentionally carry **no** class-level `error_category` — their category is genuinely per-instance, decided by the worker.
 
@@ -448,14 +478,17 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 
 | Scenario | Behavior |
 |----------|----------|
-| Rate limit hit | `TRANSIENT` → retryable; transport retry honors `Retry-After` |
-| Quota / billing exhausted | `CAPACITY` → non-retryable; `UserAction(CHECK_BILLING)` |
+| Rate limit hit | `TRANSIENT` → retryable; `error_domain = RUNTIME`; transport retry honors `Retry-After` (a provider 429 answers 429 regardless of domain) |
+| Quota / billing exhausted | `CAPACITY` → non-retryable; `UserAction(CHECK_BILLING)`; `error_domain = RUNTIME` → HTTP 500 |
 | Bad API key | `CONFIGURATION` → non-retryable; `error_domain = CONFIG` → HTTP 500 |
 | Model or deployment not found (provider HTTP 404) | Raises a dedicated `*ModelNotFoundError` sibling (`LLMModelNotFoundError`, `ImgGenModelNotFoundError`, `ExtractModelNotFoundError`, `SearchModelNotFoundError`); operator re-raises `PipeOperatorModelAvailabilityError` |
-| Content-policy violation | `CONTENT` → non-retryable; `UserAction(CHANGE_INPUT)` |
-| LLM returns schema-mismatched JSON | `instructor` re-asks; if exhausted → `UNKNOWN` |
-| Connection dropped mid-request | `AMBIGUOUS` → non-retryable (outcome unknown) |
-| Wrapper exception (no own category) | Inherits cause's classification via enrichment |
+| Content-policy violation | `CONTENT` → non-retryable; `UserAction(CHANGE_INPUT)`; `error_domain = INPUT` → **HTTP 422** |
+| Malformed prompt image / bad prompt parameter | `CONTENT` class-level (`PromptImageFormatError`, `LLMPromptParameterError`, …) → `error_domain = INPUT` → **HTTP 422** |
+| Any other provider **HTTP 400** | `CONTENT` → `error_domain = INPUT` → **HTTP 422**. This is the widest reach of the derivation: a 400 covers a context-length overflow and a parameter the model rejects alike, and an engine-side request-construction fault lands here too — reported as the caller's to fix, and absent from the 5xx rate |
+| Local file extractor raises a builtin (docling, pypdfium2) | `ValueError` / `RuntimeError` / `FileNotFoundError` → `CONTENT` → `error_domain = INPUT` → **HTTP 422**; `OSError` → `TRANSIENT` (see `_LOCAL_EXTRACT_BY_TYPE_NAME`) |
+| LLM returns schema-mismatched JSON | `instructor` re-asks; if exhausted → `UNKNOWN` → no `error_domain` asserted → HTTP 500 |
+| Connection dropped mid-request | `AMBIGUOUS` → non-retryable (outcome unknown); `error_domain = RUNTIME` |
+| Wrapper exception (no own category) | Inherits cause's classification via enrichment — including the domain the cause derived |
 | Failure on a distributed worker | `ErrorReport` recovered from the transport's serialized details — same classification as local |
 | Worker exception with no `ErrorReport` | Synthesized fallback report — `error_domain = RUNTIME` |
 

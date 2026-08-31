@@ -14,7 +14,7 @@ Error raised when a model choice cannot be found in the model deck.
 | `error_type` | `ModelChoiceNotFoundError` |
 | `title` | Model choice not found |
 | `type_uri` | `https://docs.pipelex.com/latest/errors/model-choice-not-found-error/` |
-| `error_domain` | _(inherited from parent)_ |
+| `error_domain` | `input` |
 | Defined in | `pipelex.cogt.exceptions` |
 | Parent class | [`CogtError`](cogt-error.md) |
 

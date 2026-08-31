@@ -17,7 +17,13 @@ from pipelex.cogt.exceptions import (
 )
 from pipelex.core.stuffs.exceptions import DateContentError
 from pipelex.mthds_parsing.exceptions import MthdsParserError
-from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError, ValidateBundleError
+from pipelex.pipeline.exceptions import (
+    PipeExecutionError,
+    PipelineExecutionError,
+    PipelineInputContentError,
+    PipelineInputUrlMissingError,
+    ValidateBundleError,
+)
 from pipelex.plugins.exceptions import UnknownSecretsMethodError, UnknownStorageMethodError
 from pipelex.system.exceptions import EnvVarNotFoundError
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -47,6 +53,7 @@ class TestClassLevelMetadata:
             ("pipeline_execution", _PIPELINE_EXEC_ERROR, ErrorDomain.RUNTIME),
             ("pipe_execution", PipeExecutionError("boom"), ErrorDomain.RUNTIME),
             ("validate_bundle", ValidateBundleError("boom"), ErrorDomain.INPUT),
+            ("pipeline_input_content", PipelineInputContentError("boom"), ErrorDomain.INPUT),
             ("interpreter", MthdsParserError("boom"), ErrorDomain.INPUT),
             ("setup", PipelexSetupError("boom"), ErrorDomain.CONFIG),
             ("config", PipelexConfigError("boom"), ErrorDomain.CONFIG),
@@ -101,6 +108,15 @@ class TestClassLevelMetadata:
         [
             ("interpreter", MthdsParserError("boom"), True),
             ("validate_bundle", ValidateBundleError("boom"), True),
+            # Regression pin: this class declared the *report field* name (``caller_facing_message``)
+            # instead of the class-level flag (``_authors_caller_facing_message``), so its
+            # caller-facing message was silently redacted under STRICT disclosure.
+            ("pipeline_input_url_missing", PipelineInputUrlMissingError("boom"), True),
+            # Security pin, and the reason the family is split: this class's message names the
+            # resolved local path and the OSError subclass that rejected it. Flagging it
+            # caller-facing would let STRICT disclosure answer "does this server-side path exist,
+            # and may the runner read it?" for any authenticated caller.
+            ("pipeline_input_content", PipelineInputContentError("boom"), False),
             ("csv", CsvError("boom"), True),
             ("unknown_storage_method", UnknownStorageMethodError(method="bogus", registered_methods=["local", "s3"]), True),
             ("unknown_secrets_method", UnknownSecretsMethodError(method="bogus", registered_methods=["env"]), True),
