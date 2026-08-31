@@ -245,4 +245,7 @@ class PipelineInputContentError(PipelexError):
             "Provide a valid url on every Image/Document input (https://, data:, pipelex-storage://, or an existing local file when running locally)."
         ),
     )
-    caller_facing_message = True
+    # The message names the caller's own input url and the accepted schemes, with no internal paths
+    # or secrets, so it should survive STRICT disclosure intact. (``caller_facing_message`` is the
+    # *report* field; the class-level flag that sets it is ``_authors_caller_facing_message``.)
+    _authors_caller_facing_message = True

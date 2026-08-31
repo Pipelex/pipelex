@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:c28a7ec0b029ea11e2ca96dccf909609b4b34ed1079e67d6e24f5bb34e5863d1"
+digest = "sha256:98cd6d18e164724aa99408c14e3975728c57006cedf1460f1d354e9bf8b5ed9d"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-30T16:39:08Z"
-rationale = "Escaping the rich markup in the NAME argument help of the eight method subcommands. No command, flag, argument or documented surface changed: the address grammar the help states is identical before and after, and the escape exists only because typer renders argument help through rich's markup parser, which read the literal [/name] as a closing tag and crashed. Reviewed docs/tools/cli/ — run.md, validate.md, run-by-address.md and the three build pages state the same grammar in Markdown, where the brackets are already literal, so nothing there was stale; no page carries a verbatim --help transcript. pipelex/cli/agent_cli/CLAUDE.md is unaffected, since the two-stream output contract it documents is untouched."
+reviewed_at = "2026-08-31T16:15:54Z"
+rationale = "Inference errors now derive error_domain from their InferenceErrorCategory, so agent_error's report-first read supersedes the AGENT_ERROR_DOMAINS lookup for every categorized CogtError. Removed the three now-unreachable entries and gave ModelChoiceNotFoundError an explicit class-level INPUT domain, since a mistyped model reference is the caller's to fix even though its category is CONFIGURATION. Reviewed docs/tools/cli/ — agent-cli.md states the generic error envelope and enumerates no dict entries, so nothing there was stale. Updated the Error classification bullet in pipelex/cli/agent_cli/CLAUDE.md, which named the dict as the only source and no longer described how a class self-describes."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -12,7 +12,7 @@ rationale = "Escaping the rich markup in the NAME argument help of the eight met
 "pipelex/cli/agent_cli/commands/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/accept_gateway_terms_cmd.py" = "blob:cb8338c09a7b5dee6088551c156d69dab613213a"
 "pipelex/cli/agent_cli/commands/agent_cli_factory.py" = "blob:c9a251db61d8655bdb41002c62eab88b486fc32f"
-"pipelex/cli/agent_cli/commands/agent_output.py" = "blob:19cb8df5cf764c85aeaf91d24ce13b26607fff1c"
+"pipelex/cli/agent_cli/commands/agent_output.py" = "blob:a1ffa37559c51d6272d0ec26bfbd073303233096"
 "pipelex/cli/agent_cli/commands/bundle_path_resolver.py" = "blob:30339c5d91048f4e67312d5691ed9a65d57472e0"
 "pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:ff33446143044332983a0cb7b204b8eca349795a"
 "pipelex/cli/agent_cli/commands/codegen/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
