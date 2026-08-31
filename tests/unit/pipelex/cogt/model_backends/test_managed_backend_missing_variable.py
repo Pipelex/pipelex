@@ -1,15 +1,20 @@
-"""A managed gateway backend missing its `${…}` variables is disabled; every other backend still stops the boot.
+"""A backend that DECLARES a model specs section is disabled when its `${…}` variables are unset; every other backend still stops the boot.
 
-The kit ships `[pipelex_manifold]` declared and enabled, so joining the beta is setting two variables
-rather than editing a config file. That only works if an installation that has *not* joined boots
-normally, which is why a managed gateway backend whose variables are unset is disabled with a warning
-naming it.
+The kit ships `[pipelex_manifold]` declared, so joining the beta is enabling it and setting two
+variables rather than editing a config file. That only works if an installation that has *not*
+joined boots normally, which is why such a backend whose variables are unset is disabled with a
+warning naming it.
 
 **The scoping is the point of these tests, not a detail.** The tolerance sits on a code path every
 backend shares, so a global version of it would mean a user who typos `ANTHROPIC_API_KEY` stops
 getting a boot failure and starts getting a silently missing backend that resurfaces much later as a
 model-resolution error — a behaviour change on the Portkey-cloud path and on every direct-SDK path,
 which the two-gateways work must not make.
+
+**And the predicate is the declaration rather than managed-ness**, because the two come apart on
+`pipelex_gateway`: it is handed its section by compatibility default, so keying on managed-ness
+would hand it the tolerance too and lose exactly the boot failure the paragraph above protects. The
+third test below is what holds those two apart.
 """
 
 from __future__ import annotations
@@ -21,14 +26,13 @@ import pytest
 from pipelex.cogt.exceptions import InferenceBackendCredentialsError
 from pipelex.cogt.model_backends.backend import MANIFOLD_MODEL_SPECS_SECTION, PipelexBackend
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
+from pipelex.cogt.model_backends.gateway_config import GatewayConfig
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from pytest_mock import MockerFixture
-
-    from pipelex.cogt.model_backends.gateway_config import GatewayConfig
 
 # A name no environment has, so the substitution fails for the reason under test rather than by luck.
 UNSET_VAR = "PIPELEX_TEST_VARIABLE_THAT_IS_NEVER_SET"
@@ -43,6 +47,14 @@ api_key = "sk-not-a-real-key"
 
 BYOK_BACKEND_TOML = f"""
 [anthropic]
+enabled = true
+api_key = "${{{UNSET_VAR}}}"
+"""
+
+# The legacy gateway, declaring nothing: `resolve_model_specs_section` hands it a section by
+# compatibility default, which is exactly why it must not inherit the tolerance along with it.
+LEGACY_GATEWAY_BACKEND_TOML = f"""
+[pipelex_gateway]
 enabled = true
 api_key = "${{{UNSET_VAR}}}"
 """
@@ -81,6 +93,26 @@ class TestAManagedBackendMissingItsVariables:
         """Unchanged, deliberately: a typo in an API-key variable must stay loud."""
         with pytest.raises(InferenceBackendCredentialsError) as refused:
             _load(tmp_path, body=BYOK_BACKEND_TOML)
+
+        assert refused.value.key_name == UNSET_VAR
+
+    def test_the_legacy_gateway_missing_its_key_still_stops_the_boot(self, tmp_path: Path) -> None:
+        """The Portkey-cloud path keeps today's fatal boot, and the distinction is why this test exists.
+
+        `pipelex_gateway` declares no `model_specs_section` — it is handed one by compatibility
+        default so that a `backends.toml` written before the field keeps working. That default makes
+        it *managed*, and if the tolerance were scoped to managed-ness it would inherit it: an unset
+        `PIPELEX_GATEWAY_API_KEY` would stop being a boot failure with a remediation message and
+        become a silently missing backend that resurfaces much later as a model-resolution error.
+        The tolerance is therefore scoped to a backend that *declares* its section, which the kit
+        ships only for a backend it also ships disabled.
+        """
+        with pytest.raises(InferenceBackendCredentialsError) as refused:
+            _load(
+                tmp_path,
+                body=LEGACY_GATEWAY_BACKEND_TOML,
+                managed_gateway_configs={PipelexBackend.GATEWAY: GatewayConfig(model_specs={}, aws_region="eu-west-1")},
+            )
 
         assert refused.value.key_name == UNSET_VAR
 

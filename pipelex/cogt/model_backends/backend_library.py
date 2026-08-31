@@ -166,11 +166,20 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             # Read before substitution, deliberately: the section is a plain literal with no `${…}`
             # in it, and whether this backend is *managed* decides how the substitution below is
             # allowed to fail. Reading it off the validated blueprint would be too late.
+            declared_model_specs_section = self._declared_model_specs_section(backend_dict=inference_backend_blueprint_dict_raw)
             model_specs_section = resolve_model_specs_section(
                 backend_name=backend_name,
-                declared_section=self._declared_model_specs_section(backend_dict=inference_backend_blueprint_dict_raw),
+                declared_section=declared_model_specs_section,
             )
-            is_managed_gateway = model_specs_section is not None
+            # **The tolerance below keys on the DECLARATION, not on the resolved section**, and the
+            # two come apart on exactly one name. `pipelex_gateway` is handed a section by
+            # compatibility default so a `backends.toml` written before the field keeps working, so
+            # it is managed without declaring anything — and keying on managed-ness would hand it a
+            # tolerance it never had: an unset `PIPELEX_GATEWAY_API_KEY` would stop being a boot
+            # failure with a remediation message and become a silently missing backend, which is the
+            # behaviour delta on the Portkey-cloud path this work must not make. A declaration is
+            # something only the kit writes, and only for a backend it also ships disabled.
+            tolerates_missing_variables = declared_model_specs_section is not None
             try:
                 inference_backend_blueprint_dict = apply_to_strings_recursive(
                     inference_backend_blueprint_dict_raw, transform_func=substitute_vars_with_provider
@@ -191,21 +200,23 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 if lenient:
                     log.verbose(f"Skipping backend '{backend_name}': missing credential variable '{var_not_found_exc.var_name}'")
                     continue
-                if is_managed_gateway:
-                    # **Scoped to managed gateway backends, and the scoping is the whole point.**
-                    # A managed backend is one the kit can ship *declared* — `pipelex_manifold`
-                    # ships declared and disabled, and joining the beta is enabling it and setting
-                    # two variables — so an installation that has enabled one and not yet filled in
-                    # its variables must not fail to boot over them. Disabled with a named warning
-                    # is exactly the posture the gateway itself takes toward an integration missing
-                    # its variables. (An installation that has not joined never reaches here at all:
-                    # a disabled backend is skipped above, and the one loader that asks for disabled
-                    # backends asks leniently.)
+                if tolerates_missing_variables:
+                    # **Scoped to backends that DECLARE a model specs section, and the scoping is
+                    # the whole point.** Such a backend is one the kit can ship *declared* —
+                    # `pipelex_manifold` ships declared and disabled, and joining the beta is
+                    # enabling it and setting two variables — so an installation that has enabled
+                    # one and not yet filled in its variables must not fail to boot over them.
+                    # Disabled with a named warning is exactly the posture the gateway itself takes
+                    # toward an integration missing its variables. (An installation that has not
+                    # joined never reaches here at all: a disabled backend is skipped above, and the
+                    # one loader that asks for disabled backends asks leniently.)
                     #
-                    # Every BYOK backend keeps today's fatal boot, because widening this would mean
-                    # a user who typos ANTHROPIC_API_KEY stops getting a boot failure and starts
-                    # getting a silently missing backend that resurfaces much later as a
-                    # model-resolution error — a behaviour delta on paths this work must not touch.
+                    # Every other backend keeps today's fatal boot — `pipelex_gateway` included,
+                    # since it declares no section — because widening this would mean a user who
+                    # typos ANTHROPIC_API_KEY or PIPELEX_GATEWAY_API_KEY stops getting a boot
+                    # failure and starts getting a silently missing backend that resurfaces much
+                    # later as a model-resolution error, a behaviour delta on paths this work must
+                    # not touch.
                     log.warning(
                         f"Backend '{backend_name}' is disabled: it is a Pipelex-managed gateway backend and the variable "
                         f"'{var_not_found_exc.var_name}' it needs is not set. Set it to enable this backend, or set "
