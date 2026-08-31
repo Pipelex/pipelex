@@ -18,7 +18,7 @@ Bundle order is part of the capture: it fixes the key order of every emitted map
 
 - `input_form.json` and `pipe_io_contracts.json` — the descriptor and contract capture, keyed by namespaced `pipe_ref`. Byte for byte what `trace-input-semantics` dumps at hop 5, so migrating the existing committed copies to this command is a no-op diff.
 - `inputs_template/<pipe_ref>.<shape>.<format>` — the **expected** template each projection must produce, in both shapes (`compact`, `explicit`) and both formats (`json`, `toml`).
-- `inputs_template/manifest.json` — what the corpus covers (bundles, pipes, shapes, formats) plus the declared divergences, each with worked sites a consumer repo can check with no engine present.
+- `inputs_template/manifest.json` — what the corpus covers (bundles, pipes, shapes, formats), the declared divergences, each with worked sites a consumer repo can check with no engine present, and the templates the input shaper refuses to take back.
 - `engine/` — the engine's own renderings of the same pipes. **Not committed.** It is what the divergence record is measured against, not part of the contract.
 
 A pipe declaring no inputs is captured from the projection alone: an empty input form is a valid form and the projection renders it as `{}` (an empty TOML document), but the engine's renderer refuses one with `NoInputsRequiredError`, so that pipe gets its templates and no `engine/` file, and nothing is compared for it.
@@ -49,6 +49,23 @@ The walk visits both sides' keys, so a field the projection *stopped* rendering 
 
 What it still cannot separate is a *wrong value at a site that already carries a class*: a projection inventing a field reads as `optional-field-included`, and a garbled placeholder at a url-named text field reads as `text-named-url`. Telling those apart needs each node's kind and presence carried through the whole walk, which is a redesign rather than a fix, and the two shipped projections are pinned against the committed bytes anyway.
 
+## The shaping round-trip
+
+A fill-in template exists to be filled in and handed back to the runtime, so surviving `InputShaper.shape` is part of what the corpus asserts — and until this gate existed, nothing checked it. Twice the corpus pinned slots the runtime rejects outright, and both times a human review round caught it rather than the capture; the second time the divergence gate absorbed the broken sites into a declared class and exited 0, because "differs from the engine" and "the engine refuses this value" are not the same question.
+
+So every projected template goes straight back through the shaper, assembled exactly as an entry-pipe run assembles it: the pipe's own declared inputs as the signature, its domain as the search scope. Both shapes, both pipes' worth — the explicit template is as much a runnable scaffold as the compact one. The round-trip is offline: the file-ish arms wrap a mock URL without fetching it.
+
+The verdict follows the same declared-never-discovered discipline as the divergence record, through the `EXPECTED_UNSHAPEABLE` registry in `generate_projection_corpus_cmd.py`, which maps a `(pipe_ref, shape)` to the ledger item tracking the gap:
+
+- A refusal **not** in the registry fails the command, naming the pipe, the shape, the error class and the error's first line. This is the mechanism that would have caught both prior escapes at capture time.
+- A registry entry whose template **now shapes** fails the command too — *delete the entry, the gap closed* — so a fix retires its declaration deliberately rather than leaving the manifest claiming a defect that no longer exists.
+- A registry entry this capture **never walked at all** fails it as well, and is worded apart from the one above because the two call for opposite actions: a key addressing no pipe and shape the run produced is a renamed pipe or a run over a subset of the bundles, so it wants re-keying or the full bundle list — deleting it would drop a gap that is still open.
+- A declared entry is recorded in the manifest as an `unshapeable` entry (`pipe_ref`, `shape`, `error_type`, `ledger_item`) and printed, and generation proceeds. A known-open gap therefore never blocks the capture; it is simply stated.
+
+The manifest holds the error's **class name**, never its message. The class name is contract-stable — the error-identity snapshot makes a rename a reviewable diff — while the message is wording that would churn these committed bytes across pydantic versions, so it goes to the console and to the refusal only. Passing verdicts are printed as a count, never committed: a template the shaper takes back is the state every entry is working towards, not a fact worth pinning.
+
+The entries declared today are all one descriptor gap — a nested list inside a structure — which takes both shapes of the two probe pipes that reach it. Closing it deletes the four entries; the lapse rule fails the command until somebody does.
+
 ## The bundles
 
 `tests/data/input_semantics/` holds the corpus bundles. `probe_bundle.mthds` exercises every construct the language accepts and `hinted_bundle.mthds` the intent hints; `scaffold_bundle.mthds` was added for this corpus and covers what the other two do not — a text field merely named `url` beside a real file position, an optional nested structure, optional `native.Image` and `native.Document` fields inside a structure, and both a fixed `[N]` and a variable `[]` slot over a structured concept.
@@ -57,4 +74,4 @@ What it still cannot separate is a *wrong value at a site that already carries a
 
 Rerun and re-commit the capture in both consumer repos whenever the descriptor derivation changes, a `kind` is added to the standard, or a bundle changes. The per-repo harness asserts that the set of kinds appearing across the corpus **equals** the closed `FieldKind` vocabulary, so a kind added without a fixture fails by name rather than passing silently.
 
-`tests/unit/pipelex/cli/dev_cli/test_generate_projection_corpus.py` keeps the capture complete and byte-stable, `test_projection_divergence_gate.py` states the gate's guarantee as the regressions it must not absorb, and `test_projection_reference.py` pins the projection's rules one at a time, so a rule that changed fails by name instead of as a wall of differing bytes.
+`tests/unit/pipelex/cli/dev_cli/test_generate_projection_corpus.py` keeps the capture complete and byte-stable and measures the registry against the real round-trip, `test_projection_divergence_gate.py` and `test_projection_shaping_gate.py` state each gate's guarantee as the regressions it must not absorb, and `test_projection_reference.py` pins the projection's rules one at a time, so a rule that changed fails by name instead of as a wall of differing bytes.

@@ -13,10 +13,14 @@ that corpus trustworthy, and both are checked here against the corpus bundles th
 - **A pipe with no inputs is captured from the projection alone.** An empty input form is a valid
   form, but the engine's own renderer refuses one, so the capture takes the projected half and skips
   the comparison. No corpus bundle declares such a pipe, so the case is put to the generator here.
+- **Every template the shaper refuses is exactly one the registry declares.** The templates are
+  pinned to be filled in and handed back to the runtime, so the capture round-trips each one through
+  `InputShaper.shape`. This is where that round-trip actually runs, against real descriptors and the
+  real concept library, and states that its verdicts meet `EXPECTED_UNSHAPEABLE` on the nose.
 
-The gate that measures the divergences is checked at the collector itself, in
-`test_projection_divergence_gate.py`: the corpus is exactly the case where the projection is right,
-so nothing here can state what happens when it is wrong.
+The two gates that measure the capture are checked at their own collectors, in
+`test_projection_divergence_gate.py` and `test_projection_shaping_gate.py`: the corpus is exactly the
+case where the projection is right, so nothing here can state what happens when it is wrong.
 """
 
 from __future__ import annotations
@@ -28,6 +32,7 @@ import pytest
 
 from pipelex.cli.dev_cli.commands.generate_projection_corpus_cmd import (
     ENGINE_DIR_NAME,
+    EXPECTED_UNSHAPEABLE,
     INPUT_FORM_FILE_NAME,
     MANIFEST_FILE_NAME,
     PIPE_IO_CONTRACTS_FILE_NAME,
@@ -100,6 +105,26 @@ class TestGenerateProjectionCorpus:
 
         # The manifest round-trips: it is what the consumer repos parse.
         assert CorpusManifest.model_validate_json((template_dir / MANIFEST_FILE_NAME).read_text(encoding="utf-8")) == manifest
+
+    async def test_every_unshapeable_template_is_one_the_registry_declares(self, tmp_path: Path) -> None:
+        """The round-trip runs for real here, so the registry is measured rather than restated."""
+        manifest = await generate_projection_corpus(bundle_paths=CORPUS_BUNDLES, output_dir=tmp_path)
+
+        # Exactly the declared set, in both directions: an undeclared refusal fails the capture, and
+        # a declaration whose gap closed fails it too. Stating it here is what makes the registry a
+        # measurement of the corpus rather than a list somebody keeps in their head.
+        assert {(entry.pipe_ref, entry.shape): entry.ledger_item for entry in manifest.unshapeable} == EXPECTED_UNSHAPEABLE
+
+        for entry in manifest.unshapeable:
+            assert entry.pipe_ref in manifest.pipes
+            assert entry.shape in manifest.shapes
+            # The error class is contract-stable and belongs in the committed bytes; which class it
+            # is today is not asserted, because typing the explicit arm's escaped pydantic error
+            # (L-260831-1e1a71) will change it without changing anything this corpus pins.
+            assert entry.error_type
+
+        # The gap is a descriptor one, so it takes both shapes of the pipes it touches.
+        assert {entry.shape for entry in manifest.unshapeable} == set(manifest.shapes)
 
     async def test_a_rerun_writes_the_same_bytes(self, tmp_path: Path) -> None:
         """The corpus is committed, so the capture has to be a function of the bundles alone."""
