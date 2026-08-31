@@ -8,9 +8,10 @@ measured property rather than an aspiration.
 
 What this command writes into the output directory:
 
-- ``input_form.json`` / ``pipe_io_contracts.json`` — the descriptor and contract capture, byte for
-  byte what ``trace-input-semantics`` dumps at hop 5. This command is the sole producer of the
-  committed copies; the tracer stays a debugging tool.
+- ``input_form.json`` / ``output_form.json`` / ``pipe_io_contracts.json`` — the descriptor and
+  contract capture, byte for byte what ``trace-input-semantics`` dumps at hop 5. This command is the
+  sole producer of the committed copies; the tracer stays a debugging tool. All three share one key
+  set, because all three iterate the same ``result.pipes``.
 - ``inputs_template/<pipe_ref>.<shape>.<format>`` — the expected template, from the reference
   projection in ``projection_reference.py``.
 - ``inputs_template/manifest.json`` — the pipes covered and the declared divergences from the
@@ -63,7 +64,7 @@ from pipelex.pipe_machinery.rendering.input_renderer import (
 )
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.input_form import ListField, PipeInputFormDescriptor, build_input_form
+from pipelex.pipeline.input_form import ListField, PipeInputFormDescriptor, build_input_form, build_output_form
 from pipelex.pipeline.pipe_io_contracts import build_pipe_io_contracts
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.runtime_hub import get_console
@@ -73,6 +74,7 @@ if TYPE_CHECKING:
     from mthds.protocol.pipeline_inputs import PipelineInputs
 
 INPUT_FORM_FILE_NAME = "input_form.json"
+OUTPUT_FORM_FILE_NAME = "output_form.json"
 PIPE_IO_CONTRACTS_FILE_NAME = "pipe_io_contracts.json"
 TEMPLATES_DIR_NAME = "inputs_template"
 ENGINE_DIR_NAME = "engine"
@@ -603,6 +605,11 @@ async def generate_projection_corpus(*, bundle_paths: list[Path], output_dir: Pa
         _write_json(
             path=output_dir / INPUT_FORM_FILE_NAME,
             payload={pipe_ref: descriptor.model_dump(mode="json") for pipe_ref, descriptor in input_form.items()},
+        )
+        output_form = build_output_form(result.pipes)
+        _write_json(
+            path=output_dir / OUTPUT_FORM_FILE_NAME,
+            payload={pipe_ref: descriptor.model_dump(mode="json") for pipe_ref, descriptor in output_form.items()},
         )
         io_contracts = build_pipe_io_contracts(result.pipes)
         _write_json(

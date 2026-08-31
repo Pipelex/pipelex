@@ -4632,6 +4632,10 @@ rationale = "Verb-object read: the slot value whose hints are extracted."
 param = "pipes"
 rationale = "Reads as a verb-object sentence over the loaded pipes, mirroring build_pipe_io_contracts."
 
+["pipelex/pipeline/input_form.py::build_output_form"]
+param = "pipes"
+rationale = "The output twin of build_input_form; the two are called side by side and must read alike."
+
 ["pipelex/pipeline/input_normalizer.py::_normalize_list"]
 param = "items"
 rationale = "Verb-object: normalizes the items; context stays keyword."

@@ -74,6 +74,7 @@ from mthds.protocol.input_form import (
     UnknownField,
     UnknownItem,
 )
+from mthds.protocol.output_form import OutputForm, PipeOutputFormDescriptor
 from pydantic import BaseModel, TypeAdapter
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
@@ -123,7 +124,9 @@ __all__ = [
     "NumberItem",
     "ObjectField",
     "ObjectItem",
+    "OutputForm",
     "PipeInputFormDescriptor",
+    "PipeOutputFormDescriptor",
     "ProseField",
     "ProseItem",
     "TextField",
@@ -132,8 +135,20 @@ __all__ = [
     "UnknownField",
     "UnknownItem",
     "build_input_form",
+    "build_output_form",
     "qualify_current_library_crate",
 ]
+
+
+_OUTPUT_NODE_NAME = "output"
+"""The `name` an output node carries.
+
+An input's name is authored by the method; an output has none. The node type requires one
+because it is the named half of the union — the nameless half is what a `list`'s `item`
+holds — so a producer must state something, and the standard fixes this. Nothing displays
+it: a result is labelled by its concept, a list entry by its index, exactly as the
+input-form page already rules for list items. It is an address, not a label.
+"""
 
 
 def build_input_form(pipes: Sequence[PipeAbstract], *, qualified_crate: QualifiedCrateContent | None = None) -> InputForm:
@@ -170,6 +185,62 @@ def build_input_form(pipes: Sequence[PipeAbstract], *, qualified_crate: Qualifie
         ]
         input_form[pipe.pipe_ref] = PipeInputFormDescriptor(fields=fields)
     return input_form
+
+
+def build_output_form(pipes: Sequence[PipeAbstract], *, qualified_crate: QualifiedCrateContent | None = None) -> OutputForm:
+    """Derive the `output_form` descriptors of loaded pipes — what each pipe RESOLVES TO, described.
+
+    The twin of `build_input_form`, iterating the same pipes in the same order so all three
+    validate artifacts share one key set, and reusing the same deriver: an output is a concept ref
+    exactly like an input is, so its kinds, its nesting and its constraints are the same questions
+    with the same answers. `derive_concept` is the entry point that describes a concept on its own,
+    which is precisely what an output is — a node belonging to no slot. It is not a new code path
+    either: it is what runs for every nested concept field of every input.
+
+    Two things this does that `derive_slot` does for an input, and one it deliberately does not.
+
+    It performs the **plural wrap**, because plurality is not on the concept: `concept_ref` is the
+    element with the multiplicity suffix stripped, on both sides of the contract, so a `Concept[]`
+    output must become a `list` node whose `item` is the element. `derive_slot` knows the slot's
+    multiplicity and does this; `derive_concept` describes a concept alone and cannot. Skipping it
+    fails silently — the descriptor would say one item where a run produces many — so it is here,
+    read off `pipe.output.multiplicity`, the same source the contract's `multiplicity` comes from.
+
+    It names the node `output`. An input's name is authored; an output has none, and the node type
+    requires one because it is the named half of the union. Nothing reads it: a result is labelled
+    by its concept and a list entry by its index.
+
+    It stamps **no slot facts**. `presence` and `gating` are facts of an input slot — `!` may not
+    appear on an output, `?` is stated by the contract's `optional`, and nothing waits on a result.
+    Both members are optional on the node for exactly this reason, and
+    `PipeOutputFormDescriptor` rejects a producer that fills them in anyway.
+
+    Args:
+        pipes: The loaded pipes to describe (typically `ValidateBundleResult.pipes`).
+        qualified_crate: The current library's already-qualified crate, when the caller holds one —
+            the same optimisation, and the same reason, as `build_input_form`.
+
+    Returns:
+        `pipe_ref` → `PipeOutputFormDescriptor` for every given pipe.
+    """
+    qualified = qualified_crate if qualified_crate is not None else qualify_current_library_crate()
+    deriver = InputFormDeriver(concepts=qualified.concepts)
+    output_form: OutputForm = {}
+    for pipe in pipes:
+        node = deriver.derive_concept(name=_OUTPUT_NODE_NAME, concept_ref=pipe.output.concept.concept_ref)
+        if pipe.output.is_multiple():
+            node = ListField(
+                name=_OUTPUT_NODE_NAME,
+                concept_ref=node.concept_ref,
+                refines=node.refines,
+                description=node.description,
+                required=True,
+                hints=node.hints,
+                item=_as_list_item(node=node),
+                item_count=fixed_item_count(multiplicity=pipe.output.multiplicity),
+            )
+        output_form[pipe.pipe_ref] = PipeOutputFormDescriptor(field=node)
+    return output_form
 
 
 def qualify_current_library_crate() -> QualifiedCrateContent:
