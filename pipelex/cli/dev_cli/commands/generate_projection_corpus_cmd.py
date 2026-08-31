@@ -34,6 +34,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from pipelex.base_exceptions import PipelexError
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.dev_cli.commands.projection_reference import (
+    ENVELOPE_CONTENT_KEY,
+    keeps_envelope,
     project_concept_comments,
     project_inputs_template,
 )
@@ -53,7 +55,7 @@ from pipelex.pipe_machinery.rendering.input_renderer import (
 )
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.input_form import PipeInputFormDescriptor, build_input_form
+from pipelex.pipeline.input_form import ListField, PipeInputFormDescriptor, build_input_form
 from pipelex.pipeline.pipe_io_contracts import build_pipe_io_contracts
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.runtime_hub import get_console
@@ -169,17 +171,55 @@ def _write_text(*, path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-class _DivergenceCollector:
+class DivergenceCollector:
     """Walks the engine's template beside the projection's and buckets every difference.
 
     Every difference must land in a declared class: an unclassified one means the projection changed
     in a way nobody wrote down, and the capture refuses rather than committing bytes no record explains.
+    The walk meets *both* sides' keys — a field the projection stopped rendering is a difference as
+    much as one it added — so nothing reaches the manifest by being skipped.
+
+    **What the classification rests on, and where it stops.** Each arm reads the two values' shapes,
+    plus the one descriptor fact shape cannot supply: the declared `item_count` of a fixed-count slot
+    (`register_fixed_counts`). That is enough to keep a regression out of the two classes whose arms
+    would otherwise swallow one whole — `file-leaf-not-expanded`, which used to return without ever
+    comparing the URL both sides carry, and `fixed-count-honoured`, which used to fire on any list
+    longer than the engine's one element. It is not enough to tell every *wrong* value at a site that
+    already carries a class from the right one: a projection that invents a field still reads as
+    `optional-field-included`, and a garbled placeholder at a url-named text field still reads as
+    `text-named-url`. Separating those needs each node's kind and presence threaded through the whole
+    walk, which is a redesign of the walk rather than a fix to it.
     """
 
     def __init__(self) -> None:
         self.counts: dict[str, int] = {}
         self.examples: dict[str, list[DivergenceExample]] = {}
         self.unclassified: list[str] = []
+        self._fixed_counts: dict[tuple[str, ...], int] = {}
+
+    def register_fixed_counts(self, *, pipe_ref: str, descriptor: PipeInputFormDescriptor) -> None:
+        """Record where this pipe's descriptor declares a fixed element count, by the path the walk meets.
+
+        The one descriptor fact the classification cannot do without: `fixed-count-honoured` has to
+        separate a `Concept[N]` slot rendering its N elements from a projection rendering the wrong
+        number, and the two are indistinguishable by value shape alone.
+
+        Only a top-level slot can carry a count — `InputFormDeriver.derive_slot` is the sole site
+        that passes `item_count`, and both nested `ListField` constructions leave it `None` — so the
+        map holds one entry per fixed slot, at the exact path its list sits at in each shape. A
+        nested list therefore matches nothing, which is the safe direction: a length mismatch there
+        is unclassified rather than absorbed.
+        """
+        for field in descriptor.fields:
+            if not isinstance(field, ListField) or field.item_count is None:
+                continue
+            # The explicit shape always wraps the slot; the compact shape unwraps unless the slot is
+            # one the shaper cannot rebuild from a bare value, which keeps its envelope.
+            self._fixed_counts[pipe_ref, EXPLICIT_SHAPE, field.name, ENVELOPE_CONTENT_KEY] = field.item_count
+            if keeps_envelope(node=field):
+                self._fixed_counts[pipe_ref, COMPACT_SHAPE, field.name, ENVELOPE_CONTENT_KEY] = field.item_count
+            else:
+                self._fixed_counts[pipe_ref, COMPACT_SHAPE, field.name] = field.item_count
 
     def _record(self, *, divergence_id: str, path: list[str], engine: Any, expected: Any) -> None:
         self.counts[divergence_id] = self.counts.get(divergence_id, 0) + 1
@@ -195,12 +235,16 @@ class _DivergenceCollector:
                 )
             )
 
+    def _unclassify(self, *, path: list[str], engine: Any, projected: Any) -> None:
+        """A difference no declared class explains — one of these fails the whole capture."""
+        self.unclassified.append(f"{'.'.join(path)}: engine={engine!r} projected={projected!r}")
+
     def compare(self, *, engine_value: Any, projected_value: Any, path: list[str]) -> None:
         """Bucket every leaf difference between one engine value and its projected counterpart."""
-        # Handled before the dict/dict walk below, which iterates the *projected* keys and would
-        # therefore find nothing to say about an empty projection. Deliberately not declared in
-        # DIVERGENCE_REASONS: no bundle in the corpus reaches it today, so a capture that does must
-        # write the declaration rather than inherit one nobody reviewed.
+        # Handled before the dict/dict walk below, which would report the same thing one key at a
+        # time: a projection rendering nothing where the engine renders an object is one fact, not N.
+        # Deliberately not declared in DIVERGENCE_REASONS: no bundle in the corpus reaches it today,
+        # so a capture that does must write the declaration rather than inherit one nobody reviewed.
         if isinstance(engine_value, dict) and projected_value == {} and engine_value != {}:
             self._record(divergence_id="unknown-empty-object", path=path, engine=engine_value, expected=projected_value)
             return
@@ -212,10 +256,28 @@ class _DivergenceCollector:
             and "url" in cast("dict[str, Any]", engine_value)
         ):
             self._record(divergence_id="file-leaf-not-expanded", path=path, engine=engine_value, expected=projected_value)
+            # The expansion is the declared difference; the URL both sides carry is not part of it,
+            # and is compared strictly here rather than recursed into. Plain recursion would hand a
+            # regressed placeholder to the `text-named-url` arm below, whose only test is that the
+            # *engine* value is a mock URL — so the regression would be absorbed into a class that
+            # then explains it away. Both sides derive the same URL today.
+            for key in sorted(set(cast("dict[str, Any]", projected_value)) & set(cast("dict[str, Any]", engine_value))):
+                engine_leaf = cast("dict[str, Any]", engine_value)[key]
+                projected_leaf = cast("dict[str, Any]", projected_value)[key]
+                if engine_leaf != projected_leaf:
+                    self._unclassify(path=[*path, key], engine=engine_leaf, projected=projected_leaf)
             return
         if isinstance(engine_value, dict) and isinstance(projected_value, dict):
             engine_fields = cast("dict[str, Any]", engine_value)
             projected_fields = cast("dict[str, Any]", projected_value)
+            # Walked before the projected keys, because the walk below iterates those and would
+            # otherwise skip a field the projection stopped rendering entirely — a projection
+            # regression that reached neither a class nor `unclassified`. Deliberately not declared
+            # in DIVERGENCE_REASONS, like `unknown-empty-object` above: no bundle in the corpus
+            # reaches it today, so a capture that does must write the declaration itself.
+            for key in engine_fields:
+                if key not in projected_fields:
+                    self._record(divergence_id="engine-only-field", path=[*path, key], engine=engine_fields[key], expected=None)
             for key in projected_fields:
                 if key not in engine_fields:
                     self._record(divergence_id="optional-field-included", path=[*path, key], engine=None, expected=projected_fields[key])
@@ -225,8 +287,15 @@ class _DivergenceCollector:
         if isinstance(engine_value, list) and isinstance(projected_value, list):
             engine_items = cast("list[Any]", engine_value)
             projected_items = cast("list[Any]", projected_value)
-            if len(engine_items) == 1 and len(projected_items) > 1:
-                self._record(divergence_id="fixed-count-honoured", path=path, engine=engine_items, expected=projected_items)
+            if len(engine_items) != len(projected_items):
+                # `fixed-count-honoured` is the slot's *declared* count being met, which the lengths
+                # alone cannot say: without the descriptor, a `[2]` slot rendering four elements and
+                # a variable `[]` slot rendering two both read as "more than the engine's one".
+                declared_count = self._fixed_counts.get(tuple(path))
+                if len(engine_items) == 1 and declared_count is not None and len(projected_items) == declared_count:
+                    self._record(divergence_id="fixed-count-honoured", path=path, engine=engine_items, expected=projected_items)
+                else:
+                    self._unclassify(path=path, engine=engine_items, projected=projected_items)
             for index in range(min(len(engine_items), len(projected_items))):
                 self.compare(engine_value=engine_items[index], projected_value=projected_items[index], path=[*path, str(index)])
             return
@@ -278,16 +347,23 @@ def _capture_pipe(
     pipe: PipeAbstract,
     descriptor: PipeInputFormDescriptor,
     output_dir: Path,
-    collector: _DivergenceCollector,
+    collector: DivergenceCollector,
 ) -> None:
     """Write one pipe's four projected renderings, the engine's four, and bucket the differences."""
     templates_dir = output_dir / TEMPLATES_DIR_NAME
     engine_dir = output_dir / ENGINE_DIR_NAME
+    collector.register_fixed_counts(pipe_ref=pipe.pipe_ref, descriptor=descriptor)
     for explicit in (False, True):
         shape = EXPLICIT_SHAPE if explicit else COMPACT_SHAPE
         json_text, toml_text = _render_projection(descriptor=descriptor, explicit=explicit)
         _write_text(path=templates_dir / f"{pipe.pipe_ref}.{shape}.json", content=json_text)
         _write_text(path=templates_dir / f"{pipe.pipe_ref}.{shape}.toml", content=toml_text)
+        if not descriptor.fields:
+            # An empty input form is a valid form — `PipeInputFormDescriptor` says so — and the
+            # projection renders it as `{}`. Only the engine's own renderer refuses one, raising
+            # NoInputsRequiredError, so the projected half is the whole capture here and there is
+            # nothing to compare it against.
+            continue
         _write_text(path=engine_dir / f"{pipe.pipe_ref}.{shape}.json", content=render_inputs(pipe, explicit=explicit))
         _write_text(path=engine_dir / f"{pipe.pipe_ref}.{shape}.toml", content=render_inputs_toml(pipe, explicit=explicit))
         collector.compare(
@@ -325,7 +401,7 @@ async def generate_projection_corpus(*, bundle_paths: list[Path], output_dir: Pa
 
     prev_library_id = get_current_library_id_or_none()
     validation_library_id: str | None = None
-    collector = _DivergenceCollector()
+    collector = DivergenceCollector()
     try:
         result = await validate_bundle(mthds_contents=mthds_contents, mthds_sources=mthds_sources)
         validation_library_id = get_current_library_id_or_none()

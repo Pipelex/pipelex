@@ -44,6 +44,11 @@ MOCK_URL_PREFIX = "https://mock.invalid/"
 FILE_CONTENT_KEY = "url"
 TIME_FORMAT = "time"
 
+# The two keys of the ceremonial envelope — the explicit shape's whole framing, and what a compact
+# slot keeps when its value is not re-shapable from a bare one.
+ENVELOPE_CONCEPT_KEY = "concept"
+ENVELOPE_CONTENT_KEY = "content"
+
 # The single wire key a native scalar's value sits inside. It is a fact about the *payload*, which
 # the descriptor deliberately does not carry — so the projection needs this table to build the
 # explicit `{concept, content}` envelope. It is the standard's to state, not the runtime's: the
@@ -244,7 +249,7 @@ def _compact_slot(*, field: InputFormField) -> Any:
     template that no longer runs.
     """
     if keeps_envelope(node=field):
-        return {"concept": field.concept_ref, "content": _slot_content(node=field, name=field.name)}
+        return {ENVELOPE_CONCEPT_KEY: field.concept_ref, ENVELOPE_CONTENT_KEY: _slot_content(node=field, name=field.name)}
     match field.kind:
         case FieldKind.LIST:
             item_value = _light_value(node=field.item, name=f"{field.name}_item")
@@ -295,8 +300,8 @@ def project_inputs_template(*, descriptor: PipeInputFormDescriptor, explicit: bo
     for field in descriptor.fields:
         if explicit:
             template[field.name] = {
-                "concept": field.concept_ref,
-                "content": _slot_content(node=field, name=field.name),
+                ENVELOPE_CONCEPT_KEY: field.concept_ref,
+                ENVELOPE_CONTENT_KEY: _slot_content(node=field, name=field.name),
             }
         else:
             template[field.name] = _compact_slot(field=field)
