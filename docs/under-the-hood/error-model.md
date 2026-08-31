@@ -212,8 +212,8 @@ The three steps live in three modules. Only the per-provider Extract functions s
 
 | Module | Step | What it owns |
 |--------|------|--------------|
-| `pipelex/cogt/inference/error_classification.py` | Extract | `ProviderErrorMetadata`, `SDKErrorEnvelope`, `UserAction`, `UserActionKind`, the 12 `extract_*_metadata` functions, plus pure discriminators (`is_quota_exhaustion`, `is_content_policy_violation`, `is_network_error`) exposed as `@property` on the metadata |
-| `pipelex/cogt/inference/error_classify.py` | Classify | `classify_inference_error()` — provider-blind mapping from `ProviderErrorMetadata` → `ClassificationResult(category, user_action_kind, is_model_not_found)` |
+| `pipelex/cogt/inference/error_classification.py` | Extract | `ProviderErrorMetadata`, `SDKErrorEnvelope`, `UserAction`, `UserActionKind`, `GatewayRequestLimit`, the `extract_*_metadata` functions, plus pure discriminators (`is_quota_exhaustion`, `is_content_policy_violation`, `is_network_error`, `gateway_request_limit`) exposed as `@property` on the metadata |
+| `pipelex/cogt/inference/error_classify.py` | Classify | `classify_inference_error()` — provider-blind mapping from `ProviderErrorMetadata` → `ClassificationResult(category, user_action_kind, is_model_not_found, gateway_request_limit)` |
 | `pipelex/cogt/inference/error_render.py` | Render | `render_inference_error()` — picks the `CogtError` subclass from `InferenceErrorFamily` plus `is_model_not_found` (e.g. `LLMModelNotFoundError` vs `LLMCompletionError`) |
 
 Provider-specific nuance is normalized away in Extract (e.g. Google's `code` becomes `status_code`; AWS Bedrock error codes are mapped to HTTP statuses), so Classify has no provider branching. HTTP status drives classification; status-less errors dispatch on the SDK exception type name. The `tests/unit/pipelex/cogt/inference/test_provider_classification_parity.py` meta-test walks every `ProviderName` against the extract-fn registry so adding a new provider without wiring it fails fast.
@@ -237,6 +237,27 @@ class ProviderErrorMetadata(BaseModel):
     The raw provider response `body` can carry account ids, billing details, or credential fragments. It is held in-process but `exclude`d from every serialized form — CLI JSON, agent output, and any serialized worker payload.
 
 `UserAction` pairs a discrete `UserActionKind` (`WAIT_AND_RETRY`, `CHECK_BILLING`, `CHECK_CREDENTIALS`, `CHANGE_INPUT`, `CHANGE_MODEL`, `CONTACT_SUPPORT`, `UNKNOWN`) with a free-form `detail` string — so the CLI can render consistent guidance while keeping provider-specific text.
+
+### The Gateway's Own Refusals
+
+Not every failure on an inference call comes from a provider. The Pipelex inference gateway bounds what a request may weigh and how deeply it may nest, and refuses anything over those bounds itself — the body cap runs ahead of authentication, on the request headers alone, so the request never reaches a model at all. Those refusals arrive with the gateway's own error codes, and `GatewayRequestLimit` is the runtime's name for each one.
+
+| Gateway code | HTTP | `GatewayRequestLimit` | Category / action | What the caller is told |
+|---|---|---|---|---|
+| `pig-07` | 413 | `BODY_TOO_LARGE` | `CONTENT` / `CHANGE_INPUT` | the request was too large — send less in one call |
+| `pig-08` | 411 | `BODY_LENGTH_REQUIRED` | `CONFIGURATION` / `CONTACT_SUPPORT` | the gateway could not read the request's declared size |
+| `pig-10` | 413 | `OBJECT_TOO_LARGE` | `CONTENT` / `CHANGE_INPUT` | a file the request refers to is over the per-file limit |
+| `pig-11` | 400 | `BODY_TOO_DEEP` | `CONTENT` / `CHANGE_INPUT` | the request nests too deeply — flatten the inputs or the output structure |
+
+Three of the four are the caller's to fix and none of the four is ever retried: the gateway refused the request before a provider saw it, so an identical retry earns an identical refusal. `pig-08` is the exception in kind rather than in retryability — an HTTP client framed the request in a way the gateway will not bound (a chunked body, or an unreadable `Content-Length`), which no client the runtime ships produces, so it points at the transport stack rather than at the inputs.
+
+Three details are worth knowing before touching this:
+
+- **The code is the discriminator, not the provider.** A request reaches the gateway through whichever SDK its dialect calls for — the Portkey substrate, plain `httpx` on the native extract and search routes, and the shared Anthropic driver that Claude travels on — so the same refusal arrives under more than one `ProviderName`. `pig-` is the gateway's own code namespace, so matching on the code alone is both necessary and sufficient. Every Extract hop that can carry one of these already recovers the code into `provider_error_code`.
+- **The check runs before the status ladder.** An explicit code from a service we operate is a more specific verdict than any status bucket, and 413 / 411 / 400 would otherwise be read as a provider rejecting the prompt. It cannot collide with the quota rules, which only fire on 402 and 429.
+- **The advice names no numbers.** The caps belong to the deployment, they differ between deployments, and the gateway already states its own figures in the message the advice sits beside. `_render_gateway_limit_detail` in the Render step is also where a per-plan message belongs once the hosted product's tier limits are wired through — the gateway knows nothing of users, organizations or plans, so only the runtime can say "your plan allows files up to N MB".
+
+The gateway's other codes — routing refusals, storage resolution — are a different family and classify on their status like anything else.
 
 ### The `instructor` Unwrap
 

@@ -44,6 +44,57 @@ _STATUSLESS_TRANSPORT_TYPE_NAMES: frozenset[str] = frozenset(
 )
 
 
+class GatewayRequestLimit(StrEnum):
+    """A request-shape refusal raised by the Pipelex inference gateway itself.
+
+    The gateway bounds what a request may weigh and how deeply it may nest, and
+    refuses anything over those bounds *before* the request reaches a provider —
+    the body cap and the length rule run ahead of authentication, on the headers
+    alone. Those refusals are not inference failures and must not read as one: a
+    caller who sent something too large has a limit to respect, not a prompt to
+    revise, and nothing about a retry can help.
+
+    Each member corresponds to one of the gateway's own error codes, which is the
+    contract between the two repositories — the wording of a refusal is free to
+    change, the code is not.
+    """
+
+    #: ``pig-07`` at HTTP 413 — the declared body size is over the gateway's cap
+    #: for its media type (JSON or multipart).
+    BODY_TOO_LARGE = "body_too_large"
+    #: ``pig-08`` at HTTP 411 — the body's size cannot be read at all: a chunked
+    #: body, or a ``Content-Length`` that is not a byte count. No HTTP client the
+    #: runtime uses produces this; it exists so that an unusual one fails closed
+    #: and legibly rather than being buffered to find out how big it is.
+    BODY_LENGTH_REQUIRED = "body_length_required"
+    #: ``pig-10`` at HTTP 413 — a ``pipelex-storage://`` object the gateway
+    #: resolved is over the per-object cap. The same "too large" family as
+    #: ``BODY_TOO_LARGE``, one indirection further out.
+    OBJECT_TOO_LARGE = "object_too_large"
+    #: ``pig-11`` at HTTP 400 — the parsed body nests deeper than the gateway's
+    #: depth limit. Not a byte question: nesting costs two bytes a level, so a
+    #: body well under any size cap can still overflow a walker.
+    BODY_TOO_DEEP = "body_too_deep"
+
+
+# The gateway's error codes, mapped to what the runtime does about them.
+#
+# **Matched on the code alone, with no check on ``provider``**, and that is the
+# design rather than an omission. A request reaches the gateway through whichever
+# SDK its dialect calls for — the Portkey substrate (reported as ``GATEWAY``),
+# plain ``httpx`` on the native extract/search routes (``GATEWAY`` as well), and
+# the shared Anthropic driver that Claude travels on (reported as ``ANTHROPIC``) —
+# so the reporting provider does not identify the gateway. ``pig-`` is the
+# gateway's own code namespace and no vendor emits into it, so the code alone is
+# both necessary and sufficient.
+_GATEWAY_REQUEST_LIMIT_BY_CODE: dict[str, GatewayRequestLimit] = {
+    "pig-07": GatewayRequestLimit.BODY_TOO_LARGE,
+    "pig-08": GatewayRequestLimit.BODY_LENGTH_REQUIRED,
+    "pig-10": GatewayRequestLimit.OBJECT_TOO_LARGE,
+    "pig-11": GatewayRequestLimit.BODY_TOO_DEEP,
+}
+
+
 def _resolve_sdk_exception_type(exc: BaseException, *, status_code: int | None) -> str:
     """Return the ``sdk_exception_type`` name, normalizing status-less httpx transport errors.
 
@@ -109,6 +160,24 @@ class ProviderErrorMetadata(BaseModel):
                 ProviderName.AZURE | ProviderName.FAL | ProviderName.HUGGINGFACE | ProviderName.LINKUP | ProviderName.DOCLING | ProviderName.PYPDFIUM2
             ):
                 return False
+
+    @property
+    def gateway_request_limit(self) -> GatewayRequestLimit | None:
+        """Which of the gateway's request-shape limits this refusal hit, if any.
+
+        Reads ``provider_error_code``, which every Extract hop that can carry a
+        gateway refusal already populates: the Portkey substrate and the shared
+        Anthropic driver both recover it from the ``{"error": {"code": …}}`` body
+        the gateway renders, and the OpenAI substrate reads the same value off
+        ``exc.code`` after its SDK pre-unwraps that body.
+
+        Returns ``None`` for every other refusal — including the gateway's own
+        routing and storage-resolution codes, which are a different family and
+        classify on their status like anything else.
+        """
+        if self.provider_error_code is None:
+            return None
+        return _GATEWAY_REQUEST_LIMIT_BY_CODE.get(self.provider_error_code)
 
     @property
     def is_content_policy_violation(self) -> bool:

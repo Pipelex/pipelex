@@ -16,7 +16,7 @@ SDK exception type name.
 from pydantic import BaseModel
 
 from pipelex.cogt.exceptions import InferenceErrorCategory
-from pipelex.cogt.inference.error_classification import SDKErrorEnvelope, UserActionKind
+from pipelex.cogt.inference.error_classification import GatewayRequestLimit, SDKErrorEnvelope, UserActionKind
 
 
 class ClassificationResult(BaseModel):
@@ -30,6 +30,12 @@ class ClassificationResult(BaseModel):
     category: InferenceErrorCategory
     user_action_kind: UserActionKind
     is_model_not_found: bool = False
+    # Which of the inference gateway's request-shape limits was hit, when the
+    # refusal came from the gateway itself rather than from a provider. Like
+    # ``is_model_not_found`` this is a flag rather than a category: it does not
+    # change the retry decision, it lets the Render step say which limit was hit
+    # instead of falling back to the generic "the provider rejected the request".
+    gateway_request_limit: GatewayRequestLimit | None = None
 
 
 # Status-less SDK exception type names recognizable regardless of provider:
@@ -94,6 +100,34 @@ def _classify_statusless(metadata: SDKErrorEnvelope) -> ClassificationResult:
     )
 
 
+def _classify_gateway_request_limit(*, limit: GatewayRequestLimit) -> ClassificationResult:
+    """Classify a request-shape refusal the inference gateway raised on its own.
+
+    None of these is retryable and none is a provider failure: the gateway refused
+    the request before a provider ever saw it, and sending the identical request
+    again earns the identical refusal.
+    """
+    match limit:
+        case GatewayRequestLimit.BODY_TOO_LARGE | GatewayRequestLimit.OBJECT_TOO_LARGE | GatewayRequestLimit.BODY_TOO_DEEP:
+            # The caller sent more than the deployment serves — a smaller input is
+            # the whole remedy, and it is theirs to make.
+            return ClassificationResult(
+                category=InferenceErrorCategory.CONTENT,
+                user_action_kind=UserActionKind.CHANGE_INPUT,
+                gateway_request_limit=limit,
+            )
+        case GatewayRequestLimit.BODY_LENGTH_REQUIRED:
+            # Nothing about the *content* is wrong here: an HTTP client framed the
+            # request in a way the gateway will not bound. No client the runtime
+            # ships produces it, so reaching this means something in the transport
+            # stack changed — which is an operator's problem, not the caller's.
+            return ClassificationResult(
+                category=InferenceErrorCategory.CONFIGURATION,
+                user_action_kind=UserActionKind.CONTACT_SUPPORT,
+                gateway_request_limit=limit,
+            )
+
+
 def classify_inference_error(metadata: SDKErrorEnvelope) -> ClassificationResult:
     """Classify an inference SDK error from its structured metadata.
 
@@ -109,6 +143,15 @@ def classify_inference_error(metadata: SDKErrorEnvelope) -> ClassificationResult
 
     if status_code is None:
         return _classify_statusless(metadata)
+
+    # The inference gateway's own request-shape refusals come first: an explicit
+    # code from a service we operate is a more specific verdict than any status
+    # bucket, and the statuses they arrive on (413, 411, 400) would otherwise be
+    # read as a provider rejecting the prompt. They cannot collide with the quota
+    # rules below, which only fire on 402 and 429.
+    gateway_request_limit = metadata.gateway_request_limit
+    if gateway_request_limit is not None:
+        return _classify_gateway_request_limit(limit=gateway_request_limit)
 
     # Quota exhaustion is decided by the provider-aware ``is_quota_exhaustion``
     # property and takes precedence over the HTTP status: providers signal it on
