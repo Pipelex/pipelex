@@ -232,10 +232,19 @@ class PipeIOContractError(PipelexError):
 class PipelineInputContentError(PipelexError):
     """A pipeline input's content reference (url) is unusable.
 
-    Raised by the input normalizer when an Image/Document input carries a
-    blank url, or a local path that cannot be read. The caller supplied the
-    value — INPUT domain, so API servers answer 422, never a sanitized 500
-    (a blank url used to surface as IsADirectoryError('.') → 500).
+    Raised by the input normalizer when an Image/Document input carries a local
+    path that cannot be read. The caller supplied the value — INPUT domain, so
+    API servers answer 422, never a sanitized 500 (a blank url used to surface
+    as IsADirectoryError('.') → 500).
+
+    Deliberately NOT caller-facing: the message names the resolved path and the
+    ``OSError`` subclass that rejected it, which are server-side filesystem
+    facts. Surviving STRICT disclosure would turn the report into an
+    existence/permission oracle over the runner's filesystem for any
+    authenticated caller — ``PermissionError`` on a path that exists reads
+    differently from ``FileNotFoundError`` on one that does not. The
+    caller-facing half of this family is ``PipelineInputUrlMissingError``,
+    whose message carries nothing but the accepted schemes.
     """
 
     error_domain = ErrorDomain.INPUT
@@ -245,7 +254,16 @@ class PipelineInputContentError(PipelexError):
             "Provide a valid url on every Image/Document input (https://, data:, pipelex-storage://, or an existing local file when running locally)."
         ),
     )
-    # The message names the caller's own input url and the accepted schemes, with no internal paths
-    # or secrets, so it should survive STRICT disclosure intact. (``caller_facing_message`` is the
-    # *report* field; the class-level flag that sets it is ``_authors_caller_facing_message``.)
+
+
+class PipelineInputUrlMissingError(PipelineInputContentError):
+    """An Image/Document input carries a blank url.
+
+    The message states only the accepted schemes — no path, no server-side fact
+    — so it is caller-facing copy and survives STRICT disclosure intact, where
+    the placeholder would leave the caller with nothing to act on.
+    (``caller_facing_message`` is the *report* field; the class-level flag that
+    sets it is ``_authors_caller_facing_message``.)
+    """
+
     _authors_caller_facing_message = True

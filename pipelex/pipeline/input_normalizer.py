@@ -17,7 +17,7 @@ from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.pipeline.exceptions import PipelineInputContentError
+from pipelex.pipeline.exceptions import PipelineInputContentError, PipelineInputUrlMissingError
 from pipelex.runtime_hub import get_storage_provider
 from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
@@ -220,7 +220,7 @@ async def _normalize_url_content(
     """
     if not content.url.strip():
         msg = f"{type(content).__name__} input has a blank url — provide https://, data:, pipelex-storage://, or a local file path."
-        raise PipelineInputContentError(msg)
+        raise PipelineInputUrlMissingError(msg)
 
     resolved_uri = resolve_uri(content.url)
 
