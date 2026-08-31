@@ -21,6 +21,8 @@ Bundle order is part of the capture: it fixes the key order of every emitted map
 - `inputs_template/manifest.json` — what the corpus covers (bundles, pipes, shapes, formats) plus the declared divergences, each with worked sites a consumer repo can check with no engine present.
 - `engine/` — the engine's own renderings of the same pipes. **Not committed.** It is what the divergence record is measured against, not part of the contract.
 
+A pipe declaring no inputs is captured from the projection alone: an empty input form is a valid form and the projection renders it as `{}` (an empty TOML document), but the engine's renderer refuses one with `NoInputsRequiredError`, so that pipe gets its templates and no `engine/` file, and nothing is compared for it.
+
 ## Where the expectation comes from
 
 The expected templates are not the engine's output. They come from the reference projection in `pipelex/cli/dev_cli/commands/projection_reference.py`, which walks the **descriptor** — the authored facts a method states — where the engine's renderer (`pipelex/pipe_machinery/rendering/input_renderer.py`) reflects the **runtime content classes**. That is the whole design: the shipped projections have only the descriptor, so the contract has to be authored from the descriptor too.
@@ -41,6 +43,12 @@ The classes it declares today:
 
 Each is a `pipelex` defect filed in the workspace ledger, not a difference of taste; the manifest is what records that the corpus knowingly departs from the engine and why.
 
+### What the gate can and cannot separate
+
+The walk visits both sides' keys, so a field the projection *stopped* rendering is a difference like any other — it is recorded under an id with no entry in `DIVERGENCE_REASONS`, which makes the capture refuse rather than pass silently. Beyond that, each arm classifies on the two values' shapes plus one descriptor fact the shapes cannot supply: the declared `item_count` of a fixed-count slot. So `fixed-count-honoured` means the slot's declared count was met, not merely that the projection rendered more elements than the engine's one; a variable `[]` slot rendering two, or a `[2]` slot rendering four, is unclassified and fails the capture. Likewise the file-leaf arm compares the URL both sides carry instead of returning on the expansion alone.
+
+What it still cannot separate is a *wrong value at a site that already carries a class*: a projection inventing a field reads as `optional-field-included`, and a garbled placeholder at a url-named text field reads as `text-named-url`. Telling those apart needs each node's kind and presence carried through the whole walk, which is a redesign rather than a fix, and the two shipped projections are pinned against the committed bytes anyway.
+
 ## The bundles
 
 `tests/data/input_semantics/` holds the corpus bundles. `probe_bundle.mthds` exercises every construct the language accepts and `hinted_bundle.mthds` the intent hints; `scaffold_bundle.mthds` was added for this corpus and covers what the other two do not — a text field merely named `url` beside a real file position, an optional nested structure, optional `native.Image` and `native.Document` fields inside a structure, and both a fixed `[N]` and a variable `[]` slot over a structured concept.
@@ -49,4 +57,4 @@ Each is a `pipelex` defect filed in the workspace ledger, not a difference of ta
 
 Rerun and re-commit the capture in both consumer repos whenever the descriptor derivation changes, a `kind` is added to the standard, or a bundle changes. The per-repo harness asserts that the set of kinds appearing across the corpus **equals** the closed `FieldKind` vocabulary, so a kind added without a fixture fails by name rather than passing silently.
 
-`tests/unit/pipelex/cli/dev_cli/test_generate_projection_corpus.py` keeps the capture complete and byte-stable, and `test_projection_reference.py` pins the projection's rules one at a time, so a rule that changed fails by name instead of as a wall of differing bytes.
+`tests/unit/pipelex/cli/dev_cli/test_generate_projection_corpus.py` keeps the capture complete and byte-stable, `test_projection_divergence_gate.py` states the gate's guarantee as the regressions it must not absorb, and `test_projection_reference.py` pins the projection's rules one at a time, so a rule that changed fails by name instead of as a wall of differing bytes.
