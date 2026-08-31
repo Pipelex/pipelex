@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 item: L-260831-17614f
 ---
 
@@ -64,7 +64,7 @@ Precedence: an explicit class-level `error_domain` wins (the `pipelex/cogt/conte
 
 ## Implementation record
 
-Ratified and executed on `dev`. Every step above landed as written; what follows is only what the plan could not know in advance.
+Ratified and executed on `dev`, and merged there as pull request #1175 (merge commit `b3b496dee45c5d76264bd6a3b8f9a77d5b94a331`). The 500 → 422 change on content-classified inference failures is breaking for consumers of `ErrorReport.http_status`, so it reaches them only with the next published pipelex release; that release is tracked separately in the ledger. Every step above landed as written; what follows is only what the plan could not know in advance.
 
 **The derivation reads `self.error_category`, not the plan's `effective_category`.** The plan proposed deriving from `self.error_category or base_report.error_category`, but `ErrorReport.error_category` is typed `str` — and `model_copy(update=...)` bypasses validation, so what is actually in that field is whatever the previous layer put there. Calling `.error_domain` on it is not type-safe. The shipped form is `self.error_domain or own_domain or base_report.error_domain`, where `own_domain` derives from this error's own typed category, and it produces identical results for every case: an error with no category of its own inherits both fields from the cause chain in the same precedence order, so the two can still never disagree. The consistency invariant test pins that.
 
