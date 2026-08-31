@@ -157,9 +157,11 @@ jobs:
 
 # --------------------------------------------------------------------------
 # 6.  Drift contracts — single job, version-independent
-#     ADVISORY: deliberately NOT in lint-all's `needs`, so an open contract is
-#     visible on the PR but does not block merges. Promote it into lint-all's
-#     `needs` once the current open-PR backlog has landed.
+#     BLOCKING, but through the ruleset rather than through lint-all: `Lint
+#     (drift-contracts)` is named as a required status check on both `dev` and
+#     `main`, so an open contract already stops the merge. It stays out of
+#     lint-all's `needs` so that it reports under its own name — do not "promote"
+#     it there expecting that to change what blocks.
 # --------------------------------------------------------------------------
   lint-drift:
     name: Lint (drift-contracts)
@@ -207,7 +209,11 @@ jobs:
         run: make check-rules
 
 # --------------------------------------------------------------------------
-# 8.  Aggregator job — the *single* required status check
+# 8.  Aggregator job — the required status check that covers every lint job,
+#     including the ones the rulesets do not name individually
+#     (`Lint (hub layering)`, `Lint (agent-rules)`). It is not the only
+#     required lint check: the rulesets name several of the jobs above by
+#     name as well. Anything added to `needs` becomes blocking through here.
 # --------------------------------------------------------------------------
   lint-all:
     name: Lint (all)
