@@ -10,6 +10,13 @@ that corpus trustworthy, and both are checked here against the corpus bundles th
 - **A rerun writes the same bytes.** The corpus is committed, so a capture that varied run to run
   would show up as a diff nobody authored — and the enum placeholder is exactly where the engine's
   own renderer varies.
+- **A pipe with no inputs is captured from the projection alone.** An empty input form is a valid
+  form, but the engine's own renderer refuses one, so the capture takes the projected half and skips
+  the comparison. No corpus bundle declares such a pipe, so the case is put to the generator here.
+
+The gate that measures the divergences is checked at the collector itself, in
+`test_projection_divergence_gate.py`: the corpus is exactly the case where the projection is right,
+so nothing here can state what happens when it is wrong.
 """
 
 from __future__ import annotations
@@ -34,6 +41,23 @@ CORPUS_BUNDLES = [
     Path("tests/data/input_semantics/probe_bundle.mthds"),
     Path("tests/data/input_semantics/scaffold_bundle.mthds"),
 ]
+
+# A pipe declaring no inputs at all, which no corpus bundle does: the descriptor is the empty form
+# and the projection renders it as `{}`, while the engine's renderer raises NoInputsRequiredError.
+NO_INPUT_BUNDLE = """domain      = "no_input_probe"
+description = "A throwaway bundle whose only pipe declares no inputs at all"
+main_pipe   = "no_input_pipe"
+
+[pipe.no_input_pipe]
+type        = "PipeLLM"
+description = "A pipe that takes no inputs, so its input form is the empty one"
+output      = "Text"
+prompt      = \"\"\"
+Write a haiku about an empty form.
+\"\"\"
+"""
+
+NO_INPUT_PIPE_REF = "no_input_probe.no_input_pipe"
 
 
 def _corpus_files(*, corpus_dir: Path) -> dict[str, str]:
@@ -86,3 +110,20 @@ class TestGenerateProjectionCorpus:
         await generate_projection_corpus(bundle_paths=CORPUS_BUNDLES, output_dir=second_dir)
 
         assert _corpus_files(corpus_dir=first_dir) == _corpus_files(corpus_dir=second_dir)
+
+    async def test_a_pipe_with_no_inputs_is_captured_from_the_projection_alone(self, tmp_path: Path) -> None:
+        """`PipeInputFormDescriptor` documents `{"fields": []}` as valid; only the engine refuses one."""
+        bundle_path = tmp_path / "no_input_bundle.mthds"
+        bundle_path.write_text(NO_INPUT_BUNDLE, encoding="utf-8")
+        output_dir = tmp_path / "corpus"
+
+        manifest = await generate_projection_corpus(bundle_paths=[*CORPUS_BUNDLES, bundle_path], output_dir=output_dir)
+
+        assert NO_INPUT_PIPE_REF in manifest.pipes
+        templates_dir = output_dir / TEMPLATES_DIR_NAME
+        for shape in manifest.shapes:
+            # The template is the empty object; its TOML rendering is the empty document, which is
+            # the only way TOML has to say it.
+            assert (templates_dir / f"{NO_INPUT_PIPE_REF}.{shape}.json").read_text(encoding="utf-8") == "{}"
+            assert (templates_dir / f"{NO_INPUT_PIPE_REF}.{shape}.toml").read_text(encoding="utf-8") == ""
+        assert not list((output_dir / ENGINE_DIR_NAME).glob(f"{NO_INPUT_PIPE_REF}.*"))

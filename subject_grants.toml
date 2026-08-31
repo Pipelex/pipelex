@@ -6300,18 +6300,6 @@ rationale = "Inner helper: collects diffs from the dir comparison; single operan
 param = "file_list"
 rationale = "Inner helper: filters the file list; single operand."
 
-["pipelex/tools/misc/document_utils.py::DocumentFormat.from_mime_type"]
-param = "mime_type"
-rationale = "Factory from source: builds the result from the mime_type; single operand."
-
-["pipelex/tools/misc/document_utils.py::DocumentFormat.is_supported_mime_type"]
-param = "mime_type"
-rationale = "Predicate on the mime_type; single operand."
-
-["pipelex/tools/misc/document_utils.py::DocumentFormat.raise_if_unsupported_mime_type"]
-param = "mime_type"
-rationale = "Validates/checks the mime_type; single operand."
-
 ["pipelex/tools/misc/exceptions.py::TomlError.from_tomli_error"]
 param = "exc"
 rationale = "Factory from source: builds the result from the exc; single operand."
