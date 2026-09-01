@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from pipelex.core.stuffs.html_content import HtmlContent
@@ -32,15 +34,21 @@ class TestHtmlContentRenders:
         content = HtmlContent(inner_html=TestData.SAMPLE_INNER_HTML)
         assert content.rendered_html() == TestData.EXPECTED_RENDERED_HTML_NO_CLASS
 
-    def test_rendered_json(self):
-        """Verify rendered_json returns JSON string with html and css_class keys."""
+    def test_rendered_json_states_the_models_own_members(self):
+        """The JSON rendering is the model's, member for member — `inner_html`, never a rename.
+
+        It used to emit `html`, which made a payload that did not satisfy the schema its own output
+        contract publishes: `native.Html` pins `inner_html` and pins it required, so a consumer
+        reading the contract found the required member absent and one the standard does not define
+        beside it. Caught by a real run once the output contract started carrying a schema.
+        """
         content = HtmlContent(inner_html=TestData.SAMPLE_INNER_HTML, css_class=TestData.SAMPLE_CSS_CLASS)
-        assert content.rendered_json() == TestData.EXPECTED_RENDERED_JSON
+        assert json.loads(content.rendered_json()) == TestData.EXPECTED_RENDERED_JSON
 
     def test_rendered_json_without_css_class(self):
-        """An unset css_class is omitted from the JSON rendering, never emitted as null."""
+        """An unset optional member is stated as null, exactly as the model dumps it."""
         content = HtmlContent(inner_html=TestData.SAMPLE_INNER_HTML)
-        assert content.rendered_json() == TestData.EXPECTED_RENDERED_JSON_NO_CLASS
+        assert json.loads(content.rendered_json()) == TestData.EXPECTED_RENDERED_JSON_NO_CLASS
 
     def test_rendered_for_prompt(self):
         """Verify rendered_for_prompt returns markdown format (which is inner_html for HtmlContent)."""
@@ -73,4 +81,4 @@ class TestHtmlContentRenders:
         """Verify async rendered_json returns the same as sync version."""
         content = HtmlContent(inner_html=TestData.SAMPLE_INNER_HTML, css_class=TestData.SAMPLE_CSS_CLASS)
         result = await content.rendered_json_async()
-        assert result == TestData.EXPECTED_RENDERED_JSON
+        assert json.loads(result) == TestData.EXPECTED_RENDERED_JSON
