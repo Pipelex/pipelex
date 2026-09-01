@@ -291,6 +291,23 @@ def every_type_kind_crate() -> LibraryCrate:
                         choices=['marked "urgent"', "left unmarked"],
                         required=True,
                     ),
+                    # The intersection the two shapes above never combined: a choice carrying a comma AND a
+                    # double quote, on a list long enough to explode. The quote makes `_ts_string` spell it
+                    # single-quoted, and a member split that walks only `"` then cuts at the inner comma —
+                    # two unterminated literals again, on the one spelling the comma fix did not cover.
+                    "escalation_note": ConceptStructureBlueprint(
+                        description="A note explaining the escalation",
+                        choices=['say "hi", then continue', "left unmarked", "needs another look"],
+                        required=True,
+                    ),
+                    # Enumerated answer options: ordinary prose whose `)` closers are unmatched. They are
+                    # inside string literals, so a chain split that counts brackets without tracking quotes
+                    # reaches depth zero mid-literal and cuts the member chain there.
+                    "survey_answer": ConceptStructureBlueprint(
+                        description="The reviewer's answer",
+                        choices=["a) strongly agree with the proposal", "b) agree. with some reservations", "c unsure"],
+                        required=True,
+                    ),
                     # The same unbounded choice list carrying a default — the widest presence spelling
                     # ts-zod emits (`.nullable().default(…)` on top of a broken `z.enum([…])`), so the
                     # print-width and prettier guards actually exercise the multi-member chain break.

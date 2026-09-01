@@ -84,6 +84,28 @@ class TestTsZodEmitter:
 
         assert '  escalation_reason: z.enum([\n    "blocked, awaiting the owner",\n    "stale, no movement for a week",' in content
 
+    def test_an_exploded_single_quoted_choice_keeps_its_own_commas(self, every_type_kind_crate: LibraryCrate):
+        """A choice carrying a `"` is spelled single-quoted, and it may carry a comma too.
+
+        The two guards either side of this one cover the halves separately — a comma in a double-quoted
+        choice, and a `"` in a choice short enough to stay flat. The defect lives in the intersection:
+        split a single-quoted member on its own comma and the emission stops being TypeScript.
+        """
+        content = emit_ts_zod(resolve_concepts_from_crate(every_type_kind_crate))[0].content
+
+        assert '  escalation_note: z.enum([\n    \'say "hi", then continue\',\n    "left unmarked",' in content
+
+    def test_an_exploded_choice_keeps_its_own_brackets(self, every_type_kind_crate: LibraryCrate):
+        """A choice is prose and its brackets need not balance — `a)` is an ordinary answer option.
+
+        The member-chain split counts brackets to find the depth-zero dots, so counting the ones *inside*
+        a literal walks the depth to zero mid-string and cuts the chain there, mid-literal.
+        """
+        content = emit_ts_zod(resolve_concepts_from_crate(every_type_kind_crate))[0].content
+
+        assert '  survey_answer: z.enum([\n    "a) strongly agree with the proposal",\n' in content
+        assert '    "b) agree. with some reservations",\n    "c unsure",\n  ]),' in content
+
     def test_a_quoted_choice_takes_the_quote_style_prettier_keeps(self, every_type_kind_crate: LibraryCrate):
         """Prettier normalizes a string literal to whichever quote needs fewer escapes, at any width.
 

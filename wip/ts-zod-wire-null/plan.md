@@ -97,3 +97,30 @@ It is **pre-existing and orthogonal to this campaign**: the same line measures 1
 It is not a one-liner, which is why it was not folded in here. Probing prettier 3.9.6 across every shape `_ts_type` can produce: a literal union breaks in three tiers (flat, then break after the `?:`, then leading-`|` one per line); `Record<string, X> | null` and `Array<union> | null` explode the type-argument list; but `Array<atom> | null` and a bare long atom **stay flat past 80**. Those last two are the trap — prettier tolerates them, so the always-on width guard is *stricter* than prettier on this path, and simply adding a recursive fixture to it reddens shapes that are already prettier-clean. A correct fix models the union tiers and the type-argument explosion together, and teaches the guard the same distinction.
 
 Filed as [L-260901-47759d](http://localhost:4747/i/L-260901-47759d) (owner `pipelex`), carrying the repro, the probe matrix and the parent-commit measurement.
+
+## Checkpoint — review round 2, two splitter defects fixed and one deferred
+
+Round 2 ran with no usable PR input: the branch's only review thread was already answered and resolved in round 1, and greptile has not re-reviewed since. The whole round came from the two reviewers run locally against `origin/dev` — cubic and Codex — which is exactly the case they exist for.
+
+**Both fixed defects are the same mistake in two places, and both emit TypeScript that does not parse.** The round-1 fix introduced `_ts_string`, which spells a string single-quoted where that strictly reduces escapes; before it, every string went through `json.dumps` and was always double-quoted. Two new splitters were written in that same commit and neither was taught the new spelling.
+
+1. **`_split_enum_members` walked only `"`.** Raised independently by cubic and Codex. A choice carrying both a `"` and a comma — `'say "hi", then continue'` — is spelled single-quoted and then cut at its own comma into two unterminated literals. *Not* a regression: the round-1 baseline split on every comma, so this input was broken there too. It was admitted under round 2's ship-blocker clause, because the consumer's build breaks rather than merely its stamp, and because the changelog already claimed the split walked the literals.
+
+2. **`_split_member_chain` counted brackets inside literals.** Found in verification; neither bot named it, and it is the round's clean regression. Inside `z.enum([…])` the base depth is 2, so a choice list carrying two net-unmatched closers before a `.` walks the depth to zero mid-literal and cuts the member chain there. Plain enumerated prose does it: `["a) strongly agree with the proposal", "b) agree. with some reservations", "c unsure"]`. **The baseline emitter, on the identical input, emits valid TypeScript** — valid to invalid across round 1, since `_split_member_chain` is entirely new there.
+
+Both now track the enclosing quote before counting anything, which is what `python_common._split_top_level` already did — the Python half was right all along and only the TypeScript half was left behind. Verified with prettier 3.9.6 installed into the session scratchpad: both shapes parse and are prettier-clean, and the skip-gated prettier test passes when run with it on PATH. Mutation-tested: reverting either splitter reddens its own byte assertion *and* the new class invariant.
+
+**The blind spot got a cheap always-on guard at last.** `test_emitted_ts_never_breaks_a_line_inside_a_string_literal` scans each emitted code line and asserts none ends inside an unterminated literal. It needs no node toolchain, so it runs in CI, and it reddens on all three defects of this class rather than on the two that happened to be found — which is the point, since hand-written byte assertions have now missed this class three times. It is a stopgap, not the fix: a real parse or a non-optional prettier gate is still [L-260901-26da36](http://localhost:4747/i/L-260901-26da36). Note the guard skips comment lines deliberately — an authored description may hold an apostrophe, and the first draft failed on `/** The reviewer's answer */`.
+
+### Deferred — `_ts_object_key` bypasses the quote rule
+
+`_ts_object_key` renders a non-identifier object key with `json.dumps` rather than `_ts_string`, so a dict-default key carrying more `"` than `'` is emitted double-quoted with escapes and prettier rewrites it:
+
+```
+-     .default({ "marked \"urgent\"": 3 }),
++     .default({ 'marked "urgent"': 3 }),
+```
+
+Reachable — `default_value = { 'marked "urgent"' = 3 }` is legal TOML on a `type = "dict"` field — but narrow: `per-reviewer` and `it's` are both already spelled the way prettier wants. Raised by cubic; Codex reviewed the same diff and did not flag it.
+
+**Deferred under the round-2 bar, deliberately.** It is a stamp instability only — the emission is valid TypeScript — and it is *not* a regression: the round-1 baseline rendered the whole dict as JSON and prettier rewrote both the brace padding and the quote, so round 1 made it strictly narrower and never worse. The fix looks like one word (`json.dumps(text)` → `_ts_string(text)`), which is precisely why it was left alone: the bar exists to stop a converging PR from taking on work that is neither a regression nor a blocker. It should be picked up in the follow-up that closes [L-260901-26da36](http://localhost:4747/i/L-260901-26da36), where a real TS parse would catch the whole family at once.

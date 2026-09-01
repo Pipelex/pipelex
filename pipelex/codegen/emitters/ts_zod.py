@@ -189,17 +189,32 @@ def _break_zod_expr(expr: str, *, modifiers: list[str]) -> str:
 def _split_member_chain(expr: str) -> list[str]:
     """Split `z.record(z.string(), z.number()).int()` into its head and calls: `["z", ".record(…)", ".int()"]`.
 
-    Splits on the dots sitting at bracket depth zero. The emitted grammar puts every literal inside a
-    bracket — a `z.enum([…])`'s choices, a nested `z.array(…)` — so a depth-zero dot is always a member call.
+    Splits on the dots sitting at bracket depth zero **outside a string literal**, and the literal half is
+    what makes the count trustworthy. A choice is authored prose whose brackets need not balance — `a)` is
+    an ordinary answer option — so counting the brackets *inside* one walks the depth to zero mid-literal
+    and cuts the chain through the middle of a string. Both quote styles have to be walked, because
+    `_ts_string` spells a choice carrying a `"` single-quoted.
     """
     parts: list[str] = []
     depth = 0
     current = ""
+    quote: str | None = None
+    escaped = False
     for char in expr:
-        if char == "." and depth == 0 and current:
-            parts.append(current)
-            current = ""
-        depth += {"(": 1, "[": 1, "{": 1, ")": -1, "]": -1, "}": -1}.get(char, 0)
+        if escaped:
+            escaped = False
+        elif quote is not None:
+            if char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+        elif char in {'"', "'"}:
+            quote = char
+        else:
+            if char == "." and depth == 0 and current:
+                parts.append(current)
+                current = ""
+            depth += {"(": 1, "[": 1, "{": 1, ")": -1, "]": -1, "}": -1}.get(char, 0)
         current += char
     parts.append(current)
     return parts
@@ -215,26 +230,35 @@ def _explode_enum_call(call: str, *, indent: int) -> str:
 
     The split has to walk the string literals rather than `str.split(",")`: a choice is authored text, and
     an ordinary one like `"yes, absolutely"` carries a comma. Split naively it became two unterminated
-    literals — generated TypeScript that does not parse, on any crate whose choice list overflows.
+    literals — generated TypeScript that does not parse, on any crate whose choice list overflows. It walks
+    both quote styles, since `_ts_string` spells a choice carrying a `"` single-quoted.
     """
     rendered = "".join(f"{' ' * (indent + 2)}{member},\n" for member in _split_enum_members(call[len(".enum([") : -2]))
     return f".enum([\n{rendered}{' ' * indent}])"
 
 
 def _split_enum_members(members_text: str) -> list[str]:
-    """Split `"a", "b, c"` on its separating commas only — the ones outside a JSON string literal."""
+    """Split `"a", 'b, c'` on its separating commas only — the ones outside a string literal.
+
+    Both quote styles have to be walked, not just the double one: `_ts_string` spells a choice carrying a
+    `"` single-quoted, since that is the style prettier keeps. Track only `"` and an ordinary authored
+    choice like `'say "hi", then continue'` is cut at its own comma into two unterminated literals.
+    """
     members: list[str] = []
     current = ""
-    in_string = False
+    quote: str | None = None
     escaped = False
     for char in members_text:
         if escaped:
             escaped = False
-        elif char == "\\" and in_string:
-            escaped = True
-        elif char == '"':
-            in_string = not in_string
-        elif char == "," and not in_string:
+        elif quote is not None:
+            if char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+        elif char in {'"', "'"}:
+            quote = char
+        elif char == ",":
             members.append(current.strip())
             current = ""
             continue

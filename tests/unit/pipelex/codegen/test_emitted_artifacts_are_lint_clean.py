@@ -302,6 +302,39 @@ class TestEmittedArtifactsAreLintClean:
             offenders = [line for line in emitted_file.content.splitlines() if line != line.rstrip()]
             assert not offenders, f"{emitted_file.filename} has lines with trailing whitespace:\n" + "\n".join(repr(line) for line in offenders)
 
+    def test_emitted_ts_never_breaks_a_line_inside_a_string_literal(self, every_type_kind_crate: LibraryCrate):
+        """No emitted line may end inside an unterminated string literal.
+
+        This is the always-on guard for a whole class of defect the other three are blind to. Every
+        emitted break is computed by splitting a rendered expression — on its member commas, or on its
+        member-chain dots — and each of those splits has to walk the string literals to avoid cutting
+        *through* one. Cut through one and the artifact stops being TypeScript.
+
+        Nothing else catches it. The broken form is a run of *short* lines, so the print-width guard
+        cannot see it, and `test_emitted_ts_is_prettier_clean` — the only test that actually parses the
+        emission — skips wherever there is no node toolchain, which is CI and every machine here. Three
+        separate defects of exactly this shape reached review before this guard existed; the durable fix
+        is a real parse, tracked as L-260901-26da36.
+        """
+        for emitted_file in emit_ts_zod(resolve_concepts_from_crate(every_type_kind_crate)):
+            for line_number, line in enumerate(emitted_file.content.splitlines(), start=1):
+                # Comment lines are prose, not code: an authored description may hold an apostrophe, and
+                # the emitted grammar keeps every comment on a line of its own (`//`, `/** … */`, ` * `).
+                if line.lstrip().startswith(("//", "/*", "*")):
+                    continue
+                quote: str | None = None
+                escaped = False
+                for char in line:
+                    if escaped:
+                        escaped = False
+                    elif quote is not None and char == "\\":
+                        escaped = True
+                    elif quote is not None:
+                        quote = None if char == quote else quote
+                    elif char in {'"', "'"}:
+                        quote = char
+                assert quote is None, f"{emitted_file.filename}:{line_number} ends inside a {quote} literal: {line!r}"
+
     def test_emitted_ts_is_prettier_clean(self, every_type_kind_crate: LibraryCrate, tmp_path: Path):
         """`prettier --check` must find nothing to change in the emitted TypeScript.
 
