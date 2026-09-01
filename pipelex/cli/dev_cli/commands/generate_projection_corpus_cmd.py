@@ -225,6 +225,19 @@ def _write_text(*, path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def _engine_dict_placeholder(*, path: list[str]) -> dict[str, str]:
+    """What the engine renders at a dict-typed field, which is exactly where the descriptor says `unknown`.
+
+    `ConceptRepresentationGenerator._generate_dict_value` returns `{f"{name}_key": f"{name}_value"}`,
+    and `generate_field_value` is its only caller — dispatched on `origin is dict`, the same test that
+    makes the input-form deriver state the node as `unknown`. A dict inside a list never reaches it
+    (`_generate_list_value` routes items through `_generate_basic_value`, which returns no dicts), so
+    the placeholder is always keyed by the field's own name — the last segment of the walk's path.
+    """
+    field_name = path[-1]
+    return {f"{field_name}_key": f"{field_name}_value"}
+
+
 class DivergenceCollector:
     """Walks the engine's template beside the projection's and buckets every difference.
 
@@ -301,7 +314,18 @@ class DivergenceCollector:
         # `unknown` like every dict field, so the projection renders the empty object while the
         # engine fills it with a sample key. The corpus's optional dict fields never reach here:
         # the engine drops those entirely, which is `optional-field-included`.
-        if isinstance(engine_value, dict) and projected_value == {} and engine_value != {}:
+        #
+        # Recognised by the engine's own placeholder rather than by the empty object alone, because
+        # `{}` is what the projection renders for an `object` node with no fields as much as for an
+        # `unknown` one: a shape-only arm would file a projection that collapsed a populated object
+        # into this declared class and return without ever walking the subtree — the whole-difference
+        # swallow the file-leaf and fixed-count arms were repaired for. The placeholder is exact, not
+        # a heuristic: `ConceptRepresentationGenerator._generate_dict_value` renders `{name_key:
+        # name_value}` and is dispatched from one site only, on `origin is dict`, which is precisely
+        # what makes the descriptor node `unknown`. A non-matching value falls through to the dict
+        # walk below, where each key the projection dropped is `engine-only-field` and the capture
+        # refuses.
+        if isinstance(engine_value, dict) and projected_value == {} and engine_value == _engine_dict_placeholder(path=path):
             self._record(divergence_id="unknown-empty-object", path=path, engine=engine_value, expected=projected_value)
             return
         if (
