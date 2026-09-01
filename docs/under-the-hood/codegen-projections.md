@@ -29,6 +29,17 @@ Wire-native keys (D10) are a deliberate correctness choice: a camelCase-keyed sc
 
 For **`python-pydantic`**, no key mapping is ever needed either: wire names are already snake_case Python names, so parse/serialize are the native `Model.model_validate(data)` / `model.model_dump(mode="json")`.
 
+### Optionality: the wire carries explicit nulls
+
+A projection describes the payload the engine actually produces, and that payload spells an unset optional field as an explicit `null` — not as an absent key. The runtime class generated for a concept annotates every non-required field `X | None`, and the transport dump keeps nulls deliberately (`dump_for_transport()` is a `model_dump(serialize_as_any=True)` with no `exclude_none`, and the composer spells `exclude_none=False` at its dump sites), because the shape also feeds the Temporal data converter and the hydrator. A partial payload arriving from a caller, meanwhile, may simply omit the key. **The wire genuinely carries both spellings of "unset", so every projection must accept both.**
+
+Per target that means:
+
+- **`python-pydantic` / `python-structures`** — `X | None = Field(default=None)`. Pydantic accepts an omitted key and an explicit `null` alike, so nothing further is needed.
+- **`ts-zod`** — `.nullish()` for a non-required field (`T | null | undefined`), and `.nullable().default(…)` for a non-required field carrying a default, since a producer may null it explicitly. A bare `.optional()` would mean `T | undefined` in Zod and would **reject the engine's own output**; a bare `.default(…)` rejects the explicit null the same way. There is deliberately no `.transform()` folding `null` into `undefined`: the binder uses one schema for both `parse` and `serialize`, so a transform would make the pair asymmetric.
+
+On the TypeScript side the consequence is that a parsed optional field types as `T | null | undefined` rather than `T | undefined` — `??` covers both. For a recursive concept, where the emitter writes an explicit `export type` beside a `z.ZodType<Name>`-annotated schema, the declared type carries the same widening (`next?: Node | null`), because that annotation is checked against the schema's inferred output and stops typechecking otherwise.
+
 ### Refinement and native bases
 
 A concept that refines another keeps its `refines` link when the base is **native-backed** (the refinement chain bottoms out at a native such as `Text` or `Number`), because the native is materialized into the crate and the base carries real runtime behavior; the emitter then renders inheritance (`class Summary(TextContent)` / `class Summary(Text)` / `z.lazy(() => TextSchema)`), which round-trips to the correct base class. A concept that refines an **in-crate structured** base has that base's effective structure flattened in during normalization.

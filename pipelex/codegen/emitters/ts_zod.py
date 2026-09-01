@@ -127,39 +127,58 @@ def _render_field(
     reasons = list(dict.fromkeys(iter_imprecision_reasons(concept_field.resolved_type)))
     doc = _jsdoc(concept_field.description, imprecise="; ".join(reasons) if reasons else None, indent="  ")
     expr = _zod_type(concept_field.resolved_type, by_ref=by_ref, type_name_by_ref=type_name_by_ref)
-    modifier = ""
-    if concept_field.default_value is not None:
-        modifier = f".default({_format_default_value(concept_field.default_value)})"
-    elif not concept_field.required:
-        modifier = ".optional()"
+    modifiers = _presence_modifiers(concept_field)
 
-    flat = f"  {key}: {expr}{modifier},"
+    flat = f"  {key}: {expr}{''.join(modifiers)},"
     if len(flat) <= TS_PRINT_WIDTH or "\n" in expr:
         return f"{doc}{flat}"
-    return f"{doc}  {key}: {_break_zod_expr(expr, modifier=modifier)},"
+    return f"{doc}  {key}: {_break_zod_expr(expr, modifiers=modifiers)},"
 
 
-def _break_zod_expr(expr: str, *, modifier: str) -> str:
+def _presence_modifiers(concept_field: ResolvedField) -> list[str]:
+    """The zod member calls that encode a field's presence, in chain order.
+
+    Both non-required spellings are **null-tolerant**, because the runtime serializes an unset optional
+    field as an explicit `null`: the generated runtime class annotates every non-required field `X | None`
+    and `dump_for_transport()` keeps nulls on purpose (no `exclude_none`). `.optional()` means
+    `T | undefined` in zod and rejects that payload, so a schema that spelled it would fail to parse the
+    very wire the engine produces. The wire genuinely carries both spellings of "unset" — a key a partial
+    payload omitted, and a key the runtime nulled — and `.nullish()` is the honest description of that.
+
+    A defaulted field is non-required by construction (the blueprint validator refuses `required = true`
+    beside a `default_value`, E3), and a producer may set it to `None` explicitly, so `.default(...)` needs
+    `.nullable()` in front of it for the same reason.
+    """
+    if concept_field.default_value is not None:
+        return [".nullable()", f".default({_format_default_value(concept_field.default_value)})"]
+    if not concept_field.required:
+        return [".nullish()"]
+    return []
+
+
+def _break_zod_expr(expr: str, *, modifiers: list[str]) -> str:
     """Prettier's rendering of a field expression too long to sit on one line.
 
     Only `z.enum([...])` can genuinely overflow — its members are authored choices with no length bound,
     while every other emitted expression is a short fixed form or a `z.lazy(() => XSchema)` whose width is
     the concept name's. Two shapes, and prettier picks between them: bare, it breaks the array in place;
-    with a modifier attached it breaks the whole member chain, pulling `.enum(` onto its own line.
+    with modifiers attached it breaks the whole member chain, pulling `.enum(` and every modifier onto a
+    line of its own.
 
     Anything we do not model stays flat — `test_emitted_ts_lines_fit_the_print_width` is the guard that
     turns an unmodelled overflow into a failing test rather than a silently broken stamp.
     """
     prefix, _, members_text = expr.partition("([")
     if prefix != "z.enum" or not members_text.endswith("])"):
-        return f"{expr}{modifier}"
+        return f"{expr}{''.join(modifiers)}"
     members = [member.strip() for member in members_text[:-2].split(",")]
 
-    if not modifier:
+    if not modifiers:
         rendered = "".join(f"    {member},\n" for member in members)
         return f"z.enum([\n{rendered}  ])"
     rendered = "".join(f"      {member},\n" for member in members)
-    return f"z\n    .enum([\n{rendered}    ])\n    {modifier}"
+    chained = "".join(f"\n    {modifier}" for modifier in modifiers)
+    return f"z\n    .enum([\n{rendered}    ]){chained}"
 
 
 def _format_default_value(value: Any) -> str:
@@ -189,9 +208,15 @@ def _render_type_field(
     by_ref: dict[str, ResolvedConcept],
     type_name_by_ref: dict[str, str],
 ) -> str:
-    optional_marker = "?" if not concept_field.required and concept_field.default_value is None else ""
     type_expr = _ts_type(concept_field.resolved_type, by_ref=by_ref, type_name_by_ref=type_name_by_ref)
-    return f"  {concept_field.name}{optional_marker}: {type_expr};"
+    # Mirror `_presence_modifiers` branch for branch: this declared type is what the annotated
+    # `z.ZodType<Name>` is checked against, so it has to be exactly the schema's inferred output —
+    # `.nullable().default(…)` infers `T | null`, `.nullish()` infers `T | null | undefined`.
+    if concept_field.default_value is not None:
+        return f"  {concept_field.name}: {type_expr} | null;"
+    if not concept_field.required:
+        return f"  {concept_field.name}?: {type_expr} | null;"
+    return f"  {concept_field.name}: {type_expr};"
 
 
 def _ts_type(

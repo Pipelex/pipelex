@@ -41,14 +41,29 @@ class TestTsZodEmitter:
     def test_concept_refs_use_lazy_and_literals_keep_defaults(self, pipeline_crate: LibraryCrate):
         content = emit_ts_zod(resolve_concepts_from_crate(pipeline_crate))[0].content
         # A concept reference is a forward-safe lazy schema; the literal-with-default is a defaulted enum.
-        assert "score: z.lazy(() => ScoreSchema).optional()" in content
-        assert 'status: z.enum(["draft", "final"]).default("draft")' in content
+        assert "score: z.lazy(() => ScoreSchema).nullish()" in content
+        assert 'status: z.enum(["draft", "final"]).nullable().default("draft")' in content
+
+    def test_non_required_fields_are_null_tolerant(self, pipeline_crate: LibraryCrate):
+        """Both non-required spellings must accept the explicit `null` the runtime puts on the wire.
+
+        An unset optional field is dumped as `"key": null` (the generated runtime class annotates it
+        `X | None` and `dump_for_transport()` carries no `exclude_none`), so a `.optional()` schema —
+        `T | undefined` in zod — rejects the engine's own payload. `.nullish()` and `.nullable()` are
+        the two null-tolerant spellings; `.optional()` alone must appear nowhere.
+        """
+        content = emit_ts_zod(resolve_concepts_from_crate(pipeline_crate))[0].content
+        assert ".optional()" not in content
+        # No default: the wire may omit the key *or* null it, and `.nullish()` describes exactly that.
+        assert "rationale: z.string().nullish()" in content
+        # With a default: absent applies the default, explicit null stays null.
+        assert 'status: z.enum(["draft", "final"]).nullable().default("draft")' in content
 
     def test_temporal_defaults_emit_iso_wire_strings(self, temporal_defaults_crate: LibraryCrate):
         content = emit_ts_zod(resolve_concepts_from_crate(temporal_defaults_crate))[0].content
-        assert 'starts_on: z.string().default("2026-07-11")' in content
-        assert 'recorded_at: z.string().default("2026-07-11T09:30:00")' in content
-        assert 'starts_at: z.string().default("09:30:00")' in content
+        assert 'starts_on: z.string().nullable().default("2026-07-11")' in content
+        assert 'recorded_at: z.string().nullable().default("2026-07-11T09:30:00")' in content
+        assert 'starts_at: z.string().nullable().default("09:30:00")' in content
 
     def test_dict_defaults_are_canonical(self, reordered_dict_default_crates: tuple[LibraryCrate, LibraryCrate]):
         first_crate, second_crate = reordered_dict_default_crates
@@ -91,8 +106,37 @@ class TestTsZodEmitter:
 
         content = emit_ts_zod(resolve_concepts_from_crate(crate))[0].content
 
-        assert "export type Node = {\n  next?: Node;\n};" in content
+        # The declared type is what `z.ZodType<Node>` is checked against, so it must be the schema's
+        # inferred output exactly: `.nullish()` infers `Node | null | undefined`.
+        assert "export type Node = {\n  next?: Node | null;\n};" in content
         assert "export const NodeSchema: z.ZodType<Node> = z.object({" in content
+        assert "next: z.lazy(() => NodeSchema).nullish()" in content
+
+    def test_recursive_defaulted_field_declares_a_nullable_type(self):
+        """The other explicit-type branch: a defaulted field infers `T | null` with no `?` marker."""
+        crate = LibraryCrate(
+            concepts={
+                "graph.Node": ConceptBlueprint(
+                    description="A recursive node",
+                    structure={
+                        "next": ConceptStructureBlueprint(
+                            description="Next node",
+                            type=ConceptStructureBlueprintFieldType.CONCEPT,
+                            concept_ref="graph.Node",
+                            required=False,
+                        ),
+                        "label": ConceptStructureBlueprint(description="A label", type=ConceptStructureBlueprintFieldType.TEXT, default_value="root"),
+                        "depth": ConceptStructureBlueprint(description="How deep", type=ConceptStructureBlueprintFieldType.INTEGER, required=True),
+                    },
+                )
+            }
+        )
+
+        content = emit_ts_zod(resolve_concepts_from_crate(crate))[0].content
+
+        assert "export type Node = {\n  next?: Node | null;\n  label: string | null;\n  depth: number;\n};" in content
+        assert 'label: z.string().nullable().default("root")' in content
+        assert "depth: z.number().int()," in content
 
     def test_mutually_recursive_concepts_use_explicit_types_and_annotated_schemas(self):
         crate = LibraryCrate(
@@ -249,10 +293,10 @@ class TestTsZodEmitter:
         `Image` materializes flat pixel dimensions.
         """
         content = emit_ts_zod(resolve_concepts_from_crate(materialized_image_crate))[0].content
-        assert "metadata: z.record(z.string(), z.unknown()).optional()" in content
+        assert "metadata: z.record(z.string(), z.unknown()).nullish()" in content
         assert "@imprecise dict value type unspecified" in content
         assert "captions: z.record(z.string(), z.string())" in content
-        assert "width: z.number().int().optional()" in content
+        assert "width: z.number().int().nullish()" in content
 
     def test_imprecision_and_opaque_are_surfaced(self, edge_crate: LibraryCrate):
         content = emit_ts_zod(resolve_concepts_from_crate(edge_crate))[0].content

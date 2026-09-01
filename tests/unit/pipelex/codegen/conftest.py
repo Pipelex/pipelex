@@ -264,6 +264,14 @@ def every_type_kind_crate() -> LibraryCrate:
                         choices=["awaiting_triage", "in_progress_with_owner", "blocked_on_dependency", "ready_for_review"],
                         required=False,
                     ),
+                    # The same unbounded choice list carrying a default — the widest presence spelling
+                    # ts-zod emits (`.nullable().default(…)` on top of a broken `z.enum([…])`), so the
+                    # print-width and prettier guards actually exercise the multi-member chain break.
+                    "fallback_state": ConceptStructureBlueprint(
+                        description="Fallback workflow state",
+                        choices=["awaiting_triage", "in_progress_with_owner", "blocked_on_dependency", "ready_for_review"],
+                        default_value="awaiting_triage",
+                    ),
                 },
             ),
             # A multi-line description, and one padded with edge whitespace. Rendered naively the first

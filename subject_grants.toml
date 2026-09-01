@@ -1080,6 +1080,10 @@ rationale = "Single-operand formatting of the value."
 param = "description"
 rationale = "Noun-named derivation: builds the JSDoc from the description; extras stay keyword."
 
+["pipelex/codegen/emitters/ts_zod.py::_presence_modifiers"]
+param = "concept_field"
+rationale = "Reads as a verb-object sentence over the one field it describes, matching every other renderer in this emitter."
+
 ["pipelex/codegen/emitters/ts_zod.py::_render_field"]
 param = "concept_field"
 rationale = "Verb-object: renders the field; context stays keyword."
