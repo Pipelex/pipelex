@@ -124,3 +124,15 @@ Both now track the enclosing quote before counting anything, which is what `pyth
 Reachable — `default_value = { 'marked "urgent"' = 3 }` is legal TOML on a `type = "dict"` field — but narrow: `per-reviewer` and `it's` are both already spelled the way prettier wants. Raised by cubic; Codex reviewed the same diff and did not flag it.
 
 **Deferred under the round-2 bar, deliberately.** It is a stamp instability only — the emission is valid TypeScript — and it is *not* a regression: the round-1 baseline rendered the whole dict as JSON and prettier rewrote both the brace padding and the quote, so round 1 made it strictly narrower and never worse. The fix looks like one word (`json.dumps(text)` → `_ts_string(text)`), which is precisely why it was left alone: the bar exists to stop a converging PR from taking on work that is neither a regression nor a blocker. It should be picked up in the follow-up that closes [L-260901-26da36](http://localhost:4747/i/L-260901-26da36), where a real TS parse would catch the whole family at once.
+
+## Checkpoint — review round 3, one regression fixed
+
+`/review` against `dev` with a real prettier (3.9.6, scratchpad install) found one defect and confirmed one known deferral.
+
+**The chain break exploded an enum's members even when the enum fitted on its own line — a regression this branch introduces.** `_break_zod_expr`'s new member-chain path ran `_explode_enum_call` on any `.enum([…])` in the chain, unconditionally. Prettier does not: once the chain is broken it re-measures each call at its new indent and leaves flat any that fits, and the threshold is exact — probed member by member, `indent + len(call) <= 80` stays on the line, `81` explodes.
+
+The shape that reaches it is ordinary, not contrived: `escalation_severity: z.enum(["low", "medium", "high"]).nullable().default("medium"),` is 86 columns flat, so it breaks; the `.enum([…])` is then 36 columns at indent 4 and prettier folds it straight back. **It is a regression rather than a pre-existing defect**, because `.nullable()` is what pushes the line over: the same field emits 75 columns on this branch's merge-base, stays flat, and is prettier-clean there. Verified both directions by emitting the same crate with the merge-base emitter.
+
+`_render_broken_call` now applies the measurement, `every_type_kind_crate` carries the shape (`escalation_severity`, deliberately just inside the width where `fallback_state` is past it), and `test_a_broken_chain_keeps_a_call_that_fits_on_its_own_line` is the byte assertion. Mutation-tested: restoring the unconditional explode reddens it. The whole fixture emission is prettier-clean for real, and `test_emitted_ts_is_prettier_clean` passes with prettier on PATH rather than skipping.
+
+**The deferred `_ts_object_key` case was re-confirmed and left deferred.** A dict-default key carrying more `"` than `'` is still emitted `{ "marked \"urgent\"": 3 }` and prettier rewrites it to `{ 'marked "urgent"': 3 }`. It remains a stamp instability on valid TypeScript, not a regression, and belongs with [L-260901-26da36](http://localhost:4747/i/L-260901-26da36).

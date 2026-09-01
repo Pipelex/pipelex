@@ -74,6 +74,20 @@ class TestTsZodEmitter:
         # A single call has no chain to break: prettier explodes the enum members in place instead.
         assert '  workflow_state: z.enum([\n    "awaiting_triage",' in content
 
+    def test_a_broken_chain_keeps_a_call_that_fits_on_its_own_line(self, every_type_kind_crate: LibraryCrate):
+        """Prettier re-measures every call once the chain is broken, and one that now fits stays flat.
+
+        The counterpart to the test above: `.nullable()` costs width on every defaulted field, so an
+        ordinary three-choice enum reaches the break on nothing but that — and then sits far inside the
+        print width at indent 4. Exploding its members anyway produces a shape prettier folds straight
+        back, changing the artifact's bytes on the consumer's first format run. The threshold is exact:
+        a call is left flat while `indent + len(call)` fits, and `fallback_state` above is the same
+        shape past it.
+        """
+        content = emit_ts_zod(resolve_concepts_from_crate(every_type_kind_crate))[0].content
+
+        assert '  escalation_severity: z\n    .enum(["low", "medium", "high"])\n    .nullable()\n    .default("medium"),' in content
+
     def test_an_exploded_choice_keeps_its_own_commas(self, every_type_kind_crate: LibraryCrate):
         """A choice is authored text and may carry a comma; split on it, the emission stops being TypeScript.
 

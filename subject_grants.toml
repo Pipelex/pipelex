@@ -1092,6 +1092,10 @@ rationale = "Noun-named derivation: builds the JSDoc from the description; extra
 param = "concept_field"
 rationale = "Reads as a verb-object sentence over the one field it describes, matching every other renderer in this emitter."
 
+["pipelex/codegen/emitters/ts_zod.py::_render_broken_call"]
+param = "call"
+rationale = "Verb-object: renders the one member call it is handed; the column stays keyword."
+
 ["pipelex/codegen/emitters/ts_zod.py::_render_field"]
 param = "concept_field"
 rationale = "Verb-object: renders the field; context stays keyword."

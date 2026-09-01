@@ -316,6 +316,15 @@ def every_type_kind_crate() -> LibraryCrate:
                         choices=["awaiting_triage", "in_progress_with_owner", "blocked_on_dependency", "ready_for_review"],
                         default_value="awaiting_triage",
                     ),
+                    # A short choice list that only overflows once `.nullable().default(…)` is attached.
+                    # Prettier re-measures each call after breaking the chain, so the enum goes back onto
+                    # one line at indent 4 — exploding its members regardless is a shape prettier folds
+                    # straight back, which is exactly the stamp break the breaking exists to prevent.
+                    "escalation_severity": ConceptStructureBlueprint(
+                        description="How severe the escalation is",
+                        choices=["low", "medium", "high"],
+                        default_value="medium",
+                    ),
                     # The overflow that has nothing to do with the *expression*: `z.string()` is as short as
                     # they come, and this line still passes prettier's print width on the authored field name
                     # and default literal alone. It is the shape that makes the member-chain break general

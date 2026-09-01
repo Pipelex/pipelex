@@ -182,8 +182,24 @@ def _break_zod_expr(expr: str, *, modifiers: list[str]) -> str:
         if chain and _is_enum_call(chain[0]):
             return f"{head}{_explode_enum_call(chain[0], indent=2)}"
         return f"{expr}{''.join(modifiers)}"
-    rendered = "".join(f"\n    {_explode_enum_call(call, indent=4) if _is_enum_call(call) else call}" for call in chain)
+    rendered = "".join(f"\n    {_render_broken_call(call, indent=4)}" for call in chain)
     return f"{head}{rendered}"
+
+
+def _render_broken_call(call: str, *, indent: int) -> str:
+    """One member call on its own line after the chain break, exploded only if it still overflows there.
+
+    Prettier re-measures every call once the chain is broken, and one that now fits is left flat — the
+    threshold is exact, `indent + len(call) <= TS_PRINT_WIDTH` stays on the line. Exploding unconditionally
+    is what a `z.enum` special case looks like from the other side: an ordinary three-choice enum carrying a
+    default reaches this branch on its `.nullable()` width alone, sits far inside the width at indent 4, and
+    was being exploded into a shape prettier immediately folds back — a consumer's first format run changes
+    the bytes and `pipelex codegen check` reports an untouched artifact as hand-edited. Only the enum's
+    arguments are modelled here, for the same reason as in the single-call branch.
+    """
+    if _is_enum_call(call) and indent + len(call) > TS_PRINT_WIDTH:
+        return _explode_enum_call(call, indent=indent)
+    return call
 
 
 def _split_member_chain(expr: str) -> list[str]:
