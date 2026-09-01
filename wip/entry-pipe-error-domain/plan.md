@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 item: L-260829-fa8267
 ---
 
@@ -81,3 +81,13 @@ Two corrections on top of the checkpoint, both inside the design's own surface.
 The translation arm caught `PipeLibraryError`, and `PipeNotFoundError` is one — so a miss raised from inside `get_optional_pipe` would have been re-raised as a class asserting an ambiguity, carrying a hint about candidates that never existed. No in-body site raises one there today, which is exactly why the trap would have been silent; `get_optional_entry_pipe` now lets `PipeNotFoundError` through untranslated. Pinned by `test_entry_pipe_does_not_translate_a_miss_into_an_ambiguity`, which injects the raise and was mutation-checked red with the arm removed.
 
 The review also found the same defect class one module over, left out to keep this diff at its stated scope: `validate_bundle.py`'s `_pipes_to_dry_run` raises the undomained `PipeNotFoundError` for a caller-supplied `--pipe` / `pipe_ref`, and `pipelex-api`'s build route maps it to 422 by hand. Filed as L-260901-296dfb.
+
+### Landed
+
+Merged as PR #1180 into `dev`, squashed at `7faacf81f98e59c20867dd102d2140ab0a9b8e23`, with every CI job green — the eight py3.11 test shards, the typecheck, and the whole lint set including the drift-contracts job that gates the `cli-docs` ack this work opened. Verified in the merged tree: `pipe_library.py` raises the two entry classes at its ambiguous-bare-code and required-miss sites, `exceptions.py` declares `ErrorDomain.INPUT` on both, and a live probe of `pipelex-agent validate pipe` on a code declared in two domains answers `EntryPipeAmbiguousError` with `error_domain: input` and the `CHANGE_INPUT` hint, where the same probe on the pre-merge tree returned an unclassified `PipeLibraryError`.
+
+The merge is on `dev` only. Nothing here reaches a consumer pinning an exact version until a release carries it; the repo's open release item is L-260828-f4e88c, which was cut for a different change and will pick this up if it has not already been published by the time it moves.
+
+**A correction to the checkpoint's closing line.** It said the blocked runner-side item L-260829-a30018 becomes workable after this merge. It does not: that item waits on L-260829-be0d9b as well, and only that second blocker's close will release it. The ready work that this close actually exposes is elsewhere under the same epic — the protocol-side `pipe_ref` items, starting with L-260829-662bf4.
+
+**The pre-landing review added nothing new.** It re-derived the `_pipes_to_dry_run` gap already recorded above and confirmed it is genuinely out of this diff's scope, and it verified by live probe that `pipelex-agent validate bundle --pipe <typo>` still answers with no `error_domain` while its sibling `validate pipe <typo>` now answers `input` — which is the divergence L-260901-296dfb exists to close. One presentational nit worth carrying into that item: `bundle_cmd.py`'s new `type(exc).__name__` label is a no-op until then, because the only class reaching that arm today is the bare `PipeNotFoundError` from `_pipes_to_dry_run`, so its comment pointing at "the same arm in `validate pipe`" describes an intent rather than the current behaviour.
