@@ -16,7 +16,12 @@ SDK exception type name.
 from pydantic import BaseModel
 
 from pipelex.cogt.exceptions import InferenceErrorCategory
-from pipelex.cogt.inference.error_classification import GatewayRequestLimit, SDKErrorEnvelope, UserActionKind
+from pipelex.cogt.inference.error_classification import (
+    GatewayRequestLimit,
+    GatewayUnresolvedReference,
+    SDKErrorEnvelope,
+    UserActionKind,
+)
 
 
 class ClassificationResult(BaseModel):
@@ -36,6 +41,12 @@ class ClassificationResult(BaseModel):
     # change the retry decision, it lets the Render step say which limit was hit
     # instead of falling back to the generic "the provider rejected the request".
     gateway_request_limit: GatewayRequestLimit | None = None
+    # Which of the gateway's unresolvable-reference refusals this is, when the
+    # request named a file the gateway could not turn into bytes. A flag for the
+    # same reason as the field above: the retry decision is unchanged, but the
+    # Render step can say which reference failed and how, instead of telling a
+    # caller with a mistyped storage key to revise their prompt.
+    gateway_unresolved_reference: GatewayUnresolvedReference | None = None
 
 
 # Status-less SDK exception type names recognizable regardless of provider:
@@ -128,6 +139,48 @@ def _classify_gateway_request_limit(*, limit: GatewayRequestLimit) -> Classifica
             )
 
 
+def _classify_gateway_unresolved_reference(*, reference: GatewayUnresolvedReference) -> ClassificationResult:
+    """Classify an unresolvable-reference refusal the inference gateway raised on its own.
+
+    None of these is retryable, for the same reason none of the request-shape
+    limits is: the gateway refused before a provider saw the request, and the same
+    reference resolves the same way the second time. That includes
+    ``DOCUMENT_UNREACHABLE``, where the origin *could* have been transiently down —
+    the gateway renders it a 400, a retry would re-run a whole inference call just
+    to re-fetch a document, and the common case is a URL that is simply wrong.
+    """
+    match reference:
+        case (
+            GatewayUnresolvedReference.REFERENCE_UNRESOLVED
+            | GatewayUnresolvedReference.STORAGE_REFERENCE_INVALID
+            | GatewayUnresolvedReference.STORAGE_OBJECT_UNREADABLE
+            | GatewayUnresolvedReference.DOCUMENT_URL_REFUSED
+            | GatewayUnresolvedReference.DOCUMENT_HOST_REFUSED
+            | GatewayUnresolvedReference.DOCUMENT_UNREACHABLE
+            | GatewayUnresolvedReference.DOCUMENT_CONTENT_UNUSABLE
+        ):
+            # The reference is the caller's to fix — a different key, a different
+            # URL, or the file uploaded where the gateway can reach it.
+            # ``DOCUMENT_HOST_REFUSED`` belongs here too: the refusal is a security
+            # policy rather than a fault, but the caller is still the one who can
+            # act on it, and the Render step is where that distinction is stated.
+            return ClassificationResult(
+                category=InferenceErrorCategory.CONTENT,
+                user_action_kind=UserActionKind.CHANGE_INPUT,
+                gateway_unresolved_reference=reference,
+            )
+        case GatewayUnresolvedReference.STORAGE_NOT_SERVED:
+            # This deployment serves no ``pipelex-storage://`` references at all,
+            # because no bucket is configured for it. Nothing about the inputs
+            # causes it and no input can avoid it — it is an operator's problem,
+            # like ``BODY_LENGTH_REQUIRED``.
+            return ClassificationResult(
+                category=InferenceErrorCategory.CONFIGURATION,
+                user_action_kind=UserActionKind.CONTACT_SUPPORT,
+                gateway_unresolved_reference=reference,
+            )
+
+
 def classify_inference_error(metadata: SDKErrorEnvelope) -> ClassificationResult:
     """Classify an inference SDK error from its structured metadata.
 
@@ -152,6 +205,15 @@ def classify_inference_error(metadata: SDKErrorEnvelope) -> ClassificationResult
     gateway_request_limit = metadata.gateway_request_limit
     if gateway_request_limit is not None:
         return _classify_gateway_request_limit(limit=gateway_request_limit)
+
+    # And its "cannot resolve this reference" refusals, for the same reason and on
+    # the same footing. The two code sets are disjoint — a code names either a
+    # bound the request exceeded or a reference that could not be resolved — so the
+    # order between these two branches carries no meaning. Both arrive on 400,
+    # which the status ladder would read as a provider rejecting the prompt.
+    gateway_unresolved_reference = metadata.gateway_unresolved_reference
+    if gateway_unresolved_reference is not None:
+        return _classify_gateway_unresolved_reference(reference=gateway_unresolved_reference)
 
     # Quota exhaustion is decided by the provider-aware ``is_quota_exhaustion``
     # property and takes precedence over the HTTP status: providers signal it on

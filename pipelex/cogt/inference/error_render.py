@@ -21,7 +21,13 @@ from pipelex.cogt.exceptions import (
     SearchJobFailureError,
     SearchModelNotFoundError,
 )
-from pipelex.cogt.inference.error_classification import GatewayRequestLimit, SDKErrorEnvelope, UserAction, UserActionKind
+from pipelex.cogt.inference.error_classification import (
+    GatewayRequestLimit,
+    GatewayUnresolvedReference,
+    SDKErrorEnvelope,
+    UserAction,
+    UserActionKind,
+)
 from pipelex.cogt.inference.error_classify import ClassificationResult
 
 
@@ -83,6 +89,55 @@ def _render_gateway_limit_detail(*, limit: GatewayRequestLimit) -> str:
             )
 
 
+def _render_gateway_unresolved_reference_detail(*, reference: GatewayUnresolvedReference) -> str:
+    """Produce the advice for a reference the inference gateway could not resolve.
+
+    Names no key, host, status or media type, for the same reason
+    ``_render_gateway_limit_detail`` names no number: the gateway's own refusal
+    message sits beside this detail and already states the specifics. What this
+    text adds is what the caller should *do*, which the message does not say.
+    """
+    match reference:
+        case GatewayUnresolvedReference.REFERENCE_UNRESOLVED:
+            return (
+                "A file reference in the request could not be resolved by the inference gateway — "
+                "the error message names the cause; fix the reference it names."
+            )
+        case GatewayUnresolvedReference.STORAGE_REFERENCE_INVALID:
+            return "The pipelex-storage:// reference in the request is malformed — check it against the key the upload returned."
+        case GatewayUnresolvedReference.STORAGE_OBJECT_UNREADABLE:
+            return (
+                "The referenced storage object does not exist or cannot be read — check that the reference points at a file "
+                "uploaded to this deployment."
+            )
+        case GatewayUnresolvedReference.STORAGE_NOT_SERVED:
+            return (
+                "This inference gateway does not serve pipelex-storage:// references at all — no storage is configured for it. "
+                "Nothing about the inputs causes this — contact support."
+            )
+        case GatewayUnresolvedReference.DOCUMENT_URL_REFUSED:
+            return (
+                "The inference gateway refused the document URL — send a plain public https:// URL, a data: URL, or a "
+                "pipelex-storage:// reference, and give the final address rather than one that redirects."
+            )
+        case GatewayUnresolvedReference.DOCUMENT_HOST_REFUSED:
+            return (
+                "The inference gateway does not fetch documents from that host, as a matter of security policy: private and "
+                "internal addresses are never fetched. Host the document at a publicly reachable address, or upload it to "
+                "Pipelex storage and reference it from there."
+            )
+        case GatewayUnresolvedReference.DOCUMENT_UNREACHABLE:
+            return (
+                "The document could not be fetched from its URL — check that it is live and publicly reachable, and try again "
+                "if its host was temporarily down."
+            )
+        case GatewayUnresolvedReference.DOCUMENT_CONTENT_UNUSABLE:
+            return (
+                "The document was fetched but cannot be used — the error message says whether it was served empty, in a media "
+                "type the pipeline does not accept, or as a data: URL that could not be decoded."
+            )
+
+
 def _render_detail(metadata: SDKErrorEnvelope, *, classification: ClassificationResult) -> str:
     """Produce the free-form user-facing advice text for the classified error."""
     if classification.gateway_request_limit is not None:
@@ -90,6 +145,12 @@ def _render_detail(metadata: SDKErrorEnvelope, *, classification: Classification
         # the remedy more precisely than the kind does, and two of the four limits
         # would otherwise land on advice that is simply wrong for them.
         return _render_gateway_limit_detail(limit=classification.gateway_request_limit)
+    if classification.gateway_unresolved_reference is not None:
+        # Same reason, one indirection further out: every member here would
+        # otherwise render "review the prompt, parameters, and inputs" for a
+        # reference the caller has to repair, and one of them for a security
+        # refusal that no reshaping of the inputs can get around.
+        return _render_gateway_unresolved_reference_detail(reference=classification.gateway_unresolved_reference)
     match classification.user_action_kind:
         case UserActionKind.WAIT_AND_RETRY:
             if metadata.retry_after_seconds is not None:

@@ -212,8 +212,8 @@ The three steps live in three modules. Only the per-provider Extract functions s
 
 | Module | Step | What it owns |
 |--------|------|--------------|
-| `pipelex/cogt/inference/error_classification.py` | Extract | `ProviderErrorMetadata`, `SDKErrorEnvelope`, `UserAction`, `UserActionKind`, `GatewayRequestLimit`, the `extract_*_metadata` functions, plus pure discriminators (`is_quota_exhaustion`, `is_content_policy_violation`, `is_network_error`, `gateway_request_limit`) exposed as `@property` on the metadata |
-| `pipelex/cogt/inference/error_classify.py` | Classify | `classify_inference_error()` — provider-blind mapping from `ProviderErrorMetadata` → `ClassificationResult(category, user_action_kind, is_model_not_found, gateway_request_limit)` |
+| `pipelex/cogt/inference/error_classification.py` | Extract | `ProviderErrorMetadata`, `SDKErrorEnvelope`, `UserAction`, `UserActionKind`, `GatewayRequestLimit`, `GatewayUnresolvedReference`, the `extract_*_metadata` functions, plus pure discriminators (`is_quota_exhaustion`, `is_content_policy_violation`, `is_network_error`, `gateway_request_limit`, `gateway_unresolved_reference`) exposed as `@property` on the metadata |
+| `pipelex/cogt/inference/error_classify.py` | Classify | `classify_inference_error()` — provider-blind mapping from `ProviderErrorMetadata` → `ClassificationResult(category, user_action_kind, is_model_not_found, gateway_request_limit, gateway_unresolved_reference)` |
 | `pipelex/cogt/inference/error_render.py` | Render | `render_inference_error()` — picks the `CogtError` subclass from `InferenceErrorFamily` plus `is_model_not_found` (e.g. `LLMModelNotFoundError` vs `LLMCompletionError`) |
 
 Provider-specific nuance is normalized away in Extract (e.g. Google's `code` becomes `status_code`; AWS Bedrock error codes are mapped to HTTP statuses), so Classify has no provider branching. HTTP status drives classification; status-less errors dispatch on the SDK exception type name. The `tests/unit/pipelex/cogt/inference/test_provider_classification_parity.py` meta-test walks every `ProviderName` against the extract-fn registry so adding a new provider without wiring it fails fast.
@@ -240,7 +240,11 @@ class ProviderErrorMetadata(BaseModel):
 
 ### The Gateway's Own Refusals
 
-Not every failure on an inference call comes from a provider. The Pipelex inference gateway bounds what a request may weigh and how deeply it may nest, and refuses anything over those bounds itself — the body cap runs ahead of authentication, on the request headers alone, so the request never reaches a model at all. Those refusals arrive with the gateway's own error codes, and `GatewayRequestLimit` is the runtime's name for each one.
+Not every failure on an inference call comes from a provider. The Pipelex inference gateway refuses some requests itself, before a model ever sees them, and it does so for two different reasons: the request is outside what it will carry, or a reference the request depends on cannot be turned into content. Both arrive with the gateway's own error codes, and each has a runtime enum naming its outcomes — `GatewayRequestLimit` and `GatewayUnresolvedReference`.
+
+#### What the request may weigh
+
+The gateway bounds what a request may weigh and how deeply it may nest, and refuses anything over those bounds itself — the body cap runs ahead of authentication, on the request headers alone, so the request never reaches a model at all.
 
 | Gateway code | HTTP | `GatewayRequestLimit` | Category / action | What the caller is told |
 |---|---|---|---|---|
@@ -260,7 +264,37 @@ A few details are worth knowing before touching this:
 - **The advice names no numbers.** The caps belong to the deployment, they differ between deployments, and the gateway already states its own figures in the message the advice sits beside. `_render_gateway_limit_detail` in the Render step is also where a per-plan message belongs once the hosted product's tier limits are wired through — the gateway knows nothing of users, organizations or plans, so only the runtime can say "your plan allows files up to N MB".
 - **One failure can wear two codes, and reading `type` first loses one of them.** The gateway renders a refusal in the vocabulary of the route it arrived on: its own `pig-0N` family on the LLM routes, where the client is speaking a provider's protocol, and its frozen `pipelex_*` contract codes on the native `/v1/pipelex/extract` and `/v1/pipelex/search` routes. So "this file is over its cap" is `pig-10` on one and `pipelex_storage_object_too_large` on the other, and a caller cannot tell which route their extract took. The native-route envelope also puts a generic `invalid_request_error` in `error.type` beside the real code in `error.code`, so the two Pipelex-service Extract hops read `code` before `type` — the inverse of the vendor-facing precedence, which stays as it is because Anthropic's error section carries a `type` and no `code` at all. Reading `type` first there replaces the whole `pipelex_*` vocabulary with one bucket.
 
-The gateway's remaining codes — routing refusals, and the storage codes that mean "this reference cannot be resolved" rather than "this object is too big" — are a different family and classify on their status like anything else.
+#### When a reference cannot be resolved
+
+The other half of the gateway's own refusals. A request may *name* a file rather than carry it — a `pipelex-storage://` key the gateway resolves for the caller, or a document URL it fetches on their behalf — and when it cannot turn that reference into bytes it refuses the request itself, again before a provider sees it. So one family bounds what the request may weigh; this one says a reference the request depends on could not be turned into content. `GatewayUnresolvedReference` is the runtime's name for each outcome.
+
+| Gateway code | HTTP | `GatewayUnresolvedReference` | Category / action | What the caller is told |
+|---|---|---|---|---|
+| `pig-09` | 400 | `REFERENCE_UNRESOLVED` | `CONTENT` / `CHANGE_INPUT` | a file reference could not be resolved — the message names the cause |
+| `pipelex_storage_uri_invalid` | 400 | `STORAGE_REFERENCE_INVALID` | `CONTENT` / `CHANGE_INPUT` | the storage reference is malformed — check it against the key the upload returned |
+| `pipelex_storage_unreadable` | 400 | `STORAGE_OBJECT_UNREADABLE` | `CONTENT` / `CHANGE_INPUT` | the object is not there, or cannot be read |
+| `pipelex_storage_uri_unsupported` | 400 | `STORAGE_NOT_SERVED` | `CONFIGURATION` / `CONTACT_SUPPORT` | this deployment serves no storage references at all |
+| `pipelex_unsupported_uri_scheme` | 400 | `DOCUMENT_URL_REFUSED` | `CONTENT` / `CHANGE_INPUT` | send an `https://` URL, a `data:` URL, or a `pipelex-storage://` reference |
+| `pipelex_document_scheme_refused` | 400 | `DOCUMENT_URL_REFUSED` | `CONTENT` / `CHANGE_INPUT` | the same remedy — the fetch's own scheme check |
+| `pipelex_document_address_refused` | 400 | `DOCUMENT_URL_REFUSED` | `CONTENT` / `CHANGE_INPUT` | the same remedy — the resolved address is not publicly routable |
+| `pipelex_document_redirect_refused` | 400 | `DOCUMENT_URL_REFUSED` | `CONTENT` / `CHANGE_INPUT` | the same remedy — the gateway does not follow redirects |
+| `pipelex_document_host_refused` | 400 | `DOCUMENT_HOST_REFUSED` | `CONTENT` / `CHANGE_INPUT` | documents are not fetched from that host, as a matter of security policy |
+| `pipelex_document_unreachable` | 400 | `DOCUMENT_UNREACHABLE` | `CONTENT` / `CHANGE_INPUT` | check the document is live and publicly reachable |
+| `pipelex_document_empty` | 400 | `DOCUMENT_CONTENT_UNUSABLE` | `CONTENT` / `CHANGE_INPUT` | the document was fetched and cannot be used |
+| `pipelex_document_unsupported_type` | 400 | `DOCUMENT_CONTENT_UNUSABLE` | `CONTENT` / `CHANGE_INPUT` | the same — a media type the pipeline does not accept |
+| `pipelex_document_bad_data_url` | 400 | `DOCUMENT_CONTENT_UNUSABLE` | `CONTENT` / `CHANGE_INPUT` | the same — a `data:` URL that could not be decoded |
+
+Everything said above about the request limits holds here too — the code is the discriminator rather than the provider, the check runs ahead of the status ladder, and the advice defers every specific to the gateway's own message, which already names the key, the host, the status or the media type. Three things are particular to this family:
+
+- **The members group by remedy, not by wire code.** Two codes share a member only when the caller's next move is the same, which is why the URL-shape refusals are one member. Two of them are scheme checks in different places and both belong there: `classifyExtractInput` runs before any fetch and admits only `https:`, `data:` and `pipelex-storage://`, so an `http://` URL is refused as `pipelex_unsupported_uri_scheme`, and `pipelex_document_scheme_refused` is the fetch's own check on what by then can only be an `https://` URL. `pipelex_document_host_refused` is deliberately *not* folded in with them: the caller can act on all four, but only that one has to be stated as the deliberate security refusal it is. Advice that reads as a fault to work around — revise the prompt, use a smaller file — sends someone hunting for a problem in a document that is perfectly fine.
+- **One member is not the caller's problem at all.** `pipelex_storage_uri_unsupported` means no bucket is configured, so the deployment does not serve the scheme: no input avoids it, and telling the caller to fix theirs is wrong in kind. It is the family's one `CONFIGURATION` / `CONTACT_SUPPORT` arm, the same call `BODY_LENGTH_REQUIRED` gets among the request limits.
+- **`pig-09` is one code for every storage failure but "over its cap", and the advice says so.** On the LLM routes the client is speaking a provider's protocol, so the gateway's `pig-0N` family is the only vocabulary available and it has a single fail-closed slot for "cannot resolve" — no bucket configured, not a storage reference, no such object, an object it cannot read, a type no provider takes, or no way to hand a file to the provider the model resolves to. The message carries the difference; the code does not, so `REFERENCE_UNRESOLVED` defers to the message rather than guessing which it was. The native `/v1/pipelex/*` routes name each cause with its own frozen contract code, which is why the rest of the table is `pipelex_*`.
+
+`pig-09` also folds in causes that are not the caller's to repair — no bucket configured, and no way to hand a file to the provider the model resolves to — because the LLM routes have one slot for all of them. The native routes name the first of those separately (`pipelex_storage_uri_unsupported`, `CONTACT_SUPPORT`), so the same storage-less deployment reads differently by route. Splitting `pig-09` is a gateway-side change, filed on `pipelex-manifold` as `L-260901-f2b554`.
+
+Nothing in either family is ever retried, and the two never overlap: a code names either a bound the request exceeded or a reference that could not be resolved. `pig-09` and `pig-10` are the clearest illustration — the same middleware raises both, one when the object cannot be resolved and one when it is over its cap.
+
+The gateway's remaining codes — its routing refusals, and the storage deadline outcomes (`pig_storage_timeout` at 504, `pig_storage_client_disconnected` at 499) — belong to neither family and classify on their status like anything else, which is the right reading for a timeout.
 
 ### The `instructor` Unwrap
 
