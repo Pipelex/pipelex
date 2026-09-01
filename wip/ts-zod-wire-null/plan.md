@@ -68,4 +68,12 @@ Verified for real rather than reasoned about, with prettier and typescript insta
 
 **Mutation-tested.** Reverting `_presence_modifiers` to `.optional()` / bare `.default(…)` reddens both the projection pin and the executable round-trip, the latter with zod's own *"expected record, received null"* on the runtime's own payload — the ledger item's failure, reproduced in this repo.
 
-One coverage gap left open deliberately: the print-width guard exercises `_render_field`, not `_render_type_field`, because no fixture crate is recursive. A long enough concept name plus ` | null` could overflow a declared-type line; `test_emitted_ts_lines_fit_the_print_width` would catch it only once a recursive crate reaches that fixture.
+### One defect found and deliberately deferred
+
+The print-width guard exercises `_render_field` but never `_render_type_field`, because no fixture crate is recursive — so the whole declared-type path is unmeasured. Probing it turned up a real, reachable defect rather than a mere coverage hole: a recursive concept with an ordinary four-choice enum field emits a declared-type line at **118 characters**, prettier rewrites it to the leading-`|` broken form, and the resulting byte change makes `pipelex codegen check` report an untouched file as `[hand-edited]`.
+
+It is **pre-existing and orthogonal to this campaign**: the same line measures 111 characters on this branch's parent commit, so the ` | null` widening makes the overflow easier to reach but does not cause it.
+
+It is not a one-liner, which is why it was not folded in here. Probing prettier 3.9.6 across every shape `_ts_type` can produce: a literal union breaks in three tiers (flat, then break after the `?:`, then leading-`|` one per line); `Record<string, X> | null` and `Array<union> | null` explode the type-argument list; but `Array<atom> | null` and a bare long atom **stay flat past 80**. Those last two are the trap — prettier tolerates them, so the always-on width guard is *stricter* than prettier on this path, and simply adding a recursive fixture to it reddens shapes that are already prettier-clean. A correct fix models the union tiers and the type-argument explosion together, and teaches the guard the same distinction.
+
+Filed as [L-260901-47759d](http://localhost:4747/i/L-260901-47759d) (owner `pipelex`), carrying the repro, the probe matrix and the parent-commit measurement.
