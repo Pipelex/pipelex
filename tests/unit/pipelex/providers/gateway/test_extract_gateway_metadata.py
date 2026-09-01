@@ -2,13 +2,20 @@
 
 Distills a Portkey/Gateway SDK exception into a ``ProviderErrorMetadata``.
 ``APIStatusError`` subclasses carry ``status_code``, ``response`` (httpx),
-and ``body`` (pre-parsed dict). ``APITimeoutError`` / ``APIConnectionError``
-carry only a request; status fields come back as ``None``.
+and ``body``. ``APITimeoutError`` / ``APIConnectionError`` carry only a
+request; status fields come back as ``None``.
+
+``body`` is a pre-parsed dict only on the paths that bypass Portkey's own
+exception factory; the factory itself puts the message *string* there, so the
+error code has to be recovered from the response. Both shapes are pinned below.
 """
 
 from __future__ import annotations
 
+import json
+
 import httpx
+from portkey_ai import Portkey
 from portkey_ai.api_resources import exceptions as portkey_exc
 
 from pipelex.cogt.inference.error_classification import extract_gateway_metadata
@@ -63,3 +70,50 @@ class TestExtractGatewayMetadata:
         assert metadata.sdk_exception_type == "APIConnectionError"
         assert metadata.status_code is None
         assert metadata.request_id is None
+
+
+class TestTheCodeWhenPortkeyDiscardsThePayload:
+    """``exc.body`` is not the payload on the SDK's own factory — the response still is."""
+
+    @staticmethod
+    def _as_the_sdk_raises_it(status_code: int, payload: dict[str, object]) -> BaseException:
+        """Build the exception through Portkey's own factory, not through its constructor.
+
+        The constructor accepts whatever ``body`` it is handed; only the factory
+        reproduces the string ``body`` the Extract step actually receives.
+        """
+        request = httpx.Request("POST", "https://api.portkey.ai/v1/chat/completions")
+        response = httpx.Response(
+            status_code=status_code,
+            request=request,
+            content=json.dumps(payload).encode(),
+            headers={"content-type": "application/json"},
+        )
+        client = Portkey(api_key="unused-in-this-test", base_url="https://api.portkey.ai/v1")
+        return client._make_status_error_from_response(request=request, response=response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+    def test_the_code_is_recovered_from_the_response_body(self) -> None:
+        """Portkey sets ``body`` to ``json.loads(text)["error"]["message"]`` — a string, not the document."""
+        exc = self._as_the_sdk_raises_it(400, {"error": {"message": "refused", "code": "pig-11"}})
+
+        assert isinstance(getattr(exc, "body", None), str)
+        metadata = extract_gateway_metadata(exc)
+
+        assert metadata.provider_error_code == "pig-11"
+        assert isinstance(metadata.body, dict)
+
+    def test_a_response_that_is_not_json_leaves_the_code_unset(self) -> None:
+        request = httpx.Request("POST", "https://api.portkey.ai/v1/chat/completions")
+        response = httpx.Response(status_code=502, request=request, content=b"<html>bad gateway</html>")
+        exc = portkey_exc.APIStatusError(message="error", request=request, response=response, body=None)
+
+        metadata = extract_gateway_metadata(exc)
+
+        assert metadata.provider_error_code is None
+        assert metadata.status_code == 502
+
+    def test_a_dict_body_still_wins_over_the_response(self) -> None:
+        """The vendored-OpenAI fallback paths hand a real dict here — it must not be re-parsed away."""
+        exc = _make_status_error(400, body={"error": {"code": "pig-07"}})
+
+        assert extract_gateway_metadata(exc).provider_error_code == "pig-07"

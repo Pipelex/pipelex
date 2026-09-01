@@ -166,10 +166,11 @@ class ProviderErrorMetadata(BaseModel):
         """Which of the gateway's request-shape limits this refusal hit, if any.
 
         Reads ``provider_error_code``, which every Extract hop that can carry a
-        gateway refusal already populates: the Portkey substrate and the shared
-        Anthropic driver both recover it from the ``{"error": {"code": …}}`` body
-        the gateway renders, and the OpenAI substrate reads the same value off
-        ``exc.code`` after its SDK pre-unwraps that body.
+        gateway refusal populates: the shared Anthropic driver recovers it from the
+        ``{"error": {"code": …}}`` body the gateway renders, the OpenAI substrate
+        reads the same value off ``exc.code`` after its SDK pre-unwraps that body,
+        and the Portkey substrate re-parses the response because its SDK replaces
+        ``exc.body`` with the message string (see ``extract_gateway_metadata``).
 
         Returns ``None`` for every other refusal — including the gateway's own
         routing and storage-resolution codes, which are a different family and
@@ -824,10 +825,20 @@ def extract_manifold_metadata(exc: BaseException) -> ProviderErrorMetadata:
 def extract_gateway_metadata(exc: BaseException) -> ProviderErrorMetadata:
     """Distill a Portkey/Gateway SDK exception into a ``ProviderErrorMetadata``.
 
-    ``APIStatusError`` subclasses expose ``status_code``, ``response`` (httpx),
-    and ``body`` (already a pre-parsed dict — Portkey mirrors the OpenAI SDK
-    style here). ``APIConnectionError`` / ``APITimeoutError`` carry only a
-    request; every status field comes back as ``None``.
+    ``APIStatusError`` subclasses expose ``status_code``, ``response`` (httpx) and
+    ``body``. ``APIConnectionError`` / ``APITimeoutError`` carry only a request;
+    every status field comes back as ``None``.
+
+    **``body`` cannot be trusted to be the payload here**, and that is the whole
+    reason for the response fallback below. Portkey's own
+    ``_make_status_error_from_response`` sets ``body`` to
+    ``json.loads(text)["error"]["message"]`` — the *message string*, not the
+    document — so on every refusal the SDK itself raises there is no dict to read a
+    code from. Reading ``exc.body`` alone recovered ``provider_error_code = None``
+    for every Portkey-substrate error the runtime ever saw. A dict does reach here
+    on the paths that bypass Portkey's factory (the vendored OpenAI client the
+    image workers fall back to pre-unwraps ``body["error"]``), so the dict probe
+    stays first and the response is only re-parsed when it came up empty.
     """
     status_code = getattr(exc, "status_code", None)
     if not isinstance(status_code, int):
@@ -843,6 +854,16 @@ def extract_gateway_metadata(exc: BaseException) -> ProviderErrorMetadata:
         retry_after_seconds = _parse_retry_after_seconds(headers.get("retry-after"))
     body: Any = getattr(exc, "body", None)
     provider_error_code = _provider_error_code_from_body(body) or _provider_error_code_from_flat_body(body)
+    if provider_error_code is None:
+        # The response is still buffered — the SDK just read ``.text`` off it to
+        # build the message — so the payload it discarded is recoverable here
+        # rather than lost. A recovered code means the helper parsed a document, so
+        # it also replaces the stringified ``body`` and the in-process
+        # content-policy scan gets structure back instead of one rendered sentence.
+        recovered_body, recovered_code = _parse_response_text_body(response)
+        provider_error_code = recovered_code
+        if recovered_code is not None:
+            body = recovered_body
     return ProviderErrorMetadata(
         provider=ProviderName.GATEWAY,
         sdk_exception_type=type(exc).__name__,

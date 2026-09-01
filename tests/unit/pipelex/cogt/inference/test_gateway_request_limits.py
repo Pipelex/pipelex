@@ -23,12 +23,13 @@ namespace, which is why recognition keys on it alone.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import anthropic
 import httpx
 import pytest
-from portkey_ai.api_resources import exceptions as portkey_exc
+from portkey_ai import Portkey
 
 from pipelex.cogt.exceptions import InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import (
@@ -66,6 +67,24 @@ _LENGTH_REQUIRED_BODY = _refusal_body(
 )
 _OBJECT_TOO_LARGE_BODY = _refusal_body("The storage object is over this gateway's per-object limit", "pig-10")
 _BODY_TOO_DEEP_BODY = _refusal_body("The request body nests deeper than this gateway's limit of 128 levels", "pig-11")
+
+
+def _as_the_portkey_sdk_raises_it(*, status_code: int, body: dict[str, Any]) -> BaseException:
+    """Build the exception through Portkey's own factory rather than by hand.
+
+    The constructor accepts any ``body`` you give it; the SDK's factory does not —
+    it sets ``body`` to ``json.loads(text)["error"]["message"]``, a string. Only the
+    factory reproduces what the Extract step actually receives in production.
+    """
+    request = httpx.Request("POST", f"{_ORIGIN}/v1/chat/completions")
+    response = httpx.Response(
+        status_code=status_code,
+        request=request,
+        content=json.dumps(body).encode(),
+        headers={"content-type": "application/json"},
+    )
+    client = Portkey(api_key="unused-in-this-test", base_url=f"{_ORIGIN}/v1")
+    return client._make_status_error_from_response(request=request, response=response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
 
 def _envelope(code: str | None, *, status_code: int, provider: ProviderName = ProviderName.GATEWAY) -> ProviderErrorMetadata:
@@ -108,14 +127,25 @@ class TestTheCodeSurvivesEveryExtractHop:
     """The refusal body the gateway actually emits, through each SDK that can carry it."""
 
     def test_through_the_portkey_substrate(self) -> None:
-        request = httpx.Request("POST", f"{_ORIGIN}/v1/chat/completions")
-        response = httpx.Response(status_code=413, request=request)
-        exc = portkey_exc.BadRequestError(message="error", request=request, response=response, body=_BODY_TOO_LARGE_BODY)
+        exc = _as_the_portkey_sdk_raises_it(status_code=413, body=_BODY_TOO_LARGE_BODY)
 
         metadata = extract_gateway_metadata(exc)
 
         assert metadata.provider_error_code == "pig-07"
         assert metadata.gateway_request_limit == GatewayRequestLimit.BODY_TOO_LARGE
+
+    def test_the_portkey_substrate_discards_the_payload_and_the_code_survives_anyway(self) -> None:
+        """The reason the hop above is built through the SDK rather than by hand.
+
+        Portkey's ``_make_status_error_from_response`` puts the *message string* on
+        ``exc.body``, never the document — so a test that hands the constructor a
+        nested dict passes on a shape production never produces, while the real path
+        recovers no code at all. Pinned here so it cannot quietly regress.
+        """
+        exc = _as_the_portkey_sdk_raises_it(status_code=413, body=_BODY_TOO_LARGE_BODY)
+
+        assert isinstance(getattr(exc, "body", None), str)
+        assert extract_gateway_metadata(exc).gateway_request_limit == GatewayRequestLimit.BODY_TOO_LARGE
 
     def test_through_plain_httpx_on_the_native_routes(self) -> None:
         request = httpx.Request("POST", f"{_ORIGIN}/v1/pipelex/extract")
