@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 item: L-260901-296dfb
 ---
 
@@ -115,3 +115,11 @@ The fix is to stop naming a scope at all, because a class-level detail spans rai
 The pinned expectation in the class-metadata sweep and the generated error page moved with the string; `make gep` rewrote exactly the one `user_action` row and nothing else. The error-identity snapshot is untouched, as expected for a detail-only change.
 
 What the same round confirmed rather than changed, each checked against the code: the caller-facing invariant genuinely holds at the new raise site, since `missing = wanted - matched` puts the library-derived strings only on the subtrahend side where they can remove elements but never contribute one; the entry subclass really does survive `translate_to_validate_bundle_error`, because the passthrough arm precedes the `LibraryError` arm that would have folded it into an undomained `ValidateBundleError` and made the whole campaign a no-op; and nothing anywhere dispatches on the exact class or on the `error_type` string, every consumer being an `except` or an `isinstance` on the base, with the agent CLI's hint and domain lookups report-first in any case.
+
+## Landed
+
+The campaign shipped as PR #1182, squash-merged into `dev` as `bcd1b572260427ae5e51200e5b1ab50b20c44919` on 2026-09-01, with every required check green (the full sharded test matrix on py3.11, the typecheck, all lint jobs including `drift-contracts`, `doc-check` and `uv-lock-check`). L-260901-296dfb is closed `fixed`. The merged tree carries the raise at `pipelex/pipeline/validate_bundle.py:238`.
+
+The merge has **not** reached `main`, so no published artifact carries the fix yet. The repo's open release item is L-260828-f4e88c ("cut the pipelex release that carries #1154"); whichever release goes out next will be the one that delivers this.
+
+That distinction is what the `pipelex-api` half turns on. L-260901-d34e23 — drop `build/runner.py`'s hand-written `except PipeNotFoundError` → 422 — was released by this close and is now workable in principle, but its work needs the *published* pipelex, not the merged source, so it should not be started against a release that has not happened. Its own deferral note above stands: dropping the catch keeps the 422 and the `input` domain, and hands the RFC 7807 `type`, `title` and `error_type` to the class while losing the route's "not found in the submitted closure" framing in `detail` — a wire change to take deliberately, not a pure cleanup.
