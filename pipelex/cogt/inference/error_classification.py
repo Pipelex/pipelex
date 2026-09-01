@@ -67,9 +67,14 @@ class GatewayRequestLimit(StrEnum):
     #: runtime uses produces this; it exists so that an unusual one fails closed
     #: and legibly rather than being buffered to find out how big it is.
     BODY_LENGTH_REQUIRED = "body_length_required"
-    #: ``pig-10`` at HTTP 413 — a ``pipelex-storage://`` object the gateway
-    #: resolved is over the per-object cap. The same "too large" family as
-    #: ``BODY_TOO_LARGE``, one indirection further out.
+    #: HTTP 413 — a file the request only *refers* to is over its cap: a
+    #: ``pipelex-storage://`` object the gateway resolved, or a document it
+    #: fetched by URL. The same "too large" family as ``BODY_TOO_LARGE``, one
+    #: indirection further out. It arrives under three codes because the gateway
+    #: renders the same failure twice — ``pig-10`` on the LLM routes, where its
+    #: own ``pig-0N`` family is the only vocabulary available, and
+    #: ``pipelex_storage_object_too_large`` / ``pipelex_document_too_large`` on
+    #: the native ``/v1/pipelex/*`` routes, whose wire contract is its own.
     OBJECT_TOO_LARGE = "object_too_large"
     #: ``pig-11`` at HTTP 400 — the parsed body nests deeper than the gateway's
     #: depth limit. Not a byte question: nesting costs two bytes a level, so a
@@ -84,14 +89,26 @@ class GatewayRequestLimit(StrEnum):
 # SDK its dialect calls for — the Portkey substrate (reported as ``GATEWAY``),
 # plain ``httpx`` on the native extract/search routes (``GATEWAY`` as well), and
 # the shared Anthropic driver that Claude travels on (reported as ``ANTHROPIC``) —
-# so the reporting provider does not identify the gateway. ``pig-`` is the
-# gateway's own code namespace and no vendor emits into it, so the code alone is
-# both necessary and sufficient.
+# so the reporting provider does not identify the gateway. ``pig-`` and
+# ``pipelex_`` are both the gateway's own code namespaces and no vendor emits into
+# either, so the code alone is both necessary and sufficient.
+#
+# **One failure can appear under two codes**, and leaving out the second one is
+# how a caller reads "the provider rejected the request" for a file they can
+# simply make smaller. The gateway renders a refusal in the vocabulary of the
+# route it arrived on: its own ``pig-0N`` family on the LLM routes, where the
+# client is speaking a provider's protocol, and its frozen ``pipelex_*`` contract
+# codes on the native ``/v1/pipelex/*`` extract and search routes. A new limit has
+# to be looked for in both.
 _GATEWAY_REQUEST_LIMIT_BY_CODE: dict[str, GatewayRequestLimit] = {
     "pig-07": GatewayRequestLimit.BODY_TOO_LARGE,
     "pig-08": GatewayRequestLimit.BODY_LENGTH_REQUIRED,
     "pig-10": GatewayRequestLimit.OBJECT_TOO_LARGE,
     "pig-11": GatewayRequestLimit.BODY_TOO_DEEP,
+    # The native routes' rendering of the same "over its cap" refusal: a storage
+    # object the gateway resolved, and a document it fetched by URL.
+    "pipelex_storage_object_too_large": GatewayRequestLimit.OBJECT_TOO_LARGE,
+    "pipelex_document_too_large": GatewayRequestLimit.OBJECT_TOO_LARGE,
 }
 
 
@@ -172,9 +189,9 @@ class ProviderErrorMetadata(BaseModel):
         and the Portkey substrate re-parses the response because its SDK replaces
         ``exc.body`` with the message string (see ``extract_gateway_metadata``).
 
-        Returns ``None`` for every other refusal — including the gateway's own
-        routing and storage-resolution codes, which are a different family and
-        classify on their status like anything else.
+        Returns ``None`` for every other refusal — including the gateway's routing
+        codes and its "cannot resolve this reference" storage codes, which are a
+        different family and classify on their status like anything else.
         """
         if self.provider_error_code is None:
             return None
@@ -548,6 +565,42 @@ def _provider_error_code_from_flat_body(body: Any) -> str | None:
     return None
 
 
+def _pipelex_service_error_code_from_body(body: Any) -> str | None:
+    """Read the error code off a body a Pipelex-operated gateway rendered, preferring ``code``.
+
+    Same traversal as ``_provider_error_code_from_body`` then
+    ``_provider_error_code_from_flat_body`` — nested ``{"error": {…}}`` first, then
+    the top level, which is where the vendored OpenAI client leaves it after
+    pre-unwrapping — **but reading ``code`` before ``type``**, and that inversion
+    is the whole point of the function.
+
+    Our own services put the *specific* code in ``code`` and a generic
+    OpenAI-shaped bucket in ``type``: every refusal on the native
+    ``/v1/pipelex/*`` routes is rendered as
+    ``{"error": {"message": …, "type": "invalid_request_error", "code":
+    "pipelex_document_too_large"}}``. The vendor-facing precedence is right for
+    Anthropic, whose error section carries a ``type`` and no ``code`` at all, and
+    wrong here — it replaces every ``pipelex_*`` code with
+    ``invalid_request_error`` and the code never reaches the classifier.
+
+    The gateway's fail-closed shape carries only ``code`` (no ``type`` beside it),
+    so the ``pig-0N`` family reads identically through either precedence.
+    """
+    if not isinstance(body, dict):
+        return None
+    body_dict = cast("dict[str, Any]", body)
+    error_section = body_dict.get("error")
+    sections: list[dict[str, Any]] = []
+    if isinstance(error_section, dict):
+        sections.append(cast("dict[str, Any]", error_section))
+    sections.append(body_dict)
+    for section in sections:
+        code = section.get("code") or section.get("type")
+        if isinstance(code, str):
+            return code
+    return None
+
+
 def _parse_response_text_body(response: Any) -> tuple[Any | None, str | None]:
     """Read ``response.text`` and recover ``(body, provider_error_code)`` on a best-effort basis.
 
@@ -776,11 +829,18 @@ def extract_manifold_metadata(exc: BaseException) -> ProviderErrorMetadata:
     leaves two exception shapes to distill:
 
     - ``httpx.HTTPStatusError``, which carries the whole ``response`` — status, headers, and a body
-      this reads as JSON on a best-effort basis, since the service renders its refusals as
-      ``{status, message, type, code}``;
+      this reads as JSON on a best-effort basis;
     - ``httpx.RequestError`` (connect, timeout, read), which carries only a request; every
       status-related field comes back as ``None``, and the class name is what the classify step
       matches on to call it a network failure.
+
+    **The error code is read ``code`` first**, via ``_pipelex_service_error_code_from_body``, and
+    the ordinary vendor-facing precedence would lose it here. A refusal these routes raise
+    themselves is rendered as ``{"error": {"message": …, "type": "invalid_request_error", "code":
+    "pipelex_document_too_large"}}`` — the generic bucket in ``type``, the frozen contract code the
+    classifier actually needs in ``code`` — so reading ``type`` first replaces every ``pipelex_*``
+    code with ``invalid_request_error``. The gateway's fail-closed ``pig-0N`` shape carries no
+    ``type`` at all, so it reads the same either way.
 
     **It reports ``ProviderName.GATEWAY``**, and that is a decision rather than an oversight: the
     manifold service *is* the same gateway codebase, so it phrases quota exhaustion and rate
@@ -809,7 +869,7 @@ def extract_manifold_metadata(exc: BaseException) -> ProviderErrorMetadata:
             # the message carry it, and insisting on a body here would trade a classified error for
             # a decode error raised while classifying one.
             body = None
-    provider_error_code = _provider_error_code_from_body(body) or _provider_error_code_from_flat_body(body)
+    provider_error_code = _pipelex_service_error_code_from_body(body)
     return ProviderErrorMetadata(
         provider=ProviderName.GATEWAY,
         sdk_exception_type=type(exc).__name__,
@@ -853,14 +913,15 @@ def extract_gateway_metadata(exc: BaseException) -> ProviderErrorMetadata:
             request_id = request_id_value
         retry_after_seconds = _parse_retry_after_seconds(headers.get("retry-after"))
     body: Any = getattr(exc, "body", None)
-    provider_error_code = _provider_error_code_from_body(body) or _provider_error_code_from_flat_body(body)
+    provider_error_code = _pipelex_service_error_code_from_body(body)
     if provider_error_code is None:
         # The response is still buffered — the SDK just read ``.text`` off it to
         # build the message — so the payload it discarded is recoverable here
         # rather than lost. A recovered code means the helper parsed a document, so
         # it also replaces the stringified ``body`` and the in-process
         # content-policy scan gets structure back instead of one rendered sentence.
-        recovered_body, recovered_code = _parse_response_text_body(response)
+        recovered_body, _ = _parse_response_text_body(response)
+        recovered_code = _pipelex_service_error_code_from_body(recovered_body)
         provider_error_code = recovered_code
         if recovered_code is not None:
             body = recovered_body

@@ -59,7 +59,21 @@ class TestExtractGatewayMetadata:
         assert metadata.retry_after_seconds == 9.0
 
     def test_extracts_provider_error_code_from_body(self) -> None:
+        """``code`` is read before ``type``, which is the opposite of the vendor-facing precedence.
+
+        The gateway is ours, and it puts the *specific* code in ``code`` and a
+        generic OpenAI-shaped bucket in ``type`` — every refusal on its native
+        ``/v1/pipelex/*`` routes carries ``type: "invalid_request_error"``. Reading
+        ``type`` first therefore reports that one bucket for the whole contract
+        vocabulary and no ``pipelex_*`` code ever reaches the classifier. Anthropic
+        keeps the other precedence because its error section carries no ``code``.
+        """
         exc = _make_status_error(400, body={"error": {"type": "invalid_request_error", "code": "missing_field"}})
+        metadata = extract_gateway_metadata(exc)
+        assert metadata.provider_error_code == "missing_field"
+
+    def test_falls_back_to_type_when_the_body_carries_no_code(self) -> None:
+        exc = _make_status_error(400, body={"error": {"type": "invalid_request_error"}})
         metadata = extract_gateway_metadata(exc)
         assert metadata.provider_error_code == "invalid_request_error"
 

@@ -17,8 +17,15 @@ which limit was hit.
 **The code is the discriminator, not the provider.** A request reaches the gateway
 through several SDKs — the Portkey substrate, plain ``httpx`` on the native routes,
 and the shared Anthropic driver that Claude travels on — so the refusal arrives
-under three different ``ProviderName`` values. ``pig-`` is the gateway's own code
-namespace, which is why recognition keys on it alone.
+under three different ``ProviderName`` values. ``pig-`` and ``pipelex_`` are both
+the gateway's own code namespaces, which is why recognition keys on the code alone.
+
+**And one failure can wear two codes.** The gateway renders a refusal in the
+vocabulary of the route it arrived on, so "this file is over its cap" is ``pig-10``
+on the LLM routes and ``pipelex_storage_object_too_large`` (or, for a document
+fetched by URL, ``pipelex_document_too_large``) on the native ``/v1/pipelex/*``
+ones. A caller cannot tell which route their extract took, so both renderings have
+to classify alike.
 """
 
 from __future__ import annotations
@@ -147,6 +154,15 @@ class TestTheCodeSurvivesEveryExtractHop:
         assert isinstance(getattr(exc, "body", None), str)
         assert extract_gateway_metadata(exc).gateway_request_limit == GatewayRequestLimit.BODY_TOO_LARGE
 
+    def test_the_length_rule_arrives_on_the_substrate_too(self) -> None:
+        """``pig-08`` is raised by the same middleware as ``pig-07``, ahead of authentication."""
+        exc = _as_the_portkey_sdk_raises_it(status_code=411, body=_LENGTH_REQUIRED_BODY)
+
+        metadata = extract_gateway_metadata(exc)
+
+        assert metadata.provider_error_code == "pig-08"
+        assert metadata.gateway_request_limit == GatewayRequestLimit.BODY_LENGTH_REQUIRED
+
     def test_through_plain_httpx_on_the_native_routes(self) -> None:
         request = httpx.Request("POST", f"{_ORIGIN}/v1/pipelex/extract")
         response = httpx.Response(status_code=400, request=request, json=_BODY_TOO_DEEP_BODY)
@@ -260,3 +276,83 @@ class TestRenderedAdvice:
             details.append(rendered.user_action.detail)
 
         assert details[0] != details[1]
+
+
+def _native_route_refusal_body(message: str, code: str) -> dict[str, Any]:
+    """The body pig's native ``/v1/pipelex/*`` routes render, verbatim in shape.
+
+    A different envelope from the fail-closed one above, and the difference is the
+    whole point of these tests: ``providerErrorResponse`` renders every refusal on
+    those routes through the gateway's standard provider-error shape, which puts a
+    generic ``invalid_request_error`` in ``error.type`` and the frozen contract code
+    in ``error.code``. Reading ``type`` first — which is right for Anthropic, whose
+    error section has no ``code`` at all — throws the code away.
+    """
+    return {
+        "error": {"message": message, "type": "invalid_request_error", "param": None, "code": code},
+        "provider": "linkup",
+    }
+
+
+class TestTheSameLimitOnTheNativeRoutes:
+    """The gateway renders one failure twice, and both renderings have to classify.
+
+    ``pig-10`` is how the LLM routes say "this file is over its cap", because there
+    the client speaks a provider's protocol and the gateway's own ``pig-0N`` family
+    is the only vocabulary available. On ``/v1/pipelex/extract`` and
+    ``/v1/pipelex/search`` the wire contract is pig's own and the same refusal is a
+    ``pipelex_*`` code — one for a storage object it resolved, one for a document it
+    fetched by URL. A caller cannot tell which route their extract took, so the two
+    must read alike.
+    """
+
+    @pytest.mark.parametrize("code", ["pipelex_storage_object_too_large", "pipelex_document_too_large"])
+    def test_a_file_over_its_cap_classifies_as_too_large(self, code: str) -> None:
+        request = httpx.Request("POST", f"{_ORIGIN}/v1/pipelex/extract")
+        response = httpx.Response(status_code=413, request=request, json=_native_route_refusal_body("over the limit", code))
+        exc = httpx.HTTPStatusError("Client error '413 Payload Too Large'", request=request, response=response)
+
+        metadata = extract_manifold_metadata(exc)
+        result = classify_inference_error(metadata)
+
+        assert metadata.provider_error_code == code
+        assert result.gateway_request_limit == GatewayRequestLimit.OBJECT_TOO_LARGE
+        assert result.category == InferenceErrorCategory.CONTENT
+        assert result.category.is_retryable is False
+
+    def test_both_routes_give_the_caller_the_same_advice(self) -> None:
+        """``pig-10`` and its native-route twin are one limit, so one remedy."""
+        details: list[str] = []
+        for metadata in (
+            _envelope("pig-10", status_code=413),
+            _envelope("pipelex_storage_object_too_large", status_code=413),
+        ):
+            rendered = render_inference_error(
+                metadata=metadata,
+                classification=classify_inference_error(metadata),
+                family=InferenceErrorFamily.EXTRACT,
+                model_desc="extractor-fake",
+                model_handle="fake-handle",
+            )
+            assert rendered.user_action is not None
+            details.append(rendered.user_action.detail)
+
+        assert details[0] == details[1]
+
+    def test_the_generic_type_does_not_shadow_the_contract_code(self) -> None:
+        """The regression this envelope exists to pin.
+
+        Every native-route refusal carries ``type: "invalid_request_error"`` beside
+        its code. Reading ``type`` first reports that bucket as the provider error
+        code for the whole ``pipelex_*`` vocabulary, so no contract code ever
+        reaches the classifier — including the ones that are not limits.
+        """
+        request = httpx.Request("POST", f"{_ORIGIN}/v1/pipelex/extract")
+        body = _native_route_refusal_body("that host is refused", "pipelex_document_host_refused")
+        response = httpx.Response(status_code=400, request=request, json=body)
+        exc = httpx.HTTPStatusError("Client error '400 Bad Request'", request=request, response=response)
+
+        metadata = extract_manifold_metadata(exc)
+
+        assert metadata.provider_error_code == "pipelex_document_host_refused"
+        assert metadata.gateway_request_limit is None
