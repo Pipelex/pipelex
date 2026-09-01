@@ -71,3 +71,13 @@ That edit opened the `cli-docs` drift contract. Reviewed, acked, and the rule is
 **Also pinned.** `tests/unit/pipelex/exceptions/test_class_level_metadata.py` gained both classes in the domain, user-action and caller-facing sweeps, plus their undomained, non-caller-facing parents — so a future refactor that lets the entry classification leak onto the in-body doors, or that quietly drops it from the entry ones, fails there too.
 
 Next: open the PR against `dev` with `Closes L-260829-fa8267` in the body. After the merge, the blocked runner-side item L-260829-a30018 becomes workable.
+
+### Review round
+
+Two corrections on top of the checkpoint, both inside the design's own surface.
+
+`EntryPipeAmbiguousError`'s `user_action` detail said `Name one of the listed candidates explicitly, as 'domain.pipe_code'.` That is right for the bare-code arm and wrong for the arm translated from the alias-scoped search, whose message names domains inside a dependency package: a caller obeying it and sending `scoring.compute_score` reaches the entry lookup's host-only match (`pipe_library.py`'s `has_cross_package_prefix` exclusion), resolves nothing, and gets `EntryPipeNotFoundError` instead. One `user_action` serves both raise sites, so the detail now carries both spellings. `make gep` regenerated the ambiguous page.
+
+The translation arm caught `PipeLibraryError`, and `PipeNotFoundError` is one — so a miss raised from inside `get_optional_pipe` would have been re-raised as a class asserting an ambiguity, carrying a hint about candidates that never existed. No in-body site raises one there today, which is exactly why the trap would have been silent; `get_optional_entry_pipe` now lets `PipeNotFoundError` through untranslated. Pinned by `test_entry_pipe_does_not_translate_a_miss_into_an_ambiguity`, which injects the raise and was mutation-checked red with the arm removed.
+
+The review also found the same defect class one module over, left out to keep this diff at its stated scope: `validate_bundle.py`'s `_pipes_to_dry_run` raises the undomained `PipeNotFoundError` for a caller-supplied `--pipe` / `pipe_ref`, and `pipelex-api`'s build route maps it to 422 by hand. Filed as L-260901-296dfb.

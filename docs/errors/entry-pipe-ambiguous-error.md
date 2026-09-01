@@ -17,6 +17,6 @@ An entry-shaped bare `pipe_code` matched pipes in several domains.
 | `error_domain` | `input` |
 | Defined in | `pipelex.libraries.pipe.exceptions` |
 | Parent class | [`PipeLibraryError`](pipe-library-error.md) |
-| `user_action` | `change_input` — Name one of the listed candidates explicitly, as 'domain.pipe_code'. |
+| `user_action` | `change_input` — Name one candidate explicitly: 'domain.pipe_code', or 'alias->domain.pipe_code' for a cross-package code. |
 
 [Back to Error Reference](index.md)

@@ -120,6 +120,11 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         """
         try:
             pipe = self.get_optional_pipe(pipe_code=pipe_code)
+        except PipeNotFoundError:
+            # A miss is not an ambiguity. `get_optional_pipe` raises none today, but `PipeNotFoundError`
+            # IS a `PipeLibraryError`, so without this arm a future one would be re-raised under a class
+            # asserting the opposite — and handed a `user_action` naming candidates that never existed.
+            raise
         except PipeLibraryError as exc:
             raise EntryPipeAmbiguousError(str(exc)) from exc
         if pipe is not None:

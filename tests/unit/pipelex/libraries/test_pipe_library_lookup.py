@@ -130,6 +130,22 @@ class TestPipeLibraryLookup:
         assert not isinstance(cause, EntryPipeAmbiguousError)
         assert exc_info.value.to_error_report().error_domain == ErrorDomain.INPUT
 
+    def test_entry_pipe_does_not_translate_a_miss_into_an_ambiguity(self, mocker: MockerFixture):
+        """A miss surfacing from `get_optional_pipe` must not be re-raised as an ambiguity.
+
+        `PipeNotFoundError` IS a `PipeLibraryError`, so the translation arm would otherwise catch it
+        and report it under a class asserting the opposite — with a `user_action` naming candidates
+        that never existed. No in-body raise site produces one today, so the raise is injected.
+        """
+        library = PipeLibrary.make_empty()
+        # Patched on the class, not the instance: PipeLibrary is a pydantic RootModel and rejects the
+        # per-instance attribute set. mocker undoes it at teardown.
+        mocker.patch.object(PipeLibrary, "get_optional_pipe", side_effect=PipeNotFoundError("boom"))
+
+        with pytest.raises(PipeNotFoundError) as exc_info:
+            library.get_optional_entry_pipe("compute_score")
+        assert not isinstance(exc_info.value, EntryPipeAmbiguousError)
+
     def test_in_body_aliased_ambiguity_is_not_translated(self, mocker: MockerFixture):
         """The same lookup through the in-body door keeps the plain, unclassified error.
 

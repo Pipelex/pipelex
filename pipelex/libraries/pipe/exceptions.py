@@ -48,7 +48,10 @@ class EntryPipeAmbiguousError(PipeLibraryError):
     error_domain = ErrorDomain.INPUT
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
-        detail="Name one of the listed candidates explicitly, as 'domain.pipe_code'.",
+        # Both spellings, because both raise sites reach this one detail: the bare-code arm is fixed by
+        # 'domain.pipe_code', while the cross-package arm translated from the alias-scoped search needs
+        # the alias too — a bare 'domain.pipe_code' does not reach a dependency pipe at all.
+        detail="Name one candidate explicitly: 'domain.pipe_code', or 'alias->domain.pipe_code' for a cross-package code.",
     )
     _declared_title = "Entry pipe ambiguous"
     _authors_caller_facing_message = True

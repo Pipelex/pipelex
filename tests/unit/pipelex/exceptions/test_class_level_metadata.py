@@ -87,7 +87,7 @@ class TestClassLevelMetadata:
             (
                 "entry_pipe_ambiguous",
                 EntryPipeAmbiguousError("boom"),
-                "Name one of the listed candidates explicitly, as 'domain.pipe_code'.",
+                "Name one candidate explicitly: 'domain.pipe_code', or 'alias->domain.pipe_code' for a cross-package code.",
             ),
         ],
     )
