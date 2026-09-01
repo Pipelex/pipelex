@@ -237,15 +237,16 @@ def every_type_kind_crate() -> LibraryCrate:
                     "counts": ConceptStructureBlueprint(
                         description="Counts", type=ConceptStructureBlueprintFieldType.DICT, key_type="text", value_type="integer", required=True
                     ),
-                    # A dict-valued default, carrying both key spellings: prettier unquotes a plain
-                    # identifier key and keeps the quotes on one that is not, so the emitted literal has to
-                    # make that distinction per key or a consumer's formatter rewrites the artifact.
+                    # A dict-valued default, carrying all three key spellings: prettier unquotes a plain
+                    # identifier key, keeps the quotes on one that is not, and picks the quote style that
+                    # needs fewer escapes on a key carrying a `"` — so the emitted literal has to make
+                    # both distinctions per key or a consumer's formatter rewrites the artifact.
                     "quotas": ConceptStructureBlueprint(
                         description="Quotas",
                         type=ConceptStructureBlueprintFieldType.DICT,
                         key_type="text",
                         value_type="integer",
-                        default_value={"per-reviewer": 3, "total": 12},
+                        default_value={"per-reviewer": 3, "total": 12, 'marked "urgent"': 1},
                     ),
                     # ANY — only reachable nested, from genuine source imprecision. An untyped list also
                     # emits the trailing `# imprecise:` comment, so that shape gets linted too.

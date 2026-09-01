@@ -124,12 +124,15 @@ class TestTsZodEmitter:
         """Prettier normalizes a string literal to whichever quote needs fewer escapes, at any width.
 
         So the naive always-double spelling — double-quoted with both inner quotes escaped — is rewritten on
-        the consumer's first format run and the artifact is reported as hand-edited. The Python targets have
-        the same rule and the ruff guards catch them; nothing always-on watches the TypeScript spelling.
+        the consumer's first format run and the artifact is reported as hand-edited. The rule reaches an
+        object-literal *key* as well as a value: prettier quotes a non-identifier key in whichever style
+        needs fewer escapes, so a dict default keyed `marked "urgent"` — legal TOML on a `type = "dict"`
+        field — has to be emitted single-quoted too, next to the two spellings it is emitted beside.
         """
         content = emit_ts_zod(resolve_concepts_from_crate(every_type_kind_crate))[0].content
 
         assert '  reviewer_verdict: z.enum([\'marked "urgent"\', "left unmarked"]),' in content
+        assert '.default({ \'marked "urgent"\': 1, "per-reviewer": 3, total: 12 })' in content
 
     def test_temporal_defaults_emit_iso_wire_strings(self, temporal_defaults_crate: LibraryCrate):
         content = emit_ts_zod(resolve_concepts_from_crate(temporal_defaults_crate))[0].content

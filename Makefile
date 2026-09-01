@@ -26,6 +26,15 @@ VENV_PIPELEX_DEV := "$(VIRTUAL_ENV)/bin/pipelex-dev"
 SKELETON_DIR := "$(HOME)/.pipelex-skeleton/"
 HEARTBEAT_INTERVAL ?= 20
 
+# The node toolchain the TypeScript emission gates run against. Both packages are pinned exactly and
+# both have zero dependencies, so `npm install` here is reproducible without a lockfile. The prettier
+# pin is the contract: `pipelex/codegen/emitters/ts_zod.py` emits the bytes *this* prettier leaves
+# alone, so moving it is an emitter change, not a dependency bump — expect the gate to red and the
+# emitter to need teaching. The directory is gitignored and provisioned on demand.
+TS_TOOLCHAIN_DIR := $(CURDIR)/.ts-toolchain
+TS_TOOLCHAIN_PRETTIER_VERSION ?= 3.9.6
+TS_TOOLCHAIN_ZOD_VERSION ?= 4.5.4
+
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
 USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api"
@@ -146,6 +155,9 @@ make test-xdist               - Run unit tests with xdist (no inference)
 make agent-test               - Run unit tests, silent on success, output on failure (for AI agents)
 make agent-test-debug         - Debug variant: cleanup + outer timeout + live log; use when agent-test hangs or fails opaquely
 make atd                      - Shorthand -> agent-test-debug
+make ts-toolchain             - Install the pinned prettier + zod the TypeScript emission gates need
+make test-ts-gates            - Run the codegen tests with that toolchain, where the node gates may not skip
+make ttg                      - Shorthand -> test-ts-gates
 make t                        - Shorthand -> test-xdist
 make test-quiet               - Run unit tests without prints (no inference)
 make tq                       - Shorthand -> test-quiet
@@ -230,6 +242,7 @@ export HELP
 	generate-error-identity generate-error-identity-quiet gei \
 	update-gateway-models update-gateway-models-quiet ugm check-gateway-models cgm up \
 	test-count check-test-badge \
+	ts-toolchain test-ts-gates ttg \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
 	docs-deploy-root
 
@@ -557,6 +570,7 @@ cleanderived:
 	rm -f tests/integration/pipelex/fixtures/_generated_model_sets.py && \
 	rm -f .pipelex-dev/model_availability.json && \
 	rm -rf derived/ && \
+	rm -rf .ts-toolchain/ && \
 	echo "Cleaned up derived files and directories";
 
 cleanenv:
@@ -623,6 +637,37 @@ gha-tests: env
 	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
 	@echo "• Running unit tests for github actions (excluding inference and gha_disabled)"
 	$(VENV_PYTEST) -n auto --dist=worksteal $(if $(SPLITS),--splits $(SPLITS) --group $(GROUP)) --max-worker-restart=2 --timeout=180 --timeout-method=thread --tb=line -p no:cacheprovider --no-header -m $(GHA_PYTEST_MARKERS) || [ $$? = 5 ]
+
+# --------------------------------------------------------------------------------------
+# The TypeScript emission gates. These are the two tests that need node, and they are the
+# only ones that read the emitted TypeScript as TypeScript rather than as lines of text:
+# `prettier --check` parses it and holds the byte-for-byte formatting the codegen stamp
+# depends on, and the wire round-trip executes the emitted schema under a real zod. Both
+# were written to skip when the toolchain is absent, which on a Python repo meant always
+# — so three content defects reached review with the suite green. This target provisions
+# the toolchain and sets PIPELEX_REQUIRE_TS_GATES, under which a missing binary is a
+# failure instead of a skip. CI runs this same target, so the gates cannot silently lapse.
+# --------------------------------------------------------------------------------------
+ts-toolchain:
+	$(call PRINT_TITLE,"Provisioning the pinned node toolchain for the TypeScript emission gates")
+	@command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1 || { \
+		echo "The TypeScript emission gates need node >= 22.6 and npm on PATH — install them and retry."; \
+		exit 1; \
+	}
+	@mkdir -p "$(TS_TOOLCHAIN_DIR)"
+	@npm install --silent --no-audit --no-fund --prefix "$(TS_TOOLCHAIN_DIR)" \
+		prettier@$(TS_TOOLCHAIN_PRETTIER_VERSION) zod@$(TS_TOOLCHAIN_ZOD_VERSION)
+	@echo "• prettier $$("$(TS_TOOLCHAIN_DIR)/node_modules/.bin/prettier" --version), zod $(TS_TOOLCHAIN_ZOD_VERSION), node $$(node --version)"
+
+test-ts-gates: env ts-toolchain
+	$(call PRINT_TITLE,"Running the TypeScript emission gates against the pinned node toolchain")
+	@PATH="$(TS_TOOLCHAIN_DIR)/node_modules/.bin:$$PATH" \
+		PIPELEX_REQUIRE_TS_GATES=1 \
+		PIPELEX_ZOD_PACKAGE="$(TS_TOOLCHAIN_DIR)/node_modules/zod" \
+		$(VENV_PYTEST) tests/unit/pipelex/codegen --no-header -p no:cacheprovider -q
+
+ttg: test-ts-gates
+	@echo "> done: ttg = test-ts-gates"
 
 run-all-tests: env
 	$(call PRINT_TITLE,"Running all unit tests")

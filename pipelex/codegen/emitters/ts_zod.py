@@ -331,12 +331,17 @@ def _ts_literal(value: Any) -> str:
 def _ts_object_key(key: Any) -> str:
     """An object-literal key, quoted only where prettier keeps the quotes (a non-identifier key).
 
+    A quoted key goes through `_ts_string` like any other literal, not through `json.dumps`: prettier
+    applies the same fewer-escapes quote rule to a key as to a value, so a key carrying a `"` — legal TOML
+    on a `type = "dict"` field, `default_value = { 'marked "urgent"' = 3 }` — came out double-quoted with
+    escapes and was rewritten to `'marked "urgent"'` on the consumer's first format run.
+
     A non-string key is stringified first, exactly as `json.dumps` used to coerce one — `default_value` is
     typed `Any`, so nothing but authoring convention keeps a non-string out, and a crash here would be a
     worse answer than the spelling the emitter has always produced.
     """
     text = key if isinstance(key, str) else json.dumps(key)
-    return text if _TS_IDENTIFIER.match(text) else json.dumps(text)
+    return text if _TS_IDENTIFIER.match(text) else _ts_string(text)
 
 
 def _concept_type_expr(
