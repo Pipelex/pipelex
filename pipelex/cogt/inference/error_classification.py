@@ -135,11 +135,13 @@ class GatewayUnresolvedReference(StrEnum):
     """
 
     #: ``pig-09`` at HTTP 400 — the LLM routes' single fail-closed slot for "this
-    #: reference cannot be resolved". Four distinct causes arrive under it (no
-    #: bucket configured, not a storage reference, no such object, a type no
-    #: provider takes) because there the client speaks a provider's protocol and
-    #: the gateway's own ``pig-0N`` family is the only vocabulary available. The
-    #: message carries the difference; the code does not, so the advice defers to it.
+    #: reference cannot be resolved". Every storage failure but "over its cap"
+    #: arrives under it (no bucket configured, not a storage reference, no such
+    #: object, an object that cannot be read, a type no provider takes, no way to
+    #: hand a file to the provider this model resolves to) because there the client
+    #: speaks a provider's protocol and the gateway's own ``pig-0N`` family is the
+    #: only vocabulary available. The message carries the difference; the code does
+    #: not, so the advice defers to it.
     REFERENCE_UNRESOLVED = "reference_unresolved"
     #: ``pipelex_storage_uri_invalid`` at HTTP 400 — the reference does not obey the
     #: key grammar (the path-traversal guard refuses under the same code).
@@ -153,10 +155,12 @@ class GatewayUnresolvedReference(StrEnum):
     #: Nothing about the inputs causes it: it is an operator's problem.
     STORAGE_NOT_SERVED = "storage_not_served"
     #: HTTP 400 — the document URL was refused before or during the fetch, on its
-    #: form rather than on what it served: ``pipelex_document_scheme_refused`` (not
-    #: an http(s) URL), ``pipelex_document_address_refused`` (the resolved address is
-    #: not publicly routable) and ``pipelex_document_redirect_refused`` (the origin
-    #: answered a redirect, which the gateway will not follow).
+    #: form rather than on what it served: ``pipelex_unsupported_uri_scheme`` (a
+    #: scheme the route does not read) and ``pipelex_document_scheme_refused`` (the
+    #: fetch's own check, reachable only for an unparseable URL now that the route
+    #: admits ``https:`` alone), ``pipelex_document_address_refused`` (the resolved
+    #: address is not publicly routable) and ``pipelex_document_redirect_refused``
+    #: (the origin answered a redirect, which the gateway will not follow).
     DOCUMENT_URL_REFUSED = "document_url_refused"
     #: ``pipelex_document_host_refused`` at HTTP 400 — the gateway's SSRF guard
     #: refuses to fetch documents from this host. Its own member rather than a share
@@ -198,6 +202,12 @@ _GATEWAY_UNRESOLVED_REFERENCE_BY_CODE: dict[str, GatewayUnresolvedReference] = {
     "pipelex_storage_unreadable": GatewayUnresolvedReference.STORAGE_OBJECT_UNREADABLE,
     "pipelex_storage_uri_unsupported": GatewayUnresolvedReference.STORAGE_NOT_SERVED,
     "pipelex_document_scheme_refused": GatewayUnresolvedReference.DOCUMENT_URL_REFUSED,
+    # The scheme refusal a caller actually reaches. ``classifyExtractInput`` runs
+    # before any fetch and admits only ``https:``, ``data:`` and
+    # ``pipelex-storage://``, so an ``http://`` URL is refused here rather than by
+    # the fetch above — which by then can only see URLs that already start with
+    # ``https://``.
+    "pipelex_unsupported_uri_scheme": GatewayUnresolvedReference.DOCUMENT_URL_REFUSED,
     "pipelex_document_address_refused": GatewayUnresolvedReference.DOCUMENT_URL_REFUSED,
     "pipelex_document_redirect_refused": GatewayUnresolvedReference.DOCUMENT_URL_REFUSED,
     "pipelex_document_host_refused": GatewayUnresolvedReference.DOCUMENT_HOST_REFUSED,

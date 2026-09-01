@@ -117,8 +117,8 @@ def _render_gateway_unresolved_reference_detail(*, reference: GatewayUnresolvedR
             )
         case GatewayUnresolvedReference.DOCUMENT_URL_REFUSED:
             return (
-                "The inference gateway refused the document URL — pass a plain public http(s) URL, and send the final address "
-                "rather than one that redirects."
+                "The inference gateway refused the document URL — send a plain public https:// URL, a data: URL, or a "
+                "pipelex-storage:// reference, and give the final address rather than one that redirects."
             )
         case GatewayUnresolvedReference.DOCUMENT_HOST_REFUSED:
             return (

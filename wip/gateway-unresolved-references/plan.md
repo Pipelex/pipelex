@@ -31,7 +31,7 @@ Verified against `pipelex-manifold/src/pig/`:
 
 | Code | HTTP | Raised by | Meaning |
 |---|---|---|---|
-| `pig-09` | 400 | `modelResolver.ts` (LLM routes) | the one fail-closed slot for "cannot resolve": no bucket configured, not a storage reference, no such object, or a type no provider takes. The message carries the difference; the code does not. |
+| `pig-09` | 400 | `modelResolver.ts` (LLM routes) | the one fail-closed slot for "cannot resolve" — every `StorageFailureReason` but `oversize`: no bucket configured, not a storage reference, no such object, an object it cannot read, a type no provider takes, or no way to hand a file to the resolved provider. The message carries the difference; the code does not. |
 | `pipelex_storage_uri_invalid` | 400 | `storage/nativeRoute.ts` | the reference does not obey the key grammar (also the traversal guard) |
 | `pipelex_storage_unreadable` | 400 | `storage/nativeRoute.ts` | the object is not there, or the role may not read it |
 | `pipelex_storage_uri_unsupported` | 400 | `storage/nativeRoute.ts` | no bucket configured — the scheme is not served at all |
@@ -54,7 +54,7 @@ New enum `GatewayUnresolvedReference` in `error_classification.py`, beside `Gate
 
 | Member | Codes | Category / action | Advice (gist — final wording at implementation) |
 |---|---|---|---|
-| `REFERENCE_UNRESOLVED` | `pig-09` | `CONTENT` / `CHANGE_INPUT` | a file reference in the request could not be resolved — the error message names the cause; fix the reference it names. Deliberately defers to the message because the code is the LLM routes' single fail-closed slot for four distinct causes. |
+| `REFERENCE_UNRESOLVED` | `pig-09` | `CONTENT` / `CHANGE_INPUT` | a file reference in the request could not be resolved — the error message names the cause; fix the reference it names. Deliberately defers to the message because the code is the LLM routes' single fail-closed slot for every storage failure but "over its cap". |
 | `STORAGE_REFERENCE_INVALID` | `pipelex_storage_uri_invalid` | `CONTENT` / `CHANGE_INPUT` | the `pipelex-storage://` reference is malformed — check the key against what the upload returned |
 | `STORAGE_OBJECT_UNREADABLE` | `pipelex_storage_unreadable` | `CONTENT` / `CHANGE_INPUT` | the referenced object does not exist or cannot be read — check the reference points at an object that was uploaded to this deployment |
 | `STORAGE_NOT_SERVED` | `pipelex_storage_uri_unsupported` | `CONFIGURATION` / `CONTACT_SUPPORT` | this deployment does not serve `pipelex-storage://` references at all — an operator's problem, nothing about the inputs causes it |

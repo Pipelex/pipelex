@@ -43,6 +43,7 @@ from portkey_ai import Portkey
 
 from pipelex.cogt.exceptions import InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import (
+    _GATEWAY_UNRESOLVED_REFERENCE_BY_CODE,  # pyright: ignore[reportPrivateUsage]
     GatewayRequestLimit,
     GatewayUnresolvedReference,
     ProviderErrorMetadata,
@@ -66,6 +67,7 @@ _EVERY_CODE_AND_MEMBER: list[tuple[str, GatewayUnresolvedReference]] = [
     ("pipelex_storage_uri_invalid", GatewayUnresolvedReference.STORAGE_REFERENCE_INVALID),
     ("pipelex_storage_unreadable", GatewayUnresolvedReference.STORAGE_OBJECT_UNREADABLE),
     ("pipelex_storage_uri_unsupported", GatewayUnresolvedReference.STORAGE_NOT_SERVED),
+    ("pipelex_unsupported_uri_scheme", GatewayUnresolvedReference.DOCUMENT_URL_REFUSED),
     ("pipelex_document_scheme_refused", GatewayUnresolvedReference.DOCUMENT_URL_REFUSED),
     ("pipelex_document_address_refused", GatewayUnresolvedReference.DOCUMENT_URL_REFUSED),
     ("pipelex_document_redirect_refused", GatewayUnresolvedReference.DOCUMENT_URL_REFUSED),
@@ -187,6 +189,15 @@ class TestTheCodeIsRecognized:
     def test_every_member_is_reachable_from_a_wire_code(self, member: GatewayUnresolvedReference) -> None:
         """A member no code reaches is dead advice — it would never render for anyone."""
         assert member in {expected for _, expected in _EVERY_CODE_AND_MEMBER}
+
+    def test_the_table_covers_the_whole_production_map(self) -> None:
+        """The other direction, which the per-code cases cannot see.
+
+        Every case in this module walks the table above into the map. Without this
+        one, a code added to the map and forgotten here would be classified and
+        rendered in production and exercised by nothing.
+        """
+        assert set(_EVERY_CODE) == set(_GATEWAY_UNRESOLVED_REFERENCE_BY_CODE)
 
     @pytest.mark.parametrize(
         "code",
@@ -341,7 +352,8 @@ class TestRenderedAdvice:
             ("pipelex_storage_uri_invalid", "malformed"),
             ("pipelex_storage_unreadable", "does not exist or cannot be read"),
             ("pipelex_storage_uri_unsupported", "contact support"),
-            ("pipelex_document_scheme_refused", "http(s) URL"),
+            ("pipelex_unsupported_uri_scheme", "pipelex-storage:// reference"),
+            ("pipelex_document_scheme_refused", "https:// URL"),
             ("pipelex_document_host_refused", "security policy"),
             ("pipelex_document_unreachable", "publicly reachable"),
             ("pipelex_document_empty", "fetched but cannot be used"),
@@ -376,11 +388,16 @@ class TestRenderedAdvice:
 
         assert malformed != unreadable
 
-    def test_the_three_document_url_refusals_share_one_remedy(self) -> None:
+    def test_the_url_shape_refusals_share_one_remedy(self) -> None:
         """They are one member precisely because the caller's next move is the same."""
         details = {
             _rendered_detail(_envelope(code))
-            for code in ("pipelex_document_scheme_refused", "pipelex_document_address_refused", "pipelex_document_redirect_refused")
+            for code in (
+                "pipelex_unsupported_uri_scheme",
+                "pipelex_document_scheme_refused",
+                "pipelex_document_address_refused",
+                "pipelex_document_redirect_refused",
+            )
         }
 
         assert len(details) == 1
