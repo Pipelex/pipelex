@@ -42,7 +42,11 @@ class EntryPipeAmbiguousError(PipeLibraryError):
 
     Caller-facing copy: the message names the caller's own `pipe_code` and the qualified `pipe_ref`s
     of bundles they loaded themselves, so it survives STRICT disclosure intact — and it has to, since
-    the candidates are the only thing that makes the error actionable.
+    the candidates are the only thing that makes the error actionable. That holds because the entry
+    library carries only the caller's own bundles: the runner passes no `library_dirs` and no
+    deployment sets `PIPELEXPATH`, so no host-private `.mthds` is merged into it. It is a property of
+    how the runner is deployed, not a rule this class enforces — a deployment that did merge a host
+    library would put host `pipe_ref`s in this message.
     """
 
     error_domain = ErrorDomain.INPUT
