@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipelex.base_exceptions import ErrorDomain
+from pipelex.base_exceptions import INTERNAL_ERROR_PLACEHOLDER, DisclosureMode, ErrorDomain
 from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_bundle_core,
     validate_pipe_in_bundle_core,
@@ -197,6 +197,15 @@ class TestAgentValidatePipeInBundle:
         assert report.http_status == 422
         # The raise site keeps its own bundle-scoped wording, which names the caller's own code.
         assert "does_not_exist" in report.message
+        # `to_error_report()` never redacts, so the assertion above cannot prove the class-level
+        # `_authors_caller_facing_message` invariant this raise site inherits. Project through the
+        # STRICT serialization — the untrusted-surface one — where a message that is NOT declared
+        # caller-facing is replaced by the placeholder. This is what pins the promise the class
+        # docstring makes of every raise site: the wording may name what the caller typed, so it
+        # survives verbatim, and nothing from the loaded library rides along with it.
+        strict_payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
+        assert strict_payload["message"] != INTERNAL_ERROR_PLACEHOLDER
+        assert "does_not_exist" in strict_payload["message"]
 
     def test_pipe_slice_cross_package_controller_reports_skipped_not_success(
         self,

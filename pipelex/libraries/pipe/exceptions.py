@@ -28,7 +28,10 @@ class EntryPipeNotFoundError(PipeNotFoundError):
     error_domain = ErrorDomain.INPUT
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
-        detail="Check the pipe code for typos and make sure the bundle declaring it is loaded.",
+        # True at every raise site, which a hint naming only one of them is not: the library lookup
+        # misses because no loaded bundle declares the code, while the `--pipe` slice misses because
+        # the bundle being sliced does not declare it — even when another loaded bundle does.
+        detail="Check the pipe code for typos and make sure it is declared in the bundle being validated.",
     )
     _declared_title = "Entry pipe not found"
     _authors_caller_facing_message = True
