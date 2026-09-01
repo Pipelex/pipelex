@@ -24,7 +24,7 @@ from pipelex.interpreter_hub import (
 )
 from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
-from pipelex.libraries.pipe.exceptions import PipeNotFoundError
+from pipelex.libraries.pipe.exceptions import EntryPipeNotFoundError, PipeNotFoundError
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.handle_pipe_errors import (
     categorize_pipe_factory_error,
@@ -161,10 +161,13 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
             pipe_validation_errors=pipe_validation_errors,
         ) from validation_error
     except PipeNotFoundError:
-        # PipeNotFoundError is a PipeLibraryError (hence a LibraryError), but it is NOT a bundle
-        # merge/load failure: it means a requested --pipe slice names a pipe absent from the bundle.
-        # It has its own dedicated CLI handler (execute_validate's `except PipeNotFoundError`), so it
-        # must propagate raw rather than be folded into a ValidateBundleError by the arm below.
+        # The base class on purpose: the slice miss raised by ``_pipes_to_dry_run`` is the
+        # INPUT-domained ``EntryPipeNotFoundError`` subclass, and this arm must let it through raw,
+        # domain and all. PipeNotFoundError is a PipeLibraryError (hence a LibraryError), but it is
+        # NOT a bundle merge/load failure: it means a requested --pipe slice names a pipe absent from
+        # the bundle. It has its own dedicated CLI handler (execute_validate's
+        # `except PipeNotFoundError`), so it must propagate raw rather than be folded into a
+        # ValidateBundleError by the arm below.
         raise
     except LibraryError as library_error:
         # Library merge / load failures that are NOT pydantic ValidationErrors: undeclared
@@ -214,8 +217,11 @@ def _pipes_to_dry_run(loaded_pipes: list[PipeAbstract], *, dry_run_pipe_codes: l
     narrows the dry-run sweep to just the selected pipe (signatures are never an error either way — D-B).
 
     Raises:
-        PipeNotFoundError: when ``dry_run_pipe_codes`` names a pipe absent from the loaded bundle —
-            so a typo'd ``--pipe`` argument fails loudly instead of passing vacuously.
+        EntryPipeNotFoundError: when ``dry_run_pipe_codes`` names a pipe absent from the loaded
+            bundle — so a typo'd ``--pipe`` argument fails loudly instead of passing vacuously. The
+            selector is caller-supplied entry-shaped input, not a ref written inside a bundle, so it
+            carries the INPUT domain (→ 422) rather than the undomained base class (→ 500). Every
+            ``except PipeNotFoundError`` downstream still matches: it is a subclass.
     """
     if dry_run_pipe_codes is None:
         return loaded_pipes
@@ -226,7 +232,10 @@ def _pipes_to_dry_run(loaded_pipes: list[PipeAbstract], *, dry_run_pipe_codes: l
     if missing:
         missing_str = ", ".join(f"'{code}'" for code in sorted(missing))
         msg = f"Pipe(s) {missing_str} not found in the bundle. Check for typos and make sure they are declared in the bundle."
-        raise PipeNotFoundError(msg)
+        # The bundle-scoped wording stays the raise site's own — more precise here than the class's
+        # library-lookup message — and is safe under ``_authors_caller_facing_message``: it names only
+        # the caller's own selector codes (derived from ``wanted``), nothing from the loaded library.
+        raise EntryPipeNotFoundError(msg)
     return selected
 
 

@@ -3,7 +3,8 @@ from typing import Any
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundError
+from pipelex.base_exceptions import ErrorDomain
+from pipelex.libraries.pipe.exceptions import EntryPipeAmbiguousError, EntryPipeNotFoundError, PipeLibraryError, PipeNotFoundError
 from pipelex.libraries.pipe.pipe_library import PipeLibrary
 
 
@@ -78,23 +79,95 @@ class TestPipeLibraryLookup:
         assert library.get_optional_entry_pipe("compute_score") is mock_pipe
 
     def test_entry_pipe_ambiguous_bare_code_raises(self, mocker: MockerFixture):
-        """Two domains declaring the code: refuse to guess, and name both so the user can pick."""
+        """Two domains declaring the code: refuse to guess, and name both so the user can pick.
+
+        The code came from a human — a CLI argument or an API request field — so the failure is the
+        caller's to fix: INPUT domain, 422, never a server fault the caller would retry.
+        """
         library = PipeLibrary.make_empty()
         library.root["scoring.compute_score"] = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
         library.root["analytics.compute_score"] = _make_stub_pipe(mocker, code="compute_score", domain_code="analytics")
-        with pytest.raises(PipeLibraryError, match="is ambiguous") as exc_info:
+        with pytest.raises(EntryPipeAmbiguousError, match="is ambiguous") as exc_info:
             library.get_optional_entry_pipe("compute_score")
         assert "analytics.compute_score" in str(exc_info.value)
         assert "scoring.compute_score" in str(exc_info.value)
+
+        report = exc_info.value.to_error_report()
+        assert report.error_domain == ErrorDomain.INPUT
+        assert report.http_status == 422
 
     def test_entry_pipe_no_match_returns_none(self):
         library = PipeLibrary.make_empty()
         assert library.get_optional_entry_pipe("nonexistent") is None
 
     def test_entry_pipe_required_raises_not_found(self):
+        """An entry code that resolves to nothing is a caller typo, reported as INPUT / 422."""
         library = PipeLibrary.make_empty()
-        with pytest.raises(PipeNotFoundError):
+        with pytest.raises(EntryPipeNotFoundError) as exc_info:
             library.get_required_entry_pipe("nonexistent")
+
+        report = exc_info.value.to_error_report()
+        assert report.error_domain == ErrorDomain.INPUT
+        assert report.http_status == 422
+
+    def test_entry_pipe_translates_aliased_ambiguity(self, mocker: MockerFixture):
+        """An ambiguous `alias->bare_code` reaching the entry lookup is still the caller's typo.
+
+        The ambiguity is detected one frame down, inside `get_optional_pipe`'s alias-scoped
+        bare-remainder search, which raises the domain-less in-body error. The entry lookup
+        translates it so the whole entry surface classifies uniformly, keeping the original as
+        `__cause__`.
+        """
+        library = PipeLibrary.make_empty()
+        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="scoring"))
+        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="analytics"))
+
+        with pytest.raises(EntryPipeAmbiguousError) as exc_info:
+            library.get_optional_entry_pipe("lib->compute_score")
+
+        cause = exc_info.value.__cause__
+        assert isinstance(cause, PipeLibraryError)
+        assert not isinstance(cause, EntryPipeAmbiguousError)
+        assert exc_info.value.to_error_report().error_domain == ErrorDomain.INPUT
+
+    def test_entry_pipe_does_not_translate_a_miss_into_an_ambiguity(self, mocker: MockerFixture):
+        """A miss surfacing from `get_optional_pipe` must not be re-raised as an ambiguity.
+
+        `PipeNotFoundError` IS a `PipeLibraryError`, so the translation arm would otherwise catch it
+        and report it under a class asserting the opposite — with a `user_action` naming candidates
+        that never existed. No in-body raise site produces one today, so the raise is injected.
+        """
+        library = PipeLibrary.make_empty()
+        # Patched on the class, not the instance: PipeLibrary is a pydantic RootModel and rejects the
+        # per-instance attribute set. mocker undoes it at teardown.
+        mocker.patch.object(PipeLibrary, "get_optional_pipe", side_effect=PipeNotFoundError("boom"))
+
+        with pytest.raises(PipeNotFoundError) as exc_info:
+            library.get_optional_entry_pipe("compute_score")
+        assert not isinstance(exc_info.value, EntryPipeAmbiguousError)
+
+    def test_in_body_aliased_ambiguity_is_not_translated(self, mocker: MockerFixture):
+        """The same lookup through the in-body door keeps the plain, unclassified error.
+
+        In-body resolution failures are not a caller's input mistake — the ref was written in a
+        bundle — so the entry classification must not leak onto them.
+        """
+        library = PipeLibrary.make_empty()
+        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="scoring"))
+        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="analytics"))
+
+        with pytest.raises(PipeLibraryError) as exc_info:
+            library.get_optional_pipe("lib->compute_score")
+        assert not isinstance(exc_info.value, EntryPipeAmbiguousError)
+        assert exc_info.value.to_error_report().error_domain is None
+
+    def test_in_body_required_miss_stays_unclassified(self):
+        """`get_required_pipe` is the in-body door and keeps raising the plain, domain-less error."""
+        library = PipeLibrary.make_empty()
+        with pytest.raises(PipeNotFoundError) as exc_info:
+            library.get_required_pipe("scoring.nonexistent")
+        assert not isinstance(exc_info.value, EntryPipeNotFoundError)
+        assert exc_info.value.to_error_report().error_domain is None
 
     def test_entry_pipe_ignores_aliased_dependency_entries(self, mocker: MockerFixture):
         """An installed package must not make a host pipe's bare code ambiguous.

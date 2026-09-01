@@ -95,6 +95,15 @@ def get_agent_cli_error_format() -> CliOutputFormat:
 # migrated to class-level metadata. A PipelexError subclass that declares
 # class-level error_domain / user_action must NOT appear here — enforced by
 # tests/unit/pipelex/cli/test_agent_output_drift.py.
+#
+# A CogtError subclass carrying an error_category self-describes too, without any
+# class-level error_domain of its own: InferenceErrorCategory.error_domain derives
+# one, and to_error_report() puts it on the report, so the report-first read at the
+# bottom of agent_error() always wins and an AGENT_ERROR_DOMAINS entry for such a
+# class can never be read. Those are barred from this dict as well, by the same
+# drift test — a dead entry is exactly the rot it exists to prevent. When the
+# derived domain is not the one this CLI wants, fix it on the class (declare an
+# explicit error_domain, as ModelChoiceNotFoundError does), never here.
 AGENT_ERROR_HINTS: dict[str, str] = {
     # Model/routing errors
     "ModelChoiceNotFoundError": (
@@ -177,7 +186,6 @@ RETRYABLE_ERROR_TYPES: set[str] = {
 
 AGENT_ERROR_DOMAINS: dict[str, str] = {
     # input = agent can fix (bad .mthds, wrong args, bad JSON)
-    "ModelChoiceNotFoundError": "input",
     "PipeValidationError": "input",
     "FixBundleError": "input",
     "FileNotFoundError": "input",
@@ -198,9 +206,7 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "ClientAuthenticationError": "config",
     "PipeOperatorModelChoiceError": "config",
     "PipeOperatorModelAvailabilityError": "config",
-    "ModelDeckPresetValidatonError": "config",
     "BinaryNotFoundError": "config",
-    "GatewayUnknownModelError": "config",
     "InitConfigError": "config",
 }
 

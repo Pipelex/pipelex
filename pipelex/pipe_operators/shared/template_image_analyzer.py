@@ -211,6 +211,14 @@ class TemplateImageAnalyzer:
             Tuple of (is_image_content, is_list_of_images, has_nested_images, nested_paths)
             or None if type cannot be resolved
         """
+        # A dynamic concept gets no static classification: the question here is "is this
+        # definitely an image", and Dynamic's universal compatibility answers a different
+        # question — `is_compatible` short-circuits to True on it before any structural tier.
+        # It renders as text through the template; an author who wants image attachment
+        # declares Image (or a refining concept).
+        if NativeConceptCode.is_dynamic_concept(concept_code=root_concept.code):
+            return (False, False, False, None)
+
         native_image_concept = get_native_concept(NativeConceptCode.IMAGE)
 
         # For simple variable references (no dots after root)
