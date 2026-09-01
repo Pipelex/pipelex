@@ -28,6 +28,20 @@ class TestTemplateDocumentAnalyzer:
         assert result[0].variable_path == "document"
         assert result[0].kind == DocumentReferenceKind.DIRECT
 
+    def test_dynamic_input_yields_no_document_reference(self, load_test_library: Callable[[list[Path]], None]) -> None:
+        """A Dynamic input referenced plainly is never statically a document — same rule as the
+        image analyzer: universal compatibility is not identity.
+        """
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
+
+        result = TemplateDocumentAnalyzer.analyze_template_for_documents(
+            template_source="Process this:\n@dynamic_in\nand inline $dynamic_in",
+            input_specs={"dynamic_in": "Dynamic"},
+            domain_code="test_pipes",
+        )
+
+        assert result == []
+
     def test_document_list_input_creates_direct_list_reference(self, load_test_library: Callable[[list[Path]], None]) -> None:
         """Test that Document[] input creates a DIRECT_LIST reference."""
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])

@@ -209,6 +209,10 @@ Analyze the document and explain how it relates to the context: $reference_doc
 """
 ```
 
+## Dynamic Inputs Render as Text
+
+A `native.Dynamic` input referenced in a prompt renders as text through the template, exactly as it does in a `PipeCompose` template. `Dynamic` is compatible with every concept by design, but compatibility is not identity: the prompt analyzers only attach a variable as an image or document when it is *definitely* one, and a dynamic concept's shape is unknowable statically. If you want image or document attachment, declare `Image` / `Document` (or a concept refining them) instead. Consequently, `| with_images` on a `Dynamic` variable is refused — statically unknowable nested images are refused, not guessed.
+
 ## Configuration
 
 `PipeLLM` is configured in your pipeline's `.mthds` file.
