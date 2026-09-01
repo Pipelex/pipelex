@@ -36,6 +36,7 @@ from typing import Any
 import anthropic
 import httpx
 import pytest
+from openai import OpenAI
 from portkey_ai import Portkey
 
 from pipelex.cogt.exceptions import InferenceErrorCategory
@@ -46,6 +47,7 @@ from pipelex.cogt.inference.error_classification import (
     extract_anthropic_metadata,
     extract_gateway_metadata,
     extract_manifold_metadata,
+    extract_openai_metadata,
 )
 from pipelex.cogt.inference.error_classify import classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
@@ -92,6 +94,31 @@ def _as_the_portkey_sdk_raises_it(*, status_code: int, body: dict[str, Any]) -> 
     )
     client = Portkey(api_key="unused-in-this-test", base_url=f"{_ORIGIN}/v1")
     return client._make_status_error_from_response(request=request, response=response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+
+def _as_the_openai_sdk_raises_it(*, status_code: int, body: dict[str, Any]) -> BaseException:
+    """Build the exception through the OpenAI SDK's own factory, for the same reason as above.
+
+    This is the hop a gateway or manifold *chat* call actually takes: both plugins
+    build an ``OpenAICompletionsLLMWorker`` / ``OpenAIResponsesLLMWorker`` over a
+    client pointed at the service, so an LLM-route refusal is distilled by
+    ``extract_openai_metadata`` and never by ``extract_gateway_metadata``.
+
+    That hop reads ``exc.type`` before ``exc.code`` — the opposite precedence to
+    the two Pipelex-service hops — and it stays that way because it is the vendor's
+    hop too. It recovers the code regardless, because the gateway's fail-closed
+    envelope carries a ``code`` and no ``type`` at all; pinning it here is what
+    turns that into a checked property instead of a standing assumption.
+    """
+    request = httpx.Request("POST", f"{_ORIGIN}/v1/chat/completions")
+    response = httpx.Response(
+        status_code=status_code,
+        request=request,
+        content=json.dumps(body).encode(),
+        headers={"content-type": "application/json"},
+    )
+    client = OpenAI(api_key="unused-in-this-test", base_url=f"{_ORIGIN}/v1")
+    return client._make_status_error_from_response(response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
 
 def _envelope(code: str | None, *, status_code: int, provider: ProviderName = ProviderName.GATEWAY) -> ProviderErrorMetadata:
@@ -182,6 +209,30 @@ class TestTheCodeSurvivesEveryExtractHop:
 
         assert metadata.provider_error_code == "pig-10"
         assert metadata.gateway_request_limit == GatewayRequestLimit.OBJECT_TOO_LARGE
+
+    @pytest.mark.parametrize(
+        ("body", "expected"),
+        [
+            (_BODY_TOO_LARGE_BODY, GatewayRequestLimit.BODY_TOO_LARGE),
+            (_BODY_TOO_DEEP_BODY, GatewayRequestLimit.BODY_TOO_DEEP),
+        ],
+    )
+    def test_through_the_openai_substrate_that_carries_every_chat_call(self, body: dict[str, Any], expected: GatewayRequestLimit) -> None:
+        """The hop a gateway or manifold LLM call actually takes, and the last one without a test.
+
+        Both plugins build an ``OpenAICompletionsLLMWorker`` over a client pointed
+        at the service, so a chat-route refusal is distilled by
+        ``extract_openai_metadata``. That hop reads ``type`` before ``code``, which
+        is right for the vendor it also serves and would throw a ``pipelex_*`` code
+        away — it recovers these because the fail-closed envelope carries no
+        ``type``. That is a property of the gateway's envelope, so it is checked
+        here rather than assumed.
+        """
+        exc = _as_the_openai_sdk_raises_it(status_code=413, body=body)
+
+        metadata = extract_openai_metadata(exc)
+
+        assert metadata.gateway_request_limit == expected
 
 
 class TestClassification:
@@ -338,6 +389,36 @@ class TestTheSameLimitOnTheNativeRoutes:
             details.append(rendered.user_action.detail)
 
         assert details[0] == details[1]
+
+    def test_the_native_envelope_survives_the_portkey_substrate_too(self) -> None:
+        """Where the two fixes on this branch actually meet, on one real call.
+
+        A gateway extract or search reaches Azure Document Intelligence and Linkup
+        through the chat costume, so the refusal those providers raise is rendered
+        by ``providerErrorResponse`` — the ``type``-bearing native envelope — and
+        then raised by Portkey's factory, which replaces the payload with the
+        message string. Recovering the code needs the response fallback *and* the
+        ``code``-first precedence; either one alone leaves the caller reading "the
+        provider rejected the request" for a file they can simply make smaller.
+        """
+        request = httpx.Request("POST", f"{_ORIGIN}/v1/chat/completions")
+        payload = _native_route_refusal_body("over the limit", "pipelex_document_too_large")
+        response = httpx.Response(
+            status_code=413,
+            request=request,
+            content=json.dumps(payload).encode(),
+            headers={"content-type": "application/json"},
+        )
+        client = Portkey(api_key="unused-in-this-test", base_url=f"{_ORIGIN}/v1")
+        exc = client._make_status_error_from_response(request=request, response=response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+        assert isinstance(getattr(exc, "body", None), str)
+        metadata = extract_gateway_metadata(exc)
+        result = classify_inference_error(metadata)
+
+        assert metadata.provider_error_code == "pipelex_document_too_large"
+        assert result.gateway_request_limit == GatewayRequestLimit.OBJECT_TOO_LARGE
+        assert result.category.is_retryable is False
 
     def test_the_generic_type_does_not_shadow_the_contract_code(self) -> None:
         """The regression this envelope exists to pin.
