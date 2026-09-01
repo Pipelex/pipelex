@@ -125,3 +125,33 @@ class TestTheDivergenceGateSeesEveryDifference:
 
         assert collector.counts == {"fixed-count-honoured": 1}
         assert not collector.unclassified
+
+    def test_a_structured_object_collapsed_to_nothing_is_not_absorbed(self) -> None:
+        """`unknown-empty-object` means the engine's placeholder for a dict, not any object gone empty."""
+        collector = DivergenceCollector()
+
+        collector.compare(
+            engine_value={"title": "title_value", "stamp": "stamp_value"},
+            projected_value={},
+            path=["scaffold.scaffold_nesting", COMPACT_SHAPE, "dossier"],
+        )
+
+        assert "unknown-empty-object" not in collector.counts
+        # It falls through to the dict walk, where every key the projection stopped rendering is
+        # `engine-only-field` — undeclared on purpose, so the whole capture refuses.
+        assert collector.counts.get("engine-only-field") == 2
+        with pytest.raises(ValueError, match="Undeclared divergence class"):
+            collector.declared()
+
+    def test_an_unknown_node_keeps_its_class(self) -> None:
+        """The control: the engine's dict placeholder against the empty object the descriptor states."""
+        collector = DivergenceCollector()
+
+        collector.compare(
+            engine_value={"json_obj_key": "json_obj_value"},
+            projected_value={},
+            path=["scaffold.scaffold_open_natives", COMPACT_SHAPE, "json_in", "json_obj"],
+        )
+
+        assert collector.counts == {"unknown-empty-object": 1}
+        assert not collector.unclassified

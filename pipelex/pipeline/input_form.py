@@ -336,6 +336,7 @@ class InputFormDeriver:
             case (
                 NativeConceptCode.DATE
                 | NativeConceptCode.HTML
+                | NativeConceptCode.JSON
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.SEARCH_RESULT
@@ -349,7 +350,12 @@ class InputFormDeriver:
                     required=True,
                     fields=[self._structure_field(name=field_name, field=field, seen=seen) for field_name, field in pinned_structure.items()],
                 )
-            case NativeConceptCode.DYNAMIC | NativeConceptCode.ANYTHING | NativeConceptCode.JSON | NativeConceptCode.COMPOSITE:
+            case NativeConceptCode.DYNAMIC | NativeConceptCode.ANYTHING | NativeConceptCode.COMPOSITE:
+                # The three the standard calls structureless: `_pinned_structure` returns None for
+                # exactly these, so there is no authored shape to expand and `unknown` states that
+                # honestly. Every other native belongs on an arm above — `native.JSON` sat here
+                # until its pinned `json_obj` was noticed, and a template describing it as unknown
+                # rendered `{}`, which `JSONContent` then refused.
                 return UnknownField(name=name, concept_ref=node_ref, refines=refines, description=text, required=True)
 
     def _class_backed_node(

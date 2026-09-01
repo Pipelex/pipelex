@@ -40,8 +40,9 @@ The classes it declares today:
 - `fixed-count-honoured` — a `Concept[N]` slot renders `N` elements. The engine emits one whatever the count, and `InputShaper` then rejects that template with `MultiplicityCountMismatchError`, so the scaffold it produced does not run.
 - `text-named-url` — the engine picks a placeholder by field **name**, so a text field merely named `url` renders as a URL. The projection reads the descriptor's `kind`.
 - `object-native-keeps-envelope` — a native carrying an optional field beside its required one (`native.Date`) renders as an object once the optional field is included, and the shaper's bare-value arm dispatches a native on its scalar kind, so the object form is only re-shapable inside its `{concept, content}` envelope. The projection keeps that envelope; the engine unwraps to a bare scalar, which it can only do because it drops the optional field. A consequence of `optional-field-included`.
+- `unknown-empty-object` — an `unknown` node renders as the empty object, because the descriptor withholds the payload shape at that position and a projection that invented one would stop projecting the descriptor. The engine reflects the runtime content class instead and fills a required dict with a sample key/value pair whoever fills the template in has to delete. Reached by `json_obj` inside `native.JSON`, the corpus's first *required* dict; the optional dict fields elsewhere never reach it, because the engine drops those entirely and that is `optional-field-included`.
 
-Each is a `pipelex` defect filed in the workspace ledger, not a difference of taste; the manifest is what records that the corpus knowingly departs from the engine and why.
+Most are `pipelex` defects filed in the workspace ledger rather than differences of taste, and the manifest names the item whose fix would retire each one. Some carry no item, deliberately: `file-leaf-not-expanded` and `unknown-empty-object` are the descriptor's vantage rather than engine bugs, and `object-native-keeps-envelope` is a consequence of `optional-field-included` rather than a defect of its own. The manifest is what records that the corpus knowingly departs from the engine, and why.
 
 ### What the gate can and cannot separate
 
@@ -68,7 +69,9 @@ The entries declared today are all one descriptor gap — a nested list inside a
 
 ## The bundles
 
-`tests/data/input_semantics/` holds the corpus bundles. `probe_bundle.mthds` exercises every construct the language accepts and `hinted_bundle.mthds` the intent hints; `scaffold_bundle.mthds` was added for this corpus and covers what the other two do not — a text field merely named `url` beside a real file position, an optional nested structure, optional `native.Image` and `native.Document` fields inside a structure, and both a fixed `[N]` and a variable `[]` slot over a structured concept.
+`tests/data/input_semantics/` holds the corpus bundles. `probe_bundle.mthds` exercises every construct the language accepts and `hinted_bundle.mthds` the intent hints; `scaffold_bundle.mthds` was added for this corpus and covers what the other two do not — a text field merely named `url` beside a real file position, an optional nested structure, optional `native.Image` and `native.Document` fields inside a structure, and both a fixed `[N]` and a variable `[]` slot over a structured concept. Its `scaffold_open_natives` pipe holds the natives whose payload shape the descriptor states openly, at slot positions: `native.Dynamic` and `native.Composite`, which the standard calls structureless and whose node is therefore `unknown`, beside `native.JSON`, which is not — its pinned blueprint carries a required `json_obj`, so it expands like any other pinned native and its dict is where `unknown-empty-object` is measured.
+
+`native.Anything` belongs in that pipe and is not there yet: an `Anything` input crashes the engine's contract builder, which resolves a structure class for every input and so asks for the one class the standard says does not exist. Its slot coverage waits on `L-260831-8f7c8c`.
 
 ## When to rerun it
 
