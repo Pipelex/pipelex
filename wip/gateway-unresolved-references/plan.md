@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 item: L-260901-b0bd98
 ---
 
@@ -120,6 +120,18 @@ Every step above is implemented on this branch. What was decided or discovered w
 - **The two families are pinned as disjoint by a test rather than by a comment.** `TestTheTwoGatewayFamiliesDoNotShadowEachOther` walks both code sets and asserts each reaches one family and not the other, so a code added to the wrong map fails rather than silently borrowing the other family's advice. The `pipelex_storage_*` codes are the case that needs it: `object_too_large` is a limit, `unreadable` is an unresolved reference, and both arrive from the same route.
 - **The test module keeps one parametrize table as its single source of codes** (`_EVERY_CODE_AND_MEMBER`), reused by the recognition, classification, rendering and disjointness cases, plus a case asserting every enum member is reachable from a wire code — a member no code reaches would be advice that never renders for anyone.
 - **The docs section grew two `####` headings** rather than one long run: the existing request-limit half is now "What the request may weigh" and the new half "When a reference cannot be resolved", under the unchanged `### The Gateway's Own Refusals`. Nothing links to those anchors, so the split breaks no reference. The closing paragraph now names `pig_storage_timeout` / `pig_storage_client_disconnected` explicitly as belonging to neither family, which is where the inventory's out-of-scope note now lives in shipped documentation.
+
+## Checkpoint — landed
+
+Merged as pipelex#1181, *"Classify the gateway's unresolvable-reference refusals"*, squashed onto the stack trunk `feature/Two-gateways-2` — the branch this work was stacked on. Commits are named by subject rather than by hash throughout this document, because every rebase of the trunk rewrites them.
+
+What the merge carries, against the steps above: all six are done as written. The two commits on the branch were *"classify the gateway's unresolvable-reference refusals"* (the family, the classify branch, the render branch, the test module, the docs half) and *"recognize the scheme refusal a caller actually reaches"* — the second a review correction adding `pipelex_unsupported_uri_scheme` to `DOCUMENT_URL_REFUSED` beside `pipelex_document_scheme_refused` rather than in place of it. `classifyExtractInput` runs before any fetch and admits only `https:`, `data:` and `pipelex-storage://`, so an `http://` document URL is refused there and never reaches the fetch — which means the inventory's `pipelex_document_scheme_refused`, mapped and kept, is not the code that arm actually sees in practice. The family therefore covers thirteen wire codes, not the twelve this plan's inventory table lists.
+
+Every check on the pull request passed — typecheck, all eight test shards on py3.11, and each lint job including the drift-contract and keyword-only gates.
+
+**Delivery.** The merge is on `feature/Two-gateways-2` only; it has reached neither `dev` nor `main`. It ships when the trunk's own pull request lands, and reaches consumers when a pipelex release is cut after that — the repo's open release item is the one that carries #1154 (`L-260828-f4e88c`), which predates this work and does not yet include it.
+
+**Left for a person.** Nothing this campaign asked for. The neighbouring gateway family — the routing refusals `pig-01`, `pig-02`, `pig-05` and `pig-06`, which still answer 400 and so advise a caller to revise their prompt when the real fault is an unknown model handle — is open work of its own under its own ledger item (`L-260831-9963b5`), not unfinished business here.
 
 ## Out of scope
 
