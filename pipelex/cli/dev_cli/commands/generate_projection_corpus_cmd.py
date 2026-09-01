@@ -102,6 +102,13 @@ DIVERGENCE_REASONS: dict[str, str] = {
         "The engine picks a placeholder by field name, so a text field merely named url or ending in _url "
         "renders as a URL. The projection reads the descriptor's kind instead."
     ),
+    "unknown-empty-object": (
+        "An unknown node renders as the empty object, because the descriptor withholds the payload shape "
+        "at that position and a projection that invented one would stop projecting the descriptor. The "
+        "engine reflects the runtime content class instead and fills a required dict with a sample "
+        "key/value pair whoever fills the template in has to delete. The empty object is re-shapable: the "
+        "round-trip takes it back."
+    ),
     "object-native-keeps-envelope": (
         "A native whose pinned definition carries an optional field beside its required one — native.Date — "
         "renders as an object once the optional field is included, and the shaper's bare-value arm dispatches "
@@ -115,8 +122,9 @@ DIVERGENCE_REASONS: dict[str, str] = {
 # The workspace-ledger item tracking the engine fix, where the difference is a defect rather than a
 # difference of vantage. Named in the manifest so the corpus records not just that it departs from
 # the engine but what would retire the departure. A class with no entry here is deliberate on both
-# sides: `file-leaf-not-expanded` is the descriptor's vantage rather than an engine bug, and
-# `object-native-keeps-envelope` is a consequence of `optional-field-included` rather than its own.
+# sides: `file-leaf-not-expanded` and `unknown-empty-object` are the descriptor's vantage rather than
+# engine bugs, and `object-native-keeps-envelope` is a consequence of `optional-field-included`
+# rather than its own.
 DIVERGENCE_ITEMS: dict[str, str] = {
     "text-named-url": "L-260830-dc48bf",
     "fixed-count-honoured": "L-260830-f3de29",
@@ -217,6 +225,19 @@ def _write_text(*, path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def _engine_dict_placeholder(*, path: list[str]) -> dict[str, str]:
+    """What the engine renders at a dict-typed field, which is exactly where the descriptor says `unknown`.
+
+    `ConceptRepresentationGenerator._generate_dict_value` returns `{f"{name}_key": f"{name}_value"}`,
+    and `generate_field_value` is its only caller — dispatched on `origin is dict`, the same test that
+    makes the input-form deriver state the node as `unknown`. A dict inside a list never reaches it
+    (`_generate_list_value` routes items through `_generate_basic_value`, which returns no dicts), so
+    the placeholder is always keyed by the field's own name — the last segment of the walk's path.
+    """
+    field_name = path[-1]
+    return {f"{field_name}_key": f"{field_name}_value"}
+
+
 class DivergenceCollector:
     """Walks the engine's template beside the projection's and buckets every difference.
 
@@ -289,9 +310,22 @@ class DivergenceCollector:
         """Bucket every leaf difference between one engine value and its projected counterpart."""
         # Handled before the dict/dict walk below, which would report the same thing one key at a
         # time: a projection rendering nothing where the engine renders an object is one fact, not N.
-        # Deliberately not declared in DIVERGENCE_REASONS: no bundle in the corpus reaches it today,
-        # so a capture that does must write the declaration rather than inherit one nobody reviewed.
-        if isinstance(engine_value, dict) and projected_value == {} and engine_value != {}:
+        # Reached by the required dict inside `native.JSON` — `json_obj`, whose descriptor node is
+        # `unknown` like every dict field, so the projection renders the empty object while the
+        # engine fills it with a sample key. The corpus's optional dict fields never reach here:
+        # the engine drops those entirely, which is `optional-field-included`.
+        #
+        # Recognised by the engine's own placeholder rather than by the empty object alone, because
+        # `{}` is what the projection renders for an `object` node with no fields as much as for an
+        # `unknown` one: a shape-only arm would file a projection that collapsed a populated object
+        # into this declared class and return without ever walking the subtree — the whole-difference
+        # swallow the file-leaf and fixed-count arms were repaired for. The placeholder is exact, not
+        # a heuristic: `ConceptRepresentationGenerator._generate_dict_value` renders `{name_key:
+        # name_value}` and is dispatched from one site only, on `origin is dict`, which is precisely
+        # what makes the descriptor node `unknown`. A non-matching value falls through to the dict
+        # walk below, where each key the projection dropped is `engine-only-field` and the capture
+        # refuses.
+        if isinstance(engine_value, dict) and projected_value == {} and engine_value == _engine_dict_placeholder(path=path):
             self._record(divergence_id="unknown-empty-object", path=path, engine=engine_value, expected=projected_value)
             return
         if (
@@ -318,9 +352,9 @@ class DivergenceCollector:
             projected_fields = cast("dict[str, Any]", projected_value)
             # Walked before the projected keys, because the walk below iterates those and would
             # otherwise skip a field the projection stopped rendering entirely — a projection
-            # regression that reached neither a class nor `unclassified`. Deliberately not declared
-            # in DIVERGENCE_REASONS, like `unknown-empty-object` above: no bundle in the corpus
-            # reaches it today, so a capture that does must write the declaration itself.
+            # regression that reached neither a class nor `unclassified`. Deliberately absent from
+            # DIVERGENCE_REASONS: no bundle in the corpus reaches it today, so a capture that does
+            # must write the declaration itself rather than inherit one nobody reviewed.
             for key in engine_fields:
                 if key not in projected_fields:
                     self._record(divergence_id="engine-only-field", path=[*path, key], engine=engine_fields[key], expected=None)

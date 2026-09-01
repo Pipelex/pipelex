@@ -51,3 +51,16 @@ Exactly two dossiers:
 Any number of bookmarks:
 @bookmarks
 """
+
+# The natives whose payload shape the descriptor states openly, at slot positions — the one place
+# the corpus never reached. `native.Dynamic` and `native.Composite` are structureless by design, so
+# their node is `unknown` and every projection renders the empty object both renderers agree on.
+# `native.JSON` is not: its pinned blueprint carries a required `json_obj`, so it expands like any
+# other pinned native, and the dict inside it is the corpus's first REQUIRED unknown node — the
+# engine invents a sample key there, the projection leaves the object empty for whoever fills it in.
+[pipe.scaffold_open_natives]
+type        = "PipeCompose"
+description = "SCAFFOLD_pipe_scaffold_open_natives: a pinned-dict native beside the two structureless ones, each at a slot position"
+inputs      = { json_in = "JSON", dynamic_in = "Dynamic", composite_in = "Composite" }
+output      = "Text"
+template    = "SCAFFOLD_template_open_natives: $json_in $dynamic_in $composite_in"
