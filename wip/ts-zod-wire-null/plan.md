@@ -136,3 +136,33 @@ The shape that reaches it is ordinary, not contrived: `escalation_severity: z.en
 `_render_broken_call` now applies the measurement, `every_type_kind_crate` carries the shape (`escalation_severity`, deliberately just inside the width where `fallback_state` is past it), and `test_a_broken_chain_keeps_a_call_that_fits_on_its_own_line` is the byte assertion. Mutation-tested: restoring the unconditional explode reddens it. The whole fixture emission is prettier-clean for real, and `test_emitted_ts_is_prettier_clean` passes with prettier on PATH rather than skipping.
 
 **The deferred `_ts_object_key` case was re-confirmed and left deferred.** A dict-default key carrying more `"` than `'` is still emitted `{ "marked \"urgent\"": 3 }` and prettier rewrites it to `{ 'marked "urgent"': 3 }`. It remains a stamp instability on valid TypeScript, not a regression, and belongs with [L-260901-26da36](http://localhost:4747/i/L-260901-26da36).
+
+## Checkpoint — review round 4, nothing found, and the round-3 fix verified against real prettier
+
+This pass reviewed the code that landed *after* the previous agent-comment round — the `_render_broken_call` fix and the `origin/dev` merge — which no reviewer had seen. It changed no product code. (It is this branch's fourth review pass but carries the `round=3` stamp on the PR, because one earlier pass was run by `/review` rather than by the agent-comment skill, and only the latter stamps.)
+
+**The PR's own threads contributed nothing again.** The single greptile thread was answered and resolved in round 1, and greptile's "Last reviewed commit" still names a commit several behind the branch head, so there has been no re-review. The whole round came from the two reviewers run locally against `origin/dev`.
+
+**Codex reviewed the branch diff and found nothing.** cubic raised three, none of which clears the bar:
+
+1. **The hand-rolled scanners are duplicated across `ts_zod.py` and `python_common.py`** and cubic would rather see the zod expression kept structural until final rendering. A design concern with no defect behind it, and the same concern already filed as [L-260901-26da36](http://localhost:4747/i/L-260901-26da36) — it belongs there, not in this PR.
+2. **`sorted(pairs)` in `_ts_literal` crashes on a dict default with mixed key types.** Adjudicated as unreachable — the argument is below.
+3. **`_ts_object_key` bypasses `_ts_string`.** The known deferral, re-raised for the third time; unchanged in status.
+
+### `sorted(pairs)` — why the mixed-key crash is unreachable
+
+Recorded in full because cubic is stateless and will raise it again, and a local-only finding has no PR thread to carry its adjudication.
+
+cubic is right on the narrow point: nothing *validates* the key types. `default_value` is typed `Any | None` (`pipelex/core/concepts/concept_structure_blueprint.py:70`) and the `DICT` branch of `_validate_default_value_type` checks only `isinstance(self.default_value, dict)`. So `{1: "a", "b": 2}` would reach `sorted(pairs)` and raise `TypeError: '<' not supported between instances of 'str' and 'int'`.
+
+It cannot get there. Both ingress formats guarantee string keys — a TOML table key is a bare or quoted key, a JSON object key is a string — and `clean_json_content` copies keys through verbatim without coercing them (`pipelex/tools/misc/json_utils.py`: `cleaned[key] = clean_json_content(content_dict[key])`, keys untouched). A dict whose keys are *uniformly* non-string sorts fine and is then handled by `_ts_object_key`; only the mixed case would crash, and no authored bundle can produce it.
+
+Worth naming the inconsistency underneath, since it is what made the finding look reachable: `_ts_object_key`'s docstring says it stringifies a non-string key because "a crash here would be a worse answer than the spelling the emitter has always produced" — and `sorted()`, one line earlier, defeats that promise for the mixed case. That defence is pre-existing and is itself the over-engineering; extending it to satisfy the finding would add a second guard on a state neither guard can be reached in. Left alone deliberately.
+
+### The round-3 fix now has empirical backing, not just a probe record
+
+`_render_broken_call` rests entirely on a claim about prettier's behaviour, and on this machine `test_emitted_ts_is_prettier_clean` skips — prettier is not on PATH — so the claim had never been executed here. Installing prettier 3.9.6 into the session scratchpad and putting it on PATH makes the whole `tests/unit/pipelex/codegen/` suite run with **no skips**: the prettier gate and the node round-trip in `test_ts_zod_wire_agreement.py` both execute (node v24.17.0 and a global `zod` are present on this machine) and all pass.
+
+**Mutation-tested against real prettier.** Restoring the unconditional explode reddens exactly two tests, and the second is the one that matters: `test_emitted_ts_is_prettier_clean` fails with prettier's own *"Code style issues found"* on the emitted `types.ts`, alongside the byte assertion `test_a_broken_chain_keeps_a_call_that_fits_on_its_own_line`. The fix is confirmed by the formatter it models, not only by an assertion written from a probe.
+
+One more reading of the threshold, checked independently rather than taken from the commit message: `indent + len(call) <= TS_PRINT_WIDTH` is exact because the trailing comma never lands on an enum. `_zod_type` emits `.enum([…])` only for a top-level `LITERAL`; a nested one is wrapped, so its member call spells `.array(…)` or `.record(…)` and `_is_enum_call` does not match it. An enum is therefore always the *first* call in a broken chain and never the last one that carries the `,`, so the measured width is the rendered width.
