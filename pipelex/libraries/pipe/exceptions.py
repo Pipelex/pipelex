@@ -16,12 +16,13 @@ class EntryPipeNotFoundError(PipeNotFoundError):
 
     The in-body sibling `PipeNotFoundError` reports a ref written inside a bundle, which is a fault
     of the loaded methods and stays unclassified. This one reports a code the caller supplied at an
-    entry point (a CLI argument, the `pipe_code` field of a run request), so it is the caller's own
-    typo: INPUT domain, which every presentation derives from at once — 422 rather than a 500 that
-    reads as retryable to every SDK.
+    entry point (a CLI argument, the `pipe_code` field of a run request, the `--pipe` / `pipe_ref`
+    slice selector of bundle validation), so it is the caller's own typo: INPUT domain, which every
+    presentation derives from at once — 422 rather than a 500 that reads as retryable to every SDK.
 
     Caller-facing copy: the message names only the caller's own `pipe_code`, so STRICT disclosure
-    keeps it verbatim. The flag spans every raise site of the class, and this class has exactly one.
+    keeps it verbatim. The flag spans every raise site of the class, so each one owes that invariant:
+    a message here may name what the caller typed and nothing from the loaded library.
     """
 
     error_domain = ErrorDomain.INPUT

@@ -1,5 +1,5 @@
 ---
-status: draft
+status: active
 item: L-260901-296dfb
 ---
 
@@ -68,3 +68,15 @@ The only consumer that repairs this is `pipelex-api`'s `api/routes/pipelex/build
 ### Checkpoint
 
 After Phase 3: record what landed, any deviations, and open the PR against `dev` with `Closes L-260901-296dfb` in the body. After the merge, the `pipelex-api` follow-up item becomes workable once a release carries the change.
+
+## Checkpoint — all three phases landed
+
+All three phases went in as designed. The raise site in `_pipes_to_dry_run` now raises `EntryPipeNotFoundError`, keeping its own bundle-scoped message, and the same live probe that opened this plan answers with `error_type: EntryPipeNotFoundError`, `error_domain: input` and the `CHANGE_INPUT` hint — the divergence against `validate pipe <typo>` is closed.
+
+**What the design predicted and the run confirmed.** `make gei` and `make gep` both produced no diff, as expected for a reused class whose docstring summary line did not change. No catcher needed touching: every one of them catches the base `PipeNotFoundError`, and the whole targeted suite (pipeline, CLI at all three levels, libraries, exceptions, builder) is green with no assertion loosened anywhere. `bundle_cmd.py`'s `type(exc).__name__` label needed no edit and its comment now describes behaviour rather than intent — the probe output is the evidence.
+
+**The one thing the plan did not anticipate: the `cli-docs` drift contract reopened.** The docstring edit in `pipelex/cli/agent_cli/commands/validate/_validate_core.py` is a trigger file, so `make agent-check` failed on an open contract even though the change is a two-line docstring. The review was done for real against both targets and found nothing stale: `docs/tools/cli/` documents the `--pipe` flag and the error envelope generically, naming no per-command error class, and no exit code moved (the not-found arm still exits 2); `pipelex/cli/agent_cli/CLAUDE.md`'s Error classification bullet already states the report-first rule and cites these two arms, and this change is precisely what gives the `validate bundle` arm's label a real domain to carry. Recorded with `make drift-ack CONTRACT=cli-docs`; the ack file rides the same commit.
+
+**Deliberate wording choice on the class docstring.** The plan asked for the "exactly one raise site" sentence to be reworded to state the invariant per raise site instead of counting them, and that is what went in — the caller-facing-copy paragraph now says the flag spans every raise site and each one owes the invariant (name what the caller typed, nothing from the loaded library). The entry-point list in the first paragraph gained the slice selector alongside the CLI argument and the run request's `pipe_code`, so the class definition names all three of its doors.
+
+**What is next.** The `pipelex-api` half stays a dependent item: once a release carries this change, `build/runner.py`'s hand-written `except PipeNotFoundError` → 422 catch is redundant, since the global handler renders `report.http_status` and the INPUT domain makes that 422 on its own.

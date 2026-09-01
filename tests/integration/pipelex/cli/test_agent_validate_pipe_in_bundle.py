@@ -7,11 +7,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from pipelex.base_exceptions import ErrorDomain
 from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_bundle_core,
     validate_pipe_in_bundle_core,
 )
-from pipelex.libraries.pipe.exceptions import PipeNotFoundError
+from pipelex.libraries.pipe.exceptions import EntryPipeNotFoundError
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -179,8 +180,11 @@ class TestAgentValidatePipeInBundle:
         self,
         implemented_plus_signature_dir: Path,
     ) -> None:
-        # Selecting a pipe that is not defined in the bundle is an error, not a vacuous success.
-        with pytest.raises(PipeNotFoundError):
+        # Selecting a pipe that is not defined in the bundle is an error, not a vacuous success. The
+        # `--pipe` / `pipe_ref` selector is entry-shaped input the caller typed, so the miss must be
+        # the INPUT-domained EntryPipeNotFoundError — not the undomained base, which every
+        # presentation would render as a 500 server fault for a mistake only the caller can fix.
+        with pytest.raises(EntryPipeNotFoundError) as exc_info:
             asyncio.run(
                 validate_pipe_in_bundle_core(
                     bundle_path=implemented_plus_signature_dir / "bundle.mthds",
@@ -188,6 +192,11 @@ class TestAgentValidatePipeInBundle:
                     library_dirs=[implemented_plus_signature_dir],
                 )
             )
+        report = exc_info.value.to_error_report()
+        assert report.error_domain == ErrorDomain.INPUT
+        assert report.http_status == 422
+        # The raise site keeps its own bundle-scoped wording, which names the caller's own code.
+        assert "does_not_exist" in report.message
 
     def test_pipe_slice_cross_package_controller_reports_skipped_not_success(
         self,

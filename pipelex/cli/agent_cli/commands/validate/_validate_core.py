@@ -210,7 +210,9 @@ async def validate_pipe_in_bundle_core(
 
     Raises:
         ValidateBundleError: If validation fails.
-        PipeNotFoundError: If `pipe_code` is not defined in the bundle.
+        EntryPipeNotFoundError: If `pipe_code` is not defined in the bundle. The caller-supplied
+            selector makes it INPUT-domained; it is a `PipeNotFoundError` subclass, so an existing
+            `except PipeNotFoundError` still catches it.
     """
     result = await validate_bundle(
         mthds_file_path=bundle_path,
