@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:98cd6d18e164724aa99408c14e3975728c57006cedf1460f1d354e9bf8b5ed9d"
+digest = "sha256:26081eec477bf9277bbb4dec7490c21f5ef92506b61e2e21555979440d760e9d"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-31T16:15:54Z"
-rationale = "Inference errors now derive error_domain from their InferenceErrorCategory, so agent_error's report-first read supersedes the AGENT_ERROR_DOMAINS lookup for every categorized CogtError. Removed the three now-unreachable entries and gave ModelChoiceNotFoundError an explicit class-level INPUT domain, since a mistyped model reference is the caller's to fix even though its category is CONFIGURATION. Reviewed docs/tools/cli/ — agent-cli.md states the generic error envelope and enumerates no dict entries, so nothing there was stale. Updated the Error classification bullet in pipelex/cli/agent_cli/CLAUDE.md, which named the dict as the only source and no longer described how a class self-describes."
+reviewed_at = "2026-09-01T12:40:49Z"
+rationale = "The two validate not-found arms stopped hardcoding PipeNotFoundError as the reported error_type and now name the class that actually failed, since the entry-shaped lookups raise EntryPipeNotFoundError. Reviewed docs/tools/cli/ — agent-cli.md documents the error envelope generically and enumerates no per-command error types, so nothing there was stale. Added the rule to the Error classification bullet in pipelex/cli/agent_cli/CLAUDE.md: with the report-first read, a hardcoded label detaches the reported class from the domain and hint the cause's report puts on the same envelope."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -49,9 +49,9 @@ rationale = "Inference errors now derive error_domain from their InferenceErrorC
 "pipelex/cli/agent_cli/commands/validate/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/validate/_validate_core.py" = "blob:6e9e8488573fe17d7769608e299879a092ceaf6c"
 "pipelex/cli/agent_cli/commands/validate/app.py" = "blob:d2d0ed19288c2d1c25be1650dd962189fcdb3b86"
-"pipelex/cli/agent_cli/commands/validate/bundle_cmd.py" = "blob:3207973c194b096ed5c6ec2d3a955c417789e019"
+"pipelex/cli/agent_cli/commands/validate/bundle_cmd.py" = "blob:27cc2c0b0a7fb5d3a232c6c3ce44663572e14260"
 "pipelex/cli/agent_cli/commands/validate/method_cmd.py" = "blob:794914167c13975bc0cdff7b301a8268ff1b79b6"
-"pipelex/cli/agent_cli/commands/validate/pipe_cmd.py" = "blob:7c15cf5a7341b774baad2f14540acbef8daebf76"
+"pipelex/cli/agent_cli/commands/validate/pipe_cmd.py" = "blob:2f7dce6a1d3d9987aa14146bac79d6b0e7e985e1"
 "pipelex/cli/bundle_target_resolution.py" = "blob:8dccc50b700b877968ed1b2c1c3652ab1c32e956"
 "pipelex/cli/cli_factory.py" = "blob:1f859ab3b995e1a67e5fdc812a168d56c338e970"
 "pipelex/cli/commands/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
