@@ -112,6 +112,102 @@ _GATEWAY_REQUEST_LIMIT_BY_CODE: dict[str, GatewayRequestLimit] = {
 }
 
 
+class GatewayUnresolvedReference(StrEnum):
+    """A "cannot resolve this reference" refusal raised by the Pipelex inference gateway itself.
+
+    A request may name a file rather than carry it — a ``pipelex-storage://`` key
+    the gateway resolves for the caller, or a document URL it fetches on their
+    behalf. When it cannot turn that reference into bytes it refuses the request
+    itself, before a provider sees it. Like the request-shape limits these are not
+    inference failures and must not read as one: a caller who mistyped a storage
+    key, pointed at an object this deployment cannot read, or aimed a URL at a host
+    the gateway will not fetch from has a *reference* to fix, not a prompt to
+    revise, and nothing about a retry can help.
+
+    The members group by remedy rather than by wire code: two codes share a member
+    only when the caller's next move is the same. Every member defers the specifics
+    — the key, the host, the status, the media type — to the gateway's own refusal
+    message, which already names them.
+
+    Each member corresponds to one or more of the gateway's own error codes, which
+    is the contract between the two repositories — the wording of a refusal is free
+    to change, the code is not.
+    """
+
+    #: ``pig-09`` at HTTP 400 — the LLM routes' single fail-closed slot for "this
+    #: reference cannot be resolved". Four distinct causes arrive under it (no
+    #: bucket configured, not a storage reference, no such object, a type no
+    #: provider takes) because there the client speaks a provider's protocol and
+    #: the gateway's own ``pig-0N`` family is the only vocabulary available. The
+    #: message carries the difference; the code does not, so the advice defers to it.
+    REFERENCE_UNRESOLVED = "reference_unresolved"
+    #: ``pipelex_storage_uri_invalid`` at HTTP 400 — the reference does not obey the
+    #: key grammar (the path-traversal guard refuses under the same code).
+    STORAGE_REFERENCE_INVALID = "storage_reference_invalid"
+    #: ``pipelex_storage_unreadable`` at HTTP 400 — the object is not there, or the
+    #: gateway's role may not read it. Deliberately one member: the gateway does not
+    #: tell a caller which of the two it was, and neither may we.
+    STORAGE_OBJECT_UNREADABLE = "storage_object_unreadable"
+    #: ``pipelex_storage_uri_unsupported`` at HTTP 400 — no bucket is configured, so
+    #: this deployment does not serve ``pipelex-storage://`` references at all.
+    #: Nothing about the inputs causes it: it is an operator's problem.
+    STORAGE_NOT_SERVED = "storage_not_served"
+    #: HTTP 400 — the document URL was refused before or during the fetch, on its
+    #: form rather than on what it served: ``pipelex_document_scheme_refused`` (not
+    #: an http(s) URL), ``pipelex_document_address_refused`` (the resolved address is
+    #: not publicly routable) and ``pipelex_document_redirect_refused`` (the origin
+    #: answered a redirect, which the gateway will not follow).
+    DOCUMENT_URL_REFUSED = "document_url_refused"
+    #: ``pipelex_document_host_refused`` at HTTP 400 — the gateway's SSRF guard
+    #: refuses to fetch documents from this host. Its own member rather than a share
+    #: of ``DOCUMENT_URL_REFUSED`` because the advice has to state a deliberate
+    #: security policy: the caller can act, but nothing about their document is at
+    #: fault and no amount of reshaping it will help.
+    DOCUMENT_HOST_REFUSED = "document_host_refused"
+    #: ``pipelex_document_unreachable`` at HTTP 400 — the origin answered a
+    #: non-success status. Not retried: the gateway renders it 400, a retry would
+    #: re-run a whole inference call to re-fetch the document, and the common case
+    #: is a URL that is simply wrong.
+    DOCUMENT_UNREACHABLE = "document_unreachable"
+    #: HTTP 400 — the document was fetched, and what came back cannot be used:
+    #: ``pipelex_document_empty`` (served empty), ``pipelex_document_unsupported_type``
+    #: (a media type the pipeline does not accept) and ``pipelex_document_bad_data_url``
+    #: (a ``data:`` URL that cannot be decoded).
+    DOCUMENT_CONTENT_UNUSABLE = "document_content_unusable"
+
+
+# The gateway's unresolvable-reference codes, mapped to what the runtime does
+# about them.
+#
+# **Matched on the code alone, with no check on ``provider``**, for exactly the
+# reason ``_GATEWAY_REQUEST_LIMIT_BY_CODE`` is: the reporting provider does not
+# identify the gateway (three SDK hops report three provider names), while ``pig-``
+# and ``pipelex_`` are the gateway's own code namespaces and no vendor emits into
+# either.
+#
+# **Disjoint from the request-limit map by construction.** The two families answer
+# different questions — one bounds the request's shape, the other says a reference
+# could not be resolved — and a code belongs to exactly one of them. ``pig-09`` and
+# ``pig-10`` are the clearest illustration: the same middleware raises both, one
+# when the object is over its cap and one when it cannot be resolved at all.
+_GATEWAY_UNRESOLVED_REFERENCE_BY_CODE: dict[str, GatewayUnresolvedReference] = {
+    "pig-09": GatewayUnresolvedReference.REFERENCE_UNRESOLVED,
+    # The native ``/v1/pipelex/*`` routes' own contract codes, where the gateway
+    # names each cause instead of folding them into one fail-closed slot.
+    "pipelex_storage_uri_invalid": GatewayUnresolvedReference.STORAGE_REFERENCE_INVALID,
+    "pipelex_storage_unreadable": GatewayUnresolvedReference.STORAGE_OBJECT_UNREADABLE,
+    "pipelex_storage_uri_unsupported": GatewayUnresolvedReference.STORAGE_NOT_SERVED,
+    "pipelex_document_scheme_refused": GatewayUnresolvedReference.DOCUMENT_URL_REFUSED,
+    "pipelex_document_address_refused": GatewayUnresolvedReference.DOCUMENT_URL_REFUSED,
+    "pipelex_document_redirect_refused": GatewayUnresolvedReference.DOCUMENT_URL_REFUSED,
+    "pipelex_document_host_refused": GatewayUnresolvedReference.DOCUMENT_HOST_REFUSED,
+    "pipelex_document_unreachable": GatewayUnresolvedReference.DOCUMENT_UNREACHABLE,
+    "pipelex_document_empty": GatewayUnresolvedReference.DOCUMENT_CONTENT_UNUSABLE,
+    "pipelex_document_unsupported_type": GatewayUnresolvedReference.DOCUMENT_CONTENT_UNUSABLE,
+    "pipelex_document_bad_data_url": GatewayUnresolvedReference.DOCUMENT_CONTENT_UNUSABLE,
+}
+
+
 def _resolve_sdk_exception_type(exc: BaseException, *, status_code: int | None) -> str:
     """Return the ``sdk_exception_type`` name, normalizing status-less httpx transport errors.
 
@@ -190,12 +286,31 @@ class ProviderErrorMetadata(BaseModel):
         ``exc.body`` with the message string (see ``extract_gateway_metadata``).
 
         Returns ``None`` for every other refusal — including the gateway's routing
-        codes and its "cannot resolve this reference" storage codes, which are a
-        different family and classify on their status like anything else.
+        codes, which classify on their status like anything else, and its "cannot
+        resolve this reference" codes, which are a separate family read by
+        ``gateway_unresolved_reference``.
         """
         if self.provider_error_code is None:
             return None
         return _GATEWAY_REQUEST_LIMIT_BY_CODE.get(self.provider_error_code)
+
+    @property
+    def gateway_unresolved_reference(self) -> GatewayUnresolvedReference | None:
+        """Which of the gateway's unresolvable-reference refusals this is, if any.
+
+        Reads ``provider_error_code`` off the same Extract hops
+        ``gateway_request_limit`` does, and for the same reason: a request that
+        names a file rather than carrying it can be refused by the gateway before
+        any provider sees it, and the code is the only thing that says so.
+
+        The two families are disjoint — a code names either a bound the request
+        exceeded or a reference that could not be resolved, never both — so the
+        Classify step may read them in either order. Returns ``None`` for every
+        other refusal, the gateway's routing codes included.
+        """
+        if self.provider_error_code is None:
+            return None
+        return _GATEWAY_UNRESOLVED_REFERENCE_BY_CODE.get(self.provider_error_code)
 
     @property
     def is_content_policy_violation(self) -> bool:

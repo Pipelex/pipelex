@@ -1,5 +1,5 @@
 ---
-status: draft
+status: active
 item: L-260901-b0bd98
 ---
 
@@ -111,6 +111,15 @@ Mirror `test_gateway_request_limits.py`'s structure and its module docstring sty
 ### 6. Gate
 
 `make agent-check`, then `make agent-test` (full — the new test module and `.test_durations` need the full run).
+
+## Checkpoint — the implementation landed
+
+Every step above is implemented on this branch. What was decided or discovered while building it, beyond what the design section already records:
+
+- **The arms are exactly as designed**; review did not move `address_refused`, so it stays with the URL-shape refusals under `DOCUMENT_URL_REFUSED` and `DOCUMENT_HOST_REFUSED` keeps its own arm.
+- **The two families are pinned as disjoint by a test rather than by a comment.** `TestTheTwoGatewayFamiliesDoNotShadowEachOther` walks both code sets and asserts each reaches one family and not the other, so a code added to the wrong map fails rather than silently borrowing the other family's advice. The `pipelex_storage_*` codes are the case that needs it: `object_too_large` is a limit, `unreadable` is an unresolved reference, and both arrive from the same route.
+- **The test module keeps one parametrize table as its single source of codes** (`_EVERY_CODE_AND_MEMBER`), reused by the recognition, classification, rendering and disjointness cases, plus a case asserting every enum member is reachable from a wire code — a member no code reaches would be advice that never renders for anyone.
+- **The docs section grew two `####` headings** rather than one long run: the existing request-limit half is now "What the request may weigh" and the new half "When a reference cannot be resolved", under the unchanged `### The Gateway's Own Refusals`. Nothing links to those anchors, so the split breaks no reference. The closing paragraph now names `pig_storage_timeout` / `pig_storage_client_disconnected` explicitly as belonging to neither family, which is where the inventory's out-of-scope note now lives in shipped documentation.
 
 ## Out of scope
 
