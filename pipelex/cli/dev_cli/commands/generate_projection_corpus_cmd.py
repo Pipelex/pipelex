@@ -328,9 +328,9 @@ class DivergenceCollector:
             projected_fields = cast("dict[str, Any]", projected_value)
             # Walked before the projected keys, because the walk below iterates those and would
             # otherwise skip a field the projection stopped rendering entirely — a projection
-            # regression that reached neither a class nor `unclassified`. Deliberately not declared
-            # in DIVERGENCE_REASONS, like `unknown-empty-object` above: no bundle in the corpus
-            # reaches it today, so a capture that does must write the declaration itself.
+            # regression that reached neither a class nor `unclassified`. Deliberately absent from
+            # DIVERGENCE_REASONS: no bundle in the corpus reaches it today, so a capture that does
+            # must write the declaration itself rather than inherit one nobody reviewed.
             for key in engine_fields:
                 if key not in projected_fields:
                     self._record(divergence_id="engine-only-field", path=[*path, key], engine=engine_fields[key], expected=None)
