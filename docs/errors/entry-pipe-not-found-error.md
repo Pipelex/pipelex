@@ -17,6 +17,6 @@ An entry-shaped `pipe_code` — one a human typed — resolved to no pipe.
 | `error_domain` | `input` |
 | Defined in | `pipelex.libraries.pipe.exceptions` |
 | Parent class | [`PipeNotFoundError`](pipe-not-found-error.md) |
-| `user_action` | `change_input` — Check the pipe code for typos and make sure it is declared in the bundle being validated. |
+| `user_action` | `change_input` — Check the pipe code for typos and make sure the bundle in scope for this operation declares it. |
 
 [Back to Error Reference](index.md)

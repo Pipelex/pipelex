@@ -28,10 +28,14 @@ class EntryPipeNotFoundError(PipeNotFoundError):
     error_domain = ErrorDomain.INPUT
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
-        # True at every raise site, which a hint naming only one of them is not: the library lookup
-        # misses because no loaded bundle declares the code, while the `--pipe` slice misses because
-        # the bundle being sliced does not declare it — even when another loaded bundle does.
-        detail="Check the pipe code for typos and make sure it is declared in the bundle being validated.",
+        # Scope-neutral on purpose, because a class-level detail cannot name the scope its raise
+        # sites work in and they do not share one: the entry lookup serves run, show and build as
+        # much as validate, and misses because nothing loaded declares the code, while the `--pipe`
+        # slice misses because the bundle being sliced does not declare it — even when another
+        # loaded bundle does. Either wording that names one of those scopes is false at the other
+        # site. Both raise sites carry a precise message of their own, so the detail only has to
+        # stop asserting a scope it cannot know.
+        detail="Check the pipe code for typos and make sure the bundle in scope for this operation declares it.",
     )
     _declared_title = "Entry pipe not found"
     _authors_caller_facing_message = True
