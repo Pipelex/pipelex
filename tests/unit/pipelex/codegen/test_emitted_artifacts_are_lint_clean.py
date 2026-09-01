@@ -340,7 +340,7 @@ class TestEmittedArtifactsAreLintClean:
         """`prettier --check` must find nothing to change in the emitted TypeScript.
 
         This is the only gate that actually *parses* the emission, so it is the one that sees a content
-        defect the four structural invariants above are blind to by construction — a wrong quote style, an
+        defect the structural invariants above are blind to by construction — a wrong quote style, an
         object literal spelled as JSON, a member chain broken where prettier would not break it. Each of
         those reached review at least once while this test skipped everywhere.
 

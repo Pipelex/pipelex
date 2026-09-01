@@ -11,6 +11,12 @@ The fix is not another assertion, it is making the skip impossible where it matt
 provisions a pinned prettier and zod, puts them where these resolvers look, and sets
 `PIPELEX_REQUIRE_TS_GATES=1`; under that flag an absent toolchain is a **failure**, not a skip. CI runs
 that same target, so the gates are mandatory there and stay opportunistic on a developer's machine.
+
+**Every resolver returns an absolute path.** Its callers use the result from somewhere else — the wire
+round-trip launches node with `cwd=tmp_path` and symlinks the zod package into a `node_modules` under that
+same directory — so a relative path clears the checks here, which run from the repository root, and then
+names something different at the point of use. `shutil.which` returns whatever the `PATH` entry was, and an
+environment variable holds whatever a human typed, so neither source can be trusted to be absolute.
 """
 
 import os
@@ -45,12 +51,22 @@ def _unavailable(what: str) -> NoReturn:
     pytest.skip(f"{what} (run `make test-ts-gates` to provision it)")
 
 
+def _absolute_executable(found: str) -> str:
+    """An executable path an absolute one, with its symlinks left alone.
+
+    `Path.resolve()` is wrong here: a version manager (volta, asdf, nvm) puts a *shim* on PATH, and some
+    shims dispatch on the path they were invoked by, so resolving one to its target can change what runs.
+    Only the relative-`PATH`-entry case needs fixing, and `absolute()` is exactly that much.
+    """
+    return str(Path(found).absolute())
+
+
 def resolve_prettier() -> str:
-    """The `prettier` binary the formatting gate runs, from PATH."""
+    """The `prettier` binary the formatting gate runs, from PATH, absolute."""
     prettier = shutil.which("prettier")
     if prettier is None:
         _unavailable("prettier is not on PATH")
-    return prettier
+    return _absolute_executable(prettier)
 
 
 def resolve_node() -> str:
@@ -66,7 +82,7 @@ def resolve_node() -> str:
     if len(version) != 2 or version < NODE_TYPE_STRIPPING_MINIMUM:
         minimum = ".".join(str(part) for part in NODE_TYPE_STRIPPING_MINIMUM)
         _unavailable(f"node {reported.stdout.strip()} cannot strip types (needs >= {minimum})")
-    return node
+    return _absolute_executable(node)
 
 
 def resolve_zod_package() -> Path:
@@ -77,7 +93,9 @@ def resolve_zod_package() -> Path:
     """
     provisioned = os.environ.get(ZOD_PACKAGE_ENV, "").strip()
     if provisioned:
-        package = Path(provisioned)
+        # Fully resolved rather than merely absolute: this becomes a symlink *target*, and a relative one
+        # would be read from the link's own parent — a dangling link reported as a missing `zod` module.
+        package = Path(provisioned).resolve()
         if not (package / "package.json").is_file():
             _unavailable(f"{ZOD_PACKAGE_ENV} points at {package}, which holds no package.json")
         return package
@@ -87,7 +105,7 @@ def resolve_zod_package() -> Path:
     reported = subprocess.run([npm, "root", "-g"], capture_output=True, text=True, check=False)  # ruff: ignore[subprocess-without-shell-equals-true]
     if reported.returncode != 0:
         _unavailable(f"`npm root -g` failed: {reported.stderr.strip()}")
-    package = Path(reported.stdout.strip()) / "zod"
+    package = (Path(reported.stdout.strip()) / "zod").resolve()
     if not (package / "package.json").is_file():
         _unavailable("no globally installed zod to link against")
     return package

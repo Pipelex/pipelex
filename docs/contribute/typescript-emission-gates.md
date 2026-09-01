@@ -4,7 +4,7 @@ The `ts-zod` target promises something stronger than "the generated code compile
 
 ## Why the always-on tests are not enough
 
-`tests/unit/pipelex/codegen/test_emitted_artifacts_are_lint_clean.py` carries four TypeScript invariants that need no toolchain at all: no collapsible blank-line run, no line past the print width, no trailing whitespace, and no line ending inside an unterminated string literal. They are cheap, they run everywhere, and they are all **structural** — they measure the shape of the emitted lines without ever reading them as TypeScript.
+`tests/unit/pipelex/codegen/test_emitted_artifacts_are_lint_clean.py` carries a set of TypeScript invariants that need no toolchain at all: no collapsible blank-line run, no line past the print width, no trailing whitespace, and no line ending inside an unterminated string literal. They are cheap, they run everywhere, and they are all **structural** — they measure the shape of the emitted lines without ever reading them as TypeScript.
 
 That leaves a whole family of defect invisible. A member chain broken where Prettier would have kept it flat, a string literal in the quote style Prettier rewrites, an object literal spelled as JSON — each of those is a run of short, well-formed, whitespace-clean lines. Three such defects reached pull-request review, and each was caught afterwards only because somebody read the emission by hand and then wrote a byte assertion for that one shape. Hand-written assertions do not generalize to the next shape.
 
@@ -29,7 +29,7 @@ make test-ts-gates   # alias: make ttg
 
 It provisions a pinned toolchain into the gitignored `.ts-toolchain/` (`make ts-toolchain` on its own does just that step), puts `prettier` on `PATH`, points `PIPELEX_ZOD_PACKAGE` at the installed `zod`, and runs the whole `tests/unit/pipelex/codegen` suite with **`PIPELEX_REQUIRE_TS_GATES=1`**. Under that flag `tests/helpers/ts_toolchain.py` turns a missing binary into a test *failure* instead of a skip, so the gates cannot lapse back into silence. The `Tests (ts emission gates)` job in `.github/workflows/tests-check.yml` runs this exact target behind `actions/setup-node`, and the `Tests (all)` aggregate requires it.
 
-Without the flag — an ordinary `make agent-test` on a machine with no node — the two gates still skip, and say which command would provision them. The four structural invariants hold the line there.
+Without the flag — an ordinary `make agent-test` on a machine with no node — the two gates still skip, and say which command would provision them. The structural invariants hold the line there.
 
 ## The pins, and why moving one is an emitter change
 
