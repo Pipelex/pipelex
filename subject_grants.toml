@@ -1760,6 +1760,10 @@ rationale = "Parses the response; single operand."
 param = "value"
 rationale = "Parses the value; single operand."
 
+["pipelex/cogt/inference/error_classification.py::_pipelex_service_error_code_from_body"]
+param = "body"
+rationale = "Reads an error code out of one body dict, exactly as its siblings _provider_error_code_from_body and _provider_error_code_from_flat_body do; the body is the single obvious operand and all three read as one verb-object sentence."
+
 ["pipelex/cogt/inference/error_classification.py::_provider_error_code_from_body"]
 param = "body"
 rationale = "Extracts/derives from the body; single operand."

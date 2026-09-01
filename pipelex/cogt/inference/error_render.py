@@ -21,7 +21,7 @@ from pipelex.cogt.exceptions import (
     SearchJobFailureError,
     SearchModelNotFoundError,
 )
-from pipelex.cogt.inference.error_classification import SDKErrorEnvelope, UserAction, UserActionKind
+from pipelex.cogt.inference.error_classification import GatewayRequestLimit, SDKErrorEnvelope, UserAction, UserActionKind
 from pipelex.cogt.inference.error_classify import ClassificationResult
 
 
@@ -57,8 +57,39 @@ def _format_message(metadata: SDKErrorEnvelope, *, model_desc: str) -> str:
     return f"{metadata.provider} inference failed for model '{model_desc}'{status_part}: {metadata.message}"
 
 
+def _render_gateway_limit_detail(*, limit: GatewayRequestLimit) -> str:
+    """Produce the advice for a request-shape refusal the inference gateway raised itself.
+
+    Deliberately says nothing about a number. The caps are the deployment's, they
+    differ between deployments, and the gateway already names its own figures in
+    the message this detail sits beside — repeating a compiled-in guess here is how
+    advice starts contradicting the refusal it explains.
+
+    **This is where a per-plan message belongs** once the hosted product's tier
+    limits are wired through: the gateway knows nothing of users, organisations or
+    plans, so "your plan allows files up to N MB" can only be said from here.
+    """
+    match limit:
+        case GatewayRequestLimit.BODY_TOO_LARGE:
+            return "The request was too large for the inference gateway — send less in one call, or use smaller inputs."
+        case GatewayRequestLimit.OBJECT_TOO_LARGE:
+            return "A file the request refers to is over the inference gateway's per-file size limit — use a smaller file."
+        case GatewayRequestLimit.BODY_TOO_DEEP:
+            return "The request nests too deeply for the inference gateway — flatten the inputs or the output structure."
+        case GatewayRequestLimit.BODY_LENGTH_REQUIRED:
+            return (
+                "The inference gateway could not read the request's declared size and refused it: it requires a "
+                "Content-Length and does not accept a chunked body. Nothing about the inputs causes this — contact support."
+            )
+
+
 def _render_detail(metadata: SDKErrorEnvelope, *, classification: ClassificationResult) -> str:
     """Produce the free-form user-facing advice text for the classified error."""
+    if classification.gateway_request_limit is not None:
+        # Branches ahead of the action kind rather than inside it: the limit names
+        # the remedy more precisely than the kind does, and two of the four limits
+        # would otherwise land on advice that is simply wrong for them.
+        return _render_gateway_limit_detail(limit=classification.gateway_request_limit)
     match classification.user_action_kind:
         case UserActionKind.WAIT_AND_RETRY:
             if metadata.retry_after_seconds is not None:
