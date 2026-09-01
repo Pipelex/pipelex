@@ -240,6 +240,37 @@ class TestTemplateImageAnalyzer:
         kinds = {ref.kind for ref in result}
         assert kinds == {ImageReferenceKind.DIRECT, ImageReferenceKind.NESTED}
 
+    # --------------------------------------------------------------------------
+    # Dynamic concepts: no static classification
+    # --------------------------------------------------------------------------
+
+    def test_dynamic_input_yields_no_image_reference(self, load_test_library: Callable[[list[Path]], None]) -> None:
+        """A Dynamic input referenced plainly is never statically an image: its universal
+        compatibility answers a different question than "is this definitely an image".
+        """
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
+
+        result = TemplateImageAnalyzer.analyze_template_for_images(
+            template_source="Process this:\n@dynamic_in\nand inline $dynamic_in",
+            input_specs={"dynamic_in": "Dynamic"},
+            domain_code="test_pipes",
+        )
+
+        assert result == []
+
+    def test_with_images_on_dynamic_raises(self, load_test_library: Callable[[list[Path]], None]) -> None:
+        """`| with_images` on a Dynamic variable is refused: statically unknowable nested images
+        are refused, not guessed.
+        """
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
+
+        with pytest.raises(WithImagesFilterError):
+            TemplateImageAnalyzer.analyze_template_for_images(
+                template_source="Process: {{ dynamic_in | with_images }}",
+                input_specs={"dynamic_in": "Dynamic"},
+                domain_code="test_pipes",
+            )
+
 
 class TestValidateUnusedInputs:
     """Tests for TemplateImageAnalyzer.validate_unused_inputs()."""
