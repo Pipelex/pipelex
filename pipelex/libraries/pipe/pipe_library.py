@@ -8,7 +8,7 @@ from typing_extensions import override
 
 from pipelex import pretty_print
 from pipelex.core.qualified_ref import QualifiedRef
-from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundError
+from pipelex.libraries.pipe.exceptions import EntryPipeAmbiguousError, EntryPipeNotFoundError, PipeLibraryError, PipeNotFoundError
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
@@ -111,8 +111,22 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         Aliased dependency entries are excluded from the search. Without that, installing an
         unrelated package could make a host pipe's bare code ambiguous — reintroducing, through this
         door, exactly the contextual instability the strict in-body rule exists to remove.
+
+        Every failure this door reports is the caller's own typo, so it is raised as an entry-shaped
+        error carrying the INPUT domain — including the one detected one frame down, in the
+        alias-scoped bare-remainder search inside `get_optional_pipe`, which is translated here. The
+        in-body door keeps the unclassified errors: the same ambiguity read from inside a bundle is
+        not a caller's input mistake.
         """
-        pipe = self.get_optional_pipe(pipe_code=pipe_code)
+        try:
+            pipe = self.get_optional_pipe(pipe_code=pipe_code)
+        except PipeNotFoundError:
+            # A miss is not an ambiguity. `get_optional_pipe` raises none today, but `PipeNotFoundError`
+            # IS a `PipeLibraryError`, so without this arm a future one would be re-raised under a class
+            # asserting the opposite — and handed a `user_action` naming candidates that never existed.
+            raise
+        except PipeLibraryError as exc:
+            raise EntryPipeAmbiguousError(str(exc)) from exc
         if pipe is not None:
             return pipe
 
@@ -126,8 +140,8 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
             return matches[0]
         if len(matches) > 1:
             candidates = sorted(match.pipe_ref for match in matches)
-            msg = f"Pipe code '{pipe_code}' is ambiguous — it is declared by {candidates}. Name one of them explicitly."
-            raise PipeLibraryError(msg)
+            msg = f"Pipe code '{pipe_code}' is ambiguous — it is declared by {candidates}. Name one of them explicitly, as 'domain.pipe_code'."
+            raise EntryPipeAmbiguousError(msg)
         return None
 
     @override
@@ -138,7 +152,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
                 f"Pipe '{pipe_code}' could not be resolved. Check for typos and make sure its bundle is loaded. "
                 "A bare code only matches this library's own domains — a pipe from a dependency package must be named 'alias->pipe_code'."
             )
-            raise PipeNotFoundError(msg)
+            raise EntryPipeNotFoundError(msg)
         return the_pipe
 
     def add_dependency_pipe(self, *, alias: str, pipe: PipeAbstract) -> None:
