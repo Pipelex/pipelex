@@ -119,6 +119,19 @@ go = "check"
 """
 
 
+_ANYTHING_MTHDS = """
+domain = "anything_contracts_test"
+description = "Bundle exercising the structureless native.Anything at input positions"
+
+[pipe.carry]
+type = "PipeCompose"
+description = "Carry an untyped payload through"
+inputs = { anything_in = "Anything", batch_in = "Anything[]", pair_in = "Anything[2]" }
+output = "Text"
+template = "$anything_in $batch_in $pair_in"
+"""
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestBuildPipeIOContracts:
     async def test_optional_markers_reported_on_contracts(self, load_empty_library: Callable[[], str]) -> None:
@@ -195,6 +208,39 @@ class TestBuildPipeIOContracts:
         assert make_from_one.inputs["docs"].item_count is None
         one_schema = make_from_one.inputs["docs"].json_schema
         assert one_schema.get("type") != "array"
+
+    async def test_anything_input_publishes_permissive_schema(self, load_empty_library: Callable[[], str]) -> None:
+        """A `native.Anything` input renders instead of crashing: the contract publishes the
+        permissive schema — no constraint keywords, only the concept's identity annotations —
+        with multiplicity wrapping exactly as for class-backed concepts.
+        """
+        outer_library_id = load_empty_library()
+        try:
+            result = await validate_bundle(mthds_contents=[_ANYTHING_MTHDS])
+            io_contracts = build_pipe_io_contracts(result.pipes)
+        finally:
+            _teardown_validation_library(outer_library_id)
+
+        carry = io_contracts["anything_contracts_test.carry"]
+
+        single = carry.inputs["anything_in"]
+        assert single.concept_ref == "native.Anything"
+        assert single.multiplicity == IOMultiplicity.SINGLE
+        assert single.json_schema["title"] == "native.Anything"
+        assert single.json_schema["description"]
+        assert set(single.json_schema) == {"title", "description"}
+
+        batch = carry.inputs["batch_in"]
+        assert batch.multiplicity == IOMultiplicity.VARIABLE
+        assert batch.json_schema["type"] == "array"
+        assert batch.json_schema["items"]["title"] == "native.Anything"
+        assert "minItems" not in batch.json_schema
+
+        pair = carry.inputs["pair_in"]
+        assert pair.multiplicity == IOMultiplicity.FIXED
+        assert pair.item_count == 2
+        assert pair.json_schema["minItems"] == 2
+        assert pair.json_schema["maxItems"] == 2
 
     async def test_schema_render_failure_converts_to_structured_error(
         self,

@@ -35,6 +35,10 @@ The JSON Schema on an input names its concept: `title` is the `concept_ref`, `de
 }
 ```
 
+## The one structureless concept: `native.Anything`
+
+`native.Anything` deliberately declares no structure class, so its input schema cannot come from a pydantic render. It publishes the **permissive schema**: no constraint keywords, only the identity annotations every rendered input schema carries — `{"title": "native.Anything", "description": "…"}`. Annotation keywords constrain nothing, so this is semantically the empty schema (any JSON value), which is what an untyped vehicle means, while consumers still see the concept's identity instead of a bare `{}` they would have to special-case. Multiplicity wraps exactly as above: `Anything[]` is an array of that schema, a fixed count adds the bounds.
+
 ## Which surfaces carry it
 
 The protocol `validate` operation carries `pipe_io_contracts` on its report. The [Agent CLI](../tools/cli/agent-cli.md#validate) does not: `pipelex-agent validate` emits the verdict, `pending_signatures`, `is_runnable`, and its own advisory `warnings` array, and stops there — the typed contracts are not part of its envelope.

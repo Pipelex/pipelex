@@ -53,6 +53,14 @@ class StuffSpec(BaseModel):
             Dictionary with concept and content structure,
             wrapped in a list if multiplicity indicates multiple items.
         """
+        if not self.concept.declares_a_structure_class:
+            # `native.Anything` deliberately has no structure class: asking the provider for one
+            # is a category error, not a missing registration — render structureless instead.
+            json_value, _ = self.concept.render_structureless_representation(
+                output_format=output_format,
+                multiplicity=self.multiplicity,
+            )
+            return json_value
         json_value, _ = self.concept.render_concept_representation(
             structure_class=concept_provider.get_structure_class(concept=self.concept),
             output_format=output_format,
