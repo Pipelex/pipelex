@@ -44,7 +44,6 @@ reports/
 results/
 
 # personnal pipelex config files that overrides the default one
-.worktreeinclude
 pipelex_super.toml
 pipelex_override.toml
 pipelex_temporary_override.toml
