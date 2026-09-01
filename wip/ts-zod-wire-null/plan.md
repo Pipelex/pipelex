@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 item: L-260820-ee327d
 ---
 
@@ -166,3 +166,15 @@ Worth naming the inconsistency underneath, since it is what made the finding loo
 **Mutation-tested against real prettier.** Restoring the unconditional explode reddens exactly two tests, and the second is the one that matters: `test_emitted_ts_is_prettier_clean` fails with prettier's own *"Code style issues found"* on the emitted `types.ts`, alongside the byte assertion `test_a_broken_chain_keeps_a_call_that_fits_on_its_own_line`. The fix is confirmed by the formatter it models, not only by an assertion written from a probe.
 
 One more reading of the threshold, checked independently rather than taken from the commit message: `indent + len(call) <= TS_PRINT_WIDTH` is exact because the trailing comma never lands on an enum. `_zod_type` emits `.enum([…])` only for a top-level `LITERAL`; a nested one is wrapped, so its member call spells `.array(…)` or `.record(…)` and `_is_enum_call` does not match it. An enum is therefore always the *first* call in a broken chain and never the last one that carries the `,`, so the measured width is the rendered width.
+
+## Checkpoint — landed
+
+The campaign merged as `pipelex#1177`, squashed onto `dev` as `fc9bc8891ce9d3b4174d7dca4946f6b7f7335d72`. Every check on the pull request passed: the eight py3.11 test shards and the `Tests (all)` aggregate, `Lint (all)` with its ruff/plxt, keyword-only, hub-layering, config-sync, agent-rules and drift-contracts jobs, `Typecheck (py3.11)`, `uv-lock-check`, `doc-check`, and the MTHDS standard conformance job.
+
+All four phases landed as planned. Phase 1's emitter change is `pipelex/codegen/emitters/ts_zod.py::_presence_modifiers`, which returns `[".nullable()", ".default(…)"]` for a defaulted non-required field and `[".nullish()"]` otherwise; the `.optional()` branch the ledger item reported is gone. Phase 2's three-layer contract is `tests/unit/pipelex/codegen/test_ts_zod_wire_agreement.py`. Phase 3's optionality contract is stated in `docs/under-the-hood/codegen-projections.md`, and the changelog entry sits under `## [Unreleased]` — no version was cut by this campaign.
+
+Phase 4's follow-through is complete on both counts. The consumer cleanup was filed as [L-260901-3bd51e](http://localhost:4747/i/L-260901-3bd51e), owned by `pipelex-starter-js` and blocked on this campaign's item; closing that item released it. The `pipelex-integrate` item [L-260830-344594](http://localhost:4747/i/L-260830-344594) carries a ledger note recording the merge and what it does and does not yet permit.
+
+**The fix is merged but not delivered, and the distinction matters for both dependents.** The merge is on `dev` and has not reached `main`, so no release carries it yet; `pipelex` has one open release item, [L-260828-f4e88c](http://localhost:4747/i/L-260828-f4e88c), cut for the input-form work, and a release train that departs after this merge would carry this fix too. Neither dependent can act on the merge alone: both the starter cleanup and the skill's helper-removal consume the projection through the hosted `POST /v1/codegen` route, so the real gate is a `pipelex` release plus an api-dev deploy, not this merge.
+
+**Two defects found during the campaign were deliberately not fixed in it, and both remain open.** [L-260901-47759d](http://localhost:4747/i/L-260901-47759d) is the recursive concept's declared-type line overflowing prettier's print width, which makes `codegen check` flag an untouched file as hand-edited; it is pre-existing, and the deferral argument is in the pre-landing review checkpoint above. [L-260901-26da36](http://localhost:4747/i/L-260901-26da36) is the structural one — the TypeScript target still has no always-on guard that *parses* its emission. This campaign advanced it rather than closing it: `test_emitted_ts_never_breaks_a_line_inside_a_string_literal` now runs in CI with no node toolchain and reddens on the whole unterminated-literal class, but the real gate, `test_emitted_ts_is_prettier_clean`, is still skipped wherever prettier is absent, which is CI and every machine here. The `_ts_object_key` deferral recorded in round 2 belongs with it.
