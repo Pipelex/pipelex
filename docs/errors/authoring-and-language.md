@@ -112,6 +112,8 @@ own page. Classes are grouped by subsystem.
 - [`CrateNormalizationError`](crate-normalization-error.md) — Crate normalization error
 - [`DomainLibraryError`](domain-library-error.md) — Domain library
 - [`DomainLoadingError`](domain-loading-error.md) — Domain loading
+- [`EntryPipeAmbiguousError`](entry-pipe-ambiguous-error.md) — Entry pipe ambiguous
+- [`EntryPipeNotFoundError`](entry-pipe-not-found-error.md) — Entry pipe not found
 - [`LibraryError`](library-error.md) — Library error
 - [`LibraryLoadingError`](library-loading-error.md) — Library loading
 - [`PipeLibraryError`](pipe-library-error.md) — Pipe library

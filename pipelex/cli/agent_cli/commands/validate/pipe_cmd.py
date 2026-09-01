@@ -188,7 +188,10 @@ def validate_pipe_cmd(
         error_message = str(exc)
         if pipe_code == "all":
             error_message += " Did you mean '--all'?"
-        agent_error(error_message, error_type="PipeNotFoundError", cause=exc, exit_code=2)
+        # The label is the real class, not the caught base: the entry-shaped lookup raises
+        # EntryPipeNotFoundError, whose INPUT domain and hint already ride this envelope from the
+        # report. Hardcoding the base name would attribute them to a class that declares neither.
+        agent_error(error_message, error_type=type(exc).__name__, cause=exc, exit_code=2)
 
     except ValidateBundleError as exc:
         # Invalid verdict (see the --all arm): structured failure envelope; validation_errors[] is the

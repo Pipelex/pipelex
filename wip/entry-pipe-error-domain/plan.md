@@ -1,5 +1,5 @@
 ---
-status: draft
+status: active
 item: L-260829-fa8267
 ---
 
@@ -11,7 +11,8 @@ An ambiguous or unknown entry `pipe_code` on the run routes is reported as a ser
 
 ```python
 from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundError
-PipeLibraryError("…").to_error_report()   # error_domain=None, http_status=500
+
+PipeLibraryError("…").to_error_report()  # error_domain=None, http_status=500
 PipeNotFoundError("…").to_error_report()  # error_domain=None, http_status=500
 ```
 
@@ -55,4 +56,18 @@ Run them, watch them fail for the right reason.
 
 ### Checkpoint
 
-Record here: test results, any deviation from the design above (especially on the alias-ambiguity translation), and the commit SHA. Then open the PR against `dev` with `Closes L-260829-fa8267` in the body. After the merge, the blocked runner-side item L-260829-a30018 becomes workable.
+All three phases landed. `make agent-check` and the full `make agent-test` are green.
+
+**Deviations from the design, and one thing the sweep actually found.**
+
+The alias-ambiguity translation went in as designed, wrapping only the `get_optional_pipe` delegation in `get_optional_entry_pipe` and re-raising `from` the original. Nothing else about the in-body path moved: the plain `PipeLibraryError` / `PipeNotFoundError` still come out of `get_optional_pipe` and `get_required_pipe` with no domain, pinned in both directions by the lookup suite.
+
+The one real find was outside the design. `pipelex/cli/agent_cli/commands/validate/pipe_cmd.py` and `bundle_cmd.py` caught `PipeNotFoundError` and passed `error_type="PipeNotFoundError"` as a hardcoded string. Because `agent_error` reads the domain and hint report-first from the cause, those envelopes would have carried `EntryPipeNotFoundError`'s INPUT domain and `CHANGE_INPUT` hint while naming a class that declares neither — an envelope contradicting itself for anyone branching on `error_type`. Both arms now pass `type(exc).__name__`. That is a wire-visible change for a consumer keyed on the old string, which is the point: the string was already the wrong answer. No test asserted on it, and neither `AGENT_ERROR_HINTS` nor `AGENT_ERROR_DOMAINS` held an entry for it.
+
+That edit opened the `cli-docs` drift contract. Reviewed, acked, and the rule is now written into `pipelex/cli/agent_cli/CLAUDE.md`'s Error-classification bullet, since the trap generalizes: with a report-first read, any hardcoded `error_type` label detaches the reported class from the classification riding beside it.
+
+**Docs.** `docs/under-the-hood/error-model.md` gained a Behavior Summary row for the entry lookups, stating the in-body contrast. `docs/errors/entry-pipe-not-found-error.md` and `entry-pipe-ambiguous-error.md` are the generated pages (`make gep`), and `tests/data/errors/error_identity.txt` the regenerated snapshot (`make gei`).
+
+**Also pinned.** `tests/unit/pipelex/exceptions/test_class_level_metadata.py` gained both classes in the domain, user-action and caller-facing sweeps, plus their undomained, non-caller-facing parents — so a future refactor that lets the entry classification leak onto the in-body doors, or that quietly drops it from the entry ones, fails there too.
+
+Next: open the PR against `dev` with `Closes L-260829-fa8267` in the body. After the merge, the blocked runner-side item L-260829-a30018 becomes workable.

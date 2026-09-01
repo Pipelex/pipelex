@@ -16,6 +16,7 @@ from pipelex.cogt.exceptions import (
     SdkTypeError,
 )
 from pipelex.core.stuffs.exceptions import DateContentError
+from pipelex.libraries.pipe.exceptions import EntryPipeAmbiguousError, EntryPipeNotFoundError, PipeLibraryError, PipeNotFoundError
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.pipeline.exceptions import (
     PipeExecutionError,
@@ -54,6 +55,10 @@ class TestClassLevelMetadata:
             ("pipe_execution", PipeExecutionError("boom"), ErrorDomain.RUNTIME),
             ("validate_bundle", ValidateBundleError("boom"), ErrorDomain.INPUT),
             ("pipeline_input_content", PipelineInputContentError("boom"), ErrorDomain.INPUT),
+            # The entry-shaped lookups report a pipe_code the caller supplied, so a typo is theirs
+            # to fix — 422, never the 500 an undomained error renders as.
+            ("entry_pipe_not_found", EntryPipeNotFoundError("boom"), ErrorDomain.INPUT),
+            ("entry_pipe_ambiguous", EntryPipeAmbiguousError("boom"), ErrorDomain.INPUT),
             ("interpreter", MthdsParserError("boom"), ErrorDomain.INPUT),
             ("setup", PipelexSetupError("boom"), ErrorDomain.CONFIG),
             ("config", PipelexConfigError("boom"), ErrorDomain.CONFIG),
@@ -74,6 +79,16 @@ class TestClassLevelMetadata:
         [
             ("pipeline_execution", _PIPELINE_EXEC_ERROR, "Check pipe_stack to identify which pipe failed"),
             ("validate_bundle", ValidateBundleError("boom"), "Check the validation_errors array for specific issues"),
+            (
+                "entry_pipe_not_found",
+                EntryPipeNotFoundError("boom"),
+                "Check the pipe code for typos and make sure the bundle declaring it is loaded.",
+            ),
+            (
+                "entry_pipe_ambiguous",
+                EntryPipeAmbiguousError("boom"),
+                "Name one of the listed candidates explicitly, as 'domain.pipe_code'.",
+            ),
         ],
     )
     def test_user_action(self, _topic: str, exc: PipelexError, expected_detail: str) -> None:
@@ -117,6 +132,14 @@ class TestClassLevelMetadata:
             # caller-facing would let STRICT disclosure answer "does this server-side path exist,
             # and may the runner read it?" for any authenticated caller.
             ("pipeline_input_content", PipelineInputContentError("boom"), False),
+            # The entry-lookup messages name the caller's own pipe_code and the qualified pipe_refs
+            # of bundles they loaded themselves — nothing server-side — and the candidate list is
+            # the only thing that makes an ambiguity actionable, so redacting it would gut the error.
+            ("entry_pipe_not_found", EntryPipeNotFoundError("boom"), True),
+            ("entry_pipe_ambiguous", EntryPipeAmbiguousError("boom"), True),
+            # The in-body doors stay redacted: their refs come from a bundle, not from the caller.
+            ("pipe_not_found", PipeNotFoundError("boom"), False),
+            ("pipe_library", PipeLibraryError("boom"), False),
             ("csv", CsvError("boom"), True),
             ("unknown_storage_method", UnknownStorageMethodError(method="bogus", registered_methods=["local", "s3"]), True),
             ("unknown_secrets_method", UnknownSecretsMethodError(method="bogus", registered_methods=["env"]), True),

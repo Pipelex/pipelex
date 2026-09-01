@@ -73,6 +73,8 @@ DuplicateOrchestratorError | Duplicate orchestrator | https://docs.pipelex.com/l
 DuplicatePipeFuncExecutorError | Duplicate pipe func executor | https://docs.pipelex.com/latest/errors/duplicate-pipe-func-executor-error/
 DuplicateSecretsProviderError | Duplicate secrets provider | https://docs.pipelex.com/latest/errors/duplicate-secrets-provider-error/
 DuplicateStorageProviderError | Duplicate storage provider | https://docs.pipelex.com/latest/errors/duplicate-storage-provider-error/
+EntryPipeAmbiguousError | Entry pipe ambiguous | https://docs.pipelex.com/latest/errors/entry-pipe-ambiguous-error/
+EntryPipeNotFoundError | Entry pipe not found | https://docs.pipelex.com/latest/errors/entry-pipe-not-found-error/
 EnvVarNotFoundError | Environment variable not set | https://docs.pipelex.com/latest/errors/env-var-not-found-error/
 EventLogError | Event log | https://docs.pipelex.com/latest/errors/event-log-error/
 EventLogReadError | Event log read | https://docs.pipelex.com/latest/errors/event-log-read-error/
