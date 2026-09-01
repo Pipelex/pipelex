@@ -185,7 +185,7 @@ async def validate_pipe_in_bundle(
     Loads the bundle's pipes into the library (so the requested pipe's dependencies resolve), then
     dry-runs ONLY the requested pipe via ``dry_run_pipe_codes`` — so an unrelated unimplemented
     ``PipeSignature`` or failing sibling does not block validating one implemented slice. ``validate_bundle``
-    raises ``PipeNotFoundError`` when ``pipe_code`` is not defined in the bundle (no vacuous success).
+    raises ``EntryPipeNotFoundError`` when ``pipe_code`` is not defined in the bundle (no vacuous success).
 
     Args:
         bundle_path: Path to the bundle file.
@@ -197,7 +197,9 @@ async def validate_pipe_in_bundle(
 
     Raises:
         ValidateBundleError: If validation fails.
-        PipeNotFoundError: If ``pipe_code`` is not defined in the bundle.
+        EntryPipeNotFoundError: If ``pipe_code`` is not defined in the bundle. The caller-supplied
+            selector makes it INPUT-domained; it is a ``PipeNotFoundError`` subclass, so an existing
+            ``except PipeNotFoundError`` still catches it.
     """
     result = await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs, dry_run_pipe_codes=[pipe_code])
 

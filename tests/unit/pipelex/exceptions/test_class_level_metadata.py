@@ -82,7 +82,7 @@ class TestClassLevelMetadata:
             (
                 "entry_pipe_not_found",
                 EntryPipeNotFoundError("boom"),
-                "Check the pipe code for typos and make sure the bundle declaring it is loaded.",
+                "Check the pipe code for typos and make sure the bundle in scope for this operation declares it.",
             ),
             (
                 "entry_pipe_ambiguous",

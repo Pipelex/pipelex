@@ -1,0 +1,117 @@
+---
+status: active
+item: L-260901-296dfb
+---
+
+# Give the `--pipe` / `pipe_ref` slice miss in `validate_bundle` the INPUT domain
+
+Follow-up to the entry-pipe error-domain work (`wip/entry-pipe-error-domain/plan.md`, PR #1180), which deliberately left this raise site out of its diff and filed it as L-260901-296dfb.
+
+## The bug, verified
+
+`_pipes_to_dry_run` (`pipelex/pipeline/validate_bundle.py:229`) raises the bare, undomained `PipeNotFoundError` when `dry_run_pipe_codes` names a pipe absent from the loaded bundle. Its own docstring calls the trigger "a typo'd `--pipe` argument" — entry-shaped input a human typed, exactly the case PR #1180 classified for the two library lookups. The class declares no `error_domain`, so `ErrorReport.http_status` falls through `error_domain_to_http_status(None)` to 500.
+
+Live probe on `dev` (same caller typo, two verdicts):
+
+```bash
+.venv/bin/pipelex-agent validate bundle tests/data/input_semantics/probe_bundle.mthds --pipe nonexistent_zzz --format json
+# → error_type: PipeNotFoundError, NO error_domain, no hint
+
+.venv/bin/pipelex-agent validate pipe nonexistent_zzz --format json
+# → error_type: EntryPipeNotFoundError, error_domain: input, CHANGE_INPUT hint
+```
+
+The only consumer that repairs this is `pipelex-api`'s `api/routes/pipelex/build/runner.py:174`, which catches `PipeNotFoundError` by hand and maps it to a 422 — the same "one input, two verdicts depending on the route" shape PR #1180's changelog says it removes. Any other surface reaching `validate_bundle` with `dry_run_pipe_codes` renders the caller's typo as a server fault, logged with a traceback and looking retryable to every SDK.
+
+## Design
+
+**Raise `EntryPipeNotFoundError` at the existing site — no new class.** The `--pipe` / `pipe_ref` selector is entry-shaped input by the class's own definition ("one a human typed... a CLI argument, the `pipe_code` field of a run request"), so the concept already has a home. Reusing it means:
+
+- Every current catcher keeps matching, because all of them catch the base `PipeNotFoundError`: the passthrough in `validate_bundle.py`'s `translate_to_validate_bundle_error` (`except PipeNotFoundError: raise`), the agent CLI arms (`bundle_cmd.py`, `pipe_cmd.py`), the bare CLI (`cli/commands/validate/_validate_core.py`), and `pipelex-api`'s hand catch.
+- No new error identity: `make gei` / `make gep` produce no diff for a new class (verify by running them — the class docstring's summary line, which is all the generated page renders, does not change).
+- The agent CLI arms already pass `error_type=type(exc).__name__` (PR #1180's carry-along), so the envelope will name `EntryPipeNotFoundError` and the INPUT domain + `CHANGE_INPUT` hint riding it report-first will finally be attributed to the class that declares them. `bundle_cmd.py:190`'s comment ("The real class, not the caught base") stops describing an intent and starts describing behaviour — no edit needed there.
+
+**The message stays the raise site's own.** `_pipes_to_dry_run` keeps its bundle-scoped wording ("Pipe(s) 'x' not found in the bundle. Check for typos and make sure they are declared in the bundle.") — more precise here than the class's library-lookup message. This is safe under `_authors_caller_facing_message = True`: the flag spans every raise site of the class, and this message names only the caller's own `--pipe` codes (derived from `wanted`, which is caller-supplied), nothing from the loaded library.
+
+**Docstring corrections that must ride the same diff:**
+
+- `EntryPipeNotFoundError`'s docstring says "this class has exactly one [raise site]" — after this change it has two. Reword the caller-facing-copy paragraph to state the invariant per raise site instead of counting them.
+- `_pipes_to_dry_run`'s `Raises:` section names `PipeNotFoundError` — update to `EntryPipeNotFoundError` and say why (caller-supplied selector → INPUT domain).
+- `builder/operations/validate_ops.py`'s docstrings name `PipeNotFoundError` for this path — update the wording (the subclass still satisfies any `except`, but the docs should name the real class).
+
+**Out of scope, unaffected:** the in-body lookups (`get_optional_pipe` / `get_required_pipe`) and `bundle_validator.py`'s sweep-time `except PipeNotFoundError` (it catches sub-pipe resolution misses during the dry-run sweep; `_pipes_to_dry_run` runs before the sweep and its raise never reaches that arm).
+
+**The `pipelex-api` half is a dependent ledger item, not this diff.** Once a pipelex release carries this change, `build/runner.py`'s hand-written `except PipeNotFoundError` → 422 catch becomes redundant: the global `PipelexError` handler (`api/exception_handlers.py`) renders `report.http_status`, which the INPUT domain now makes 422 on its own. Dropping the catch is `pipelex-api` work gated on that release — filed as its own item, blocked by L-260901-296dfb (see the ledger).
+
+## Phases
+
+### Phase 1 — red tests
+
+- `tests/integration/pipelex/cli/test_agent_validate_pipe_in_bundle.py::test_pipe_slice_unknown_pipe_raises_not_found`: tighten `pytest.raises(PipeNotFoundError)` to `EntryPipeNotFoundError`, and assert on the caught error's `to_error_report()`: `error_domain == ErrorDomain.INPUT`, `http_status == 422`, and the message still names the missing code. This is the red test: it fails on `dev` because the raise is the bare base class.
+- Verify the class-metadata sweeps in `tests/unit/pipelex/exceptions/test_class_level_metadata.py` already pin `EntryPipeNotFoundError`'s domain, user action, and caller-facing flag (they do, from PR #1180) — nothing to add there.
+
+### Phase 2 — implement
+
+- `pipelex/pipeline/validate_bundle.py`: import `EntryPipeNotFoundError`, swap the raise at the `missing` check in `_pipes_to_dry_run`, update its `Raises:` docstring. Leave the `translate_to_validate_bundle_error` passthrough arm as `except PipeNotFoundError: raise` (the base catch is the point: it must let the subclass through raw), refreshing its comment to name the entry class.
+- `pipelex/libraries/pipe/exceptions.py`: reword the `EntryPipeNotFoundError` docstring's "exactly one raise site" sentence.
+- `pipelex/builder/operations/validate_ops.py`: update the docstring mentions.
+- Phase 1's test goes green.
+
+### Phase 3 — sweep, docs, gates
+
+- Sweep the remaining catchers for message-matching or type branching the subclass would change — none expected: `_validate_core.py:242` (bare CLI, prints `str(exc)`), `pipe_cmd.py:187` (unreachable from this raise site but catches the base), `bundle_validator.py`'s sweep arm (unreachable, see Design).
+- Run `make gei` and `make gep`; confirm both produce no diff (no new class, unchanged summary line). If `gep` does diff, commit the regenerated page.
+- `docs/under-the-hood/error-model.md`: extend the Behavior Summary row for entry pipe lookups (line ~491) to mention the `--pipe` / `pipe_ref` bundle-slice miss as a third raise context of `EntryPipeNotFoundError`.
+- `CHANGELOG.md` under `## [Unreleased]`: one condensed entry — fixed: a typo'd `--pipe` / `pipe_ref` slice selector in bundle validation now raises `EntryPipeNotFoundError` (INPUT domain → 422), matching the entry lookups, instead of the undomained base class that rendered 500 off the build route.
+- `make agent-check`, targeted tests (`tests/unit/pipelex/pipeline/ tests/integration/pipelex/pipeline/ tests/unit/pipelex/cli/ tests/integration/pipelex/cli/`), then full `make agent-test` before the PR.
+
+### Checkpoint
+
+After Phase 3: record what landed, any deviations, and open the PR against `dev` with `Closes L-260901-296dfb` in the body. After the merge, the `pipelex-api` follow-up item becomes workable once a release carries the change.
+
+## Checkpoint — all three phases landed
+
+All three phases went in as designed. The raise site in `_pipes_to_dry_run` now raises `EntryPipeNotFoundError`, keeping its own bundle-scoped message, and the same live probe that opened this plan answers with `error_type: EntryPipeNotFoundError`, `error_domain: input` and the `CHANGE_INPUT` hint — the divergence against `validate pipe <typo>` is closed.
+
+**What the design predicted and the run confirmed.** `make gei` and `make gep` both produced no diff, as expected for a reused class whose docstring summary line did not change. No catcher needed touching: every one of them catches the base `PipeNotFoundError`, and the whole targeted suite (pipeline, CLI at all three levels, libraries, exceptions, builder) is green with no assertion loosened anywhere. `bundle_cmd.py`'s `type(exc).__name__` label needed no edit and its comment now describes behaviour rather than intent — the probe output is the evidence.
+
+**The one thing the plan did not anticipate: the `cli-docs` drift contract reopened.** The docstring edit in `pipelex/cli/agent_cli/commands/validate/_validate_core.py` is a trigger file, so `make agent-check` failed on an open contract even though the change is a two-line docstring. The review was done for real against both targets and found nothing stale: `docs/tools/cli/` documents the `--pipe` flag and the error envelope generically, naming no per-command error class, and no exit code moved (the not-found arm still exits 2); `pipelex/cli/agent_cli/CLAUDE.md`'s Error classification bullet already states the report-first rule and cites these two arms, and this change is precisely what gives the `validate bundle` arm's label a real domain to carry. Recorded with `make drift-ack CONTRACT=cli-docs`; the ack file rides the same commit.
+
+**Deliberate wording choice on the class docstring.** The plan asked for the "exactly one raise site" sentence to be reworded to state the invariant per raise site instead of counting them, and that is what went in — the caller-facing-copy paragraph now says the flag spans every raise site and each one owes the invariant (name what the caller typed, nothing from the loaded library). The entry-point list in the first paragraph gained the slice selector alongside the CLI argument and the run request's `pipe_code`, so the class definition names all three of its doors.
+
+**What is next.** The `pipelex-api` half stays a dependent item: once a release carries this change, `build/runner.py`'s hand-written `except PipeNotFoundError` → 422 catch is redundant, since the global handler renders `report.http_status` and the INPUT domain makes that 422 on its own.
+
+## Pre-landing review — what was fixed and what was deferred
+
+A pre-landing review (Claude adversarial subagent plus a Codex `exec` pass, both read-only against `dev`) confirmed the change is correct and found no reachable defect. The attacks that came back clean, with what was actually checked: `dry_run_pipe_codes` has exactly two in-repo call sites and both pass a caller-typed selector; `missing ⊆ wanted` by construction, so the message can only name caller strings; no code anywhere branches on the exact type or the `error_type` string for this hierarchy — every catcher is an `isinstance` on the base; the `except PipeNotFoundError: raise` passthrough at `validate_bundle.py:163` genuinely precedes `except LibraryError` at `:172` and no arm above it is an ancestor; and the error-identity snapshot and the generated error page were both re-derived with no diff.
+
+Three things changed as a result.
+
+**The changelog named a command that does not exist.** The entry said the fix covers `pipelex validate --pipe`. It does not: `pipelex validate bundle` carries no `--pipe` option at all (verified against `--help`), and the bare CLI's one `--pipe`, on `validate method`, routes through `execute_validate(pipe_code=…, bundle_path=None)` into the `elif pipe_code:` arm at `cli/commands/validate/_validate_core.py:174` → `get_required_entry_pipe` — the lookup PR #1180 already classified, never `_pipes_to_dry_run`. The raise site this campaign changed is reached only by `pipelex-agent validate bundle|method --pipe` and by `builder/operations/validate_pipe_in_bundle`, which `pipelex-api` calls with the request's `pipe_ref`. The entry now names those. The class docstring and the error-model row are unaffected: they describe the selector without claiming a binary.
+
+**The new test could not see the invariant it was written to protect.** It asserted on `to_error_report()`, where the message is verbatim regardless of `_authors_caller_facing_message` — redaction happens only in `ErrorReport.to_dict(disclosure_mode=STRICT)`. Mutation-verified both ways: forcing the flag off left every test in the module green before, and reddens the new assertion now. This matters more after this campaign than before it, because the reworded docstring deliberately stops counting raise sites and says each one owes the invariant — so the promise needed a guard at a raise site, not only the class-level metadata sweep's guard on a hand-built instance.
+
+**The class's `user_action` detail was false at the new raise site.** It read "make sure the bundle declaring it is loaded", which fits the library lookup but not the slice: `_pipes_to_dry_run` filters only the target bundle's pipes, so a pipe declared in a loaded `--library-dir` bundle still reports missing and the hint sent the caller to load something already loaded. Since a class-level `user_action` spans every raise site the same way the caller-facing flag does, the wording was changed to "make sure it is declared in the bundle being validated". That replacement was itself false at the other site, and the PR review caught it — see the round-1 section below for the wording that actually holds at both. The pinned expectation and the generated error page moved with it.
+
+**Deferred, deliberately.**
+
+- *The INPUT domain is a property of the call sites, not of the function.* Nothing in `_pipes_to_dry_run`'s signature constrains `dry_run_pipe_codes` to caller-typed input, and `validate_bundle` is a public entry point. The near-miss is one frame up: `cli/method_resolver.py` falls back to the fetched method manifest's `main_pipe`, and it stays out of the slice only because the agent CLI's `method_cmd.py` gates on the raw `--pipe` option while passing the resolved code. If that gate is ever loosened, a broken manifest would report as the caller's typo. Not a defect today — every reachable caller supplies a typed selector — and moving the classification up to the boundaries would mean two translation sites for one condition, which is what this campaign removed. Worth revisiting only if a caller genuinely needs to slice by a server-derived code.
+- *The `error_type` on the wire changes for this path*, from `PipeNotFoundError` to `EntryPipeNotFoundError`. Python catchers are unaffected by subclassing, but a consumer string-matching `error_type` is not. A sweep across every sibling repo found no such consumer — `pipelex-api` catches the Python class, and no `error_type`→status map holds either name. The exposure is identical to the one PR #1180 accepted for the entry lookups, and the workspace's no-backward-compatibility rule covers it.
+- *Two workspace spec lines still name the old class*, `docs/specs/pipelex-validation-api.md:130` and `:144`, both stale since PR #1180 rather than because of this change, and both describing paths this campaign does not touch. Filed as its own item against `workspace`, with the trace.
+- *The translation passthrough lets a second, in-body class escape too.* `validate_bundle.py`'s already-loaded branch calls `get_required_pipe` inside the same `with translate_to_validate_bundle_error()` block, and that raises the plain `PipeNotFoundError`, which the `except PipeNotFoundError: raise` arm re-raises raw as a non-`ValidateBundleError` exactly as it does the entry subclass. Present identically on `dev` before this campaign and untouched by it. It is also close to unreachable: that branch only runs when the bundle path is already loaded, and it looks up the blueprint's own `[pipe.<code>]` keys qualified with the blueprint's own domain — refs the loader just registered. If it did fire, the CLI's dedicated not-found handler turns it into a clean exit 2 rather than a crash.
+- *Two surfaces of the new behaviour have no test.* Nothing asserts the emitted agent-CLI envelope for the slice miss — the `error_type`, the `error_domain` and the exit code that `bundle_cmd.py`'s arm produces — and `builder/operations/validate_pipe_in_bundle` has no non-mocked not-found test, which is the entry the changelog's "422 through the build routes" claim actually rests on. Both are one-line passthroughs over behaviour the integration test already pins at the raise site, which is why they were left.
+- *The `pipelex-api` follow-up is a wire change, not a pure cleanup.* Dropping that route's hand-written catch keeps 422 and the `input` domain, but hands the RFC 7807 `type`, `title` and `error_type` over to the class and loses the route's "not found in the submitted closure" framing in `detail` — and `type` is the field the hosted-envelope spec designates for SDK branching. Recorded on the dependent item so whoever works it decides deliberately.
+
+## Review round 1 — the hint was still false, at the other site
+
+The pre-landing review above rewrote the class's `user_action` detail to "make sure it is declared in the bundle being validated" and recorded it as true at both raise sites. It is not. The PR's local reviewers — Codex reading the branch diff, corroborated by an independent verification pass — caught that the replacement simply moved the falsehood from the rarer site to the busier one.
+
+`get_required_entry_pipe` is not a validation door. It has thirteen call sites and only three of them validate: the rest are the pipeline execution seam behind `pipelex run pipe`, the agent CLI's `PIPELEX` runner arm and the hosted run request's `pipe_code`; `show pipe`; the four `cli/commands/build/` cores; the three hosted `builder/operations/` build ops; and the in-process dry run. On every one of those, nothing is being validated, and the detail reaches the caller as the agent-CLI `hint` and as `user_action` in the 422 body — it survives STRICT precisely because this class declares `_authors_caller_facing_message`. So the campaign shipped a remedy naming a thing that does not exist, on the majority of the paths that raise it.
+
+The diagnosis of the *original* wording stands: `validate_bundle` discards what the `--library-dir` load returns, so `loaded_pipes` really is scoped to the submitted bundle and "make sure the bundle declaring it is loaded" really did send the caller to load something already loaded. Both wordings were false at exactly one site each.
+
+The fix is to stop naming a scope at all, because a class-level detail spans raise sites that do not share one: **"Check the pipe code for typos and make sure the bundle in scope for this operation declares it."** Each raise site already carries a precise message of its own — the entry lookup's "make sure its bundle is loaded", the slice's "make sure they are declared in the bundle" — so the class detail does not have to supply the scope, only to stop asserting a wrong one. A per-site override or a class split would have bought the same accuracy for two translation sites where one honest sentence does, which is the shape this campaign existed to remove.
+
+The pinned expectation in the class-metadata sweep and the generated error page moved with the string; `make gep` rewrote exactly the one `user_action` row and nothing else. The error-identity snapshot is untouched, as expected for a detail-only change.
+
+What the same round confirmed rather than changed, each checked against the code: the caller-facing invariant genuinely holds at the new raise site, since `missing = wanted - matched` puts the library-derived strings only on the subtrahend side where they can remove elements but never contribute one; the entry subclass really does survive `translate_to_validate_bundle_error`, because the passthrough arm precedes the `LibraryError` arm that would have folded it into an undomained `ValidateBundleError` and made the whole campaign a no-op; and nothing anywhere dispatches on the exact class or on the `error_type` string, every consumer being an `except` or an `isinstance` on the base, with the agent CLI's hint and domain lookups report-first in any case.
