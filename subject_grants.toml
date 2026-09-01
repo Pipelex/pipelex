@@ -1068,6 +1068,10 @@ rationale = "Noun-named derivation: the type expr for the concept; context stays
 param = "concepts"
 rationale = "Verb-object: emits the binder for the concepts; mapping stays keyword."
 
+["pipelex/codegen/emitters/ts_zod.py::_explode_enum_call"]
+param = "call"
+rationale = "Verb-object: explodes the enum call it is handed; the column stays keyword."
+
 ["pipelex/codegen/emitters/ts_zod.py::_find_recursive_concept_refs"]
 param = "concepts"
 rationale = "Single-operand analysis over the concepts collection."
@@ -1075,6 +1079,10 @@ rationale = "Single-operand analysis over the concepts collection."
 ["pipelex/codegen/emitters/ts_zod.py::_format_default_value"]
 param = "value"
 rationale = "Single-operand formatting of the value."
+
+["pipelex/codegen/emitters/ts_zod.py::_is_enum_call"]
+param = "call"
+rationale = "Verb-object predicate over the one member call it classifies."
 
 ["pipelex/codegen/emitters/ts_zod.py::_jsdoc"]
 param = "description"
@@ -1108,9 +1116,29 @@ rationale = "Single-operand sanitization of the text."
 param = "concept"
 rationale = "Noun-named derivation: the schema expr for the concept; context stays keyword."
 
+["pipelex/codegen/emitters/ts_zod.py::_split_enum_members"]
+param = "members_text"
+rationale = "Verb-object: splits the enum member text it is handed, its one operand."
+
+["pipelex/codegen/emitters/ts_zod.py::_split_member_chain"]
+param = "expr"
+rationale = "Verb-object: splits the zod expression into its member chain, its one operand."
+
+["pipelex/codegen/emitters/ts_zod.py::_ts_literal"]
+param = "value"
+rationale = "Single-operand formatting of the value, matching the sibling default-value renderers."
+
+["pipelex/codegen/emitters/ts_zod.py::_ts_object_key"]
+param = "key"
+rationale = "Single-operand formatting of the key it quotes."
+
 ["pipelex/codegen/emitters/ts_zod.py::_ts_signature"]
 param = "name"
 rationale = "Verb-object: renders the signature for the named function; param and return type are context."
+
+["pipelex/codegen/emitters/ts_zod.py::_ts_string"]
+param = "text"
+rationale = "Single-operand formatting of the text it quotes."
 
 ["pipelex/codegen/emitters/ts_zod.py::_ts_type"]
 param = "resolved_type"

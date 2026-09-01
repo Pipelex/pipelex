@@ -51,14 +51,27 @@ def python_header(*, target: str) -> str:
 
 
 def escape_py_string(value: str) -> str:
-    """Escape a string for a double-quoted Python literal (handles quotes, backslashes, newlines)."""
-    # repr() escapes everything correctly and returns a quoted literal; prefer double quotes when repr
-    # chose single quotes (for consistency with the rest of the generated code).
+    """Escape a string as the Python literal `ruff format` would leave alone.
+
+    Double quotes by default, and single quotes only where that **strictly reduces** the escape count —
+    which is ruff's (and black's) own normalization rule, verified across the mixed and tied cases. Always
+    double-quoting was the tempting simplification and it broke the stamp: a description or choice
+    carrying a `"` came out double-quoted with both quotes escaped, which ruff rewrites to the
+    escape-free `'say "hi"'` on a consumer's very first format run — at any line width, reporting an
+    untouched artifact as hand-edited.
+
+    `repr` does the escaping of everything else — backslashes, newlines, control characters — and picks its
+    own quote by a different rule, so its choice is converted when it disagrees.
+    """
+    quote = "'" if value.count("'") < value.count('"') else '"'
     escaped = repr(value)
-    if escaped.startswith("'") and escaped.endswith("'") and not escaped.startswith("'''"):
-        inner = escaped[1:-1].replace("\\'", "'").replace('"', '\\"')
-        return f'"{inner}"'
-    return escaped
+    if escaped[0] == quote:
+        return escaped
+    # Only repr-single -> double is reachable: repr picks `"` solely for a value carrying `'` and no `"`,
+    # which is exactly the shape this rule also wants double-quoted.
+    other = escaped[0]
+    inner = escaped[1:-1].replace(f"\\{other}", other).replace(quote, f"\\{quote}")
+    return f"{quote}{inner}{quote}"
 
 
 def format_default_value(value: Any) -> str:
@@ -191,16 +204,34 @@ def field_line(field: ResolvedField, *, annotation: str, imports: set[str]) -> s
 
 
 def _split_top_level(inner: str) -> list[str]:
-    """Split `a, b[c, d], e` on its top-level commas only."""
+    """Split `a, b[c, d], e` on its top-level commas only — outside a bracket *and* outside a literal.
+
+    The literal half is not decoration: a `Literal[...]` member is authored text, and an ordinary choice
+    like `"yes, absolutely"` carries a comma. Split on it and the exploded annotation is two unterminated
+    strings — generated Python that does not parse. Both quote styles have to be walked, because
+    `escape_py_string` falls back to a single-quoted `repr` for a choice that itself contains a `"`.
+    """
     members: list[str] = []
     depth = 0
     current = ""
+    quote: str | None = None
+    escaped = False
     for char in inner:
-        if char == "," and depth == 0:
+        if escaped:
+            escaped = False
+        elif quote is not None:
+            if char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+        elif char in {'"', "'"}:
+            quote = char
+        elif char == "," and depth == 0:
             members.append(current.strip())
             current = ""
             continue
-        depth += {"[": 1, "]": -1}.get(char, 0)
+        else:
+            depth += {"[": 1, "]": -1}.get(char, 0)
         current += char
     members.append(current.strip())
     return members

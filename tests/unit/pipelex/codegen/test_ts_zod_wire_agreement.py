@@ -159,9 +159,12 @@ class TestTsZodWireAgreement:
 
         assert ".optional()" not in content
         for field_name in _NON_REQUIRED_FIELDS:
-            line = next(line for line in content.splitlines() if line.strip().startswith(f"{field_name}: "))
+            # Every field of this crate is short enough to stay on one line, so a missing match means the
+            # field vanished from the projection rather than that it was broken across lines.
+            line = next((line for line in content.splitlines() if line.strip().startswith(f"{field_name}: ")), None)
+            assert line is not None, f"{field_name} has no field line in the emitted schema"
             assert ".nullish()" in line or ".nullable()" in line, f"{field_name} is not null-tolerant: {line.strip()}"
-        # The declared-type side of the same contract, for the recursion-safe explicit-type path.
+        # The nested concept's own optional field, reached through the reference rather than declared beside it.
         assert "weight: z.number().nullish()," in content
 
     def test_the_emitted_schema_parses_the_runtime_payload(self, wire_payloads: list[dict[str, Any]], tmp_path: Path):

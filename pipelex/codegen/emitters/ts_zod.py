@@ -20,7 +20,8 @@ sibling file), the TS analog of the Python subclassing story; the generated file
 """
 
 import json
-from typing import Any
+import re
+from typing import Any, cast
 
 from pipelex.codegen.emitters.naming import allocate_ts_type_names
 from pipelex.codegen.emitters.target import EmittedFile
@@ -159,31 +160,143 @@ def _presence_modifiers(concept_field: ResolvedField) -> list[str]:
 def _break_zod_expr(expr: str, *, modifiers: list[str]) -> str:
     """Prettier's rendering of a field expression too long to sit on one line.
 
-    Only `z.enum([...])` can genuinely overflow — its members are authored choices with no length bound,
-    while every other emitted expression is a short fixed form or a `z.lazy(() => XSchema)` whose width is
-    the concept name's. Two shapes, and prettier picks between them: bare, it breaks the array in place;
-    with modifiers attached it breaks the whole member chain, pulling `.enum(` and every modifier onto a
-    line of its own.
+    Prettier picks between two shapes by how many calls the chain carries, and the count is what decides —
+    not which expression it is. **Two or more** calls (every field carrying a presence modifier, and
+    `z.number().int()` on its own) and it breaks the whole member chain: `z` stays on the property line and
+    every call goes onto a line of its own. A **single** call has no chain to break, so prettier explodes
+    that call's arguments in place instead.
 
-    Anything we do not model stays flat — `test_emitted_ts_lines_fit_the_print_width` is the guard that
-    turns an unmodelled overflow into a failing test rather than a silently broken stamp.
+    Both unbounded widths reach this. A `z.enum([...])`'s members are authored choices with no length bound,
+    and the *field name* and *default literal* are authored too — so an ordinary `z.string()` carrying a
+    default overflows on nothing but a long name, which is why the break cannot key on the expression.
+
+    The one shape still unmodelled is a single call whose arguments must explode for a reason other than
+    enum members — a `z.lazy(() => AVeryLongConceptNameSchema)` on a required field. It stays flat, and
+    `test_emitted_ts_lines_fit_the_print_width` is the guard that turns that into a failing test rather
+    than a silently broken stamp.
     """
-    prefix, _, members_text = expr.partition("([")
-    if prefix != "z.enum" or not members_text.endswith("])"):
+    head, *calls = _split_member_chain(expr)
+    chain = calls + modifiers
+    if len(chain) < 2:
+        # No chain to break: prettier explodes the single call's arguments, and only `z.enum` is modelled.
+        if chain and _is_enum_call(chain[0]):
+            return f"{head}{_explode_enum_call(chain[0], indent=2)}"
         return f"{expr}{''.join(modifiers)}"
-    members = [member.strip() for member in members_text[:-2].split(",")]
+    rendered = "".join(f"\n    {_explode_enum_call(call, indent=4) if _is_enum_call(call) else call}" for call in chain)
+    return f"{head}{rendered}"
 
-    if not modifiers:
-        rendered = "".join(f"    {member},\n" for member in members)
-        return f"z.enum([\n{rendered}  ])"
-    rendered = "".join(f"      {member},\n" for member in members)
-    chained = "".join(f"\n    {modifier}" for modifier in modifiers)
-    return f"z\n    .enum([\n{rendered}    ]){chained}"
+
+def _split_member_chain(expr: str) -> list[str]:
+    """Split `z.record(z.string(), z.number()).int()` into its head and calls: `["z", ".record(…)", ".int()"]`.
+
+    Splits on the dots sitting at bracket depth zero. The emitted grammar puts every literal inside a
+    bracket — a `z.enum([…])`'s choices, a nested `z.array(…)` — so a depth-zero dot is always a member call.
+    """
+    parts: list[str] = []
+    depth = 0
+    current = ""
+    for char in expr:
+        if char == "." and depth == 0 and current:
+            parts.append(current)
+            current = ""
+        depth += {"(": 1, "[": 1, "{": 1, ")": -1, "]": -1, "}": -1}.get(char, 0)
+        current += char
+    parts.append(current)
+    return parts
+
+
+def _is_enum_call(call: str) -> bool:
+    """Whether a member call is the one shape whose arguments can overflow on their own contents."""
+    return call.startswith(".enum([") and call.endswith("])")
+
+
+def _explode_enum_call(call: str, *, indent: int) -> str:
+    """Render `.enum([...])` with one choice per line, for a call sitting at column `indent`.
+
+    The split has to walk the string literals rather than `str.split(",")`: a choice is authored text, and
+    an ordinary one like `"yes, absolutely"` carries a comma. Split naively it became two unterminated
+    literals — generated TypeScript that does not parse, on any crate whose choice list overflows.
+    """
+    rendered = "".join(f"{' ' * (indent + 2)}{member},\n" for member in _split_enum_members(call[len(".enum([") : -2]))
+    return f".enum([\n{rendered}{' ' * indent}])"
+
+
+def _split_enum_members(members_text: str) -> list[str]:
+    """Split `"a", "b, c"` on its separating commas only — the ones outside a JSON string literal."""
+    members: list[str] = []
+    current = ""
+    in_string = False
+    escaped = False
+    for char in members_text:
+        if escaped:
+            escaped = False
+        elif char == "\\" and in_string:
+            escaped = True
+        elif char == '"':
+            in_string = not in_string
+        elif char == "," and not in_string:
+            members.append(current.strip())
+            current = ""
+            continue
+        current += char
+    members.append(current.strip())
+    return members
 
 
 def _format_default_value(value: Any) -> str:
-    """Render a JSON-safe default canonically so mapping insertion order cannot affect output."""
-    return json.dumps(clean_json_content(value), sort_keys=True)
+    """Render a JSON-safe default as a canonical *TypeScript* literal, not a JSON one.
+
+    Keys are sorted so mapping insertion order cannot affect the output. Beyond that the two spellings
+    diverge on objects, and JSON's is the one prettier rewrites: it pads the braces (`{ a: 1 }`) and drops
+    the quotes from every key that is a valid identifier, at any line width. Emitting JSON therefore made a
+    single dict-valued default enough to have a consumer's formatter change the bytes and `pipelex codegen
+    check` report an untouched artifact as hand-edited. Scalars and arrays are spelled the same in both.
+    """
+    return _ts_literal(clean_json_content(value))
+
+
+# A key prettier is willing to leave unquoted in an object literal: a plain JS identifier.
+_TS_IDENTIFIER = re.compile(r"^[A-Za-z_$][A-Za-z0-9_$]*$")
+
+
+def _ts_string(text: str) -> str:
+    """A string literal in the quote style prettier would leave alone — the same rule ruff applies to Python.
+
+    Double quotes by default, single only where that **strictly reduces** the escape count. `json.dumps`
+    always double-quotes, so a choice or default carrying a `"` came out double-quoted with both quotes
+    escaped, which prettier rewrites to the escape-free `'say "hi"'` on a consumer's first format run,
+    reporting the artifact as hand-edited.
+    """
+    quote = "'" if text.count("'") < text.count('"') else '"'
+    body = json.dumps(text)[1:-1].replace('\\"', '"').replace(quote, f"\\{quote}")
+    return f"{quote}{body}{quote}"
+
+
+def _ts_literal(value: Any) -> str:
+    """One JSON-safe value as the TypeScript literal prettier would leave alone."""
+    if isinstance(value, str):
+        return _ts_string(value)
+    if isinstance(value, dict):
+        pairs = cast("dict[str, Any]", value)
+        if not pairs:
+            return "{}"
+        rendered = ", ".join(f"{_ts_object_key(key)}: {_ts_literal(pairs[key])}" for key in sorted(pairs))
+        return f"{{ {rendered} }}"
+    if isinstance(value, list):
+        items = cast("list[Any]", value)
+        return f"[{', '.join(_ts_literal(item) for item in items)}]"
+    return json.dumps(value)
+
+
+def _ts_object_key(key: Any) -> str:
+    """An object-literal key, quoted only where prettier keeps the quotes (a non-identifier key).
+
+    A non-string key is stringified first, exactly as `json.dumps` used to coerce one — `default_value` is
+    typed `Any`, so nothing but authoring convention keeps a non-string out, and a crash here would be a
+    worse answer than the spelling the emitter has always produced.
+    """
+    text = key if isinstance(key, str) else json.dumps(key)
+    return text if _TS_IDENTIFIER.match(text) else json.dumps(text)
 
 
 def _concept_type_expr(
@@ -234,7 +347,7 @@ def _ts_type(
         case ResolvedTypeKind.BOOLEAN:
             return "boolean"
         case ResolvedTypeKind.LITERAL:
-            return " | ".join(json.dumps(choice) for choice in resolved_type.choices or [])
+            return " | ".join(_ts_string(choice) for choice in resolved_type.choices or [])
         case ResolvedTypeKind.CONCEPT:
             return _concept_type(resolved_type, by_ref=by_ref, type_name_by_ref=type_name_by_ref)
         case ResolvedTypeKind.LIST:
@@ -313,7 +426,7 @@ def _zod_type(
             # ISO date / datetime / time string on the wire (the `@wire` field keeps the shape documented).
             return "z.string()"
         case ResolvedTypeKind.LITERAL:
-            choices = ", ".join(json.dumps(choice) for choice in resolved_type.choices or [])
+            choices = ", ".join(_ts_string(choice) for choice in resolved_type.choices or [])
             return f"z.enum([{choices}])"
         case ResolvedTypeKind.CONCEPT:
             return _concept_schema(resolved_type, by_ref=by_ref, type_name_by_ref=type_name_by_ref)

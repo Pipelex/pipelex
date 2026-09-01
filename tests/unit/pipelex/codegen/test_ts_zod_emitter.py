@@ -59,6 +59,42 @@ class TestTsZodEmitter:
         # With a default: absent applies the default, explicit null stays null.
         assert 'status: z.enum(["draft", "final"]).nullable().default("draft")' in content
 
+    def test_an_overlong_field_breaks_its_whole_member_chain(self, every_type_kind_crate: LibraryCrate):
+        """Prettier breaks by call count, not by expression, so the break cannot be a `z.enum` special case.
+
+        `z.string()` is the shortest expression the emitter produces, and a defaulted one still overflows on
+        the authored field name and default literal alone. Left flat, a consumer's prettier run rewrites the
+        bytes and `pipelex codegen check` reports an untouched artifact as hand-edited. Both shapes below are
+        prettier 3.9.6's own output for the emitted crate.
+        """
+        content = emit_ts_zod(resolve_concepts_from_crate(every_type_kind_crate))[0].content
+
+        assert '  default_summary_style: z\n    .string()\n    .nullable()\n    .default("a concise executive summary"),' in content
+        assert "  per_reviewer_summary_style_overrides: z\n    .record(z.string(), z.string())\n    .nullish()," in content
+        # A single call has no chain to break: prettier explodes the enum members in place instead.
+        assert '  workflow_state: z.enum([\n    "awaiting_triage",' in content
+
+    def test_an_exploded_choice_keeps_its_own_commas(self, every_type_kind_crate: LibraryCrate):
+        """A choice is authored text and may carry a comma; split on it, the emission stops being TypeScript.
+
+        Nothing else in this repo catches it: the broken form is two *short* unterminated string literals,
+        so the print-width guard is blind to it and no always-on test parses the emitted TypeScript.
+        """
+        content = emit_ts_zod(resolve_concepts_from_crate(every_type_kind_crate))[0].content
+
+        assert '  escalation_reason: z.enum([\n    "blocked, awaiting the owner",\n    "stale, no movement for a week",' in content
+
+    def test_a_quoted_choice_takes_the_quote_style_prettier_keeps(self, every_type_kind_crate: LibraryCrate):
+        """Prettier normalizes a string literal to whichever quote needs fewer escapes, at any width.
+
+        So the naive always-double spelling — double-quoted with both inner quotes escaped — is rewritten on
+        the consumer's first format run and the artifact is reported as hand-edited. The Python targets have
+        the same rule and the ruff guards catch them; nothing always-on watches the TypeScript spelling.
+        """
+        content = emit_ts_zod(resolve_concepts_from_crate(every_type_kind_crate))[0].content
+
+        assert '  reviewer_verdict: z.enum([\'marked "urgent"\', "left unmarked"]),' in content
+
     def test_temporal_defaults_emit_iso_wire_strings(self, temporal_defaults_crate: LibraryCrate):
         content = emit_ts_zod(resolve_concepts_from_crate(temporal_defaults_crate))[0].content
         assert 'starts_on: z.string().nullable().default("2026-07-11")' in content
@@ -72,7 +108,10 @@ class TestTsZodEmitter:
         second_output = emit_ts_zod(resolve_concepts_from_crate(second_crate))
 
         assert first_output == second_output
-        assert 'default({"alpha": "first", "zeta": "last"})' in first_output[0].content
+        # A *TypeScript* object literal, not a JSON one: prettier pads the braces and unquotes every key
+        # that is a plain identifier, at any line width, so the JSON spelling made a single dict-valued
+        # default enough to have a consumer's formatter rewrite the artifact and break its stamp.
+        assert 'default({ alpha: "first", zeta: "last" })' in first_output[0].content
 
     def test_explicitly_empty_structure_emits_an_empty_object_schema(self):
         crate = LibraryCrate(
