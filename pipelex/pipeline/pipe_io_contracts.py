@@ -87,19 +87,23 @@ def _render_output_schema(*, pipe: PipeAbstract, concept_provider: ConceptProvid
     would stop tracking that type the moment it changed — silently, because a wrong envelope still
     parses as a schema.
     """
-    if not pipe.output.concept.declares_a_structure_class:
-        # `native.Anything` is the untyped vehicle: its content class deliberately does not
-        # exist, so asking a provider for it is a category error rather than a missing
-        # registration. The honest JSON Schema for "no constraint at all" is the empty
-        # schema, and every keyword we could add instead would be invented. A consumer
-        # reads it exactly right: no property to unwrap by, so the payload is shown raw —
-        # which is also what the descriptor says, since a structureless concept derives to
-        # `kind: "unknown"`.
-        return {}
     try:
         if not pipe.output.is_multiple():
+            # The single arm needs no structureless special case: `render_stuff_spec` handles
+            # `native.Anything` itself, publishing the permissive schema with the concept's
+            # identity annotations. Short-circuiting to a bare `{}` here would be strictly
+            # worse — it would drop the `title`/`description` every rendered schema is
+            # supposed to carry.
             rendered = pipe.output.render_stuff_spec(concept_provider=concept_provider, output_format=ConceptRepresentationFormat.SCHEMA)
             return cast("dict[str, Any]", rendered["content"])
+        if not pipe.output.concept.declares_a_structure_class:
+            # The plural arm is where structureless still needs saying, because the envelope
+            # is parametrized by a class and `native.Anything` deliberately has none. The
+            # envelope is still the right answer — a plural output's payload IS a
+            # `ListContent` — so it is asked of pydantic UNPARAMETRIZED, whose `items` are
+            # then bounded by nothing. That states exactly what is true: a list envelope
+            # holding values no schema constrains.
+            return ListContent.model_json_schema()
         structure_class = concept_provider.get_structure_class(concept=pipe.output.concept)
         # Parametrizing a generic with a class held in a variable is a runtime operation both type
         # checkers read as a type expression, so both are told to stand down here rather than the
@@ -168,14 +172,6 @@ def build_pipe_io_contracts(pipes: Sequence[PipeAbstract]) -> PipeIOContracts:
                 fixed_item_count(multiplicity=stuff_spec.multiplicity),
             )
             json_schema = schema_memo.get(memo_key)
-            if json_schema is None and not stuff_spec.concept.declares_a_structure_class:
-                # Same category error as on the output side above, and it used to raise here
-                # too: a `native.Anything` INPUT would have failed the whole contract build
-                # with a "not a registered subclass of StuffContent" message about a class
-                # that never existed. Nothing in the corpus declared one, so the crash was
-                # latent rather than absent.
-                json_schema = {}
-                schema_memo[memo_key] = json_schema
             if json_schema is None:
                 try:
                     # Indexing (not .get with a default) is deliberate: a render-shape drift

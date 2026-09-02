@@ -46,9 +46,9 @@ def _teardown_validation_library(outer_library_id: str) -> None:
     clear_current_library()
 
 
-_ANYTHING_MTHDS = """
-domain = "anything_test"
-description = "Bundle whose router carries the structureless native concept on both sides"
+_ANYTHING_OUTPUT_MTHDS = """
+domain = "anything_output_test"
+description = "Bundle whose router RESOLVES TO the structureless native concept"
 
 [concept.Verdict]
 description = "A verdict"
@@ -182,8 +182,8 @@ class TestBuildPipeIOContracts:
         gate = io_contracts["optional_contracts_test.gate"]
         assert gate.output.optional is True
 
-    async def test_structureless_concept_renders_the_empty_schema(self, load_empty_library: Callable[[], str]) -> None:
-        """`native.Anything` carries `{}` on both sides rather than failing the whole build.
+    async def test_structureless_output_renders_permissively(self, load_empty_library: Callable[[], str]) -> None:
+        """A pipe RESOLVING TO `native.Anything` carries a permissive schema rather than failing the build.
 
         `Anything` is the untyped vehicle: `structure_class` is `None` for it, so the
         `AnythingContent` name derived mechanically from its code has no class behind it
@@ -192,26 +192,32 @@ class TestBuildPipeIOContracts:
         raised `PipeIOContractError` naming a class that never existed, taking every OTHER
         pipe in the bundle down with it.
 
-        The empty schema is the honest JSON Schema for "no constraint at all", and every
-        keyword we could put there instead would be invented. A consumer reads it exactly
-        right: no property to unwrap by, so the payload is shown raw — which is also what
-        the descriptor says, since a structureless concept derives to `kind: "unknown"`.
+        **The schema is permissive, not empty**, and the difference is the point. It carries
+        no constraint keyword — "any JSON value" is what an untyped vehicle means — but it
+        does carry the concept's identity annotations, because every rendered schema does
+        and an exception for this one would be a second rule. A bare `{}` would read the
+        same to a validator and tell a reader nothing about what they are looking at.
 
-        Both sides are asserted because both had the bug. The output side surfaced it (an
-        `Anything`-resolving router is ordinary in a real method); the input side had the
-        same latent crash and no bundle in the corpus happened to declare one.
+        Scoped to the OUTPUT side: the input side is covered by
+        `test_anything_input_publishes_permissive_schema` below, which reaches the plural
+        arms too. This one exists because an `Anything`-resolving `PipeCondition` — a router
+        that resolves to whatever branch it took — is ordinary in a real method, and the
+        output contract gained its schema after that test was written.
         """
         outer_library_id = load_empty_library()
         try:
-            result = await validate_bundle(mthds_contents=[_ANYTHING_MTHDS])
+            result = await validate_bundle(mthds_contents=[_ANYTHING_OUTPUT_MTHDS])
             io_contracts = build_pipe_io_contracts(result.pipes)
         finally:
             _teardown_validation_library(outer_library_id)
 
-        route = io_contracts["anything_test.route"]
+        route = io_contracts["anything_output_test.route"]
         assert route.output.concept_ref == "native.Anything"
-        assert route.output.json_schema == {}
-        assert route.inputs["payload"].json_schema == {}
+        # The concept's identity, and nothing that constrains a value.
+        json_schema = route.output.json_schema
+        assert json_schema["title"] == "native.Anything"
+        assert "description" in json_schema
+        assert not {"type", "properties", "required", "enum", "items"} & set(json_schema)
 
     async def test_multiplicity_entry_shapes(self, load_empty_library: Callable[[], str]) -> None:
         """Entries are keyed by namespaced pipe_ref; output multiplicity is single vs variable."""
