@@ -53,25 +53,41 @@ Any number of bookmarks:
 """
 
 # The natives whose payload shape the descriptor states openly, at slot positions — the one place
-# the corpus never reached. `native.Dynamic`, `native.Composite` and `native.Anything` declare no
-# pinned structure, so their node is `unknown` and every projection renders the empty object both
-# renderers agree on. `native.JSON` is not: its pinned blueprint carries a required `json_obj`, so it
-# expands like any other pinned native, and the dict inside it is the corpus's first REQUIRED unknown
-# node — the engine invents a sample key there, the projection leaves the object empty for whoever
-# fills it in. `anything_in` is the slot the input shaper still refuses to take back: its template is
-# the empty object every other unknown node renders, and the shaper has no arm that accepts it, so
-# both shapes of this pipe are declared in the capture's unshapeable record.
+# the corpus never reached. `native.Dynamic` and `native.Composite` declare no pinned structure, so
+# their node is `unknown` and every projection renders the empty object both renderers agree on.
+# `native.JSON` is not: its pinned blueprint carries a required `json_obj`, so it expands like any
+# other pinned native, and the dict inside it is the corpus's first REQUIRED unknown node — the
+# engine invents a sample key there, the projection leaves the object empty for whoever fills it in.
+# `native.Anything` belongs to the same family and is deliberately NOT here: it is the one open
+# native the input shaper refuses, so it sits in its own pipe below rather than putting this whole
+# template behind a declared refusal. That matters because the round-trip gate keys on the pipe and
+# the shape, never on the slot: an entry here would suspend the shaper check for `json_in`,
+# `dynamic_in` and `composite_in` too, and `json_in`'s dict is the only site where the corpus
+# measures `unknown-empty-object` — the class whose whole claim is that the empty object round-trips.
 [pipe.scaffold_open_natives]
 type        = "PipeCompose"
-description = "SCAFFOLD_pipe_scaffold_open_natives: a pinned-dict native beside the three structureless ones, each at a slot position"
-inputs      = { json_in = "JSON", dynamic_in = "Dynamic", composite_in = "Composite", anything_in = "Anything" }
+description = "SCAFFOLD_pipe_scaffold_open_natives: a pinned-dict native beside the two structureless ones, each at a slot position"
+inputs      = { json_in = "JSON", dynamic_in = "Dynamic", composite_in = "Composite" }
 output      = "Text"
-template    = "SCAFFOLD_template_open_natives: $json_in $dynamic_in $composite_in $anything_in"
+template    = "SCAFFOLD_template_open_natives: $json_in $dynamic_in $composite_in"
+
+# `native.Anything`, alone, because the runtime refuses the template the descriptor makes it publish.
+# The node is `unknown` exactly as its two siblings above are, so the projection renders the same
+# empty object — and those two hand that value straight back, while `native.Anything` alone has no
+# dict-content arm: the shaper answers "not compatible with a dict content" and accepts a bare string
+# there and nothing else, returning it as a `native.Text` stuff. Both shapes of THIS pipe are
+# therefore declared in the capture's unshapeable record, and nothing else is dragged in with them.
+[pipe.scaffold_anything_slot]
+type        = "PipeCompose"
+description = "SCAFFOLD_pipe_scaffold_anything_slot: the one open-shaped native whose published template the runtime refuses, alone at a slot position"
+inputs      = { anything_in = "Anything" }
+output      = "Text"
+template    = "SCAFFOLD_template_anything_slot: $anything_in"
 
 # A `native.Dynamic` slot read by a PipeLLM prompt, under both markers. Until the prompt analyzers
 # stopped reading universal compatibility as identity, this bundle did not validate at all: a dynamic
 # input was recorded as a DIRECT image reference and dry-run validation demanded `ImageContent`. It
-# renders as text through the template like any other variable, which is what makes it a slot the
+# renders as text through the prompt like any other variable, which is what makes it a slot the
 # corpus can carry — the descriptor states it `unknown` exactly as the PipeCompose above does, so the
 # capture holds one open-shaped native at an LLM prompt position beside the same native at a
 # template position.

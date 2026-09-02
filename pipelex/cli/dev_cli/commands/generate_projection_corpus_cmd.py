@@ -140,18 +140,24 @@ DIVERGENCE_ITEMS: dict[str, str] = {
 # whose template has started shaping fails it too — so closing the gap retires its declaration
 # deliberately instead of leaving the manifest claiming a defect that no longer exists.
 #
+# A key is a whole template, never a slot, and the shaper aborts at the first slot it refuses — so an
+# entry suspends this check for every OTHER slot in that pipe too. A gap therefore belongs in a pipe
+# that carries nothing else; where a corpus bundle would otherwise mix it with slots that do shape,
+# the bundle isolates it instead of widening the declaration.
+#
 # Two gaps are declared. `L-260830-191719` is the nested-list descriptor gap (`matrix` in `Widget`),
-# which takes both shapes of both probe pipes that reach it. `L-260902-10eb56` is the `native.Anything`
-# slot in `scaffold_open_natives`: its template value is the empty object every `unknown` node renders,
-# and the shaper accepts a bare string alone at an `Anything` position — so the contract publishes a
-# template the runtime cannot take back. Each fix deletes its own entries and regenerates.
+# which takes both shapes of both probe pipes that reach it. `L-260902-10eb56` is `native.Anything`,
+# which is why `scaffold_anything_slot` holds that native alone: its template value is the empty
+# object every `unknown` node renders, and the shaper accepts a bare string alone at an `Anything`
+# position — so the contract publishes a template the runtime cannot take back. Each fix deletes its
+# own entries and regenerates.
 EXPECTED_UNSHAPEABLE: dict[tuple[str, str], str] = {
     ("input_semantics_probe.probe_markers", COMPACT_SHAPE): "L-260830-191719",
     ("input_semantics_probe.probe_markers", EXPLICIT_SHAPE): "L-260830-191719",
     ("input_semantics_probe.probe_single", COMPACT_SHAPE): "L-260830-191719",
     ("input_semantics_probe.probe_single", EXPLICIT_SHAPE): "L-260830-191719",
-    ("input_semantics_scaffold.scaffold_open_natives", COMPACT_SHAPE): "L-260902-10eb56",
-    ("input_semantics_scaffold.scaffold_open_natives", EXPLICIT_SHAPE): "L-260902-10eb56",
+    ("input_semantics_scaffold.scaffold_anything_slot", COMPACT_SHAPE): "L-260902-10eb56",
+    ("input_semantics_scaffold.scaffold_anything_slot", EXPLICIT_SHAPE): "L-260902-10eb56",
 }
 
 

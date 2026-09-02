@@ -166,7 +166,12 @@
    - **`generate-projection-corpus`**: Write the shared inputs-template projection fixture corpus — the descriptors, the expected fill-in templates in both shapes and both formats, and the record of where the expectation deliberately differs from the engine's own renderer. Sole producer of the capture committed byte-identically in `mthds-js/tests/fixtures/protocol/` and `mthds-python/tests/fixtures/protocol/`, which is what pins the TypeScript and Python projections against each other. See `docs/contribute/generate-projection-corpus.md`.
 
      ```bash
-     .venv/bin/pipelex-dev generate-projection-corpus tests/data/input_semantics/*.mthds -o /tmp/projection-corpus
+     .venv/bin/pipelex-dev generate-projection-corpus \
+       tests/data/input_semantics/hinted_bundle.mthds \
+       tests/data/input_semantics/probe_bundle.mthds \
+       tests/data/input_semantics/scaffold_bundle.mthds \
+       tests/data/input_semantics/output_bundle.mthds \
+       -o /tmp/projection-corpus
      ```
 
    - **`drift`**: Drift contracts — deterministic review obligations between code and docs, declared in the root `drift.toml` (see `docs/contribute/drift-contracts.md`). When `make drift-check` (part of `make agent-check`, `make check`, and CI) reports an open contract: run `make drift-plan` to see what changed and what to review, actually review the targets and fix what is stale, `git add` the trigger files (the digest reads the git index, not the working tree), then record the review with `make drift-ack CONTRACT=<id> RATIONALE="…"`. The rationale is the on-the-record review decision — write an honest sentence. There is no bypass flag; "reviewed, no doc change needed" is a legitimate rationale.
