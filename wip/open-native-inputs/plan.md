@@ -1,6 +1,6 @@
 ---
 status: active
-item: L-260831-8f7c8c
+item: L-260902-543ad0
 ---
 
 # Open-shaped natives at input positions: the two fixes the corpus could not ride along with
@@ -57,6 +57,8 @@ Branch `fix/Anything-io-contract`, PR → `dev`. Its own PR, per the item: a wir
 >
 > Also corrected in review: `docs/contribute/generate-projection-corpus.md` still asserted that an `Anything` input crashes the contract builder, which this phase made false; the word *structureless* was carrying two incompatible meanings across `NativeConceptCode.is_structureless_concept` (no structure **class**, `Anything` alone) and `input_form.py` (no **pinned structure**, three natives), and the sites now say which they mean.
 
+> **Checkpoint 1 closed (2026-09-02):** PR [#1178](https://github.com/Pipelex/pipelex/pull/1178) merged to `dev` as `68b6976`, every check green, and L-260831-8f7c8c is closed `fixed` with that merge as evidence. R1 and R2 landed exactly as ruled. The merge has not reached `main` — the release that publishes both this phase and Phase 2 is L-260828-f4e88c. With both PRs merged, Phase 3 is unblocked: the corpus can now be regenerated with `anything_in` in `scaffold_open_natives` and a `PipeLLM` covering `native.Dynamic`, subject to the refusal measured in Phase 3 item 4, which the shaper — not this phase — has to close.
+
 ## Phase 2 — dynamic concepts get no static prompt classification (fixes L-260831-635398)
 
 Branch `fix/Dynamic-prompt-classification`, PR → `dev`. Independent of Phase 1 — disjoint files; no stacking needed.
@@ -99,6 +101,8 @@ This is the work L-260831-264cbd had to leave behind, and it lands as a fixture 
    So the choice this item offered — record a deliberate projection difference, or fix the shaper arm — resolves toward **fixing the shaper arm**: recording a difference would pin a template nobody can submit, which is exactly the defect the `native.JSON` entry in the same release says it removed. It also means R1's published schema ("any JSON value") is currently wider than the runtime, which `docs/under-the-hood/pipe-io-contracts.md` now says out loud rather than leaving for a consumer to discover. Adding `anything_in` to `scaffold_open_natives` before the shaper is fixed will fail the round-trip gate; `docs/contribute/generate-projection-corpus.md` records that as the reason the slot is still empty.
 
 **Checkpoint 3** — corpus regenerated and re-committed across the three repos; both bugs closed with the merges as evidence.
+
+> Phase 3 is tracked by L-260902-543ad0, filed when Phase 1 landed: both bug items that used to carry this campaign are closed, so the document's `item:` now names the phase that is still open rather than a finished one.
 
 ## Ledger
 
