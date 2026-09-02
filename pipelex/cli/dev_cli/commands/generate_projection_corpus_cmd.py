@@ -138,13 +138,18 @@ DIVERGENCE_ITEMS: dict[str, str] = {
 # whose template has started shaping fails it too — so closing the gap retires its declaration
 # deliberately instead of leaving the manifest claiming a defect that no longer exists.
 #
-# Every entry below is the one nested-list descriptor gap (`matrix` in `Widget`), which takes both
-# shapes of both pipes that reach it. Its fix deletes these four entries and regenerates.
+# Two gaps are declared. `L-260830-191719` is the nested-list descriptor gap (`matrix` in `Widget`),
+# which takes both shapes of both probe pipes that reach it. `L-260902-10eb56` is the `native.Anything`
+# slot in `scaffold_open_natives`: its template value is the empty object every `unknown` node renders,
+# and the shaper accepts a bare string alone at an `Anything` position — so the contract publishes a
+# template the runtime cannot take back. Each fix deletes its own entries and regenerates.
 EXPECTED_UNSHAPEABLE: dict[tuple[str, str], str] = {
     ("input_semantics_probe.probe_markers", COMPACT_SHAPE): "L-260830-191719",
     ("input_semantics_probe.probe_markers", EXPLICIT_SHAPE): "L-260830-191719",
     ("input_semantics_probe.probe_single", COMPACT_SHAPE): "L-260830-191719",
     ("input_semantics_probe.probe_single", EXPLICIT_SHAPE): "L-260830-191719",
+    ("input_semantics_scaffold.scaffold_open_natives", COMPACT_SHAPE): "L-260902-10eb56",
+    ("input_semantics_scaffold.scaffold_open_natives", EXPLICIT_SHAPE): "L-260902-10eb56",
 }
 
 
