@@ -70,3 +70,7 @@ Inapplicable slots are absent, never JSON `null`: the report's valid arm is dump
 ## Seeing it
 
 `pipelex-dev trace-input-semantics` captures the descriptors as `hop5_input_form.json` beside `hop5_pipe_io_contracts.json`, so an authored fact can be checked on both projections at once — see [Tracing Input Semantics](../contribute/trace-input-semantics.md). The assignment table is pinned by `tests/integration/pipelex/pipeline/test_input_form.py` over the committed probe bundle (and the hints behavior over its hinted sibling, `hinted_bundle.mthds`), the emitted wire's null-free shape by `tests/unit/pipelex/pipeline/test_input_form_models.py`, the hint merges and kind-feeding by `tests/unit/pipelex/pipeline/test_input_form_hints.py`, and the escape hatches the library loader keeps unreachable (concept cycles, unregistered classes, a structure class that holds itself) by `tests/unit/pipelex/pipeline/test_input_form_deriver.py`.
+
+## What clients project from it
+
+The descriptor is what a client SDK renders a pipe's fill-in inputs template from — the hosted build routes no longer render one server-side. That projection is written twice, in TypeScript and in Python, and the two are pinned against each other by a shared fixture corpus this engine generates: see [Projection Fixture Corpus](../contribute/generate-projection-corpus.md). The corpus is also where the projection's rules are stated, including the places it is deliberately right where this engine's own inputs-template renderer is not.

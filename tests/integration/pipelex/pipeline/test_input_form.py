@@ -613,9 +613,14 @@ class TestKindAssignmentTable:
         search_result = _field_by_name(natives, "search_result_in")
         assert search_result.kind == FieldKind.OBJECT
         assert search_result.fields is not None
+        json_field = _field_by_name(natives, "json_in")
+        assert json_field.kind == FieldKind.OBJECT, "native.JSON has a pinned structure, so it expands like the other pinned natives"
+        assert json_field.fields is not None
+        assert [field.name for field in json_field.fields] == ["json_obj"], "Its pinned blueprint's single required field"
+        # The three natives that declare no pinned structure — `_pinned_structure` returns None for
+        # exactly these, so `unknown` is the honest kind and no other native may join them.
         assert _field_by_name(natives, "dynamic_in").kind == FieldKind.UNKNOWN
         assert _field_by_name(natives, "anything_in").kind == FieldKind.UNKNOWN
-        assert _field_by_name(natives, "json_in").kind == FieldKind.UNKNOWN
         for field in natives.fields:
             assert field.concept_ref is not None
             assert field.concept_ref.startswith("native.")

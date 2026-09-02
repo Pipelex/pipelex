@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
-from pipelex.base_exceptions import ErrorReport, PipelexError, iter_cause_chain
+from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexError, iter_cause_chain
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.system.pipelex_service.types import RemoteConfigSource
 
@@ -40,6 +40,36 @@ class InferenceErrorCategory(StrEnum):
                 | InferenceErrorCategory.UNKNOWN
             ):
                 return False
+
+    @property
+    def error_domain(self) -> ErrorDomain | None:
+        """The :class:`~pipelex.base_exceptions.ErrorDomain` this category implies — who can fix it.
+
+        The category a worker assigns is already the authoritative statement of *whose fault*
+        an inference failure is, so :meth:`CogtError.to_error_report` derives the domain from it
+        rather than making every leaf class in the family declare the same fact twice.
+
+        ``CONTENT`` is the one mapping that changes an HTTP answer: a content-policy refusal, a
+        malformed prompt image, a bad prompt parameter are all properties of material the caller
+        submitted, so they belong in ``INPUT`` and answer 422 rather than 500.
+
+        ``UNKNOWN`` deliberately maps to ``None``. It means classification itself failed, and
+        ``RUNTIME`` would be a claim this code cannot support; an absent domain already renders
+        500, so the honest answer costs nothing.
+
+        ``CAPACITY -> RUNTIME`` does not disturb the provider-429 passthrough:
+        :attr:`~pipelex.base_exceptions.ErrorReport.http_status` checks
+        ``provider_metadata.status_code`` before it consults the domain.
+        """
+        match self:
+            case InferenceErrorCategory.CONTENT:
+                return ErrorDomain.INPUT
+            case InferenceErrorCategory.CONFIGURATION:
+                return ErrorDomain.CONFIG
+            case InferenceErrorCategory.TRANSIENT | InferenceErrorCategory.CAPACITY | InferenceErrorCategory.AMBIGUOUS:
+                return ErrorDomain.RUNTIME
+            case InferenceErrorCategory.UNKNOWN:
+                return None
 
 
 class CogtError(PipelexError):
@@ -98,9 +128,19 @@ class CogtError(PipelexError):
         # ``tests/unit/pipelex/cogt/test_cogt_provider_metadata_wrapper_wins.py``.
         base_report = super().to_error_report()
         own_retryable = self.error_category.is_retryable if self.error_category is not None else None
+        # ``error_domain`` is derived from this error's own category rather than declared per leaf
+        # class, so the two fields can never contradict each other on the wire. Precedence mirrors
+        # every other field here — a class-level ``error_domain`` set explicitly on the leaf wins,
+        # then the derivation, then whatever ``base_report`` already inherited from the cause chain
+        # (which for a ``CogtError`` cause is that cause's own derivation). Deriving from
+        # ``self.error_category`` and not from ``base_report.error_category`` is deliberate: the
+        # report field is typed ``str``, and the same wrapper-wins precedence on both fields makes
+        # the two agree anyway — an inherited category rides in with the domain it derived.
+        own_domain = self.error_category.error_domain if self.error_category is not None else None
         return base_report.model_copy(
             update={
                 "error_category": self.error_category or base_report.error_category,
+                "error_domain": self.error_domain or own_domain or base_report.error_domain,
                 "retryable": own_retryable if own_retryable is not None else base_report.retryable,
                 "model": self.model_handle or base_report.model,
                 "provider": self.backend_name or base_report.provider,
@@ -158,6 +198,15 @@ class ModelChoiceNotFoundError(CogtError):
     """
 
     error_category = InferenceErrorCategory.CONFIGURATION
+    # Declared explicitly, against the grain of the CONFIGURATION category's ``CONFIG`` derivation,
+    # because the two fields are answering different questions here. The *category* is right: from
+    # the provider call's point of view the setup is wrong and no retry will help. But this class
+    # exists to report a mistyped model reference in material the caller authored — its message
+    # carries "Did you mean:" suggestions and lists the available options — so the caller is who
+    # fixes it, on the hosted API (a submitted method naming an unknown model) as much as in a
+    # local ``.mthds`` file. An operator-side deck fault surfaces as
+    # ``ModelDeckPresetValidatonError`` instead, which keeps the derived ``CONFIG``.
+    error_domain = ErrorDomain.INPUT
 
     def __init__(
         self,

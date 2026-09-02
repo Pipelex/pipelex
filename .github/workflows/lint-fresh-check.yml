@@ -1,12 +1,15 @@
 name: Lint fresh (pre-main gate)
 
-# Gate on PRs targeting main (the release PRs, dev -> main). The FULL lint suite
-# (the read-only equivalent of `make c`: ruff, plxt, config-sync, keyword-only,
-# drift, pyright, mypy) across every supported Python version, with NO mypy
-# cache. Feature PRs to dev run the same suite fast on py3.11 with a warm cache
-# (lint-check.yml); before anything reaches main it must also pass this clean,
-# all-versions, cache-free run — so incremental-mypy drift or a version-specific
-# break can never land on main.
+# Gate on PRs targeting main (the release PRs, dev -> main). Re-runs the
+# read-only lint suite across every supported Python version with NO mypy cache
+# — the step list below is the authority on which checks that is; do not restate
+# it here, an enumeration in a comment goes stale the next time a check is added.
+# Feature PRs to dev run it fast on py3.11 with a warm cache (lint-check.yml);
+# before anything reaches main it must also pass this clean, all-versions,
+# cache-free run, so incremental-mypy drift or a version-specific break can never
+# land on main. A version-independent check needs no place here to be enforced on
+# main: lint-check.yml runs on every pull request and its `Lint (all)` aggregate
+# is a required status check on `main` as well as on `dev`.
 
 on:
   pull_request:

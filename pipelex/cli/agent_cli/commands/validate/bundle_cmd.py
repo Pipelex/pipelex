@@ -187,7 +187,8 @@ def validate_bundle_cmd(
             raise typer.Exit(1)
 
     except PipeNotFoundError as exc:
-        agent_error(str(exc), error_type="PipeNotFoundError", cause=exc, exit_code=2)
+        # The real class, not the caught base — see the same arm in `validate pipe`.
+        agent_error(str(exc), error_type=type(exc).__name__, cause=exc, exit_code=2)
 
     except FileNotFoundError as exc:
         agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc, exit_code=2)

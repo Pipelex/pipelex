@@ -73,6 +73,8 @@ DuplicateOrchestratorError | Duplicate orchestrator | https://docs.pipelex.com/l
 DuplicatePipeFuncExecutorError | Duplicate pipe func executor | https://docs.pipelex.com/latest/errors/duplicate-pipe-func-executor-error/
 DuplicateSecretsProviderError | Duplicate secrets provider | https://docs.pipelex.com/latest/errors/duplicate-secrets-provider-error/
 DuplicateStorageProviderError | Duplicate storage provider | https://docs.pipelex.com/latest/errors/duplicate-storage-provider-error/
+EntryPipeAmbiguousError | Entry pipe ambiguous | https://docs.pipelex.com/latest/errors/entry-pipe-ambiguous-error/
+EntryPipeNotFoundError | Entry pipe not found | https://docs.pipelex.com/latest/errors/entry-pipe-not-found-error/
 EnvVarNotFoundError | Environment variable not set | https://docs.pipelex.com/latest/errors/env-var-not-found-error/
 EventLogError | Event log | https://docs.pipelex.com/latest/errors/event-log-error/
 EventLogReadError | Event log read | https://docs.pipelex.com/latest/errors/event-log-read-error/
@@ -242,6 +244,7 @@ PipelexSetupError | Pipelex setup | https://docs.pipelex.com/latest/errors/pipel
 PipelexUnexpectedError | Unexpected internal error | https://docs.pipelex.com/latest/errors/pipelex-unexpected-error/
 PipelineExecutionError | Pipeline execution | https://docs.pipelex.com/latest/errors/pipeline-execution-error/
 PipelineInputContentError | Pipeline input content | https://docs.pipelex.com/latest/errors/pipeline-input-content-error/
+PipelineInputUrlMissingError | Pipeline input url missing | https://docs.pipelex.com/latest/errors/pipeline-input-url-missing-error/
 PipelineManagerAlreadyExistsError | Pipeline manager already exists | https://docs.pipelex.com/latest/errors/pipeline-manager-already-exists-error/
 PipelineManagerNotFoundError | Pipeline manager not found | https://docs.pipelex.com/latest/errors/pipeline-manager-not-found-error/
 PluginApiVersionMismatchError | Plugin api version mismatch | https://docs.pipelex.com/latest/errors/plugin-api-version-mismatch-error/

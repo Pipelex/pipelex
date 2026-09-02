@@ -11,6 +11,7 @@ import importlib
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cli.agent_cli.commands.agent_output import AGENT_ERROR_DOMAINS, AGENT_ERROR_HINTS, RETRYABLE_ERROR_TYPES
+from pipelex.cogt.exceptions import CogtError
 
 # Modules defining every PipelexError subclass referenced by the lookup dicts.
 # Imported so PipelexError.__subclasses__() sees them when the registry is built.
@@ -90,6 +91,30 @@ class TestAgentOutputDrift:
                     f"{cls.__name__} carries a class-level error_domain; its AGENT_ERROR_DOMAINS entry "
                     f"is redundant — remove it so the class is the single source of truth."
                 )
+
+    def test_category_derived_error_domain_not_duplicated_in_dict(self) -> None:
+        """A CogtError subclass whose error_category derives a domain must not sit in AGENT_ERROR_DOMAINS either.
+
+        Such a class self-describes without declaring an ``error_domain`` of its own:
+        ``InferenceErrorCategory.error_domain`` derives one and ``CogtError.to_error_report()``
+        puts it on the report, so ``agent_error()``'s report-first read always wins and the
+        lookup entry is unreachable. ``test_class_level_error_domain_not_duplicated_in_dict``
+        does not catch these, because the class attribute is genuinely ``None``.
+        """
+        for cls in _all_pipelex_error_subclasses():
+            if not issubclass(cls, CogtError):
+                continue
+            category = cls.error_category
+            if category is None:
+                continue
+            derived_domain = category.error_domain
+            if derived_domain is None:
+                continue
+            assert cls.__name__ not in AGENT_ERROR_DOMAINS, (
+                f"{cls.__name__} derives error_domain {derived_domain!r} from its {category!r} category, "
+                f"so its AGENT_ERROR_DOMAINS entry can never be read — remove it. If that derived domain "
+                f"is wrong for this class, declare an explicit class-level error_domain on the class instead."
+            )
 
     def test_class_level_user_action_not_duplicated_in_dict(self) -> None:
         """A subclass that declares class-level user_action must not also sit in AGENT_ERROR_HINTS."""

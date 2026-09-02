@@ -12,7 +12,7 @@ from pipelex.cli.method_resolver import resolve_method_target
 def validate_method_cmd(
     name: Annotated[
         str,
-        typer.Argument(help="Installed method name, method address (github.com/owner/repo[/name][@tag]), or GitHub URL to validate"),
+        typer.Argument(help="Installed method name, method address (github.com/owner/repo\\[/name]\\[@tag]), or GitHub URL to validate"),
     ],
     pipe: Annotated[
         str | None,

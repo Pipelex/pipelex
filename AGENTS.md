@@ -100,6 +100,17 @@
      .venv/bin/pipelex-dev trace-input-semantics tests/data/input_semantics/probe_bundle.mthds -o /tmp/probe-trace
      ```
 
+   - **`generate-projection-corpus`**: Write the shared inputs-template projection fixture corpus — the descriptors, the expected fill-in templates in both shapes and both formats, and the record of where the expectation deliberately differs from the engine's own renderer. Sole producer of the capture committed byte-identically in `mthds-js/tests/fixtures/protocol/` and `mthds-python/tests/fixtures/protocol/`, which is what pins the TypeScript and Python projections against each other. See `docs/contribute/generate-projection-corpus.md`.
+
+     ```bash
+     .venv/bin/pipelex-dev generate-projection-corpus \
+       tests/data/input_semantics/hinted_bundle.mthds \
+       tests/data/input_semantics/probe_bundle.mthds \
+       tests/data/input_semantics/scaffold_bundle.mthds \
+       tests/data/input_semantics/output_bundle.mthds \
+       -o /tmp/projection-corpus
+     ```
+
 ### Pipelex CLI Commands
 
    To run the Pipelex CLI commands without the logo, you can use the `--no-logo` flag, this will avoid useless tokens in the console output.

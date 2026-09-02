@@ -28,14 +28,16 @@ the library that defined them. They still do — what changed is that this build
 reaches them behind the library's back. (Registry teardown hygiene is tracked separately.)
 """
 
-from typing import Any, Sequence
+from typing import Any, Sequence, cast
 
 from mthds.protocol.pipe_io_contracts import IOMultiplicity, PipeInputContract, PipeIOContract, PipeIOContracts, PipeOutputContract
-from pydantic import PydanticUndefinedAnnotation, PydanticUserError
+from pydantic import BaseModel, PydanticUndefinedAnnotation, PydanticUserError
 
+from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.concepts.exceptions import ConceptValueError
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, fixed_item_count, is_multiple_multiplicity
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.interpreter_hub import get_concept_library
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipeline.exceptions import PipeIOContractError
@@ -63,6 +65,71 @@ def make_io_multiplicity(*, multiplicity: VariableMultiplicity | None) -> tuple[
     if is_multiple_multiplicity(multiplicity=multiplicity):
         return IOMultiplicity.VARIABLE, None
     return IOMultiplicity.SINGLE, None
+
+
+def _render_output_schema(*, pipe: PipeAbstract, concept_provider: ConceptProviderAbstract) -> dict[str, Any]:
+    """The JSON Schema of the payload a pipe resolves to — its concept's content model.
+
+    **This is where the output side departs from the input side, and the departure is the point.**
+    An input's schema describes what a CALLER SENDS, so a plural slot's is a bare array: that is
+    the shape the caller hands over. An output's schema describes what COMES BACK, and what comes
+    back is a `StuffContent` — so a plural output's payload is a `ListContent`, an object holding
+    its elements under `items`, never a bare array. Emitting the input side's plural rule here
+    would state a shape no run produces, which is worse than stating none: a consumer reading it
+    would unwrap by a property that is not there.
+
+    On the single arm the two sides agree exactly, and deliberately so — the same
+    `render_stuff_spec` call the inputs go through, so a `native.Text` output and a `native.Text`
+    input carry byte-identical schemas.
+
+    On the plural arm the envelope is asked of pydantic (`ListContent[structure_class]`) rather
+    than hand-built. A hand-built copy would be a second declaration of a runtime type, and it
+    would stop tracking that type the moment it changed — silently, because a wrong envelope still
+    parses as a schema.
+    """
+    try:
+        if not pipe.output.is_multiple():
+            # The single arm needs no structureless special case: `render_stuff_spec` handles
+            # `native.Anything` itself, publishing the permissive schema with the concept's
+            # identity annotations. Short-circuiting to a bare `{}` here would be strictly
+            # worse — it would drop the `title`/`description` every rendered schema is
+            # supposed to carry.
+            rendered = pipe.output.render_stuff_spec(concept_provider=concept_provider, output_format=ConceptRepresentationFormat.SCHEMA)
+            return cast("dict[str, Any]", rendered["content"])
+        if not pipe.output.concept.declares_a_structure_class:
+            # The plural arm is where structureless still needs saying, because the envelope
+            # is parametrized by a class and `native.Anything` deliberately has none. The
+            # envelope is still the right answer — a plural output's payload IS a
+            # `ListContent` — so it is asked of pydantic UNPARAMETRIZED, whose `items` are
+            # then bounded by nothing. That states exactly what is true: a list envelope
+            # holding values no schema constrains.
+            return ListContent.model_json_schema()
+        structure_class = concept_provider.get_structure_class(concept=pipe.output.concept)
+        # Parametrizing a generic with a class held in a variable is a runtime operation both type
+        # checkers read as a type expression, so both are told to stand down here rather than the
+        # envelope being hand-built to please them.
+        list_content_model = cast(
+            "type[BaseModel]",
+            ListContent[structure_class],  # type: ignore[valid-type]  # pyright: ignore[reportInvalidTypeArguments]
+        )
+        schema = list_content_model.model_json_schema()
+        item_count = fixed_item_count(multiplicity=pipe.output.multiplicity)
+        if item_count is not None:
+            # The fixed arm's bounds, stated on the ELEMENT array inside the envelope — the input
+            # side puts them on its bare array, and the same fact belongs in the same place
+            # relative to the elements. `ListContent` states no bounds of its own (its field is a
+            # plain `list`), so a `Concept[N]` output would otherwise be indistinguishable from a
+            # `Concept[]` one by schema alone.
+            #
+            # The property is looked up rather than spelled: it is the envelope model's own field
+            # name, and hardcoding it would fail SILENTLY — a renamed field would leave the bounds
+            # written onto a key nothing reads.
+            elements_key = next(iter(ListContent.model_fields))
+            schema["properties"][elements_key] |= {"minItems": item_count, "maxItems": item_count}
+        return schema
+    except (ConceptValueError, KeyError, PydanticUserError, PydanticUndefinedAnnotation) as exc:
+        msg = f"Failed to render the JSON Schema for the output of pipe '{pipe.pipe_ref}' (concept '{pipe.output.concept.concept_ref}'): {exc}"
+        raise PipeIOContractError(message=msg) from exc
 
 
 def build_pipe_io_contracts(pipes: Sequence[PipeAbstract]) -> PipeIOContracts:
@@ -134,6 +201,7 @@ def build_pipe_io_contracts(pipes: Sequence[PipeAbstract]) -> PipeIOContracts:
             multiplicity=output_multiplicity,
             item_count=output_item_count,
             optional=pipe.output.presence.is_optional,
+            json_schema=_render_output_schema(pipe=pipe, concept_provider=concept_provider),
         )
         io_contracts[pipe.pipe_ref] = PipeIOContract(inputs=pipe_inputs, output=pipe_output)
     return io_contracts

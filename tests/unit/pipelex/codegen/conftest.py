@@ -237,6 +237,17 @@ def every_type_kind_crate() -> LibraryCrate:
                     "counts": ConceptStructureBlueprint(
                         description="Counts", type=ConceptStructureBlueprintFieldType.DICT, key_type="text", value_type="integer", required=True
                     ),
+                    # A dict-valued default, carrying all three key spellings: prettier unquotes a plain
+                    # identifier key, keeps the quotes on one that is not, and picks the quote style that
+                    # needs fewer escapes on a key carrying a `"` — so the emitted literal has to make
+                    # both distinctions per key or a consumer's formatter rewrites the artifact.
+                    "quotas": ConceptStructureBlueprint(
+                        description="Quotas",
+                        type=ConceptStructureBlueprintFieldType.DICT,
+                        key_type="text",
+                        value_type="integer",
+                        default_value={"per-reviewer": 3, "total": 12, 'marked "urgent"': 1},
+                    ),
                     # ANY — only reachable nested, from genuine source imprecision. An untyped list also
                     # emits the trailing `# imprecise:` comment, so that shape gets linted too.
                     "items": ConceptStructureBlueprint(description="Untyped items", type=ConceptStructureBlueprintFieldType.LIST, required=True),
@@ -262,6 +273,74 @@ def every_type_kind_crate() -> LibraryCrate:
                     "prior_state": ConceptStructureBlueprint(
                         description="Prior workflow state",
                         choices=["awaiting_triage", "in_progress_with_owner", "blocked_on_dependency", "ready_for_review"],
+                        required=False,
+                    ),
+                    # A choice carrying a comma, on a list long enough to force the explode. Split naively
+                    # this became two unterminated string literals in every target — generated code that
+                    # does not parse, which the lint-clean guards catch only if a fixture carries the shape.
+                    "escalation_reason": ConceptStructureBlueprint(
+                        description="Why it escalated",
+                        choices=["blocked, awaiting the owner", "stale, no movement for a week", "ready for review"],
+                        required=True,
+                    ),
+                    # A choice carrying a double quote. Both formatters normalize a string literal to the
+                    # quote style needing fewer escapes, so the naive always-double spelling
+                    # (`"marked \"urgent\""`) is rewritten to a single-quoted one on the consumer's first
+                    # format run — at any line width, in both languages.
+                    "reviewer_verdict": ConceptStructureBlueprint(
+                        description='Whether the reviewer marked it "urgent"',
+                        choices=['marked "urgent"', "left unmarked"],
+                        required=True,
+                    ),
+                    # The intersection the two shapes above never combined: a choice carrying a comma AND a
+                    # double quote, on a list long enough to explode. The quote makes `_ts_string` spell it
+                    # single-quoted, and a member split that walks only `"` then cuts at the inner comma —
+                    # two unterminated literals again, on the one spelling the comma fix did not cover.
+                    "escalation_note": ConceptStructureBlueprint(
+                        description="A note explaining the escalation",
+                        choices=['say "hi", then continue', "left unmarked", "needs another look"],
+                        required=True,
+                    ),
+                    # Enumerated answer options: ordinary prose whose `)` closers are unmatched. They are
+                    # inside string literals, so a chain split that counts brackets without tracking quotes
+                    # reaches depth zero mid-literal and cuts the member chain there.
+                    "survey_answer": ConceptStructureBlueprint(
+                        description="The reviewer's answer",
+                        choices=["a) strongly agree with the proposal", "b) agree. with some reservations", "c unsure"],
+                        required=True,
+                    ),
+                    # The same unbounded choice list carrying a default — the widest presence spelling
+                    # ts-zod emits (`.nullable().default(…)` on top of a broken `z.enum([…])`), so the
+                    # print-width and prettier guards actually exercise the multi-member chain break.
+                    "fallback_state": ConceptStructureBlueprint(
+                        description="Fallback workflow state",
+                        choices=["awaiting_triage", "in_progress_with_owner", "blocked_on_dependency", "ready_for_review"],
+                        default_value="awaiting_triage",
+                    ),
+                    # A short choice list that only overflows once `.nullable().default(…)` is attached.
+                    # Prettier re-measures each call after breaking the chain, so the enum goes back onto
+                    # one line at indent 4 — exploding its members regardless is a shape prettier folds
+                    # straight back, which is exactly the stamp break the breaking exists to prevent.
+                    "escalation_severity": ConceptStructureBlueprint(
+                        description="How severe the escalation is",
+                        choices=["low", "medium", "high"],
+                        default_value="medium",
+                    ),
+                    # The overflow that has nothing to do with the *expression*: `z.string()` is as short as
+                    # they come, and this line still passes prettier's print width on the authored field name
+                    # and default literal alone. It is the shape that makes the member-chain break general
+                    # rather than a `z.enum` special case, so the width and prettier guards must carry it.
+                    "default_summary_style": ConceptStructureBlueprint(
+                        description="How the summary should be written",
+                        type=ConceptStructureBlueprintFieldType.TEXT,
+                        default_value="a concise executive summary",
+                    ),
+                    # The same overflow reached through a nested type rather than a long default.
+                    "per_reviewer_summary_style_overrides": ConceptStructureBlueprint(
+                        description="Summary style per reviewer",
+                        type=ConceptStructureBlueprintFieldType.DICT,
+                        key_type="text",
+                        value_type="text",
                         required=False,
                     ),
                 },
