@@ -53,7 +53,7 @@ Any number of bookmarks:
 """
 
 # The natives whose payload shape the descriptor states openly, at slot positions — the one place
-# the corpus never reached. `native.Dynamic` and `native.Composite` are structureless by design, so
+# the corpus never reached. `native.Dynamic` and `native.Composite` declare no pinned structure, so
 # their node is `unknown` and every projection renders the empty object both renderers agree on.
 # `native.JSON` is not: its pinned blueprint carries a required `json_obj`, so it expands like any
 # other pinned native, and the dict inside it is the corpus's first REQUIRED unknown node — the

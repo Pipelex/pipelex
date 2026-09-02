@@ -35,9 +35,11 @@ The JSON Schema on an input names its concept: `title` is the `concept_ref`, `de
 }
 ```
 
-## The one structureless concept: `native.Anything`
+## The one concept with no structure class: `native.Anything`
 
-`native.Anything` deliberately declares no structure class, so its input schema cannot come from a pydantic render. It publishes the **permissive schema**: no constraint keywords, only the identity annotations every rendered input schema carries — `{"title": "native.Anything", "description": "…"}`. Annotation keywords constrain nothing, so this is semantically the empty schema (any JSON value), which is what an untyped vehicle means, while consumers still see the concept's identity instead of a bare `{}` they would have to special-case. Multiplicity wraps exactly as above: `Anything[]` is an array of that schema, a fixed count adds the bounds.
+`native.Anything` is the only concept that declares no structure class, so its input schema cannot come from a pydantic render. (That is a different question from the three natives which declare no *pinned structure* — `Dynamic`, `Anything`, `Composite` — and therefore render as `unknown` in the [input-form descriptor](input-form-descriptor.md).) It publishes the **permissive schema**: no constraint keywords, only the identity annotations every rendered input schema carries — `{"title": "native.Anything", "description": "…"}`. Annotation keywords constrain nothing, so this is semantically the empty schema (any JSON value), which is what an untyped vehicle means, while consumers still see the concept's identity instead of a bare `{}` they would have to special-case. Multiplicity wraps exactly as above: `Anything[]` is an array of that schema, a fixed count adds the bounds.
+
+The schema states what the *concept* admits, not what today's input shaper accepts: an `Anything` slot currently takes a string (shaped into a `native.Text` stuff) and refuses the other JSON types. Narrowing the published schema to match would be stating a runtime limitation as a contract, so the schema stays permissive and the shaper is what has to catch up.
 
 ## Which surfaces carry it
 

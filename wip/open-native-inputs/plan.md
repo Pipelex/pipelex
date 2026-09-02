@@ -49,6 +49,14 @@ Branch `fix/Anything-io-contract`, PR → `dev`. Its own PR, per the item: a wir
 
 > **Checkpoint 1 recorded (2026-09-01):** PR [#1178](https://github.com/Pipelex/pipelex/pull/1178) open against `dev` (branch `fix/Anything-io-contract`), full `agent-check` + `agent-test` green. R1 implemented as annotated-permissive and R2 as the empty mapping, both as planned; review outcome pending. The structureless arm landed in `StuffSpec.render_stuff_spec` with `Concept.render_structureless_representation` beside `_render_schema_representation`, sharing the array wrap through an extracted `_wrap_schema_for_multiplicity`; PYTHON is refused with `ConceptValueError`. The deferred `error_domain` ruling on `PipeIOContractError`'s residual causes is filed as L-260901-5bb532.
 
+> **Checkpoint 1 — review outcome (2026-09-02):** R1 and R2 both survived review unamended; the reviewed additions to the PR are tests and wording only, no behaviour change. Three findings were deferred to their own items rather than widening the PR, all three the same root cause — a mechanically derived `AnythingContent` that never resolves — at sites this phase did not reach:
+>
+> - **L-260902-9546ef (high)** — a `PipeLLM` with `output = "Anything"` still escapes protocol `validate` as `kajson.ClassRegistryNotFoundError`, which is not a `PipelexError` and carries no `error_domain`, so the hosted route renders the same HTTP 500 this phase set out to remove. `pipe_operators/llm/pipe_llm.py:234` reads the class registry directly, bypassing `get_structure_class` and therefore the guard. This is the input fix's mirror image and the phase's biggest blind spot: the regression test is input-only.
+> - **L-260902-db6d1e (normal)** — `pipelex build runner` on an `Anything` input still emits the unfollowable "include that module" advice verbatim (`builder/runner_code.py:102`, `:213`), and a concept declaring `refines = "Anything"` cannot be loaded at all (`core/concepts/concept_factory.py:466`) while codegen treats that declaration as legal.
+> - **R1 is wider than the runtime, and the docs now say so.** An `Anything` input accepts a string only (shaped into a `native.Text` stuff) and refuses number, bool, list and dict — see Phase 3 item 4 below for the measured evidence. R1 stays as ruled: narrowing the published schema would state a runtime limitation as a contract. `docs/under-the-hood/pipe-io-contracts.md` names the gap explicitly so a consumer reading the contract is not surprised by it, and closing it is the shaper's job.
+>
+> Also corrected in review: `docs/contribute/generate-projection-corpus.md` still asserted that an `Anything` input crashes the contract builder, which this phase made false; the word *structureless* was carrying two incompatible meanings across `NativeConceptCode.is_structureless_concept` (no structure **class**, `Anything` alone) and `input_form.py` (no **pinned structure**, three natives), and the sites now say which they mean.
+
 ## Phase 2 — dynamic concepts get no static prompt classification (fixes L-260831-635398)
 
 Branch `fix/Dynamic-prompt-classification`, PR → `dev`. Independent of Phase 1 — disjoint files; no stacking needed.
@@ -74,7 +82,21 @@ This is the work L-260831-264cbd had to leave behind, and it lands as a fixture 
 1. Add `anything_in = "Anything"` to `scaffold_open_natives` in `tests/data/input_semantics/scaffold_bundle.mthds` (inputs and template), alongside its existing `json_in` / `dynamic_in` / `composite_in`. Add a `PipeLLM` pipe covering `native.Dynamic` referenced in a prompt — the coverage item 2's fix makes writable.
 2. Regenerate: `.venv/bin/pipelex-dev generate-projection-corpus tests/data/input_semantics/*.mthds -o /tmp/projection-corpus`; update `tests/integration/pipelex/pipeline/test_input_form.py` expectations where the scaffold grew.
 3. Re-commit the captures in `mthds-js` and `mthds-python`. L-260831-56a78f and L-260831-933a6c are already open for the current regeneration — if still open when Phase 3 runs, note the added coverage on them and let one re-commit carry both; otherwise file fresh items with `ledger new --owner mthds-python|mthds-js`.
-4. **Known risk**: the corpus round-trip gate feeds every projected template back through the input shaper. The `{}` example for `Anything` goes down the shaper's `InputKind.DYNAMIC` bottom-up arm; if that arm refuses an empty dict, the gate says so at generation time — resolve by either recording it as a deliberate projection difference (the corpus has a slot for those) or fixing the shaper arm, whichever the failure shows is honest. Do not pre-build a guard for a refusal that may not happen.
+4. **Known risk, now measured — the arm refuses.** The risk this item named is real, and PR 1's review probed it ahead of Phase 3 so the phase starts from a settled question. Against a live library, an `Anything` slot refuses the R2 template in both shapes:
+
+   ```
+   compact  {}                                          REFUSED StuffFactoryError: ... does not have a 'concept' key.
+   explicit {"concept": "native.Anything", "content": {}} REFUSED StuffFactoryError: ... 'native.Anything' is not compatible with a dict content
+   ```
+
+   The refusal is broader than the empty dict. Of the JSON types, an `Anything` input accepts only a string, and shapes it into a `native.Text` stuff rather than an `Anything` one:
+
+   ```
+   string  OK -> concept=native.Text content=TextContent
+   number  REFUSED    bool  REFUSED    list  REFUSED    dict  REFUSED
+   ```
+
+   So the choice this item offered — record a deliberate projection difference, or fix the shaper arm — resolves toward **fixing the shaper arm**: recording a difference would pin a template nobody can submit, which is exactly the defect the `native.JSON` entry in the same release says it removed. It also means R1's published schema ("any JSON value") is currently wider than the runtime, which `docs/under-the-hood/pipe-io-contracts.md` now says out loud rather than leaving for a consumer to discover. Adding `anything_in` to `scaffold_open_natives` before the shaper is fixed will fail the round-trip gate; `docs/contribute/generate-projection-corpus.md` records that as the reason the slot is still empty.
 
 **Checkpoint 3** — corpus regenerated and re-committed across the three repos; both bugs closed with the merges as evidence.
 

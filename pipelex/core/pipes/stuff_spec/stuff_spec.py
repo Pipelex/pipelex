@@ -44,10 +44,10 @@ class StuffSpec(BaseModel):
         """Render a representation of this stuff spec.
 
         Args:
-            concept_provider: Resolves this spec's concept into its structure class. This is the one
-                place in the whole render chain that resolves a class, so a caller states which
-                library it means instead of every renderer reaching for one.
-            output_format: The format to generate (JSON or PYTHON)
+            concept_provider: Resolves this spec's concept into its structure class, so a caller
+                states which library it means instead of every renderer reaching for one. Unused
+                on the structureless arm below, which resolves nothing.
+            output_format: The format to generate (JSON, PYTHON, or SCHEMA)
 
         Returns:
             Dictionary with concept and content structure,

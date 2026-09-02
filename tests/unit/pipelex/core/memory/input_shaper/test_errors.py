@@ -30,6 +30,10 @@ ERROR_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, type[InputSh
     ("wrong-bool-for-number", "shaper_test.Priority", None, True, WrongScalarKindError, "expects a number"),
     # D9 a top-level null is a hard error (absence = omit the key).
     ("null-top-level", "native.Text", None, None, NullInputError, "null"),
+    # Same rule on the one concept that declares no structure class: `native.Anything` reaches the
+    # expected-shape render (this arm fires before the D5 `InputKind.DYNAMIC` short-circuit), so the
+    # hint has to be renderable without resolving a class — it used to raise while building the error.
+    ("null-top-level-anything", "native.Anything", None, None, NullInputError, "null"),
     # D2 a list where a singular is declared is ambiguous.
     ("list-where-singular", "shaper_test.Question", None, ["a", "b"], ListWhereSingularError, "single"),
     # `[1]` IS the singular declaration, so it refuses a list on the same grounds — including a

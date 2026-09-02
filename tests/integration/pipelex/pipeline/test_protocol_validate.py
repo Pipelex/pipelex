@@ -158,7 +158,11 @@ class TestProtocolValidate:
             assert isinstance(report, PipelexValidationReport)
             assert report.is_runnable is True
             anything_schema = report.pipe_io_contracts["protocol_validate_anything.carry"].inputs["anything_in"].json_schema
-            assert anything_schema == {"title": "native.Anything", "description": anything_schema["description"]}
+            # The permissive schema carries the identity annotations and nothing else: no constraint
+            # keyword may appear, and `description` must be the concept's own, not an empty string.
+            assert set(anything_schema) == {"title", "description"}
+            assert anything_schema["title"] == "native.Anything"
+            assert anything_schema["description"]
         finally:
             clear_current_library()
 
