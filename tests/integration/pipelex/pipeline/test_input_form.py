@@ -612,8 +612,8 @@ class TestKindAssignmentTable:
         assert json_field.kind == FieldKind.OBJECT, "native.JSON has a pinned structure, so it expands like the other pinned natives"
         assert json_field.fields is not None
         assert [field.name for field in json_field.fields] == ["json_obj"], "Its pinned blueprint's single required field"
-        # The three the standard calls structureless — `_pinned_structure` returns None for exactly
-        # these, so `unknown` is the honest kind and no other native may join them.
+        # The three natives that declare no pinned structure — `_pinned_structure` returns None for
+        # exactly these, so `unknown` is the honest kind and no other native may join them.
         assert _field_by_name(natives, "dynamic_in").kind == FieldKind.UNKNOWN
         assert _field_by_name(natives, "anything_in").kind == FieldKind.UNKNOWN
         for field in natives.fields:

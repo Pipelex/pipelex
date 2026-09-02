@@ -47,6 +47,18 @@ output = "Summary"
 prompt = "Summarize $doc"
 """
 
+_ANYTHING_INPUT_MTHDS = """
+domain = "protocol_validate_anything"
+description = "Bundle with an untyped native.Anything input, for the verdict-not-500 regression"
+
+[pipe.carry]
+type = "PipeCompose"
+description = "Carry an untyped payload through"
+inputs = { anything_in = "Anything" }
+output = "Text"
+template = "$anything_in"
+"""
+
 _MAIN_PIPE_MTHDS = """
 domain = "protocol_validate_graph"
 description = "Bundle declaring a main_pipe, for the graph arm"
@@ -130,6 +142,27 @@ class TestProtocolValidate:
             }
             # No main_pipe declared → no graph.
             assert report.graph_spec is None
+        finally:
+            clear_current_library()
+
+    async def test_anything_input_produces_a_verdict(self, load_empty_library: Callable[[], str]) -> None:
+        """A legal bundle with a `native.Anything` input produces a report — the IO-contract
+        assembly must not throw the verdict away after validation succeeded (the hosted route
+        rendered that as HTTP 500).
+        """
+        load_empty_library()
+        try:
+            runner = PipelexMTHDSProtocol()
+            report = await runner.validate(mthds_contents=[_ANYTHING_INPUT_MTHDS])
+
+            assert isinstance(report, PipelexValidationReport)
+            assert report.is_runnable is True
+            anything_schema = report.pipe_io_contracts["protocol_validate_anything.carry"].inputs["anything_in"].json_schema
+            # The permissive schema carries the identity annotations and nothing else: no constraint
+            # keyword may appear, and `description` must be the concept's own, not an empty string.
+            assert set(anything_schema) == {"title", "description"}
+            assert anything_schema["title"] == "native.Anything"
+            assert anything_schema["description"]
         finally:
             clear_current_library()
 
