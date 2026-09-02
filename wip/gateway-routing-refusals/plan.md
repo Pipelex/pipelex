@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 item: L-260831-9963b5
 ---
 
@@ -133,3 +133,11 @@ Mirror the unresolvable-references module's structure and docstring style, inclu
   - **A correction to a finding the review raised and the code refuted.** The advice for `pig-01` was reported lost at the pipe boundary, since `PipeOperatorModelAvailabilityError`'s constructor takes no user action. It is not: `PipelexError._enrich_error_report_from_cause` inherits `user_action` and `error_domain` off the `__cause__` chain, and `pipe_operator.py` raises `from` the original. Probed live, and now pinned by `TestTheAdviceSurvivesThePipeBoundary` — which mutation-testing shows goes red both when the category is reverted and when that enrichment line is dropped.
   - **Two doc precision fixes.** The closing "remaining codes" sentence was a closed two-item list that omitted `pig-12` (unmapped, filed as [L-260901-0859e8](http://localhost:4747/i/L-260901-0859e8)); it now names it and says what closes it. And `pig-05`'s path shape is the gateway-prefixed `/v1/<v1|v1alpha|v1beta>/models/<model>:generateContent` with a `streamGenerateContent` twin, not the bare `/v1beta` single form the comment and the page claimed.
 
+- **Checkpoint 4 — landed (2026-09-02).** PR #1185 was squash-merged into `feature/Two-gateways-2` as `6c4b834bc`, with every CI job green: the eight py3.11 test shards, the typecheck, and each lint job (agent-rules, config-sync, drift-contracts, hub layering, keyword-only, ruff + plxt). [L-260831-9963b5](http://localhost:4747/i/L-260831-9963b5) is closed `fixed` against that merge. The merge sits on the stack's own branch and has not yet reached `dev` or `main`, so nothing here is published: it travels with whatever pull request takes `feature/Two-gateways-2` onward, and the repo's open release item is [L-260828-f4e88c](http://localhost:4747/i/L-260828-f4e88c).
+
+  The items this campaign filed stay open by design, each recorded above and none of them a loose end of this plan:
+
+  - [L-260901-0859e8](http://localhost:4747/i/L-260901-0859e8) — the `pig-12` map entry, split out at checkpoint 1.
+  - [L-260902-a8f50b](http://localhost:4747/i/L-260902-a8f50b) — the Google Extract hop returning `"failure"` as a provider error code, to be fixed before any native Google path is pointed at a gateway.
+  - [L-260902-701614](http://localhost:4747/i/L-260902-701614) — the gateway-side split of `pig-01`, whose three facts under one code are why the detail is hedged rather than asserting a deck-versus-gateway disagreement.
+  - [L-260902-b17ff6](http://localhost:4747/i/L-260902-b17ff6) — the default this campaign kept proving is missing: an unmapped code in the gateway's own namespaces must never degrade to "review your prompt".
