@@ -16,8 +16,10 @@ prompt, parameters, and inputs."* — and receives an ``LLMCompletionError`` rat
 than the ``LLMModelNotFoundError`` that case has always produced when the model
 deck itself cannot find a model. These tests pin the whole chain: the code is
 recognized, it survives every Extract hop that can carry it, it classifies as a
-configuration problem that is never retried, and the Render step says which
-routing decision failed and who has to change what.
+configuration problem that is never retried, the Render step says which routing
+decision failed and who has to change what, and both consequences of the category
+that outlive this module are pinned too — the HTTP status the family now answers,
+and the advice surviving the pipe layer's re-raise.
 
 **Every member is its own wire code here**, unlike the two families beside it.
 That is not an accident of the code space: grouping is by remedy in all three
@@ -38,15 +40,20 @@ would hide an unset variable. The same call ``STORAGE_NOT_SERVED`` and
 ``BODY_LENGTH_REQUIRED`` get in the two families beside this one.
 
 **``pig-03`` and ``pig-04`` are deliberately outside the family**, and that scope
-decision is pinned below rather than left to a comment. Neither is producible by
-the clients the runtime ships: ``pig-03`` refuses client-side routing forms that
-``tests/unit/pipelex/providers/manifold/test_manifold_clients.py`` already pins the
-manifold clients never send, and ``pig-04`` refuses a path the gateway does not
-mount at all.
+decision is pinned below rather than left to a comment. Neither is produced today
+by a client talking to a Pipelex-operated gateway: ``pig-03`` refuses client-side
+routing forms that
+``tests/unit/pipelex/providers/manifold/test_manifold_clients.py`` pins the
+manifold clients against by name, and ``pig-04`` refuses a path the gateway does
+not mount at all. Two limits on the first half, recorded beside the map rather
+than implied here: that test names four headers while the gateway refuses on an
+allow-list, and the gateway img-gen worker does send ``x-portkey-config``, which
+Portkey's cloud reads and one of our gateways would refuse.
 
 **``pig-05`` is mapped but unreachable from today's runtime**, which is why no
-Extract hop is pinned for it. It is raised only on the native Google protocol path
-(``/v1beta/models/<model>:generateContent``), and no worker speaks that protocol to
+Extract hop is pinned for it. It is raised only on a native Google protocol path
+(``/v1/<v1|v1alpha|v1beta>/models/<model>:generateContent`` or its
+``streamGenerateContent`` twin), and no worker speaks that protocol to
 the gateway: both the gateway and manifold plugins build their LLM workers on the
 OpenAI substrate, and ``ManifoldNativeClient`` serves only the ``/v1/pipelex/*``
 extract and search routes. The map entry costs nothing and is right the day a
@@ -66,7 +73,8 @@ import pytest
 from openai import OpenAI
 from portkey_ai import Portkey
 
-from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, LLMModelNotFoundError
+from pipelex.base_exceptions import ErrorDomain
+from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory, LLMCompletionError, LLMModelNotFoundError
 from pipelex.cogt.inference.error_classification import (
     _GATEWAY_ROUTING_REFUSAL_BY_CODE,  # pyright: ignore[reportPrivateUsage]
     GatewayRoutingRefusal,
@@ -81,6 +89,8 @@ from pipelex.cogt.inference.error_classification import (
 from pipelex.cogt.inference.error_classify import classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
+from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
+from pipelex.system.pipe_run_mode import PipeRunMode
 
 _ORIGIN = "https://manifold.example.com"
 
@@ -172,14 +182,18 @@ def _envelope(code: str | None, *, status_code: int = 400, provider: ProviderNam
     )
 
 
-def _rendered_detail(metadata: ProviderErrorMetadata, *, family: InferenceErrorFamily = InferenceErrorFamily.LLM) -> str:
-    rendered = render_inference_error(
+def _rendered_error(metadata: ProviderErrorMetadata, *, family: InferenceErrorFamily = InferenceErrorFamily.LLM) -> CogtError:
+    return render_inference_error(
         metadata=metadata,
         classification=classify_inference_error(metadata),
         family=family,
         model_desc="claude-fake",
         model_handle="fake-handle",
     )
+
+
+def _rendered_detail(metadata: ProviderErrorMetadata, *, family: InferenceErrorFamily = InferenceErrorFamily.LLM) -> str:
+    rendered = _rendered_error(metadata, family=family)
     assert rendered.user_action is not None
     return rendered.user_action.detail
 
@@ -539,3 +553,76 @@ class TestTheThreeGatewayFamiliesDoNotShadowEachOther:
         assert limits & references == set()
         assert limits & routing == set()
         assert references & routing == set()
+
+
+class TestWhatTheFamilyAnswersOverHTTP:
+    """The category is not only advice — it decides the status an HTTP surface returns.
+
+    ``CONFIGURATION`` implies ``ErrorDomain.CONFIG``, which
+    ``error_domain_to_http_status`` renders as 500; the ``CONTENT`` these four used
+    to receive implies ``INPUT`` and renders as 422. So classifying the family
+    moved its HTTP answer as surely as it moved its wording, and that is the half a
+    classification test cannot see. 500 is also the status outer clients retry,
+    which is worth pinning precisely because "never retried" elsewhere in this
+    module is a statement about ``InferenceErrorCategory.is_retryable`` inside this
+    process and about nothing else.
+    """
+
+    @pytest.mark.parametrize("code", _EVERY_CODE)
+    def test_every_member_answers_500_rather_than_the_422_it_used_to(self, code: str) -> None:
+        report = _rendered_error(_envelope(code)).to_error_report()
+
+        assert report.error_domain == ErrorDomain.CONFIG
+        assert report.http_status == 500
+
+    def test_an_unrecognized_400_still_answers_422(self) -> None:
+        """The contrast that makes the case above a change rather than a constant."""
+        report = _rendered_error(_envelope("something-else")).to_error_report()
+
+        assert report.error_domain == ErrorDomain.INPUT
+        assert report.http_status == 422
+
+
+class TestTheAdviceSurvivesThePipeBoundary:
+    """``pig-01`` is the one member whose error class is re-raised on the way out.
+
+    ``pipe_operator.py`` catches ``ModelNotFoundError`` and re-raises it as a
+    ``PipeOperatorModelAvailabilityError``, whose constructor takes a message, a
+    handle and a stack and no user action — so the advice reaches a caller only
+    because ``_enrich_error_report_from_cause`` inherits ``user_action`` and
+    ``error_domain`` off the ``__cause__`` chain. That inheritance is what carries
+    every word of this family's most-argued detail through the pipe layer, and
+    nothing else in this module crosses that boundary to see it.
+    """
+
+    def _re_raised_as_the_pipe_operator_does(self, cause: LLMModelNotFoundError) -> PipeOperatorModelAvailabilityError:
+        """Mirror ``PipeOperator``'s ``except ModelNotFoundError`` arm, ``from`` included.
+
+        The ``from`` is the load-bearing part: without it there is no ``__cause__``
+        and the enrichment this class exists to pin has nothing to read.
+        """
+        try:
+            raise cause
+        except LLMModelNotFoundError as model_not_found_error:
+            try:
+                raise PipeOperatorModelAvailabilityError(
+                    message=model_not_found_error.message,
+                    run_mode=PipeRunMode.LIVE,
+                    pipe_type="PipeLLM",
+                    pipe_code="some_pipe",
+                    pipe_stack=[],
+                    model_handle=model_not_found_error.model_handle,
+                ) from model_not_found_error
+            except PipeOperatorModelAvailabilityError as availability_error:
+                return availability_error
+
+    def test_the_unknown_model_advice_reaches_the_caller_through_the_pipe_error(self) -> None:
+        rendered = _rendered_error(_envelope("pig-01"))
+        assert isinstance(rendered, LLMModelNotFoundError)
+
+        report = self._re_raised_as_the_pipe_operator_does(rendered).to_error_report()
+
+        assert report.error_type == "PipeOperatorModelAvailabilityError"
+        assert report.user_action_detail() == _rendered_detail(_envelope("pig-01"))
+        assert report.error_domain == ErrorDomain.CONFIG
+        assert report.http_status == 500

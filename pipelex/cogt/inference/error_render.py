@@ -148,17 +148,28 @@ def _render_gateway_routing_refusal_detail(*, refusal: GatewayRoutingRefusal) ->
     text adds is what the caller — or whoever operates the deployment — should
     *do*, which the message does not say.
 
-    Two of the four say "the model deck" out loud. The runtime picks the protocol
-    and the route from its own deck, so those refusals usually mean the deck and
-    the gateway disagree about a model rather than that the caller chose badly, and
-    advice that only said "pick another model" would send an operator hunting for a
-    model problem that is a configuration problem.
+    Every member whose remedy could be a deck edit says "the model deck" out loud.
+    The runtime picks the model, the protocol and the route from its own deck, so
+    those refusals usually mean the deck and the gateway disagree about a model
+    rather than that the caller chose badly, and advice that only said "pick
+    another model" would send an operator hunting for a model problem that is a
+    configuration problem.
     """
     match refusal:
         case GatewayRoutingRefusal.UNKNOWN_MODEL:
+            # The second sentence is hedged deliberately. ``pig-01`` is the gateway's
+            # answer to three different facts — it serves no such model, the body
+            # named none, and the body could not be parsed at all (its model reader
+            # returns "no model" from a bare ``catch``) — and the wire code does not
+            # tell them apart. Only the gateway's own message does, so the advice
+            # sends the reader there before it sends them to the deck: asserting a
+            # deck-versus-gateway disagreement outright would be a confident lie for
+            # the other two causes. Splitting the code is the real fix, filed on
+            # ``pipelex-manifold`` as L-260902-701614.
             return (
-                "The inference gateway does not serve that model — pick a model this deployment serves. "
-                "If your model deck lists it, the deck and the gateway disagree about what is available."
+                "The inference gateway does not serve that model — pick a model this deployment serves. Its own message is "
+                "the authority on which: the same code also answers a request it could not read a model out of at all. "
+                "If it names a model your model deck lists, the deck and the gateway disagree about what is available."
             )
         case GatewayRoutingRefusal.DISABLED_INTEGRATION:
             return (
@@ -192,12 +203,13 @@ def _render_detail(metadata: SDKErrorEnvelope, *, classification: Classification
         # refusal that no reshaping of the inputs can get around.
         return _render_gateway_unresolved_reference_detail(reference=classification.gateway_unresolved_reference)
     if classification.gateway_routing_refusal is not None:
-        # Same reason a third time, and here the action kind is wrong for every
-        # member rather than for some: ``CHANGE_MODEL`` renders "the requested
-        # model was not found", which is true of one of the four and false of the
-        # three whose model exists and is served, and ``CONTACT_SUPPORT`` renders
-        # "the error could not be classified" for a refusal that named itself
-        # precisely.
+        # Same reason a third time, and here the action kind is too coarse for
+        # every member rather than for some: ``CHANGE_MODEL`` renders "the
+        # requested model was not found", which is right only for ``pig-01`` and
+        # false for ``pig-05`` and ``pig-06``, whose model exists and is served —
+        # and for ``pig-02``, whose model resolves but to an integration that is
+        # switched off. ``CONTACT_SUPPORT`` renders "the error could not be
+        # classified" for a refusal that named itself precisely.
         return _render_gateway_routing_refusal_detail(refusal=classification.gateway_routing_refusal)
     match classification.user_action_kind:
         case UserActionKind.WAIT_AND_RETRY:

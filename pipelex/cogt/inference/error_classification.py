@@ -240,11 +240,20 @@ class GatewayRoutingRefusal(StrEnum):
     change, the code is not.
     """
 
-    #: ``pig-01`` at HTTP 400 — the request body names no model at all, or names
-    #: one that no integration this deployment carries lists. Reached from the
-    #: runtime by a model deck whose handle the gateway does not serve: a stale
-    #: deck, a typo in a ``.mthds`` file's model, or a model the deployment
-    #: deliberately does not carry.
+    #: ``pig-01`` at HTTP 400 — the request body names one that no integration
+    #: this deployment carries lists. Reached from the runtime by a model deck
+    #: whose handle the gateway does not serve: a stale deck, a typo in a
+    #: ``.mthds`` file's model, or a model the deployment deliberately does not
+    #: carry.
+    #:
+    #: **The code covers two other facts and does not distinguish them**: a body
+    #: that names no model, and a body the gateway could not parse at all — its
+    #: model reader returns "no model" from a bare ``catch`` around the JSON and
+    #: multipart reads alike, so a truncated or non-conforming payload lands here
+    #: too. Only the gateway's message says which, which is why the rendered
+    #: advice defers to it rather than asserting a deck disagreement (see
+    #: ``_render_gateway_routing_refusal_detail``). Splitting the code is a
+    #: gateway-side change, filed on ``pipelex-manifold`` as L-260902-701614.
     UNKNOWN_MODEL = "unknown_model"
     #: ``pig-02`` at HTTP 400 — the model resolves, but to an integration the
     #: deployment has switched off because a credential variable is unset. Nothing
@@ -253,9 +262,10 @@ class GatewayRoutingRefusal(StrEnum):
     #: set.
     DISABLED_INTEGRATION = "disabled_integration"
     #: ``pig-05`` at HTTP 400 — a native-protocol path names a model that another
-    #: provider serves. Today that is only Google's
-    #: ``/v1beta/models/<model>:generateContent`` shape, the one
-    #: ``nativeProtocolPaths.ts`` admits. Reaching it means the model deck and the
+    #: provider serves. Today that is only Google's generative shape —
+    #: ``/v1/<v1|v1alpha|v1beta>/models/<model>:generateContent`` or its
+    #: ``streamGenerateContent`` twin, under the gateway's own ``/v1`` prefix —
+    #: the one ``nativeProtocolPaths.ts`` admits. Reaching it means the model deck and the
     #: gateway disagree about which backend serves a model: the model exists and
     #: is served, just not over the protocol the runtime spoke to ask for it.
     WRONG_PROTOCOL = "wrong_protocol"
@@ -282,10 +292,20 @@ class GatewayRoutingRefusal(StrEnum):
 #
 # - ``pig-03`` ("the client tried to route") refuses a ``x-portkey-*`` steering
 #   header, the ``?model=`` query form, a ``@<slug>/<model>`` virtual-key model, or
-#   a path and body naming different models. No client the runtime ships produces
-#   any of those — ``tests/unit/pipelex/providers/manifold/test_manifold_clients.py``
-#   pins that — so reaching it means a client bug, not a caller's or an operator's
-#   mistake, and the status ladder's reading is as good as any.
+#   a path and body naming different models. No client that talks to a
+#   Pipelex-operated gateway today produces any of those, so reaching it means a
+#   client bug rather than a caller's or an operator's mistake, and the status
+#   ladder's reading is as good as any.
+#
+#   Two limits on that sentence, because it is the whole reason the code stays
+#   out. ``tests/unit/pipelex/providers/manifold/test_manifold_clients.py`` pins
+#   the manifold clients against the four steering headers by name, while the
+#   gateway refuses on an *allow*-list — so a ``portkey_ai`` release that starts
+#   sending some other ``x-portkey-*`` header turns every request into a
+#   ``pig-03`` with that test still green. And ``gateway_img_gen_worker.py`` does
+#   send ``x-portkey-config`` on every image call, which Portkey's cloud reads and
+#   a Pipelex-operated gateway refuses: harmless while ``pipelex_gateway`` keeps
+#   its default endpoint, and a client bug the day that backend names one of ours.
 # - ``pig-04`` ("this gateway does not serve ``<method> <path>``") is the proxy
 #   policy refusing a path only the catch-all could answer, and it is a 404, so the
 #   ladder already reads it as model-not-found — wrong in kind, but unreachable
