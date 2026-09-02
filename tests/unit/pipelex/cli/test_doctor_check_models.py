@@ -143,8 +143,8 @@ class TestCheckModels:
         assert message == "Error checking models: preset broken"
 
     @pytest.mark.usefixtures("gateway_disabled")
-    def test_backend_library_error_updates_named_backend_report(self, mocker: MockerFixture, models_manager: Any) -> None:
-        """A library error naming a known backend flips that backend's report to invalid."""
+    def test_backend_library_error_updates_declared_backend_report(self, mocker: MockerFixture, models_manager: Any) -> None:
+        """A library error declaring a known backend flips that backend's report to invalid."""
         openai_report = BackendFileReport(
             backend_name="openai",
             file_path="/cfg/inference/backends/openai.toml",
@@ -154,11 +154,37 @@ class TestCheckModels:
             "pipelex.cli.commands.doctor_cmd.check_backend_files",
             return_value=(True, {"openai": openai_report}, "All backend files are valid"),
         )
-        models_manager.setup.side_effect = InferenceBackendLibraryError("openai: cannot resolve model")
+        models_manager.setup.side_effect = InferenceBackendLibraryError("cannot resolve model", backend_name="openai")
 
         healthy, message, reports = check_models()
 
         assert healthy is False
-        assert message == "Error checking models: openai: cannot resolve model"
+        assert message == "Error checking models: cannot resolve model"
         assert reports["openai"].is_valid is False
-        assert reports["openai"].error_message == "openai: cannot resolve model"
+        assert reports["openai"].error_message == "cannot resolve model"
+
+    @pytest.mark.usefixtures("gateway_disabled")
+    def test_backend_library_error_spares_backend_named_only_in_prose(self, mocker: MockerFixture, models_manager: Any) -> None:
+        """The loader's unknown-key advice names `x-portkey-provider`, so portkey's name rides in every
+        such message. Only the backend the error declares records it — portkey's file is untouched.
+        """
+        reports_in = {
+            "openai": BackendFileReport(backend_name="openai", file_path="/cfg/inference/backends/openai.toml", is_valid=True),
+            "portkey": BackendFileReport(backend_name="portkey", file_path="/cfg/inference/backends/portkey.toml", is_valid=True),
+        }
+        mocker.patch(
+            "pipelex.cli.commands.doctor_cmd.check_backend_files",
+            return_value=(True, reports_in, "All backend files are valid"),
+        )
+        models_manager.setup.side_effect = InferenceBackendLibraryError(
+            "Unknown key 'maxtokens' on model 'gpt-5' for backend 'openai': a per-model key that is not a "
+            "model-spec field is sent as a request header and must contain a hyphen (e.g. 'x-portkey-provider')",
+            backend_name="openai",
+        )
+
+        healthy, _, reports = check_models()
+
+        assert healthy is False
+        assert reports["openai"].is_valid is False
+        assert reports["portkey"].is_valid is True
+        assert reports["portkey"].error_message is None

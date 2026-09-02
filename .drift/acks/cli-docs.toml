@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:2e2f3f3c4886666d48918080519c18ff9466e16a11798eaf55b7af89ecab097f"
+digest = "sha256:0ff100013089b0a003f5e016377c4394e27d7efa5aad76c4cc34fdb288941ab8"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-02T20:44:04Z"
-rationale = "Pre-landing review pass on fix/Library-class-registry-scoping. The only CLI trigger change is in pipelex/cli/commands/run/_run_core.py: the comment above the --save-csv except block is rewritten to state what is true (CsvError is a ToolError and so a PipelexError, so it never escaped execute_run's generic except arm) and CsvError is dropped from that tuple because PipelexError already covers it -- no command, flag, help text, exit code or message moved. Re-reviewed docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md against that: neither names the exception tuple or the CsvError class, and the --save-csv behaviour they describe is unchanged, so nothing there is stale."
+reviewed_at = "2026-09-02T23:04:48Z"
+rationale = "Pre-landing review round on fix/Doctor-backend-file-check-leniency. The trigger is again pipelex/cli/commands/doctor_cmd.py: check_models now attributes an InferenceBackendLibraryError with the same _is_error_about_backend helper the Backend Files row uses, instead of marking every report whose backend name appears in the message text -- which falsely condemned portkey, whose name rides in the loader's own advice as the example header x-portkey-provider. No command, flag, output key, exit code or message shape moved; the doctor's summary line for that failure is unchanged. Re-read docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md: the doctor is described at the row level (config, credentials, model health) and only the telemetry and pending_migrations findings are detailed; neither page states which backend a models-row failure is charged to, so nothing there is stale."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -82,7 +82,7 @@ rationale = "Pre-landing review pass on fix/Library-class-registry-scoping. The 
 "pipelex/cli/commands/codegen/inputs_cmd.py" = "blob:20738a9e42f0e5ef7ffc489093348af3cb4643a0"
 "pipelex/cli/commands/codegen/types_cmd.py" = "blob:b7c9c7a3664c9fbe66f9b4c3c5ebf9ea1322445c"
 "pipelex/cli/commands/crate_loading.py" = "blob:3d7d651931ecf1a15a3e2d72411b3212b55d74ef"
-"pipelex/cli/commands/doctor_cmd.py" = "blob:c5be1a89ac851d51dbca1f0b6ad4c49e720472ab"
+"pipelex/cli/commands/doctor_cmd.py" = "blob:69b83439f17b9ffa533b82e37f0906bba39c34ca"
 "pipelex/cli/commands/fix/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/fix/_diff_sandbox.py" = "blob:5ce264f5b0ab4ff4172f4d8789450916947f5c0e"
 "pipelex/cli/commands/fix/_fix_core.py" = "blob:8f6a187a0fb42c498629b177753d81620800b0da"
