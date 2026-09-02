@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:2e2f3f3c4886666d48918080519c18ff9466e16a11798eaf55b7af89ecab097f"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-02T20:44:04Z"
-rationale = "Pre-landing review pass on fix/Library-class-registry-scoping. The only CLI trigger change is in pipelex/cli/commands/run/_run_core.py: the comment above the --save-csv except block is rewritten to state what is true (CsvError is a ToolError and so a PipelexError, so it never escaped execute_run's generic except arm) and CsvError is dropped from that tuple because PipelexError already covers it -- no command, flag, help text, exit code or message moved. Re-reviewed docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md against that: neither names the exception tuple or the CsvError class, and the --save-csv behaviour they describe is unchanged, so nothing there is stale."
+digest = "sha256:0fdb91c1db6bb918ac9696c62eaefe1bd116de15c6a6174c297c2d6cc1d4cd72"
+reviewed_by = "Claude (Fable 5.1)"
+reviewed_at = "2026-09-02T22:36:22Z"
+rationale = "Trigger is pipelex/cli/commands/doctor_cmd.py: the Backend Files probe now loads the backend library leniently and charges a failure to the backend the error declares (backend_name) instead of any backend whose name appears in the message text. No command, flag, output key, exit code or message shape moved. Re-read docs/tools/cli/agent-cli.md and pipelex/cli/agent_cli/CLAUDE.md: both describe doctor as checking config, credentials and model health and detail only the telemetry and pending_migrations findings; neither describes how the backend-files row loads or attributes, so nothing there is stale."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -82,7 +82,7 @@ rationale = "Pre-landing review pass on fix/Library-class-registry-scoping. The 
 "pipelex/cli/commands/codegen/inputs_cmd.py" = "blob:20738a9e42f0e5ef7ffc489093348af3cb4643a0"
 "pipelex/cli/commands/codegen/types_cmd.py" = "blob:b7c9c7a3664c9fbe66f9b4c3c5ebf9ea1322445c"
 "pipelex/cli/commands/crate_loading.py" = "blob:3d7d651931ecf1a15a3e2d72411b3212b55d74ef"
-"pipelex/cli/commands/doctor_cmd.py" = "blob:c5be1a89ac851d51dbca1f0b6ad4c49e720472ab"
+"pipelex/cli/commands/doctor_cmd.py" = "blob:8518ee621e5060dba19419a6735a87e2a8af670e"
 "pipelex/cli/commands/fix/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/fix/_diff_sandbox.py" = "blob:5ce264f5b0ab4ff4172f4d8789450916947f5c0e"
 "pipelex/cli/commands/fix/_fix_core.py" = "blob:8f6a187a0fb42c498629b177753d81620800b0da"

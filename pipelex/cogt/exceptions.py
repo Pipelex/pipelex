@@ -434,7 +434,9 @@ class RoutingProfileLibraryError(CogtError):
 
 
 class InferenceModelSpecError(CogtError):
-    pass
+    def __init__(self, message: str, *, backend_name: str | None = None):
+        super().__init__(message)
+        self.backend_name = backend_name
 
 
 class InferenceBackendLibraryNotFoundError(CogtError):
@@ -442,7 +444,9 @@ class InferenceBackendLibraryNotFoundError(CogtError):
 
 
 class InferenceBackendLibraryValidationError(CogtError):
-    pass
+    def __init__(self, message: str, *, backend_name: str | None = None):
+        super().__init__(message)
+        self.backend_name = backend_name
 
 
 class InferenceBackendCredentialsErrorType(StrEnum):
@@ -472,7 +476,17 @@ class InferenceBackendCredentialsError(CogtError):
 
 
 class InferenceBackendLibraryError(CogtError):
+    """A backend the library cannot load.
+
+    ``backend_name`` is the backend the error is about, stamped by the loader so a caller can charge
+    the failure to that backend rather than to one whose name merely appears in the message's prose.
+    """
+
     error_category = InferenceErrorCategory.CONFIGURATION
+
+    def __init__(self, message: str, *, backend_name: str | None = None):
+        super().__init__(message)
+        self.backend_name = backend_name
 
 
 class RoutingProfileDisabledBackendError(CogtError):

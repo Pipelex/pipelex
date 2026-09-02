@@ -1,5 +1,5 @@
 ---
-status: draft
+status: active
 item: L-260902-376d51
 ---
 
@@ -47,11 +47,16 @@ Rejected alternatives:
 5. **Changelog.** A `### Fixed` entry under `[Unreleased]`: the doctor no longer reports a false backend-configuration error for the gateway on a stock install, the Models row runs its own check, and a malformed backend file is no longer hidden behind the gateway.
 6. **Verify.** `make agent-check`; the two doctor test modules directly; `make agent-test`. By hand: `pipelex doctor` against a fresh `pipelex init config` directory, expecting the Backend Files row healthy and the Models row reporting its own verdict.
 7. **PR** against `dev` with `Closes L-260902-376d51` in the body.
+8. **Attribution by declared backend** (added while implementing, see Revisions). `InferenceBackendLibraryError`, its validation sibling and `InferenceModelSpecError` take a keyword-only `backend_name`, the loader stamps it at every raise about one backend, and the doctor charges a failure to the backend the error declares, falling back to the file path only for an error that declares none. A unit test pins that an error about another backend whose prose mentions this one leaves this one valid.
 
 ## Out of scope
 
-- `check_backend_files` loads the whole library once per enabled backend and attributes an exception to a backend by substring match on its name or file path. It is quadratic in file reads, and a name that is a substring of another (`openai` inside `azure_openai`) can misattribute an error. A per-backend validation entrypoint on the loader would fix both. Not this fix; file a ledger item if it bites.
+- `check_backend_files` still loads the whole library once per enabled backend, quadratic in file reads, and every probe sees the same first failure. A per-backend validation entrypoint on the loader would make one probe read one file. Not this fix.
 - The loader's message wording is a caller's message and stays one: after this fix no user-facing surface reaches it on a stock install.
+
+## Revisions
+
+- 2026-09-03, while implementing: the substring attribution was planned as out of scope, but the first kit-based test tripped on it. The loader's unknown-key explanation names `portkey` in passing, so anthropic's error was charged to portkey as well and the probe reported two invalid files. Fixed here rather than deferred (step 8), because the malformed-file test could not be written honestly around it.
 
 ## Verification record
 

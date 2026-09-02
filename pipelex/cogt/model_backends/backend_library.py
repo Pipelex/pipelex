@@ -131,8 +131,9 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             backends_dir_path: Path to directory containing per-backend TOML files.
             include_disabled: Whether to include disabled backends.
             gateway_config: Gateway configuration for Pipelex Gateway backend.
-            lenient: When True, skip a backend whose *credentials* cannot be resolved instead of
-                raising — that is the whole of the tolerance. A malformed configuration (an unknown
+            lenient: When True, skip a backend whose *credentials* cannot be resolved, or the
+                gateway backend when no `gateway_config` was handed in, instead of raising — that
+                is the whole of the tolerance. A malformed configuration (an unknown
                 or invalid key, a model spec that is not a table, a missing per-backend TOML) stays
                 fatal in both modes: a config typo must never silently delete a backend, because the
                 commands that boot leniently (validate, show, dry runs) would then report the far
@@ -217,7 +218,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     # that field.
                     validation_error_msg = format_pydantic_validation_error(validation_error)
                     msg = f"Invalid inference backend '{backend_name}' in '{backends_library_path}': {validation_error_msg}"
-                    raise InferenceBackendLibraryValidationError(msg) from validation_error
+                    raise InferenceBackendLibraryValidationError(msg, backend_name=backend_name) from validation_error
 
                 # Handle pipelex_gateway specially - use remote config
                 backend_config_source: str
@@ -235,7 +236,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                             f"Backend '{backend_name}' is enabled in '{backends_library_path}' but no Pipelex Gateway model specs "
                             "were given to the loader: pass `gateway_config`, or disable the backend"
                         )
-                        raise InferenceBackendLibraryError(msg)
+                        raise InferenceBackendLibraryError(msg, backend_name=backend_name)
                     extra_config["aws_region"] = gateway_config.aws_region
                     model_spec_source = ModelSpecSource.REMOTE_GATEWAY
                     model_specs_dict, backend_config_source = self._load_gateway_model_specs(
@@ -312,7 +313,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         for model_spec_name, value in remaining_tables.items():
             if not isinstance(value, dict):
                 msg = f"Model spec '{model_spec_name}' for backend '{backend_name}' from {backend_config_source} is not a dictionary"
-                raise InferenceModelSpecError(msg)
+                raise InferenceModelSpecError(msg, backend_name=backend_name)
             model_spec_dict: dict[str, Any] = cast("dict[str, Any]", value)
             try:
                 # A per-model key the blueprint does not know is a request header only if it is shaped
@@ -330,7 +331,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                                 f"Unknown key{plural} on model '{model_spec_name}' for backend '{backend_name}' "
                                 f"from {backend_config_source}: {describe_rejected_keys(rejected=key_split.rejected)}"
                             )
-                            raise InferenceBackendLibraryError(msg)
+                            raise InferenceBackendLibraryError(msg, backend_name=backend_name)
                         case ModelSpecSource.REMOTE_GATEWAY:
                             # Version skew, the same judgement `drop_unknown_gateway_defaults` makes for the
                             # `defaults` block: pruned, and silently — this can run before the log hub is set.
@@ -354,10 +355,10 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     f"Invalid inference model spec '{model_spec_name}' for backend '{backend_name}' "
                     f"from {backend_config_source}: {validation_error_msg}"
                 )
-                raise InferenceBackendLibraryError(msg) from validation_error
+                raise InferenceBackendLibraryError(msg, backend_name=backend_name) from validation_error
             except InferenceModelSpecError as exc:
                 msg = f"Failed to load inference model spec '{model_spec_name}' for backend '{backend_name}' from {backend_config_source}"
-                raise InferenceBackendLibraryError(msg) from exc
+                raise InferenceBackendLibraryError(msg, backend_name=backend_name) from exc
         return backend_model_specs
 
     def _local_model_specs_the_ledger_can_explain(
@@ -482,7 +483,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             model_specs_dict_raw = load_toml_from_path(path=path_to_model_specs_toml)
         except FileNotFoundError as file_not_found_exc:
             msg = f"Failed to load inference model specs from file '{path_to_model_specs_toml}': {file_not_found_exc}"
-            raise InferenceBackendLibraryError(msg) from file_not_found_exc
+            raise InferenceBackendLibraryError(msg, backend_name=backend_name) from file_not_found_exc
 
         backend_config_source = f"file '{path_to_model_specs_toml}'"
         model_specs_dict = self._substitute_model_spec_vars(
