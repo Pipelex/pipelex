@@ -511,6 +511,14 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # --- Tools ----------------------------------------------------------------------------
 
         self.class_registry = class_registry or ClassRegistry()
+        # A read through ``KajsonManager.get_class_registry()`` before any boot — the scoped accessor's
+        # global fallback, or a library opened on a bare ``LibraryManager`` — instantiates the singleton
+        # around an empty registry, and ``KajsonManager(class_registry=…)`` would then hand that manager
+        # back and silently discard this boot's registry: the core models would land where nothing
+        # resolves, and the boot would still report ready. So any pre-boot manager is dropped first. A
+        # *live* boot's manager cannot be the one dropped here: the guard in ``__init__`` and ``make()``
+        # already refused a second boot, and a failed or torn-down boot released its own manager.
+        KajsonManager.teardown()
         self.kajson_manager = KajsonManager(class_registry=self.class_registry)
 
         self.func_registry = func_registry or FuncRegistry()

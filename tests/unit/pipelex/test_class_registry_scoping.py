@@ -63,10 +63,9 @@ class TestHubClassRegistry:
     def test_opening_a_library_against_an_empty_global_registry_still_yields_one(self) -> None:
         """Seeding must survive an empty process-global registry.
 
-        kajson's ``register_classes_dict`` names the single class it logs by indexing into the
-        values, so handing it an empty dict raises ``IndexError`` rather than registering nothing.
         The global registry genuinely is empty between a teardown and the next boot, and a library
-        opened there must come out carrying its own empty registry instead of failing to open.
+        opened there must come out carrying its own empty registry instead of failing to open
+        (kajson's ``register_classes_dict`` used to raise ``IndexError`` on an empty dict).
         """
         library_manager = get_library_manager()
         with patch.object(KajsonManager, "get_class_registry", return_value=ClassRegistry()):
@@ -77,6 +76,19 @@ class TestHubClassRegistry:
             assert library_registry.get_classes_dict() == {}
         finally:
             library_manager.teardown(library_id=library_id)
+
+    def test_teardown_drops_the_library_registry_and_empties_a_held_reference(self) -> None:
+        """A torn-down library's registry is gone, even through a reference a caller kept."""
+        library_manager = get_library_manager()
+        library_id, library = library_manager.open_library()
+        held_registry = library.get_class_registry()
+        assert held_registry is not None
+        held_registry.register_class(ScopedModel, name="held__ScopedModel")
+
+        library_manager.teardown(library_id=library_id)
+
+        assert library.get_class_registry() is None
+        assert not held_registry.has_class(name="held__ScopedModel")
 
     def test_get_class_registry_with_unknown_library_id_falls_back_to_global(self) -> None:
         """_library_id pinned to a library the manager does not hold -> falls back to global."""

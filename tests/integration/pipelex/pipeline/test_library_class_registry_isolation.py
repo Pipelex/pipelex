@@ -17,7 +17,8 @@ activity, every crate route:
   ``PipeLLM`` chain never yields).
 
 Both are closed structurally by ``LibraryManager.open_library`` attaching a per-library ``ClassRegistry``
-seeded from the process-global one, so these tests fail loudly if that ever regresses to opt-in.
+seeded from the process-global one, so these tests fail loudly if that ever regresses to opt-in. The
+invariant itself is pinned directly in ``tests/unit/pipelex/test_class_registry_scoping.py``.
 """
 
 from __future__ import annotations
@@ -30,7 +31,7 @@ import pytest
 from kajson.kajson_manager import KajsonManager
 
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
+from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.runtime_hub import get_class_registry
@@ -161,22 +162,3 @@ class TestLibraryClassRegistryIsolation:
         second_schema = second_report.pipe_io_contracts["registry_isolation.fan_gamma"].inputs["summary"].json_schema
         assert _schema_property_names(first_schema) == ["alpha_field"]
         assert _schema_property_names(second_schema) == ["gamma_field"]
-
-    @pytest.mark.asyncio(loop_scope="class")
-    async def test_an_opened_library_carries_its_own_registry_seeded_from_the_global_one(self) -> None:
-        """The structural invariant behind both tests above, asserted directly."""
-        library_manager = get_library_manager()
-        library_id, library = library_manager.open_library()
-        global_registry = KajsonManager.get_class_registry()
-
-        library_registry = library.get_class_registry()
-        assert library_registry is not None
-        assert library_registry is not global_registry
-        assert set(global_registry.get_classes_dict()) <= set(library_registry.get_classes_dict())
-
-        set_current_library(library_id=library_id)
-        try:
-            assert get_class_registry() is library_registry
-        finally:
-            clear_current_library()
-            library_manager.teardown(library_id=library_id)

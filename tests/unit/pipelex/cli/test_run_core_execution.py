@@ -21,6 +21,7 @@ from pipelex.core.concepts.exceptions import ConceptValueError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.libraries.exceptions import LibraryError
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
@@ -76,17 +77,27 @@ class TestRunCoreExecution:
         mocker.patch("pipelex.cli.commands.run._run_core.render_cost_report_for_output")
         return runner_class_mock
 
-    def _mock_structure_class(self, mocker: MockerFixture, *, resolves_to: Any = None, raises: Exception | None = None) -> None:
-        """Stand in for the throwaway library reload that resolves the CSV row class on an empty result."""
+    def _mock_structure_class(self, mocker: MockerFixture, *, resolves_to: Any = None, raises: Exception | None = None) -> SimpleNamespace:
+        """Stand in for the throwaway library reload that resolves the CSV row class on an empty result.
+
+        Returns the reload seams (``acquire``, ``clear``, ``manager``) so a test can assert the
+        throwaway library was opened with the run's own load inputs and torn down again.
+        """
         concept_library_mock = mocker.MagicMock()
         if raises is not None:
             concept_library_mock.get_structure_class.side_effect = raises
         else:
             concept_library_mock.get_structure_class.return_value = resolves_to
-        mocker.patch("pipelex.cli.commands.run._run_core.acquire_library", return_value=("reload-library", None))
+        acquire_mock = mocker.patch("pipelex.cli.commands.run._run_core.acquire_library", return_value=("reload-library", None))
         mocker.patch("pipelex.cli.commands.run._run_core.get_concept_library", return_value=concept_library_mock)
-        mocker.patch("pipelex.cli.commands.run._run_core.clear_current_library")
-        mocker.patch("pipelex.cli.commands.run._run_core.get_library_manager")
+        clear_mock = mocker.patch("pipelex.cli.commands.run._run_core.clear_current_library")
+        manager_mock = mocker.patch("pipelex.cli.commands.run._run_core.get_library_manager")
+        return SimpleNamespace(acquire=acquire_mock, clear=clear_mock, manager=manager_mock)
+
+    @staticmethod
+    def _assert_reload_library_torn_down(reload: SimpleNamespace) -> None:
+        reload.clear.assert_called_once_with()
+        reload.manager.return_value.teardown.assert_called_once_with(library_id="reload-library")
 
     def _make_pipe_output(
         self,
@@ -452,14 +463,17 @@ class TestRunCoreExecution:
         main_stuff.content = ListContent[TextContent](items=[])
         pipe_output = self._make_pipe_output(mocker, main_stuff=main_stuff)
         self._mock_runner(mocker, pipe_output)
-        self._mock_structure_class(mocker, resolves_to=TextContent)
+        reload = self._mock_structure_class(mocker, resolves_to=TextContent)
         mocker.patch("pipelex.cli.commands.run._run_core.flat_field_names", return_value=["text"])
         csv_codec_mock = mocker.patch("pipelex.cli.commands.run._run_core.csv_from_list_content")
 
-        _run_async(_call_execute_run(save_csv=str(tmp_path / "out.csv")))
+        _run_async(_call_execute_run(save_csv=str(tmp_path / "out.csv"), library_dir=["libs"]))
 
         csv_codec_mock.assert_called_once()
         assert csv_codec_mock.call_args.kwargs["row_model"] is TextContent
+        # The reload sees exactly the load inputs the run was handed, and is torn down again.
+        assert reload.acquire.call_args.kwargs == {"library_id": "", "library_dirs": ["libs"], "mthds_contents": None, "bundle_uris": None}
+        self._assert_reload_library_torn_down(reload)
 
     @pytest.mark.usefixtures("config_mock", "console")
     def test_save_csv_concept_error_framed_as_csv_failure(self, mocker: MockerFixture, tmp_path: Path) -> None:
@@ -472,9 +486,28 @@ class TestRunCoreExecution:
         main_stuff.content = ListContent[TextContent](items=[])
         pipe_output = self._make_pipe_output(mocker, main_stuff=main_stuff)
         self._mock_runner(mocker, pipe_output)
-        self._mock_structure_class(mocker, raises=ConceptValueError("no structure class"))
+        reload = self._mock_structure_class(mocker, raises=ConceptValueError("no structure class"))
 
         with pytest.raises(typer.Exit) as exc_info:
             _run_async(_call_execute_run(save_csv=str(tmp_path / "out.csv")))
 
         assert exc_info.value.exit_code == 1
+        # The throwaway library does not outlive a failed resolution either.
+        self._assert_reload_library_torn_down(reload)
+
+    @pytest.mark.usefixtures("config_mock", "console")
+    def test_save_csv_reload_failure_framed_as_csv_failure(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """A bundle reload that fails on an empty result is a --save-csv failure, not a pipeline failure."""
+        main_stuff = mocker.MagicMock()
+        main_stuff.content = ListContent[TextContent](items=[])
+        pipe_output = self._make_pipe_output(mocker, main_stuff=main_stuff)
+        self._mock_runner(mocker, pipe_output)
+        reload = self._mock_structure_class(mocker, resolves_to=TextContent)
+        reload.acquire.side_effect = LibraryError("reload failed")
+
+        with pytest.raises(typer.Exit) as exc_info:
+            _run_async(_call_execute_run(save_csv=str(tmp_path / "out.csv")))
+
+        assert exc_info.value.exit_code == 1
+        # acquire_library owns its own load-failure teardown, so nothing was left for the helper to drop.
+        reload.manager.return_value.teardown.assert_not_called()

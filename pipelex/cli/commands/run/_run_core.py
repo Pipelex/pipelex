@@ -368,10 +368,11 @@ async def _execute_run(
         csv_list_content = cast("ListContent[StuffContent]", csv_content)
         # expanduser so a quoted/`=`-form `~/out.csv` writes to the home dir, not a literal `./~` dir.
         csv_path = Path(save_csv).expanduser()
-        # A CSV-save failure (output concept with no structure class, non-flat output, write error) is
-        # framed as a --save-csv failure, not a pipeline failure — the pipeline already succeeded.
-        # ConceptValueError (a ValueError) and CsvError would otherwise escape execute_run's generic
-        # `except PipelexError` and read as "Failed to execute pipeline" (or as a raw traceback).
+        # A CSV-save failure (output concept with no structure class, non-flat output, a failed bundle
+        # reload, write error) is framed as a --save-csv failure, not a pipeline failure — the pipeline
+        # already succeeded. Every PipelexError raised in this block (the codec's CsvError, a reload's
+        # LibraryError) would otherwise read as "Failed to execute pipeline" under execute_run's generic
+        # `except PipelexError`; ConceptValueError (a ValueError) and OSError would escape as a raw traceback.
         try:
             # Resolving the row model is the one post-run step that needs the run's library, and
             # `runner.execute` tore that library down on its way out — along with the ClassRegistry its
@@ -400,7 +401,7 @@ async def _execute_run(
             # nested target (e.g. reports/2026/out.csv) doesn't fail late after the run completed.
             csv_path.parent.mkdir(parents=True, exist_ok=True)
             csv_from_list_content(csv_list_content, row_model=csv_row_model, path=csv_path)
-        except (CsvError, ConceptValueError, PipelexError, OSError) as csv_exc:
+        except (ConceptValueError, PipelexError, OSError) as csv_exc:
             typer.secho(f"Failed to --save-csv to '{save_csv}': {csv_exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from csv_exc
         log.verbose(f"Main stuff CSV saved to: {save_csv}")

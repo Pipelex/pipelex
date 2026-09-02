@@ -586,19 +586,23 @@ prompt = \"\"\"
 class TestKindAssignmentTable:
     async def _derive_kind_table(self, load_empty_library: Callable[[], str]) -> dict[str, PipeInputFormDescriptor]:
         outer_library_id = load_empty_library()
+        # Register into the *process-global* registry, not the ambient one: these classes stand in
+        # for structure classes a Python module put in the process, and `validate_bundle` opens its
+        # own library, whose registry is seeded from the global one. Registering through
+        # `get_class_registry()` here would put them in the enclosing empty library's registry,
+        # where the validate library cannot see them.
+        registry = KajsonManager.get_class_registry()
         try:
-            # Register into the *process-global* registry, not the ambient one: these classes stand in
-            # for structure classes a Python module put in the process, and `validate_bundle` opens its
-            # own library, whose registry is seeded from the global one. Registering through
-            # `get_class_registry()` here would put them in the enclosing empty library's registry,
-            # where the validate library cannot see them.
-            registry = KajsonManager.get_class_registry()
             registry.register_class(InputFormConstrainedPayload)
             registry.register_class(InputFormPartlyMappablePayload)
             registry.register_class(InputFormFieldLessPayload)
             result = await validate_bundle(mthds_contents=[_KIND_TABLE_MTHDS])
             return build_input_form(result.pipes)
         finally:
+            # Unregister so the stand-ins do not outlive this test and seed every library opened after it.
+            registry.unregister_class(InputFormConstrainedPayload)
+            registry.unregister_class(InputFormPartlyMappablePayload)
+            registry.unregister_class(InputFormFieldLessPayload)
             _teardown_validation_library(outer_library_id)
 
     async def test_remaining_natives_complete_the_table(self, load_empty_library: Callable[[], str]) -> None:
