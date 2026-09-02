@@ -27,12 +27,13 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
-from pipelex.libraries.concept.concept_library import ConceptLibrary
+from pipelex.interpreter_hub import clear_current_library, get_concept_library, get_library_manager
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
+from pipelex.pipeline.execution_seams import acquire_library
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.reporting.cost_report_renderer import render_cost_report_for_output
 from pipelex.runtime_hub import get_console, get_telemetry_manager
@@ -47,6 +48,7 @@ from pipelex.tools.tabular.csv_codec import assert_supported_table_suffix, csv_f
 from pipelex.tools.tabular.exceptions import CsvError
 
 if TYPE_CHECKING:
+    from pipelex.core.concepts.concept import Concept
     from pipelex.core.stuffs.stuff_content import StuffContent
 
 COMMAND = "run"
@@ -73,6 +75,35 @@ def validate_run_flag_combination(*, dry_run: bool, mock_usage: bool, mock_input
     if mock_usage and not dry_run:
         typer.secho("Failed to run: --mock-usage requires --dry-run", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
+
+
+def _resolve_row_model_for_empty_result(
+    *,
+    concept: Concept,
+    bundle_path: str | None,
+    mthds_content: str | None,
+    library_dir: list[str] | None,
+) -> type[StuffContent]:
+    """Resolve the CSV row model for a run that produced no rows, by reloading its bundle.
+
+    A run whose main output is an empty list leaves no instance to read the row class off, and the
+    run's own library — which owned the ClassRegistry holding its generated structure classes — is
+    torn down by the time ``--save-csv`` runs. Reloading the same bundle into a throwaway library
+    regenerates the declared concept's structure class under the same name and fields, which is what
+    the header needs. The load inputs are the ones handed to the runner just above, so the two see
+    the same bundle. The library is torn down again immediately; only the resolved class survives.
+    """
+    library_id, _main_pipe = acquire_library(
+        library_id="",
+        library_dirs=library_dir,
+        mthds_contents=[mthds_content] if mthds_content else None,
+        bundle_uris=[bundle_path] if bundle_path else None,
+    )
+    try:
+        return get_concept_library().get_structure_class(concept=concept)
+    finally:
+        clear_current_library()
+        get_library_manager().teardown(library_id=library_id)
 
 
 async def _execute_run(
@@ -337,19 +368,32 @@ async def _execute_run(
         csv_list_content = cast("ListContent[StuffContent]", csv_content)
         # expanduser so a quoted/`=`-form `~/out.csv` writes to the home dir, not a literal `./~` dir.
         csv_path = Path(save_csv).expanduser()
-        # A CSV-save failure (output concept with no structure class, non-flat output, write error) is
-        # framed as a --save-csv failure, not a pipeline failure — the pipeline already succeeded.
-        # ConceptValueError (a ValueError) and CsvError would otherwise escape execute_run's generic
-        # `except PipelexError` and read as "Failed to execute pipeline" (or as a raw traceback).
+        # A CSV-save failure (output concept with no structure class, non-flat output, a failed bundle
+        # reload, write error) is framed as a --save-csv failure, not a pipeline failure — the pipeline
+        # already succeeded. Every PipelexError raised in this block (the codec's CsvError, a reload's
+        # LibraryError) would otherwise read as "Failed to execute pipeline" under execute_run's generic
+        # `except PipelexError`; ConceptValueError (a ValueError) and OSError would escape as a raw traceback.
         try:
-            # An empty library, not the loaded method's: `runner.execute` tore the run library down on
-            # its way out, so by here there is no current library to ask. `ConceptLibrary.make_empty()`
-            # resolves against the process class registry, which still holds the generated structure
-            # classes — the same place this lookup has always landed — while keeping the one typed
-            # "name -> StuffContent subclass, or ConceptStructureClassNotFoundError" implementation.
-            # That error is a ConceptValueError, so an unresolvable class is framed as a save-csv
-            # failure by the guard below rather than escaping as a pipeline failure.
-            csv_row_model = ConceptLibrary.make_empty().get_structure_class(concept=csv_main_stuff.concept)
+            # Resolving the row model is the one post-run step that needs the run's library, and
+            # `runner.execute` tore that library down on its way out — along with the ClassRegistry its
+            # dynamically generated structure classes were registered in. So there is no ambient registry
+            # left to resolve `<domain>__<Concept>` by name against, and the model is recovered two ways:
+            # from the rows the run produced (each is an instance of exactly the class the pipeline
+            # structured its output into), and — for an empty result, which has no instance to ask —
+            # by reloading the bundle into a throwaway library just long enough to resolve the declared
+            # concept's class. The reload is what keeps `--save-csv` writing a correct header-only file
+            # for a run that produced no rows. Its failures are ConceptValueError/PipelexError, framed as
+            # a save-csv failure by the guard below rather than escaping as a pipeline failure.
+            csv_row_model: type[StuffContent]
+            if csv_list_content.items:
+                csv_row_model = type(csv_list_content.items[0])
+            else:
+                csv_row_model = _resolve_row_model_for_empty_result(
+                    concept=csv_main_stuff.concept,
+                    bundle_path=bundle_path,
+                    mthds_content=mthds_content,
+                    library_dir=library_dir,
+                )
             # Validate the row flatness BEFORE touching the filesystem, so a non-flat output leaves no
             # directory behind (the suffix was already validated up front).
             flat_field_names(csv_row_model)
@@ -357,7 +401,7 @@ async def _execute_run(
             # nested target (e.g. reports/2026/out.csv) doesn't fail late after the run completed.
             csv_path.parent.mkdir(parents=True, exist_ok=True)
             csv_from_list_content(csv_list_content, row_model=csv_row_model, path=csv_path)
-        except (CsvError, ConceptValueError, OSError) as csv_exc:
+        except (ConceptValueError, PipelexError, OSError) as csv_exc:
             typer.secho(f"Failed to --save-csv to '{save_csv}': {csv_exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from csv_exc
         log.verbose(f"Main stuff CSV saved to: {save_csv}")

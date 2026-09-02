@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from kajson.class_registry import ClassRegistry
+from kajson.kajson_manager import KajsonManager
 from mthds.package.dependency_resolver import ResolvedDependency, determine_exported_pipes, resolve_all_dependencies
 from mthds.package.discovery import find_package_manifest
 from mthds.package.exceptions import DependencyResolveError, ManifestError
@@ -187,9 +188,46 @@ class LibraryManager(LibraryManagerAbstract):
             the_library = self._libraries[library_id]
         else:
             the_library = LibraryFactory.make_empty()
+            the_library.set_class_registry(self._make_library_class_registry())
             self._libraries[library_id] = the_library
 
         return library_id, the_library
+
+    @classmethod
+    def _make_library_class_registry(cls) -> ClassRegistry:
+        """Build the per-library ClassRegistry every manager-opened Library carries.
+
+        Concept materialization registers dynamically generated structure classes under a
+        *name* key (``domain__Concept``), and kajson's ``register_class`` overwrites an existing
+        key unconditionally. A library that carried no registry of its own resolved through to the
+        process-global registry, which made two libraries loading the same concept ref share one
+        slot: whichever loaded last owned the class, and neither teardown removed it. Two
+        contaminations followed — a later load reusing an earlier one's class (``ConceptFactory``
+        reuses a registered class for a basic concept), and two concurrent loads overwriting each
+        other at any ``await`` between generation and use. Both crossed request boundaries wherever
+        one process serves several bundles, and the generated classes are what
+        ``pipe_io_contracts`` renders schemas from.
+
+        Giving the registry to the library at open time makes the isolation structural rather than
+        opt-in: the classes a load generates live and die with the library that asked for them, and
+        the process-global registry keeps only what boot put there.
+
+        The seed is a snapshot of the process-global registry — the boot-time core and test models,
+        plus anything registered outside any library — taken from ``KajsonManager`` rather than from
+        the ambient ``get_class_registry()``: opening a library while another one is current must not
+        copy that library's dynamic classes into the new one. Being a snapshot, it is taken at open
+        time: a class registered globally *after* a library is open is not visible to that library.
+        Nothing in-tree does that — boot registers before any library exists, and every load-time
+        registration runs under the library it is loading into — so the ordering that would make it
+        matter is a host registering classes mid-flight, which is a case for registering them at
+        startup instead.
+        """
+        library_class_registry = ClassRegistry()
+        # The global registry really is empty before boot registers anything; kajson's
+        # register_classes_dict is a no-op on an empty dict, so a library opened there comes out
+        # carrying its own empty registry rather than failing to open.
+        library_class_registry.register_classes_dict(KajsonManager.get_class_registry().get_classes_dict())
+        return library_class_registry
 
     @override
     def open_fresh_library(self, library_id: str) -> Library:

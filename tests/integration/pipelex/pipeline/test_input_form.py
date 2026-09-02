@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
+from kajson.kajson_manager import KajsonManager
 from pydantic import Field
 
 from pipelex.core.memory.exceptions import ListWhereSingularError
@@ -41,7 +42,6 @@ from pipelex.interpreter_hub import (
 from pipelex.pipeline.input_form import FieldKind, InputFormField, build_input_form
 from pipelex.pipeline.pipe_io_contracts import IOMultiplicity, build_pipe_io_contracts
 from pipelex.pipeline.validate_bundle import validate_bundle
-from pipelex.system.registries.class_registry_access import get_class_registry
 from tests.helpers.input_form import as_list, fields_by_name
 
 if TYPE_CHECKING:
@@ -586,14 +586,23 @@ prompt = \"\"\"
 class TestKindAssignmentTable:
     async def _derive_kind_table(self, load_empty_library: Callable[[], str]) -> dict[str, PipeInputFormDescriptor]:
         outer_library_id = load_empty_library()
+        # Register into the *process-global* registry, not the ambient one: these classes stand in
+        # for structure classes a Python module put in the process, and `validate_bundle` opens its
+        # own library, whose registry is seeded from the global one. Registering through
+        # `get_class_registry()` here would put them in the enclosing empty library's registry,
+        # where the validate library cannot see them.
+        registry = KajsonManager.get_class_registry()
         try:
-            registry = get_class_registry()
             registry.register_class(InputFormConstrainedPayload)
             registry.register_class(InputFormPartlyMappablePayload)
             registry.register_class(InputFormFieldLessPayload)
             result = await validate_bundle(mthds_contents=[_KIND_TABLE_MTHDS])
             return build_input_form(result.pipes)
         finally:
+            # Unregister so the stand-ins do not outlive this test and seed every library opened after it.
+            registry.unregister_class(InputFormConstrainedPayload)
+            registry.unregister_class(InputFormPartlyMappablePayload)
+            registry.unregister_class(InputFormFieldLessPayload)
             _teardown_validation_library(outer_library_id)
 
     async def test_remaining_natives_complete_the_table(self, load_empty_library: Callable[[], str]) -> None:
@@ -612,8 +621,8 @@ class TestKindAssignmentTable:
         assert json_field.kind == FieldKind.OBJECT, "native.JSON has a pinned structure, so it expands like the other pinned natives"
         assert json_field.fields is not None
         assert [field.name for field in json_field.fields] == ["json_obj"], "Its pinned blueprint's single required field"
-        # The three the standard calls structureless — `_pinned_structure` returns None for exactly
-        # these, so `unknown` is the honest kind and no other native may join them.
+        # The three natives that declare no pinned structure — `_pinned_structure` returns None for
+        # exactly these, so `unknown` is the honest kind and no other native may join them.
         assert _field_by_name(natives, "dynamic_in").kind == FieldKind.UNKNOWN
         assert _field_by_name(natives, "anything_in").kind == FieldKind.UNKNOWN
         for field in natives.fields:

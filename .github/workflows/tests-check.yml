@@ -68,19 +68,58 @@ jobs:
           fi
 
 # --------------------------------------------------------------------------
-# 2.  Aggregator job — the *single* required status check
+# 2.  TypeScript emission gates — the two codegen tests that need node.
+#     The shards above run them too, and there they skip: `prettier --check`
+#     is the only test that PARSES the emitted TypeScript, and the zod round
+#     trip is the only one that EXECUTES it, so with no node toolchain the
+#     emitter's whole content contract was unguarded — three defects reached
+#     review that way, each caught afterwards by a hand-written assertion.
+#     This job provisions a pinned toolchain and sets PIPELEX_REQUIRE_TS_GATES,
+#     under which those tests fail instead of skipping. One job, not a node
+#     step on all 8 shards: the codegen suite is seconds and lands in one shard.
+# --------------------------------------------------------------------------
+  ts-emission-gates:
+    name: Tests (ts emission gates)
+    runs-on: ubuntu-latest
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+      ENV: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      # >= 22.6 for `--experimental-strip-types`, which is what lets node run the emitted `.ts`.
+      - name: Install node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install dependencies
+        run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
+
+      - name: Run the TypeScript emission gates
+        run: make test-ts-gates
+
+# --------------------------------------------------------------------------
+# 3.  Aggregator job — the *single* required status check
 #     Guards against a silently-dropped shard: fails unless ALL 8 succeed.
 # --------------------------------------------------------------------------
   tests-all:
     name: Tests (all)
     runs-on: ubuntu-latest
-    needs: [matrix-test]
+    needs: [matrix-test, ts-emission-gates]
     if: always()
 
     steps:
       - name: Fail if any test job failed
         run: |
-          if [ "${{ needs.matrix-test.result }}" != "success" ]; then
+          if [ "${{ needs.matrix-test.result }}" != "success" ] || \
+             [ "${{ needs.ts-emission-gates.result }}" != "success" ]; then
             echo "::error::At least one test job failed."
             exit 1
           fi

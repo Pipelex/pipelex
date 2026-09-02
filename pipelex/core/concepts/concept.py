@@ -194,6 +194,40 @@ class Concept(ConceptAbstract):
 
                 return result, generator.imports_needed
 
+    def render_structureless_representation(
+        self,
+        *,
+        output_format: ConceptRepresentationFormat,
+        multiplicity: VariableMultiplicity | None = None,
+    ) -> tuple[dict[str, Any], set[str]]:
+        """Render a representation for a concept that declares no structure class (`native.Anything`).
+
+        The SCHEMA arm publishes the permissive schema: no constraint keywords, only the concept's
+        identity annotations (`title` = concept ref, `description` = authored description) —
+        semantically the empty schema, "any JSON value", which is what an untyped vehicle means,
+        while keeping the invariant that every rendered input schema carries its concept's
+        identity. The JSON arm renders the empty mapping `{}` — the escape hatch's only honest
+        example value. Multiplicity wraps exactly as for class-backed concepts. PYTHON is refused:
+        there is no class to instantiate.
+
+        Returns:
+            Tuple of (representation dict with "concept" and "content" keys, empty imports set)
+
+        Raises:
+            ConceptValueError: When `output_format` is PYTHON.
+        """
+        match output_format:
+            case ConceptRepresentationFormat.SCHEMA:
+                json_schema: dict[str, Any] = {"title": self.concept_ref, "description": self.description}
+                content = self._wrap_schema_for_multiplicity(json_schema=json_schema, multiplicity=multiplicity)
+                return {"concept": self.concept_ref, "content": content}, set()
+            case ConceptRepresentationFormat.JSON:
+                json_content: dict[str, Any] | list[dict[str, Any]] = [{}] if is_multiple_multiplicity(multiplicity=multiplicity) else {}
+                return {"concept": self.concept_ref, "content": json_content}, set()
+            case ConceptRepresentationFormat.PYTHON:
+                msg = f"Concept '{self.concept_ref}' declares no structure class, so it has no Python representation"
+                raise ConceptValueError(msg)
+
     def _render_schema_representation(
         self,
         *,
@@ -218,17 +252,29 @@ class Concept(ConceptAbstract):
         # render: `title` is the concept ref, `description` the concept's authored description.
         json_schema["title"] = self.concept_ref
         json_schema["description"] = self.description
+        content = self._wrap_schema_for_multiplicity(json_schema=json_schema, multiplicity=multiplicity)
+        return {"concept": self.concept_ref, "content": content}, set()
 
-        if is_multiple_multiplicity(multiplicity=multiplicity):
-            # Wrap the schema in an array schema; the concept identity stays on `items`.
-            array_schema: dict[str, Any] = {
-                "type": "array",
-                "items": json_schema,
-            }
-            item_count = fixed_item_count(multiplicity=multiplicity)
-            if item_count is not None:
-                array_schema["minItems"] = item_count
-                array_schema["maxItems"] = item_count
-            return {"concept": self.concept_ref, "content": array_schema}, set()
+    @classmethod
+    def _wrap_schema_for_multiplicity(
+        cls,
+        *,
+        json_schema: dict[str, Any],
+        multiplicity: VariableMultiplicity | None,
+    ) -> dict[str, Any]:
+        """Wrap a rendered item schema per the declared multiplicity.
 
-        return {"concept": self.concept_ref, "content": json_schema}, set()
+        A list-shaped multiplicity wraps the schema in an array type (the concept identity stays
+        on `items`), and a fixed count adds `minItems`/`maxItems` bounds on the array.
+        """
+        if not is_multiple_multiplicity(multiplicity=multiplicity):
+            return json_schema
+        array_schema: dict[str, Any] = {
+            "type": "array",
+            "items": json_schema,
+        }
+        item_count = fixed_item_count(multiplicity=multiplicity)
+        if item_count is not None:
+            array_schema["minItems"] = item_count
+            array_schema["maxItems"] = item_count
+        return array_schema

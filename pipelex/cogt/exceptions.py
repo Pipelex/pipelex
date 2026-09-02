@@ -86,6 +86,7 @@ class CogtError(PipelexError):
         error_category: InferenceErrorCategory | None = None,
         user_action: UserAction | None = None,
         provider_metadata: ProviderErrorMetadata | None = None,
+        backend_name: str | None = None,
     ):
         super().__init__(message)
         if error_category is not None:
@@ -94,6 +95,8 @@ class CogtError(PipelexError):
             self.user_action = user_action
         if provider_metadata is not None:
             self.provider_metadata = provider_metadata
+        if backend_name is not None:
+            self.backend_name = backend_name
 
     def fill_model_and_provider(self, model_handle: str | None, *, backend_name: str | None) -> None:
         """Fill ``model_handle`` / ``backend_name`` from the worker, only when still unset.
@@ -472,6 +475,12 @@ class InferenceBackendCredentialsError(CogtError):
 
 
 class InferenceBackendLibraryError(CogtError):
+    """A backend the library cannot load.
+
+    ``backend_name`` is the backend the error is about, stamped by the loader so a caller can charge
+    the failure to that backend rather than to one whose name merely appears in the message's prose.
+    """
+
     error_category = InferenceErrorCategory.CONFIGURATION
 
 

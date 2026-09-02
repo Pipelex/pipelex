@@ -24,6 +24,7 @@ from pipelex.cli.commands.migrate_cmd import apply_pending_migrations
 from pipelex.cli.commands.update_cmd import update_cmd
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.exceptions import (
+    CogtError,
     GatewayUnknownModelError,
     InferenceBackendCredentialsError,
     InferenceBackendLibraryError,
@@ -536,6 +537,18 @@ def replace_backend_file(backend_name: str, *, dry_run: bool = False, config_dir
         return False
 
 
+def _is_error_about_backend(*, exc: BaseException, backend_name: str, backend_file_path: str) -> bool:
+    """Charge a load failure to the backend it declares, never to one whose name merely appears in its prose.
+
+    The loader stamps ``backend_name`` on every error it raises about one backend. An error that
+    declares none — a TOML syntax error from the file reader, say — is charged by the file it names.
+    A bare name match is not enough: the loader's explanations name other backends in passing.
+    """
+    if isinstance(exc, CogtError) and exc.backend_name is not None:
+        return exc.backend_name == backend_name
+    return backend_file_path in str(exc)
+
+
 def check_backend_files(*, config_dir: Path | None = None) -> tuple[bool, dict[str, BackendFileReport], str]:
     """Check individual backend configuration files for validity.
 
@@ -597,27 +610,25 @@ def check_backend_files(*, config_dir: Path | None = None) -> tuple[bool, dict[s
             secrets_provider = EnvSecretsProvider()
             temp_library = InferenceBackendLibrary.make_empty()
 
-            # Try to load just this backend's specs
+            # This row reports on file shape, so the load is lenient: a backend whose gateway
+            # model specs were not handed to the loader (no fetch happens here) or whose
+            # credentials do not resolve is skipped rather than reported — those are the
+            # Models row's and the Credentials row's findings. A malformed file stays fatal
+            # in lenient mode, which is what this probe exists to catch.
             temp_library.load(
                 secrets_provider=secrets_provider,
                 backends_library_path=str(backends_toml_path),
                 backends_dir_path=str(backends_dir_path),
                 include_disabled=False,
+                lenient=True,
             )
 
-        except InferenceBackendLibraryError as exc:
-            # Check if this specific backend caused the error
-            error_str = str(exc)
-            if backend_name in error_str or backend_file_path in error_str:
-                is_valid = False
-                error_message = error_str
-                all_valid = False
         except Exception as exc:  # ruff: ignore[blind-except]
-            # Doctor probe: a backend load can fail in many ways; any error naming this backend is recorded as its validation failure.
-            error_str = str(exc)
-            if backend_name in error_str or backend_file_path in error_str:
+            # Doctor probe: a backend load can fail in many ways, and every probe sees the same first
+            # failure since the loader stops there — so only the backend the error is about records it.
+            if _is_error_about_backend(exc=exc, backend_name=backend_name, backend_file_path=backend_file_path):
                 is_valid = False
-                error_message = error_str
+                error_message = str(exc)
                 all_valid = False
 
         # Check if kit template exists for this backend
@@ -1128,15 +1139,14 @@ def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str
         )
         models_manager.validate_model_deck()
     except InferenceBackendLibraryError as exc:
-        # Backend library error - try to identify which backend
+        # The setup load is strict and reaches backends the file probe skipped leniently, so it can
+        # be the first thing to name a broken backend. Attribution is the file probe's, for the same
+        # reason: the loader's own advice text names other backends in passing.
         error_str = str(exc)
-        # Parse error to see if we can identify a specific backend
-        for backend_name in backend_file_reports:
-            if backend_name in error_str:
-                # Update the report for this backend
-                if backend_name in backend_file_reports:
-                    backend_file_reports[backend_name].is_valid = False
-                    backend_file_reports[backend_name].error_message = error_str
+        for backend_name, backend_file_report in backend_file_reports.items():
+            if _is_error_about_backend(exc=exc, backend_name=backend_name, backend_file_path=backend_file_report.file_path):
+                backend_file_report.is_valid = False
+                backend_file_report.error_message = error_str
         return False, f"Error checking models: {exc}", backend_file_reports
     except (
         RoutingProfileLibraryNotFoundError,

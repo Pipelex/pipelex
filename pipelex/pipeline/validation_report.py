@@ -22,7 +22,7 @@ from pipelex.graph.graphspec import GraphSpec
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.bundle_validator import DryRunOutput
-from pipelex.pipeline.input_form import InputForm
+from pipelex.pipeline.input_form import InputForm, OutputForm
 from pipelex.pipeline.liftable_pipes import LiftablePipeEntry
 from pipelex.pipeline.pipe_io_contracts import PipeIOContracts
 from pipelex.pipeline.validate_bundle import ValidatedPipeEntry, build_validated_pipes
@@ -56,6 +56,15 @@ class PipelexValidationReport(ValidationReport):
     so a backend that forgets it fails loudly instead of shipping an empty view. The HTTP route
     decides whether the field travels on the wire (absent unless a caller opts in via `views`)."""
 
+    output_form: OutputForm
+    """Per-pipe output-form descriptors — what each pipe RESOLVES TO, described with the same node
+    vocabulary the input form uses, because an output is a concept ref exactly like an input is.
+    Keyed exactly like `pipe_io_contracts`. Required and defaultless for the same reason
+    `input_form` is: a backend that forgets it must fail loudly rather than ship an empty view.
+    Read with `pipe_io_contracts[...].output.json_schema`, which states the payload's shape — the
+    descriptor says what the field IS, the schema names the property it arrives under, and neither
+    is sufficient alone."""
+
     liftable_pipes: list[LiftablePipeEntry] = Field(default_factory=empty_list_factory_of(LiftablePipeEntry))
     """Pipes that may be skipped (lifted) when an optional slot resolves absent — the
     build-time visibility that the implicit-lifting design (D3) commits to."""
@@ -84,6 +93,7 @@ def build_validation_report(
     blueprints: Sequence[PipelexBundleBlueprint],
     pipe_io_contracts: PipeIOContracts,
     input_form: InputForm,
+    output_form: OutputForm,
     dry_run_result: dict[str, DryRunOutput],
     pending_signatures: list[str],
     graph_spec: GraphSpec | None = None,
@@ -100,6 +110,7 @@ def build_validation_report(
         blueprints: The validated batch's blueprints, in declaration order (non-empty).
         pipe_io_contracts: Per-pipe contracts from `build_pipe_io_contracts`, keyed by `pipe_ref`.
         input_form: Per-pipe input-form descriptors from `build_input_form`, keyed by `pipe_ref`.
+        output_form: Per-pipe output-form descriptors from `build_output_form`, keyed the same way.
         dry_run_result: The sweep's per-pipe status map (`ValidateBundleResult.dry_run_result`).
         pending_signatures: Library-wide unsatisfied signature refs.
         graph_spec: Best-effort graph of the declared main pipe, when one was produced.
@@ -113,6 +124,7 @@ def build_validation_report(
         bundle_blueprint=select_primary_blueprint(blueprints).blueprint,
         pipe_io_contracts=pipe_io_contracts,
         input_form=input_form,
+        output_form=output_form,
         liftable_pipes=liftable_pipes or [],
         graph_spec=graph_spec,
         validated_pipes=build_validated_pipes(dry_run_result),

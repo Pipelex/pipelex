@@ -8,9 +8,10 @@ measured property rather than an aspiration.
 
 What this command writes into the output directory:
 
-- ``input_form.json`` / ``pipe_io_contracts.json`` — the descriptor and contract capture, byte for
-  byte what ``trace-input-semantics`` dumps at hop 5. This command is the sole producer of the
-  committed copies; the tracer stays a debugging tool.
+- ``input_form.json`` / ``output_form.json`` / ``pipe_io_contracts.json`` — the descriptor and
+  contract capture, byte for byte what ``trace-input-semantics`` dumps at hop 5. This command is the
+  sole producer of the committed copies; the tracer stays a debugging tool. All three share one key
+  set, because all three iterate the same ``result.pipes``.
 - ``inputs_template/<pipe_ref>.<shape>.<format>`` — the expected template, from the reference
   projection in ``projection_reference.py``.
 - ``inputs_template/manifest.json`` — the pipes covered and the declared divergences from the
@@ -63,7 +64,7 @@ from pipelex.pipe_machinery.rendering.input_renderer import (
 )
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.input_form import ListField, PipeInputFormDescriptor, build_input_form
+from pipelex.pipeline.input_form import ListField, PipeInputFormDescriptor, build_input_form, build_output_form
 from pipelex.pipeline.pipe_io_contracts import build_pipe_io_contracts
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.runtime_hub import get_console
@@ -73,6 +74,7 @@ if TYPE_CHECKING:
     from mthds.protocol.pipeline_inputs import PipelineInputs
 
 INPUT_FORM_FILE_NAME = "input_form.json"
+OUTPUT_FORM_FILE_NAME = "output_form.json"
 PIPE_IO_CONTRACTS_FILE_NAME = "pipe_io_contracts.json"
 TEMPLATES_DIR_NAME = "inputs_template"
 ENGINE_DIR_NAME = "engine"
@@ -138,13 +140,24 @@ DIVERGENCE_ITEMS: dict[str, str] = {
 # whose template has started shaping fails it too — so closing the gap retires its declaration
 # deliberately instead of leaving the manifest claiming a defect that no longer exists.
 #
-# Every entry below is the one nested-list descriptor gap (`matrix` in `Widget`), which takes both
-# shapes of both pipes that reach it. Its fix deletes these four entries and regenerates.
+# A key is a whole template, never a slot, and the shaper aborts at the first slot it refuses — so an
+# entry suspends this check for every OTHER slot in that pipe too. A gap therefore belongs in a pipe
+# that carries nothing else; where a corpus bundle would otherwise mix it with slots that do shape,
+# the bundle isolates it instead of widening the declaration.
+#
+# Two gaps are declared. `L-260830-191719` is the nested-list descriptor gap (`matrix` in `Widget`),
+# which takes both shapes of both probe pipes that reach it. `L-260902-10eb56` is `native.Anything`,
+# which is why `scaffold_anything_slot` holds that native alone: its template value is the empty
+# object every `unknown` node renders, and the shaper accepts a bare string alone at an `Anything`
+# position — so the contract publishes a template the runtime cannot take back. Each fix deletes its
+# own entries and regenerates.
 EXPECTED_UNSHAPEABLE: dict[tuple[str, str], str] = {
     ("input_semantics_probe.probe_markers", COMPACT_SHAPE): "L-260830-191719",
     ("input_semantics_probe.probe_markers", EXPLICIT_SHAPE): "L-260830-191719",
     ("input_semantics_probe.probe_single", COMPACT_SHAPE): "L-260830-191719",
     ("input_semantics_probe.probe_single", EXPLICIT_SHAPE): "L-260830-191719",
+    ("input_semantics_scaffold.scaffold_anything_slot", COMPACT_SHAPE): "L-260902-10eb56",
+    ("input_semantics_scaffold.scaffold_anything_slot", EXPLICIT_SHAPE): "L-260902-10eb56",
 }
 
 
@@ -603,6 +616,11 @@ async def generate_projection_corpus(*, bundle_paths: list[Path], output_dir: Pa
         _write_json(
             path=output_dir / INPUT_FORM_FILE_NAME,
             payload={pipe_ref: descriptor.model_dump(mode="json") for pipe_ref, descriptor in input_form.items()},
+        )
+        output_form = build_output_form(result.pipes)
+        _write_json(
+            path=output_dir / OUTPUT_FORM_FILE_NAME,
+            payload={pipe_ref: descriptor.model_dump(mode="json") for pipe_ref, descriptor in output_form.items()},
         )
         io_contracts = build_pipe_io_contracts(result.pipes)
         _write_json(
