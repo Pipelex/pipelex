@@ -664,7 +664,7 @@ test-ts-gates: env ts-toolchain
 	@PATH="$(TS_TOOLCHAIN_DIR)/node_modules/.bin:$$PATH" \
 		PIPELEX_REQUIRE_TS_GATES=1 \
 		PIPELEX_ZOD_PACKAGE="$(TS_TOOLCHAIN_DIR)/node_modules/zod" \
-		$(VENV_PYTEST) tests/unit/pipelex/codegen --no-header -p no:cacheprovider -q
+		$(VENV_PYTEST) tests/unit/pipelex/codegen --no-header -p no:cacheprovider -q --timeout=180 --timeout-method=thread
 
 ttg: test-ts-gates
 	@echo "> done: ttg = test-ts-gates"

@@ -28,3 +28,7 @@ The `?=` is not the widest door. `resolve_prettier()` in `tests/helpers/ts_toolc
 Keep the Makefile as the single source of the pin and pass it down — `PIPELEX_PRETTIER_VERSION_PIN=$(TS_TOOLCHAIN_PRETTIER_VERSION)` beside the two variables the target already exports — then have `resolve_prettier()` compare `prettier --version` against it and refuse **only in required mode**. Duplicating the version into Python instead would create a second source of truth and is the wrong trade.
 
 Worth revisiting if the gate ever produces a confusing result that turns out to be a version mismatch, or if a second consumer starts running these gates outside the make target.
+
+## The same hole on the zod side
+
+Raised in the pre-landing review of the same PR (2026-09-02). Everything above reasons about prettier, but `resolve_zod_package()` has the identical shape: with `PIPELEX_ZOD_PACKAGE` unset it falls back to `npm root -g` plus `zod` and never compares what it finds against `TS_TOOLCHAIN_ZOD_VERSION`. The deferral reasoning carries over unchanged — CI always goes through `make test-ts-gates`, which names the provisioned package explicitly — and the exposure is milder still: the round trip *executes* the schema, so a zod far enough from the pin to matter fails loudly rather than passing on bytes the pinned one would reject. If the fix above is ever taken, it should carry both pins down, not just prettier's.
