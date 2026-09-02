@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:f248fe213446457c1d1ba69bed204c9741fc91a1dd965969a3065ac7be4af20d"
+digest = "sha256:2e2f3f3c4886666d48918080519c18ff9466e16a11798eaf55b7af89ecab097f"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-09-01T14:16:51Z"
-rationale = "The --pipe slice miss now raises EntryPipeNotFoundError, so the agent-CLI validate_pipe_in_bundle_core docstring names it instead of the base. Reviewed docs/tools/cli/ -- agent-cli.md and validate.md document the --pipe flag and the error envelope generically, naming no per-command error class and no exit code that moved (the not-found arm still exits 2), so nothing there was stale. Reviewed pipelex/cli/agent_cli/CLAUDE.md -- its Error classification bullet already states the report-first rule and cites the two validate not-found arms; this change is what finally makes the validate bundle arm's label carry a real domain, which the bullet already describes, so no edit was needed."
+reviewed_at = "2026-09-02T20:44:04Z"
+rationale = "Pre-landing review pass on fix/Library-class-registry-scoping. The only CLI trigger change is in pipelex/cli/commands/run/_run_core.py: the comment above the --save-csv except block is rewritten to state what is true (CsvError is a ToolError and so a PipelexError, so it never escaped execute_run's generic except arm) and CsvError is dropped from that tuple because PipelexError already covers it -- no command, flag, help text, exit code or message moved. Re-reviewed docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md against that: neither names the exception tuple or the CsvError class, and the --save-csv behaviour they describe is unchanged, so nothing there is stale."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -111,7 +111,7 @@ rationale = "The --pipe slice miss now raises EntryPipeNotFoundError, so the age
 "pipelex/cli/commands/run/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/run/_inputs_file_loader.py" = "blob:dde781f846968b667a0acfb4b3e3cea01cef7049"
 "pipelex/cli/commands/run/_inputs_path_resolver.py" = "blob:c8ec89d98718e18af7aaaded44c9f545be60adab"
-"pipelex/cli/commands/run/_run_core.py" = "blob:71434e5eb9dc512a89f582d7f897a5a121b20eec"
+"pipelex/cli/commands/run/_run_core.py" = "blob:2659db67a5c929f8de1dd47e2bbb729563ef1e2f"
 "pipelex/cli/commands/run/app.py" = "blob:a7090b0ff6bf2f1d47827fa27d2a138096a2e148"
 "pipelex/cli/commands/run/bundle_cmd.py" = "blob:cb420bf4879c863d64c5e20ed535c42732b720a2"
 "pipelex/cli/commands/run/exceptions.py" = "blob:e9552226e597922b6ac0757f7b52eb880a2e1472"

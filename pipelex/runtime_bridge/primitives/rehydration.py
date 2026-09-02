@@ -1,8 +1,5 @@
 from typing import Any
 
-from kajson.class_registry import ClassRegistry
-from kajson.kajson_manager import KajsonManager
-
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.interpreter_hub import get_library_manager, set_current_library
 from pipelex.libraries.library_crate import LibraryCrate
@@ -25,22 +22,17 @@ def rehydrate_library_and_memory(
 
     Steps, in order (order matters):
 
-    1. Create a per-run ``ClassRegistry`` pre-seeded from the global one, so this run's dynamically
-       generated concept classes register into an isolated registry rather than leaking globally.
-    2. Open a fresh library under ``library_id`` and attach the registry; make it the current library
-       so the factory and hydrator resolve classes against it.
-    3. ``load_from_crate`` — rebuilds domains/concepts/pipes and registers the dynamic classes.
-    4. Hydrate the working memory (needs step 3 to have registered the classes it references).
+    1. Open a fresh library under ``library_id`` and make it the current library, so the factory and
+       hydrator resolve classes against it. The library arrives carrying its own ``ClassRegistry``
+       pre-seeded from the process-global one (``LibraryManager.open_library`` attaches it), which is
+       what keeps this run's dynamically generated concept classes out of every other library.
+    2. ``load_from_crate`` — rebuilds domains/concepts/pipes and registers the dynamic classes.
+    3. Hydrate the working memory (needs step 2 to have registered the classes it references).
 
     Returns the hydrated WorkingMemory, or None when there was nothing to hydrate.
     """
-    global_registry = KajsonManager.get_class_registry()
-    run_registry = ClassRegistry()
-    run_registry.register_classes_dict(global_registry.get_classes_dict())
-
     library_manager = get_library_manager()
-    library = library_manager.open_fresh_library(library_id=library_id)
-    library.set_class_registry(run_registry)
+    library_manager.open_fresh_library(library_id=library_id)
     set_current_library(library_id=library_id)
 
     library_manager.load_from_crate(library_id=library_id, crate=crate)
