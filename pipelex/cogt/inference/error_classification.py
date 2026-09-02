@@ -218,6 +218,111 @@ _GATEWAY_UNRESOLVED_REFERENCE_BY_CODE: dict[str, GatewayUnresolvedReference] = {
 }
 
 
+class GatewayRoutingRefusal(StrEnum):
+    """A "cannot route this request" refusal raised by the Pipelex inference gateway itself.
+
+    Before a request can reach a provider the gateway has to decide *which*
+    provider — it reads the model out of the request, looks it up in its own
+    routing table, and hands the call to the integration that serves it. When
+    that resolution fails it refuses the request itself, with codes of its own.
+    These are not inference failures and must not read as one: a caller who named
+    a model this deployment does not serve has a *model* to change or a
+    deployment to fix, not a prompt to revise, and nothing about a retry can help.
+
+    Every member is its own wire code here, unlike the two families beside it —
+    not by accident but because each names a different thing that has to change.
+    The one they nearly share is the flag: ``UNKNOWN_MODEL`` is the only member
+    that means "this deployment does not know that model", so it is the only one
+    the Classify step renders as a ``*ModelNotFoundError``.
+
+    Each member corresponds to one of the gateway's own error codes, which is the
+    contract between the two repositories — the wording of a refusal is free to
+    change, the code is not.
+    """
+
+    #: ``pig-01`` at HTTP 400 — the request body names one that no integration
+    #: this deployment carries lists. Reached from the runtime by a model deck
+    #: whose handle the gateway does not serve: a stale deck, a typo in a
+    #: ``.mthds`` file's model, or a model the deployment deliberately does not
+    #: carry.
+    #:
+    #: **The code covers two other facts and does not distinguish them**: a body
+    #: that names no model, and a body the gateway could not parse at all — its
+    #: model reader returns "no model" from a bare ``catch`` around the JSON and
+    #: multipart reads alike, so a truncated or non-conforming payload lands here
+    #: too. Only the gateway's message says which, which is why the rendered
+    #: advice defers to it rather than asserting a deck disagreement (see
+    #: ``_render_gateway_routing_refusal_detail``). Splitting the code is a
+    #: gateway-side change, filed on ``pipelex-manifold`` as L-260902-701614.
+    UNKNOWN_MODEL = "unknown_model"
+    #: ``pig-02`` at HTTP 400 — the model resolves, but to an integration the
+    #: deployment has switched off because a credential variable is unset. Nothing
+    #: about the request causes it and no request avoids it: the gateway's own
+    #: message names the integration and the variables whoever operates it must
+    #: set.
+    DISABLED_INTEGRATION = "disabled_integration"
+    #: ``pig-05`` at HTTP 400 — a native-protocol path names a model that another
+    #: provider serves. Today that is only Google's generative shape —
+    #: ``/v1/<v1|v1alpha|v1beta>/models/<model>:generateContent`` or its
+    #: ``streamGenerateContent`` twin, under the gateway's own ``/v1`` prefix —
+    #: the one ``nativeProtocolPaths.ts`` admits. Reaching it means the model deck and the
+    #: gateway disagree about which backend serves a model: the model exists and
+    #: is served, just not over the protocol the runtime spoke to ask for it.
+    WRONG_PROTOCOL = "wrong_protocol"
+    #: ``pig-06`` at HTTP 400 — a model reached one of the native
+    #: ``/v1/pipelex/*`` routes (extract, search) whose integration's provider does
+    #: not serve that capability. Again a deck-versus-gateway disagreement, or a
+    #: model named on a pipe it cannot serve: the message names the integration,
+    #: the provider and the capability.
+    UNSERVED_CAPABILITY = "unserved_capability"
+
+
+# The gateway's routing-refusal codes, mapped to what the runtime does about them.
+#
+# **Matched on the code alone, with no check on ``provider``**, for exactly the
+# reason the two maps above are: the reporting provider does not identify the
+# gateway. These arrive under more than one ``ProviderName`` — the Portkey
+# substrate and the OpenAI substrate that carries every chat call both report
+# ``GATEWAY``, plain ``httpx`` on the native routes reports ``GATEWAY`` too, and
+# Claude travels on the shared Anthropic driver — while ``pig-`` is the gateway's
+# own code namespace and no vendor emits into it.
+#
+# **Two of the gateway's routing codes are deliberately absent**, and the omission
+# is the scope decision rather than an oversight:
+#
+# - ``pig-03`` ("the client tried to route") refuses a ``x-portkey-*`` steering
+#   header, the ``?model=`` query form, a ``@<slug>/<model>`` virtual-key model, or
+#   a path and body naming different models. No client that talks to a
+#   Pipelex-operated gateway today produces any of those, so reaching it means a
+#   client bug rather than a caller's or an operator's mistake, and the status
+#   ladder's reading is as good as any.
+#
+#   Two limits on that sentence, because it is the whole reason the code stays
+#   out. ``tests/unit/pipelex/providers/manifold/test_manifold_clients.py`` pins
+#   the manifold clients against the four steering headers by name, while the
+#   gateway refuses on an *allow*-list — so a ``portkey_ai`` release that starts
+#   sending some other ``x-portkey-*`` header turns every request into a
+#   ``pig-03`` with that test still green. And ``gateway_img_gen_worker.py`` does
+#   send ``x-portkey-config`` on every image call, which Portkey's cloud reads and
+#   a Pipelex-operated gateway refuses: harmless while ``pipelex_gateway`` keeps
+#   its default endpoint, and a client bug the day that backend names one of ours.
+# - ``pig-04`` ("this gateway does not serve ``<method> <path>``") is the proxy
+#   policy refusing a path only the catch-all could answer, and it is a 404, so the
+#   ladder already reads it as model-not-found — wrong in kind, but unreachable
+#   while the runtime calls only the routes the gateway mounts, and a served-path
+#   drift is a deployment bug to surface loudly rather than a verdict to soften.
+#
+# ``pig-09`` is not a routing refusal either: it belongs to the
+# unresolvable-reference family, which ``_GATEWAY_UNRESOLVED_REFERENCE_BY_CODE``
+# reads.
+_GATEWAY_ROUTING_REFUSAL_BY_CODE: dict[str, GatewayRoutingRefusal] = {
+    "pig-01": GatewayRoutingRefusal.UNKNOWN_MODEL,
+    "pig-02": GatewayRoutingRefusal.DISABLED_INTEGRATION,
+    "pig-05": GatewayRoutingRefusal.WRONG_PROTOCOL,
+    "pig-06": GatewayRoutingRefusal.UNSERVED_CAPABILITY,
+}
+
+
 def _resolve_sdk_exception_type(exc: BaseException, *, status_code: int | None) -> str:
     """Return the ``sdk_exception_type`` name, normalizing status-less httpx transport errors.
 
@@ -295,10 +400,10 @@ class ProviderErrorMetadata(BaseModel):
         and the Portkey substrate re-parses the response because its SDK replaces
         ``exc.body`` with the message string (see ``extract_gateway_metadata``).
 
-        Returns ``None`` for every other refusal — including the gateway's routing
-        codes, which classify on their status like anything else, and its "cannot
-        resolve this reference" codes, which are a separate family read by
-        ``gateway_unresolved_reference``.
+        Returns ``None`` for every other refusal — including the gateway's "cannot
+        resolve this reference" codes and its routing refusals, each a separate
+        family read by ``gateway_unresolved_reference`` and
+        ``gateway_routing_refusal``.
         """
         if self.provider_error_code is None:
             return None
@@ -313,14 +418,35 @@ class ProviderErrorMetadata(BaseModel):
         names a file rather than carrying it can be refused by the gateway before
         any provider sees it, and the code is the only thing that says so.
 
-        The two families are disjoint — a code names either a bound the request
-        exceeded or a reference that could not be resolved, never both — so the
-        Classify step may read them in either order. Returns ``None`` for every
-        other refusal, the gateway's routing codes included.
+        The three gateway families are disjoint — a code names a bound the request
+        exceeded, a reference that could not be resolved, or a request that could
+        not be routed, never two of them — so the Classify step may read them in
+        any order. Returns ``None`` for every other refusal, the gateway's routing
+        codes included.
         """
         if self.provider_error_code is None:
             return None
         return _GATEWAY_UNRESOLVED_REFERENCE_BY_CODE.get(self.provider_error_code)
+
+    @property
+    def gateway_routing_refusal(self) -> GatewayRoutingRefusal | None:
+        """Which of the gateway's routing refusals this is, if any.
+
+        Reads ``provider_error_code`` off the same Extract hops the two properties
+        above do, and for the same reason: the gateway can refuse to route a
+        request before any provider sees it, and the code is the only thing that
+        says so. Without this the whole family falls through to the status ladder's
+        400 arm and a caller who named a model the deployment does not serve is
+        told to review their prompt.
+
+        Disjoint from both other families by construction, so the Classify step may
+        read the three in any order. Returns ``None`` for every other refusal,
+        including the gateway's own ``pig-03`` and ``pig-04``, which the runtime's
+        own clients cannot produce (see ``_GATEWAY_ROUTING_REFUSAL_BY_CODE``).
+        """
+        if self.provider_error_code is None:
+            return None
+        return _GATEWAY_ROUTING_REFUSAL_BY_CODE.get(self.provider_error_code)
 
     @property
     def is_content_policy_violation(self) -> bool:

@@ -237,8 +237,8 @@ The three steps live in three modules. Only the per-provider Extract functions s
 
 | Module | Step | What it owns |
 |--------|------|--------------|
-| `pipelex/cogt/inference/error_classification.py` | Extract | `ProviderErrorMetadata`, `SDKErrorEnvelope`, `UserAction`, `UserActionKind`, `GatewayRequestLimit`, `GatewayUnresolvedReference`, the `extract_*_metadata` functions, plus pure discriminators (`is_quota_exhaustion`, `is_content_policy_violation`, `is_network_error`, `gateway_request_limit`, `gateway_unresolved_reference`) exposed as `@property` on the metadata |
-| `pipelex/cogt/inference/error_classify.py` | Classify | `classify_inference_error()` — provider-blind mapping from `ProviderErrorMetadata` → `ClassificationResult(category, user_action_kind, is_model_not_found, gateway_request_limit, gateway_unresolved_reference)` |
+| `pipelex/cogt/inference/error_classification.py` | Extract | `ProviderErrorMetadata`, `SDKErrorEnvelope`, `UserAction`, `UserActionKind`, `GatewayRequestLimit`, `GatewayUnresolvedReference`, `GatewayRoutingRefusal`, the `extract_*_metadata` functions, plus pure discriminators (`is_quota_exhaustion`, `is_content_policy_violation`, `is_network_error`, `gateway_request_limit`, `gateway_unresolved_reference`, `gateway_routing_refusal`) exposed as `@property` on the metadata |
+| `pipelex/cogt/inference/error_classify.py` | Classify | `classify_inference_error()` — provider-blind mapping from `ProviderErrorMetadata` → `ClassificationResult(category, user_action_kind, is_model_not_found, gateway_request_limit, gateway_unresolved_reference, gateway_routing_refusal)` |
 | `pipelex/cogt/inference/error_render.py` | Render | `render_inference_error()` — picks the `CogtError` subclass from `InferenceErrorFamily` plus `is_model_not_found` (e.g. `LLMModelNotFoundError` vs `LLMCompletionError`) |
 
 Provider-specific nuance is normalized away in Extract (e.g. Google's `code` becomes `status_code`; AWS Bedrock error codes are mapped to HTTP statuses), so Classify has no provider branching. HTTP status drives classification; status-less errors dispatch on the SDK exception type name. The `tests/unit/pipelex/cogt/inference/test_provider_classification_parity.py` meta-test walks every `ProviderName` against the extract-fn registry so adding a new provider without wiring it fails fast.
@@ -265,7 +265,7 @@ class ProviderErrorMetadata(BaseModel):
 
 ### The Gateway's Own Refusals
 
-Not every failure on an inference call comes from a provider. The Pipelex inference gateway refuses some requests itself, before a model ever sees them, and it does so for two different reasons: the request is outside what it will carry, or a reference the request depends on cannot be turned into content. Both arrive with the gateway's own error codes, and each has a runtime enum naming its outcomes — `GatewayRequestLimit` and `GatewayUnresolvedReference`.
+Not every failure on an inference call comes from a provider. The Pipelex inference gateway refuses some requests itself, before a model ever sees them, and it does so for three different reasons: the request is outside what it will carry, a reference the request depends on cannot be turned into content, or it cannot decide which provider should serve the request at all. All three arrive with the gateway's own error codes, and each has a runtime enum naming its outcomes — `GatewayRequestLimit`, `GatewayUnresolvedReference` and `GatewayRoutingRefusal`.
 
 #### What the request may weigh
 
@@ -291,7 +291,7 @@ A few details are worth knowing before touching this:
 
 #### When a reference cannot be resolved
 
-The other half of the gateway's own refusals. A request may *name* a file rather than carry it — a `pipelex-storage://` key the gateway resolves for the caller, or a document URL it fetches on their behalf — and when it cannot turn that reference into bytes it refuses the request itself, again before a provider sees it. So one family bounds what the request may weigh; this one says a reference the request depends on could not be turned into content. `GatewayUnresolvedReference` is the runtime's name for each outcome.
+The second of the gateway's three families. A request may *name* a file rather than carry it — a `pipelex-storage://` key the gateway resolves for the caller, or a document URL it fetches on their behalf — and when it cannot turn that reference into bytes it refuses the request itself, again before a provider sees it. So the family above bounds what the request may weigh; this one says a reference the request depends on could not be turned into content. `GatewayUnresolvedReference` is the runtime's name for each outcome.
 
 | Gateway code | HTTP | `GatewayUnresolvedReference` | Category / action | What the caller is told |
 |---|---|---|---|---|
@@ -317,9 +317,40 @@ Everything said above about the request limits holds here too — the code is th
 
 `pig-09` also folds in causes that are not the caller's to repair — no bucket configured, and no way to hand a file to the provider the model resolves to — because the LLM routes have one slot for all of them. The native routes name the first of those separately (`pipelex_storage_uri_unsupported`, `CONTACT_SUPPORT`), so the same storage-less deployment reads differently by route. Splitting `pig-09` is a gateway-side change, filed on `pipelex-manifold` as `L-260901-f2b554`.
 
-Nothing in either family is ever retried, and the two never overlap: a code names either a bound the request exceeded or a reference that could not be resolved. `pig-09` and `pig-10` are the clearest illustration — the same middleware raises both, one when the object cannot be resolved and one when it is over its cap.
+#### When the model cannot be routed
 
-The gateway's remaining codes — its routing refusals, and the storage deadline outcomes (`pig_storage_timeout` at 504, `pig_storage_client_disconnected` at 499) — belong to neither family and classify on their status like anything else, which is the right reading for a timeout.
+The third family, and the one no request escapes: whatever else it asks, it has to be *routed* first — the gateway reads the model out of it, looks that model up in its own routing table, and hands the call to the integration that serves it. When that resolution fails there is no provider to send the request to, so the gateway refuses it itself. `GatewayRoutingRefusal` is the runtime's name for each outcome.
+
+| Gateway code | HTTP | `GatewayRoutingRefusal` | Category / action | What the caller is told |
+|---|---|---|---|---|
+| `pig-01` | 400 | `UNKNOWN_MODEL` | `CONFIGURATION` / `CHANGE_MODEL` | the gateway serves no such model — and if the deck lists it, the deck and the gateway disagree |
+| `pig-02` | 400 | `DISABLED_INTEGRATION` | `CONFIGURATION` / `CONTACT_SUPPORT` | the model's integration is not enabled on this deployment — its credentials are unset |
+| `pig-05` | 400 | `WRONG_PROTOCOL` | `CONFIGURATION` / `CHANGE_MODEL` | the model is served, but not over the protocol the request used for it |
+| `pig-06` | 400 | `UNSERVED_CAPABILITY` | `CONFIGURATION` / `CHANGE_MODEL` | the model's integration does not serve that capability (extract, search) |
+
+Everything said about the two families above holds here too — the code is the discriminator rather than the provider, the check runs ahead of the status ladder, the advice defers every specific to the gateway's own message, and nothing is ever retried. Four things are particular to this family:
+
+- **The category is `CONFIGURATION`, never `CONTENT`, and that is the whole bug this family fixes.** Nothing in the prompt, the parameters or the inputs causes any of these, and no edit to them avoids one. Before the family existed all four fell through to the status ladder's 400 arm, so a caller who named a model the deployment does not serve was told *"The provider rejected the request — review the prompt, parameters, and inputs"* and received an `LLMCompletionError`.
+- **Every member is its own wire code, unlike the two families above.** Grouping is by remedy in all three, and here each code names a different thing that has to change — so the grouping happens to be one-to-one rather than by design.
+- **Only `pig-01` sets `is_model_not_found`.** The flag is not a category: it selects the family's `*ModelNotFoundError` class, which `pipe_operator.py` re-raises as a `PipeOperatorModelAvailabilityError` carrying the model handle — the pipe-level error a caller already gets when the model deck itself cannot find a model. `pig-01` is exactly that case seen from the gateway. For `pig-05` and `pig-06` the model *does* exist and *is* served, so claiming it was not found would be false; they stay on the generic failure class and carry the distinction in the advice.
+- **`pig-02` is the family's `CONTACT_SUPPORT` arm**, the same call `STORAGE_NOT_SERVED` and `BODY_LENGTH_REQUIRED` get. A switched-off integration is the gateway operator's fact: `CHECK_CREDENTIALS` would send a hosted caller to rotate their own perfectly valid key, and `CHANGE_MODEL` would send them shopping for a model over an unset variable. The gateway's message names the integration and the variables to set, and the advice points at it.
+
+**Moving the family to `CONFIGURATION` moves its HTTP answer too, and that is worth stating out loud.** `InferenceErrorCategory.CONFIGURATION` implies `ErrorDomain.CONFIG`, which `error_domain_to_http_status` renders as **500**, where `CONTENT` implies `INPUT` and renders as 422. So on any surface built on `ErrorReport.http_status`, all four of these now answer 500 where they answered 422 — the same answer the status ladder's 404 arm has always given a missing model, and the right one in kind, since none of them is a property of what the caller submitted. Two consequences follow: these land in server-error alerting rather than client-error, and 500 is a status outer HTTP clients and orchestrators retry. "Never retried" above is a statement about `InferenceErrorCategory.is_retryable` inside this process; it says nothing about what a caller's own client does with the status, and an outer retry of any of these earns an identical refusal.
+
+`pig-05` and `pig-06` are as often a deck-versus-gateway disagreement as a caller's mistake — the runtime picks the protocol and the route from its own model deck — so both details say "your model deck" out loud rather than only "pick another model", which would leave an operator hunting for a model problem that is a configuration problem.
+
+Two of the gateway's routing codes are deliberately **not** in the family, because no client the runtime ships can produce either:
+
+| Code | HTTP | Why it stays with the status ladder |
+|---|---|---|
+| `pig-03` | 400 | "the client tried to route" — a refused `x-portkey-*` header, the `?model=` query form, a `@<slug>/<model>` virtual-key model, or a path and body naming different models. No client that talks to a Pipelex-operated gateway today sends one, so reaching it means a client bug rather than a caller's or an operator's mistake. Two limits on that: `tests/unit/pipelex/providers/manifold/test_manifold_clients.py` pins the manifold clients against the four steering headers *by name* while the gateway refuses on an allow-list, so a `portkey_ai` release sending some other `x-portkey-*` header would turn every request into a `pig-03` with that test still green; and the gateway img-gen worker does send `x-portkey-config`, which Portkey's cloud reads and one of our gateways refuses — harmless while `pipelex_gateway` keeps its default endpoint, a client bug the day it names one of ours. |
+| `pig-04` | 404 | "this gateway does not serve `<method> <path>`" — the proxy policy refusing a path only the catch-all could answer, unreachable while the runtime calls only the routes the gateway mounts. Being a 404 the ladder reads it as model-not-found, which is wrong in kind — but a served-path drift is a deployment bug to surface loudly rather than a verdict to soften. |
+
+`pig-05` is mapped but not reachable from today's runtime: it is raised only on a native Google protocol path (`/v1/<v1|v1alpha|v1beta>/models/<model>:generateContent`, or its `streamGenerateContent` twin, under the gateway's own `/v1` prefix), and no worker speaks that protocol to the gateway — both service plugins build their LLM workers on the OpenAI substrate, and the manifold's native client serves only the `/v1/pipelex/*` extract and search routes. The entry costs nothing and is right the day such a path is wired. One trap waits there, pinned by a test rather than left to be discovered: Google's Extract hop reads the symbolic `status` a Google error carries (`RESOURCE_EXHAUSTED` and friends), and the gateway's envelope has no `error.status` — only a top-level `status: "failure"`, which that hop returns as though it were a provider code. A native Google path needs that hop taught the gateway's envelope first.
+
+Nothing in any of the three families is ever retried, and no two of them overlap: a code names a bound the request exceeded, a reference that could not be resolved, or a request that could not be routed. `pig-09` and `pig-10` are the clearest illustration — the same middleware raises both, one when the object cannot be resolved and one when it is over its cap.
+
+The gateway's remaining codes belong to no family and classify on their status like anything else. For the storage deadline outcomes (`pig_storage_timeout` at 504, `pig_storage_client_disconnected` at 499) that is the right reading — a timeout is a timeout. For `pig-12` at 400, the LLM routes' "no storage bucket is configured", it is not: it is the operator's fact and reads as a prompt to revise, exactly as `pipelex_storage_uri_unsupported` does not on the native routes. One map entry into `GatewayUnresolvedReference.STORAGE_NOT_SERVED` closes it, filed as `L-260901-0859e8`.
 
 ### The `instructor` Unwrap
 

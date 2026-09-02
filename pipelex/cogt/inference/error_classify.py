@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from pipelex.cogt.exceptions import InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import (
     GatewayRequestLimit,
+    GatewayRoutingRefusal,
     GatewayUnresolvedReference,
     SDKErrorEnvelope,
     UserActionKind,
@@ -47,6 +48,14 @@ class ClassificationResult(BaseModel):
     # Render step can say which reference failed and how, instead of telling a
     # caller with a mistyped storage key to revise their prompt.
     gateway_unresolved_reference: GatewayUnresolvedReference | None = None
+    # Which of the gateway's routing refusals this is, when the gateway could not
+    # decide which provider should serve the request at all. A flag for the same
+    # reason as the two fields above: the retry decision is unchanged, but the
+    # Render step can say that the *gateway* refused to route the model, instead
+    # of telling a caller who named a model it does not serve to revise their
+    # prompt — or, for the three whose model does exist, instead of the generic
+    # "the requested model was not found".
+    gateway_routing_refusal: GatewayRoutingRefusal | None = None
 
 
 # Status-less SDK exception type names recognizable regardless of provider:
@@ -181,6 +190,60 @@ def _classify_gateway_unresolved_reference(*, reference: GatewayUnresolvedRefere
             )
 
 
+def _classify_gateway_routing_refusal(*, refusal: GatewayRoutingRefusal) -> ClassificationResult:
+    """Classify a routing refusal the inference gateway raised on its own.
+
+    Every member is ``CONFIGURATION``: nothing in the prompt, the parameters or the
+    inputs causes any of these, and no edit to them avoids one. That is the whole
+    point of the family — without it all four take the status ladder's 400 arm and
+    read as a provider rejecting the caller's content.
+
+    None is retryable, for the reason none of the other two gateway families is:
+    the gateway refused before a provider saw the request, and an identical retry
+    earns an identical refusal.
+    """
+    match refusal:
+        case GatewayRoutingRefusal.UNKNOWN_MODEL:
+            # The deployment does not know that model at all — which is exactly
+            # what the ``is_model_not_found`` flag means, so this is the one member
+            # that gets it. It selects the family's ``*ModelNotFoundError`` class,
+            # which ``pipe_operator.py`` re-raises as a
+            # ``PipeOperatorModelAvailabilityError`` carrying the model handle: the
+            # same pipe-level error a caller gets when the deck itself cannot find
+            # a model, which is this case seen from the gateway.
+            return ClassificationResult(
+                category=InferenceErrorCategory.CONFIGURATION,
+                user_action_kind=UserActionKind.CHANGE_MODEL,
+                is_model_not_found=True,
+                gateway_routing_refusal=refusal,
+            )
+        case GatewayRoutingRefusal.WRONG_PROTOCOL | GatewayRoutingRefusal.UNSERVED_CAPABILITY:
+            # The model exists and is served — it just cannot do what was asked, or
+            # was asked over a protocol its integration does not speak. So the flag
+            # stays unset: telling a caller the model was not found would be false,
+            # and the Render step carries the real distinction. ``CHANGE_MODEL`` is
+            # still what an end caller can do about it.
+            return ClassificationResult(
+                category=InferenceErrorCategory.CONFIGURATION,
+                user_action_kind=UserActionKind.CHANGE_MODEL,
+                gateway_routing_refusal=refusal,
+            )
+        case GatewayRoutingRefusal.DISABLED_INTEGRATION:
+            # The integration is switched off because whoever operates the gateway
+            # never set its credential. The deployment is what has to change, not
+            # the request — so this is the family's ``CONTACT_SUPPORT`` arm, the
+            # same call ``STORAGE_NOT_SERVED`` and ``BODY_LENGTH_REQUIRED`` get.
+            # ``CHECK_CREDENTIALS`` would send a hosted caller to rotate their own
+            # perfectly valid key; ``CHANGE_MODEL`` would send them shopping for a
+            # model over an operator's unset variable. The flag stays unset: the
+            # handle resolved, so this is not a model the deployment does not know.
+            return ClassificationResult(
+                category=InferenceErrorCategory.CONFIGURATION,
+                user_action_kind=UserActionKind.CONTACT_SUPPORT,
+                gateway_routing_refusal=refusal,
+            )
+
+
 def classify_inference_error(metadata: SDKErrorEnvelope) -> ClassificationResult:
     """Classify an inference SDK error from its structured metadata.
 
@@ -214,6 +277,16 @@ def classify_inference_error(metadata: SDKErrorEnvelope) -> ClassificationResult
     gateway_unresolved_reference = metadata.gateway_unresolved_reference
     if gateway_unresolved_reference is not None:
         return _classify_gateway_unresolved_reference(reference=gateway_unresolved_reference)
+
+    # And its refusals to route the request at all, on the same footing again. All
+    # three gateway code sets are disjoint, so the order among these branches
+    # carries no meaning; what matters is that all three run ahead of the status
+    # ladder. Every routing refusal arrives on 400, which the ladder would read as
+    # a provider rejecting the prompt — for a model the gateway does not serve, is
+    # not configured to reach, or cannot ask what was asked.
+    gateway_routing_refusal = metadata.gateway_routing_refusal
+    if gateway_routing_refusal is not None:
+        return _classify_gateway_routing_refusal(refusal=gateway_routing_refusal)
 
     # Quota exhaustion is decided by the provider-aware ``is_quota_exhaustion``
     # property and takes precedence over the HTTP status: providers signal it on
