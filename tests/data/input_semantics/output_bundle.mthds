@@ -1,0 +1,121 @@
+domain      = "input_semantics_output"
+description = "OUTPUT_bundle_desc: the cases an output-form descriptor and an output payload schema must get right — every authored fact carries an OUTPUT_ sentinel so its survival is greppable in every capture"
+main_pipe   = "output_structured"
+
+# The three bundles beside this one all resolve to `Text`, which is why this one exists: a corpus
+# whose every pipe outputs the same native scalar can only ever capture one output descriptor and
+# one output schema, and the two facts most likely to be got wrong — the plural wrap on the
+# descriptor, and the list content model on the schema — would never appear in it at all.
+
+[concept.Verdict]
+description = "OUTPUT_desc_concept_Verdict: a flat structured result, so an output descriptor recurses at least once"
+
+[concept.Verdict.structure]
+label = { type = "text", description = "OUTPUT_desc_field_label: the verdict itself", required = true, choices = [
+  "accepted",
+  "rejected",
+  "deferred",
+] }
+confidence = { type = "number", description = "OUTPUT_desc_field_confidence: how sure, 0 to 1", required = true }
+rationale = { type = "text", description = "OUTPUT_desc_field_rationale: why it landed there" }
+
+[concept.Finding]
+description = "OUTPUT_desc_concept_Finding: one element of a plural result"
+
+[concept.Finding.structure]
+summary  = { type = "text", description = "OUTPUT_desc_field_summary: what was found", required = true }
+severity = { type = "integer", description = "OUTPUT_desc_field_severity: how bad, 1 to 5", required = true }
+
+[concept.Dossier]
+description = "OUTPUT_desc_concept_Dossier: a nested structured result carrying a date and a list of concepts"
+
+[concept.Dossier.structure]
+reference = { type = "text", description = "OUTPUT_desc_field_reference: the dossier reference", required = true }
+opened_on = { type = "date", description = "OUTPUT_desc_field_opened_on: when it was opened", required = true }
+settled   = { type = "boolean", description = "OUTPUT_desc_field_settled: whether it is closed" }
+findings  = { type = "list", item_type = "concept", item_concept_ref = "Finding", description = "OUTPUT_desc_field_findings: a NESTED list, which stays a bare array on the wire", required = true }
+
+# A single structured output: the descriptor recurses, and the payload schema is the structure
+# itself — a structured concept IS its own content model, so nothing wraps it.
+[pipe.output_structured]
+type = "PipeLLM"
+description = "OUTPUT_pipe_output_structured: a flat structured output"
+inputs = { note = "Text" }
+output = "Verdict"
+prompt = """
+OUTPUT_prompt_output_structured
+@note
+"""
+
+# A nested structured output. The interesting half is `opened_on`: a `date` FIELD inside a
+# structure is not a `native.Date` value, and `findings` is a nested list, which is a bare array
+# on the wire where a top-level plural output is not.
+[pipe.output_nested]
+type = "PipeLLM"
+description = "OUTPUT_pipe_output_nested: a structured output nesting a date and a list of concepts"
+inputs = { note = "Text" }
+output = "Dossier"
+prompt = """
+OUTPUT_prompt_output_nested
+@note
+"""
+
+# The one that used to be impossible to get right from the contract alone. `concept_ref` names
+# `Finding` with the suffix stripped, on BOTH sides, so a producer that does not read
+# `multiplicity` describes one finding where a run returns many. The descriptor must be a `list`,
+# and the payload schema must be the list content model rather than a bare array.
+[pipe.output_plural]
+type = "PipeLLM"
+description = "OUTPUT_pipe_output_plural: a variable plural output"
+inputs = { note = "Text" }
+output = "Finding[]"
+prompt = """
+OUTPUT_prompt_output_plural
+@note
+"""
+
+# The fixed arm of the same wrap: `item_count` rides the descriptor's list node and the contract's
+# `item_count` alike, and the schema's element array carries the matching bounds.
+[pipe.output_fixed_plural]
+type = "PipeLLM"
+description = "OUTPUT_pipe_output_fixed_plural: a fixed-count plural output"
+inputs = { note = "Text" }
+output = "Finding[3]"
+prompt = """
+OUTPUT_prompt_output_fixed_plural
+@note
+"""
+
+# An optional output. `optional: true` says a SUCCESSFUL run may leave it absent — so the schema
+# describes the shape when present, and carries no null arm.
+[pipe.output_optional]
+type = "PipeLLM"
+description = "OUTPUT_pipe_output_optional: an output a successful run may resolve as an absence"
+inputs = { note = "Text" }
+output = "Verdict?"
+prompt = """
+OUTPUT_prompt_output_optional
+@note
+"""
+
+# A native scalar output whose content model wraps: the payload sits under `text`, which is the
+# property a consumer unwraps by — read off this schema, never worked out by inspecting a value.
+[pipe.output_native_text]
+type = "PipeLLM"
+description = "OUTPUT_pipe_output_native_text: a native scalar output, whose content model wraps"
+inputs = { note = "Text" }
+output = "Text"
+prompt = """
+OUTPUT_prompt_output_native_text
+@note
+"""
+
+# A file-bearing output. Its content model is multi-property (`url` and friends), so nothing
+# unwraps, and a renderer told `kind = "image"` reads the pinned members. A PipeLLM may not resolve
+# to a concept containing images, so the carrier is the operator that produces one.
+[pipe.output_native_image]
+type        = "PipeImgGen"
+description = "OUTPUT_pipe_output_native_image: a file-bearing output, whose content model does NOT wrap"
+inputs      = { subject = "Text" }
+output      = "Image"
+prompt      = "$subject"

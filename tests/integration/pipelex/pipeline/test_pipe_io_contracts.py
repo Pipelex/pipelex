@@ -1,10 +1,13 @@
 """Pin the D6 `build_pipe_io_contracts` builder: typed `PipeIOContract` entries keyed by `pipe_ref`.
 
-Covers the two combinations the hosted builder it was ported from never saw:
+Covers the combinations the hosted builder it was ported from never saw:
 
 - **`PipeSignature` pipes in a lenient batch** — a forward-declared header validated with
   ``allow_signatures=True`` gets an IO-contract entry like any concrete pipe (its declared
   contract is exactly what a top-down build needs), keyed by its namespaced ``pipe_ref``.
+- **The structureless concept** — `native.Anything` deliberately has no content class, so
+  asking a provider for one is a category error rather than a missing registration. Both
+  sides of the contract report the empty schema instead of failing the whole build.
 - **Multiplicity entry shapes** — a single output reports ``multiplicity="single"``, a
   variable list output (``Concept[]``) reports ``multiplicity="variable"``, and a fixed-count
   output (``Concept[N]``) reports ``multiplicity="fixed"`` with ``item_count=N``; list-typed
@@ -42,6 +45,33 @@ def _teardown_validation_library(outer_library_id: str) -> None:
         get_library_manager().teardown(library_id=validation_library_id)
     clear_current_library()
 
+
+_ANYTHING_OUTPUT_MTHDS = """
+domain = "anything_output_test"
+description = "Bundle whose router RESOLVES TO the structureless native concept"
+
+[concept.Verdict]
+description = "A verdict"
+
+[concept.Verdict.structure]
+matched = { type = "boolean", description = "Whether it matched", required = true }
+
+[pipe.say_yes]
+type = "PipeLLM"
+description = "Say yes"
+inputs = { payload = "Anything" }
+output = "Text"
+prompt = "Say yes about $payload"
+
+[pipe.route]
+type = "PipeCondition"
+description = "Route on a verdict, resolving to whatever the chosen branch produced"
+inputs = { verdict = "Verdict", payload = "Anything" }
+output = "Anything"
+expression = "verdict.matched"
+outcomes = { yes = "say_yes" }
+default_outcome = "say_yes"
+"""
 
 _SIGNATURE_ONLY_DIR = Path(__file__).parents[3] / "e2e" / "pipelex" / "pipes" / "additive_multi_file_library" / "signature_only"
 
@@ -151,6 +181,43 @@ class TestBuildPipeIOContracts:
 
         gate = io_contracts["optional_contracts_test.gate"]
         assert gate.output.optional is True
+
+    async def test_structureless_output_renders_permissively(self, load_empty_library: Callable[[], str]) -> None:
+        """A pipe RESOLVING TO `native.Anything` carries a permissive schema rather than failing the build.
+
+        `Anything` is the untyped vehicle: `structure_class` is `None` for it, so the
+        `AnythingContent` name derived mechanically from its code has no class behind it
+        and never will. Asking a provider for that class is a category error rather than a
+        missing registration, and it used to be treated as the second: the contract build
+        raised `PipeIOContractError` naming a class that never existed, taking every OTHER
+        pipe in the bundle down with it.
+
+        **The schema is permissive, not empty**, and the difference is the point. It carries
+        no constraint keyword — "any JSON value" is what an untyped vehicle means — but it
+        does carry the concept's identity annotations, because every rendered schema does
+        and an exception for this one would be a second rule. A bare `{}` would read the
+        same to a validator and tell a reader nothing about what they are looking at.
+
+        Scoped to the OUTPUT side: the input side is covered by
+        `test_anything_input_publishes_permissive_schema` below, which reaches the plural
+        arms too. This one exists because an `Anything`-resolving `PipeCondition` — a router
+        that resolves to whatever branch it took — is ordinary in a real method, and the
+        output contract gained its schema after that test was written.
+        """
+        outer_library_id = load_empty_library()
+        try:
+            result = await validate_bundle(mthds_contents=[_ANYTHING_OUTPUT_MTHDS])
+            io_contracts = build_pipe_io_contracts(result.pipes)
+        finally:
+            _teardown_validation_library(outer_library_id)
+
+        route = io_contracts["anything_output_test.route"]
+        assert route.output.concept_ref == "native.Anything"
+        # The concept's identity, and nothing that constrains a value.
+        json_schema = route.output.json_schema
+        assert json_schema["title"] == "native.Anything"
+        assert "description" in json_schema
+        assert not {"type", "properties", "required", "enum", "items"} & set(json_schema)
 
     async def test_multiplicity_entry_shapes(self, load_empty_library: Callable[[], str]) -> None:
         """Entries are keyed by namespaced pipe_ref; output multiplicity is single vs variable."""
