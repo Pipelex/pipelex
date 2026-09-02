@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 item: L-260902-376d51
 ---
 
@@ -63,3 +63,16 @@ Rejected alternatives:
 ## Verification record
 
 The facts above were established on 2026-09-03 by calling `check_backend_files` and `InferenceBackendLibrary.load` directly from `.venv/bin/python` over scratch copies of the kit's `inference/` directory, under `env -i` so no API key was in the environment.
+
+## Landing
+
+Merged as `pipelex#1188`, squashed onto `dev` as `3840f800f`. The merge has **not** reached `main`: the fix ships to exact-version consumers with the next pipelex release, which is tracked by L-260828-f4e88c. L-260902-376d51 closed `fixed` on that merge.
+
+Every step landed as planned, plus step 8 and the review round recorded under Revisions. What the merged tree carries, for a reader who arrives here first:
+
+- `lenient=True` on the probe's load — `pipelex/cli/commands/doctor_cmd.py`, inside `check_backend_files`.
+- `_is_error_about_backend`, used by **both** doctor rows: the Backend Files probe and `check_models`, which mutates the same `BackendFileReport` objects.
+- `backend_name` as a keyword parameter on `CogtError.__init__`, where the attribute was already declared, rather than on three subclass constructors.
+- Two kit-based regression tests in `tests/unit/pipelex/cli/test_doctor_backend_checks.py`, both of which go red with the one-line fix reverted, and two attribution tests in `test_doctor_check_models.py`.
+
+The one thing this campaign deliberately did not fix is L-260902-42b735: the probe still loads the whole library once per enabled backend and stops at the first failure, so a second malformed file ordered after the first is still reported valid. That item carries the reproduction.
