@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:0fdb91c1db6bb918ac9696c62eaefe1bd116de15c6a6174c297c2d6cc1d4cd72"
-reviewed_by = "Claude (Fable 5.1)"
-reviewed_at = "2026-09-02T22:36:22Z"
-rationale = "Trigger is pipelex/cli/commands/doctor_cmd.py: the Backend Files probe now loads the backend library leniently and charges a failure to the backend the error declares (backend_name) instead of any backend whose name appears in the message text. No command, flag, output key, exit code or message shape moved. Re-read docs/tools/cli/agent-cli.md and pipelex/cli/agent_cli/CLAUDE.md: both describe doctor as checking config, credentials and model health and detail only the telemetry and pending_migrations findings; neither describes how the backend-files row loads or attributes, so nothing there is stale."
+digest = "sha256:0ff100013089b0a003f5e016377c4394e27d7efa5aad76c4cc34fdb288941ab8"
+reviewed_by = "Louis Choquel"
+reviewed_at = "2026-09-02T23:04:48Z"
+rationale = "Pre-landing review round on fix/Doctor-backend-file-check-leniency. The trigger is again pipelex/cli/commands/doctor_cmd.py: check_models now attributes an InferenceBackendLibraryError with the same _is_error_about_backend helper the Backend Files row uses, instead of marking every report whose backend name appears in the message text -- which falsely condemned portkey, whose name rides in the loader's own advice as the example header x-portkey-provider. No command, flag, output key, exit code or message shape moved; the doctor's summary line for that failure is unchanged. Re-read docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md: the doctor is described at the row level (config, credentials, model health) and only the telemetry and pending_migrations findings are detailed; neither page states which backend a models-row failure is charged to, so nothing there is stale."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -82,7 +82,7 @@ rationale = "Trigger is pipelex/cli/commands/doctor_cmd.py: the Backend Files pr
 "pipelex/cli/commands/codegen/inputs_cmd.py" = "blob:20738a9e42f0e5ef7ffc489093348af3cb4643a0"
 "pipelex/cli/commands/codegen/types_cmd.py" = "blob:b7c9c7a3664c9fbe66f9b4c3c5ebf9ea1322445c"
 "pipelex/cli/commands/crate_loading.py" = "blob:3d7d651931ecf1a15a3e2d72411b3212b55d74ef"
-"pipelex/cli/commands/doctor_cmd.py" = "blob:8518ee621e5060dba19419a6735a87e2a8af670e"
+"pipelex/cli/commands/doctor_cmd.py" = "blob:69b83439f17b9ffa533b82e37f0906bba39c34ca"
 "pipelex/cli/commands/fix/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/fix/_diff_sandbox.py" = "blob:5ce264f5b0ab4ff4172f4d8789450916947f5c0e"
 "pipelex/cli/commands/fix/_fix_core.py" = "blob:8f6a187a0fb42c498629b177753d81620800b0da"

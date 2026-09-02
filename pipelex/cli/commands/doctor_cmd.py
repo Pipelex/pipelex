@@ -1138,15 +1138,14 @@ def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str
         )
         models_manager.validate_model_deck()
     except InferenceBackendLibraryError as exc:
-        # Backend library error - try to identify which backend
+        # The setup load is strict and reaches backends the file probe skipped leniently, so it can
+        # be the first thing to name a broken backend. Attribution is the file probe's, for the same
+        # reason: the loader's own advice text names other backends in passing.
         error_str = str(exc)
-        # Parse error to see if we can identify a specific backend
-        for backend_name in backend_file_reports:
-            if backend_name in error_str:
-                # Update the report for this backend
-                if backend_name in backend_file_reports:
-                    backend_file_reports[backend_name].is_valid = False
-                    backend_file_reports[backend_name].error_message = error_str
+        for backend_name, backend_file_report in backend_file_reports.items():
+            if _is_error_about_backend(exc=exc, backend_name=backend_name, backend_file_path=backend_file_report.file_path):
+                backend_file_report.is_valid = False
+                backend_file_report.error_message = error_str
         return False, f"Error checking models: {exc}", backend_file_reports
     except (
         RoutingProfileLibraryNotFoundError,

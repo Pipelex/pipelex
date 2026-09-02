@@ -51,12 +51,14 @@ Rejected alternatives:
 
 ## Out of scope
 
-- `check_backend_files` still loads the whole library once per enabled backend, quadratic in file reads, and every probe sees the same first failure. A per-backend validation entrypoint on the loader would make one probe read one file. Not this fix.
+- `check_backend_files` still loads the whole library once per enabled backend, quadratic in file reads, and every probe sees the same first failure — so a second malformed file ordered after the first is still reported valid. A per-backend validation entrypoint on the loader would make one probe read one file. Not this fix; filed as L-260902-42b735 with its reproduction.
 - The loader's message wording is a caller's message and stays one: after this fix no user-facing surface reaches it on a stock install.
 
 ## Revisions
 
 - 2026-09-03, while implementing: the substring attribution was planned as out of scope, but the first kit-based test tripped on it. The loader's unknown-key explanation names `portkey` in passing, so anthropic's error was charged to portkey as well and the probe reported two invalid files. Fixed here rather than deferred (step 8), because the malformed-file test could not be written honestly around it.
+
+- 2026-09-03, pre-landing review: the substring attribution fixed in step 8 was still live in `check_models`, which writes into the same `BackendFileReport` objects. Reproduced against a kit copy: an `InferenceBackendLibraryError` declaring `openai` also marked `portkey` invalid, because the loader's unknown-key advice names `x-portkey-provider`. Leniency makes that path more reachable, not less, since the Backend Files row now stops returning early. `check_models` now uses the same `_is_error_about_backend` helper, and `backend_name` moved from three duplicated subclass constructors onto `CogtError.__init__`, which already declared the attribute.
 
 ## Verification record
 
