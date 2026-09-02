@@ -2552,14 +2552,18 @@ wheels = [
 
 [[package]]
 name = "mthds"
-version = "0.12.0"
-source = { git = "https://github.com/mthds-ai/mthds-python?rev=570cf7c657ac2bcdac68055efb18d8d03c52e5b9#570cf7c657ac2bcdac68055efb18d8d03c52e5b9" }
+version = "0.13.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
     { name = "semantic-version" },
     { name = "tomlkit" },
     { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e4/b6/6c67b86693d01d473444523db0aeadc1afdffaa1748a264dfab9c1c77b1c/mthds-0.13.0.tar.gz", hash = "sha256:ef59ffa94902da72371390cc39d8c0d85dfd2a524dbca2a8909a0a1ba6255607", size = 216142, upload-time = "2026-09-02T15:09:15.937Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/89/26/f73e625b54cfba2e09a29df5e7173e508c25d3f7ce106be69fae6065d76c/mthds-0.13.0-py3-none-any.whl", hash = "sha256:606fef7978bbc8a5b249882c0b9377fed37123f618f8183f29e89b71a4eadac0", size = 85993, upload-time = "2026-09-02T15:09:14.334Z" },
 ]
 
 [[package]]
@@ -3468,7 +3472,7 @@ requires-dist = [
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "mkdocs-redirects", marker = "extra == 'docs'", specifier = "==1.2.2" },
     { name = "moto", extras = ["dynamodb", "s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "mthds", git = "https://github.com/mthds-ai/mthds-python?rev=570cf7c657ac2bcdac68055efb18d8d03c52e5b9" },
+    { name = "mthds", specifier = "==0.13.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=2.0.0" },

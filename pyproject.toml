@@ -31,7 +31,7 @@ dependencies = [
   "json2html>=1.3.0",
   "kajson==0.7.1",
   "markdown>=3.6",
-  "mthds==0.12.0",
+  "mthds==0.13.0",
   "networkx>=3.4.2",
   "openai>=2.0.0",
   "opentelemetry-api",
@@ -502,26 +502,6 @@ runtime-evaluated-base-classes = [
 [tool.uv]
 required-version = ">=0.7.2"
 
-# TEMPORARY: resolve `mthds` from the branch that adds `output_form`, until it is
-# published.
-#
-# `dependencies` above says `mthds==0.12.0`, and that version IS on PyPI — but the
-# published wheel carries `mthds/protocol/input_form.py` and no `output_form.py`.
-# The number was consumed by a build that predates the output-form descriptor, so a
-# resolver that believes the range installs a package missing the module this branch
-# imports, and the failure is an ImportError at collection rather than a version
-# conflict anyone would read as one.
-#
-# A `[tool.uv.sources]` entry is dev-and-CI metadata: it is not part of the
-# published dependency, so a `pip install pipelex` still resolves the range above.
-# That means this pin makes CI honest and does NOT make a release correct — the
-# version in `dependencies` must move to whatever mthds-python actually publishes
-# the output-form change as, and THIS BLOCK MUST BE DELETED in the same change.
-#
-# Pinned by SHA rather than by branch name so the resolution cannot drift under a
-# force-push while the PR is open.
-[tool.uv.sources]
-mthds = { git = "https://github.com/mthds-ai/mthds-python", rev = "570cf7c657ac2bcdac68055efb18d8d03c52e5b9" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["pipelex"]
