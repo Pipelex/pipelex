@@ -15,12 +15,12 @@ Three layers, on one shared crate:
    `exclude_none`, this reddens and forces the projection decision to be revisited alongside it.
 2. **Projection pin** — emit ts-zod for the same crate and require every non-required field to be
    null-tolerant. Paired with (1), the cross-language contract is encoded here even where CI has no node.
-3. **Executable round-trip** — feed (1)'s JSON through the emitted schema under a real zod. Skipped unless
-   node and a global `zod` are both present; the always-on pins hold the line in CI.
+3. **Executable round-trip** — feed (1)'s JSON through the emitted schema under a real zod. Mandatory
+   wherever the node toolchain is provisioned (`make test-ts-gates`, which is what CI runs); opportunistic
+   on a machine without it, where the two always-on pins hold the line.
 """
 
 import json
-import shutil
 import subprocess  # ruff: ignore[suspicious-subprocess-import]
 from pathlib import Path
 from typing import Any
@@ -37,6 +37,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.system.registries.class_registry_access import get_class_registry
+from tests.helpers.ts_toolchain import resolve_node, resolve_zod_package
 from tests.unit.pipelex.codegen.conftest import CRATE_TEST_VERSION
 
 _DOMAIN = "wire"
@@ -77,40 +78,12 @@ _AUTHORED: dict[str, ConceptBlueprint] = {
 # Every non-required field of `Payload`, i.e. every key the runtime can put on the wire as an explicit null.
 _NON_REQUIRED_FIELDS = ("note", "detail", "tags", "counts", "status")
 
-_NODE_TYPE_STRIPPING_MINIMUM = (22, 6)
-"""`--experimental-strip-types` landed in 22.6, which is what lets node run the emitted `.ts` directly."""
-
 
 def _authored_crate() -> LibraryCrate:
     return LibraryCrate(
         concepts={f"{_DOMAIN}.{code}": blueprint for code, blueprint in _AUTHORED.items()},
         domains={_DOMAIN: DomainBlueprint(code=_DOMAIN, description="Wire agreement domain")},
     )
-
-
-def _node_executable() -> str | None:
-    """The node binary, when it is present and new enough to strip types off the emitted `.ts`."""
-    node = shutil.which("node")
-    if node is None:
-        return None
-    reported = subprocess.run([node, "--version"], capture_output=True, text=True, check=False)  # ruff: ignore[subprocess-without-shell-equals-true]
-    if reported.returncode != 0:
-        return None
-    parts = reported.stdout.strip().lstrip("v").split(".")
-    version = tuple(int(part) for part in parts[:2] if part.isdigit())
-    return node if len(version) == 2 and version >= _NODE_TYPE_STRIPPING_MINIMUM else None
-
-
-def _global_zod_package() -> Path | None:
-    """The globally installed `zod` package directory, if there is one to link against."""
-    npm = shutil.which("npm")
-    if npm is None:
-        return None
-    reported = subprocess.run([npm, "root", "-g"], capture_output=True, text=True, check=False)  # ruff: ignore[subprocess-without-shell-equals-true]
-    if reported.returncode != 0:
-        return None
-    package = Path(reported.stdout.strip()) / "zod"
-    return package if (package / "package.json").is_file() else None
 
 
 class TestTsZodWireAgreement:
@@ -170,15 +143,13 @@ class TestTsZodWireAgreement:
     def test_the_emitted_schema_parses_the_runtime_payload(self, wire_payloads: list[dict[str, Any]], tmp_path: Path):
         """The round trip itself: a real zod, the emitted schema, the runtime's own JSON.
 
-        Skipped when the node toolchain is absent — this is a Python repo, so CI has none. The two pins
-        above encode the same contract without it.
+        This is the only layer that executes the projection, so it is the one that would catch a schema
+        that is well-formed and still wrong. `make test-ts-gates` provisions node's companions and sets
+        `PIPELEX_REQUIRE_TS_GATES`, under which an absent toolchain fails here instead of skipping, and CI
+        runs that target. Without the flag it still skips, and the two pins above encode the same contract.
         """
-        node = _node_executable()
-        if node is None:
-            pytest.skip("node >= 22.6 not available")
-        zod_package = _global_zod_package()
-        if zod_package is None:
-            pytest.skip("no globally installed zod to link against")
+        node = resolve_node()
+        zod_package = resolve_zod_package()
 
         content = emit_ts_zod(resolve_concepts_from_crate(normalize_crate(_authored_crate(), mthds_version=CRATE_TEST_VERSION)))[0].content
         (tmp_path / "types.ts").write_text(content, encoding="utf-8")

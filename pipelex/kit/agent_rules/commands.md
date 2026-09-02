@@ -58,6 +58,18 @@
 
    For the full debugging methodology — clean-state protocol, when to bail to the user, how to grep failures by error class name, when xdist failures are flakes vs real bugs — see [`docs/agents/debugging-hanging-pytest-runs.md`](docs/agents/debugging-hanging-pytest-runs.md).
 
+### Changing a codegen emitter: `make test-ts-gates`
+
+   ⚠ **`make agent-test` does not cover the TypeScript emission.** The two tests that read the emitted TypeScript *as TypeScript* — `prettier --check` over it, and running the emitted schema under a real zod — need a node toolchain, so in an ordinary run they skip and the suite still reports green. Everything else about the ts-zod target is measured structurally (line width, trailing whitespace, blank-line runs, unterminated literals), which is blind to a wrong quote style or a member chain broken where prettier would not break it.
+
+   So after touching anything under `pipelex/codegen/emitters/`, run:
+
+   ```bash
+   make test-ts-gates   # alias: make ttg
+   ```
+
+   It provisions a pinned prettier and zod into the gitignored `.ts-toolchain/` (needs npm and node >= 22.6), then runs the codegen suite with `PIPELEX_REQUIRE_TS_GATES=1`, under which those two gates **fail** instead of skipping. CI runs the same target as the `Tests (ts emission gates)` job, so skipping it locally means finding out on the pull request. Moving the pinned prettier version is an emitter change rather than a dependency bump — the emitter models that formatter's exact behaviour. Full rationale in [`docs/contribute/typescript-emission-gates.md`](docs/contribute/typescript-emission-gates.md).
+
 ## Running Tests with Prints
 
    > **LOCAL ONLY**: The commands below are meant for a human developer running on their local machine. If you are an AI agent (Claude Code, Cursor, Codex, or any other agent running in the cloud or in a sandboxed environment), **do NOT use these commands**. Use `make agent-test` instead.
