@@ -47,7 +47,15 @@ class TestBuildValidationReport:
         pipe_io_contracts = {
             "beta.do_it": PipeIOContract(
                 inputs={},
-                output=PipeOutputContract(concept_ref="native.Text", multiplicity=IOMultiplicity.SINGLE, item_count=None, optional=False),
+                output=PipeOutputContract(
+                    concept_ref="native.Text",
+                    multiplicity=IOMultiplicity.SINGLE,
+                    item_count=None,
+                    optional=False,
+                    # The payload's schema: `native.Text` resolves to its content model, which
+                    # wraps the value under `text`.
+                    json_schema={"type": "object", "properties": {"text": {"type": "string"}}},
+                ),
             ),
         }
         dry_run_result: dict[str, DryRunOutput] = {
@@ -58,6 +66,7 @@ class TestBuildValidationReport:
             blueprints=blueprints,
             pipe_io_contracts=pipe_io_contracts,
             input_form={},
+            output_form={},
             dry_run_result=dry_run_result,
             pending_signatures=["beta.still_pending"],
         )
@@ -79,6 +88,7 @@ class TestBuildValidationReport:
             blueprints=blueprints,
             pipe_io_contracts={},
             input_form={},
+            output_form={},
             dry_run_result={},
             pending_signatures=[],
         )
@@ -105,6 +115,7 @@ class TestBuildValidationReport:
             blueprints=blueprints,
             pipe_io_contracts={},
             input_form={},
+            output_form={},
             dry_run_result={},
             pending_signatures=[],
             warnings=[warning_item],
