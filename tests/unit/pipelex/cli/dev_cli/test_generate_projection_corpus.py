@@ -45,6 +45,7 @@ CORPUS_BUNDLES = [
     Path("tests/data/input_semantics/hinted_bundle.mthds"),
     Path("tests/data/input_semantics/probe_bundle.mthds"),
     Path("tests/data/input_semantics/scaffold_bundle.mthds"),
+    Path("tests/data/input_semantics/output_bundle.mthds"),
 ]
 
 # A pipe declaring no inputs at all, which no corpus bundle does: the descriptor is the empty form
@@ -123,7 +124,8 @@ class TestGenerateProjectionCorpus:
             # (L-260831-1e1a71) will change it without changing anything this corpus pins.
             assert entry.error_type
 
-        # The gap is a descriptor one, so it takes both shapes of the pipes it touches.
+        # Both declared gaps sit under the shape, not above it — a descriptor gap in the probe pipes
+        # and a runtime one at the `Anything` slot — so each takes both shapes of the pipe it touches.
         assert {entry.shape for entry in manifest.unshapeable} == set(manifest.shapes)
 
     async def test_a_rerun_writes_the_same_bytes(self, tmp_path: Path) -> None:
