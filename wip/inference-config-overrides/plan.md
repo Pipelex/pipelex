@@ -1,5 +1,5 @@
 ---
-status: active
+status: landed
 item: L-260903-9fe4ad
 ---
 
@@ -62,3 +62,9 @@ Next session, in order:
 
 1. `ledger claim L-260903-9fe4ad --renew`, then `make agent-check` once more (the formatter is idempotent now).
 2. Open the PR against `dev` with `Closes L-260903-9fe4ad` in the body; `/ledger-land` after the merge.
+
+## Landed — 2026-09-03
+
+PR #1189 merged into `dev` as squash commit `67a2a6f182f4835ee929e1ee594acafcda7e4f73`, with every CI check green, and the landing closed `L-260903-9fe4ad`. The pre-landing review round (the Revisions bullet above) rode in the same PR. The merge had not reached `main` at landing; it ships with the next pipelex release, whose open item is `L-260828-f4e88c`.
+
+Both steps of the previous checkpoint's "next session" list are done. What the review deferred rather than fixed is one ledger item, `L-260903-36da37`: the three-place duplication of the override file names, the doctor's base-only `exists()` pre-checks, a direct test for `describe_toml_base_and_overrides`, a `show backends` test with a real override, the init checkbox editor not signalling override-pinned backends, and `pipelex_temporary_override.toml` missing from `GIT_IGNORED_CONFIG_FILES`. The two sibling-project gitignore follow-ups (`L-260903-6b77c1`, `L-260903-36002a`) stay open in their own repos.
