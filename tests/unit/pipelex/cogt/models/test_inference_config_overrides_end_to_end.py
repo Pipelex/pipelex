@@ -49,7 +49,7 @@ class TestInferenceConfigOverridesEndToEnd:
         models_manager = ModelManager()
         models_manager.setup(
             secrets_provider=EnvSecretsProvider(),
-            gateway_config=None,
+            managed_gateway_configs=None,
             gateway_config_source=None,
             needs_inference=False,
         )

@@ -6,7 +6,7 @@ Machine-first CLI for running and validating Pipelex method bundles (`.mthds` fi
 
 Two independent options control the two output streams:
 
-- `--format markdown|json` — **success/useful output**. Defaults to markdown. Accepted by `run`, `validate`, `fix`, `init`, `models`, `check-model`, `doctor`, `codegen types`, `codegen check`. Goes to stdout. Threaded explicitly to `agent_success_formatted()` from each command function — no hidden state.
+- `--format markdown|json` — **success/useful output**. Defaults to markdown. Accepted by `run`, `validate`, `fix`, `init`, `models`, `check-model`, `doctor`, `migrate`, `codegen types`, `codegen check`. Goes to stdout. Threaded explicitly to `agent_success_formatted()` from each command function — no hidden state.
 - `--error-format markdown|json` — **error reporting** (stderr). Optional. When omitted, **inherits the value of `--format`**, so `--format json` still flips both as it did historically. Accepted by the same commands as `--format`.
 
 Only the error format is backed by a module-level `ContextVar` in `agent_output.py` (`_agent_cli_error_format`). The reason: `agent_error()` is called from sites that don't see the Typer option — factory init failures (`agent_cli_factory.py`), the unknown-command handler in `PipelexAgentCLI.get_command`, runner validation in the app callback, and any future site in shared library/runtime code. The ContextVar lets all of them honor `--error-format` (or `--format`'s inherited value) for free. JSON is the default so errors raised before any command opts in stay machine-parseable.

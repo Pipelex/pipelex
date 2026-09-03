@@ -11,9 +11,9 @@ from rich.prompt import Confirm
 
 from pipelex.cli.commands.init.backends import (
     customize_backends_config,
-    disable_gateway_backend,
+    disable_managed_gateway_backends,
     get_selected_backend_keys,
-    warn_if_gateway_pinned_by_override,
+    warn_if_managed_gateway_pinned_by_override,
 )
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.credentials import prompt_credentials
@@ -34,7 +34,7 @@ from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError
 from pipelex.system.pipelex_service.pipelex_service_agreement import update_service_terms_acceptance
 from pipelex.system.pipelex_service.pipelex_service_config import (
-    is_pipelex_gateway_enabled,
+    enabled_managed_gateway_sections,
     load_pipelex_service_config_if_exists,
 )
 from pipelex.system.pipelex_service.remote_config_cache import RemoteConfigCache
@@ -49,7 +49,8 @@ class CachePrimingResult(BaseModel):
     afterwards. ``error_message`` is populated when the fetch was attempted but failed (offline at
     init time) *or* when the fetch succeeded but the cache could not be persisted, read back, or
     validated as a usable ``RemoteConfig`` (e.g. a read-only or full cache directory). ``None``
-    means priming was skipped (gateway disabled or terms not accepted) or that it succeeded.
+    means priming was skipped (no managed gateway backend enabled, or terms not accepted) or that
+    it succeeded.
     """
 
     model_config = ConfigDict(extra="forbid", strict=True)
@@ -66,8 +67,12 @@ def attempt_prime_remote_config_cache(*, target_config_dir: Path | None = None) 
     structured JSON field).
 
     Skipped (``primed=False, error_message=None``) when:
-    - the gateway is disabled in ``backends.toml`` (BYOK has nothing to cache), or
-    - gateway terms have not been accepted (we cannot fetch without consent).
+    - no managed gateway backend is enabled in ``backends.toml`` (BYOK has nothing to cache), or
+    - the service terms have not been accepted (we cannot fetch without consent).
+
+    The question is the boot's — *any* managed gateway backend — rather than the Portkey-cloud
+    one's, because what gets cached is the single published configuration carrying every managed
+    backend's section: a manifold-only installation has exactly as much to cache as a gateway one.
 
     Always passes ``require_fresh=True`` to the fetcher: priming's only job is to write a fresh
     cache, so silently accepting an existing cached fallback would be a misleading success. When
@@ -81,13 +86,14 @@ def attempt_prime_remote_config_cache(*, target_config_dir: Path | None = None) 
 
     Args:
         target_config_dir: When set, read the backends document *at that directory* (its
-            ``backends.toml`` and its own ``backends_override.toml``) to decide whether the gateway
-            is enabled. ``pipelex init`` and ``pipelex init --local`` target different ``.pipelex/``
-            directories — using the layered/project-preferred config here would let priming branch
-            on the wrong file. ``None`` (default) falls back to the layered document. The
-            terms-acceptance check always reads the *global* ``pipelex_service.toml`` by design.
+            ``backends.toml`` and its own ``backends_override.toml``) to decide whether a managed
+            gateway backend is enabled. ``pipelex init`` and ``pipelex init --local`` target
+            different ``.pipelex/`` directories — using the layered/project-preferred config here
+            would let priming branch on the wrong file. ``None`` (default) falls back to the layered
+            document. The terms-acceptance check always reads the *global* ``pipelex_service.toml``
+            by design.
     """
-    if not is_pipelex_gateway_enabled(config_dir=target_config_dir):
+    if not enabled_managed_gateway_sections(config_dir=target_config_dir):
         return CachePrimingResult(primed=False)
 
     service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
@@ -128,7 +134,7 @@ def prime_remote_config_cache(*, console: Console, target_config_dir: Path | Non
     Prints a yellow warning to the console when a fetch was attempted and failed; otherwise
     silent. Used by ``pipelex init`` so the user knows priming didn't happen and how to retry.
 
-    ``target_config_dir`` is forwarded so the gateway-enabled check inspects the directory
+    ``target_config_dir`` is forwarded so the managed-gateway check inspects the directory
     being initialized rather than the layered config (see ``attempt_prime_remote_config_cache``).
     """
     result = attempt_prime_remote_config_cache(target_config_dir=target_config_dir)
@@ -154,7 +160,10 @@ def _check_gateway_terms_if_needed(*, console: Console, backends_toml_path: Path
     if not backends_toml_path.exists():
         return
 
-    if not is_pipelex_gateway_enabled(config_dir=backends_toml_path.parent.parent):
+    # Any managed gateway backend puts this installation behind the service terms — the same
+    # question the boot asks. Asking only about the Portkey-cloud one leaves a manifold-only
+    # install unable to record acceptance through any supported step.
+    if not enabled_managed_gateway_sections(config_dir=backends_toml_path.parent.parent):
         return
 
     # Gateway is enabled - check if terms are already accepted (always global)
@@ -172,9 +181,10 @@ def _check_gateway_terms_if_needed(*, console: Console, backends_toml_path: Path
     else:
         display_gateway_declined_message(console=console)
         update_service_terms_acceptance(accepted=False, config_dir=config_manager.global_config_dir)
-        # Actually disable the gateway in backends.toml — and say so if an override still pins it on
-        disable_gateway_backend(backends_toml_path)
-        warn_if_gateway_pinned_by_override(console=console, backends_toml_path=backends_toml_path)
+        # Actually disable the managed gateway backends in backends.toml — and say so if an
+        # override still pins one on
+        disable_managed_gateway_backends(backends_toml_path)
+        warn_if_managed_gateway_pinned_by_override(console=console, backends_toml_path=backends_toml_path)
 
 
 def determine_needs(
@@ -425,16 +435,18 @@ def execute_initialization(
 def _init_agreement(*, console: Console) -> None:
     """Handle the agreement-only initialization flow.
 
-    This prompts the user to accept Pipelex Gateway terms without resetting any configuration.
-    If gateway is not enabled, it informs the user that no action is needed.
+    This prompts the user to accept the Pipelex service terms without resetting any configuration,
+    and it is the human CLI's only way to record acceptance after the fact. It therefore asks the
+    same question the boot asks — is ANY managed gateway backend enabled — rather than the narrower
+    gateway-only one, which would report that nothing is needed on an installation the boot refuses
+    to start for want of exactly this.
 
     Args:
         console: Rich Console instance for user interaction.
     """
-    # Check if gateway is even enabled
-    if not is_pipelex_gateway_enabled():
+    if not enabled_managed_gateway_sections():
         console.print()
-        console.print("[green]✓ Pipelex Gateway is not enabled.[/green]")
+        console.print("[green]✓ No Pipelex-managed gateway backend is enabled.[/green]")
         console.print("[dim]No terms acceptance is required.[/dim]")
         console.print()
         return
@@ -468,8 +480,8 @@ def _init_agreement(*, console: Console) -> None:
         # Disable the gateway since terms were declined
         backends_toml_path = config_manager.pipelex_config_dir / "inference" / "backends.toml"
         if backends_toml_path.exists():
-            disable_gateway_backend(backends_toml_path)
-            warn_if_gateway_pinned_by_override(console=console, backends_toml_path=backends_toml_path)
+            disable_managed_gateway_backends(backends_toml_path)
+            warn_if_managed_gateway_pinned_by_override(console=console, backends_toml_path=backends_toml_path)
 
     console.print()
 

@@ -21,7 +21,14 @@ from pipelex.cogt.exceptions import (
     SearchJobFailureError,
     SearchModelNotFoundError,
 )
-from pipelex.cogt.inference.error_classification import SDKErrorEnvelope, UserAction, UserActionKind
+from pipelex.cogt.inference.error_classification import (
+    GatewayRequestLimit,
+    GatewayRoutingRefusal,
+    GatewayUnresolvedReference,
+    SDKErrorEnvelope,
+    UserAction,
+    UserActionKind,
+)
 from pipelex.cogt.inference.error_classify import ClassificationResult
 
 
@@ -57,8 +64,153 @@ def _format_message(metadata: SDKErrorEnvelope, *, model_desc: str) -> str:
     return f"{metadata.provider} inference failed for model '{model_desc}'{status_part}: {metadata.message}"
 
 
+def _render_gateway_limit_detail(*, limit: GatewayRequestLimit) -> str:
+    """Produce the advice for a request-shape refusal the inference gateway raised itself.
+
+    Deliberately says nothing about a number. The caps are the deployment's, they
+    differ between deployments, and the gateway already names its own figures in
+    the message this detail sits beside — repeating a compiled-in guess here is how
+    advice starts contradicting the refusal it explains.
+
+    **This is where a per-plan message belongs** once the hosted product's tier
+    limits are wired through: the gateway knows nothing of users, organisations or
+    plans, so "your plan allows files up to N MB" can only be said from here.
+    """
+    match limit:
+        case GatewayRequestLimit.BODY_TOO_LARGE:
+            return "The request was too large for the inference gateway — send less in one call, or use smaller inputs."
+        case GatewayRequestLimit.OBJECT_TOO_LARGE:
+            return "A file the request refers to is over the inference gateway's per-file size limit — use a smaller file."
+        case GatewayRequestLimit.BODY_TOO_DEEP:
+            return "The request nests too deeply for the inference gateway — flatten the inputs or the output structure."
+        case GatewayRequestLimit.BODY_LENGTH_REQUIRED:
+            return (
+                "The inference gateway could not read the request's declared size and refused it: it requires a "
+                "Content-Length and does not accept a chunked body. Nothing about the inputs causes this — contact support."
+            )
+
+
+def _render_gateway_unresolved_reference_detail(*, reference: GatewayUnresolvedReference) -> str:
+    """Produce the advice for a reference the inference gateway could not resolve.
+
+    Names no key, host, status or media type, for the same reason
+    ``_render_gateway_limit_detail`` names no number: the gateway's own refusal
+    message sits beside this detail and already states the specifics. What this
+    text adds is what the caller should *do*, which the message does not say.
+    """
+    match reference:
+        case GatewayUnresolvedReference.REFERENCE_UNRESOLVED:
+            return (
+                "A file reference in the request could not be resolved by the inference gateway — "
+                "the error message names the cause; fix the reference it names."
+            )
+        case GatewayUnresolvedReference.STORAGE_REFERENCE_INVALID:
+            return "The pipelex-storage:// reference in the request is malformed — check it against the key the upload returned."
+        case GatewayUnresolvedReference.STORAGE_OBJECT_UNREADABLE:
+            return (
+                "The referenced storage object does not exist or cannot be read — check that the reference points at a file "
+                "uploaded to this deployment."
+            )
+        case GatewayUnresolvedReference.STORAGE_NOT_SERVED:
+            return (
+                "This inference gateway does not serve pipelex-storage:// references at all — no storage is configured for it. "
+                "Nothing about the inputs causes this — contact support."
+            )
+        case GatewayUnresolvedReference.DOCUMENT_URL_REFUSED:
+            return (
+                "The inference gateway refused the document URL — send a plain public https:// URL, a data: URL, or a "
+                "pipelex-storage:// reference, and give the final address rather than one that redirects."
+            )
+        case GatewayUnresolvedReference.DOCUMENT_HOST_REFUSED:
+            return (
+                "The inference gateway does not fetch documents from that host, as a matter of security policy: private and "
+                "internal addresses are never fetched. Host the document at a publicly reachable address, or upload it to "
+                "Pipelex storage and reference it from there."
+            )
+        case GatewayUnresolvedReference.DOCUMENT_UNREACHABLE:
+            return (
+                "The document could not be fetched from its URL — check that it is live and publicly reachable, and try again "
+                "if its host was temporarily down."
+            )
+        case GatewayUnresolvedReference.DOCUMENT_CONTENT_UNUSABLE:
+            return (
+                "The document was fetched but cannot be used — the error message says whether it was served empty, in a media "
+                "type the pipeline does not accept, or as a data: URL that could not be decoded."
+            )
+
+
+def _render_gateway_routing_refusal_detail(*, refusal: GatewayRoutingRefusal) -> str:
+    """Produce the advice for a request the inference gateway refused to route.
+
+    Names no model, integration, protocol or capability, for the same reason
+    ``_render_gateway_limit_detail`` names no number: the gateway's own refusal
+    message sits beside this detail and already states every specific. What this
+    text adds is what the caller — or whoever operates the deployment — should
+    *do*, which the message does not say.
+
+    Every member whose remedy could be a deck edit says "the model deck" out loud.
+    The runtime picks the model, the protocol and the route from its own deck, so
+    those refusals usually mean the deck and the gateway disagree about a model
+    rather than that the caller chose badly, and advice that only said "pick
+    another model" would send an operator hunting for a model problem that is a
+    configuration problem.
+    """
+    match refusal:
+        case GatewayRoutingRefusal.UNKNOWN_MODEL:
+            # The second sentence is hedged deliberately. ``pig-01`` is the gateway's
+            # answer to three different facts — it serves no such model, the body
+            # named none, and the body could not be parsed at all (its model reader
+            # returns "no model" from a bare ``catch``) — and the wire code does not
+            # tell them apart. Only the gateway's own message does, so the advice
+            # sends the reader there before it sends them to the deck: asserting a
+            # deck-versus-gateway disagreement outright would be a confident lie for
+            # the other two causes. Splitting the code is the real fix, filed on
+            # ``pipelex-manifold`` as L-260902-701614.
+            return (
+                "The inference gateway does not serve that model — pick a model this deployment serves. Its own message is "
+                "the authority on which: the same code also answers a request it could not read a model out of at all. "
+                "If it names a model your model deck lists, the deck and the gateway disagree about what is available."
+            )
+        case GatewayRoutingRefusal.DISABLED_INTEGRATION:
+            return (
+                "The model is served by an integration this inference gateway has not enabled — its credentials are unset. "
+                "Nothing about the request causes this, and none of your own credentials are at fault: the error message "
+                "names the integration and the variables whoever operates the gateway has to set. Contact support."
+            )
+        case GatewayRoutingRefusal.WRONG_PROTOCOL:
+            return (
+                "The inference gateway serves that model, but not over the protocol the request used for it — your model "
+                "deck names a different backend for it than the gateway routes it to. Correct the deck, or pick another model."
+            )
+        case GatewayRoutingRefusal.UNSERVED_CAPABILITY:
+            return (
+                "The model's integration does not serve that capability on the inference gateway — the error message names "
+                "the provider and what was asked of it. Pick a model whose provider serves it, or correct the model deck."
+            )
+
+
 def _render_detail(metadata: SDKErrorEnvelope, *, classification: ClassificationResult) -> str:
     """Produce the free-form user-facing advice text for the classified error."""
+    if classification.gateway_request_limit is not None:
+        # Branches ahead of the action kind rather than inside it: the limit names
+        # the remedy more precisely than the kind does, and two of the four limits
+        # would otherwise land on advice that is simply wrong for them.
+        return _render_gateway_limit_detail(limit=classification.gateway_request_limit)
+    if classification.gateway_unresolved_reference is not None:
+        # Same reason, one indirection further out: every member here would
+        # otherwise render "review the prompt, parameters, and inputs" for a
+        # reference the caller has to repair, and one of them for a security
+        # refusal that no reshaping of the inputs can get around.
+        return _render_gateway_unresolved_reference_detail(reference=classification.gateway_unresolved_reference)
+    if classification.gateway_routing_refusal is not None:
+        # Same reason a third time, and here the action kind is too coarse for
+        # every member rather than for some: ``CHANGE_MODEL`` renders "the
+        # requested model was not found", which is right only for ``pig-01`` and
+        # false for ``pig-05`` and ``pig-06``, whose model exists and is served —
+        # and for ``pig-02``, whose model resolves but to an integration that is
+        # switched off. ``CONTACT_SUPPORT`` renders "the error could not be
+        # classified" for a refusal that named itself precisely.
+        return _render_gateway_routing_refusal_detail(refusal=classification.gateway_routing_refusal)
     match classification.user_action_kind:
         case UserActionKind.WAIT_AND_RETRY:
             if metadata.retry_after_seconds is not None:

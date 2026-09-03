@@ -348,9 +348,9 @@ rationale = "Verb-object: fixes the bundle at bundle_path; options stay keyword.
 param = "input_file"
 rationale = "Renders the input file to a graph; single operand."
 
-["pipelex/cli/commands/init/backends.py::disable_gateway_backend"]
+["pipelex/cli/commands/init/backends.py::disable_managed_gateway_backends"]
 param = "backends_toml_path"
-rationale = "Edits the backends TOML at the path to disable the gateway; single operand."
+rationale = "Edits the backends TOML at the path to disable the managed gateway backends; single operand."
 
 ["pipelex/cli/commands/init/backends.py::get_selected_backend_keys"]
 param = "backends_toml_path"
@@ -1796,6 +1796,10 @@ rationale = "Parses the response; single operand."
 param = "value"
 rationale = "Parses the value; single operand."
 
+["pipelex/cogt/inference/error_classification.py::_pipelex_service_error_code_from_body"]
+param = "body"
+rationale = "Reads an error code out of one body dict, exactly as its siblings _provider_error_code_from_body and _provider_error_code_from_flat_body do; the body is the single obvious operand and all three read as one verb-object sentence."
+
 ["pipelex/cogt/inference/error_classification.py::_provider_error_code_from_body"]
 param = "body"
 rationale = "Extracts/derives from the body; single operand."
@@ -1849,6 +1853,10 @@ param = "exc"
 rationale = "Extracts from the exc; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::extract_local_extract_metadata"]
+param = "exc"
+rationale = "Extracts from the exc; single operand."
+
+["pipelex/cogt/inference/error_classification.py::extract_manifold_metadata"]
 param = "exc"
 rationale = "Extracts from the exc; single operand."
 
@@ -2031,10 +2039,6 @@ rationale = "Keyed accessor by the key; single operand."
 ["pipelex/cogt/model_backends/backend.py::InferenceBackend.get_model_spec"]
 param = "model_name"
 rationale = "Keyed accessor by the model_name; single operand."
-
-["pipelex/cogt/model_backends/backend.py::PipelexBackend.is_gateway_backend"]
-param = "backend_name"
-rationale = "Predicate on the backend_name; single operand."
 
 ["pipelex/cogt/model_backends/backend_credentials.py::BackendCredentialsErrorMsgFactory.make_comprehensive_error_msg"]
 param = "backend_credential_reports"
@@ -2237,8 +2241,8 @@ param = "deck"
 rationale = "Keyed accessor by the deck; single operand."
 
 ["pipelex/cogt/models/model_manager.py::ModelManager._enforce_gateway_model_membership"]
-param = "gateway_config"
-rationale = "Operates on the gateway_config; single operand (qualifiers keyword-only)."
+param = "managed_gateway_configs"
+rationale = "Operates on the managed gateway configs; single operand (qualifiers keyword-only)."
 
 ["pipelex/cogt/models/model_manager.py::ModelManager._extract_choice_handle"]
 param = "choice"
@@ -5088,6 +5092,58 @@ rationale = "Plugin protocol register: the registrar is the sole sink the plugin
 param = "date_str"
 rationale = "Parses/consumes the date_str; single operand."
 
+["pipelex/providers/manifold/manifold_completions_factory.py::ManifoldCompletionsFactory.make_openai_client_for_completions"]
+param = "model_handle"
+rationale = "Factory from source: builds the result from the model_handle; single operand."
+
+["pipelex/providers/manifold/manifold_constants.py::ManifoldOpenAISdkVariant.is_completions"]
+param = "sdk"
+rationale = "Predicate on the sdk; single operand."
+
+["pipelex/providers/manifold/manifold_constants.py::ManifoldOpenAISdkVariant.is_responses"]
+param = "sdk"
+rationale = "Predicate on the sdk; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory._make_gemini_image_config"]
+param = "inference_model"
+rationale = "Factory from source: builds the result from the inference_model; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.get_api_key"]
+param = "backend"
+rationale = "Derives the value from the backend config; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.get_base_url"]
+param = "backend"
+rationale = "Derives the value from the backend config; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.get_origin"]
+param = "backend"
+rationale = "Derives the value from the backend config; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.is_debug_enabled"]
+param = "backend"
+rationale = "Predicate: reports whether debug logging is enabled for the backend; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.make_auth_headers"]
+param = "backend"
+rationale = "Factory from source: builds the result from the backend; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.make_extras"]
+param = "inference_model"
+rationale = "Factory from source: builds the result from the inference_model; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.make_portkey_client"]
+param = "backend"
+rationale = "Factory from source: builds the result from the backend; single operand."
+
+["pipelex/providers/manifold/manifold_plugin.py::ManifoldPlugin.register"]
+param = "registrar"
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
+
+["pipelex/providers/manifold/manifold_responses_factory.py::ManifoldResponsesFactory.make_openai_client_for_responses"]
+param = "model_handle"
+rationale = "Factory from source: builds the result from the model_handle; single operand."
+
 ["pipelex/providers/mistral/mistral_config.py::MistralConfig.get_reasoning_level"]
 param = "effort"
 rationale = "Maps the reasoning effort to a provider reasoning level; single operand."
@@ -5571,6 +5627,10 @@ rationale = "Derivation: hashes the gateway API key into a distinct id; single o
 ["pipelex/system/pipelex_service/pipelex_service_config.py::load_pipelex_service_config_if_exists"]
 param = "config_dir"
 rationale = "Verb-object: loads from the config dir; single operand."
+
+["pipelex/system/pipelex_service/remote_config.py::RemoteConfig.get_model_specs_section"]
+param = "section_name"
+rationale = "Keyed accessor by the section_name; single operand."
 
 ["pipelex/system/pipelex_service/remote_config_cache.py::RemoteConfigCache.store"]
 param = "remote_config_payload"

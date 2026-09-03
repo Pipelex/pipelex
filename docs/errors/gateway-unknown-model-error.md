@@ -7,7 +7,7 @@ description: "Reference for the `GatewayUnknownModelError` Pipelex error class."
 
 # Gateway unknown model
 
-A model handle referenced by the deck cannot be located in the active gateway specs.
+A model handle the active routing profile sends to a managed gateway is absent from its specs.
 
 | Field | Value |
 |---|---|

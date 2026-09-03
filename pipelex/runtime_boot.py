@@ -64,10 +64,10 @@ from pipelex.cogt.exceptions import (
     RoutingProfileLibraryNotFoundError,
 )
 from pipelex.cogt.inference.inference_manager import InferenceManager
+from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.model_backends.backend_credentials import (
     BackendCredentialsErrorMsgFactory,
 )
-from pipelex.cogt.model_backends.gateway_config import GatewayConfig
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
@@ -101,8 +101,9 @@ from pipelex.system.pipelex_service.exceptions import (
     InferenceSetupRequiredError,
     RemoteConfigStaleWarning,
 )
+from pipelex.system.pipelex_service.managed_gateway_configs import build_managed_gateway_configs
 from pipelex.system.pipelex_service.pipelex_service_config import (
-    is_pipelex_gateway_enabled,
+    enabled_managed_gateway_sections,
     load_pipelex_service_config_if_exists,
 )
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
@@ -129,6 +130,7 @@ from pipelex.urls import URLs
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from pipelex.cogt.model_backends.gateway_config import GatewayConfig
     from pipelex.plugins.contract import PipelexPlugin
     from pipelex.plugins.plugin_group import PluginGroup
     from pipelex.system.pipelex_service.remote_config import RemoteConfig
@@ -377,29 +379,31 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         # --- Pipelex Service and Telemetry --------------------------------------------------
 
-        # Check if Pipelex Gateway is enabled
-        # for now the only service is the Pipelex Gateway
+        # Which Pipelex-managed gateway backends are enabled, and which section of the published
+        # artifact each takes its model specs from. More than one can be live at once — the Portkey
+        # cloud service and the manifold one are two services, sharing this one artifact, this one
+        # fetch and its one cache, and nothing else.
         try:
-            is_pipelex_service_enabled = is_pipelex_gateway_enabled()
+            managed_gateway_sections = enabled_managed_gateway_sections()
         except BACKEND_LIBRARY_REFUSED as backends_document_exc:
             # The document is read here before the library loads it: a file that does not parse
             # is the library's refusal, and it gets the library's message.
             msg = self._get_validation_error_msg(component=BootComponent.INFERENCE_BACKEND_LIBRARY, validation_exc=backends_document_exc)
             raise PipelexSetupError(msg) from backends_document_exc
+        is_pipelex_service_enabled = bool(managed_gateway_sections)
 
         effective_needs_model_specs = needs_model_specs if needs_model_specs is not None else needs_inference
 
         remote_config: RemoteConfig | None = None
-        gateway_config: GatewayConfig | None = None
+        managed_gateway_configs: dict[str, GatewayConfig] | None = None
         gateway_config_source: RemoteConfigSource | None = None
         if is_pipelex_service_enabled:
             if not effective_needs_model_specs:
                 # Use dummy config when inference is not needed (for testing without network access)
                 remote_config = RemoteConfigFetcher.make_dummy_remote_config()
-                gateway_model_specs = remote_config.backend_model_specs
-                gateway_config = GatewayConfig(
-                    model_specs=gateway_model_specs,
-                    aws_region=remote_config.aws_region,
+                managed_gateway_configs = build_managed_gateway_configs(
+                    remote_config=remote_config,
+                    managed_gateway_sections=managed_gateway_sections,
                 )
                 # Keep ``gateway_config_source`` as ``None``: the dummy specs are an empty
                 # placeholder, not real Gateway data. ``ModelManager._enforce_gateway_model_membership``
@@ -411,6 +415,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 # Terms acceptance is only required for actual inference usage, not for
                 # read-only operations like fetching model specs for validation.
                 # Also skip for CI mode — automated pipelines don't require human consent.
+                #
+                # **One gate, for any managed gateway backend.** The terms are the Pipelex service's
+                # terms, not one dialect's: a boot that reaches the service at all passes through
+                # here, whichever managed backend asked for it.
                 if needs_inference and integration_mode.requires_terms_acceptance:
                     pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
                     # First-run check: fires if inference has never been configured
@@ -430,10 +438,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 remote_config = remote_config_result.config
                 gateway_config_source = remote_config_result.source
                 log.verbose(f"Successfully fetched Pipelex Gateway remote configuration (source={gateway_config_source})")
-                gateway_model_specs = remote_config.backend_model_specs
-                gateway_config = GatewayConfig(
-                    model_specs=gateway_model_specs,
-                    aws_region=remote_config.aws_region,
+                managed_gateway_configs = build_managed_gateway_configs(
+                    remote_config=remote_config,
+                    managed_gateway_sections=managed_gateway_sections,
                 )
                 # Stale operation: warn loudly so machine consumers can re-surface the provenance.
                 # Emission lives at this orchestration layer (not in the fetcher) so the fetcher
@@ -499,11 +506,27 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             secrets_provider = secrets_provider_registry.get_required(method=secrets_config.method)(secrets_config)
 
         # Disable Pipelex telemetry when:
+        # - the legacy gateway backend is not enabled, OR
         # - inference is not needed (no live runs to track), OR
         # - the gateway config came from the cache (stale specs imply potentially stale model
         #   identities; phoning home about pipe runs in that state would pollute metrics).
+        #
+        # **The first condition asks about `pipelex_gateway` specifically, not about managed backends
+        # in general**, and the distinct id is why: it is derived from `PIPELEX_GATEWAY_API_KEY`, which
+        # a manifold backend neither has nor can stand in for — its own key is, for the private beta,
+        # one token shared by every participant, so keying on it would produce a single indistinguishable
+        # user rather than an identity. Asked the general way, a manifold-only installation would be
+        # required to hold a gateway key it has no other use for and would fail to boot without one.
+        # The common beta case is unaffected: a participant who keeps `pipelex_gateway` enabled has a
+        # real gateway key, and their manifold runs are tracked under it like everything else.
+        #
+        # Read off the mapping computed above rather than by asking the document a second time. The
+        # two answers are the same one — the gateway resolves to a section whenever it is enabled —
+        # and a second read would be a second chance for an unparseable file to escape the clause
+        # that frames it as a backend-library refusal.
         gateway_source_is_cached = gateway_config_source is not None and gateway_config_source.is_cached
-        is_pipelex_telemetry_enabled = is_pipelex_service_enabled and needs_inference and not gateway_source_is_cached
+        is_gateway_enabled = PipelexBackend.GATEWAY in managed_gateway_sections
+        is_pipelex_telemetry_enabled = is_gateway_enabled and needs_inference and not gateway_source_is_cached
         self.telemetry_manager = TelemetryFactory.make_telemetry_manager(
             secrets_provider=secrets_provider,
             integration_mode=integration_mode,
@@ -574,7 +597,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             # this; do not read ``config_dir`` as "only this directory is read" for inference.
             self.models_manager.setup(
                 secrets_provider=secrets_provider,
-                gateway_config=gateway_config,
+                managed_gateway_configs=managed_gateway_configs,
                 gateway_config_source=gateway_config_source,
                 needs_inference=needs_inference,
             )

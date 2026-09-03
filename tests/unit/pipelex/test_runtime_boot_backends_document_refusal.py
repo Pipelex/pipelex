@@ -1,9 +1,13 @@
 """A backends document that does not parse is a setup error naming the file, even when the gate reads it before the library does.
 
-`RuntimeBoot` asks `is_pipelex_gateway_enabled` whether to fetch gateway specs before the backend library loads,
-so a `backends_override.toml` with a stray quote used to surface there as a raw `TomlError` — outside every clause
-the boot has for an unloadable library. The gate now raises the library's own refusal class, and this pins that
-the boot turns it into the setup error the library's refusal gets.
+`RuntimeBoot` asks `enabled_managed_gateway_sections` which managed gateway backends to fetch specs for before
+the backend library loads, so a `backends_override.toml` with a stray quote used to surface there as a raw
+`TomlError` — outside every clause the boot has for an unloadable library. The gate now raises the library's own
+refusal class, and this pins that the boot turns it into the setup error the library's refusal gets.
+
+The gate is read exactly once. The telemetry decision further down needs the narrower "is the legacy gateway
+enabled" answer, and it reads it off the mapping this gate returned rather than asking the document again — a
+second read would be a second way past the clause.
 """
 
 import pytest
@@ -25,7 +29,7 @@ class TestRuntimeBootBackendsDocumentRefusal:
             "Invalid inference backend library 'base' with overrides 'home/backends_override.toml': "
             "TOML parsing error in file 'home/backends_override.toml'"
         )
-        mocker.patch("pipelex.runtime_boot.is_pipelex_gateway_enabled", side_effect=refusal)
+        mocker.patch("pipelex.runtime_boot.enabled_managed_gateway_sections", side_effect=refusal)
 
         Pipelex.teardown_if_needed()
         try:

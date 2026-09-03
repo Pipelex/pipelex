@@ -190,7 +190,7 @@ This handles two scenarios:
 | `not backends_existed_before` | First-time setup (no inference yet) | Force inference step regardless of focus |
 | `check_inference and backends_exists_now` | Inference in focus + existing config | Re-run inference (reset) |
 
-When inference is **not** forced and backends already exist, gateway terms are still checked. "Enabled" is read off the merged backends document pinned to the target directory (`is_pipelex_gateway_enabled(config_dir=…)`), so a gateway switched on only by that directory's `backends_override.toml` is prompted for terms too; declining writes `enabled = false` into the base, and `warn_if_gateway_pinned_by_override` says so when an override still keeps it on:
+When inference is **not** forced and backends already exist, service terms are still checked. The question is the broad one — is *any* Pipelex-managed gateway backend enabled — because the terms are the Pipelex service's rather than one dialect's, and it is read off the merged backends document pinned to the target directory (`enabled_managed_gateway_sections(config_dir=…)`), so a managed backend switched on only by that directory's `backends_override.toml` is prompted for terms too. Declining writes `enabled = false` into the base for every managed backend, and `warn_if_managed_gateway_pinned_by_override` names the ones an override still keeps on:
 
 ```python
 if not needs_inference and backends_existed_before:

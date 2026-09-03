@@ -298,6 +298,31 @@ extract_models = ["@from_pdf", "linkup-fetch"]
 search_models = ["linkup-standard"]
 
 ################################################################################
+# Manifold Profile
+################################################################################
+# The `dev` profile's shape, served by Pipelex Manifold instead of the Pipelex
+# Gateway. Deliberately not a copy of `dev`: the two catalogs are allowed to
+# diverge, so this names what the manifold section actually serves. `linkup` is
+# absent from it, and `@from_pdf` is not used because most of that collection is
+# other backends' — the manifold text extractors are named directly.
+#
+# The three LLMs are chosen to cover all three of the dialect's completion SDKs
+# in one run: `claude-4.5-haiku` on `anthropic` (POST /v1/messages),
+# `gpt-4o-mini` on `manifold_responses`, `gemini-2.5-flash-lite` on
+# `manifold_completions`.
+[profiles.manifold]
+description = "The dev model set, served by Pipelex Manifold (private beta)"
+backends = ["pipelex_manifold", "internal"]
+llm_models = [
+  "claude-4.5-haiku",
+  "gpt-4o-mini",
+  "gemini-2.5-flash-lite",
+]
+img_gen_models = ["gpt-image-1-mini"]
+extract_models = ["azure-document-intelligence", "linkup-fetch"]
+search_models = ["linkup-standard"]
+
+################################################################################
 # Coverage Profile
 ################################################################################
 [profiles.coverage]
