@@ -35,7 +35,7 @@ enabled = false
 endpoint = "${PIPELEX_MANIFOLD_ENDPOINT}"
 api_key = "${PIPELEX_MANIFOLD_API_KEY}"
 model_specs_section = "manifold_model_specs"
-auth_header = "x-portkey-api-key"
+auth_header = "x-pipelex-api-key"
 
 [anthropic]
 enabled = true

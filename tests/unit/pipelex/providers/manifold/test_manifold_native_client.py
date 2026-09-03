@@ -73,7 +73,7 @@ class TestManifoldNativeClientRequest:
         assert post.call_args.args[0] == f"{_ORIGIN}/v1/pipelex/search"
         headers = post.call_args.kwargs["headers"]
         # Asserted whole: a header added later should turn this red rather than widen silently.
-        assert headers == {"x-portkey-api-key": _TOKEN, "Content-Type": "application/json"}
+        assert headers == {"x-pipelex-api-key": _TOKEN, "Content-Type": "application/json"}
         assert post.call_args.kwargs["json"] == {"model": "linkup/standard", "query": "what is a manifold"}
 
     async def test_a_json_object_body_comes_back_as_a_dict(self, mocker: MockerFixture) -> None:

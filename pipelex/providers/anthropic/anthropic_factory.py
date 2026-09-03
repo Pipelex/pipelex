@@ -66,7 +66,7 @@ class AnthropicFactory:
                 if auth_header_config is not None:
                     # The backend speaks the Anthropic protocol but authenticates on a header of
                     # its own rather than on `x-api-key`. The Pipelex Manifold service is the case
-                    # this exists for: it reads `x-portkey-api-key` (or an `Authorization` bearer)
+                    # this exists for: it reads `x-pipelex-api-key` (or an `Authorization` bearer)
                     # and never looks at `x-api-key`, so a key left in the SDK's own slot reaches
                     # it as an anonymous request. Carry it in the named header instead — the same
                     # move the manifold OpenAI-substrate factories already make.

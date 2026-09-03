@@ -2,7 +2,7 @@
 
 The anthropic SDK carries its key in `x-api-key`. That is right for Anthropic itself and for the
 Anthropic-compatible vendors, and wrong for a backend that fronts the protocol behind a gateway
-which authenticates on a header of its own — the Pipelex Manifold service reads `x-portkey-api-key`
+which authenticates on a header of its own — the Pipelex Manifold service reads `x-pipelex-api-key`
 (or an `Authorization` bearer) and never looks at `x-api-key`, so a key left in the SDK's own slot
 reaches it as an anonymous request. A backend says which header carries its key with the
 `auth_header` extra-config field; these tests pin both paths and the refusal.
@@ -32,7 +32,7 @@ from pipelex.providers.anthropic.anthropic_factory import AnthropicFactory
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-_MANIFOLD_AUTH_HEADER = "x-portkey-api-key"
+_MANIFOLD_AUTH_HEADER = "x-pipelex-api-key"
 _MANIFOLD_ORIGIN = "https://manifold.example.com"
 
 

@@ -63,4 +63,4 @@ class TestManifoldEndpointRule:
         say otherwise. Asserting the whole dict rather than one key is what makes a header added
         later a red test rather than a silent widening.
         """
-        assert ManifoldFactory.make_auth_headers(_backend()) == {"x-portkey-api-key": _TOKEN}
+        assert ManifoldFactory.make_auth_headers(_backend()) == {"x-pipelex-api-key": _TOKEN}

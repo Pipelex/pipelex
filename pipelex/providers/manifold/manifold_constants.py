@@ -10,11 +10,15 @@ from enum import StrEnum
 
 # The header the Pipelex Manifold service reads the caller's token from.
 #
-# It says "portkey" and that is not a leftover: the gateway is a continuation of the Portkey AI
-# Gateway, and `x-portkey-api-key` is the name its auth layer answers to. It is the single word of
-# the vendor's vocabulary still on the manifold wire, and renaming it is a gateway-side change with
-# no runtime half, so it is not one this plugin can make on its own.
-MANIFOLD_AUTH_HEADER = "x-portkey-api-key"
+# The gateway is a continuation of the Portkey AI Gateway, and the name its inherited auth layer
+# answers to is `x-portkey-api-key`. Until 2026-09-03 that was the single word of the vendor's
+# vocabulary still on the manifold wire; the gateway now translates this spelling to that one before
+# its auth runs (`src/pig/serviceTokenHeader.ts` there), which is what let the rename happen — it
+# had no runtime-only half. This is the one header the dialect sends about itself, on every
+# protocol: the OpenAI-substrate factories and the native client put it there directly, and the
+# shared Anthropic driver reads it from the backend's `auth_header` field, so the value in
+# `backends.toml` must spell it exactly as this constant does.
+MANIFOLD_AUTH_HEADER = "x-pipelex-api-key"
 
 # The OpenAI and Portkey SDKs both expect their `base_url` to already carry the API version segment
 # (`AsyncOpenAI`'s default is `https://api.openai.com/v1`, `AsyncPortkey`'s is

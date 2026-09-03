@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 _ORIGIN = "https://manifold.example.com"
 _TOKEN = "manifold-service-token"
-_AUTH_HEADER = "x-portkey-api-key"
+_AUTH_HEADER = "x-pipelex-api-key"
 
 # Anything that would tell the service who should serve the model. None of it belongs on this path:
 # the model id in the body is the whole of the routing decision, and the gateway refuses a client
