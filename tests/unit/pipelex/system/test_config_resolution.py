@@ -393,3 +393,26 @@ class TestConfigResolution:
             pinned_dir / "inference" / "routing_profiles.toml",
             pinned_dir / "inference" / "routing_profiles_override.toml",
         ]
+
+    def test_inference_file_paths_take_their_base_from_the_patchable_property(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """The sequence's base is the public property, so a fixture that patches it redirects every reader.
+
+        The integration fixtures boot on a routing document of their own by patching
+        ``routing_profiles_file_path``; a sequence that resolved its base itself would read past
+        the patch and boot those tests on the real file, silently, with the suite still green.
+        """
+        project_dir = tmp_path / "project"
+        (project_dir / ".git").mkdir(parents=True)
+        (project_dir / ".pipelex").mkdir(parents=True)
+        patched_routing = tmp_path / "elsewhere" / "routing_profiles.toml"
+        patched_backends = tmp_path / "elsewhere" / "backends.toml"
+
+        mocker.patch.object(Path, "cwd", return_value=project_dir)
+        mocker.patch.object(Path, "home", return_value=tmp_path / "home")
+        mocker.patch.object(ConfigLoader, "routing_profiles_file_path", property(lambda _self: str(patched_routing)))
+        mocker.patch.object(ConfigLoader, "backends_file_path", property(lambda _self: patched_backends))
+
+        loader = ConfigLoader()
+
+        assert loader.routing_profiles_file_paths()[0] == patched_routing
+        assert loader.backends_file_paths()[0] == patched_backends

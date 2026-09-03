@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from pipelex.cogt.exceptions import InferenceBackendLibraryValidationError
 from pipelex.system.pipelex_service.pipelex_service_config import (
     PIPELEX_SERVICE_CONFIG_FILE_NAME,
     PipelexServiceAgreement,
@@ -92,6 +93,19 @@ class TestPipelexServiceConfig:
         )
 
         assert is_pipelex_gateway_enabled(config_dir=tmp_path) is expected
+
+    def test_is_pipelex_gateway_enabled_refuses_an_override_that_does_not_parse_with_the_librarys_class(self, tmp_path: Path) -> None:
+        """A parse error must reach the boot as the library's refusal, which names the file, not as a raw `TomlError`."""
+        inference_dir = tmp_path / "inference"
+        inference_dir.mkdir()
+        (inference_dir / "backends.toml").write_text("[pipelex_gateway]\nenabled = true\n")
+        override_path = inference_dir / "backends_override.toml"
+        override_path.write_text("[pipelex_gateway\nenabled = false\n")
+
+        with pytest.raises(InferenceBackendLibraryValidationError) as refused:
+            is_pipelex_gateway_enabled(config_dir=tmp_path)
+
+        assert str(override_path) in str(refused.value)
 
     def test_gateway_config_default_terms_not_accepted(self) -> None:
         """Test that gateway terms_accepted defaults to False."""

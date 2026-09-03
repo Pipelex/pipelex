@@ -39,11 +39,13 @@ from pipelex.system.runtime import runtime_manager
 from pipelex.tools.misc.dict_utils import (
     apply_to_strings_recursive,
 )
+from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.toml_utils import (
     describe_toml_base_and_overrides,
     load_toml_from_base_and_overrides,
     load_toml_from_path,
     load_toml_from_path_if_exists,
+    present_toml_override_paths,
 )
 from pipelex.tools.secrets.exceptions import UnknownVarPrefixError, VarFallbackPatternError, VarNotFoundError
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
@@ -153,8 +155,16 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         try:
             backends_dict = load_toml_from_base_and_overrides(paths=backends_library_paths)
         except FileNotFoundError as file_not_found_exc:
-            msg = f"Could not find inference backend library at {library_paths_description}: {file_not_found_exc}"
+            msg = f"Could not find inference backend library at '{backends_library_paths[0]}': {file_not_found_exc}"
             raise InferenceBackendLibraryNotFoundError(msg) from file_not_found_exc
+        except TomlError as toml_exc:
+            # A hand-edited override with a stray quote is a document the library cannot load, and
+            # the boot's own clause for that names the file; a raw parse error would not reach it.
+            msg = f"Invalid inference backend library {library_paths_description}: {toml_exc}"
+            raise InferenceBackendLibraryValidationError(msg) from toml_exc
+        if present_toml_override_paths(paths=backends_library_paths):
+            # The one trace a machine-wide override leaves: which files this boot actually merged.
+            log.info(f"Inference backends read from {library_paths_description}")
 
         # Create a partial function with the secrets provider bound
         substitute_vars_with_provider = partial(substitute_vars, secrets_provider=secrets_provider)
@@ -162,8 +172,19 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         # We'll split the read settings into standard fields and extra config
         backend_blueprint_standard_fields = InferenceBackendBlueprint.model_fields.keys()
         for backend_name, backend_dict in backends_dict.items():
+            if not isinstance(backend_dict, dict):
+                # The likeliest half-written override: `acme = false` where `[acme] enabled = false`
+                # was meant. `deep_update` replaces a table by a scalar whole, so this is the first
+                # place that can name the file rather than crash on `.copy()`. Fatal in both modes:
+                # leniency is for what this machine cannot load, not for a document that is wrong.
+                msg = (
+                    f"Invalid inference backend '{backend_name}' in {library_paths_description}: "
+                    f"expected a table, got {type(backend_dict).__name__} ({backend_dict!r})"
+                )
+                raise InferenceBackendLibraryValidationError(msg, backend_name=backend_name)
+            backend_table = cast("dict[str, Any]", backend_dict)
             extra_config: dict[str, Any] = {}
-            inference_backend_blueprint_dict_raw = backend_dict.copy()
+            inference_backend_blueprint_dict_raw = backend_table.copy()
             enabled = inference_backend_blueprint_dict_raw.get("enabled", True)
             if not enabled and not include_disabled:
                 continue
@@ -215,7 +236,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 ) from unknown_var_prefix_exc
 
             try:
-                for backend_blueprint_key in backend_dict:
+                for backend_blueprint_key in backend_table:
                     if backend_blueprint_key not in backend_blueprint_standard_fields:
                         extra_config[backend_blueprint_key] = inference_backend_blueprint_dict.pop(backend_blueprint_key)
                 try:
@@ -237,9 +258,10 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                             log.verbose(f"Skipping backend '{backend_name}': gateway model specs not available")
                             continue
                         # A caller's omission rather than a user's: the boot fetches the gateway's
-                        # specs whenever `is_pipelex_gateway_enabled` reads this same file as enabled,
-                        # and that reader and this loop agree on what "enabled" means. Reachable only
-                        # by loading the library directly without a gateway config.
+                        # specs whenever `is_pipelex_gateway_enabled` reads this same document (base
+                        # plus overrides) as enabled, and that reader and this loop agree on what
+                        # "enabled" means. Reachable only by loading the library directly without a
+                        # gateway config.
                         msg = (
                             f"Backend '{backend_name}' is enabled in {library_paths_description} but no Pipelex Gateway model specs "
                             "were given to the loader: pass `gateway_config`, or disable the backend"

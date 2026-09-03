@@ -4,6 +4,7 @@ from typing import Any, cast
 from pydantic import Field, ValidationError
 
 from pipelex import log
+from pipelex.cogt.exceptions import InferenceBackendLibraryValidationError
 from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_model import ConfigModel
@@ -19,7 +20,8 @@ from pipelex.system.pipelex_service.pipelex_service_agreement import (
     PipelexServiceAgreement,
     PipelexServiceOnboarding,
 )
-from pipelex.tools.misc.toml_utils import load_toml_from_base_and_overrides, load_toml_from_path
+from pipelex.tools.misc.exceptions import TomlError
+from pipelex.tools.misc.toml_utils import describe_toml_base_and_overrides, load_toml_from_base_and_overrides, load_toml_from_path
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
@@ -100,12 +102,20 @@ def is_pipelex_gateway_enabled(*, config_dir: Path | None = None) -> bool:
 
     Returns:
         True if pipelex_gateway is enabled, False otherwise — including when there is no base file.
+
+    Raises:
+        InferenceBackendLibraryValidationError: a file in the document does not parse. The same
+            class the library loader raises for it, so the boot's clause for an unloadable backend
+            library names the file, rather than a parse error surfacing before any clause is reached.
     """
     backends_file_paths = config_manager.backends_file_paths(config_dir=config_dir)
     try:
         backends_toml = load_toml_from_base_and_overrides(paths=backends_file_paths)
     except FileNotFoundError:
         return False
+    except TomlError as toml_exc:
+        msg = f"Invalid inference backend library {describe_toml_base_and_overrides(paths=backends_file_paths)}: {toml_exc}"
+        raise InferenceBackendLibraryValidationError(msg) from toml_exc
 
     gateway_config = backends_toml.get(PipelexBackend.GATEWAY)
     if gateway_config is None or not isinstance(gateway_config, dict):

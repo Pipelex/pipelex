@@ -8,6 +8,7 @@ flipped to a profile whose backend is still disabled — is exactly the case tha
 from pathlib import Path
 
 import pytest
+from pytest_mock import MockerFixture
 
 from pipelex.cogt.exceptions import RoutingProfileDisabledBackendError, RoutingProfileLibraryError, RoutingProfileLibraryNotFoundError
 from pipelex.cogt.model_routing.routing_profile_loader import load_active_routing_profile
@@ -156,3 +157,26 @@ class TestRoutingProfileOverrides:
         )
 
         assert profile.name == "with_routes"
+
+    def test_an_override_that_does_not_parse_is_the_librarys_refusal_and_names_the_file(self, tmp_path: Path) -> None:
+        base_path = self._write_base(tmp_path)
+        override_path = tmp_path / "routing_profiles_override.toml"
+        override_path.write_text('active = "on_other\n')
+
+        with pytest.raises(RoutingProfileLibraryError) as refused:
+            load_active_routing_profile(routing_profile_library_paths=[base_path, override_path], enabled_backends=["acme", "other"])
+
+        assert str(override_path) in str(refused.value)
+
+    def test_a_merged_override_is_logged_and_an_absent_one_is_not(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        base_path = self._write_base(tmp_path)
+        override_path = tmp_path / "routing_profiles_override.toml"
+        logger = mocker.patch("pipelex.cogt.model_routing.routing_profile_loader.log")
+
+        load_active_routing_profile(routing_profile_library_paths=[base_path, override_path], enabled_backends=["acme", "other"])
+        logger.info.assert_not_called()
+
+        override_path.write_text('active = "on_other"\n')
+        load_active_routing_profile(routing_profile_library_paths=[base_path, override_path], enabled_backends=["acme", "other"])
+        logged = " ".join(str(call.args[0]) for call in logger.info.call_args_list)
+        assert str(override_path) in logged

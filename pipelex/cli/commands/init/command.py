@@ -13,6 +13,7 @@ from pipelex.cli.commands.init.backends import (
     customize_backends_config,
     disable_gateway_backend,
     get_selected_backend_keys,
+    warn_if_gateway_pinned_by_override,
 )
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.credentials import prompt_credentials
@@ -26,7 +27,6 @@ from pipelex.cli.commands.init.ui.gateway_ui import (
 )
 from pipelex.cli.commands.init.ui.general_ui import build_initialization_panel
 from pipelex.cli.commands.init.ui.types import InitFocus
-from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.models.deck_manifest import compute_kit_manifest, write_manifest
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.runtime_hub import get_console
@@ -148,12 +148,13 @@ def _check_gateway_terms_if_needed(*, console: Console, backends_toml_path: Path
         console: Rich Console instance for user interaction.
         backends_toml_path: Path to backends.toml file.
     """
-    # Check if backends.toml exists and gateway is enabled
+    # Check if backends.toml exists and gateway is enabled. Enabled means enabled in the merged
+    # document pinned to this directory — a gateway switched on only by that directory's
+    # `backends_override.toml` needs the terms as much as one switched on in the base.
     if not backends_toml_path.exists():
         return
 
-    selected_backend_keys = get_selected_backend_keys(backends_toml_path)
-    if PipelexBackend.GATEWAY not in selected_backend_keys:
+    if not is_pipelex_gateway_enabled(config_dir=backends_toml_path.parent.parent):
         return
 
     # Gateway is enabled - check if terms are already accepted (always global)
@@ -171,8 +172,9 @@ def _check_gateway_terms_if_needed(*, console: Console, backends_toml_path: Path
     else:
         display_gateway_declined_message(console=console)
         update_service_terms_acceptance(accepted=False, config_dir=config_manager.global_config_dir)
-        # Actually disable the gateway in backends.toml
+        # Actually disable the gateway in backends.toml — and say so if an override still pins it on
         disable_gateway_backend(backends_toml_path)
+        warn_if_gateway_pinned_by_override(console=console, backends_toml_path=backends_toml_path)
 
 
 def determine_needs(
@@ -467,6 +469,7 @@ def _init_agreement(*, console: Console) -> None:
         backends_toml_path = config_manager.pipelex_config_dir / "inference" / "backends.toml"
         if backends_toml_path.exists():
             disable_gateway_backend(backends_toml_path)
+            warn_if_gateway_pinned_by_override(console=console, backends_toml_path=backends_toml_path)
 
     console.print()
 

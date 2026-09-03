@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+from pytest_mock import MockerFixture
 
 from pipelex.cogt.exceptions import InferenceBackendLibraryNotFoundError, InferenceBackendLibraryValidationError
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
@@ -116,3 +117,49 @@ class TestBackendLibraryOverrides:
         assert str(base_path) in message
         assert str(override_path) in message
         assert str(absent_override) not in message
+
+    def test_an_override_that_does_not_parse_is_the_librarys_refusal_and_names_the_file(self, tmp_path: Path) -> None:
+        base_path, backends_dir = self._write_base(tmp_path)
+        override_path = tmp_path / "backends_override.toml"
+        override_path.write_text("[acme\nenabled = true\n")
+
+        with pytest.raises(InferenceBackendLibraryValidationError) as refused:
+            self._load(paths=[base_path, override_path], backends_dir=backends_dir)
+
+        assert str(override_path) in str(refused.value)
+
+    def test_a_merged_override_is_logged_and_an_absent_one_is_not(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """The one trace a machine-wide override leaves in a run's log."""
+        base_path, backends_dir = self._write_base(tmp_path)
+        override_path = tmp_path / "backends_override.toml"
+        logger = mocker.patch("pipelex.cogt.model_backends.backend_library.log")
+
+        self._load(paths=[base_path, override_path], backends_dir=backends_dir)
+        logger.info.assert_not_called()
+
+        override_path.write_text("[acme]\nenabled = true\n")
+        self._load(paths=[base_path, override_path], backends_dir=backends_dir)
+        logged = " ".join(str(call.args[0]) for call in logger.info.call_args_list)
+        assert str(override_path) in logged
+
+    @pytest.mark.parametrize("lenient", [False, True])
+    def test_a_scalar_where_a_table_was_meant_is_refused_in_both_modes(self, tmp_path: Path, lenient: bool) -> None:
+        """`acme = false` is the likeliest half-written override; the merge replaces the table whole and the loader must say so."""
+        base_path, backends_dir = self._write_base(tmp_path)
+        override_path = tmp_path / "backends_override.toml"
+        override_path.write_text("acme = false\n")
+
+        library = InferenceBackendLibrary.make_empty()
+        with pytest.raises(InferenceBackendLibraryValidationError) as refused:
+            library.load(
+                secrets_provider=EnvSecretsProvider(),
+                backends_library_paths=[base_path, override_path],
+                backends_dir_path=str(backends_dir),
+                lenient=lenient,
+            )
+
+        message = str(refused.value)
+        assert "acme" in message
+        assert "expected a table" in message
+        assert str(override_path) in message
+        assert refused.value.backend_name == "acme"

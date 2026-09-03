@@ -7,7 +7,8 @@ from pipelex import log
 from pipelex.cogt.exceptions import RoutingProfileDisabledBackendError, RoutingProfileLibraryError, RoutingProfileLibraryNotFoundError
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
 from pipelex.cogt.model_routing.routing_profile_factory import RoutingProfileFactory, RoutingProfileLibraryBlueprint
-from pipelex.tools.misc.toml_utils import describe_toml_base_and_overrides, load_toml_from_base_and_overrides
+from pipelex.tools.misc.exceptions import TomlError
+from pipelex.tools.misc.toml_utils import describe_toml_base_and_overrides, load_toml_from_base_and_overrides, present_toml_override_paths
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
@@ -25,8 +26,8 @@ def load_active_routing_profile(
     why the merge happens before validation: ``active`` is a required field of the blueprint.
 
     What this raises is what ``RuntimeBoot`` catches, and the classes are the contract: a missing
-    base is ``RoutingProfileLibraryNotFoundError``, a document the blueprint refuses or an
-    ``active`` naming no profile is ``RoutingProfileLibraryError``, and a profile whose default or
+    base is ``RoutingProfileLibraryNotFoundError``, a file that does not parse, a document the
+    blueprint refuses or an ``active`` naming no profile is ``RoutingProfileLibraryError``, and a profile whose default or
     routes name a backend that is not enabled is ``RoutingProfileDisabledBackendError``. That last
     one is the half-written override — ``active`` flipped, the backend still off — and the boot
     turns it into a setup error that says so.
@@ -43,6 +44,11 @@ def load_active_routing_profile(
     except FileNotFoundError as not_found_exc:
         msg = f"Could not find routing profile library at '{routing_profile_library_paths[0]}': {not_found_exc}"
         raise RoutingProfileLibraryNotFoundError(msg) from not_found_exc
+    except TomlError as toml_exc:
+        msg = f"Invalid routing profile library {library_description}: {toml_exc}"
+        raise RoutingProfileLibraryError(msg) from toml_exc
+    if present_toml_override_paths(paths=routing_profile_library_paths):
+        log.info(f"Routing profiles read from {library_description}")
 
     # Validate the routing profile library configuration
     try:

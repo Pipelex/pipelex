@@ -118,15 +118,21 @@ def load_toml_from_base_and_overrides(paths: Sequence[str | Path]) -> dict[str, 
     return merged_dict
 
 
+def present_toml_override_paths(*, paths: Sequence[str | Path]) -> list[str | Path]:
+    """The override files ``load_toml_from_base_and_overrides`` actually reads: every path after the base that exists."""
+    _base_path, *override_paths = paths
+    return [override_path for override_path in override_paths if path_exists(override_path)]
+
+
 def describe_toml_base_and_overrides(*, paths: Sequence[str | Path]) -> str:
-    """Name the files ``load_toml_from_base_and_overrides`` would merge, for an error message.
+    """Name the files ``load_toml_from_base_and_overrides`` would merge, for a message.
 
     The base, then only the overrides that exist: a user fixing a refusal edits one of the files
     that were actually read, and an absent override is not one of them.
     """
-    base_path, *override_paths = paths
+    base_path = paths[0]
     description = f"'{base_path}'"
-    present_overrides = [f"'{override_path}'" for override_path in override_paths if path_exists(override_path)]
+    present_overrides = [f"'{override_path}'" for override_path in present_toml_override_paths(paths=paths)]
     if present_overrides:
         description += f" with overrides {', '.join(present_overrides)}"
     return description

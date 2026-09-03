@@ -221,6 +221,7 @@ class ConfigLoader:
         See ``_inference_file_paths`` for the order and why it is what it is.
         """
         return self._inference_file_paths(
+            resolved_base=self.backends_file_path,
             file_name=BACKENDS_FILE_NAME,
             override_file_name=BACKENDS_OVERRIDE_FILE_NAME,
             config_dir=config_dir,
@@ -232,12 +233,13 @@ class ConfigLoader:
         See ``_inference_file_paths`` for the order and why it is what it is.
         """
         return self._inference_file_paths(
+            resolved_base=self.routing_profiles_file_path,
             file_name=ROUTING_PROFILES_FILE_NAME,
             override_file_name=ROUTING_PROFILES_OVERRIDE_FILE_NAME,
             config_dir=config_dir,
         )
 
-    def _inference_file_paths(self, *, file_name: str, override_file_name: str, config_dir: Path | None) -> list[Path]:
+    def _inference_file_paths(self, *, resolved_base: Path, file_name: str, override_file_name: str, config_dir: Path | None) -> list[Path]:
         """The paths a reader of one inference document merges, base first.
 
         The first path is the base and must exist; the rest are the personal override files, each
@@ -258,12 +260,19 @@ class ConfigLoader:
 
         With ``config_dir`` (the doctor's ``--global``, an init targeting one directory) the
         sequence is pinned to that directory and its own override, mirroring ``load_config``.
+
+        ``resolved_base`` is the public ``backends_file_path`` / ``routing_profiles_file_path``
+        property, read rather than recomputed here on purpose: that property is a seam a test
+        fixture may patch to boot on a document of its own, and a sequence that resolved the base
+        itself would read past the patch and boot every such test on the real file. A fixture that
+        must also keep the personal override tiers out patches this repository's sequence methods
+        instead. A property patched with a ``str`` is what the ``Path(...)`` below is for.
         """
         relative_base = f"{INFERENCE_DIR_NAME}/{file_name}"
         relative_override = f"{INFERENCE_DIR_NAME}/{override_file_name}"
         if config_dir is not None:
             return [config_dir / relative_base, config_dir / relative_override]
-        paths = [self.resolve_config_file(relative_base), self.global_config_dir / relative_override]
+        paths = [Path(resolved_base), self.global_config_dir / relative_override]
         project_dir = self.project_config_dir
         if project_dir is not None and project_dir != self.global_config_dir:
             paths.append(project_dir / relative_override)

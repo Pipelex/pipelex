@@ -33,6 +33,7 @@ from pipelex.cogt.exceptions import (
     ModelDeckNotFoundError,
     ModelDeckValidationError,
     RoutingProfileDisabledBackendError,
+    RoutingProfileLibraryError,
     RoutingProfileLibraryNotFoundError,
 )
 from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsErrorMsgFactory, BackendCredentialsReport
@@ -1099,7 +1100,11 @@ def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str
     service_config_dir = config_dir if config_dir is not None else config_manager.global_config_dir
     gateway_config: GatewayConfig | None = None
     gateway_config_source: RemoteConfigSource | None = None
-    if is_pipelex_gateway_enabled(config_dir=config_dir):
+    try:
+        gateway_enabled = is_pipelex_gateway_enabled(config_dir=config_dir)
+    except InferenceBackendLibraryValidationError as exc:
+        return False, f"Error checking models: {exc}", backend_file_reports
+    if gateway_enabled:
         pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=service_config_dir)
         if pipelex_service_config is None:
             return False, "Pipelex Gateway is enabled but service configuration is missing", backend_file_reports
@@ -1152,6 +1157,7 @@ def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str
         InferenceBackendLibraryNotFoundError,
         ModelDeckNotFoundError,
         RoutingProfileDisabledBackendError,
+        RoutingProfileLibraryError,  # an invalid document, or an `active` naming no profile: the likeliest override typo
         InferenceBackendLibraryValidationError,
         ModelDeckValidationError,
         InferenceBackendCredentialsError,
