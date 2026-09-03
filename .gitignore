@@ -48,6 +48,8 @@ pipelex_super.toml
 pipelex_override.toml
 pipelex_temporary_override.toml
 telemetry_override.toml
+backends_override.toml
+routing_profiles_override.toml
 
 # local pipelex service configuration
 .pipelex/pipelex_service.toml

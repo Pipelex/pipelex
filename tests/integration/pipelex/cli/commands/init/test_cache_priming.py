@@ -37,6 +37,8 @@ from pipelex.system.pipelex_service.remote_config_cache import (
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pytest_mock import MockerFixture
 
 INIT_COMMAND_MODULE = "pipelex.cli.commands.init.command"
@@ -105,6 +107,22 @@ def isolated_cache_dir(tmp_path: Path, mocker: MockerFixture) -> Path:
         return_value=fake_global_dir,
     )
     return fake_global_dir
+
+
+def _layered_or_pinned(layered_backends: Path) -> Callable[..., list[Path]]:
+    """A stand-in for `ConfigLoader.backends_file_paths` that keeps honouring `config_dir`.
+
+    Patched on the class, the method serves every caller: the layered sequence only when no
+    directory is named, and that directory's own base and override otherwise — which is the whole
+    contract the priming helper relies on when it passes the target directory.
+    """
+
+    def backends_file_paths(*, config_dir: Path | None = None) -> list[Path]:
+        if config_dir is None:
+            return [layered_backends]
+        return [config_dir / "inference" / "backends.toml", config_dir / "inference" / "backends_override.toml"]
+
+    return backends_file_paths
 
 
 class TestCachePriming:
@@ -215,7 +233,7 @@ class TestCachePriming:
         resolves to first.
 
         Setup:
-        - layered ``backends.toml`` (default ``config_manager.backends_file_path``) has gateway DISABLED.
+        - layered ``backends.toml`` (default ``config_manager.backends_file_paths()``) has gateway DISABLED.
         - target_config_dir's ``backends.toml`` has gateway ENABLED.
 
         Expected: priming runs (gateway enabled at the target). Without the fix, the helper
@@ -226,12 +244,7 @@ class TestCachePriming:
         layered_backends = layered_dir / "inference" / "backends.toml"
         layered_backends.parent.mkdir(parents=True, exist_ok=True)
         layered_backends.write_text("[pipelex_gateway]\nenabled = false\n", encoding="utf-8")
-        mocker.patch.object(
-            ConfigLoader,
-            "backends_file_path",
-            new_callable=mocker.PropertyMock,
-            return_value=layered_backends,
-        )
+        mocker.patch.object(ConfigLoader, "backends_file_paths", side_effect=_layered_or_pinned(layered_backends))
 
         # Target init dir says gateway IS enabled. The priming helper must read THIS file.
         target_dir = tmp_path / "target_dir"
@@ -273,12 +286,7 @@ class TestCachePriming:
         layered_backends = layered_dir / "inference" / "backends.toml"
         layered_backends.parent.mkdir(parents=True, exist_ok=True)
         layered_backends.write_text("[pipelex_gateway]\nenabled = true\n", encoding="utf-8")
-        mocker.patch.object(
-            ConfigLoader,
-            "backends_file_path",
-            new_callable=mocker.PropertyMock,
-            return_value=layered_backends,
-        )
+        mocker.patch.object(ConfigLoader, "backends_file_paths", side_effect=_layered_or_pinned(layered_backends))
 
         # Target says gateway disabled — priming should respect that and become a no-op.
         target_dir = tmp_path / "target_dir"

@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from pipelex.cogt.exceptions import InferenceBackendLibraryValidationError
 from pipelex.system.pipelex_service.pipelex_service_config import (
     PIPELEX_SERVICE_CONFIG_FILE_NAME,
     PipelexServiceAgreement,
@@ -18,6 +19,13 @@ from pipelex.system.pipelex_service.pipelex_service_config import (
 
 class TestPipelexServiceConfig:
     """Tests for PipelexServiceConfig and related functions."""
+
+    def _write_backends(self, config_dir: Path, *, base: str, override: str | None = None) -> None:
+        inference_dir = config_dir / "inference"
+        inference_dir.mkdir(parents=True, exist_ok=True)
+        (inference_dir / "backends.toml").write_text(base, encoding="utf-8")
+        if override is not None:
+            (inference_dir / "backends_override.toml").write_text(override, encoding="utf-8")
 
     @pytest.mark.parametrize(
         ("enabled_value", "expected"),
@@ -41,23 +49,63 @@ class TestPipelexServiceConfig:
         in a state the loader could not name: enabled with no specs, so refused as *"remote model specs
         were not provided"* on a strict boot, and silently dropped from the deck on a lenient one.
         """
-        backends_file = tmp_path / "backends.toml"
-        backends_file.write_text(f'[pipelex_gateway]\nenabled = {enabled_value}\napi_key = "x"\n', encoding="utf-8")
+        self._write_backends(tmp_path, base=f'[pipelex_gateway]\nenabled = {enabled_value}\napi_key = "x"\n')
 
-        assert is_pipelex_gateway_enabled(backends_file_path=backends_file) is expected
+        assert is_pipelex_gateway_enabled(config_dir=tmp_path) is expected
 
     def test_is_pipelex_gateway_enabled_defaults_to_enabled_when_the_key_is_absent(self, tmp_path: Path) -> None:
         """No `enabled` key means enabled — the loader's default too."""
-        backends_file = tmp_path / "backends.toml"
-        backends_file.write_text('[pipelex_gateway]\napi_key = "x"\n', encoding="utf-8")
+        self._write_backends(tmp_path, base='[pipelex_gateway]\napi_key = "x"\n')
 
-        assert is_pipelex_gateway_enabled(backends_file_path=backends_file) is True
+        assert is_pipelex_gateway_enabled(config_dir=tmp_path) is True
 
     def test_is_pipelex_gateway_enabled_is_false_without_a_gateway_table(self, tmp_path: Path) -> None:
-        backends_file = tmp_path / "backends.toml"
-        backends_file.write_text('[openai]\napi_key = "x"\n', encoding="utf-8")
+        self._write_backends(tmp_path, base='[openai]\napi_key = "x"\n')
 
-        assert is_pipelex_gateway_enabled(backends_file_path=backends_file) is False
+        assert is_pipelex_gateway_enabled(config_dir=tmp_path) is False
+
+    def test_is_pipelex_gateway_enabled_is_false_without_a_base_file(self, tmp_path: Path) -> None:
+        """An override cannot stand in for the base: no document, no gateway."""
+        inference_dir = tmp_path / "inference"
+        inference_dir.mkdir(parents=True)
+        (inference_dir / "backends_override.toml").write_text("[pipelex_gateway]\nenabled = true\n", encoding="utf-8")
+
+        assert is_pipelex_gateway_enabled(config_dir=tmp_path) is False
+
+    @pytest.mark.parametrize(
+        ("base_enabled", "override_enabled", "expected"),
+        [
+            ("true", "false", False),
+            ("false", "true", True),
+            # The override is read with the same truthiness as the base.
+            ("false", "1", True),
+            ("true", "0", False),
+        ],
+    )
+    def test_is_pipelex_gateway_enabled_reads_the_override_over_the_base(
+        self, tmp_path: Path, base_enabled: str, override_enabled: str, expected: bool
+    ) -> None:
+        """The personal override is the loader's document too, so the gate must see it."""
+        self._write_backends(
+            tmp_path,
+            base=f'[pipelex_gateway]\nenabled = {base_enabled}\napi_key = "x"\n',
+            override=f"[pipelex_gateway]\nenabled = {override_enabled}\n",
+        )
+
+        assert is_pipelex_gateway_enabled(config_dir=tmp_path) is expected
+
+    def test_is_pipelex_gateway_enabled_refuses_an_override_that_does_not_parse_with_the_librarys_class(self, tmp_path: Path) -> None:
+        """A parse error must reach the boot as the library's refusal, which names the file, not as a raw `TomlError`."""
+        inference_dir = tmp_path / "inference"
+        inference_dir.mkdir()
+        (inference_dir / "backends.toml").write_text("[pipelex_gateway]\nenabled = true\n")
+        override_path = inference_dir / "backends_override.toml"
+        override_path.write_text("[pipelex_gateway\nenabled = false\n")
+
+        with pytest.raises(InferenceBackendLibraryValidationError) as refused:
+            is_pipelex_gateway_enabled(config_dir=tmp_path)
+
+        assert str(override_path) in str(refused.value)
 
     def test_gateway_config_default_terms_not_accepted(self) -> None:
         """Test that gateway terms_accepted defaults to False."""

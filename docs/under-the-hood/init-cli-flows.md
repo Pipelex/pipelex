@@ -190,7 +190,7 @@ This handles two scenarios:
 | `not backends_existed_before` | First-time setup (no inference yet) | Force inference step regardless of focus |
 | `check_inference and backends_exists_now` | Inference in focus + existing config | Re-run inference (reset) |
 
-When inference is **not** forced and backends already exist, gateway terms are still checked:
+When inference is **not** forced and backends already exist, gateway terms are still checked. "Enabled" is read off the merged backends document pinned to the target directory (`is_pipelex_gateway_enabled(config_dir=…)`), so a gateway switched on only by that directory's `backends_override.toml` is prompted for terms too; declining writes `enabled = false` into the base, and `warn_if_gateway_pinned_by_override` says so when an override still keeps it on:
 
 ```python
 if not needs_inference and backends_existed_before:
@@ -270,7 +270,7 @@ Copies a telemetry template and prints instructions. No interactive prompts. Whi
 
 | Constant | Contents | Reason |
 |----------|----------|--------|
-| `INIT_SKIP_FILES` | All `GIT_IGNORED_CONFIG_FILES` (`pipelex_service.toml`, `pipelex_override.toml`, `telemetry_override.toml`, `telemetry.project.toml`, `pipelex_gateway_models.md`, `pipelex_gateway_models_plain.md`, `x_custom_llm_deck.toml`, `x_custom_extract_deck.toml`) plus `telemetry.toml` and `.DS_Store` | Git-ignored, auto-generated, or managed by other steps |
+| `INIT_SKIP_FILES` | Every name in `GIT_IGNORED_CONFIG_FILES` (`pipelex/kit/paths.py` is the list: the personal overrides, the service file, the generated gateway model pages, the custom deck files) plus `telemetry.toml` and `.DS_Store` | Git-ignored, auto-generated, or managed by other steps |
 | `INIT_SKIP_DIRS` | `inference` | Managed independently by inference step |
 
 ### Source Modules
@@ -451,8 +451,8 @@ flowchart TD
 |-------|-------------------|---------|
 | `check_config_files()` | `resolve_config_file()` | Layered resolution (project > global) |
 | `check_telemetry_config()` | `resolve_config_file()` | Layered resolution (project > global) |
-| `check_backend_credentials()` | `resolve_config_file()` | Finds `backends.toml` wherever it lives |
-| `check_backend_files()` | `resolve_config_file()` | Finds `inference/backends/` wherever it lives |
+| `check_backend_credentials()` | `backends_file_paths()` | Reads the merged backends document: the base `backends.toml` wherever it lives, plus the personal `backends_override.toml` at each tier |
+| `check_backend_files()` | `resolve_config_file()` for `inference/backends/`, `backends_file_paths()` for the enabled-backend list | Finds `inference/backends/` wherever it lives, and reads the merged backends document to decide which backends to probe |
 | `check_models()` gateway terms | `global_config_dir` | **Always global** — reads from `~/.pipelex/` |
 | `check_pending_migrations()` | none | **Both directories, always** — see below |
 

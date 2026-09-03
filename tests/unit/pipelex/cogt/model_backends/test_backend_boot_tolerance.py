@@ -147,7 +147,7 @@ class TestAStaleBackendDirectory:
         library = InferenceBackendLibrary.make_empty()
         library.load(
             secrets_provider=EnvSecretsProvider(),
-            backends_library_path=str(library_path),
+            backends_library_paths=[library_path],
             backends_dir_path=str(self._backends_dir(machine)),
             gateway_config=gateway_config,
             lenient=lenient,

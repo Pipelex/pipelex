@@ -20,7 +20,7 @@ from pipelex.cli.commands.doctor_cmd import (
     TelemetryConfigCheck,
     TelemetryConfigFinding,
 )
-from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport
+from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsReport
 from pipelex.core.validation import MIGRATE_COMMAND
 from pipelex.system.console_target import ConsoleTarget
 

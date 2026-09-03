@@ -94,7 +94,7 @@ When using your own keys, enable the corresponding backends:
     pipelex init
     ```
 
-2. Edit `~/.pipelex/inference/backends.toml` (or `.pipelex/inference/backends.toml` in your project root if you have a project-local config — the project file fully overrides the global one):
+2. Edit `~/.pipelex/inference/backends.toml` (or `.pipelex/inference/backends.toml` in your project root if you have a project-local config — the project file fully overrides the global one). To run on a backend of your own choosing without touching a tracked file, write the same keys in a git-ignored `backends_override.toml` beside it instead: see [Personal overrides](../configuration/config-technical/inference-backend-config.md#personal-overrides).
 
     ```toml
     [google]

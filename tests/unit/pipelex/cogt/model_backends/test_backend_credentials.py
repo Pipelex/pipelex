@@ -4,7 +4,6 @@ from pytest_mock import MockerFixture
 from pipelex.cogt.model_backends.backend_credentials import (
     BackendCredentialsErrorMsgFactory,
     BackendCredentialsReport,
-    CredentialsValidationReport,
 )
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
@@ -50,19 +49,6 @@ class TestBackendCredentials:
         assert report.missing_vars == ["OPENAI_API_KEY"]
         assert report.placeholder_vars == ["OPENAI_ORG_ID"]
         assert report.all_credentials_valid is False
-
-    def test_credentials_validation_report_round_trip(self):
-        """CredentialsValidationReport holds its constructed field values."""
-        valid_report = make_report(backend_name="anthropic", missing_vars=[], placeholder_vars=[])
-        invalid_report = make_report(backend_name="openai", missing_vars=["OPENAI_API_KEY"], placeholder_vars=[])
-        validation_report = CredentialsValidationReport(
-            backend_reports={"anthropic": valid_report, "openai": invalid_report},
-            all_backends_valid=False,
-        )
-        assert validation_report.backend_reports["anthropic"] == valid_report
-        assert validation_report.backend_reports["openai"] == invalid_report
-        assert validation_report.backend_reports["anthropic"].all_credentials_valid is True
-        assert validation_report.all_backends_valid is False
 
     def test_one_variable_missing_env_provider(self):
         """The env-provider branch tells the user to add the variable to the environment or .env file."""

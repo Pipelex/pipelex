@@ -6,6 +6,9 @@ from importlib.resources.abc import Traversable
 # - pipelex_service.toml: Contains terms_accepted (False for new users, True for devs)
 # - pipelex_override.toml: Personal config overrides
 # - telemetry_override.toml: Personal telemetry settings
+# - inference/backends_override.toml, inference/routing_profiles_override.toml: personal
+#   overrides of the two inference documents, so a developer runs on another backend without
+#   editing the tracked files (matched by bare name, like everything here)
 # - telemetry.project.toml: Kit-internal commented-out template used by project init
 #   only; must never be propagated into ~/.pipelex/ or a project's .pipelex/ as-is
 # The config-sync check and the kit mirror extend this set with the files that intentionally
@@ -18,6 +21,8 @@ GIT_IGNORED_CONFIG_FILES: frozenset[str] = frozenset(
         "pipelex_service.toml",
         "pipelex_override.toml",
         "telemetry_override.toml",
+        "backends_override.toml",
+        "routing_profiles_override.toml",
         "telemetry.project.toml",
         "pipelex_gateway_models.md",  # Auto-generated from remote config
         "pipelex_gateway_models_plain.md",  # Auto-generated from remote config

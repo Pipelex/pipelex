@@ -60,6 +60,7 @@ from pipelex.cogt.exceptions import (
     ModelDeckNotFoundError,
     ModelDeckValidationError,
     RoutingProfileDisabledBackendError,
+    RoutingProfileLibraryError,
     RoutingProfileLibraryNotFoundError,
 )
 from pipelex.cogt.inference.inference_manager import InferenceManager
@@ -377,8 +378,14 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # --- Pipelex Service and Telemetry --------------------------------------------------
 
         # Check if Pipelex Gateway is enabled
-        # for now the only servic is the Pipelex Gateway
-        is_pipelex_service_enabled = is_pipelex_gateway_enabled()
+        # for now the only service is the Pipelex Gateway
+        try:
+            is_pipelex_service_enabled = is_pipelex_gateway_enabled()
+        except BACKEND_LIBRARY_REFUSED as backends_document_exc:
+            # The document is read here before the library loads it: a file that does not parse
+            # is the library's refusal, and it gets the library's message.
+            msg = self._get_validation_error_msg(component=BootComponent.INFERENCE_BACKEND_LIBRARY, validation_exc=backends_document_exc)
+            raise PipelexSetupError(msg) from backends_document_exc
 
         effective_needs_model_specs = needs_model_specs if needs_model_specs is not None else needs_inference
 
@@ -583,6 +590,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         except RoutingProfileDisabledBackendError as routing_profile_exc:
             msg = f"Some backend(s) required for a routing profile is not enabled: {routing_profile_exc}"
             raise PipelexSetupError(msg) from routing_profile_exc
+        except RoutingProfileLibraryError as routing_validation_exc:
+            msg = self._get_validation_error_msg(component=BootComponent.ROUTING_PROFILE_LIBRARY, validation_exc=routing_validation_exc)
+            raise PipelexSetupError(msg) from routing_validation_exc
 
         except BACKEND_LIBRARY_REFUSED as backend_validation_exc:
             msg = self._get_validation_error_msg(component=BootComponent.INFERENCE_BACKEND_LIBRARY, validation_exc=backend_validation_exc)

@@ -13,11 +13,18 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from pipelex.cli.commands.doctor_cmd import BackendFileReport, check_models
-from pipelex.cogt.exceptions import InferenceBackendLibraryError, ModelDeckValidationError
+from pipelex.cogt.exceptions import (
+    InferenceBackendLibraryError,
+    InferenceBackendLibraryValidationError,
+    ModelDeckValidationError,
+    RoutingProfileLibraryError,
+)
 from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError
 from pipelex.system.pipelex_service.types import RemoteConfigSource
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from pytest_mock import MockerFixture
 
 
@@ -188,3 +195,41 @@ class TestCheckModels:
         assert reports["openai"].is_valid is False
         assert reports["portkey"].is_valid is True
         assert reports["portkey"].error_message is None
+
+    @pytest.mark.usefixtures("healthy_backend_files", "gateway_disabled")
+    def test_an_active_profile_naming_no_profile_is_a_reported_finding(self, models_manager: Any) -> None:
+        """The likeliest override typo — `active = "nope"` — is the routing library's own refusal, and the doctor must report it, not crash."""
+        models_manager.setup.side_effect = RoutingProfileLibraryError("Active profile 'nope' not found in the routing profile library")
+
+        healthy, message, reports = check_models()
+
+        assert healthy is False
+        assert "Active profile 'nope' not found" in message
+        assert reports == {}
+
+    @pytest.mark.usefixtures("healthy_backend_files", "gateway_disabled")
+    def test_global_pins_both_documents_as_base_plus_override(self, models_manager: Any, tmp_path: Path) -> None:
+        """`--global` hands the model manager that directory's base and its own override, for both documents."""
+        check_models(config_dir=tmp_path)
+
+        kwargs = models_manager.setup.call_args.kwargs
+        assert kwargs["backends_library_paths"] == [tmp_path / "inference" / "backends.toml", tmp_path / "inference" / "backends_override.toml"]
+        assert kwargs["routing_profile_library_paths"] == [
+            tmp_path / "inference" / "routing_profiles.toml",
+            tmp_path / "inference" / "routing_profiles_override.toml",
+        ]
+
+    @pytest.mark.usefixtures("healthy_backend_files")
+    def test_a_backends_document_that_does_not_parse_is_a_reported_finding(self, mocker: MockerFixture, models_manager: Any) -> None:
+        """The gateway gate reads the merged document before any load; its refusal is the Models row's, not a crash."""
+        mocker.patch(
+            "pipelex.cli.commands.doctor_cmd.is_pipelex_gateway_enabled",
+            side_effect=InferenceBackendLibraryValidationError("Invalid inference backend library 'x' with overrides 'y': TOML parsing error"),
+        )
+
+        healthy, message, reports = check_models()
+
+        assert healthy is False
+        assert "TOML parsing error" in message
+        assert reports == {}
+        models_manager.setup.assert_not_called()

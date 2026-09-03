@@ -39,7 +39,7 @@ class TestGatewayUnknownPerModelKeys:
         library = InferenceBackendLibrary.make_empty()
         library.load(
             secrets_provider=EnvSecretsProvider(),
-            backends_library_path=str(backends_library_path),
+            backends_library_paths=[backends_library_path],
             backends_dir_path=str(backends_dir),
             gateway_config=GatewayConfig(model_specs=model_specs, aws_region="eu-west-3"),
         )

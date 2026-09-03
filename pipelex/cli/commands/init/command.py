@@ -13,6 +13,7 @@ from pipelex.cli.commands.init.backends import (
     customize_backends_config,
     disable_gateway_backend,
     get_selected_backend_keys,
+    warn_if_gateway_pinned_by_override,
 )
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.credentials import prompt_credentials
@@ -26,11 +27,10 @@ from pipelex.cli.commands.init.ui.gateway_ui import (
 )
 from pipelex.cli.commands.init.ui.general_ui import build_initialization_panel
 from pipelex.cli.commands.init.ui.types import InitFocus
-from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.models.deck_manifest import compute_kit_manifest, write_manifest
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.runtime_hub import get_console
-from pipelex.system.configuration.config_loader import BACKENDS_FILE_NAME, INFERENCE_DIR_NAME, config_manager
+from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError
 from pipelex.system.pipelex_service.pipelex_service_agreement import update_service_terms_acceptance
 from pipelex.system.pipelex_service.pipelex_service_config import (
@@ -80,18 +80,14 @@ def attempt_prime_remote_config_cache(*, target_config_dir: Path | None = None) 
     priming step.
 
     Args:
-        target_config_dir: When set, read the ``backends.toml`` *at that directory* to decide
-            whether the gateway is enabled. ``pipelex init`` and ``pipelex init --local``
-            target different ``.pipelex/`` directories — using the layered/project-preferred
-            config here would let priming branch on the wrong file. ``None`` (default) falls
-            back to the layered path. The terms-acceptance check always reads the *global*
-            ``pipelex_service.toml`` by design.
+        target_config_dir: When set, read the backends document *at that directory* (its
+            ``backends.toml`` and its own ``backends_override.toml``) to decide whether the gateway
+            is enabled. ``pipelex init`` and ``pipelex init --local`` target different ``.pipelex/``
+            directories — using the layered/project-preferred config here would let priming branch
+            on the wrong file. ``None`` (default) falls back to the layered document. The
+            terms-acceptance check always reads the *global* ``pipelex_service.toml`` by design.
     """
-    if target_config_dir is not None:
-        backends_file_path = target_config_dir / INFERENCE_DIR_NAME / BACKENDS_FILE_NAME
-    else:
-        backends_file_path = None
-    if not is_pipelex_gateway_enabled(backends_file_path=backends_file_path):
+    if not is_pipelex_gateway_enabled(config_dir=target_config_dir):
         return CachePrimingResult(primed=False)
 
     service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
@@ -152,12 +148,13 @@ def _check_gateway_terms_if_needed(*, console: Console, backends_toml_path: Path
         console: Rich Console instance for user interaction.
         backends_toml_path: Path to backends.toml file.
     """
-    # Check if backends.toml exists and gateway is enabled
+    # Check if backends.toml exists and gateway is enabled. Enabled means enabled in the merged
+    # document pinned to this directory — a gateway switched on only by that directory's
+    # `backends_override.toml` needs the terms as much as one switched on in the base.
     if not backends_toml_path.exists():
         return
 
-    selected_backend_keys = get_selected_backend_keys(backends_toml_path)
-    if PipelexBackend.GATEWAY not in selected_backend_keys:
+    if not is_pipelex_gateway_enabled(config_dir=backends_toml_path.parent.parent):
         return
 
     # Gateway is enabled - check if terms are already accepted (always global)
@@ -175,8 +172,9 @@ def _check_gateway_terms_if_needed(*, console: Console, backends_toml_path: Path
     else:
         display_gateway_declined_message(console=console)
         update_service_terms_acceptance(accepted=False, config_dir=config_manager.global_config_dir)
-        # Actually disable the gateway in backends.toml
+        # Actually disable the gateway in backends.toml — and say so if an override still pins it on
         disable_gateway_backend(backends_toml_path)
+        warn_if_gateway_pinned_by_override(console=console, backends_toml_path=backends_toml_path)
 
 
 def determine_needs(
@@ -471,6 +469,7 @@ def _init_agreement(*, console: Console) -> None:
         backends_toml_path = config_manager.pipelex_config_dir / "inference" / "backends.toml"
         if backends_toml_path.exists():
             disable_gateway_backend(backends_toml_path)
+            warn_if_gateway_pinned_by_override(console=console, backends_toml_path=backends_toml_path)
 
     console.print()
 
