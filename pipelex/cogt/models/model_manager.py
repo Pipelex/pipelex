@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from pathlib import Path
 
 from typing_extensions import override
@@ -69,16 +70,18 @@ class ModelManager(ModelManagerAbstract):
         managed_gateway_configs: dict[str, GatewayConfig] | None,
         gateway_config_source: RemoteConfigSource | None,
         needs_inference: bool = True,
-        backends_library_path: str | None = None,
+        backends_library_paths: Sequence[Path] | None = None,
         backends_dir_path: str | None = None,
-        routing_profile_library_path: str | None = None,
+        routing_profile_library_paths: Sequence[Path] | None = None,
         deck_dir_path: str | None = None,
     ) -> None:
         # Override paths let the doctor scope --global properly; default None falls
-        # back to layered config_manager paths for all other callers.
+        # back to layered config_manager paths for all other callers. The two documents are
+        # sequences — the base file, then the personal override files — see
+        # `ConfigLoader.backends_file_paths`.
         self.inference_backend_library.load(
             secrets_provider=secrets_provider,
-            backends_library_path=backends_library_path or str(config_manager.backends_file_path),
+            backends_library_paths=backends_library_paths or config_manager.backends_file_paths(),
             backends_dir_path=backends_dir_path or str(config_manager.backends_dir_path),
             managed_gateway_configs=managed_gateway_configs,
             lenient=not needs_inference,
@@ -91,7 +94,7 @@ class ModelManager(ModelManagerAbstract):
             log.warning(stale_warning)
         enabled_backends = self.inference_backend_library.all_enabled_backends()
         self._routing_profile = load_active_routing_profile(
-            routing_profile_library_path=routing_profile_library_path or str(config_manager.routing_profiles_file_path),
+            routing_profile_library_paths=routing_profile_library_paths or config_manager.routing_profiles_file_paths(),
             enabled_backends=enabled_backends,
             lenient=not needs_inference,
         )

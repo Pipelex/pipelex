@@ -1,11 +1,22 @@
 """The `.gitignore` pipelex keeps inside the configuration directory it owns.
 
-A migration copies every file before it rewrites it, and that copy lands beside the original —
-inside `.pipelex/`, which in a real project is inside a git repository. Without a rule, one
-`pipelex migrate` puts a dozen untracked `.bak.<stamp>` files into the user's `git status`, and
-the user is left to work out which of them are ours and write the pattern themselves. Each of
-them writes a slightly different one, or forgets, and a tool that dirties a repository every time
-it runs stops getting run.
+Two kinds of file in that directory are not the project's to commit, and the file carries a rule
+for each.
+
+The first is a personal override: `pipelex_override.toml` and its siblings, and the two inference
+overrides `inference/backends_override.toml` and `inference/routing_profiles_override.toml`. Each
+is read on top of a tracked file and carries only the keys it sets, so a developer runs on the
+backend of their choice, or reports telemetry where they like, without editing the file the project
+ships — provided the override never reaches the commit. Listing them here is what makes a fresh
+`pipelex init` project safe by default; a project set up before a rule existed keeps its own file
+and adds the line itself, because this file is never rewritten (see below).
+
+The second is a backup. A migration copies every file before it rewrites it, and that copy lands
+beside the original — inside `.pipelex/`, which in a real project is inside a git repository.
+Without a rule, one `pipelex migrate` puts a dozen untracked `.bak.<stamp>` files into the user's
+`git status`, and the user is left to work out which of them are ours and write the pattern
+themselves. Each of them writes a slightly different one, or forgets, and a tool that dirties a
+repository every time it runs stops getting run.
 
 **Why the rule lives here and not in the user's root `.gitignore`.** The walk is the global
 `~/.pipelex/` and the project `.pipelex/`, and nothing else (see `run.py`), so a backup written
@@ -44,15 +55,36 @@ CONFIG_DIR_GITIGNORE_NAME = ".gitignore"
 """What the file is called inside `~/.pipelex/` or a project's `.pipelex/`."""
 
 BACKUP_IGNORE_PATTERN = f"*{BACKUP_INFIX}{BACKUP_STAMP_GLOB}"
-"""The one rule the file carries: any name ending in the infix followed by exactly the stamp.
+"""The backup rule: any name ending in the infix followed by exactly the stamp.
 
 Exactly the stamp, rather than something stamp-shaped, is what keeps `pipelex.toml.bak.notes` — and
 every other copy the user named themselves — visible in their own `git status`.
 """
 
+PERSONAL_OVERRIDE_IGNORE_PATTERNS: tuple[str, ...] = (
+    "pipelex_override.toml",
+    "pipelex_temporary_override.toml",
+    "telemetry_override.toml",
+    "inference/backends_override.toml",
+    "inference/routing_profiles_override.toml",
+)
+"""The personal override files pipelex layers over the tracked ones, one rule each.
+
+Each carries only the keys it sets, on top of a file the project tracks — which is the whole point
+of it: a developer's own choices (their observability, the backend they run on) stay theirs, and a
+project's defaults ship as the project wrote them. The two inference overrides are named with their
+subdirectory, because a rule with a slash in it is anchored to this directory rather than matched at
+any depth. What is *not* here: `pipelex_local.toml` and the `pipelex_{{environment}}.toml` tier, which
+are part of a project's tracked configuration, and `pipelex_service.toml`, which is not an override.
+"""
+
 _GITIGNORE_CONTENT = f"""\
 # Written by pipelex when it set this directory up. Yours from here on — pipelex reads this file
 # never, and rewrites it never. Delete a line and it stays deleted.
+#
+# The personal override files pipelex layers over the tracked ones. Each carries only the keys it
+# sets, so what a machine chooses for itself stays out of what the project commits.
+{chr(10).join(PERSONAL_OVERRIDE_IGNORE_PATTERNS)}
 #
 # The timestamped copy `pipelex migrate` takes of every file before it rewrites it. It is our own
 # transient artifact; the durable history of these files is your commits.

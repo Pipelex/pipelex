@@ -68,7 +68,7 @@ def _load(tmp_path: Path, *, body: str, managed_gateway_configs: dict[str, Gatew
     library = InferenceBackendLibrary.make_empty()
     library.load(
         secrets_provider=EnvSecretsProvider(),
-        backends_library_path=str(library_path),
+        backends_library_paths=[library_path],
         backends_dir_path=str(backends_dir),
         managed_gateway_configs=managed_gateway_configs,
         lenient=False,

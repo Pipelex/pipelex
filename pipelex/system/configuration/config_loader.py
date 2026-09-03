@@ -50,8 +50,10 @@ PROJECT_ROOT_MARKERS: frozenset[str] = frozenset({CONFIG_DIR_NAME, ".git", "pypr
 
 INFERENCE_DIR_NAME = "inference"
 BACKENDS_FILE_NAME = "backends.toml"
+BACKENDS_OVERRIDE_FILE_NAME = "backends_override.toml"
 BACKENDS_DIR_NAME = "backends"
 ROUTING_PROFILES_FILE_NAME = "routing_profiles.toml"
+ROUTING_PROFILES_OVERRIDE_FILE_NAME = "routing_profiles_override.toml"
 MODEL_DECKS_DIR_NAME = "deck"
 
 
@@ -192,7 +194,11 @@ class ConfigLoader:
 
     @property
     def backends_file_path(self) -> Path:
-        """Resolve backends.toml from project dir or global dir."""
+        """The base ``backends.toml``, from the project dir or else the global dir.
+
+        The base is the file that must exist and the one ``pipelex init`` writes. A reader wants
+        ``backends_file_paths`` instead: the same base followed by the personal override files.
+        """
         return self.resolve_config_file(f"{INFERENCE_DIR_NAME}/{BACKENDS_FILE_NAME}")
 
     @property
@@ -202,8 +208,75 @@ class ConfigLoader:
 
     @property
     def routing_profiles_file_path(self) -> Path:
-        """Resolve routing_profiles.toml from project dir or global dir."""
+        """The base ``routing_profiles.toml``, from the project dir or else the global dir.
+
+        The base is the file that must exist and the one ``pipelex init`` writes. A reader wants
+        ``routing_profiles_file_paths`` instead: the same base followed by the personal override files.
+        """
         return self.resolve_config_file(f"{INFERENCE_DIR_NAME}/{ROUTING_PROFILES_FILE_NAME}")
+
+    def backends_file_paths(self, *, config_dir: Path | None = None) -> list[Path]:
+        """The ``backends.toml`` merge sequence: the resolved base, then the override at each tier.
+
+        See ``_inference_file_paths`` for the order and why it is what it is.
+        """
+        return self._inference_file_paths(
+            resolved_base=self.backends_file_path,
+            file_name=BACKENDS_FILE_NAME,
+            override_file_name=BACKENDS_OVERRIDE_FILE_NAME,
+            config_dir=config_dir,
+        )
+
+    def routing_profiles_file_paths(self, *, config_dir: Path | None = None) -> list[Path]:
+        """The ``routing_profiles.toml`` merge sequence: the resolved base, then the override at each tier.
+
+        See ``_inference_file_paths`` for the order and why it is what it is.
+        """
+        return self._inference_file_paths(
+            resolved_base=self.routing_profiles_file_path,
+            file_name=ROUTING_PROFILES_FILE_NAME,
+            override_file_name=ROUTING_PROFILES_OVERRIDE_FILE_NAME,
+            config_dir=config_dir,
+        )
+
+    def _inference_file_paths(self, *, resolved_base: Path, file_name: str, override_file_name: str, config_dir: Path | None) -> list[Path]:
+        """The paths a reader of one inference document merges, base first.
+
+        The first path is the base and must exist; the rest are the personal override files, each
+        carrying only the keys it sets, merged in order so the last wins per leaf key
+        (``load_toml_from_base_and_overrides`` is the loader that honours this contract).
+
+        Without ``config_dir`` the sequence is::
+
+            [resolved base, ~/.pipelex/inference/<override>, <project>/.pipelex/inference/<override>]
+
+        The base keeps today's winner-takes-all resolution — a project's file if it has one, else
+        the global one — and the overrides layer over whichever was picked, global then project.
+        That order is deliberately not ``pipelex.toml``'s, where a project base beats a global
+        override: a global inference override exists so that one machine-wide choice ("run on this
+        backend") reaches every project on the machine, and every project carries a tracked
+        ``backends.toml`` of its own, so a project base that beat it would defeat the file's purpose.
+        A project override still wins over the global one, for the one project that needs to differ.
+
+        With ``config_dir`` (the doctor's ``--global``, an init targeting one directory) the
+        sequence is pinned to that directory and its own override, mirroring ``load_config``.
+
+        ``resolved_base`` is the public ``backends_file_path`` / ``routing_profiles_file_path``
+        property, read rather than recomputed here on purpose: that property is a seam a test
+        fixture may patch to boot on a document of its own, and a sequence that resolved the base
+        itself would read past the patch and boot every such test on the real file. A fixture that
+        must also keep the personal override tiers out patches this repository's sequence methods
+        instead. A property patched with a ``str`` is what the ``Path(...)`` below is for.
+        """
+        relative_base = f"{INFERENCE_DIR_NAME}/{file_name}"
+        relative_override = f"{INFERENCE_DIR_NAME}/{override_file_name}"
+        if config_dir is not None:
+            return [config_dir / relative_base, config_dir / relative_override]
+        paths = [Path(resolved_base), self.global_config_dir / relative_override]
+        project_dir = self.project_config_dir
+        if project_dir is not None and project_dir != self.global_config_dir:
+            paths.append(project_dir / relative_override)
+        return paths
 
     @property
     def model_decks_dir_path(self) -> Path:
@@ -246,6 +319,11 @@ class ConfigLoader:
         """Build the override file sequence for a single config dir.
 
         Order matters: later files win on key collisions during deep-merge.
+
+        This is the widest of the three override families a ``.pipelex/`` directory carries. The
+        other two are narrower on purpose: a plugin config takes ``{name}_{environment}.toml`` and
+        ``{name}_override.toml`` (``_plugin_override_files_for_dir``), and the two inference
+        documents take a single ``*_override.toml`` each (``_inference_file_paths``).
 
         Args:
             config_dir: The .pipelex directory to look in.

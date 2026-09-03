@@ -72,7 +72,7 @@ def do_show_backends(*, show_all: bool = False) -> None:
             backend_library = InferenceBackendLibrary()
             backend_library.load(
                 secrets_provider=secrets_provider,
-                backends_library_path=str(config_manager.backends_file_path),
+                backends_library_paths=config_manager.backends_file_paths(),
                 backends_dir_path=str(config_manager.backends_dir_path),
                 include_disabled=True,
                 lenient=True,

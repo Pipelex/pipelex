@@ -60,9 +60,11 @@ from pipelex.cogt.exceptions import (
     ModelDeckNotFoundError,
     ModelDeckValidationError,
     RoutingProfileDisabledBackendError,
+    RoutingProfileLibraryError,
     RoutingProfileLibraryNotFoundError,
 )
 from pipelex.cogt.inference.inference_manager import InferenceManager
+from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.model_backends.backend_credentials import (
     BackendCredentialsErrorMsgFactory,
 )
@@ -102,7 +104,6 @@ from pipelex.system.pipelex_service.exceptions import (
 from pipelex.system.pipelex_service.managed_gateway_configs import build_managed_gateway_configs
 from pipelex.system.pipelex_service.pipelex_service_config import (
     enabled_managed_gateway_sections,
-    is_pipelex_gateway_enabled,
     load_pipelex_service_config_if_exists,
 )
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
@@ -382,7 +383,13 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # artifact each takes its model specs from. More than one can be live at once — the Portkey
         # cloud service and the manifold one are two services, sharing this one artifact, this one
         # fetch and its one cache, and nothing else.
-        managed_gateway_sections = enabled_managed_gateway_sections()
+        try:
+            managed_gateway_sections = enabled_managed_gateway_sections()
+        except BACKEND_LIBRARY_REFUSED as backends_document_exc:
+            # The document is read here before the library loads it: a file that does not parse
+            # is the library's refusal, and it gets the library's message.
+            msg = self._get_validation_error_msg(component=BootComponent.INFERENCE_BACKEND_LIBRARY, validation_exc=backends_document_exc)
+            raise PipelexSetupError(msg) from backends_document_exc
         is_pipelex_service_enabled = bool(managed_gateway_sections)
 
         effective_needs_model_specs = needs_model_specs if needs_model_specs is not None else needs_inference
@@ -512,8 +519,14 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # required to hold a gateway key it has no other use for and would fail to boot without one.
         # The common beta case is unaffected: a participant who keeps `pipelex_gateway` enabled has a
         # real gateway key, and their manifold runs are tracked under it like everything else.
+        #
+        # Read off the mapping computed above rather than by asking the document a second time. The
+        # two answers are the same one — the gateway resolves to a section whenever it is enabled —
+        # and a second read would be a second chance for an unparseable file to escape the clause
+        # that frames it as a backend-library refusal.
         gateway_source_is_cached = gateway_config_source is not None and gateway_config_source.is_cached
-        is_pipelex_telemetry_enabled = is_pipelex_gateway_enabled() and needs_inference and not gateway_source_is_cached
+        is_gateway_enabled = PipelexBackend.GATEWAY in managed_gateway_sections
+        is_pipelex_telemetry_enabled = is_gateway_enabled and needs_inference and not gateway_source_is_cached
         self.telemetry_manager = TelemetryFactory.make_telemetry_manager(
             secrets_provider=secrets_provider,
             integration_mode=integration_mode,
@@ -600,6 +613,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         except RoutingProfileDisabledBackendError as routing_profile_exc:
             msg = f"Some backend(s) required for a routing profile is not enabled: {routing_profile_exc}"
             raise PipelexSetupError(msg) from routing_profile_exc
+        except RoutingProfileLibraryError as routing_validation_exc:
+            msg = self._get_validation_error_msg(component=BootComponent.ROUTING_PROFILE_LIBRARY, validation_exc=routing_validation_exc)
+            raise PipelexSetupError(msg) from routing_validation_exc
 
         except BACKEND_LIBRARY_REFUSED as backend_validation_exc:
             msg = self._get_validation_error_msg(component=BootComponent.INFERENCE_BACKEND_LIBRARY, validation_exc=backend_validation_exc)

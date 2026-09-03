@@ -64,11 +64,13 @@ def _setup_routing_for_backend(backend_name: str) -> tuple[MonkeyPatch, Path]:
     routing_override_dir = Path(tempfile.mkdtemp(prefix="pipelex-routing-override-"))
     routing_override_path = routing_override_dir / routing_profiles_path.name
     save_toml_to_path(routing_profiles_doc, path=str(routing_override_path))
-    routing_monkeypatch.setattr(
-        type(config_manager),
-        "routing_profiles_file_path",
-        property(lambda _self: str(routing_override_path)),
-    )
+
+    # The whole sequence, not the base alone: a personal `routing_profiles_override.toml` on this
+    # machine would otherwise layer over the pinned document and route this test elsewhere.
+    def pinned_routing_profile_paths(_self: object, **_kwargs: object) -> list[Path]:
+        return [routing_override_path]
+
+    routing_monkeypatch.setattr(type(config_manager), "routing_profiles_file_paths", pinned_routing_profile_paths)
     get_console().print(f"[cyan]Routing to backend:[/cyan] {backend_name}")
 
     # Reinitialize Pipelex with correct routing

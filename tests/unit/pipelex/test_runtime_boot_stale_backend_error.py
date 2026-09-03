@@ -116,7 +116,7 @@ class TestAStaleBackendFileTheLedgerCannotFullyExplain:
         with pytest.raises(BACKEND_LIBRARY_REFUSED) as refused:
             library.load(
                 secrets_provider=EnvSecretsProvider(),
-                backends_library_path=str(machine / INFERENCE_DIR_NAME / "backends.toml"),
+                backends_library_paths=[machine / INFERENCE_DIR_NAME / "backends.toml"],
                 backends_dir_path=str(machine / INFERENCE_DIR_NAME / BACKENDS_DIR_NAME),
                 managed_gateway_configs=None,
                 lenient=False,

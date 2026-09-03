@@ -3,5 +3,7 @@
 .env
 .pipelex/pipelex_override.toml
 .pipelex/telemetry_override.toml
+.pipelex/inference/backends_override.toml
+.pipelex/inference/routing_profiles_override.toml
 .pipelex/pipelex_service.toml
 .pipelex-dev/test_profiles_override.toml

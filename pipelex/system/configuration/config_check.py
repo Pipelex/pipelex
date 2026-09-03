@@ -10,7 +10,9 @@ PLXT_CONFIG_NAME = "plxt.toml"
 
 
 def check_is_initialized(*, print_warning_if_not: bool = True) -> bool:
-    # Use resolve_config_file for all checks — consistent with how backends and routing are resolved
+    # Use resolve_config_file for all checks — consistent with how backends and routing are resolved.
+    # The two inference documents are checked by their base file on purpose: a personal
+    # `*_override.toml` carries only the keys it sets and cannot stand in for the file it overrides.
     config_exists = path_exists(config_manager.resolve_config_file(CONFIG_NAME)) and path_exists(config_manager.resolve_config_file(PLXT_CONFIG_NAME))
     backends_exists = path_exists(config_manager.backends_file_path)
     routing_exists = path_exists(config_manager.routing_profiles_file_path)

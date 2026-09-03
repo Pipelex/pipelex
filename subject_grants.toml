@@ -2056,10 +2056,6 @@ rationale = "Loads model specs from the gateway config; single operand."
 param = "backend_name"
 rationale = "Loads model specs for the named backend; single operand."
 
-["pipelex/cogt/model_backends/backend_library.py::InferenceBackendLibrary.check_backend_credentials"]
-param = "path"
-rationale = "Verb–object: validates/checks the path; single operand."
-
 ["pipelex/cogt/model_backends/backend_library.py::InferenceBackendLibrary.get_inference_backend"]
 param = "backend_name"
 rationale = "Keyed accessor by the backend_name; single operand."
@@ -2075,10 +2071,6 @@ rationale = "Factory from source: builds the result from the backend_name; singl
 ["pipelex/cogt/model_routing/routing_profile_factory.py::RoutingProfileFactory.make_routing_profile"]
 param = "name"
 rationale = "Factory from source: builds the result from the name; single operand."
-
-["pipelex/cogt/model_routing/routing_profile_loader.py::load_active_routing_profile"]
-param = "routing_profile_library_path"
-rationale = "Deck/file op on the routing_profile_library_path; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::DeckSyncReport.files_with_status"]
 param = "status"
@@ -5632,14 +5624,6 @@ rationale = "Verb-object: merges the gateway model specs; merge context stays ke
 param = "gateway_api_key"
 rationale = "Derivation: hashes the gateway API key into a distinct id; single operand."
 
-["pipelex/system/pipelex_service/pipelex_service_config.py::enabled_managed_gateway_sections"]
-param = "backends_file_path"
-rationale = "Derivation inspecting the backends file at the path; single operand, mirroring is_pipelex_gateway_enabled."
-
-["pipelex/system/pipelex_service/pipelex_service_config.py::is_pipelex_gateway_enabled"]
-param = "backends_file_path"
-rationale = "Predicate inspecting the backends file at the path; single operand."
-
 ["pipelex/system/pipelex_service/pipelex_service_config.py::load_pipelex_service_config_if_exists"]
 param = "config_dir"
 rationale = "Verb-object: loads from the config dir; single operand."
@@ -6707,6 +6691,10 @@ rationale = "Parses/reads the doc; single operand."
 ["pipelex/tools/misc/toml_sync.py::set_nested_value"]
 param = "doc"
 rationale = "Setter: installs the doc; single operand."
+
+["pipelex/tools/misc/toml_utils.py::load_toml_from_base_and_overrides"]
+param = "paths"
+rationale = "Loads and merges the paths; single operand, same shape as its sibling load_toml_from_path_and_merge_with_overrides."
 
 ["pipelex/tools/misc/toml_utils.py::load_toml_from_content"]
 param = "content"

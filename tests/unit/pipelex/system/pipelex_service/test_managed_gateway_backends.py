@@ -47,9 +47,16 @@ def _remote_config(**sections: object) -> RemoteConfig:
 
 
 def _write_backends(tmp_path: Path, body: str) -> Path:
-    backends_file = tmp_path / "backends.toml"
-    backends_file.write_text(body, encoding="utf-8")
-    return backends_file
+    """Write the base document at a config dir and return that dir, which is what the readers take.
+
+    Both readers below take a `config_dir` and resolve the document under it — the base
+    `inference/backends.toml` plus any `inference/backends_override.toml` — so a test pins a
+    directory rather than a file.
+    """
+    inference_dir = tmp_path / "inference"
+    inference_dir.mkdir(parents=True, exist_ok=True)
+    (inference_dir / "backends.toml").write_text(body, encoding="utf-8")
+    return tmp_path
 
 
 class TestResolveModelSpecsSection:
@@ -71,14 +78,14 @@ class TestResolveModelSpecsSection:
 
 class TestEnabledManagedGatewaySections:
     def test_it_maps_each_enabled_managed_backend_to_its_section(self, tmp_path: Path) -> None:
-        backends_file = _write_backends(
+        config_dir = _write_backends(
             tmp_path,
             f'[pipelex_gateway]\napi_key = "pk-x"\n\n'
             f'[pipelex_manifold]\nmodel_specs_section = "{MANIFOLD_MODEL_SPECS_SECTION}"\nendpoint = "https://gw.example.com"\n\n'
             f'[anthropic]\napi_key = "sk-x"\n',
         )
 
-        assert enabled_managed_gateway_sections(backends_file_path=backends_file) == {
+        assert enabled_managed_gateway_sections(config_dir=config_dir) == {
             PipelexBackend.GATEWAY: LEGACY_GATEWAY_MODEL_SPECS_SECTION,
             PipelexBackend.MANIFOLD: MANIFOLD_MODEL_SPECS_SECTION,
         }
@@ -86,17 +93,17 @@ class TestEnabledManagedGatewaySections:
     @pytest.mark.parametrize("enabled_value", ["false", "0"])
     def test_a_disabled_backend_is_absent_reading_enabled_the_way_the_loader_does(self, tmp_path: Path, enabled_value: str) -> None:
         """Truthiness, not the literal `true` — the same reading the backend library applies."""
-        backends_file = _write_backends(tmp_path, f'[pipelex_gateway]\nenabled = {enabled_value}\napi_key = "pk-x"\n')
+        config_dir = _write_backends(tmp_path, f'[pipelex_gateway]\nenabled = {enabled_value}\napi_key = "pk-x"\n')
 
-        assert enabled_managed_gateway_sections(backends_file_path=backends_file) == {}
+        assert enabled_managed_gateway_sections(config_dir=config_dir) == {}
 
     def test_a_byok_backend_is_never_managed(self, tmp_path: Path) -> None:
-        backends_file = _write_backends(tmp_path, '[anthropic]\napi_key = "sk-x"\n\n[openai]\napi_key = "sk-y"\n')
+        config_dir = _write_backends(tmp_path, '[anthropic]\napi_key = "sk-x"\n\n[openai]\napi_key = "sk-y"\n')
 
-        assert enabled_managed_gateway_sections(backends_file_path=backends_file) == {}
+        assert enabled_managed_gateway_sections(config_dir=config_dir) == {}
 
     def test_a_missing_file_is_no_managed_backends_rather_than_a_refusal(self, tmp_path: Path) -> None:
-        assert enabled_managed_gateway_sections(backends_file_path=tmp_path / "absent.toml") == {}
+        assert enabled_managed_gateway_sections(config_dir=tmp_path / "absent") == {}
 
 
 class TestTheTwoQuestionsAreNotTheSameQuestion:
@@ -114,25 +121,25 @@ class TestTheTwoQuestionsAreNotTheSameQuestion:
     """
 
     def test_a_manifold_only_installation_is_managed_but_is_not_the_gateway(self, tmp_path: Path) -> None:
-        backends_file = _write_backends(
+        config_dir = _write_backends(
             tmp_path,
             f"[pipelex_gateway]\nenabled = false\n\n"
             f'[pipelex_manifold]\nmodel_specs_section = "{MANIFOLD_MODEL_SPECS_SECTION}"\nendpoint = "https://mf.example.com"\n',
         )
 
-        assert enabled_managed_gateway_sections(backends_file_path=backends_file) == {PipelexBackend.MANIFOLD: MANIFOLD_MODEL_SPECS_SECTION}
-        assert not is_pipelex_gateway_enabled(backends_file_path=backends_file)
+        assert enabled_managed_gateway_sections(config_dir=config_dir) == {PipelexBackend.MANIFOLD: MANIFOLD_MODEL_SPECS_SECTION}
+        assert not is_pipelex_gateway_enabled(config_dir=config_dir)
 
     def test_the_common_beta_case_keeps_both(self, tmp_path: Path) -> None:
         """A participant who leaves the legacy gateway on has a real key, and manifold runs ride on it."""
-        backends_file = _write_backends(
+        config_dir = _write_backends(
             tmp_path,
             f'[pipelex_gateway]\napi_key = "pk-x"\n\n'
             f'[pipelex_manifold]\nmodel_specs_section = "{MANIFOLD_MODEL_SPECS_SECTION}"\nendpoint = "https://mf.example.com"\n',
         )
 
-        assert set(enabled_managed_gateway_sections(backends_file_path=backends_file)) == {PipelexBackend.GATEWAY, PipelexBackend.MANIFOLD}
-        assert is_pipelex_gateway_enabled(backends_file_path=backends_file)
+        assert set(enabled_managed_gateway_sections(config_dir=config_dir)) == {PipelexBackend.GATEWAY, PipelexBackend.MANIFOLD}
+        assert is_pipelex_gateway_enabled(config_dir=config_dir)
 
 
 class TestBuildManagedGatewayConfigs:

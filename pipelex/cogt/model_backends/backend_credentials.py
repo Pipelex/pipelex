@@ -14,13 +14,6 @@ class BackendCredentialsReport(ConfigModel):
     all_credentials_valid: bool
 
 
-class CredentialsValidationReport(ConfigModel):
-    """Complete report of credentials validation across all backends."""
-
-    backend_reports: dict[str, BackendCredentialsReport]
-    all_backends_valid: bool
-
-
 class BackendCredentialsErrorMsgFactory:
     @classmethod
     def make_one_variable_missing_error_msg(
