@@ -1,4 +1,9 @@
-"""Backend configuration logic for the init command."""
+"""Backend configuration logic for the init command.
+
+Everything here reads and writes the base `backends.toml` — never a `backends_override.toml`. The
+checkboxes must pre-fill from the file they will write, or a personal override would be copied into
+the tracked file on save; the merged view is the runtime's and the doctor's, not the editor's.
+"""
 
 from pathlib import Path
 from typing import Any

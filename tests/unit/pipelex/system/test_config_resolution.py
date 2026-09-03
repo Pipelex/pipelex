@@ -303,3 +303,93 @@ class TestConfigResolution:
         # Verify the path is valid and uses the correct separator for the platform
         assert global_dir.name == ".pipelex"
         assert global_dir.parent == fake_home
+
+    def test_inference_file_paths_layer_the_overrides_over_the_resolved_base(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Project base first, then the global override, then the project override — the last wins.
+
+        The base is the project's file because it exists there; the global override still comes
+        after it, so one machine-wide choice reaches a project that carries its own tracked base.
+        """
+        project_dir = tmp_path / "project"
+        (project_dir / ".git").mkdir(parents=True)
+        project_inference_dir = project_dir / ".pipelex" / "inference"
+        project_inference_dir.mkdir(parents=True)
+        (project_inference_dir / "backends.toml").write_text("[backends]")
+        (project_inference_dir / "routing_profiles.toml").write_text("[routing]")
+        global_home = tmp_path / "home"
+        global_inference_dir = global_home / ".pipelex" / "inference"
+
+        mocker.patch.object(Path, "cwd", return_value=project_dir)
+        mocker.patch.object(Path, "home", return_value=global_home)
+
+        loader = ConfigLoader()
+
+        assert loader.backends_file_paths() == [
+            project_inference_dir / "backends.toml",
+            global_inference_dir / "backends_override.toml",
+            project_inference_dir / "backends_override.toml",
+        ]
+        assert loader.routing_profiles_file_paths() == [
+            project_inference_dir / "routing_profiles.toml",
+            global_inference_dir / "routing_profiles_override.toml",
+            project_inference_dir / "routing_profiles_override.toml",
+        ]
+
+    def test_inference_file_paths_fall_back_to_the_global_base_and_keep_both_overrides(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """A project with no inference files reads the global base, and its own override still layers last."""
+        project_dir = tmp_path / "project"
+        (project_dir / ".git").mkdir(parents=True)
+        (project_dir / ".pipelex").mkdir(parents=True)
+        global_home = tmp_path / "home"
+        global_inference_dir = global_home / ".pipelex" / "inference"
+        global_inference_dir.mkdir(parents=True)
+        (global_inference_dir / "backends.toml").write_text("[backends]")
+
+        mocker.patch.object(Path, "cwd", return_value=project_dir)
+        mocker.patch.object(Path, "home", return_value=global_home)
+
+        loader = ConfigLoader()
+
+        assert loader.backends_file_paths() == [
+            global_inference_dir / "backends.toml",
+            global_inference_dir / "backends_override.toml",
+            project_dir / ".pipelex" / "inference" / "backends_override.toml",
+        ]
+
+    def test_inference_file_paths_list_the_global_override_once_when_the_project_is_home(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """A project rooted at the home directory has one tier, not the same override twice."""
+        home = tmp_path / "home"
+        (home / ".git").mkdir(parents=True)
+        inference_dir = home / ".pipelex" / "inference"
+        inference_dir.mkdir(parents=True)
+        (inference_dir / "backends.toml").write_text("[backends]")
+
+        mocker.patch.object(Path, "cwd", return_value=home)
+        mocker.patch.object(Path, "home", return_value=home)
+
+        loader = ConfigLoader()
+
+        assert loader.backends_file_paths() == [inference_dir / "backends.toml", inference_dir / "backends_override.toml"]
+
+    def test_inference_file_paths_are_pinned_to_an_explicit_config_dir(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """With ``config_dir`` the sequence is that directory's base and its own override, nothing layered."""
+        project_dir = tmp_path / "project"
+        (project_dir / ".git").mkdir(parents=True)
+        project_inference_dir = project_dir / ".pipelex" / "inference"
+        project_inference_dir.mkdir(parents=True)
+        (project_inference_dir / "backends.toml").write_text("[backends]")
+        pinned_dir = tmp_path / "pinned"
+
+        mocker.patch.object(Path, "cwd", return_value=project_dir)
+        mocker.patch.object(Path, "home", return_value=tmp_path / "home")
+
+        loader = ConfigLoader()
+
+        assert loader.backends_file_paths(config_dir=pinned_dir) == [
+            pinned_dir / "inference" / "backends.toml",
+            pinned_dir / "inference" / "backends_override.toml",
+        ]
+        assert loader.routing_profiles_file_paths(config_dir=pinned_dir) == [
+            pinned_dir / "inference" / "routing_profiles.toml",
+            pinned_dir / "inference" / "routing_profiles_override.toml",
+        ]

@@ -35,8 +35,8 @@ from pipelex.cogt.exceptions import (
     RoutingProfileDisabledBackendError,
     RoutingProfileLibraryNotFoundError,
 )
-from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsErrorMsgFactory
-from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport, InferenceBackendLibrary
+from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsErrorMsgFactory, BackendCredentialsReport
+from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.gateway_config import GatewayConfig
 from pipelex.cogt.models.deck_manifest import DeckFileStatus, DeckSyncReport, compute_deck_sync_report, status_rich_label
 from pipelex.cogt.models.model_manager import ModelManager
@@ -65,7 +65,7 @@ from pipelex.tools.misc.dict_utils import extract_vars_from_strings_recursive
 from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.placeholder import value_is_placeholder
-from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.tools.misc.toml_utils import load_toml_from_base_and_overrides, load_toml_from_path
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
 if TYPE_CHECKING:
@@ -404,13 +404,13 @@ def check_backend_credentials(*, config_dir: Path | None = None) -> tuple[bool, 
     Returns:
         Tuple of (is_healthy, backend_reports_dict, summary_message)
     """
-    backends_toml_path = config_manager.resolve_config_file("inference/backends.toml", config_dir=config_dir)
+    backends_file_paths = config_manager.backends_file_paths(config_dir=config_dir)
 
-    if not backends_toml_path.exists():
+    if not backends_file_paths[0].exists():
         return False, {}, "Backend configuration file not found"
 
     try:
-        backends_dict = load_toml_from_path(backends_toml_path)
+        backends_dict = load_toml_from_base_and_overrides(paths=backends_file_paths)
         backend_reports: dict[str, BackendCredentialsReport] = {}
         all_backends_valid = True
 
@@ -563,13 +563,13 @@ def check_backend_files(*, config_dir: Path | None = None) -> tuple[bool, dict[s
     if not backends_dir_path.exists():
         return True, {}, "No backend files to check"
 
-    # Get list of enabled backends from backends.toml
-    backends_toml_path = config_manager.resolve_config_file("inference/backends.toml", config_dir=config_dir)
-    if not backends_toml_path.exists():
+    # Get list of enabled backends from the backends document (base plus the personal overrides)
+    backends_file_paths = config_manager.backends_file_paths(config_dir=config_dir)
+    if not backends_file_paths[0].exists():
         return True, {}, "No backends.toml to check"
 
     try:
-        backends_dict = load_toml_from_path(backends_toml_path)
+        backends_dict = load_toml_from_base_and_overrides(paths=backends_file_paths)
     except (TomlError, OSError) as exc:
         return False, {}, f"Error loading backends.toml: {exc}"
 
@@ -616,7 +616,7 @@ def check_backend_files(*, config_dir: Path | None = None) -> tuple[bool, dict[s
             # in lenient mode, which is what this probe exists to catch.
             temp_library.load(
                 secrets_provider=secrets_provider,
-                backends_library_path=str(backends_toml_path),
+                backends_library_paths=backends_file_paths,
                 backends_dir_path=str(backends_dir_path),
                 include_disabled=False,
                 lenient=True,
@@ -1091,16 +1091,15 @@ def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str
             return False, msg, backend_file_reports
 
     # Fetch gateway model specs if Gateway is enabled.
-    # Probe the same backends.toml / pipelex_service.toml the doctor is reporting on
+    # Probe the same backends document / pipelex_service.toml the doctor is reporting on
     # (project-vs-global) instead of always defaulting to the global path — otherwise
     # --global on a machine with a project-local backends.toml would mis-report gateway
-    # state because the layered `config_manager.backends_file_path` would still resolve
-    # to the project file.
-    backends_file_path = config_dir / "inference" / "backends.toml" if config_dir is not None else None
+    # state because the layered `config_manager.backends_file_paths()` would still resolve
+    # its base to the project file.
     service_config_dir = config_dir if config_dir is not None else config_manager.global_config_dir
     gateway_config: GatewayConfig | None = None
     gateway_config_source: RemoteConfigSource | None = None
-    if is_pipelex_gateway_enabled(backends_file_path=backends_file_path):
+    if is_pipelex_gateway_enabled(config_dir=config_dir):
         pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=service_config_dir)
         if pipelex_service_config is None:
             return False, "Pipelex Gateway is enabled but service configuration is missing", backend_file_reports
@@ -1118,10 +1117,11 @@ def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str
             return False, f"Failed to fetch Pipelex Gateway remote configuration: {exc}", backend_file_reports
 
     # When --global (config_dir set), pin every path so layered config_manager.X
-    # resolution doesn't silently fall back to the project-local files.
-    backends_library_override = str(config_dir / "inference" / "backends.toml") if config_dir is not None else None
+    # resolution doesn't silently fall back to the project-local files. The two documents
+    # are pinned as sequences: that directory's base file and its own override.
+    backends_library_override = config_manager.backends_file_paths(config_dir=config_dir) if config_dir is not None else None
     backends_dir_override = str(config_dir / "inference" / "backends") if config_dir is not None else None
-    routing_profile_override = str(config_dir / "inference" / "routing_profiles.toml") if config_dir is not None else None
+    routing_profile_override = config_manager.routing_profiles_file_paths(config_dir=config_dir) if config_dir is not None else None
     deck_dir_override = str(config_dir / "inference" / "deck") if config_dir is not None else None
 
     models_manager = ModelManager()
@@ -1131,9 +1131,9 @@ def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str
             secrets_provider=secrets_provider,
             gateway_config=gateway_config,
             gateway_config_source=gateway_config_source,
-            backends_library_path=backends_library_override,
+            backends_library_paths=backends_library_override,
             backends_dir_path=backends_dir_override,
-            routing_profile_library_path=routing_profile_override,
+            routing_profile_library_paths=routing_profile_override,
             deck_dir_path=deck_dir_override,
         )
         models_manager.validate_model_deck()

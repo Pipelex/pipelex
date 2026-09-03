@@ -61,7 +61,9 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
 .pipelex/
 └── inference/
     ├── backends.toml           # Backend provider configurations
+    ├── backends_override.toml  # Personal overrides of backends.toml (git-ignored, optional)
     ├── routing_profiles.toml   # Model routing rules
+    ├── routing_profiles_override.toml  # Personal overrides of routing_profiles.toml (git-ignored, optional)
     ├── backends/               # Individual backend model specifications
     │   ├── openai.toml         # OpenAI models (LLMs, image generation)
     │   ├── anthropic.toml      # Anthropic models (LLMs)
@@ -599,7 +601,41 @@ Note the sigil prefixes: `@` for aliases and `$` for presets.
 
 ## Customization
 
-### Local Overrides
+### Personal overrides
+
+`backends.toml` and `routing_profiles.toml` are tracked files: the project ships them, and `pipelex init` writes them. To run on a different backend without editing them — to try a backend the project keeps off, or to move every project on your machine onto one provider — write the change in a personal override file beside them:
+
+- `backends_override.toml` layers over `backends.toml`
+- `routing_profiles_override.toml` layers over `routing_profiles.toml`
+
+An override carries only the keys it sets. Tables merge into the base's tables, so `[anthropic]` with a single `enabled = true` flips that one flag and leaves the backend's other keys alone; scalars and lists replace the base's value whole, so a `fallback_order` in an override is the whole list, not an addition to it. The merge happens before validation, which is why `active = "all_anthropic"` on its own is a complete routing override.
+
+Both files are optional and git-ignored: `pipelex init` writes the rule into `.pipelex/.gitignore` for a fresh project (a project set up earlier adds the two names to its own `.gitignore`), the kit never ships them, and `pipelex migrate` never touches them.
+
+Where a file lives decides its reach. The base file resolves as before — the project's copy if it has one, otherwise the global one — and the overrides merge over it in this order:
+
+1. the base `backends.toml` / `routing_profiles.toml`
+2. `~/.pipelex/inference/<file>_override.toml` — the global override, applied in every project on the machine
+3. `{project}/.pipelex/inference/<file>_override.toml` — the project override, which wins
+
+The global override reaches a project that carries its own tracked base, which is the point: one edit under `~/.pipelex/inference/` and every project follows. Deleting the override files restores the shipped default.
+
+A developer who wants a whole machine off the gateway and on Anthropic writes two files once:
+
+```toml
+# ~/.pipelex/inference/backends_override.toml
+[pipelex_gateway]
+enabled = false
+```
+
+```toml
+# ~/.pipelex/inference/routing_profiles_override.toml
+active = "all_anthropic"
+```
+
+Enabling a backend and activating a profile that needs it go together: a profile whose default or routes name a backend that is not enabled is refused at boot, and the error names the backend to enable. `pipelex show backends` and `pipelex doctor` report the merged view, so what they print is what runs.
+
+### Custom deck files
 
 Use custom deck files (prefixed with `x_`) for project-specific customizations:
 
@@ -643,9 +679,9 @@ To add a new backend:
 
 The system loads configurations in this order:
 
-1. **Load Backends**: Read `backends.toml` to get enabled backends
+1. **Load Backends**: Read `backends.toml`, with any `backends_override.toml` merged over it (see [Personal overrides](#personal-overrides)), to get enabled backends
 2. **Load Model Specs**: For each backend, load model specifications (LLMs, OCR models, image generation models)
-3. **Load Routing Profiles**: Read routing rules and identify active profile
+3. **Load Routing Profiles**: Read `routing_profiles.toml`, with any `routing_profiles_override.toml` merged over it, and identify the active profile
 4. **Build Model Deck**: 
    - Apply routing rules to determine backend for each model across all AI capabilities
    - Load aliases and presets from deck files for LLMs, OCR, and image generation

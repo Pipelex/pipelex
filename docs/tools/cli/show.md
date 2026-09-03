@@ -126,6 +126,6 @@ pipelex show backends --all
 ## Related Configuration
 
 - [Inference Backend Configuration](../../configuration/config-technical/inference-backend-config.md)
-- Backend configuration files: `.pipelex/inference/backends.toml`
-- Routing configuration: `.pipelex/inference/routing_profiles.toml`
+- Backend configuration files: `.pipelex/inference/backends.toml`, with a personal `backends_override.toml` merged over it when present
+- Routing configuration: `.pipelex/inference/routing_profiles.toml`, with a personal `routing_profiles_override.toml` merged over it when present
 

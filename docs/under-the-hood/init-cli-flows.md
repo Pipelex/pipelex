@@ -270,7 +270,7 @@ Copies a telemetry template and prints instructions. No interactive prompts. Whi
 
 | Constant | Contents | Reason |
 |----------|----------|--------|
-| `INIT_SKIP_FILES` | All `GIT_IGNORED_CONFIG_FILES` (`pipelex_service.toml`, `pipelex_override.toml`, `telemetry_override.toml`, `telemetry.project.toml`, `pipelex_gateway_models.md`, `pipelex_gateway_models_plain.md`, `x_custom_llm_deck.toml`, `x_custom_extract_deck.toml`) plus `telemetry.toml` and `.DS_Store` | Git-ignored, auto-generated, or managed by other steps |
+| `INIT_SKIP_FILES` | All `GIT_IGNORED_CONFIG_FILES` (`pipelex_service.toml`, `pipelex_override.toml`, `telemetry_override.toml`, `backends_override.toml`, `routing_profiles_override.toml`, `telemetry.project.toml`, `pipelex_gateway_models.md`, `pipelex_gateway_models_plain.md`, `x_custom_llm_deck.toml`, `x_custom_extract_deck.toml`) plus `telemetry.toml` and `.DS_Store` | Git-ignored, auto-generated, or managed by other steps |
 | `INIT_SKIP_DIRS` | `inference` | Managed independently by inference step |
 
 ### Source Modules
@@ -451,7 +451,7 @@ flowchart TD
 |-------|-------------------|---------|
 | `check_config_files()` | `resolve_config_file()` | Layered resolution (project > global) |
 | `check_telemetry_config()` | `resolve_config_file()` | Layered resolution (project > global) |
-| `check_backend_credentials()` | `resolve_config_file()` | Finds `backends.toml` wherever it lives |
+| `check_backend_credentials()` | `backends_file_paths()` | Reads the merged backends document: the base `backends.toml` wherever it lives, plus the personal `backends_override.toml` at each tier |
 | `check_backend_files()` | `resolve_config_file()` | Finds `inference/backends/` wherever it lives |
 | `check_models()` gateway terms | `global_config_dir` | **Always global** — reads from `~/.pipelex/` |
 | `check_pending_migrations()` | none | **Both directories, always** — see below |

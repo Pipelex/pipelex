@@ -30,7 +30,7 @@ from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.models.deck_manifest import compute_kit_manifest, write_manifest
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.runtime_hub import get_console
-from pipelex.system.configuration.config_loader import BACKENDS_FILE_NAME, INFERENCE_DIR_NAME, config_manager
+from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError
 from pipelex.system.pipelex_service.pipelex_service_agreement import update_service_terms_acceptance
 from pipelex.system.pipelex_service.pipelex_service_config import (
@@ -80,18 +80,14 @@ def attempt_prime_remote_config_cache(*, target_config_dir: Path | None = None) 
     priming step.
 
     Args:
-        target_config_dir: When set, read the ``backends.toml`` *at that directory* to decide
-            whether the gateway is enabled. ``pipelex init`` and ``pipelex init --local``
-            target different ``.pipelex/`` directories — using the layered/project-preferred
-            config here would let priming branch on the wrong file. ``None`` (default) falls
-            back to the layered path. The terms-acceptance check always reads the *global*
-            ``pipelex_service.toml`` by design.
+        target_config_dir: When set, read the backends document *at that directory* (its
+            ``backends.toml`` and its own ``backends_override.toml``) to decide whether the gateway
+            is enabled. ``pipelex init`` and ``pipelex init --local`` target different ``.pipelex/``
+            directories — using the layered/project-preferred config here would let priming branch
+            on the wrong file. ``None`` (default) falls back to the layered document. The
+            terms-acceptance check always reads the *global* ``pipelex_service.toml`` by design.
     """
-    if target_config_dir is not None:
-        backends_file_path = target_config_dir / INFERENCE_DIR_NAME / BACKENDS_FILE_NAME
-    else:
-        backends_file_path = None
-    if not is_pipelex_gateway_enabled(backends_file_path=backends_file_path):
+    if not is_pipelex_gateway_enabled(config_dir=target_config_dir):
         return CachePrimingResult(primed=False)
 
     service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)

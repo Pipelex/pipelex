@@ -144,7 +144,7 @@ class TestBackendLibraryLeniency:
         library = InferenceBackendLibrary.make_empty()
         library.load(
             secrets_provider=EnvSecretsProvider(),
-            backends_library_path=backends_library_path,
+            backends_library_paths=[Path(backends_library_path)],
             backends_dir_path=backends_dir_path,
             lenient=lenient,
         )

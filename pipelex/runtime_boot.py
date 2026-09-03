@@ -60,6 +60,7 @@ from pipelex.cogt.exceptions import (
     ModelDeckNotFoundError,
     ModelDeckValidationError,
     RoutingProfileDisabledBackendError,
+    RoutingProfileLibraryError,
     RoutingProfileLibraryNotFoundError,
 )
 from pipelex.cogt.inference.inference_manager import InferenceManager
@@ -583,6 +584,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         except RoutingProfileDisabledBackendError as routing_profile_exc:
             msg = f"Some backend(s) required for a routing profile is not enabled: {routing_profile_exc}"
             raise PipelexSetupError(msg) from routing_profile_exc
+        except RoutingProfileLibraryError as routing_validation_exc:
+            msg = self._get_validation_error_msg(component=BootComponent.ROUTING_PROFILE_LIBRARY, validation_exc=routing_validation_exc)
+            raise PipelexSetupError(msg) from routing_validation_exc
 
         except BACKEND_LIBRARY_REFUSED as backend_validation_exc:
             msg = self._get_validation_error_msg(component=BootComponent.INFERENCE_BACKEND_LIBRARY, validation_exc=backend_validation_exc)

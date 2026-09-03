@@ -79,6 +79,7 @@ Notes on the override sequence:
 - `pipelex_{environment}.toml` (example: `pipelex_dev.toml`) is selected by the `PIPELEX_ENV` environment variable (see [Selecting the environment](#selecting-the-environment))
 - `pipelex_{run_mode}.toml` — example run modes: normal, unit_test; under unit testing the run-mode overlay is sourced exclusively from `./tests/pipelex_{run_mode}.toml`
 - Each subsequent configuration file in this sequence can override settings from the previous ones, and project-level files override the global `~/.pipelex/` layer
+- The two inference documents, `inference/backends.toml` and `inference/routing_profiles.toml`, are not part of this merge. Each has a single personal override file beside it, `backends_override.toml` and `routing_profiles_override.toml`, merged over the resolved base — global tier first, then project tier. See [Personal overrides](config-technical/inference-backend-config.md#personal-overrides)
 
 ### Override File Naming
 

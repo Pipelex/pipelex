@@ -19,7 +19,7 @@ from pipelex.system.pipelex_service.pipelex_service_agreement import (
     PipelexServiceAgreement,
     PipelexServiceOnboarding,
 )
-from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_from_path_if_exists
+from pipelex.tools.misc.toml_utils import load_toml_from_base_and_overrides, load_toml_from_path
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
@@ -75,32 +75,36 @@ def _service_config_the_ledger_can_explain(*, config_path: Path) -> PipelexServi
     return service_config
 
 
-def is_pipelex_gateway_enabled(backends_file_path: Path | None = None) -> bool:
+def is_pipelex_gateway_enabled(*, config_dir: Path | None = None) -> bool:
     """Check if pipelex_gateway is enabled in the backends configuration.
 
-    This reads the backends.toml file directly without loading the full backend library.
+    This reads the backends document directly without loading the full backend library — the
+    same document the loader reads: the base ``backends.toml`` with every ``backends_override.toml``
+    merged over it, from ``config_manager.backends_file_paths``.
 
     **It must read `enabled` exactly as the library loader does** — the raw value's truthiness, and
-    enabled when the key is absent — because the two are read over the same file and the boot acts
-    on the answer here: it fetches the gateway's model specs only when this says enabled, then hands
-    them to a loader that decides for itself which backends are enabled. Reading the literal `true`
-    here while the loader read truthiness left `enabled = 1` in a state neither could name: no specs
+    enabled when the key is absent, over the same merged document — because the boot acts on the
+    answer here: it fetches the gateway's model specs only when this says enabled, then hands them
+    to a loader that decides for itself which backends are enabled. Reading the literal `true` here
+    while the loader read truthiness left `enabled = 1` in a state neither could name: no specs
     fetched, backend loaded — refused as *"model specs were not provided"* on a strict boot, silently
-    dropped from the deck on a lenient one.
+    dropped from the deck on a lenient one. An override the loader saw and this did not would be the
+    same split.
 
     Args:
-        backends_file_path: Explicit path to the ``backends.toml`` file to inspect. When
-            ``None`` (default), uses the layered/project-preferred path from
-            ``config_manager.backends_file_path``. Callers that act on a specific target
-            directory (e.g. ``pipelex init`` / ``pipelex init --local``) should pass the
-            target's ``backends.toml`` so they don't accidentally branch on a sibling config.
+        config_dir: Read the document at that directory — its ``backends.toml`` and its own
+            ``backends_override.toml`` — as ``pipelex init`` targeting one ``.pipelex/`` and the
+            doctor's ``--global`` do, so they never branch on a sibling configuration. ``None``
+            (default) reads the layered document: the resolved base, then the global override, then
+            the project override.
 
     Returns:
-        True if pipelex_gateway is enabled, False otherwise.
+        True if pipelex_gateway is enabled, False otherwise — including when there is no base file.
     """
-    resolved_path = backends_file_path if backends_file_path is not None else config_manager.backends_file_path
-    backends_toml = load_toml_from_path_if_exists(resolved_path)
-    if backends_toml is None:
+    backends_file_paths = config_manager.backends_file_paths(config_dir=config_dir)
+    try:
+        backends_toml = load_toml_from_base_and_overrides(paths=backends_file_paths)
+    except FileNotFoundError:
         return False
 
     gateway_config = backends_toml.get(PipelexBackend.GATEWAY)

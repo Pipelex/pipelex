@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, Self, cast
@@ -14,7 +15,6 @@ from pipelex.cogt.exceptions import (
     InferenceModelSpecError,
 )
 from pipelex.cogt.model_backends.backend import InferenceBackend, PipelexBackend
-from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsReport, CredentialsValidationReport
 from pipelex.cogt.model_backends.backend_factory import (
     InferenceBackendBlueprint,
     InferenceBackendFactory,
@@ -34,15 +34,17 @@ from pipelex.system.configuration.config_surface import (
     replay_surface_files_in_memory,
     stale_configuration_warning,
 )
-from pipelex.system.environment import get_optional_env
 from pipelex.system.pipelex_service.gateway_config_merger import GatewayConfigMerger
 from pipelex.system.runtime import runtime_manager
 from pipelex.tools.misc.dict_utils import (
     apply_to_strings_recursive,
-    extract_vars_from_strings_recursive,
 )
-from pipelex.tools.misc.placeholder import value_is_placeholder
-from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_from_path_if_exists
+from pipelex.tools.misc.toml_utils import (
+    describe_toml_base_and_overrides,
+    load_toml_from_base_and_overrides,
+    load_toml_from_path,
+    load_toml_from_path_if_exists,
+)
 from pipelex.tools.secrets.exceptions import UnknownVarPrefixError, VarFallbackPatternError, VarNotFoundError
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.secrets.secrets_utils import substitute_vars
@@ -103,7 +105,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         self,
         *,
         secrets_provider: SecretsProviderAbstract,
-        backends_library_path: str,
+        backends_library_paths: Sequence[Path],
         backends_dir_path: str,
         include_disabled: bool = False,
         gateway_config: GatewayConfig | None = None,
@@ -125,9 +127,14 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         would repair: `backends_dir_path` picks one directory (a project's `.pipelex/` wins the whole
         directory over the global one), while `pipelex migrate` walks every configuration root.
 
+        The index itself is one document read from several files: the base `backends.toml` first,
+        then each `backends_override.toml` that exists, deep-merged in order so a personal file
+        carrying only `[<backend>] enabled = true` flips that one flag and leaves the table's other
+        keys to the base. `config_manager.backends_file_paths()` is the sequence every reader passes.
+
         Args:
             secrets_provider: Provider for secrets/credentials.
-            backends_library_path: Path to backends.toml.
+            backends_library_paths: The base `backends.toml` first, then the override files in merge order.
             backends_dir_path: Path to directory containing per-backend TOML files.
             include_disabled: Whether to include disabled backends.
             gateway_config: Gateway configuration for Pipelex Gateway backend.
@@ -142,10 +149,11 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 is carried forward in both modes, or fatal in both, according to the ledger alone.
         """
         stale_plans: list[MigrationPlan] = []
+        library_paths_description = describe_toml_base_and_overrides(paths=backends_library_paths)
         try:
-            backends_dict = load_toml_from_path(path=backends_library_path)
+            backends_dict = load_toml_from_base_and_overrides(paths=backends_library_paths)
         except FileNotFoundError as file_not_found_exc:
-            msg = f"Could not find inference backend library at '{backends_library_path}': {file_not_found_exc}"
+            msg = f"Could not find inference backend library at {library_paths_description}: {file_not_found_exc}"
             raise InferenceBackendLibraryNotFoundError(msg) from file_not_found_exc
 
         # Create a partial function with the secrets provider bound
@@ -169,7 +177,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 if lenient:
                     log.verbose(f"Skipping backend '{backend_name}': variable fallback pattern error")
                     continue
-                msg = f"Variable substitution failed due to a pattern error in file '{backends_library_path}':\n{var_fallback_pattern_exc}"
+                msg = f"Variable substitution failed due to a pattern error in {library_paths_description}:\n{var_fallback_pattern_exc}"
                 key_name = "unknown"
                 raise InferenceBackendCredentialsError(
                     credentials_error_type=InferenceBackendCredentialsErrorType.VAR_FALLBACK_PATTERN,
@@ -182,7 +190,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     log.verbose(f"Skipping backend '{backend_name}': missing credential variable '{var_not_found_exc.var_name}'")
                     continue
                 msg = (
-                    f"Variable substitution failed due to a 'variable not found' error in file '{backends_library_path}':\n"
+                    f"Variable substitution failed due to a 'variable not found' error in {library_paths_description}:\n"
                     f"Backend name: '{backend_name}', Variable name: '{var_not_found_exc.var_name}'\n"
                     f"{var_not_found_exc}\nRun mode: '{runtime_manager.run_mode}'"
                 )
@@ -201,7 +209,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     backend_name=backend_name,
                     message=(
                         f"Variable substitution failed due to an unknown variable prefix error "
-                        f"in file '{backends_library_path}':\n{unknown_var_prefix_exc}"
+                        f"in {library_paths_description}:\n{unknown_var_prefix_exc}"
                     ),
                     key_name=unknown_var_prefix_exc.var_name,
                 ) from unknown_var_prefix_exc
@@ -217,7 +225,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     # analysis: pydantic's error alone names a field, and every table of this file has
                     # that field.
                     validation_error_msg = format_pydantic_validation_error(validation_error)
-                    msg = f"Invalid inference backend '{backend_name}' in '{backends_library_path}': {validation_error_msg}"
+                    msg = f"Invalid inference backend '{backend_name}' in {library_paths_description}: {validation_error_msg}"
                     raise InferenceBackendLibraryValidationError(msg, backend_name=backend_name) from validation_error
 
                 # Handle pipelex_gateway specially - use remote config
@@ -233,7 +241,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                         # and that reader and this loop agree on what "enabled" means. Reachable only
                         # by loading the library directly without a gateway config.
                         msg = (
-                            f"Backend '{backend_name}' is enabled in '{backends_library_path}' but no Pipelex Gateway model specs "
+                            f"Backend '{backend_name}' is enabled in {library_paths_description} but no Pipelex Gateway model specs "
                             "were given to the loader: pass `gateway_config`, or disable the backend"
                         )
                         raise InferenceBackendLibraryError(msg, backend_name=backend_name)
@@ -539,78 +547,6 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 message=msg,
                 key_name=unknown_var_prefix_exc.var_name,
             ) from unknown_var_prefix_exc
-
-    def check_backend_credentials(self, path: str, *, include_disabled: bool = False) -> CredentialsValidationReport:
-        """Check if required environment variables are set for enabled backends.
-
-        This method loads backend configurations and extracts variable placeholders
-        without performing actual substitution or loading model specs.
-
-        Args:
-            path: Path to the backend library TOML file
-            include_disabled: If True, check disabled backends too
-
-        Returns:
-            CredentialsValidationReport with detailed status per backend
-
-        """
-        try:
-            backends_dict = load_toml_from_path(path=path)
-        except FileNotFoundError as file_not_found_exc:
-            msg = f"Could not find inference backend library at '{path}': {file_not_found_exc}"
-            raise InferenceBackendLibraryNotFoundError(msg) from file_not_found_exc
-
-        backend_reports: dict[str, BackendCredentialsReport] = {}
-        all_backends_valid = True
-
-        for backend_name, backend_dict in backends_dict.items():
-            enabled = backend_dict.get("enabled", True)
-            if not enabled and not include_disabled:
-                continue
-
-            # Skip internal backend
-            if backend_name == "internal":
-                continue
-
-            # Skip vertexai in CI testing
-            if runtime_manager.is_ci_testing and backend_name == "vertexai":
-                continue
-
-            # Extract all variable placeholders from the backend config
-            required_vars_set = extract_vars_from_strings_recursive(backend_dict)
-            required_vars = sorted(required_vars_set)
-
-            # Check status of each variable
-            missing_vars: list[str] = []
-            placeholder_vars: list[str] = []
-
-            for var_name in required_vars:
-                var_value = get_optional_env(var_name)
-                if var_value is None:
-                    missing_vars.append(var_name)
-                elif value_is_placeholder(var_value):
-                    placeholder_vars.append(var_name)
-
-            # Determine if all credentials are valid for this backend
-            backend_valid = len(missing_vars) == 0 and len(placeholder_vars) == 0
-
-            # Create report for this backend
-            backend_report = BackendCredentialsReport(
-                backend_name=backend_name,
-                required_vars=required_vars,
-                missing_vars=missing_vars,
-                placeholder_vars=placeholder_vars,
-                all_credentials_valid=backend_valid,
-            )
-            backend_reports[backend_name] = backend_report
-
-            if not backend_valid:
-                all_backends_valid = False
-
-        return CredentialsValidationReport(
-            backend_reports=backend_reports,
-            all_backends_valid=all_backends_valid,
-        )
 
     def list_backend_names(self) -> list[str]:
         return list(self.root.keys())

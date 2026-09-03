@@ -41,6 +41,12 @@ def _write_backends_toml(config_dir: Path, content: str = BACKENDS_TOML) -> Path
     return backends_toml
 
 
+def _write_backends_override(config_dir: Path, content: str) -> Path:
+    override = config_dir / "inference" / "backends_override.toml"
+    override.write_text(content, encoding="utf-8")
+    return override
+
+
 class TestDoctorBackendChecks:
     def test_credentials_backends_toml_missing(self, tmp_path: Path) -> None:
         """No backends.toml means the credentials check fails with a clear message."""
@@ -90,7 +96,7 @@ class TestDoctorBackendChecks:
     def test_credentials_broad_failure_reported(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Any unexpected failure during the scan becomes a finding, not a crash."""
         _write_backends_toml(tmp_path)
-        mocker.patch("pipelex.cli.commands.doctor_cmd.load_toml_from_path", side_effect=RuntimeError("kaboom"))
+        mocker.patch("pipelex.cli.commands.doctor_cmd.load_toml_from_base_and_overrides", side_effect=RuntimeError("kaboom"))
 
         healthy, reports, message = check_backend_credentials(config_dir=tmp_path)
 
@@ -194,6 +200,32 @@ class TestDoctorBackendChecks:
         """Provision the shipped defaults: the kit's whole inference/ tree, untouched."""
         shutil.copytree(Path(str(get_kit_configs_dir())) / "inference", tmp_path / "inference")
         return tmp_path / "inference" / "backends"
+
+    def test_credentials_read_the_override_over_the_base(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A backend the personal override disables is not asked for credentials, and one it enables is."""
+        _write_backends_toml(tmp_path)
+        _write_backends_override(tmp_path, "[openai]\nenabled = false\n\n[azure]\nenabled = true\n")
+        monkeypatch.delenv("TEST_DOCTOR_OPENAI_KEY", raising=False)
+        monkeypatch.delenv("TEST_DOCTOR_AZURE_KEY", raising=False)
+
+        healthy, reports, _ = check_backend_credentials(config_dir=tmp_path)
+
+        assert healthy is False
+        assert "openai" not in reports
+        assert reports["azure"].missing_vars == ["TEST_DOCTOR_AZURE_KEY"]
+
+    def test_backend_files_read_the_override_over_the_base(self, tmp_path: Path) -> None:
+        """The file probe walks the merged document: a backend the override turns off is not probed,
+        one it turns on is — and the loader it probes with is handed the same merged document.
+        """
+        self._copy_kit_inference(tmp_path)
+        _write_backends_override(tmp_path, "[openai]\nenabled = false\n\n[vertexai]\nenabled = true\n")
+
+        healthy, reports, _ = check_backend_files(config_dir=tmp_path)
+
+        assert healthy is True
+        assert "openai" not in reports
+        assert reports["vertexai"].is_valid is True
 
     def test_backend_files_stock_kit_is_healthy(self, tmp_path: Path) -> None:
         """The shipped defaults enable the gateway and ship its override file; the probe hands the
