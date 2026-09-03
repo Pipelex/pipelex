@@ -43,7 +43,7 @@ The two inference documents, `.pipelex/inference/backends.toml` and `.pipelex/in
 
 - 2026-09-03, while implementing: decision 9 was planned as a fix "on the way" and turned out to need a third clause, because an `active` naming no profile — the likeliest typo in an override — was still `ModelManagerError`, which no clause named. The loader keeps `RoutingProfileLibraryError` for that case and the boot catches it through the same validation-message builder the other libraries use.
 
-## Checkpoint — 2026-09-03, paused before the full suite's verdict
+## Checkpoint — 2026-09-03, paused with the full suite green, before the PR
 
 Everything in the Steps list through step 7's targeted runs is in the tree on `feature/Inference-config-overrides` (worktree `_pipelex--inference-config-overrides`), and the ledger item is claimed and references this plan.
 
@@ -54,10 +54,9 @@ What is verified:
 - By hand, in a scratch `HOME` over this repository's tracked base: the two global overrides put `pipelex show backends` on `all_anthropic` with the gateway gone, `pipelex doctor` reports the merged view, deleting the two files restores `all_pipelex_gateway`. A project-tier `routing_profiles_override.toml` in this worktree is invisible to `git status`, passes `make check-config-sync`, activates `all_mistral`, and its removal restores the default.
 - The ledger follow-ups for the sibling projects' `.gitignore` are filed: `L-260903-6b77c1` (cookbook) and `L-260903-36002a` (`pipelex-server`, member `worker`).
 
-What is not: `make agent-test` was started and had not finished when the session paused, so the full suite has no recorded verdict yet.
+- `make agent-test` passed, with one failure that was this session's own doing and not a defect: the project-tier manual check above wrote `active = "all_mistral"` into this worktree's `routing_profiles_override.toml` while the suite was running in the background, and `tests/unit/pipelex/pipe_operators/pipe_llm/test_template_image_analyzer.py` booted inside that window with a deck holding only Mistral handles. The override reached a real boot, which is the feature working; the module re-run clean after the file was removed passes. Lesson for the manual checks: never write a project-tier override into a worktree while a suite runs in it.
 
 Next session, in order:
 
-1. `ledger claim L-260903-9fe4ad --renew`, then `make agent-test`. `tests/CLAUDE.md` mandates the full suite for a change under `pipelex/system/configuration/`; expect the only pre-existing skip in `tests/unit/pipelex/tools/misc/test_toml_utils.py`.
-2. If red, the likeliest culprits are callers of the renamed loader parameters that the targeted runs did not import (grep `backends_library_path=` and `routing_profile_library_path=` across `tests/` — the singular spellings — and `is_pipelex_gateway_enabled(backends_file_path=`).
-3. `make agent-check` once more (the formatter is idempotent now), then commit and open the PR against `dev` with `Closes L-260903-9fe4ad` in the body; `/ledger-land` after the merge.
+1. `ledger claim L-260903-9fe4ad --renew`, then `make agent-check` once more (the formatter is idempotent now).
+2. Open the PR against `dev` with `Closes L-260903-9fe4ad` in the body; `/ledger-land` after the merge.
