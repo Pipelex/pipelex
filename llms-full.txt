@@ -495,7 +495,7 @@ When using your own keys, enable the corresponding backends:
     pipelex init
     ```
 
-2. Edit `~/.pipelex/inference/backends.toml` (or `.pipelex/inference/backends.toml` in your project root if you have a project-local config — the project file fully overrides the global one):
+2. Edit `~/.pipelex/inference/backends.toml` (or `.pipelex/inference/backends.toml` in your project root if you have a project-local config — the project file fully overrides the global one). To run on a backend of your own choosing without touching a tracked file, write the same keys in a git-ignored `backends_override.toml` beside it instead: see [Personal overrides](../configuration/config-technical/inference-backend-config.md#personal-overrides).
 
     ```toml
     [google]
@@ -2756,6 +2756,8 @@ Within each tier, the base `pipelex.toml` is followed by an override sequence, m
 - `pipelex_temporary_override.toml` — last-resort, highest-precedence overrides within the tier
 
 The entire global tier merges before the project tier, so any project-tier file — including the plain project `pipelex.toml` — overrides every global-tier file.
+
+The two inference documents, `.pipelex/inference/backends.toml` and `.pipelex/inference/routing_profiles.toml`, have an override layer of their own: a `backends_override.toml` and a `routing_profiles_override.toml` beside them, git-ignored, each carrying only the keys it sets. The base file resolves as before (the project's copy if it has one, otherwise the global one) and the overrides merge over it, global tier first, then project tier — so one `~/.pipelex/inference/` override reaches every project on the machine, and deleting it restores the shipped default. See [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md#personal-overrides) for the files and the merge order.
 
 ## Environment Variables
 
@@ -5634,6 +5636,43 @@ steps = [
 
 This runtime-level capability exists separately from the current public `mthds package` CLI workflow documented on this page. If you rely on cross-package references, validate them against the specific runtime setup you are using.
 
+### Include by Address: Fetch-on-Miss
+
+The alias can also be a **full package address**, so a bundle can reference a method from a public GitHub repository directly — the same reference grammar as [running a method by address](../tools/cli/run-by-address.md):
+
+```toml
+[pipe.summarize_report]
+type = "PipeSequence"
+description = "Extract a document then summarize it"
+inputs = { doc = "PDF" }
+output = "Summary"
+steps = [
+    { pipe = "github.com/Pipelex/methods/documents->documents.extract_page_contents_and_views", result = "pages" },
+    { pipe = "summarize_pages" },
+]
+```
+
+An address-based reference resolves against the **installed methods** — `~/.mthds/methods/` (global) and `.mthds/methods/` (project-local), matched by the manifest's `address` + `name`, case-insensitively. When no installed method matches, Pipelex **fetches on miss**: it fetches the package by address — honoring an `@<tag>` pin, through the same grammar, bounds, and tags-only rules as a direct fetch — installs it into `~/.mthds/methods/`, records the fetch provenance (address, tag, and the commit SHA of what was actually cloned) in a `.provenance.json` sidecar beside the manifest, and loads it so resolution proceeds. The next load finds the installed copy and never touches the network again.
+
+A few behaviors worth knowing:
+
+- **Installed wins.** Once a method is installed, it is used as-is — including when a reference pins a different `@<tag>` than what is installed (a warning tells you so). Remove the installed directory to re-fetch.
+- **A miss that cannot be bridged is a loud diagnostic, never a silent pass**: fetch disabled, an unfetchable address, or a failed fetch each raise an error naming the address and the remedy.
+- **Hosted parity warning.** A fetched method declaring Python structure classes runs locally but triggers the same warning as a direct CLI fetch: hosted execution accepts MTHDS concepts and sandboxed PipeFuncs, not in-process Python. On a sandbox-hosted deployment the fetch refuses such a package outright, with the same rule-naming error.
+
+To **disable network fetches at load time**, set the switch in your `pipelex.toml` (or use the environment variable, which takes precedence):
+
+```toml
+[interpreter.methods]
+fetch_on_miss = false
+```
+
+```bash
+export PIPELEX_METHODS_FETCH_ON_MISS=0
+```
+
+With fetching disabled, a miss raises a diagnostic that names the address and how to install the method manually (e.g. `mthds install <address>`, or by copying the package into `~/.mthds/methods/`). See [Methods Configuration](../configuration/config-practical/methods-config.md).
+
 ### Example Layout
 
 ```text
@@ -7398,6 +7437,14 @@ And this screenshot for reference: $screenshot
 Analyze the document and explain how it relates to the context: $reference_doc
 """
 ```
+
+## Dynamic Inputs Render as Text
+
+A `native.Dynamic` input referenced in a prompt renders as text through the template, exactly as it does in a `PipeCompose` template. `Dynamic` is compatible with every concept by design, but compatibility is not identity: the prompt analyzers only attach a variable as an image or document when it is *definitely* one, and a dynamic concept's shape is unknowable statically. If you want image or document attachment, declare `Image` / `Document` (or a concept refining them) instead. Consequently, `| with_images` on a `Dynamic` variable is refused — statically unknowable nested images are refused, not guessed.
+
+This holds even when the value you supply at run time *is* an image. A `Dynamic` slot does not force `DynamicContent`: the input shaper hands the raw value to the bottom-up factory, so passing an `ImageContent` (or an explicit `{"concept": "native.Image", ...}` form) into a `Dynamic` slot produces a `native.Image` stuff. That image is still **not** attached to the prompt, because attachment is decided from the declared concept, not from what the caller happened to pass. Declare the slot `Image` when you want the image to reach the model.
+
+The same rule governs `PipeImgGen` prompts (positive and negative), which use the same prompt analyzer.
 
 ## Configuration
 
@@ -9728,7 +9775,7 @@ pipelex init inference
 # Reconfigure telemetry settings
 pipelex init telemetry
 
-# Review gateway terms
+# Review the Pipelex service terms
 pipelex init agreement
 ```
 
@@ -9749,7 +9796,7 @@ This command creates or resets a Pipelex config directory with:
     Every `init` target replaces the file with the template, so whatever was in it is gone. If a configuration file has simply fallen behind the current schema, [`pipelex migrate`](migrate.md) is the command: it rewrites the file in place and keeps every setting — your PostHog key, your Langfuse credentials, your exporters. `pipelex doctor` tells you which of the two you have.
 
 !!! note "Offline cache priming"
-    When Pipelex Gateway is enabled, `pipelex init` also primes an on-disk copy of the gateway's remote config at `~/.pipelex/cache/remote_config.json`. This lets later setup, validation, and dry-runs work even when the remote config service is briefly unreachable. If you run `pipelex init` while offline, it prints a yellow warning and skips priming — re-run it online to enable offline dry-runs.
+    When any Pipelex-managed gateway backend is enabled, `pipelex init` also primes an on-disk copy of the published remote config at `~/.pipelex/cache/remote_config.json`. This lets later setup, validation, and dry-runs work even when the remote config service is briefly unreachable. If you run `pipelex init` while offline, it prints a yellow warning and skips priming — re-run it online to enable offline dry-runs.
 
 ## Interactive Setup Flow
 
@@ -9788,9 +9835,9 @@ All fields are optional:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `backends` | `list[str]` | Backend keys to enable (e.g. `openai`, `anthropic`, `pipelex_gateway`). Omit to keep template defaults. |
+| `backends` | `list[str]` | Backend keys to enable (e.g. `openai`, `anthropic`, `pipelex_gateway`, `pipelex_manifold`). Omit to keep template defaults. |
 | `primary_backend` | `str` | Required only when 2+ backends are selected and `pipelex_gateway` is not among them. |
-| `accept_gateway_terms` | `bool` | Required when `pipelex_gateway` is in backends. |
+| `accept_gateway_terms` | `bool` | Required when any Pipelex-managed gateway backend (`pipelex_gateway`, `pipelex_manifold`) is in backends. The terms are the Pipelex service's, so one acceptance covers every managed backend. |
 
 Telemetry is not configured via `--config`: init seeds a `telemetry.toml` from a template (a global init writes an active one; a project init drops a commented-out one).
 
@@ -10489,13 +10536,18 @@ What decides whether Python in a method is acceptable is **where it would execut
 
 ## Bounds
 
-Fetched packages are bounded: the clone has a fixed timeout, and the selected package is capped in file count and total bytes (tunable via the `PIPELEX_MAX_FETCHED_PACKAGE_FILES` and `PIPELEX_MAX_FETCHED_PACKAGE_TOTAL_KIB` environment variables). The manifest scan that locates the package is bounded too: at most `PIPELEX_MAX_SCANNED_MANIFESTS` manifests are considered per repository, and a `METHODS.toml` larger than `PIPELEX_MAX_MANIFEST_FILE_KIB` is skipped and reported rather than read. Content exceeding the caps is rejected with a clear error.
+Fetched packages are bounded: the clone has a fixed timeout, and the selected package is capped in file count and total bytes (tunable via the `PIPELEX_MAX_FETCHED_PACKAGE_FILES` and `PIPELEX_MAX_FETCHED_PACKAGE_TOTAL_KIB` environment variables). The manifest scan that locates the package is bounded too: at most `PIPELEX_MAX_SCANNED_MANIFESTS` manifests are considered per repository, and a `METHODS.toml` larger than `PIPELEX_MAX_MANIFEST_FILE_KIB` is skipped and reported rather than read. Content exceeding the caps is rejected with a clear error. Symlinks are refused outright: a fetched package containing one (file or directory) is rejected, because a link's target would bypass the content scans.
+
+## Referencing a Method by Address from Your Own Method
+
+The same addresses work *inside* a bundle: a pipe step can reference another method's pipe as `github.com/...->domain.pipe_code`, and a reference that misses the installed methods is fetched and installed automatically (fetch-on-miss). See [Packages → Include by Address](../../building-methods/packages.md#include-by-address-fetch-on-miss).
 
 ## Related Documentation
 
 - [CLI Run](run.md)
 - [CLI Validate](validate.md)
 - [Methods & Packages](../../building-methods/packages.md)
+- [Methods Configuration](../../configuration/config-practical/methods-config.md)
 
 
 ## Show
@@ -10624,8 +10676,8 @@ pipelex show backends --all
 ## Related Configuration
 
 - [Inference Backend Configuration](../../configuration/config-technical/inference-backend-config.md)
-- Backend configuration files: `.pipelex/inference/backends.toml`
-- Routing configuration: `.pipelex/inference/routing_profiles.toml`
+- Backend configuration files: `.pipelex/inference/backends.toml`, with a personal `backends_override.toml` merged over it when present
+- Routing configuration: `.pipelex/inference/routing_profiles.toml`, with a personal `routing_profiles_override.toml` merged over it when present
 
 
 
@@ -11542,7 +11594,7 @@ These commands do not have subcommands:
 
 Commands use different stdout formats depending on their purpose:
 
-- **Markdown or JSON**: `run`, `validate`, `fix`, `init`, `models`, `check-model`, `doctor` — markdown by default, JSON with `--format json`. Error format follows `--error-format` (defaults to `--format`'s value, so `--format json` flips both).
+- **Markdown or JSON**: `run`, `validate`, `fix`, `init`, `models`, `check-model`, `doctor`, `migrate`, `codegen types`, `codegen check` — markdown by default, JSON with `--format json`. Error format follows `--error-format` (defaults to `--format`'s value, so `--format json` flips both).
 - **JSON or raw TOML**: `inputs` — structured JSON via `agent_success()` by default (`--format json`), or the raw TOML template printed directly to stdout with `--format toml`
 - **Raw TOML**: `concept`, `pipe` — TOML text printed directly to stdout
 - **Passthrough**: `fmt`, `lint` — raw `plxt` output
@@ -11682,6 +11734,7 @@ Notes on the override sequence:
 - `pipelex_{environment}.toml` (example: `pipelex_dev.toml`) is selected by the `PIPELEX_ENV` environment variable (see [Selecting the environment](#selecting-the-environment))
 - `pipelex_{run_mode}.toml` — example run modes: normal, unit_test; under unit testing the run-mode overlay is sourced exclusively from `./tests/pipelex_{run_mode}.toml`
 - Each subsequent configuration file in this sequence can override settings from the previous ones, and project-level files override the global `~/.pipelex/` layer
+- The two inference documents, `inference/backends.toml` and `inference/routing_profiles.toml`, are not part of this merge. Each has a single personal override file beside it, `backends_override.toml` and `routing_profiles_override.toml`, merged over the resolved base — global tier first, then project tier. See [Personal overrides](config-technical/inference-backend-config.md#personal-overrides)
 
 ### Override File Naming
 
@@ -12010,6 +12063,51 @@ keywords_to_hilight = ["error", "warning", "failed"]
 ## Related Documentation
 
 - [Logging Tool](../../tools/logging.md) - Using Pipelex logging in your code
+
+
+## Methods
+
+# Methods Configuration
+
+The `MethodsConfig` class controls the behavior of installed and fetched method packages.
+
+## Configuration Options
+
+```python
+class MethodsConfig(ConfigModel):
+    fetch_on_miss: bool
+```
+
+### Fields
+
+- `fetch_on_miss`: When a bundle references another method by address (`github.com/...->domain.pipe`) and no installed method matches, fetch the package by address and install it into `~/.mthds/methods/` so the load can proceed. When disabled, such a miss raises a diagnostic naming the address and how to install the method manually, and the network is never touched at load time.
+
+## Example Configuration
+
+```toml
+[interpreter.methods]
+fetch_on_miss = true
+```
+
+## Environment Variable Override
+
+The `PIPELEX_METHODS_FETCH_ON_MISS` environment variable overrides the config when set: `1`/`true`/`yes`/`on` enables fetching, `0`/`false`/`no`/`off` disables it. An unrecognized value is warned about and ignored in favor of the config.
+
+```bash
+# Force-disable network fetches at load time for this shell
+export PIPELEX_METHODS_FETCH_ON_MISS=0
+```
+
+## When to Disable It
+
+- Offline or air-gapped environments, where a fetch could only hang or fail.
+- Deployments that must never pull code from the network at load time.
+- Reproducibility-sensitive runs where every dependency must be pre-installed and reviewed.
+
+## Related Documentation
+
+- [Packages](../../building-methods/packages.md) — Cross-package references and include by address
+- [Run a Method by Address](../../tools/cli/run-by-address.md) — The reference grammar, bounds, and provenance
 
 
 ## Pipe Run
@@ -12786,7 +12884,9 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
 .pipelex/
 └── inference/
     ├── backends.toml           # Backend provider configurations
+    ├── backends_override.toml  # Personal overrides of backends.toml (git-ignored, optional)
     ├── routing_profiles.toml   # Model routing rules
+    ├── routing_profiles_override.toml  # Personal overrides of routing_profiles.toml (git-ignored, optional)
     ├── backends/               # Individual backend model specifications
     │   ├── openai.toml         # OpenAI models (LLMs, image generation)
     │   ├── anthropic.toml      # Anthropic models (LLMs)
@@ -13324,7 +13424,43 @@ Note the sigil prefixes: `@` for aliases and `$` for presets.
 
 ## Customization
 
-### Local Overrides
+### Personal overrides
+
+`backends.toml` and `routing_profiles.toml` are tracked files: the project ships them, and `pipelex init` writes them. To run on a different backend without editing them — to try a backend the project keeps off, or to move every project on your machine onto one provider — write the change in a personal override file beside them:
+
+- `backends_override.toml` layers over `backends.toml`
+- `routing_profiles_override.toml` layers over `routing_profiles.toml`
+
+An override carries only the keys it sets. Tables merge into the base's tables, so `[anthropic]` with a single `enabled = true` flips that one flag and leaves the backend's other keys alone; scalars and lists replace the base's value whole, so a `fallback_order` in an override is the whole list, not an addition to it. The merge happens before validation, which is why `active = "all_anthropic"` on its own is a complete routing override.
+
+Both files are optional and git-ignored: `pipelex init` writes the rule into `.pipelex/.gitignore` for a fresh project (a project set up earlier adds the two names to its own `.gitignore`), the kit never ships them, and `pipelex migrate` never touches them.
+
+Where a file lives decides its reach. The base file resolves as before — the project's copy if it has one, otherwise the global one — and the overrides merge over it in this order:
+
+1. the base `backends.toml` / `routing_profiles.toml`
+2. `~/.pipelex/inference/<file>_override.toml` — the global override, applied in every project on the machine
+3. `{project}/.pipelex/inference/<file>_override.toml` — the project override, which wins
+
+The global override reaches a project that carries its own tracked base, which is the point: one edit under `~/.pipelex/inference/` and every project follows. Deleting the override files restores the shipped default.
+
+A developer who wants a whole machine off the gateway and on Anthropic writes two files once:
+
+```toml
+# ~/.pipelex/inference/backends_override.toml
+[pipelex_gateway]
+enabled = false
+```
+
+```toml
+# ~/.pipelex/inference/routing_profiles_override.toml
+active = "all_anthropic"
+```
+
+Enabling a backend and activating a profile that needs it go together: a profile whose default or routes name a backend that is not enabled is refused at boot, and the error names the backend to enable. `pipelex show backends` and `pipelex doctor` report the merged view, so what they print is what runs.
+
+An override leaves a trace. When one was merged, the boot logs which files each document was read from, so a run on an unexpected backend says why in its own log. A file that does not parse is refused the way an invalid document is — as a setup error naming the file, in the boot, in `pipelex init` and in the doctor's Models row — and so is a value where a table was meant, such as `anthropic = false` where `[anthropic]` with `enabled = false` was intended. `pipelex init` keeps writing the base file, but it decides whether a Pipelex-managed gateway backend is enabled on the merged document, so one switched on only by an override still gets the terms prompt; and when declining the terms disables those backends in the base while an override still pins one on, the command says so and names both the backend and the file to edit.
+
+### Custom deck files
 
 Use custom deck files (prefixed with `x_`) for project-specific customizations:
 
@@ -13368,9 +13504,9 @@ To add a new backend:
 
 The system loads configurations in this order:
 
-1. **Load Backends**: Read `backends.toml` to get enabled backends
+1. **Load Backends**: Read `backends.toml`, with any `backends_override.toml` merged over it (see [Personal overrides](#personal-overrides)), to get enabled backends
 2. **Load Model Specs**: For each backend, load model specifications (LLMs, OCR models, image generation models)
-3. **Load Routing Profiles**: Read routing rules and identify active profile
+3. **Load Routing Profiles**: Read `routing_profiles.toml`, with any `routing_profiles_override.toml` merged over it, and identify the active profile
 4. **Build Model Deck**: 
    - Apply routing rules to determine backend for each model across all AI capabilities
    - Load aliases and presets from deck files for LLMs, OCR, and image generation
@@ -15358,6 +15494,17 @@ Wire-native keys (D10) are a deliberate correctness choice: a camelCase-keyed sc
 
 For **`python-pydantic`**, no key mapping is ever needed either: wire names are already snake_case Python names, so parse/serialize are the native `Model.model_validate(data)` / `model.model_dump(mode="json")`.
 
+### Optionality: the wire carries explicit nulls
+
+A projection describes the payload the engine actually produces, and that payload spells an unset optional field as an explicit `null` — not as an absent key. The runtime class generated for a concept annotates every non-required field `X | None`, and the transport dump keeps nulls deliberately (`dump_for_transport()` is a `model_dump(serialize_as_any=True)` with no `exclude_none`, and the composer spells `exclude_none=False` at its dump sites), because the shape also feeds the Temporal data converter and the hydrator. A partial payload arriving from a caller, meanwhile, may simply omit the key. **The wire genuinely carries both spellings of "unset", so every projection must accept both.**
+
+Per target that means:
+
+- **`python-pydantic` / `python-structures`** — `X | None = Field(default=None)`. Pydantic accepts an omitted key and an explicit `null` alike, so nothing further is needed.
+- **`ts-zod`** — `.nullish()` for a non-required field (`T | null | undefined`), and `.nullable().default(…)` for a non-required field carrying a default, since a producer may null it explicitly. A bare `.optional()` would mean `T | undefined` in Zod and would **reject the engine's own output**; a bare `.default(…)` rejects the explicit null the same way. There is deliberately no `.transform()` folding `null` into `undefined`: the binder uses one schema for both `parse` and `serialize`, so a transform would make the pair asymmetric.
+
+On the TypeScript side the consequence is that a parsed optional field types as `T | null | undefined` rather than `T | undefined` — `??` covers both. For a recursive concept, where the emitter writes an explicit `export type` beside a `z.ZodType<Name>`-annotated schema, the declared type carries the same widening (`next?: Node | null`), because that annotation is checked against the schema's inferred output and stops typechecking otherwise.
+
 ### Refinement and native bases
 
 A concept that refines another keeps its `refines` link when the base is **native-backed** (the refinement chain bottoms out at a native such as `Text` or `Number`), because the native is materialized into the crate and the base carries real runtime behavior; the emitter then renders inheritance (`class Summary(TextContent)` / `class Summary(Text)` / `z.lazy(() => TextSchema)`), which round-trips to the correct base class. A concept that refines an **in-crate structured** base has that base's effective structure flattened in during normalization.
@@ -15460,7 +15607,7 @@ Exact bytes survive wherever they are consumed programmatically rather than read
 
 #### TypeScript assumes Prettier's defaults
 
-The `ts-zod` target is emitted to match Prettier's **default** configuration: 80-column print width, double quotes, semicolons. A long concept name or choice list is pre-wrapped the way Prettier would wrap it, for the same reason the Python side pre-explodes long calls.
+The `ts-zod` target is emitted to match Prettier's **default** configuration: 80-column print width, double quotes, semicolons. Anything that would overflow is pre-wrapped the way Prettier would wrap it, for the same reason the Python side pre-explodes long calls — and what overflows is not only a long concept name or choice list. The field name and the default literal are authored too, so an ordinary `z.string()` carrying a default can pass the width on its name alone; the emitter therefore breaks by Prettier's own rule, which keys on the **member chain's call count** rather than on the expression. A chain of two or more calls breaks entirely (`z` alone on the property line, one call per line), and each call is then re-measured at its new indent and left flat if it now fits; a single call has no chain to break, so its arguments explode in place. Default values are likewise emitted as TypeScript literals rather than JSON ones, because Prettier pads an object literal's braces and unquotes every key that is a plain identifier, at any width.
 
 If your Prettier config changes `printWidth`, `singleQuote`, or `semi`, the generated files will not match it, and `prettier --write` will rewrite them. Either run codegen output through your own Prettier before stamping, or keep an exclusion for the generated path.
 
@@ -15557,7 +15704,7 @@ The derivation is total. A node it cannot map honestly reports `kind: "unknown"`
 Kinds are decided by chain membership and declared types — never by sniffing a schema shape. Per node, in precedence order:
 
 1. A concept with an authored structure *table* anywhere along its refinement chain is an `object`; its fields are the merged structures along the chain, base fields first, a refining concept overriding its parents'. The table decides even when it is empty — the engine backs an empty `[concept.X.structure]` with a field-less structured model, not with `TextContent`, so the descriptor reports `object` with an empty `fields` list rather than falling through to rule 4.
-2. Otherwise, the first `structure = "ClassName"` on the chain decides: a native class name (`TextContent`, `ImageContent`, …) maps by identity to that native's row; any other registered class is reflected field by field into an `object`; an unregistered or unmappable class is `unknown`.
+2. Otherwise, the first `structure = "ClassName"` on the chain decides: a native class name (`TextContent`, `ImageContent`, …) maps by identity to that native's row; any other registered class is reflected field by field into an `object`; a class the registry does not hold — or one that is not a pydantic model — is `unknown`.
 3. Otherwise, a chain bottoming at a native concept takes that native's row, keeping the concept's own `concept_ref`, description and `refines`.
 4. Otherwise — a description-only or string-described concept — `prose`, with `refines` carrying the authored chain alone (absent when nothing was authored): a producer states only the links it holds, so no `native.Text` link is reconstructed — text-valuedness reaches the wire as the `prose` kind itself.
 
@@ -15578,6 +15725,8 @@ The table and rules above ARE the no-hint kind assignment — stated rules, not 
 
 Nested structure fields map by their declared type: `text` → `text`; `integer` → `number` with `integer: true`; `number` → `number`; `boolean` → `boolean`; `date` → `date`; `datetime` → `date` with `datetime: true`; `time` → `text` with `format: "time"`; a field with `choices` → `enum` (choices win over `type`, matching the structure generator); `concept` → the concept's node, carrying its namespaced `concept_ref`; `list` → `list` whose `item` comes from `item_type` / `item_concept_ref` (a nested list's inner item is inexpressible and reports `unknown`; the `item` node carries no `name` member — a list's item has no authored name, and the index labels entries); `dict` → `unknown`. The shorthand `field = "description"` form is a required `text`. Nested fields take the blueprint field's description and `required` over the concept's; a scalar flattened at the top level keeps the concept's description.
 
+A reflected class's fields map by their annotation, and each annotation is mapped **on its own**: a scalar takes its kind from the type, a native content class (`ImageContent`, `DocumentContent`, …) takes that native's row by identity, a `list[X]` is a `list` whose `item` is `X` reflected one layer down, a nested non-native pydantic model is an `object` the reflection walks into, a `RootModel` is its root annotation's node (the value it accepts is the root value itself, never an object over a `root` key), and an annotation with no honest node — a union that is neither `X | None` nor `int | float`, a `dict`, a class already on the path — is `unknown` at **that field**, leaving its siblings stated. Partiality is the point: collapsing the whole payload the moment one annotation could not be mapped hid every `document` and `image` position under the class, and a consumer preparing inputs from the descriptor then passed a local file path through un-uploaded. A class declaring no field is an `object` with an empty `fields` list — a payload that demands nothing, the class-backed twin of an empty authored structure table. A registered class that IS a `RootModel` is read the same way at the top: the concept's node is its root annotation's, carrying the concept's own `concept_ref`, `refines` and description — so a root-valued concept agrees with the `json_schema` derived from that same class beside it, instead of describing an object over a `root` key that `model_validate` would reject. This is deliberately unlike the reflection the native consistency probe performs (`pipelex/codegen/native_expansion.py`), which stays faithful-or-absent because it is compared against a normative pinned blueprint, where a plausible-looking partial answer would be the failure.
+
 Constraint slots (`minimum`, `exclusive_minimum`, `min_length`, `pattern`, …) come only from reflected classes: the language cannot author constraint keys (an authored `minimum = 0` is rejected as an unknown structure-field key), whereas a registered class's `Field(gt=0, max_length=8, pattern=...)` is read from the pydantic field metadata and stamped on the matching `number` or `text` node. A pydantic default on a reflected class is an authored fact: `field_info.is_required()` decides the node's `required` and a non-`None` default is reported as its `default_value` — a defaulted field is never required, the same invariant blueprint validation enforces by rejecting the `required = true` + `default_value` pair. (Authored `hints` are a parsed blueprint field with its own leniency rules; see below.)
 
 ## Hints
@@ -15596,7 +15745,11 @@ Inapplicable slots are absent, never JSON `null`: the report's valid arm is dump
 
 ## Seeing it
 
-`pipelex-dev trace-input-semantics` captures the descriptors as `hop5_input_form.json` beside `hop5_pipe_io_contracts.json`, so an authored fact can be checked on both projections at once — see [Tracing Input Semantics](../contribute/trace-input-semantics.md). The assignment table is pinned by `tests/integration/pipelex/pipeline/test_input_form.py` over the committed probe bundle (and the hints behavior over its hinted sibling, `hinted_bundle.mthds`), the emitted wire's null-free shape by `tests/unit/pipelex/pipeline/test_input_form_models.py`, the hint merges and kind-feeding by `tests/unit/pipelex/pipeline/test_input_form_hints.py`, and the escape hatches the library loader keeps unreachable (concept cycles, unregistered classes) by `tests/unit/pipelex/pipeline/test_input_form_deriver.py`.
+`pipelex-dev trace-input-semantics` captures the descriptors as `hop5_input_form.json` beside `hop5_pipe_io_contracts.json`, so an authored fact can be checked on both projections at once — see [Tracing Input Semantics](../contribute/trace-input-semantics.md). The assignment table is pinned by `tests/integration/pipelex/pipeline/test_input_form.py` over the committed probe bundle (and the hints behavior over its hinted sibling, `hinted_bundle.mthds`), the emitted wire's null-free shape by `tests/unit/pipelex/pipeline/test_input_form_models.py`, the hint merges and kind-feeding by `tests/unit/pipelex/pipeline/test_input_form_hints.py`, and the escape hatches the library loader keeps unreachable (concept cycles, unregistered classes, a structure class that holds itself) by `tests/unit/pipelex/pipeline/test_input_form_deriver.py`.
+
+## What clients project from it
+
+The descriptor is what a client SDK renders a pipe's fill-in inputs template from — the hosted build routes no longer render one server-side. That projection is written twice, in TypeScript and in Python, and the two are pinned against each other by a shared fixture corpus this engine generates: see [Projection Fixture Corpus](../contribute/generate-projection-corpus.md). The corpus is also where the projection's rules are stated, including the places it is deliberately right where this engine's own inputs-template renderer is not.
 
 
 ## Per-Pipe IO Contracts
@@ -15637,6 +15790,12 @@ The JSON Schema on an input names its concept: `title` is the `concept_ref`, `de
   "maxItems": 2
 }
 ```
+
+## The one concept with no structure class: `native.Anything`
+
+`native.Anything` is the only concept that declares no structure class, so its input schema cannot come from a pydantic render. (That is a different question from the three natives which declare no *pinned structure* — `Dynamic`, `Anything`, `Composite` — and therefore render as `unknown` in the [input-form descriptor](input-form-descriptor.md).) It publishes the **permissive schema**: no constraint keywords, only the identity annotations every rendered input schema carries — `{"title": "native.Anything", "description": "…"}`. Annotation keywords constrain nothing, so this is semantically the empty schema (any JSON value), which is what an untyped vehicle means, while consumers still see the concept's identity instead of a bare `{}` they would have to special-case. Multiplicity wraps exactly as above: `Anything[]` is an array of that schema, a fixed count adds the bounds.
+
+The schema states what the *concept* admits, not what today's input shaper accepts: an `Anything` slot currently takes a string (shaped into a `native.Text` stuff) and refuses the other JSON types. Narrowing the published schema to match would be stating a runtime limitation as a contract, so the schema stays permissive and the shaper is what has to catch up.
 
 ## Which surfaces carry it
 
@@ -18528,7 +18687,7 @@ This handles two scenarios:
 | `not backends_existed_before` | First-time setup (no inference yet) | Force inference step regardless of focus |
 | `check_inference and backends_exists_now` | Inference in focus + existing config | Re-run inference (reset) |
 
-When inference is **not** forced and backends already exist, gateway terms are still checked:
+When inference is **not** forced and backends already exist, service terms are still checked. The question is the broad one — is *any* Pipelex-managed gateway backend enabled — because the terms are the Pipelex service's rather than one dialect's, and it is read off the merged backends document pinned to the target directory (`enabled_managed_gateway_sections(config_dir=…)`), so a managed backend switched on only by that directory's `backends_override.toml` is prompted for terms too. Declining writes `enabled = false` into the base for every managed backend, and `warn_if_managed_gateway_pinned_by_override` names the ones an override still keeps on:
 
 ```python
 if not needs_inference and backends_existed_before:
@@ -18608,7 +18767,7 @@ Copies a telemetry template and prints instructions. No interactive prompts. Whi
 
 | Constant | Contents | Reason |
 |----------|----------|--------|
-| `INIT_SKIP_FILES` | All `GIT_IGNORED_CONFIG_FILES` (`pipelex_service.toml`, `pipelex_override.toml`, `telemetry_override.toml`, `telemetry.project.toml`, `pipelex_gateway_models.md`, `pipelex_gateway_models_plain.md`, `x_custom_llm_deck.toml`, `x_custom_extract_deck.toml`) plus `telemetry.toml` and `.DS_Store` | Git-ignored, auto-generated, or managed by other steps |
+| `INIT_SKIP_FILES` | Every name in `GIT_IGNORED_CONFIG_FILES` (`pipelex/kit/paths.py` is the list: the personal overrides, the service file, the generated gateway model pages, the custom deck files) plus `telemetry.toml` and `.DS_Store` | Git-ignored, auto-generated, or managed by other steps |
 | `INIT_SKIP_DIRS` | `inference` | Managed independently by inference step |
 
 ### Source Modules
@@ -18789,12 +18948,14 @@ flowchart TD
 |-------|-------------------|---------|
 | `check_config_files()` | `resolve_config_file()` | Layered resolution (project > global) |
 | `check_telemetry_config()` | `resolve_config_file()` | Layered resolution (project > global) |
-| `check_backend_credentials()` | `resolve_config_file()` | Finds `backends.toml` wherever it lives |
-| `check_backend_files()` | `resolve_config_file()` | Finds `inference/backends/` wherever it lives |
+| `check_backend_credentials()` | `backends_file_paths()` | Reads the merged backends document: the base `backends.toml` wherever it lives, plus the personal `backends_override.toml` at each tier |
+| `check_backend_files()` | `resolve_config_file()` for `inference/backends/`, `backends_file_paths()` for the enabled-backend list | Finds `inference/backends/` wherever it lives, and reads the merged backends document to decide which backends to probe |
 | `check_models()` gateway terms | `global_config_dir` | **Always global** — reads from `~/.pipelex/` |
 | `check_pending_migrations()` | none | **Both directories, always** — see below |
 
 `check_pending_migrations()` is the one check that takes no `config_dir` at all, and that is deliberate. Every other row reports on a *file* and is scoped to the directory the doctor was pointed at, `--global` included. That one reports on a *command* — it is `pipelex migrate`'s own dry run — and `pipelex migrate` has no `--global`: it walks the global `~/.pipelex/` and the project `.pipelex/` both. Scoping the row narrower would name a command that then rewrites a file the row never mentioned. Every file it reports is named with its full path, so the wider scope stays legible.
+
+`check_backend_files()` loads the backend library once per enabled backend, and loads it with `lenient=True`. The row reports on file shape — an unknown key, a spec that is not a table, a missing per-backend file — so a backend whose gateway model specs were not handed to the loader (the probe fetches nothing) or whose credentials do not resolve is skipped rather than reported: those are the Models row's and the Credentials row's findings. Without leniency the shipped defaults, which enable `pipelex_gateway` and ship its override file, would be reported as a backend-configuration error, and because the loader stops at the first backend it cannot load, a malformed file listed after the gateway in `backends.toml` would go unreported. Every probe sees that same first failure, so a failure is charged to the backend the error declares (`backend_name`, stamped by the loader on every error about one backend) or, for an error that declares none, to the backend whose file it names — never to a backend whose name merely appears in the message's prose. `check_models()` attributes the same way and for the same reason: its own load is strict and reaches backends the probe skipped leniently, so it can be the first thing to name a broken backend, and it writes into the very reports this row produced.
 
 ### Fix Targeting
 
@@ -19071,7 +19232,7 @@ Distributed execution introduces three mechanisms that don't exist in direct mod
 
 - **LibraryCrate propagation** — the submitter attaches a serializable snapshot of all pipes and concepts to the `PipeJob`; every worker-side job loads it (idempotently, by fingerprint) so `get_required_pipe()` resolves at every level.
 - **Deferred hydration** — `WorkingMemory` crosses as a raw JSON dict (`working_memory_raw`) on both `PipeJob` inputs and `PipeOutput` return values, avoiding deserialization failures when a receiving process hasn't registered the bundle's dynamic concept classes. The transport-prep helpers are not part of open core; the raw field and the hydration helper are.
-- **Per-call isolation** — each job gets its own `ClassRegistry` (pre-seeded from the global registry) and its own `Library`, scoped via `ContextVar`, so concurrent jobs with conflicting concept names (e.g., two bundles that both define `Result` with different fields) don't cross-contaminate.
+- **Per-call isolation** — every `Library` the manager opens carries its own `ClassRegistry` (pre-seeded from the global registry), and a job's library is scoped via `ContextVar`, so concurrent loads with conflicting concept names (e.g., two bundles that both define `Result` with different fields) don't cross-contaminate — jobs, and any other load sharing the process, a validate included.
 
 !!! warning "Known backend limitation: StuffArtefact in dry-run"
     On a host runtime whose data converter serializes working memory for internal templating activities (Temporal's `act_jinja2_gen_text`, dispatched by PipeCondition and PipeCompose), dry-run mode can fail: working memory then holds `StuffArtefact` debug objects that are not JSON-serializable. PipeSequence and PipeParallel are unaffected — they dispatch child pipes without internal templating activities. This is a backend-specific concern; see our Temporal plugin's own docs for details and fix direction.
@@ -20007,7 +20168,7 @@ An error rises through a series of layers. Each layer has exactly one job.
 | **1 — Workers / SDK calls** | `pipelex/providers/*/` | **Catch the SDK exception → classify → raise `CogtError`** |
 | **0 — Third-party SDKs** | OpenAI, Anthropic, Google, … | Raise raw, untyped provider exceptions |
 
-Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they attach context as they catch and re-raise, but the `error_category`, `error_domain`, `model`, and `provider` set at Layer 1 reach Layer 5 unchanged (see [Cause-Chain Enrichment](#cause-chain-enrichment)).
+Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they attach context as they catch and re-raise, but the `error_category`, `error_domain`, `model`, and `provider` set at Layer 1 reach Layer 5 unchanged (see [Cause-Chain Enrichment](#cause-chain-enrichment)). The worker states only the `error_category`; the matching `error_domain` is [derived from it](#the-cogterror-family-derives-its-domain-from-its-category), so a single Layer-1 decision settles both the retry question and the HTTP status.
 
 ---
 
@@ -20022,7 +20183,7 @@ Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they att
 | `title` | `str` | Stable human-readable summary — the RFC 7807 `title` |
 | `type_uri` | `str` | Per-class documentation URI — the RFC 7807 `type` |
 | `error_category` | `str \| None` | `InferenceErrorCategory` value (inference errors only) |
-| `error_domain` | `str \| None` | `ErrorDomain` value — `input` / `config` / `runtime` |
+| `error_domain` | `str \| None` | `ErrorDomain` value — `input` / `config` / `runtime`. Declared per class, except on the `CogtError` family where it is [derived from `error_category`](#the-cogterror-family-derives-its-domain-from-its-category) |
 | `retryable` | `bool \| None` | Whether a retry could succeed |
 | `user_action` | `UserAction \| None` | Typed advice — `kind` + free-form `detail` |
 | `model` | `str \| None` | Model handle, when the failure is attributable to one |
@@ -20107,16 +20268,16 @@ Two `StrEnum`s drive every downstream decision.
 
 ### InferenceErrorCategory
 
-Defined in `pipelex/cogt/exceptions.py`. Drives retry decisions — `is_retryable` is `True` only for `TRANSIENT`.
+Defined in `pipelex/cogt/exceptions.py`. It carries two derived properties: `is_retryable` drives retry decisions and is `True` only for `TRANSIENT`; `error_domain` drives the HTTP status the whole `CogtError` family answers with.
 
-| Category | Meaning | Retryable | Typical cause |
-|----------|---------|-----------|---------------|
-| `TRANSIENT` | A brief, self-correcting failure | ✅ | Rate limit, 5xx, connection blip |
-| `CONFIGURATION` | The setup is wrong | ❌ | Bad API key, missing backend |
-| `CONTENT` | The input or prompt is wrong | ❌ | Content-policy violation, bad prompt |
-| `CAPACITY` | Account quota / billing exhausted | ❌ | `insufficient_quota`, HTTP 402 |
-| `AMBIGUOUS` | Outcome unknown — may have committed | ❌ | Connection dropped mid-request |
-| `UNKNOWN` | Could not classify | ❌ | Unrecognized inner exception |
+| Category | Meaning | Retryable | Domain | Typical cause |
+|----------|---------|-----------|--------|---------------|
+| `TRANSIENT` | A brief, self-correcting failure | ✅ | `RUNTIME` | Rate limit, 5xx, connection blip |
+| `CONFIGURATION` | The setup is wrong | ❌ | `CONFIG` | Bad API key, missing backend |
+| `CONTENT` | The input or prompt is wrong | ❌ | **`INPUT`** | Content-policy violation, bad prompt |
+| `CAPACITY` | Account quota / billing exhausted | ❌ | `RUNTIME` | `insufficient_quota`, HTTP 402 |
+| `AMBIGUOUS` | Outcome unknown — may have committed | ❌ | `RUNTIME` | Connection dropped mid-request |
+| `UNKNOWN` | Could not classify | ❌ | *none* | Unrecognized inner exception |
 
 ```python
 class InferenceErrorCategory(StrEnum):
@@ -20131,10 +20292,22 @@ class InferenceErrorCategory(StrEnum):
                 return True
             case _:  # all other categories
                 return False
+
+    @property
+    def error_domain(self) -> ErrorDomain | None:
+        match self:
+            case InferenceErrorCategory.CONTENT:
+                return ErrorDomain.INPUT
+            case InferenceErrorCategory.CONFIGURATION:
+                return ErrorDomain.CONFIG
+            # ... TRANSIENT / CAPACITY / AMBIGUOUS -> RUNTIME, UNKNOWN -> None ...
 ```
 
 !!! info "`AMBIGUOUS` vs `UNKNOWN`"
     `AMBIGUOUS` means the *error type is known* but the operation may or may not have committed — a blind retry is unsafe for a non-idempotent call. `UNKNOWN` means classification itself failed. Both are non-retryable, for different reasons.
+
+!!! info "`UNKNOWN` maps to no domain at all"
+    `UNKNOWN` means the classification step itself failed, so claiming `RUNTIME` would assert something the code cannot support. An absent `error_domain` already renders 500 (see below), so the honest answer costs nothing at the HTTP boundary and keeps "could not classify" distinguishable from "classified as a server-side fault".
 
 ### ErrorDomain
 
@@ -20146,12 +20319,25 @@ Defined in `pipelex/base_exceptions.py`. Set as a class-level attribute on the e
 | `CONFIG` | Environment / configuration change needed | **500** | The operator |
 | `RUNTIME` | A failure during execution | **500** | Depends on the cause |
 
-`error_domain_to_http_status()` is the pure mapping table. `ErrorReport.http_status` layers one rule on top: a provider 429 (`provider_metadata.status_code == 429`) takes precedence over the domain, so the API can emit a `Retry-After` header.
+`error_domain_to_http_status()` is the pure mapping table — it maps an unset or unrecognized domain to 500 as well. `ErrorReport.http_status` layers one rule on top: a provider 429 (`provider_metadata.status_code == 429`) takes precedence over the domain, so the API can emit a `Retry-After` header. That precedence is why `CAPACITY -> RUNTIME` does not swallow a rate-limit passthrough.
 
 ```python
 class PipelexConfigError(PipelexError):
     error_domain = ErrorDomain.CONFIG  # class-level — every instance carries it
 ```
+
+#### The `CogtError` family derives its domain from its category
+
+The inference branch is the one place where `error_domain` is **not** declared per class. A worker has already decided whose fault the failure is when it assigns an `InferenceErrorCategory`, so `CogtError.to_error_report()` derives the domain from that category rather than asking several dozen leaf classes to state the same fact twice — which is also what keeps `error_domain` and `error_category` from ever contradicting each other on the wire.
+
+Precedence on the derived field mirrors every other field on that method: an `error_domain` declared explicitly on the leaf class wins, then the category derivation, then whatever the `__cause__` chain surfaced.
+
+```python
+own_domain = self.error_category.error_domain if self.error_category is not None else None
+"error_domain": self.error_domain or own_domain or base_report.error_domain,
+```
+
+The consequence worth knowing at the HTTP boundary: a **content-classified inference failure answers 422, not 500** — a content-policy refusal, a malformed prompt image, a bad prompt parameter are all properties of material the caller submitted. Everything else keeps the status it already had; only the report became truthful about why.
 
 ---
 
@@ -20180,8 +20366,8 @@ The three steps live in three modules. Only the per-provider Extract functions s
 
 | Module | Step | What it owns |
 |--------|------|--------------|
-| `pipelex/cogt/inference/error_classification.py` | Extract | `ProviderErrorMetadata`, `SDKErrorEnvelope`, `UserAction`, `UserActionKind`, the 12 `extract_*_metadata` functions, plus pure discriminators (`is_quota_exhaustion`, `is_content_policy_violation`, `is_network_error`) exposed as `@property` on the metadata |
-| `pipelex/cogt/inference/error_classify.py` | Classify | `classify_inference_error()` — provider-blind mapping from `ProviderErrorMetadata` → `ClassificationResult(category, user_action_kind, is_model_not_found)` |
+| `pipelex/cogt/inference/error_classification.py` | Extract | `ProviderErrorMetadata`, `SDKErrorEnvelope`, `UserAction`, `UserActionKind`, `GatewayRequestLimit`, `GatewayUnresolvedReference`, `GatewayRoutingRefusal`, the `extract_*_metadata` functions, plus pure discriminators (`is_quota_exhaustion`, `is_content_policy_violation`, `is_network_error`, `gateway_request_limit`, `gateway_unresolved_reference`, `gateway_routing_refusal`) exposed as `@property` on the metadata |
+| `pipelex/cogt/inference/error_classify.py` | Classify | `classify_inference_error()` — provider-blind mapping from `ProviderErrorMetadata` → `ClassificationResult(category, user_action_kind, is_model_not_found, gateway_request_limit, gateway_unresolved_reference, gateway_routing_refusal)` |
 | `pipelex/cogt/inference/error_render.py` | Render | `render_inference_error()` — picks the `CogtError` subclass from `InferenceErrorFamily` plus `is_model_not_found` (e.g. `LLMModelNotFoundError` vs `LLMCompletionError`) |
 
 Provider-specific nuance is normalized away in Extract (e.g. Google's `code` becomes `status_code`; AWS Bedrock error codes are mapped to HTTP statuses), so Classify has no provider branching. HTTP status drives classification; status-less errors dispatch on the SDK exception type name. The `tests/unit/pipelex/cogt/inference/test_provider_classification_parity.py` meta-test walks every `ProviderName` against the extract-fn registry so adding a new provider without wiring it fails fast.
@@ -20205,6 +20391,95 @@ class ProviderErrorMetadata(BaseModel):
     The raw provider response `body` can carry account ids, billing details, or credential fragments. It is held in-process but `exclude`d from every serialized form — CLI JSON, agent output, and any serialized worker payload.
 
 `UserAction` pairs a discrete `UserActionKind` (`WAIT_AND_RETRY`, `CHECK_BILLING`, `CHECK_CREDENTIALS`, `CHANGE_INPUT`, `CHANGE_MODEL`, `CONTACT_SUPPORT`, `UNKNOWN`) with a free-form `detail` string — so the CLI can render consistent guidance while keeping provider-specific text.
+
+### The Gateway's Own Refusals
+
+Not every failure on an inference call comes from a provider. The Pipelex inference gateway refuses some requests itself, before a model ever sees them, and it does so for three different reasons: the request is outside what it will carry, a reference the request depends on cannot be turned into content, or it cannot decide which provider should serve the request at all. All three arrive with the gateway's own error codes, and each has a runtime enum naming its outcomes — `GatewayRequestLimit`, `GatewayUnresolvedReference` and `GatewayRoutingRefusal`.
+
+#### What the request may weigh
+
+The gateway bounds what a request may weigh and how deeply it may nest, and refuses anything over those bounds itself — the body cap runs ahead of authentication, on the request headers alone, so the request never reaches a model at all.
+
+| Gateway code | HTTP | `GatewayRequestLimit` | Category / action | What the caller is told |
+|---|---|---|---|---|
+| `pig-07` | 413 | `BODY_TOO_LARGE` | `CONTENT` / `CHANGE_INPUT` | the request was too large — send less in one call |
+| `pig-08` | 411 | `BODY_LENGTH_REQUIRED` | `CONFIGURATION` / `CONTACT_SUPPORT` | the gateway could not read the request's declared size |
+| `pig-10` | 413 | `OBJECT_TOO_LARGE` | `CONTENT` / `CHANGE_INPUT` | a file the request refers to is over the per-file limit |
+| `pipelex_storage_object_too_large` | 413 | `OBJECT_TOO_LARGE` | `CONTENT` / `CHANGE_INPUT` | the same limit, as the native routes name it |
+| `pipelex_document_too_large` | 413 | `OBJECT_TOO_LARGE` | `CONTENT` / `CHANGE_INPUT` | a document the gateway fetched by URL is over that limit |
+| `pig-11` | 400 | `BODY_TOO_DEEP` | `CONTENT` / `CHANGE_INPUT` | the request nests too deeply — flatten the inputs or the output structure |
+
+Three of the four are the caller's to fix and none of the four is ever retried: the gateway refused the request before a provider saw it, so an identical retry earns an identical refusal. `pig-08` is the exception in kind rather than in retryability — an HTTP client framed the request in a way the gateway will not bound (a chunked body, or an unreadable `Content-Length`), which no client the runtime ships produces, so it points at the transport stack rather than at the inputs.
+
+A few details are worth knowing before touching this:
+
+- **The code is the discriminator, not the provider.** A request reaches the gateway through whichever SDK its dialect calls for — the Portkey substrate, plain `httpx` on the native extract and search routes, and the shared Anthropic driver that Claude travels on — so the same refusal arrives under more than one `ProviderName`. `pig-` is the gateway's own code namespace, so matching on the code alone is both necessary and sufficient. Every Extract hop that can carry one of these recovers the code into `provider_error_code` — including the Portkey substrate, where it has to be read back off the response: Portkey's own exception factory replaces the payload with the message string, so `exc.body` there is never the document the code lives in.
+- **The check runs before the status ladder.** An explicit code from a service we operate is a more specific verdict than any status bucket, and 413 / 411 / 400 would otherwise be read as a provider rejecting the prompt. It cannot collide with the quota rules, which only fire on 402 and 429.
+- **The advice names no numbers.** The caps belong to the deployment, they differ between deployments, and the gateway already states its own figures in the message the advice sits beside. `_render_gateway_limit_detail` in the Render step is also where a per-plan message belongs once the hosted product's tier limits are wired through — the gateway knows nothing of users, organizations or plans, so only the runtime can say "your plan allows files up to N MB".
+- **One failure can wear two codes, and reading `type` first loses one of them.** The gateway renders a refusal in the vocabulary of the route it arrived on: its own `pig-0N` family on the LLM routes, where the client is speaking a provider's protocol, and its frozen `pipelex_*` contract codes on the native `/v1/pipelex/extract` and `/v1/pipelex/search` routes. So "this file is over its cap" is `pig-10` on one and `pipelex_storage_object_too_large` on the other, and a caller cannot tell which route their extract took. The native-route envelope also puts a generic `invalid_request_error` in `error.type` beside the real code in `error.code`, so the two Pipelex-service Extract hops read `code` before `type` — the inverse of the vendor-facing precedence, which stays as it is because Anthropic's error section carries a `type` and no `code` at all. Reading `type` first there replaces the whole `pipelex_*` vocabulary with one bucket.
+
+#### When a reference cannot be resolved
+
+The second of the gateway's three families. A request may *name* a file rather than carry it — a `pipelex-storage://` key the gateway resolves for the caller, or a document URL it fetches on their behalf — and when it cannot turn that reference into bytes it refuses the request itself, again before a provider sees it. So the family above bounds what the request may weigh; this one says a reference the request depends on could not be turned into content. `GatewayUnresolvedReference` is the runtime's name for each outcome.
+
+| Gateway code | HTTP | `GatewayUnresolvedReference` | Category / action | What the caller is told |
+|---|---|---|---|---|
+| `pig-09` | 400 | `REFERENCE_UNRESOLVED` | `CONTENT` / `CHANGE_INPUT` | a file reference could not be resolved — the message names the cause |
+| `pipelex_storage_uri_invalid` | 400 | `STORAGE_REFERENCE_INVALID` | `CONTENT` / `CHANGE_INPUT` | the storage reference is malformed — check it against the key the upload returned |
+| `pipelex_storage_unreadable` | 400 | `STORAGE_OBJECT_UNREADABLE` | `CONTENT` / `CHANGE_INPUT` | the object is not there, or cannot be read |
+| `pipelex_storage_uri_unsupported` | 400 | `STORAGE_NOT_SERVED` | `CONFIGURATION` / `CONTACT_SUPPORT` | this deployment serves no storage references at all |
+| `pipelex_unsupported_uri_scheme` | 400 | `DOCUMENT_URL_REFUSED` | `CONTENT` / `CHANGE_INPUT` | send an `https://` URL, a `data:` URL, or a `pipelex-storage://` reference |
+| `pipelex_document_scheme_refused` | 400 | `DOCUMENT_URL_REFUSED` | `CONTENT` / `CHANGE_INPUT` | the same remedy — the fetch's own scheme check |
+| `pipelex_document_address_refused` | 400 | `DOCUMENT_URL_REFUSED` | `CONTENT` / `CHANGE_INPUT` | the same remedy — the resolved address is not publicly routable |
+| `pipelex_document_redirect_refused` | 400 | `DOCUMENT_URL_REFUSED` | `CONTENT` / `CHANGE_INPUT` | the same remedy — the gateway does not follow redirects |
+| `pipelex_document_host_refused` | 400 | `DOCUMENT_HOST_REFUSED` | `CONTENT` / `CHANGE_INPUT` | documents are not fetched from that host, as a matter of security policy |
+| `pipelex_document_unreachable` | 400 | `DOCUMENT_UNREACHABLE` | `CONTENT` / `CHANGE_INPUT` | check the document is live and publicly reachable |
+| `pipelex_document_empty` | 400 | `DOCUMENT_CONTENT_UNUSABLE` | `CONTENT` / `CHANGE_INPUT` | the document was fetched and cannot be used |
+| `pipelex_document_unsupported_type` | 400 | `DOCUMENT_CONTENT_UNUSABLE` | `CONTENT` / `CHANGE_INPUT` | the same — a media type the pipeline does not accept |
+| `pipelex_document_bad_data_url` | 400 | `DOCUMENT_CONTENT_UNUSABLE` | `CONTENT` / `CHANGE_INPUT` | the same — a `data:` URL that could not be decoded |
+
+Everything said above about the request limits holds here too — the code is the discriminator rather than the provider, the check runs ahead of the status ladder, and the advice defers every specific to the gateway's own message, which already names the key, the host, the status or the media type. Three things are particular to this family:
+
+- **The members group by remedy, not by wire code.** Two codes share a member only when the caller's next move is the same, which is why the URL-shape refusals are one member. Two of them are scheme checks in different places and both belong there: `classifyExtractInput` runs before any fetch and admits only `https:`, `data:` and `pipelex-storage://`, so an `http://` URL is refused as `pipelex_unsupported_uri_scheme`, and `pipelex_document_scheme_refused` is the fetch's own check on what by then can only be an `https://` URL. `pipelex_document_host_refused` is deliberately *not* folded in with them: the caller can act on all four, but only that one has to be stated as the deliberate security refusal it is. Advice that reads as a fault to work around — revise the prompt, use a smaller file — sends someone hunting for a problem in a document that is perfectly fine.
+- **One member is not the caller's problem at all.** `pipelex_storage_uri_unsupported` means no bucket is configured, so the deployment does not serve the scheme: no input avoids it, and telling the caller to fix theirs is wrong in kind. It is the family's one `CONFIGURATION` / `CONTACT_SUPPORT` arm, the same call `BODY_LENGTH_REQUIRED` gets among the request limits.
+- **`pig-09` is one code for every storage failure but "over its cap", and the advice says so.** On the LLM routes the client is speaking a provider's protocol, so the gateway's `pig-0N` family is the only vocabulary available and it has a single fail-closed slot for "cannot resolve" — no bucket configured, not a storage reference, no such object, an object it cannot read, a type no provider takes, or no way to hand a file to the provider the model resolves to. The message carries the difference; the code does not, so `REFERENCE_UNRESOLVED` defers to the message rather than guessing which it was. The native `/v1/pipelex/*` routes name each cause with its own frozen contract code, which is why the rest of the table is `pipelex_*`.
+
+`pig-09` also folds in causes that are not the caller's to repair — no bucket configured, and no way to hand a file to the provider the model resolves to — because the LLM routes have one slot for all of them. The native routes name the first of those separately (`pipelex_storage_uri_unsupported`, `CONTACT_SUPPORT`), so the same storage-less deployment reads differently by route. Splitting `pig-09` is a gateway-side change, filed on `pipelex-manifold` as `L-260901-f2b554`.
+
+#### When the model cannot be routed
+
+The third family, and the one no request escapes: whatever else it asks, it has to be *routed* first — the gateway reads the model out of it, looks that model up in its own routing table, and hands the call to the integration that serves it. When that resolution fails there is no provider to send the request to, so the gateway refuses it itself. `GatewayRoutingRefusal` is the runtime's name for each outcome.
+
+| Gateway code | HTTP | `GatewayRoutingRefusal` | Category / action | What the caller is told |
+|---|---|---|---|---|
+| `pig-01` | 400 | `UNKNOWN_MODEL` | `CONFIGURATION` / `CHANGE_MODEL` | the gateway serves no such model — and if the deck lists it, the deck and the gateway disagree |
+| `pig-02` | 400 | `DISABLED_INTEGRATION` | `CONFIGURATION` / `CONTACT_SUPPORT` | the model's integration is not enabled on this deployment — its credentials are unset |
+| `pig-05` | 400 | `WRONG_PROTOCOL` | `CONFIGURATION` / `CHANGE_MODEL` | the model is served, but not over the protocol the request used for it |
+| `pig-06` | 400 | `UNSERVED_CAPABILITY` | `CONFIGURATION` / `CHANGE_MODEL` | the model's integration does not serve that capability (extract, search) |
+
+Everything said about the two families above holds here too — the code is the discriminator rather than the provider, the check runs ahead of the status ladder, the advice defers every specific to the gateway's own message, and nothing is ever retried. Four things are particular to this family:
+
+- **The category is `CONFIGURATION`, never `CONTENT`, and that is the whole bug this family fixes.** Nothing in the prompt, the parameters or the inputs causes any of these, and no edit to them avoids one. Before the family existed all four fell through to the status ladder's 400 arm, so a caller who named a model the deployment does not serve was told *"The provider rejected the request — review the prompt, parameters, and inputs"* and received an `LLMCompletionError`.
+- **Every member is its own wire code, unlike the two families above.** Grouping is by remedy in all three, and here each code names a different thing that has to change — so the grouping happens to be one-to-one rather than by design.
+- **Only `pig-01` sets `is_model_not_found`.** The flag is not a category: it selects the family's `*ModelNotFoundError` class, which `pipe_operator.py` re-raises as a `PipeOperatorModelAvailabilityError` carrying the model handle — the pipe-level error a caller already gets when the model deck itself cannot find a model. `pig-01` is exactly that case seen from the gateway. For `pig-05` and `pig-06` the model *does* exist and *is* served, so claiming it was not found would be false; they stay on the generic failure class and carry the distinction in the advice.
+- **`pig-02` is the family's `CONTACT_SUPPORT` arm**, the same call `STORAGE_NOT_SERVED` and `BODY_LENGTH_REQUIRED` get. A switched-off integration is the gateway operator's fact: `CHECK_CREDENTIALS` would send a hosted caller to rotate their own perfectly valid key, and `CHANGE_MODEL` would send them shopping for a model over an unset variable. The gateway's message names the integration and the variables to set, and the advice points at it.
+
+**Moving the family to `CONFIGURATION` moves its HTTP answer too, and that is worth stating out loud.** `InferenceErrorCategory.CONFIGURATION` implies `ErrorDomain.CONFIG`, which `error_domain_to_http_status` renders as **500**, where `CONTENT` implies `INPUT` and renders as 422. So on any surface built on `ErrorReport.http_status`, all four of these now answer 500 where they answered 422 — the same answer the status ladder's 404 arm has always given a missing model, and the right one in kind, since none of them is a property of what the caller submitted. Two consequences follow: these land in server-error alerting rather than client-error, and 500 is a status outer HTTP clients and orchestrators retry. "Never retried" above is a statement about `InferenceErrorCategory.is_retryable` inside this process; it says nothing about what a caller's own client does with the status, and an outer retry of any of these earns an identical refusal.
+
+`pig-05` and `pig-06` are as often a deck-versus-gateway disagreement as a caller's mistake — the runtime picks the protocol and the route from its own model deck — so both details say "your model deck" out loud rather than only "pick another model", which would leave an operator hunting for a model problem that is a configuration problem.
+
+Two of the gateway's routing codes are deliberately **not** in the family, because no client the runtime ships can produce either:
+
+| Code | HTTP | Why it stays with the status ladder |
+|---|---|---|
+| `pig-03` | 400 | "the client tried to route" — a refused `x-portkey-*` header, the `?model=` query form, a `@<slug>/<model>` virtual-key model, or a path and body naming different models. No client that talks to a Pipelex-operated gateway today sends one, so reaching it means a client bug rather than a caller's or an operator's mistake. Two limits on that: `tests/unit/pipelex/providers/manifold/test_manifold_clients.py` pins the manifold clients against the four steering headers *by name* while the gateway refuses on an allow-list, so a `portkey_ai` release sending some other `x-portkey-*` header would turn every request into a `pig-03` with that test still green; and the gateway img-gen worker does send `x-portkey-config`, which Portkey's cloud reads and one of our gateways refuses — harmless while `pipelex_gateway` keeps its default endpoint, a client bug the day it names one of ours. |
+| `pig-04` | 404 | "this gateway does not serve `<method> <path>`" — the proxy policy refusing a path only the catch-all could answer, unreachable while the runtime calls only the routes the gateway mounts. Being a 404 the ladder reads it as model-not-found, which is wrong in kind — but a served-path drift is a deployment bug to surface loudly rather than a verdict to soften. |
+
+`pig-05` is mapped but not reachable from today's runtime: it is raised only on a native Google protocol path (`/v1/<v1|v1alpha|v1beta>/models/<model>:generateContent`, or its `streamGenerateContent` twin, under the gateway's own `/v1` prefix), and no worker speaks that protocol to the gateway — both service plugins build their LLM workers on the OpenAI substrate, and the manifold's native client serves only the `/v1/pipelex/*` extract and search routes. The entry costs nothing and is right the day such a path is wired. One trap waits there, pinned by a test rather than left to be discovered: Google's Extract hop reads the symbolic `status` a Google error carries (`RESOURCE_EXHAUSTED` and friends), and the gateway's envelope has no `error.status` — only a top-level `status: "failure"`, which that hop returns as though it were a provider code. A native Google path needs that hop taught the gateway's envelope first.
+
+Nothing in any of the three families is ever retried, and no two of them overlap: a code names a bound the request exceeded, a reference that could not be resolved, or a request that could not be routed. `pig-09` and `pig-10` are the clearest illustration — the same middleware raises both, one when the object cannot be resolved and one when it is over its cap.
+
+The gateway's remaining codes belong to no family and classify on their status like anything else. For the storage deadline outcomes (`pig_storage_timeout` at 504, `pig_storage_client_disconnected` at 499) that is the right reading — a timeout is a timeout. For `pig-12` at 400, the LLM routes' "no storage bucket is configured", it is not: it is the operator's fact and reads as a prompt to revise, exactly as `pipelex_storage_uri_unsupported` does not on the native routes. One map entry into `GatewayUnresolvedReference.STORAGE_NOT_SERVED` closes it, filed as `L-260901-0859e8`.
 
 ### The `instructor` Unwrap
 
@@ -20344,7 +20619,7 @@ flowchart TB
 
 ### Class Hierarchy
 
-`PipelexError` is the single root. `CogtError` is the inference branch — it overrides `to_error_report()` to add `error_category`, `retryable`, `user_action`, `provider_metadata`, and reads `model_handle` / `backend_name` from the instance.
+`PipelexError` is the single root. `CogtError` is the inference branch — it overrides `to_error_report()` to add `error_category`, `retryable`, `user_action`, `provider_metadata`, and reads `model_handle` / `backend_name` from the instance. It is also where `error_domain` is *derived* rather than declared: the whole subtree gets its domain from its category.
 
 ```
 Exception
@@ -20352,15 +20627,20 @@ Exception
     ├── PipelexConfigError         → error_domain = CONFIG
     ├── PipelexSetupError          → error_domain = CONFIG
     ├── CogtError                  cogt/exceptions.py — error_category, provider_metadata
-    │   ├── LLMCompletionError      ← per-instance category from the worker
+    │   │                          → error_domain derived from error_category (no per-class declaration)
+    │   ├── LLMCompletionError      ← per-instance category from the worker → per-instance domain
     │   ├── ImgGenGenerationError   ← per-instance category
+    │   ├── LLMPromptSpecError      ← class-level CONTENT → INPUT → HTTP 422
+    │   ├── LLMConfigError          ← class-level CONFIGURATION → CONFIG
     │   ├── ModelNotFoundError      ← sibling family raised on provider HTTP 404
     │   │   ├── LLMModelNotFoundError / ImgGenModelNotFoundError
     │   │   └── ExtractModelNotFoundError / SearchModelNotFoundError
     │   └── ... (see worker classification) ...
-    ├── PipelineExecutionError      pipeline/exceptions.py — error_domain = RUNTIME
+    ├── PipelineExecutionError      pipeline/exceptions.py — error_domain = RUNTIME, but only as a floor
     └── ... (one exceptions.py per package) ...
 ```
+
+`PipelineExecutionError`'s `RUNTIME` is deliberately a *floor*, applied only when the cause chain surfaced no domain — so a `CONTENT`-categorized inference failure now reaches the HTTP boundary as `INPUT` / 422 through every wrapping layer instead of being flattened to the wrapper's generic 500.
 
 ### Factory-time vs Runtime
 
@@ -20368,7 +20648,7 @@ Exception
 |------|----------------------|-----|
 | **Class definition** | `error_domain`, `error_category` defaults, `user_action` defaults | Class-level attributes — one source of truth per exception type |
 | **Raise time** | Per-instance `error_category`, `user_action`, `provider_metadata` | Constructor args — set by the worker that classified the failure |
-| **Report time** | `model`, `provider`, cause-chain fields | `fill_model_and_provider()` at the worker chokepoint; `_enrich_error_report_from_cause()` on `to_error_report()` |
+| **Report time** | `model`, `provider`, cause-chain fields; `error_domain` on the `CogtError` family | `fill_model_and_provider()` at the worker chokepoint; `InferenceErrorCategory.error_domain` derivation and `_enrich_error_report_from_cause()` on `to_error_report()` |
 
 The "outcome" exceptions (`LLMCompletionError`, `ImgGenGenerationError`, `ExtractJobFailureError`, `SearchJobFailureError`) intentionally carry **no** class-level `error_category` — their category is genuinely per-instance, decided by the worker.
 
@@ -20416,14 +20696,18 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 
 | Scenario | Behavior |
 |----------|----------|
-| Rate limit hit | `TRANSIENT` → retryable; transport retry honors `Retry-After` |
-| Quota / billing exhausted | `CAPACITY` → non-retryable; `UserAction(CHECK_BILLING)` |
+| Rate limit hit | `TRANSIENT` → retryable; `error_domain = RUNTIME`; transport retry honors `Retry-After` (a provider 429 answers 429 regardless of domain) |
+| Quota / billing exhausted | `CAPACITY` → non-retryable; `UserAction(CHECK_BILLING)`; `error_domain = RUNTIME` → HTTP 500 |
 | Bad API key | `CONFIGURATION` → non-retryable; `error_domain = CONFIG` → HTTP 500 |
 | Model or deployment not found (provider HTTP 404) | Raises a dedicated `*ModelNotFoundError` sibling (`LLMModelNotFoundError`, `ImgGenModelNotFoundError`, `ExtractModelNotFoundError`, `SearchModelNotFoundError`); operator re-raises `PipeOperatorModelAvailabilityError` |
-| Content-policy violation | `CONTENT` → non-retryable; `UserAction(CHANGE_INPUT)` |
-| LLM returns schema-mismatched JSON | `instructor` re-asks; if exhausted → `UNKNOWN` |
-| Connection dropped mid-request | `AMBIGUOUS` → non-retryable (outcome unknown) |
-| Wrapper exception (no own category) | Inherits cause's classification via enrichment |
+| Content-policy violation | `CONTENT` → non-retryable; `UserAction(CHANGE_INPUT)`; `error_domain = INPUT` → **HTTP 422** |
+| Malformed prompt image / bad prompt parameter | `CONTENT` class-level (`PromptImageFormatError`, `LLMPromptParameterError`, …) → `error_domain = INPUT` → **HTTP 422** |
+| Any other provider **HTTP 400** | `CONTENT` → `error_domain = INPUT` → **HTTP 422**. This is the widest reach of the derivation: a 400 covers a context-length overflow and a parameter the model rejects alike, and an engine-side request-construction fault lands here too — reported as the caller's to fix, and absent from the 5xx rate |
+| Local file extractor raises a builtin (docling, pypdfium2) | `ValueError` / `RuntimeError` / `FileNotFoundError` → `CONTENT` → `error_domain = INPUT` → **HTTP 422**; `OSError` → `TRANSIENT` (see `_LOCAL_EXTRACT_BY_TYPE_NAME`) |
+| LLM returns schema-mismatched JSON | `instructor` re-asks; if exhausted → `UNKNOWN` → no `error_domain` asserted → HTTP 500 |
+| Connection dropped mid-request | `AMBIGUOUS` → non-retryable (outcome unknown); `error_domain = RUNTIME` |
+| Unknown or ambiguous entry `pipe_code` (a CLI argument, a run request's field, the `--pipe` / `pipe_ref` slice selector of bundle validation) | `EntryPipeNotFoundError` / `EntryPipeAmbiguousError` → `UserAction(CHANGE_INPUT)`; `error_domain = INPUT` → **HTTP 422**, and caller-facing under STRICT. The in-body lookups (`get_optional_pipe` / `get_required_pipe`) keep raising the undomained `PipeNotFoundError` / `PipeLibraryError`: a ref written inside a bundle is not the caller's input |
+| Wrapper exception (no own category) | Inherits cause's classification via enrichment — including the domain the cause derived |
 | Failure on a distributed worker | `ErrorReport` recovered from the transport's serialized details — same classification as local |
 | Worker exception with no `ErrorReport` | Synthesized fallback report — `error_domain = RUNTIME` |
 
@@ -20552,12 +20836,14 @@ Because delivery renders from the raw dict (`pipelex/pipe_run/delivery_executor.
 
 ## Per-call scoping
 
-A single worker may process many concurrent jobs. If two jobs define a concept named `Result` with different fields, they must not share a `ClassRegistry` or `Library` — otherwise the second registration overwrites the first and silently corrupts data. Each job therefore creates its own scoped state:
+A single process may handle many concurrent jobs — and, in a server, many concurrent requests that are not jobs at all. If two of them define a concept named `Result` with different fields, they must not share a `ClassRegistry` or `Library`: structure classes are registered under a name key, so the second registration overwrites the first and the two silently swap schemas and output types. The isolation is therefore structural rather than something a caller opts into — every `Library` the manager opens carries its own registry:
 
-1. **ClassRegistry** — a fresh `ClassRegistry` pre-seeded from the global registry (which holds the base classes from `PIPELEXPATH`). The crate's dynamic classes register here, never in the global registry.
-2. **Library** — a fresh `Library` (`library_manager.open_fresh_library()`) with that `ClassRegistry` attached, set as current via a `ContextVar` keyed by the run id. Run-id keying (not job/workflow id) is deliberate: a reused workflow id across retries/resets could otherwise let a closed predecessor's cleanup tear down a live successor's library on the same worker.
+1. **ClassRegistry** — `library_manager.open_library()` attaches a fresh `ClassRegistry` to every library it creates, pre-seeded from the global registry (which holds the base classes from `PIPELEXPATH`). A load's dynamic classes register there, never in the global registry, and no caller can forget to ask for it.
+2. **Library** — a fresh `Library` (`library_manager.open_fresh_library()`), set as current via a `ContextVar` keyed by the run id. Run-id keying (not job/workflow id) is deliberate: a reused workflow id across retries/resets could otherwise let a closed predecessor's cleanup tear down a live successor's library on the same worker.
 3. **Lookup chain** — `hub.get_class_registry()` reads the `ContextVar`, returns the scoped library's registry, and falls back to the global registry when no library is set (e.g. a data converter running outside the job scope — which is exactly why output uses deferred hydration).
 4. **Cleanup** — `library_manager.teardown(library_id)` drops the library and its registry; the `ContextVar` is reset. No manual GC needed.
+
+One consequence is worth stating for host code: a structure class registered while a library is current lands in *that library's* registry and is gone when it is torn down. A Python structure class that every load should see must be registered before any library is opened — which is what importing it at boot, or loading it from a library directory into the library that uses it, already does.
 
 The class-registry accessor and its library scoping (`pipelex/runtime_hub.py`, `pipelex/system/registries/class_registry_access.py`, `pipelex/interpreter_hub.py`, `pipelex/libraries/library.py`, `pipelex/libraries/library_manager.py`) is open core — the same machinery serves direct execution, the open runner, and any host-runtime plugin.
 
@@ -20861,6 +21147,16 @@ Load order:
 
 !!! note "Unit-test special case"
     When `runtime_manager.is_unit_testing` is true, the `pipelex_{run_mode}.toml` entry is sourced exclusively from `./tests/pipelex_{run_mode}.toml` (e.g. `tests/pipelex_unit_test.toml`). Global and project run_mode files are not loaded, keeping test runs hermetic from machine-wide overrides.
+
+### The inference documents
+
+`.pipelex/inference/backends.toml` and `.pipelex/inference/routing_profiles.toml` are not part of the `pipelex.toml` merge. Each is its own document with a shorter sequence, built by `ConfigLoader.backends_file_paths()` / `routing_profiles_file_paths()` and read by `load_toml_from_base_and_overrides`:
+
+1. **The base** — the project's file if the project `.pipelex/inference/` has one, otherwise the global one. One file, winner takes all; a personal override cannot stand in for it.
+2. **Global override** — `~/.pipelex/inference/backends_override.toml` (respectively `routing_profiles_override.toml`), if present.
+3. **Project override** — the same file under the project's `.pipelex/inference/`, if present and distinct from the global one.
+
+The order differs from `pipelex.toml`'s on purpose: there the project base beats the global override, here the global override beats the project base. A global inference override exists so one machine-wide choice ("run on this backend") reaches every project, and every project carries a tracked `backends.toml`, so a project base that won would defeat the file. The project override still wins over the global one. With an explicit `config_dir` (the doctor's `--global`, an init targeting one directory), the sequence is that directory's base and its own override, nothing layered.
 
 ## Where to change things in code
 
@@ -21907,6 +22203,141 @@ Use it whenever a change touches the emission chain — the structure blueprint,
 The harness was built for the S1 input-semantics audit; its measured survival table and findings live with that audit's working documents. The integration test at `tests/integration/pipelex/cli/test_trace_input_semantics_cmd.py` keeps the per-hop capture format honest.
 
 
+## Projection Fixture Corpus
+
+# Generating the Projection Fixture Corpus
+
+The MTHDS build routes no longer render a pipe's fill-in inputs template on the server. Each client SDK projects it from the input-form descriptor it already has — once in TypeScript (`mthds`) and once in Python (`mthds-python`) — and the two projections must agree **exactly**, TOML comment lines included, or the JS/Python asymmetry the change set out to remove is simply rebuilt one layer up.
+
+`pipelex-dev generate-projection-corpus` writes the fixture corpus that makes that agreement checkable. It is the **sole producer** of the capture committed byte-identically in `mthds-js/tests/fixtures/protocol/` and `mthds-python/tests/fixtures/protocol/`; `trace-input-semantics` stays what its own page says it is, a debugging tracer.
+
+```bash
+.venv/bin/pipelex-dev generate-projection-corpus \
+  tests/data/input_semantics/hinted_bundle.mthds \
+  tests/data/input_semantics/probe_bundle.mthds \
+  tests/data/input_semantics/scaffold_bundle.mthds \
+  tests/data/input_semantics/output_bundle.mthds \
+  -o /tmp/projection-corpus
+```
+
+Bundle order is part of the capture: it fixes the key order of every emitted map, so pass the bundles exactly as the corpus README in each consumer repo records them. Adding a bundle at the end keeps the existing bytes stable; inserting one in the middle rewrites the whole capture.
+
+## What it writes
+
+- `input_form.json` and `pipe_io_contracts.json` — the descriptor and contract capture, keyed by namespaced `pipe_ref`. Byte for byte what `trace-input-semantics` dumps at hop 5, so migrating the existing committed copies to this command is a no-op diff.
+- `inputs_template/<pipe_ref>.<shape>.<format>` — the **expected** template each projection must produce, in both shapes (`compact`, `explicit`) and both formats (`json`, `toml`).
+- `inputs_template/manifest.json` — what the corpus covers (bundles, pipes, shapes, formats), the declared divergences, each with worked sites a consumer repo can check with no engine present, and the templates the input shaper refuses to take back.
+- `engine/` — the engine's own renderings of the same pipes. **Not committed.** It is what the divergence record is measured against, not part of the contract.
+
+A pipe declaring no inputs is captured from the projection alone: an empty input form is a valid form and the projection renders it as `{}` (an empty TOML document), but the engine's renderer refuses one with `NoInputsRequiredError`, so that pipe gets its templates and no `engine/` file, and nothing is compared for it.
+
+## Where the expectation comes from
+
+The expected templates are not the engine's output. They come from the reference projection in `pipelex/cli/dev_cli/commands/projection_reference.py`, which walks the **descriptor** — the authored facts a method states — where the engine's renderer (`pipelex/pipe_machinery/rendering/input_renderer.py`) reflects the **runtime content classes**. That is the whole design: the shipped projections have only the descriptor, so the contract has to be authored from the descriptor too.
+
+The reference projection lives in the dev CLI rather than in the runtime because nothing in `pipelex` consumes it. Its only job is to author the corpus bytes.
+
+## The divergence record
+
+Where the two disagree, the difference is **declared, never discovered**. The generator classifies every difference between its own rendering and the engine's, and fails if it meets one it has no declaration for — or if a declared class no longer occurs, so an engine fix retires its entry deliberately instead of leaving the manifest claiming a difference that has gone.
+
+The classes it declares today:
+
+- `optional-field-included` — the engine passes `include_optional=False` at the top of an input's own structure class and not through the recursion, so it hides an optional field at depth one and shows one nested deeper. The projection renders every field the descriptor states, at every depth.
+- `file-leaf-not-expanded` — the descriptor states a file-ish node as a leaf whose only fill-in value is a URL; the engine expands the runtime content class and asks whoever fills the template in for a width, a mime type and a caption.
+- `fixed-count-honoured` — a `Concept[N]` slot renders `N` elements. The engine emits one whatever the count, and `InputShaper` then rejects that template with `MultiplicityCountMismatchError`, so the scaffold it produced does not run.
+- `text-named-url` — the engine picks a placeholder by field **name**, so a text field merely named `url` renders as a URL. The projection reads the descriptor's `kind`.
+- `object-native-keeps-envelope` — a native carrying an optional field beside its required one (`native.Date`) renders as an object once the optional field is included, and the shaper's bare-value arm dispatches a native on its scalar kind, so the object form is only re-shapable inside its `{concept, content}` envelope. The projection keeps that envelope; the engine unwraps to a bare scalar, which it can only do because it drops the optional field. A consequence of `optional-field-included`.
+- `unknown-empty-object` — an `unknown` node renders as the empty object, because the descriptor withholds the payload shape at that position and a projection that invented one would stop projecting the descriptor. The engine reflects the runtime content class instead and fills a required dict with a sample key/value pair whoever fills the template in has to delete. Reached by `json_obj` inside `native.JSON`, the corpus's first *required* dict; the optional dict fields elsewhere never reach it, because the engine drops those entirely and that is `optional-field-included`.
+
+Most are `pipelex` defects filed in the workspace ledger rather than differences of taste, and the manifest names the item whose fix would retire each one. Some carry no item, deliberately: `file-leaf-not-expanded` and `unknown-empty-object` are the descriptor's vantage rather than engine bugs, and `object-native-keeps-envelope` is a consequence of `optional-field-included` rather than a defect of its own. The manifest is what records that the corpus knowingly departs from the engine, and why.
+
+### What the gate can and cannot separate
+
+The walk visits both sides' keys, so a field the projection *stopped* rendering is a difference like any other — it is recorded under an id with no entry in `DIVERGENCE_REASONS`, which makes the capture refuse rather than pass silently. Beyond that, each arm classifies on the two values' shapes plus one descriptor fact the shapes cannot supply: the declared `item_count` of a fixed-count slot. So `fixed-count-honoured` means the slot's declared count was met, not merely that the projection rendered more elements than the engine's one; a variable `[]` slot rendering two, or a `[2]` slot rendering four, is unclassified and fails the capture. Likewise the file-leaf arm compares the URL both sides carry instead of returning on the expansion alone.
+
+What it still cannot separate is a *wrong value at a site that already carries a class*: a projection inventing a field reads as `optional-field-included`, and a garbled placeholder at a url-named text field reads as `text-named-url`. Telling those apart needs each node's kind and presence carried through the whole walk, which is a redesign rather than a fix, and the two shipped projections are pinned against the committed bytes anyway.
+
+## The shaping round-trip
+
+A fill-in template exists to be filled in and handed back to the runtime, so surviving `InputShaper.shape` is part of what the corpus asserts — and until this gate existed, nothing checked it. Twice the corpus pinned slots the runtime rejects outright, and both times a human review round caught it rather than the capture; the second time the divergence gate absorbed the broken sites into a declared class and exited 0, because "differs from the engine" and "the engine refuses this value" are not the same question.
+
+So every projected template goes straight back through the shaper, assembled exactly as an entry-pipe run assembles it: the pipe's own declared inputs as the signature, its domain as the search scope. Both shapes, both pipes' worth — the explicit template is as much a runnable scaffold as the compact one. The round-trip is offline: the file-ish arms wrap a mock URL without fetching it.
+
+The verdict follows the same declared-never-discovered discipline as the divergence record, through the `EXPECTED_UNSHAPEABLE` registry in `generate_projection_corpus_cmd.py`, which maps a `(pipe_ref, shape)` to the ledger item tracking the gap:
+
+- A refusal **not** in the registry fails the command, naming the pipe, the shape, the error class and the error's first line. This is the mechanism that would have caught both prior escapes at capture time.
+- A registry entry whose template **now shapes** fails the command too — *delete the entry, the gap closed* — so a fix retires its declaration deliberately rather than leaving the manifest claiming a defect that no longer exists.
+- A registry entry this capture **never walked at all** fails it as well, and is worded apart from the one above because the two call for opposite actions: a key addressing no pipe and shape the run produced is a renamed pipe or a run over a subset of the bundles, so it wants re-keying or the full bundle list — deleting it would drop a gap that is still open.
+- A declared entry is recorded in the manifest as an `unshapeable` entry (`pipe_ref`, `shape`, `error_type`, `ledger_item`) and printed, and generation proceeds. A known-open gap therefore never blocks the capture; it is simply stated.
+
+The manifest holds the error's **class name**, never its message. The class name is contract-stable — the error-identity snapshot makes a rename a reviewable diff — while the message is wording that would churn these committed bytes across pydantic versions, so it goes to the console and to the refusal only. Passing verdicts are printed as a count, never committed: a template the shaper takes back is the state every entry is working towards, not a fact worth pinning.
+
+Two gaps are declared today, and each entry names the item whose fix retires it. One is a descriptor gap — a nested list inside a structure — which takes both shapes of the two probe pipes that reach it. The other is `native.Anything`, whose slot the input shaper refuses: it accepts a bare string alone at an `Anything` position, so the empty object the contract publishes as that slot's template is a template the runtime cannot take back. Closing either one deletes its own entries; the lapse rule fails the command until somebody does.
+
+A key is a whole template and never a slot, and the shaper stops at the first slot it refuses — so an entry suspends this check for every other slot in the same pipe. Put a known-open gap in a pipe of its own rather than declaring the pipe that happens to contain it: `scaffold_anything_slot` exists for exactly that reason, so that `scaffold_open_natives` beside it keeps round-tripping and the `unknown-empty-object` claim keeps the one site that demonstrates it.
+
+## The bundles
+
+`tests/data/input_semantics/` holds the corpus bundles, and the command above names every one of them: a bundle that exists in that directory but is left off the command line does not appear in the capture, and the regeneration silently drops the pipes it contributed. `probe_bundle.mthds` exercises every construct the language accepts and `hinted_bundle.mthds` the intent hints; `output_bundle.mthds` covers the output form specifically, since every bundle before it resolved to `Text`; `scaffold_bundle.mthds` was added for this corpus and covers what the others do not — a text field merely named `url` beside a real file position, an optional nested structure, optional `native.Image` and `native.Document` fields inside a structure, and both a fixed `[N]` and a variable `[]` slot over a structured concept. Its `scaffold_open_natives` pipe holds the natives whose payload shape the descriptor states openly, at slot positions: `native.Dynamic` and `native.Composite`, which declare no pinned structure and whose node is therefore `unknown`, beside `native.JSON`, which does declare one — its pinned blueprint carries a required `json_obj`, so it expands like any other pinned native and its dict is where `unknown-empty-object` is measured. Its `scaffold_dynamic_prompt` pipe puts a `native.Dynamic` slot at an LLM prompt position under both markers, which the corpus could not carry while the prompt analyzers read a dynamic concept's universal compatibility as identity and demanded an `ImageContent` for it.
+
+`native.Anything` is the third of that family, and it sits in `scaffold_anything_slot` on its own — the one slot the corpus carries knowing the runtime refuses it. It no longer crashes the engine's renderer — the structureless arm renders it without resolving a class — but its template value is the empty mapping `{}`, which the input shaper takes back in neither shape: at an `Anything` position the shaper accepts a bare string alone, and returns it as a `native.Text` stuff rather than an `Anything` one. That is a runtime gap, not a projection one — the descriptor states `Anything` as `unknown` exactly as it states `Dynamic` and `Composite`, and a projection reading only the descriptor has nothing to render there but the empty object. So the slot is captured and both shapes of its own pipe are declared in `EXPECTED_UNSHAPEABLE` against the item tracking the shaper fix, which is the mechanism this page describes for a known-open gap. Giving it a pipe to itself is what keeps that declaration from reaching the three natives beside it that do round-trip. Closing it deletes those entries and regenerates.
+
+## When to rerun it
+
+Rerun and re-commit the capture in both consumer repos whenever the descriptor derivation changes, a `kind` is added to the standard, or a bundle changes. The per-repo harness asserts that the set of kinds appearing across the corpus **equals** the closed `FieldKind` vocabulary, so a kind added without a fixture fails by name rather than passing silently.
+
+`tests/unit/pipelex/cli/dev_cli/test_generate_projection_corpus.py` keeps the capture complete and byte-stable and measures the registry against the real round-trip, `test_projection_divergence_gate.py` and `test_projection_shaping_gate.py` state each gate's guarantee as the regressions it must not absorb, and `test_projection_reference.py` pins the projection's rules one at a time, so a rule that changed fails by name instead of as a wall of differing bytes.
+
+
+## TypeScript Emission Gates
+
+# TypeScript Emission Gates
+
+The `ts-zod` target promises something stronger than "the generated code compiles": it promises the bytes are already what Prettier would write. A codegen stamp is a raw SHA-256 over the body, so a consumer's first `prettier --write` over a generated tree that is *nearly* right rewrites it, and `pipelex codegen check` then reports an untouched file as **hand-edited** — accusing the user of the one thing they did not do. That contract is stated for consumers in [Codegen Projections](../under-the-hood/codegen-projections.md#typescript-assumes-prettiers-defaults); this page is how we hold ourselves to it.
+
+## Why the always-on tests are not enough
+
+`tests/unit/pipelex/codegen/test_emitted_artifacts_are_lint_clean.py` carries a set of TypeScript invariants that need no toolchain at all: no collapsible blank-line run, no line past the print width, no trailing whitespace, and no line ending inside an unterminated string literal. They are cheap, they run everywhere, and they are all **structural** — they measure the shape of the emitted lines without ever reading them as TypeScript.
+
+That leaves a whole family of defect invisible. A member chain broken where Prettier would have kept it flat, a string literal in the quote style Prettier rewrites, an object literal spelled as JSON — each of those is a run of short, well-formed, whitespace-clean lines. Three such defects reached pull-request review, and each was caught afterwards only because somebody read the emission by hand and then wrote a byte assertion for that one shape. Hand-written assertions do not generalize to the next shape.
+
+## The two gates that read the emission
+
+Two tests do more than measure lines, and both need node:
+
+| Test | What it proves |
+|---|---|
+| `test_emitted_ts_is_prettier_clean` | `prettier --check` over the emitted `types.ts` and `binder.ts`. It parses the emission, so it is also the syntax gate, and it holds the byte-for-byte formatting the stamp depends on. |
+| `test_the_emitted_schema_parses_the_runtime_payload` | The emitted schema, under a real zod, against the JSON the runtime actually puts on the wire. It is the only layer that *executes* the projection. |
+
+Both were written to `pytest.skip` when the toolchain was absent — which, in a Python repo whose CI installs no node, meant they skipped in CI and on every developer machine. The gates existed and guarded nothing.
+
+## `make test-ts-gates`
+
+The fix is not another assertion, it is making the skip impossible where it matters:
+
+```bash
+make test-ts-gates   # alias: make ttg
+```
+
+It provisions a pinned toolchain into the gitignored `.ts-toolchain/` (`make ts-toolchain` on its own does just that step), puts `prettier` on `PATH`, points `PIPELEX_ZOD_PACKAGE` at the installed `zod`, and runs the whole `tests/unit/pipelex/codegen` suite with **`PIPELEX_REQUIRE_TS_GATES=1`**. Under that flag `tests/helpers/ts_toolchain.py` turns a missing binary into a test *failure* instead of a skip, so the gates cannot lapse back into silence. The `Tests (ts emission gates)` job in `.github/workflows/tests-check.yml` runs this exact target behind `actions/setup-node`, and the `Tests (all)` aggregate requires it.
+
+Without the flag — an ordinary `make agent-test` on a machine with no node — the two gates still skip, and say which command would provision them. The structural invariants hold the line there.
+
+## The pins, and why moving one is an emitter change
+
+`TS_TOOLCHAIN_PRETTIER_VERSION` and `TS_TOOLCHAIN_ZOD_VERSION` in the `Makefile` are exact. Both packages have zero dependencies, so `npm install` is reproducible without a lockfile.
+
+The Prettier pin is not a routine dependency bump. `pipelex/codegen/emitters/ts_zod.py` models that formatter's behaviour directly — its member-chain break rule, its re-measurement of each call at the new indent, its quote-style rule, its object-literal brace padding and key unquoting. Moving the pin is a statement that the emitter now targets a different formatter, so expect the gate to red and expect to teach the emitter what changed. That is the gate working, not the gate misfiring.
+
+Node itself needs **>= 22.6**, for `--experimental-strip-types`: it is what lets the round-trip driver run the emitted `.ts` with no build step.
+
+## What is still not gated
+
+`tsc --strict` over the emission is not run. It would catch a class the two gates above miss — a declared type that disagrees with the schema's inferred output on the recursive-concept path, where `z.ZodType<Name>` stops typechecking. Adding it is worthwhile and is deliberately not done here, because the recursive declared-type path has a known open defect of its own (its line overflows the print width, which the current width guard cannot be pointed at without reddening shapes Prettier already tolerates). A `tsc` gate belongs with the fix for that path, not before it.
+
+
 ## Migration Ledger
 
 # The Migration Ledger
@@ -22584,7 +23015,7 @@ Always back up, before writing. Exactly one backup per file — a successful run
 
 The name is the source file's whole name, extension included, followed by `.bak.` and a compact UTC stamp: `pipelex.toml` backs up to `pipelex.toml.bak.20260815T120000Z`. Extension-included so a backup never shadows a real `.toml`, and separator-free so no filesystem objects to it. Pruning matches that whole shape, stamp included — a copy the user made by hand under a name that merely starts the same way (`pipelex.toml.bak.notes`) is theirs, and is never touched.
 
-**A backup does not belong in the user's `git status`, and pipelex writes the rule that keeps it out.** A project's `.pipelex/` is normally inside a git repository, so one run would otherwise put a dozen untracked `.bak.<stamp>` files in front of the user and leave them to work out which are ours. Pipelex therefore keeps a `.gitignore` *inside* the configuration directory, carrying one rule — `*.bak.` followed by the exact stamp shape, spelled out digit class by digit class, built from the same infix the namer uses so renaming it cannot leave a rule that matches nothing. The stamp is spelled out in full rather than abbreviated to a `[0-9]*` run, because a run would also swallow a copy the user named themselves along the lines of `pipelex.toml.bak.1-notesZ` — one pruning explicitly refuses to touch, and hiding a file we decline to manage is the worse half of both answers. In-directory rather than in the repository root because the walk is `~/.pipelex/` and the project `.pipelex/` and nothing else, so a local file needs no idea where the root is and never edits a file the user maintains for their whole project.
+**A backup does not belong in the user's `git status`, and pipelex writes the rule that keeps it out.** A project's `.pipelex/` is normally inside a git repository, so one run would otherwise put a dozen untracked `.bak.<stamp>` files in front of the user and leave them to work out which are ours. Pipelex therefore keeps a `.gitignore` *inside* the configuration directory, carrying one line per personal override file — `pipelex_override.toml` and its siblings, `inference/backends_override.toml` and `inference/routing_profiles_override.toml`, files that hold only a developer's own choices and have no business in a project's commits either — and the backup rule — `*.bak.` followed by the exact stamp shape, spelled out digit class by digit class, built from the same infix the namer uses so renaming it cannot leave a rule that matches nothing. The stamp is spelled out in full rather than abbreviated to a `[0-9]*` run, because a run would also swallow a copy the user named themselves along the lines of `pipelex.toml.bak.1-notesZ` — one pruning explicitly refuses to touch, and hiding a file we decline to manage is the worse half of both answers. In-directory rather than in the repository root because the walk is `~/.pipelex/` and the project `.pipelex/` and nothing else, so a local file needs no idea where the root is and never edits a file the user maintains for their whole project.
 
 One backup is deliberately out of reach of this rule. A configuration file that is a symlink is migrated through to the file it names, so its backup lands beside *that* file — in a dotfiles directory, which is the user's and not ours. Pipelex does not follow it there: writing into the `.gitignore` of somebody's whole dotfiles repository is a larger liberty than the single untracked copy it would hide.
 
