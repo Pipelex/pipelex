@@ -17,7 +17,7 @@ from pipelex.cli.commands.doctor_cmd import (
     do_doctor_cmd,
 )
 from pipelex.cli.commands.init.ui.types import InitFocus
-from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport
+from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsReport
 from pipelex.cogt.models.deck_manifest import DeckFileStatus, DeckSyncReport
 from pipelex.core.validation import MIGRATE_COMMAND
 from pipelex.migration.plan import MigrationPlan, MigrationReport

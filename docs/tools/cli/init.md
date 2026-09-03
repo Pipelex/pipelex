@@ -50,7 +50,7 @@ pipelex init inference
 # Reconfigure telemetry settings
 pipelex init telemetry
 
-# Review gateway terms
+# Review the Pipelex service terms
 pipelex init agreement
 ```
 
@@ -71,7 +71,7 @@ This command creates or resets a Pipelex config directory with:
     Every `init` target replaces the file with the template, so whatever was in it is gone. If a configuration file has simply fallen behind the current schema, [`pipelex migrate`](migrate.md) is the command: it rewrites the file in place and keeps every setting — your PostHog key, your Langfuse credentials, your exporters. `pipelex doctor` tells you which of the two you have.
 
 !!! note "Offline cache priming"
-    When Pipelex Gateway is enabled, `pipelex init` also primes an on-disk copy of the gateway's remote config at `~/.pipelex/cache/remote_config.json`. This lets later setup, validation, and dry-runs work even when the remote config service is briefly unreachable. If you run `pipelex init` while offline, it prints a yellow warning and skips priming — re-run it online to enable offline dry-runs.
+    When any Pipelex-managed gateway backend is enabled, `pipelex init` also primes an on-disk copy of the published remote config at `~/.pipelex/cache/remote_config.json`. This lets later setup, validation, and dry-runs work even when the remote config service is briefly unreachable. If you run `pipelex init` while offline, it prints a yellow warning and skips priming — re-run it online to enable offline dry-runs.
 
 ## Interactive Setup Flow
 
@@ -110,9 +110,9 @@ All fields are optional:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `backends` | `list[str]` | Backend keys to enable (e.g. `openai`, `anthropic`, `pipelex_gateway`). Omit to keep template defaults. |
+| `backends` | `list[str]` | Backend keys to enable (e.g. `openai`, `anthropic`, `pipelex_gateway`, `pipelex_manifold`). Omit to keep template defaults. |
 | `primary_backend` | `str` | Required only when 2+ backends are selected and `pipelex_gateway` is not among them. |
-| `accept_gateway_terms` | `bool` | Required when `pipelex_gateway` is in backends. |
+| `accept_gateway_terms` | `bool` | Required when any Pipelex-managed gateway backend (`pipelex_gateway`, `pipelex_manifold`) is in backends. The terms are the Pipelex service's, so one acceptance covers every managed backend. |
 
 Telemetry is not configured via `--config`: init seeds a `telemetry.toml` from a template (a global init writes an active one; a project init drops a commented-out one).
 

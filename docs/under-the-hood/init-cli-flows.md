@@ -190,7 +190,7 @@ This handles two scenarios:
 | `not backends_existed_before` | First-time setup (no inference yet) | Force inference step regardless of focus |
 | `check_inference and backends_exists_now` | Inference in focus + existing config | Re-run inference (reset) |
 
-When inference is **not** forced and backends already exist, gateway terms are still checked:
+When inference is **not** forced and backends already exist, service terms are still checked. The question is the broad one — is *any* Pipelex-managed gateway backend enabled — because the terms are the Pipelex service's rather than one dialect's, and it is read off the merged backends document pinned to the target directory (`enabled_managed_gateway_sections(config_dir=…)`), so a managed backend switched on only by that directory's `backends_override.toml` is prompted for terms too. Declining writes `enabled = false` into the base for every managed backend, and `warn_if_managed_gateway_pinned_by_override` names the ones an override still keeps on:
 
 ```python
 if not needs_inference and backends_existed_before:
@@ -270,7 +270,7 @@ Copies a telemetry template and prints instructions. No interactive prompts. Whi
 
 | Constant | Contents | Reason |
 |----------|----------|--------|
-| `INIT_SKIP_FILES` | All `GIT_IGNORED_CONFIG_FILES` (`pipelex_service.toml`, `pipelex_override.toml`, `telemetry_override.toml`, `telemetry.project.toml`, `pipelex_gateway_models.md`, `pipelex_gateway_models_plain.md`, `x_custom_llm_deck.toml`, `x_custom_extract_deck.toml`) plus `telemetry.toml` and `.DS_Store` | Git-ignored, auto-generated, or managed by other steps |
+| `INIT_SKIP_FILES` | Every name in `GIT_IGNORED_CONFIG_FILES` (`pipelex/kit/paths.py` is the list: the personal overrides, the service file, the generated gateway model pages, the custom deck files) plus `telemetry.toml` and `.DS_Store` | Git-ignored, auto-generated, or managed by other steps |
 | `INIT_SKIP_DIRS` | `inference` | Managed independently by inference step |
 
 ### Source Modules
@@ -451,12 +451,14 @@ flowchart TD
 |-------|-------------------|---------|
 | `check_config_files()` | `resolve_config_file()` | Layered resolution (project > global) |
 | `check_telemetry_config()` | `resolve_config_file()` | Layered resolution (project > global) |
-| `check_backend_credentials()` | `resolve_config_file()` | Finds `backends.toml` wherever it lives |
-| `check_backend_files()` | `resolve_config_file()` | Finds `inference/backends/` wherever it lives |
+| `check_backend_credentials()` | `backends_file_paths()` | Reads the merged backends document: the base `backends.toml` wherever it lives, plus the personal `backends_override.toml` at each tier |
+| `check_backend_files()` | `resolve_config_file()` for `inference/backends/`, `backends_file_paths()` for the enabled-backend list | Finds `inference/backends/` wherever it lives, and reads the merged backends document to decide which backends to probe |
 | `check_models()` gateway terms | `global_config_dir` | **Always global** — reads from `~/.pipelex/` |
 | `check_pending_migrations()` | none | **Both directories, always** — see below |
 
 `check_pending_migrations()` is the one check that takes no `config_dir` at all, and that is deliberate. Every other row reports on a *file* and is scoped to the directory the doctor was pointed at, `--global` included. That one reports on a *command* — it is `pipelex migrate`'s own dry run — and `pipelex migrate` has no `--global`: it walks the global `~/.pipelex/` and the project `.pipelex/` both. Scoping the row narrower would name a command that then rewrites a file the row never mentioned. Every file it reports is named with its full path, so the wider scope stays legible.
+
+`check_backend_files()` loads the backend library once per enabled backend, and loads it with `lenient=True`. The row reports on file shape — an unknown key, a spec that is not a table, a missing per-backend file — so a backend whose gateway model specs were not handed to the loader (the probe fetches nothing) or whose credentials do not resolve is skipped rather than reported: those are the Models row's and the Credentials row's findings. Without leniency the shipped defaults, which enable `pipelex_gateway` and ship its override file, would be reported as a backend-configuration error, and because the loader stops at the first backend it cannot load, a malformed file listed after the gateway in `backends.toml` would go unreported. Every probe sees that same first failure, so a failure is charged to the backend the error declares (`backend_name`, stamped by the loader on every error about one backend) or, for an error that declares none, to the backend whose file it names — never to a backend whose name merely appears in the message's prose. `check_models()` attributes the same way and for the same reason: its own load is strict and reaches backends the probe skipped leniently, so it can be the first thing to name a broken backend, and it writes into the very reports this row produced.
 
 ### Fix Targeting
 

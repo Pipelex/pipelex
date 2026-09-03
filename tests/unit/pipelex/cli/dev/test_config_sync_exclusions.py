@@ -28,6 +28,33 @@ class TestConfigSyncExclusions:
         """It is written into the directory at init and at migrate, and is never a kit template."""
         assert CONFIG_DIR_GITIGNORE_NAME in CONFIG_SYNC_EXCLUDED_FILES
 
+    def test_a_personal_inference_override_reads_as_in_sync(self, tmp_path: Path) -> None:
+        """The two inference overrides are personal files with no kit counterpart, at any depth.
+
+        Through `has_diff_dirs` with the real constants: the exclusion is matched by bare name, and
+        this is the assertion that the name is in the set the command actually passes.
+        """
+        kit_side = tmp_path / "kit" / "inference"
+        project_side = tmp_path / "project" / "inference"
+        kit_side.mkdir(parents=True)
+        project_side.mkdir(parents=True)
+        for side in (kit_side, project_side):
+            (side / "backends.toml").write_text("[openai]\nenabled = true", encoding="utf-8")
+            (side / "routing_profiles.toml").write_text('active = "all_openai"', encoding="utf-8")
+        (project_side / "backends_override.toml").write_text("[openai]\nenabled = false", encoding="utf-8")
+        (project_side / "routing_profiles_override.toml").write_text('active = "all_anthropic"', encoding="utf-8")
+
+        assert (
+            has_diff_dirs(
+                dir1=tmp_path / "project",
+                dir2=tmp_path / "kit",
+                exclude_files=CONFIG_SYNC_EXCLUDED_FILES,
+                exclude_dirs=GIT_IGNORED_CONFIG_DIRS,
+                exclude_patterns=CONFIG_SYNC_EXCLUDED_PATTERNS,
+            )
+            is False
+        )
+
     def test_a_real_backup_name_is_excluded(self) -> None:
         """Migrating in a checkout must not make the next `make check` red."""
         backup = backup_path_for(path=Path("pipelex_override.toml"), moment=MOMENT)

@@ -38,12 +38,13 @@ qty = { type = "integer", description = "SENT_field_qty", default_value = 3 }
 [pipe.do_one]
 type = "PipeLLM"
 description = "Make text from item"
-inputs = { item = "Item", items = "Item[]", hint = "Text?" }
+inputs = { item = "Item", items = "Item[]", hint = "Text?", loose = "Anything" }
 output = "Text"
 prompt = '''
 @item
 @items
 @?hint
+$loose
 '''
 """
 
@@ -90,6 +91,12 @@ class TestTraceInputSemantics:
         assert hop4_single["content"]["properties"]["label"]["description"] == "SENT_field_label"
         hop4_multi = _read_json(output_dir / manifest["hop4_schema_renders"]["trace_tool_test.do_one.items"])
         assert hop4_multi["content"]["type"] == "array"
+        # `native.Anything` declares no structure class: hop 3 records the skip rather than resolving
+        # one, and hop 4 still renders — through the structureless arm, as the permissive schema.
+        assert any("native.Anything" in entry for entry in manifest["hop3_skipped"])
+        hop4_loose = _read_json(output_dir / manifest["hop4_schema_renders"]["trace_tool_test.do_one.loose"])
+        assert hop4_loose["concept"] == "native.Anything"
+        assert set(hop4_loose["content"]) == {"title", "description"}
 
         # Hop 5: the final wire contracts, keyed by namespaced pipe_ref, with presence flags.
         hop5 = _read_json(output_dir / HOP5_FILE_NAME)

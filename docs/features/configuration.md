@@ -27,6 +27,8 @@ Within each tier, the base `pipelex.toml` is followed by an override sequence, m
 
 The entire global tier merges before the project tier, so any project-tier file — including the plain project `pipelex.toml` — overrides every global-tier file.
 
+The two inference documents, `.pipelex/inference/backends.toml` and `.pipelex/inference/routing_profiles.toml`, have an override layer of their own: a `backends_override.toml` and a `routing_profiles_override.toml` beside them, git-ignored, each carrying only the keys it sets. The base file resolves as before (the project's copy if it has one, otherwise the global one) and the overrides merge over it, global tier first, then project tier — so one `~/.pipelex/inference/` override reaches every project on the machine, and deleting it restores the shipped default. See [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md#personal-overrides) for the files and the merge order.
+
 ## Environment Variables
 
 Two configuration areas support `${...}` variable substitution in their TOML files: the inference backend configuration (`.pipelex/inference/backends.toml` and the per-backend TOML files under `.pipelex/inference/backends/`) and the telemetry configuration (`.pipelex/telemetry.toml`). In those files, use `${env:VAR}` for environment variables, `${secret:VAR}` for the secrets provider, and fallback chains like `${env:VAR|secret:VAR}`. The `pipelex.toml` layering described above does not perform substitution — a `${env:VAR}` there stays a literal string.

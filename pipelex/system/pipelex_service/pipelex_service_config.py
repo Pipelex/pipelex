@@ -4,7 +4,8 @@ from typing import Any, cast
 from pydantic import Field, ValidationError
 
 from pipelex import log
-from pipelex.cogt.model_backends.backend import PipelexBackend
+from pipelex.cogt.exceptions import InferenceBackendLibraryValidationError
+from pipelex.cogt.model_backends.backend import PipelexBackend, resolve_model_specs_section
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.configuration.config_surface import (
@@ -19,7 +20,8 @@ from pipelex.system.pipelex_service.pipelex_service_agreement import (
     PipelexServiceAgreement,
     PipelexServiceOnboarding,
 )
-from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_from_path_if_exists
+from pipelex.tools.misc.exceptions import TomlError
+from pipelex.tools.misc.toml_utils import describe_toml_base_and_overrides, load_toml_from_base_and_overrides, load_toml_from_path
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
@@ -75,31 +77,116 @@ def _service_config_the_ledger_can_explain(*, config_path: Path) -> PipelexServi
     return service_config
 
 
-def is_pipelex_gateway_enabled(backends_file_path: Path | None = None) -> bool:
-    """Check if pipelex_gateway is enabled in the backends configuration.
+def _backends_document(*, config_dir: Path | None) -> dict[str, Any] | None:
+    """The merged ``backends.toml`` document, or ``None`` when there is no base file.
 
-    This reads the backends.toml file directly without loading the full backend library.
+    The same document the library loader reads: the base first, then every
+    ``backends_override.toml`` that exists, deep-merged in order — from
+    ``config_manager.backends_file_paths``. Both readers below go through here so neither can end
+    up branching on a narrower view of the configuration than the loader they feed.
 
-    **It must read `enabled` exactly as the library loader does** — the raw value's truthiness, and
-    enabled when the key is absent — because the two are read over the same file and the boot acts
-    on the answer here: it fetches the gateway's model specs only when this says enabled, then hands
-    them to a loader that decides for itself which backends are enabled. Reading the literal `true`
-    here while the loader read truthiness left `enabled = 1` in a state neither could name: no specs
-    fetched, backend loaded — refused as *"model specs were not provided"* on a strict boot, silently
-    dropped from the deck on a lenient one.
+    Raises:
+        InferenceBackendLibraryValidationError: a file in the document does not parse. The same
+            class the library loader raises for it, so the boot's clause for an unloadable backend
+            library names the file, rather than a parse error surfacing before any clause is reached.
+    """
+    backends_file_paths = config_manager.backends_file_paths(config_dir=config_dir)
+    try:
+        return load_toml_from_base_and_overrides(paths=backends_file_paths)
+    except FileNotFoundError:
+        return None
+    except TomlError as toml_exc:
+        msg = f"Invalid inference backend library {describe_toml_base_and_overrides(paths=backends_file_paths)}: {toml_exc}"
+        raise InferenceBackendLibraryValidationError(msg) from toml_exc
+
+
+def enabled_managed_gateway_sections(*, config_dir: Path | None = None) -> dict[str, str]:
+    """The enabled managed gateway backends, each mapped to the remote-config section its specs come from.
+
+    A *managed gateway backend* is one whose model specs arrive from the Pipelex service's published
+    artifact rather than from a local per-backend TOML, and naming a section is what declares it one
+    — see `resolve_model_specs_section`, which also explains why `pipelex_gateway` resolves to a
+    section it never declared. There can now be more than one, which is why the boot asks this
+    question rather than the single-name one below.
+
+    Read here, off the raw document, for the same reason `is_pipelex_gateway_enabled` is: the boot
+    needs the answer *before* it can load the backend library, because what it fetches is the input
+    to that load. It applies the same truthiness reading of `enabled`, for the same reason.
 
     Args:
-        backends_file_path: Explicit path to the ``backends.toml`` file to inspect. When
-            ``None`` (default), uses the layered/project-preferred path from
-            ``config_manager.backends_file_path``. Callers that act on a specific target
-            directory (e.g. ``pipelex init`` / ``pipelex init --local``) should pass the
-            target's ``backends.toml`` so they don't accidentally branch on a sibling config.
+        config_dir: Read the document at that directory — its ``backends.toml`` and its own
+            ``backends_override.toml`` — exactly as below. ``None`` (default) reads the layered
+            document.
 
     Returns:
-        True if pipelex_gateway is enabled, False otherwise.
+        ``{backend_name: section_name}``, empty when no managed gateway backend is enabled.
+
+    Raises:
+        InferenceBackendLibraryValidationError: a file in the document does not parse — see
+            `_backends_document`.
     """
-    resolved_path = backends_file_path if backends_file_path is not None else config_manager.backends_file_path
-    backends_toml = load_toml_from_path_if_exists(resolved_path)
+    backends_toml = _backends_document(config_dir=config_dir)
+    if backends_toml is None:
+        return {}
+
+    sections: dict[str, str] = {}
+    for backend_name, backend_table in backends_toml.items():
+        if not isinstance(backend_table, dict):
+            continue
+        backend_dict = cast("dict[str, Any]", backend_table)
+        if not bool(backend_dict.get("enabled", True)):
+            continue
+        declared_section = backend_dict.get("model_specs_section")
+        section = resolve_model_specs_section(
+            backend_name=backend_name,
+            declared_section=declared_section if isinstance(declared_section, str) else None,
+        )
+        if section is not None:
+            sections[backend_name] = section
+    return sections
+
+
+def is_pipelex_gateway_enabled(*, config_dir: Path | None = None) -> bool:
+    """Check if pipelex_gateway is enabled in the backends configuration.
+
+    Narrower than `enabled_managed_gateway_sections` on purpose, and still the right question for
+    the callers that ask it: the boot's telemetry decision and the test-session plugin are about
+    the Portkey-cloud service specifically, not about managed backends in general.
+
+    Two callers that read like they belong here do not. Terms acceptance asks the broad question
+    because the terms are the Pipelex service's rather than one dialect's — see `_init_agreement`
+    and `customize_backends_config`. And `pipelex init`'s cache priming asks it because what it
+    caches is the single published configuration carrying every managed backend's section, so a
+    manifold-only installation has exactly as much to prime as a gateway one.
+
+    This reads the backends document directly without loading the full backend library — the
+    same document the loader reads: the base ``backends.toml`` with every ``backends_override.toml``
+    merged over it, from ``config_manager.backends_file_paths``.
+
+    **It must read `enabled` exactly as the library loader does** — the raw value's truthiness, and
+    enabled when the key is absent, over the same merged document — because the boot acts on the
+    answer here: it fetches the gateway's model specs only when this says enabled, then hands them
+    to a loader that decides for itself which backends are enabled. Reading the literal `true` here
+    while the loader read truthiness left `enabled = 1` in a state neither could name: no specs
+    fetched, backend loaded — refused as *"model specs were not provided"* on a strict boot, silently
+    dropped from the deck on a lenient one. An override the loader saw and this did not would be the
+    same split.
+
+    Args:
+        config_dir: Read the document at that directory — its ``backends.toml`` and its own
+            ``backends_override.toml`` — as ``pipelex init`` targeting one ``.pipelex/`` and the
+            doctor's ``--global`` do, so they never branch on a sibling configuration. ``None``
+            (default) reads the layered document: the resolved base, then the global override, then
+            the project override.
+
+    Returns:
+        True if pipelex_gateway is enabled, False otherwise — including when there is no base file.
+
+    Raises:
+        InferenceBackendLibraryValidationError: a file in the document does not parse — see
+            `_backends_document`.
+    """
+    backends_toml = _backends_document(config_dir=config_dir)
     if backends_toml is None:
         return False
 

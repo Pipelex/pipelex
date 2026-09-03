@@ -608,6 +608,10 @@ def handle_gateway_unknown_model_error(exc: GatewayUnknownModelError) -> NoRetur
     in the gateway specs (either freshly fetched or loaded from cache). Branches the
     remediation on the provenance of the gateway config.
 
+    **The backend is named rather than assumed.** More than one managed gateway can be live at
+    once, so telling the user to disable `pipelex_gateway` when it was the other service that could
+    not serve the handle would send them to fix the wrong line of their configuration.
+
     Args:
         exc: The gateway unknown model error exception
     """
@@ -615,7 +619,9 @@ def handle_gateway_unknown_model_error(exc: GatewayUnknownModelError) -> NoRetur
     print_traceback_if_requested(console=console)
     console.print("\n[bold red]❌ Unknown gateway model handle[/bold red]\n")
 
+    backend_name = escape(exc.backend_name or "")
     console.print(f"[bold cyan]Model handle:[/bold cyan] [yellow]'{escape(exc.model_name)}'[/yellow]")
+    console.print(f"[bold cyan]Backend:[/bold cyan] [yellow]{backend_name}[/yellow]")
     console.print(f"[bold cyan]Config source:[/bold cyan] [yellow]{escape(exc.source)}[/yellow]")
     console.print(f"\n[bold red]Error:[/bold red] {escape(str(exc))}\n")
 
@@ -624,10 +630,10 @@ def handle_gateway_unknown_model_error(exc: GatewayUnknownModelError) -> NoRetur
         case RemoteConfigSource.FRESH:
             console.print("  • Check the model handle for typos against [cyan]pipelex doctor[/cyan]")
             console.print("  • Update the deck to reference a model the gateway currently exposes")
-            console.print("  • Or disable [cyan]pipelex_gateway[/cyan] in [cyan].pipelex/inference/backends.toml[/cyan] to fall back to BYOK")
+            console.print(f"  • Or disable [cyan]{backend_name}[/cyan] in [cyan].pipelex/inference/backends.toml[/cyan] to fall back to BYOK")
         case RemoteConfigSource.CACHED:
             console.print("  • The on-disk cache may be stale — run [cyan]pipelex init[/cyan] while online to refresh it")
-            console.print("  • Or disable [cyan]pipelex_gateway[/cyan] in [cyan].pipelex/inference/backends.toml[/cyan] to operate offline (BYOK)")
+            console.print(f"  • Or disable [cyan]{backend_name}[/cyan] in [cyan].pipelex/inference/backends.toml[/cyan] to operate offline (BYOK)")
     console.print()
 
     console.print(f"[dim]For more information: {URLs.gateway_docs}[/dim]")

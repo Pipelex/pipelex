@@ -17,6 +17,7 @@ from pipelex.runtime_hub import get_console
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.configs import ConfigPaths
 from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError, RemoteConfigValidationError
+from pipelex.system.pipelex_service.pipelex_service_config import enabled_managed_gateway_sections
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.json_utils import deep_update
@@ -39,6 +40,54 @@ MODEL_TYPES = ["llm", "img_gen", "text_extractor", "search"]
 DEFAULT_MODEL_TYPE = "llm"
 
 
+def _group_handles_by_model_type(*, specs: dict[str, Any]) -> dict[str, list[str]]:
+    """Group a table of model specs by model type.
+
+    One function for both sources on purpose: a local backend TOML and a remote-config model-specs
+    section carry the same shape — one table per model handle, an optional `defaults` table naming
+    the model type the rest inherit — so reading them differently is how the two drift.
+
+    Args:
+        specs: The specs table, keyed by model handle.
+
+    Returns:
+        Dictionary mapping model_type to a sorted list of model handles.
+    """
+    defaults = specs.get("defaults", {})
+    default_model_type: str = DEFAULT_MODEL_TYPE
+    if isinstance(defaults, dict):
+        defaults_dict = cast("dict[str, Any]", defaults)
+        default_type_raw = defaults_dict.get("model_type")
+        if default_type_raw:
+            default_model_type = str(default_type_raw)
+
+    models_by_type: dict[str, list[str]] = {model_type: [] for model_type in MODEL_TYPES}
+
+    for key, value in specs.items():
+        # Skip defaults and non-dict entries
+        if key == "defaults" or not isinstance(value, dict):
+            continue
+
+        # Skip rules sub-sections
+        if ".rules" in key:
+            continue
+
+        # Determine model type (cast for type safety)
+        value_dict = cast("dict[str, Any]", value)
+        model_type_raw = value_dict.get("model_type", default_model_type)
+        model_type = str(model_type_raw) if model_type_raw else default_model_type
+
+        # Add to appropriate list
+        if model_type in models_by_type:
+            models_by_type[model_type].append(key)
+
+    # Sort model lists
+    for model_list in models_by_type.values():
+        model_list.sort()
+
+    return models_by_type
+
+
 def _extract_models_from_backend_toml(backend_path: Path) -> dict[str, list[str]]:
     """Extract model handles from a backend TOML file, grouped by model type.
 
@@ -53,100 +102,48 @@ def _extract_models_from_backend_toml(backend_path: Path) -> dict[str, list[str]
     except (TomlError, OSError):
         return {}
 
-    # Get defaults
-    defaults = config.get("defaults", {})
-    default_model_type = defaults.get("model_type", DEFAULT_MODEL_TYPE)
-
-    models_by_type: dict[str, list[str]] = {
-        "llm": [],
-        "img_gen": [],
-        "text_extractor": [],
-        "search": [],
-    }
-
-    for key, value in config.items():
-        # Skip defaults and non-dict entries
-        if key == "defaults" or not isinstance(value, dict):
-            continue
-
-        # Skip rules sub-sections
-        if ".rules" in key:
-            continue
-
-        # Determine model type (cast for type safety)
-        value_dict = cast("dict[str, Any]", value)
-        model_type_raw = value_dict.get("model_type", default_model_type)
-        model_type = str(model_type_raw) if model_type_raw else default_model_type
-
-        # Add to appropriate list
-        if model_type in models_by_type:
-            models_by_type[model_type].append(key)
-
-    # Sort model lists
-    for model_list in models_by_type.values():
-        model_list.sort()
-
-    return models_by_type
+    return _group_handles_by_model_type(specs=config)
 
 
-def _fetch_gateway_models() -> dict[str, list[str]]:
-    """Fetch model handles from Pipelex Gateway remote config, grouped by model type.
+def _fetch_managed_gateway_models() -> dict[str, dict[str, list[str]]]:
+    """Fetch model handles for every enabled managed gateway backend, grouped by model type.
+
+    A *managed gateway backend* is one that declares a `model_specs_section`, and there can be more
+    than one of them — the Portkey-cloud `pipelex_gateway` and `pipelex_manifold` today. Which
+    section a backend reads is its own declaration, so this asks `enabled_managed_gateway_sections`
+    rather than naming any backend here: hardcoding one name is exactly what kept this command
+    blind to the second gateway.
 
     Returns:
-        Dictionary mapping model_type to list of model handles.
+        Dictionary mapping backend name to its {model_type: [model handles]}. Empty when no managed
+        gateway backend is enabled, in which case the remote config is never fetched at all.
 
     Raises:
-        RemoteConfigUnavailableError: The Gateway config is unreachable and no usable cache
+        RemoteConfigUnavailableError: The remote config is unreachable and no usable cache
             exists — ``require_fresh=True`` refuses any cached fallback.
-        RemoteConfigValidationError: The Gateway responded with a payload that does not match
+        RemoteConfigValidationError: The service responded with a payload that does not match
             the expected schema.
     """
-    # ``require_fresh=True`` guarantees we never bake stale or missing Gateway model specs
-    # into committed files. Any ``RemoteConfigUnavailableError`` / ``RemoteConfigValidationError``
-    # propagates so the command refuses to proceed rather than writing fixtures silently
-    # missing every ``pipelex_gateway`` model.
+    sections = enabled_managed_gateway_sections()
+    if not sections:
+        return {}
+
+    # ``require_fresh=True`` guarantees we never bake stale or missing model specs into committed
+    # files. Any ``RemoteConfigUnavailableError`` / ``RemoteConfigValidationError`` propagates so
+    # the command refuses to proceed rather than writing fixtures silently missing every managed
+    # gateway model.
     result = RemoteConfigFetcher.fetch_remote_config(require_fresh=True)
-    model_specs = dict(result.config.backend_model_specs)
 
-    # Get defaults
-    defaults = model_specs.get("defaults", {})
-    default_model_type: str = DEFAULT_MODEL_TYPE
-    if isinstance(defaults, dict):
-        defaults_dict = cast("dict[str, Any]", defaults)
-        default_type_raw = defaults_dict.get("model_type")
-        if default_type_raw:
-            default_model_type = str(default_type_raw)
-
-    models_by_type: dict[str, list[str]] = {
-        "llm": [],
-        "img_gen": [],
-        "text_extractor": [],
-        "search": [],
-    }
-
-    for key, value in model_specs.items():
-        # Skip defaults and non-dict entries
-        if key == "defaults" or not isinstance(value, dict):
+    models_by_backend: dict[str, dict[str, list[str]]] = {}
+    for backend_name, section_name in sorted(sections.items()):
+        section = result.config.get_model_specs_section(section_name)
+        if section is None:
+            # The artifact carries no such section: a real answer, and the same posture the runtime
+            # takes — that backend simply serves nothing here, rather than failing the whole run.
             continue
+        models_by_backend[backend_name] = _group_handles_by_model_type(specs=dict(section))
 
-        # Skip rules sub-sections
-        if ".rules" in key:
-            continue
-
-        # Determine model type (cast for type safety)
-        value_dict = cast("dict[str, Any]", value)
-        model_type_raw = value_dict.get("model_type", default_model_type)
-        model_type = str(model_type_raw) if model_type_raw else default_model_type
-
-        # Add to appropriate list
-        if model_type in models_by_type:
-            models_by_type[model_type].append(key)
-
-    # Sort model lists
-    for model_list in models_by_type.values():
-        model_list.sort()
-
-    return models_by_type
+    return models_by_backend
 
 
 def _collect_all_model_availability() -> dict[str, Any]:
@@ -171,12 +168,15 @@ def _collect_all_model_availability() -> dict[str, Any]:
 
     backends_dir = config_manager.backends_dir_path
 
+    # Managed gateway backends are handled separately below: their models come from the published
+    # artifact, so a local TOML of the same name holds overrides and never the model list.
+    managed_backends = _fetch_managed_gateway_models()
+
     # Process each backend TOML file
     for backend_file in sorted(backends_dir.glob("*.toml")):
         backend_name = backend_file.stem
 
-        # Skip pipelex_gateway (handled separately)
-        if backend_name == "pipelex_gateway":
+        if backend_name in managed_backends:
             continue
 
         models_by_type = _extract_models_from_backend_toml(backend_file)
@@ -185,11 +185,11 @@ def _collect_all_model_availability() -> dict[str, Any]:
             if models_by_type.get(model_type):
                 result[model_type][backend_name] = models_by_type[model_type]
 
-    # Add Pipelex Gateway models
-    gateway_models = _fetch_gateway_models()
-    for model_type in MODEL_TYPES:
-        if gateway_models.get(model_type):
-            result[model_type]["pipelex_gateway"] = gateway_models[model_type]
+    # Add each managed gateway backend's models
+    for backend_name, models_by_type in managed_backends.items():
+        for model_type in MODEL_TYPES:
+            if models_by_type.get(model_type):
+                result[model_type][backend_name] = models_by_type[model_type]
 
     return result
 
@@ -617,9 +617,10 @@ def preprocess_test_models_cmd(
 ) -> None:
     """Preprocess test models from backend TOMLs and generate fixture files.
 
-    This command reads all backend TOML configurations and the Pipelex Gateway
-    remote config to build a complete mapping of available models. It can optionally
-    generate a Python fixture file with pre-computed (model, backend) pairs.
+    This command reads all backend TOML configurations and, for every enabled managed gateway
+    backend, its own section of the published remote config, to build a complete mapping of
+    available models. It can optionally generate a Python fixture file with pre-computed
+    (model, backend) pairs.
 
     Args:
         profile: Test profile to use (ci, dev, coverage, full).
@@ -678,15 +679,15 @@ def preprocess_test_models_cmd(
             console.print()
         sys.exit(1)
     except (RemoteConfigUnavailableError, RemoteConfigValidationError) as exc:
-        # Pipelex Gateway remote config is unavailable or stale. This command regenerates
-        # committed files (model_availability.json, _generated_model_sets.py), so it must
-        # refuse rather than write fixtures missing every pipelex_gateway model.
+        # The remote config is unavailable or stale. This command regenerates committed files
+        # (model_availability.json, _generated_model_sets.py), so it must refuse rather than write
+        # fixtures missing every managed gateway backend's models.
         if quiet:
-            console.print(f"[red]✗ Preprocessing failed:[/red] Gateway config unavailable - {escape(str(exc))}")
+            console.print(f"[red]✗ Preprocessing failed:[/red] Remote config unavailable - {escape(str(exc))}")
         else:
             error_panel = Panel(
-                f"[red]✗[/red] Pipelex Gateway remote configuration is unavailable\n\n[dim]{escape(str(exc))}[/dim]",
-                title="[bold red]Gateway Config Unavailable[/bold red]",
+                f"[red]✗[/red] The Pipelex service's remote configuration is unavailable\n\n[dim]{escape(str(exc))}[/dim]",
+                title="[bold red]Remote Config Unavailable[/bold red]",
                 border_style="red",
                 padding=(1, 2),
             )
@@ -694,7 +695,7 @@ def preprocess_test_models_cmd(
             console.print()
             console.print("[bold yellow]Recommended Actions:[/bold yellow]")
             console.print("  • Run [cyan]pipelex init[/cyan] while online to prime the remote config cache")
-            console.print("  • Fixture generation must not proceed without fresh Gateway model specs")
+            console.print("  • Fixture generation must not proceed without fresh managed gateway model specs")
             console.print()
         sys.exit(1)
     except Exception as exc:  # ruff: ignore[blind-except]

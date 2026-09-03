@@ -1,5 +1,3 @@
-import json
-
 from pydantic import Field
 from typing_extensions import override
 
@@ -41,9 +39,3 @@ class HtmlContent(StuffContent):
     @override
     def rendered_markdown(self, *, level: int = 1, is_pretty: bool = False) -> str:
         return self.inner_html
-
-    @override
-    def rendered_json(self) -> str:
-        if self.css_class is None:
-            return json.dumps({"html": self.inner_html})
-        return json.dumps({"html": self.inner_html, "css_class": self.css_class})

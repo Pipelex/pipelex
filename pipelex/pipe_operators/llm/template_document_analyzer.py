@@ -143,6 +143,12 @@ class TemplateDocumentAnalyzer:
             Tuple of (is_document_content, is_list_of_documents)
             or None if type cannot be resolved
         """
+        # A dynamic concept gets no static classification — same rule as the image analyzer:
+        # `is_compatible` short-circuits to True on Dynamic, and reading that as "definitely a
+        # document" would demand DocumentContent from a slot the runtime fills dynamically.
+        if NativeConceptCode.is_dynamic_concept(concept_code=root_concept.code):
+            return None
+
         native_document_concept = get_native_concept(NativeConceptCode.DOCUMENT)
 
         # For simple variable references (no dots after root)

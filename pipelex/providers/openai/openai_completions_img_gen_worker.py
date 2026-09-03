@@ -17,6 +17,7 @@ from pipelex.cogt.inference.error_classification import UserAction, UserActionKi
 from pipelex.cogt.inference.error_classify import classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
+from pipelex.cogt.model_backends.backend import MANAGED_GATEWAY_BACKEND_NAMES
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.providers.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -54,10 +55,13 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
     ) -> GeneratedImageRawDetails:
         log.debug(f"Generating image with model: {self.inference_model.tag}")
         image_format: ImageFormat | None = None
-        if self.inference_model.backend_name == "pipelex_gateway":
+        # Both Pipelex-managed gateways, not just the Portkey-cloud one: the manifold service relays
+        # the same models through the same gateway codebase, so it normalises a completions image
+        # response the same way — a URL to a PNG, with no format to read off the bytes.
+        if self.inference_model.backend_name in MANAGED_GATEWAY_BACKEND_NAMES:
             if img_gen_job.job_params.output_format and not img_gen_job.job_params.output_format.is_png:
                 msg = (
-                    f"Completions ImgGen worker for Pipelex Gateway only supports PNG output format. "
+                    f"Completions ImgGen worker for backend '{self.inference_model.backend_name}' only supports PNG output format. "
                     f"Requested output format: {img_gen_job.job_params.output_format}"
                 )
                 raise ImgGenParameterError(msg)
@@ -124,7 +128,8 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
             if image_format is None:
                 msg = (
                     f"OpenAI response message is a URL but output_format is not set. This shouldn't be possible. "
-                    f"This response should only happen when using backend 'blackboxai' or 'pipelex_gateway'. "
+                    f"This response should only happen when using backend 'blackboxai' or a Pipelex-managed gateway "
+                    f"({', '.join(MANAGED_GATEWAY_BACKEND_NAMES)}). "
                     f"Backend is: '{self.inference_model.backend_name}'"
                 )
                 raise ImgGenParameterError(msg)

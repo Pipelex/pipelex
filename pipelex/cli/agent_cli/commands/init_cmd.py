@@ -18,7 +18,7 @@ from pipelex.cli.commands.init.backends import get_selected_backend_keys, update
 from pipelex.cli.commands.init.command import attempt_prime_remote_config_cache
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.ui.backends_ui import get_backend_options_from_toml
-from pipelex.cogt.model_backends.backend import PipelexBackend
+from pipelex.cogt.model_backends.backend import MANAGED_GATEWAY_BACKEND_NAMES, PipelexBackend
 from pipelex.cogt.model_routing.routing_profile import PipelexRoutingProfile
 from pipelex.cogt.models.deck_manifest import compute_kit_manifest, write_manifest
 from pipelex.kit.paths import get_kit_configs_dir
@@ -215,8 +215,10 @@ def _configure_backends(
     update_backends_in_toml(toml_doc, selected_indices=selected_indices, backend_options=backend_options)
     save_toml_to_path(toml_doc, path=backends_toml_path)
 
-    # Handle pipelex_gateway terms acceptance (only when explicitly provided)
-    if PipelexBackend.GATEWAY in requested_backends:
+    # Any managed gateway backend puts this installation behind the service terms — the same
+    # question the boot asks. Asked the gateway-only way, `accept_gateway_terms` was silently
+    # dropped for a manifold-only request and the next inference boot refused to start.
+    if any(backend_name in requested_backends for backend_name in MANAGED_GATEWAY_BACKEND_NAMES):
         accept_terms = config.get("accept_gateway_terms")
         if accept_terms is not None:
             config_manager.global_config_dir.mkdir(parents=True, exist_ok=True)

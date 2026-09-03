@@ -37,6 +37,7 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from tenacity import RetryCallState, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from pipelex.cogt.model_backends.backend import MANIFOLD_MODEL_SPECS_SECTION
 from pipelex.system.pipelex_service.exceptions import (
     RemoteConfigFetchError,
     RemoteConfigUnavailableError,
@@ -115,6 +116,11 @@ class RemoteConfigFetcher:
     def make_dummy_remote_config(cls) -> RemoteConfig:
         """Create a default RemoteConfig for testing in offline environments.
 
+        **Every managed gateway's section is present and empty, not just the legacy one.** An absent
+        section means "this backend's specs were not published" and earns a disabling warning; on
+        this path that would be a warning about a backend nobody asked for, since the boots that
+        take this branch (``pipelex-agent models``, validation, dry runs) need no specs at all.
+
         Returns:
             A minimal RemoteConfig with analytics disabled and empty model specs.
         """
@@ -127,6 +133,7 @@ class RemoteConfigFetcher:
             ),
             backend_model_specs={},
             aws_region="us-east-1",
+            **{MANIFOLD_MODEL_SPECS_SECTION: {}},
         )
 
     @classmethod

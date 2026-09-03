@@ -337,7 +337,7 @@ class TestErrorHandlersExtended:
         expected_phrase: str,
     ) -> None:
         """The unknown-model handler branches its remediation on config provenance."""
-        exc = GatewayUnknownModelError(model_name="mystery-model", source=config_source)
+        exc = GatewayUnknownModelError(model_name="mystery-model", backend_name="pipelex_manifold", source=config_source)
 
         with pytest.raises(typer.Exit) as exc_info:
             handle_gateway_unknown_model_error(exc)
@@ -346,6 +346,7 @@ class TestErrorHandlersExtended:
         output = console.export_text()
         assert "Unknown gateway model handle" in output
         assert "'mystery-model'" in output
+        assert "pipelex_manifold" in output, "the remediation must name the backend that could not serve the handle"
         assert expected_phrase in output
 
     def test_handlers_escape_rich_markup_in_messages(self, console: Console) -> None:

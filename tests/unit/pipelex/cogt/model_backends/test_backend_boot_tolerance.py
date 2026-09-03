@@ -141,15 +141,15 @@ class TestAStaleBackendDirectory:
         *,
         lenient: bool,
         library_body: str = BACKENDS_TOML,
-        gateway_config: GatewayConfig | None = None,
+        managed_gateway_configs: dict[str, GatewayConfig] | None = None,
     ) -> InferenceBackendLibrary:
         library_path = self._write_library(machine, body=library_body)
         library = InferenceBackendLibrary.make_empty()
         library.load(
             secrets_provider=EnvSecretsProvider(),
-            backends_library_path=str(library_path),
+            backends_library_paths=[library_path],
             backends_dir_path=str(self._backends_dir(machine)),
-            gateway_config=gateway_config,
+            managed_gateway_configs=managed_gateway_configs,
             lenient=lenient,
         )
         return library
@@ -269,7 +269,7 @@ class TestAStaleBackendDirectory:
             machine,
             lenient=False,
             library_body=GATEWAY_BACKENDS_TOML,
-            gateway_config=GatewayConfig(model_specs=GATEWAY_SERVED_SPECS, aws_region="eu-west-1"),
+            managed_gateway_configs={PipelexBackend.GATEWAY: GatewayConfig(model_specs=GATEWAY_SERVED_SPECS, aws_region="eu-west-1")},
         )
 
         backend = library.get_inference_backend(backend_name=PipelexBackend.GATEWAY)

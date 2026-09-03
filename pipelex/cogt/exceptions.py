@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
-from pipelex.base_exceptions import ErrorReport, PipelexError, iter_cause_chain
+from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexError, iter_cause_chain
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.system.pipelex_service.types import RemoteConfigSource
 
@@ -41,6 +41,36 @@ class InferenceErrorCategory(StrEnum):
             ):
                 return False
 
+    @property
+    def error_domain(self) -> ErrorDomain | None:
+        """The :class:`~pipelex.base_exceptions.ErrorDomain` this category implies — who can fix it.
+
+        The category a worker assigns is already the authoritative statement of *whose fault*
+        an inference failure is, so :meth:`CogtError.to_error_report` derives the domain from it
+        rather than making every leaf class in the family declare the same fact twice.
+
+        ``CONTENT`` is the one mapping that changes an HTTP answer: a content-policy refusal, a
+        malformed prompt image, a bad prompt parameter are all properties of material the caller
+        submitted, so they belong in ``INPUT`` and answer 422 rather than 500.
+
+        ``UNKNOWN`` deliberately maps to ``None``. It means classification itself failed, and
+        ``RUNTIME`` would be a claim this code cannot support; an absent domain already renders
+        500, so the honest answer costs nothing.
+
+        ``CAPACITY -> RUNTIME`` does not disturb the provider-429 passthrough:
+        :attr:`~pipelex.base_exceptions.ErrorReport.http_status` checks
+        ``provider_metadata.status_code`` before it consults the domain.
+        """
+        match self:
+            case InferenceErrorCategory.CONTENT:
+                return ErrorDomain.INPUT
+            case InferenceErrorCategory.CONFIGURATION:
+                return ErrorDomain.CONFIG
+            case InferenceErrorCategory.TRANSIENT | InferenceErrorCategory.CAPACITY | InferenceErrorCategory.AMBIGUOUS:
+                return ErrorDomain.RUNTIME
+            case InferenceErrorCategory.UNKNOWN:
+                return None
+
 
 class CogtError(PipelexError):
     error_category: InferenceErrorCategory | None = None
@@ -56,6 +86,7 @@ class CogtError(PipelexError):
         error_category: InferenceErrorCategory | None = None,
         user_action: UserAction | None = None,
         provider_metadata: ProviderErrorMetadata | None = None,
+        backend_name: str | None = None,
     ):
         super().__init__(message)
         if error_category is not None:
@@ -64,6 +95,8 @@ class CogtError(PipelexError):
             self.user_action = user_action
         if provider_metadata is not None:
             self.provider_metadata = provider_metadata
+        if backend_name is not None:
+            self.backend_name = backend_name
 
     def fill_model_and_provider(self, model_handle: str | None, *, backend_name: str | None) -> None:
         """Fill ``model_handle`` / ``backend_name`` from the worker, only when still unset.
@@ -98,9 +131,19 @@ class CogtError(PipelexError):
         # ``tests/unit/pipelex/cogt/test_cogt_provider_metadata_wrapper_wins.py``.
         base_report = super().to_error_report()
         own_retryable = self.error_category.is_retryable if self.error_category is not None else None
+        # ``error_domain`` is derived from this error's own category rather than declared per leaf
+        # class, so the two fields can never contradict each other on the wire. Precedence mirrors
+        # every other field here — a class-level ``error_domain`` set explicitly on the leaf wins,
+        # then the derivation, then whatever ``base_report`` already inherited from the cause chain
+        # (which for a ``CogtError`` cause is that cause's own derivation). Deriving from
+        # ``self.error_category`` and not from ``base_report.error_category`` is deliberate: the
+        # report field is typed ``str``, and the same wrapper-wins precedence on both fields makes
+        # the two agree anyway — an inherited category rides in with the domain it derived.
+        own_domain = self.error_category.error_domain if self.error_category is not None else None
         return base_report.model_copy(
             update={
                 "error_category": self.error_category or base_report.error_category,
+                "error_domain": self.error_domain or own_domain or base_report.error_domain,
                 "retryable": own_retryable if own_retryable is not None else base_report.retryable,
                 "model": self.model_handle or base_report.model,
                 "provider": self.backend_name or base_report.provider,
@@ -158,6 +201,15 @@ class ModelChoiceNotFoundError(CogtError):
     """
 
     error_category = InferenceErrorCategory.CONFIGURATION
+    # Declared explicitly, against the grain of the CONFIGURATION category's ``CONFIG`` derivation,
+    # because the two fields are answering different questions here. The *category* is right: from
+    # the provider call's point of view the setup is wrong and no retry will help. But this class
+    # exists to report a mistyped model reference in material the caller authored — its message
+    # carries "Did you mean:" suggestions and lists the available options — so the caller is who
+    # fixes it, on the hosted API (a submitted method naming an unknown model) as much as in a
+    # local ``.mthds`` file. An operator-side deck fault surfaces as
+    # ``ModelDeckPresetValidatonError`` instead, which keeps the derived ``CONFIG``.
+    error_domain = ErrorDomain.INPUT
 
     def __init__(
         self,
@@ -423,6 +475,12 @@ class InferenceBackendCredentialsError(CogtError):
 
 
 class InferenceBackendLibraryError(CogtError):
+    """A backend the library cannot load.
+
+    ``backend_name`` is the backend the error is about, stamped by the loader so a caller can charge
+    the failure to that backend rather than to one whose name merely appears in the message's prose.
+    """
+
     error_category = InferenceErrorCategory.CONFIGURATION
 
 
@@ -459,33 +517,40 @@ class ModelDeckValidationError(CogtError):
 
 
 class GatewayUnknownModelError(CogtError):
-    """A model handle referenced by the deck cannot be located in the active gateway specs.
+    """A model handle the active routing profile sends to a managed gateway is absent from its specs.
 
     Carries the provenance of the gateway config (``FRESH`` vs ``CACHED``) so the message can
     branch: a cached-source failure suggests stale gateway specs and points the user at
     ``pipelex init`` to refresh while online; a fresh-source failure is a genuine
     misconfiguration.
+
+    **And it carries the backend name**, because more than one managed gateway can be live at once
+    and "which one" is then a question the message has to answer — the handle may be perfectly
+    present in the other service's section, which is a legitimate configuration rather than a
+    contradiction.
     """
 
     error_category = InferenceErrorCategory.CONFIGURATION
 
-    def __init__(self, model_name: str, source: RemoteConfigSource) -> None:
+    def __init__(self, model_name: str, backend_name: str, source: RemoteConfigSource) -> None:
         self.model_name = model_name
+        self.backend_name = backend_name
         self.source = source
         match source:
             case RemoteConfigSource.FRESH:
                 msg = (
-                    f"Model handle '{model_name}' is referenced by the active model deck but is not present "
-                    "in the Pipelex Gateway specs we just fetched. Either the model name is wrong, the gateway "
-                    "no longer offers it, or your deck overrides need updating.\n"
-                    "  - Run `pipelex doctor` to inspect the active gateway models.\n"
-                    "  - Disable pipelex_gateway in .pipelex/inference/backends.toml to fall back to BYOK."
+                    f"Model handle '{model_name}' is routed to backend '{backend_name}' by the active routing profile, "
+                    f"but is not present in the model specs we just fetched for it. Either the model name is wrong, that "
+                    f"gateway no longer offers it, or your deck overrides need updating.\n"
+                    f"  - Run `pipelex doctor` to inspect the active gateway models.\n"
+                    f"  - Route this model to another backend in .pipelex/inference/routing_profiles.toml.\n"
+                    f"  - Or disable {backend_name} in .pipelex/inference/backends.toml to fall back to BYOK."
                 )
             case RemoteConfigSource.CACHED:
                 msg = (
-                    f"Model handle '{model_name}' is referenced by the active model deck but is not present "
-                    "in the Pipelex Gateway specs loaded from the on-disk cache. The cache may be stale.\n"
-                    "  - Run `pipelex init` while online to refresh the cached gateway config.\n"
-                    "  - Or disable pipelex_gateway in .pipelex/inference/backends.toml to operate offline (BYOK)."
+                    f"Model handle '{model_name}' is routed to backend '{backend_name}' by the active routing profile, "
+                    f"but is not present in the model specs loaded for it from the on-disk cache. The cache may be stale.\n"
+                    f"  - Run `pipelex init` while online to refresh the cached gateway config.\n"
+                    f"  - Or disable {backend_name} in .pipelex/inference/backends.toml to operate offline (BYOK)."
                 )
         super().__init__(msg)

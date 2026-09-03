@@ -44,11 +44,12 @@ reports/
 results/
 
 # personnal pipelex config files that overrides the default one
-.worktreeinclude
 pipelex_super.toml
 pipelex_override.toml
 pipelex_temporary_override.toml
 telemetry_override.toml
+backends_override.toml
+routing_profiles_override.toml
 
 # local pipelex service configuration
 .pipelex/pipelex_service.toml
@@ -83,9 +84,11 @@ mthds-wip
 # Derived artifacts (auto-generated, not tracked)
 derived/
 
-# Node.js (used only for syncing mthds-ui graph viewer assets)
+# Node.js (syncing mthds-ui graph viewer assets, and the pinned toolchain `make ts-toolchain`
+# installs for the TypeScript emission gates — provisioned on demand, never committed)
 node_modules/
 package-lock.json
+.ts-toolchain/
 
 # Claude plans
 .claude/plans/

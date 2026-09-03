@@ -17,7 +17,7 @@ from pipelex.cli.commands.doctor_cmd import (
     display_health_report,
     doctor_cmd,
 )
-from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport
+from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsReport
 from pipelex.cogt.models.deck_manifest import DeckFileStatus, DeckSyncReport
 from pipelex.core.validation import MIGRATE_COMMAND
 

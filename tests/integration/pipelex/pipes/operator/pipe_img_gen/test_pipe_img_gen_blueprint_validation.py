@@ -50,11 +50,13 @@ def pipelex_routed_to_openai() -> Iterator[None]:
     routing_override_dir = Path(tempfile.mkdtemp(prefix="pipelex-routing-pipe-img-gen-validation-"))
     routing_override_path = routing_override_dir / routing_profiles_path.name
     save_toml_to_path(routing_profiles_doc, path=str(routing_override_path))
-    routing_monkeypatch.setattr(
-        type(config_manager),
-        "routing_profiles_file_path",
-        property(lambda _self: str(routing_override_path)),
-    )
+
+    # The whole sequence, not the base alone: a personal `routing_profiles_override.toml` on this
+    # machine would otherwise layer over the pinned document and route this test elsewhere.
+    def pinned_routing_profile_paths(_self: object, **_kwargs: object) -> list[Path]:
+        return [routing_override_path]
+
+    routing_monkeypatch.setattr(type(config_manager), "routing_profiles_file_paths", pinned_routing_profile_paths)
     get_console().print("[cyan]Routing to backend:[/cyan] openai (for blueprint-validation test)")
 
     try:

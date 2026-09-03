@@ -24,6 +24,7 @@ from pipelex.cli.dev_cli.commands.generate_corpus_vocabulary_cmd import generate
 from pipelex.cli.dev_cli.commands.generate_error_identity_cmd import generate_error_identity_cmd
 from pipelex.cli.dev_cli.commands.generate_error_pages_cmd import generate_error_pages_cmd
 from pipelex.cli.dev_cli.commands.generate_mthds_schema_cmd import generate_mthds_schema_cmd
+from pipelex.cli.dev_cli.commands.generate_projection_corpus_cmd import generate_projection_corpus_cmd
 from pipelex.cli.dev_cli.commands.kit_cmd import kit_app
 from pipelex.cli.dev_cli.commands.preprocess_test_models_cmd import preprocess_test_models_cmd
 from pipelex.cli.dev_cli.commands.refresh_graph_ui_sri_cmd import refresh_graph_ui_sri_cmd
@@ -59,6 +60,7 @@ class PipelexDevCLI(TyperGroup):
             "generate-error-identity",
             "generate-error-pages",
             "generate-mthds-schema",
+            "generate-projection-corpus",
             "kit",
             "preprocess-test-models",
             "refresh-graph-ui-sri",
@@ -504,6 +506,15 @@ def sync_kit_configs_command(
         console.print()
         console.print(Traceback())
         sys.exit(1)
+
+
+@app.command(name="generate-projection-corpus", help="Write the shared inputs-template projection fixture corpus")
+def generate_projection_corpus_command(
+    bundles: Annotated[list[Path], typer.Argument(help="MTHDS bundle file(s) to load as one batch — order fixes the emitted key order")],
+    output_dir: Annotated[Path, typer.Option("--output-dir", "-o", help="Directory receiving the corpus")],
+) -> None:
+    """Write the descriptors, the expected inputs templates, and the divergence record."""
+    generate_projection_corpus_cmd(bundle_paths=bundles, output_dir=output_dir)
 
 
 @app.command(name="trace-input-semantics", help="Dump one artifact per hop of the input-schema emission chain for a bundle")

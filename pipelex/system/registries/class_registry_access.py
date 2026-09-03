@@ -37,18 +37,22 @@ Note what that seam does **not** yet buy. `ConceptLibrary.get_structure_class` c
 context* selects, not against one the provider carries — a `ConceptLibrary` holds no registry of its
 own (the per-library `ClassRegistry` lives on `Library`). Today the two cannot disagree: the
 interpreter hub resolves both the current library and the scoped registry from the same
-``_library_id`` ContextVar, and the one place that installs a per-library registry sets it and the
-ContextVar on the same library in adjacent statements. Scoping resolution to the provider's own
-library is therefore a one-place change if it is ever needed; see
+``_library_id`` ContextVar, and every library the manager holds carries a registry of its own, so a
+provider read and a registry read of that one variable land on the same library. Scoping resolution
+to the provider's own library is therefore a one-place change if it is ever needed; see
 ``wip/inputs/provider-scoped-class-resolution.md`` for the trip-wires that would make it needed.
 
 ``pipelex.runtime_hub.get_class_registry`` is the public accessor and delegates here; prefer it
 everywhere except inside this module's own import closure.
 
-Scoping: a run may pin a per-library ClassRegistry (a workflow's own registry) rather than the
-process-global Kajson one. Resolving *which* library is current is interpreter-layer knowledge, so
-the kernel layer holds only a slot — ``pipelex.interpreter_hub.set_interpreter_hub`` installs the real
-resolver at boot. Unresolved, or with no library pinned, callers get the process-global registry.
+Scoping: every library ``LibraryManager.open_library`` hands out carries its own ClassRegistry,
+pre-seeded from the process-global Kajson one, so a load's dynamically generated structure classes
+live and die with the library that asked for them instead of sharing one name-keyed process-global
+slot with every other request. Resolving *which* library is current is interpreter-layer knowledge,
+so the kernel layer holds only a slot — ``pipelex.interpreter_hub.set_interpreter_hub`` installs the
+real resolver at boot. With no library pinned, an unresolved slot, or a pinned id the manager no
+longer holds, callers get the process-global registry — which, after boot, holds only what boot and
+non-library callers put there.
 """
 
 from collections.abc import Callable

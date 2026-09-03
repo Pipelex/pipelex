@@ -136,6 +136,25 @@ input_item_name = "item"
 """
 
 
+# A PipeLLM referencing a native.Dynamic input in its prompt — the shape that used to fail
+# dry-run validation: the image analyzer read Dynamic's universal compatibility as identity,
+# recorded a DIRECT image reference, and the prompt assembler then demanded ImageContent from a
+# slot the dry run fills with DynamicContent. Both prompt markers are covered.
+_BV_DYNAMIC_DOMAIN = "bundle_validator_dynamic"
+_BV_DYNAMIC_MTHDS = f"""
+domain = "{_BV_DYNAMIC_DOMAIN}"
+description = "Bundle with a Dynamic input referenced in a PipeLLM prompt"
+main_pipe = "process_dynamic"
+
+[pipe.process_dynamic]
+type = "PipeLLM"
+description = "Reference a Dynamic input with both prompt markers"
+inputs = {{ dynamic_in = "Dynamic" }}
+output = "Text"
+prompt = "Process this:\\n@dynamic_in\\nand inline $dynamic_in"
+"""
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestBundleValidatorIntegration:
     async def test_validate_pipes_success_real_path(self) -> None:
@@ -148,6 +167,23 @@ class TestBundleValidatorIntegration:
             results = await BundleValidator().validate_pipes([pipe], library_id=library_id)
             assert results[pipe.pipe_ref].status.is_success
             assert results[pipe.pipe_ref].pipe_ref == f"{_BV_DOMAIN}.echo_topic"
+        finally:
+            library_manager.teardown(library_id=library_id)
+            clear_current_library()
+
+    async def test_dynamic_input_in_prompt_dry_runs_clean(self) -> None:
+        """A PipeLLM referencing a Dynamic input in its prompt passes dry-run validation:
+        a dynamic concept gets no static image (or document) classification, so the variable
+        renders as text through the template.
+        """
+        library_manager = get_library_manager()
+        library_id = "bv_dynamic_lib"
+        _, qualified_main_pipe = acquire_library(library_id=library_id, mthds_contents=[_BV_DYNAMIC_MTHDS])
+        try:
+            assert qualified_main_pipe is not None
+            pipe = get_required_entry_pipe(pipe_code=qualified_main_pipe)
+            results = await BundleValidator().validate_pipes([pipe], library_id=library_id)
+            assert results[pipe.pipe_ref].status.is_success
         finally:
             library_manager.teardown(library_id=library_id)
             clear_current_library()

@@ -293,6 +293,7 @@ plugins:
         - configuration/index.md: "Configuration Overview"
         - configuration/config-pipeline-validation/dry-run-config.md: "Dry Run Configuration"
         - configuration/config-practical/logging-config.md: "Logging Configuration"
+        - configuration/config-practical/methods-config.md: "Methods Configuration"
         - configuration/config-practical/pipe-run-config.md: "Pipe Run Configuration"
         - configuration/config-practical/reporting-config.md: "Reporting Configuration"
         - configuration/config-practical/telemetry-config.md: "Telemetry Configuration"
@@ -348,6 +349,8 @@ plugins:
         - contribute/drift-contracts.md: "Drift Contracts"
         - contribute/mthds-test-corpus.md: "MTHDS Test Corpus"
         - contribute/trace-input-semantics.md: "Tracing Input Semantics"
+        - contribute/generate-projection-corpus.md: "Projection Fixture Corpus"
+        - contribute/typescript-emission-gates.md: "TypeScript Emission Gates"
         - migration-ledger.md: "Migration Ledger"
         - changelog.md: "Changelog"
 
@@ -547,6 +550,7 @@ nav:
         - Dry Run: configuration/config-pipeline-validation/dry-run-config.md
       - Practical Configuration:
         - Logging: configuration/config-practical/logging-config.md
+        - Methods: configuration/config-practical/methods-config.md
         - Pipe Run: configuration/config-practical/pipe-run-config.md
         - Reporting: configuration/config-practical/reporting-config.md
         - Telemetry: configuration/config-practical/telemetry-config.md
@@ -599,6 +603,8 @@ nav:
     - Drift Contracts: contribute/drift-contracts.md
     - MTHDS Test Corpus: contribute/mthds-test-corpus.md
     - Tracing Input Semantics: contribute/trace-input-semantics.md
+    - Projection Fixture Corpus: contribute/generate-projection-corpus.md
+    - TypeScript Emission Gates: contribute/typescript-emission-gates.md
     - Migration Ledger: migration-ledger.md
     - Code of Conduct: CODE_OF_CONDUCT.md
     - License: license.md

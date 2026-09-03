@@ -27,7 +27,6 @@ See `render_import_block` in `pipelex/codegen/emitters/python_common.py`.
 """
 
 import re
-import shutil
 import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
 from collections.abc import Callable
@@ -44,6 +43,7 @@ from pipelex.codegen.emitters.ts_zod import TS_PRINT_WIDTH, emit_ts_zod
 from pipelex.codegen.resolved_concepts import ResolvedLibrary, resolve_concepts_from_crate
 from pipelex.core.concepts.resolved_fields import ResolvedType, ResolvedTypeKind
 from pipelex.libraries.library_crate import LibraryCrate
+from tests.helpers.ts_toolchain import resolve_prettier
 
 _REPO_ROOT = Path(__file__).parents[4]
 _PYPROJECT = _REPO_ROOT / "pyproject.toml"
@@ -265,7 +265,8 @@ class TestEmittedArtifactsAreLintClean:
         """Prettier collapses a run of blank lines to one under *every* config — so emitting two (the
         Python idiom) guarantees a reformat, and a broken stamp, for any TypeScript consumer.
 
-        This invariant needs no prettier binary, so unlike `test_emitted_ts_is_prettier_clean` it always runs.
+        This invariant needs no prettier binary, so unlike `test_emitted_ts_is_prettier_clean` it runs on any
+        machine, not only where the node toolchain is provisioned.
         """
         for emitted_file in emit_ts_zod(resolve_concepts_from_crate(every_type_kind_crate)):
             offenders = re.findall(r"\n[ \t]*\n[ \t]*\n", emitted_file.content)
@@ -274,9 +275,9 @@ class TestEmittedArtifactsAreLintClean:
     def test_emitted_ts_lines_fit_the_print_width(self, every_type_kind_crate: LibraryCrate):
         """No emitted code line may exceed prettier's print width — it would be wrapped, breaking the stamp.
 
-        This is the guard that actually holds the TypeScript line in CI, where there is no node toolchain
-        for `test_emitted_ts_is_prettier_clean` to use. It needs no prettier binary, and it is what turns
-        an unmodelled overflow (a long concept name, a long choice list) into a failing test.
+        It needs no prettier binary, so it turns an unmodelled overflow (a long concept name, a long choice
+        list) into a failing test on any machine — including a developer's, before the mandatory
+        `test_emitted_ts_is_prettier_clean` sees it in CI.
 
         Comment lines are exempt on purpose: prettier reflows code, never the contents of a `//` line or a
         `/** … */` block, so a long JSDoc line is stable at any width.
@@ -295,22 +296,60 @@ class TestEmittedArtifactsAreLintClean:
         generated `types.ts` changed the bytes and got the artifact reported as `[hand-edited]` — the exact
         false report these emitters exist to prevent.
 
-        Like the two invariants above, this needs no prettier binary, so it is what holds the line in CI
-        where `test_emitted_ts_is_prettier_clean` skips for want of a node toolchain.
+        Like the two invariants above, this needs no prettier binary, so it reddens locally on a machine with
+        no node toolchain rather than waiting for the mandatory `test_emitted_ts_is_prettier_clean` in CI.
         """
         for emitted_file in emit_ts_zod(resolve_concepts_from_crate(every_type_kind_crate)):
             offenders = [line for line in emitted_file.content.splitlines() if line != line.rstrip()]
             assert not offenders, f"{emitted_file.filename} has lines with trailing whitespace:\n" + "\n".join(repr(line) for line in offenders)
 
+    def test_emitted_ts_never_breaks_a_line_inside_a_string_literal(self, every_type_kind_crate: LibraryCrate):
+        """No emitted line may end inside an unterminated string literal.
+
+        This is the always-on guard for a whole class of defect the other three are blind to. Every
+        emitted break is computed by splitting a rendered expression — on its member commas, or on its
+        member-chain dots — and each of those splits has to walk the string literals to avoid cutting
+        *through* one. Cut through one and the artifact stops being TypeScript.
+
+        No *always-on* guard catches it: the broken form is a run of *short* lines, so the print-width guard
+        cannot see it. Three separate defects of exactly this shape reached review while the only test that
+        parses the emission — `test_emitted_ts_is_prettier_clean` — skipped everywhere for want of a node
+        toolchain. That gate is mandatory in CI now, which is the durable fix; this one is what keeps the
+        class visible on a machine that has no node at all.
+        """
+        for emitted_file in emit_ts_zod(resolve_concepts_from_crate(every_type_kind_crate)):
+            for line_number, line in enumerate(emitted_file.content.splitlines(), start=1):
+                # Comment lines are prose, not code: an authored description may hold an apostrophe, and
+                # the emitted grammar keeps every comment on a line of its own (`//`, `/** … */`, ` * `).
+                if line.lstrip().startswith(("//", "/*", "*")):
+                    continue
+                quote: str | None = None
+                escaped = False
+                for char in line:
+                    if escaped:
+                        escaped = False
+                    elif quote is not None and char == "\\":
+                        escaped = True
+                    elif quote is not None:
+                        quote = None if char == quote else quote
+                    elif char in {'"', "'"}:
+                        quote = char
+                assert quote is None, f"{emitted_file.filename}:{line_number} ends inside a {quote} literal: {line!r}"
+
     def test_emitted_ts_is_prettier_clean(self, every_type_kind_crate: LibraryCrate, tmp_path: Path):
         """`prettier --check` must find nothing to change in the emitted TypeScript.
 
-        Skipped when prettier is not on PATH — this is a Python repo, so CI has no node toolchain. The
-        always-on structural guard above is what holds the line there.
+        This is the only gate that actually *parses* the emission, so it is the one that sees a content
+        defect the structural invariants above are blind to by construction — a wrong quote style, an
+        object literal spelled as JSON, a member chain broken where prettier would not break it. Each of
+        those reached review at least once while this test skipped everywhere.
+
+        It is therefore **mandatory** rather than opportunistic: `make test-ts-gates` provisions a pinned
+        prettier and sets `PIPELEX_REQUIRE_TS_GATES`, under which an absent binary fails here instead of
+        skipping, and CI runs that target. Without the flag — an ordinary local run on a machine with no
+        node toolchain — it still skips, and the structural invariants hold the line.
         """
-        prettier = shutil.which("prettier")
-        if prettier is None:
-            pytest.skip("prettier not on PATH")
+        prettier = resolve_prettier()
 
         for emitted_file in emit_ts_zod(resolve_concepts_from_crate(every_type_kind_crate)):
             (tmp_path / emitted_file.filename).write_text(emitted_file.content, encoding="utf-8")

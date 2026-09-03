@@ -15,6 +15,7 @@ from pytest_mock import MockerFixture
 
 from pipelex import log
 from pipelex.cogt.llm.llm_job import LLMJob
+from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.gateway_config import GatewayConfig
 from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs
@@ -39,9 +40,9 @@ class TestGatewayUnknownPerModelKeys:
         library = InferenceBackendLibrary.make_empty()
         library.load(
             secrets_provider=EnvSecretsProvider(),
-            backends_library_path=str(backends_library_path),
+            backends_library_paths=[backends_library_path],
             backends_dir_path=str(backends_dir),
-            gateway_config=GatewayConfig(model_specs=model_specs, aws_region="eu-west-3"),
+            managed_gateway_configs={PipelexBackend.GATEWAY: GatewayConfig(model_specs=model_specs, aws_region="eu-west-3")},
         )
         return library
 

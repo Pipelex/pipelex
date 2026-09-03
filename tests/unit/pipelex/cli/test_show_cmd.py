@@ -160,7 +160,7 @@ class TestShowCmd:
         )
         mocker.patch("pipelex.cli.commands.show_cmd.get_models_manager", return_value=models_manager)
         mocked_config_manager = mocker.patch("pipelex.cli.commands.show_cmd.config_manager")
-        mocked_config_manager.backends_file_path = tmp_path / "backends.toml"
+        mocked_config_manager.backends_file_paths.return_value = [tmp_path / "backends.toml"]
         mocked_config_manager.backends_dir_path = tmp_path / "backends"
         lenient_library = SimpleNamespace(root={backend.name: backend for backend in backends}, load=mocker.Mock())
         library_class_mock = mocker.patch("pipelex.cli.commands.show_cmd.InferenceBackendLibrary", return_value=lenient_library)

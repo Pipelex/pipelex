@@ -23,10 +23,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
+from kajson.kajson_manager import KajsonManager
 from pydantic import Field
 
 from pipelex.core.memory.exceptions import ListWhereSingularError
 from pipelex.core.memory.input_shaper import InputShaper, PipelineInputs
+from pipelex.core.stuffs.document_content import DocumentContent
+from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.interpreter_hub import (
@@ -39,8 +42,7 @@ from pipelex.interpreter_hub import (
 from pipelex.pipeline.input_form import FieldKind, InputFormField, build_input_form
 from pipelex.pipeline.pipe_io_contracts import IOMultiplicity, build_pipe_io_contracts
 from pipelex.pipeline.validate_bundle import validate_bundle
-from pipelex.system.registries.class_registry_access import get_class_registry
-from tests.helpers.input_form import fields_by_name
+from tests.helpers.input_form import as_list, fields_by_name
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -484,10 +486,20 @@ class InputFormFieldLessPayload(StructuredContent):
     """A registered structure class declaring no field — a payload that demands nothing."""
 
 
-class InputFormUnmappablePayload(StructuredContent):
-    """A structure class whose field has no single blueprint shape — reflection must stay absent, never guess."""
+class InputFormAttachment(StructuredContent):
+    """A nested non-native model, carrying a file-bearing field one level below the concept."""
+
+    caption: str = Field(description="PROBE_desc_reflected_caption")
+    picture: ImageContent = Field(description="PROBE_desc_reflected_picture")
+
+
+class InputFormPartlyMappablePayload(StructuredContent):
+    """A structure class one annotation defeats — every other field, the file-bearing ones included, must still be stated."""
 
     payload: str | int = Field(description="PROBE_desc_reflected_payload")
+    label: str = Field(description="PROBE_desc_reflected_label")
+    attachment: InputFormAttachment = Field(description="PROBE_desc_reflected_attachment")
+    scans: list[DocumentContent] = Field(description="PROBE_desc_reflected_scans")
 
 
 _KIND_TABLE_MTHDS = """
@@ -498,9 +510,9 @@ description = "Bundle pinning the rest of the kind-assignment table"
 description = "PROBE_desc_concept_Constrained: class-backed by a hand-written constrained class"
 structure = "InputFormConstrainedPayload"
 
-[concept.Unmappable]
-description = "PROBE_desc_concept_Unmappable: class-backed by a class reflection cannot map"
-structure = "InputFormUnmappablePayload"
+[concept.PartlyMappable]
+description = "PROBE_desc_concept_PartlyMappable: class-backed by a class one annotation defeats"
+structure = "InputFormPartlyMappablePayload"
 
 [concept.FieldLess]
 description = "PROBE_desc_concept_FieldLess: class-backed by a class declaring no field"
@@ -538,12 +550,12 @@ template = "$empty_in $refining_in"
 [pipe.edges]
 type = "PipeLLM"
 description = "Fixed-count-of-one multiplicity and class-backed reflection"
-inputs = { one = "Gadget[1]", constrained = "Constrained", unmappable = "Unmappable", field_less = "FieldLess" }
+inputs = { one = "Gadget[1]", constrained = "Constrained", partly_mappable = "PartlyMappable", field_less = "FieldLess" }
 output = "Text"
 prompt = \"\"\"
 @one
 @constrained
-@unmappable
+@partly_mappable
 @field_less
 \"\"\"
 """
@@ -574,14 +586,23 @@ prompt = \"\"\"
 class TestKindAssignmentTable:
     async def _derive_kind_table(self, load_empty_library: Callable[[], str]) -> dict[str, PipeInputFormDescriptor]:
         outer_library_id = load_empty_library()
+        # Register into the *process-global* registry, not the ambient one: these classes stand in
+        # for structure classes a Python module put in the process, and `validate_bundle` opens its
+        # own library, whose registry is seeded from the global one. Registering through
+        # `get_class_registry()` here would put them in the enclosing empty library's registry,
+        # where the validate library cannot see them.
+        registry = KajsonManager.get_class_registry()
         try:
-            registry = get_class_registry()
             registry.register_class(InputFormConstrainedPayload)
-            registry.register_class(InputFormUnmappablePayload)
+            registry.register_class(InputFormPartlyMappablePayload)
             registry.register_class(InputFormFieldLessPayload)
             result = await validate_bundle(mthds_contents=[_KIND_TABLE_MTHDS])
             return build_input_form(result.pipes)
         finally:
+            # Unregister so the stand-ins do not outlive this test and seed every library opened after it.
+            registry.unregister_class(InputFormConstrainedPayload)
+            registry.unregister_class(InputFormPartlyMappablePayload)
+            registry.unregister_class(InputFormFieldLessPayload)
             _teardown_validation_library(outer_library_id)
 
     async def test_remaining_natives_complete_the_table(self, load_empty_library: Callable[[], str]) -> None:
@@ -596,9 +617,14 @@ class TestKindAssignmentTable:
         search_result = _field_by_name(natives, "search_result_in")
         assert search_result.kind == FieldKind.OBJECT
         assert search_result.fields is not None
+        json_field = _field_by_name(natives, "json_in")
+        assert json_field.kind == FieldKind.OBJECT, "native.JSON has a pinned structure, so it expands like the other pinned natives"
+        assert json_field.fields is not None
+        assert [field.name for field in json_field.fields] == ["json_obj"], "Its pinned blueprint's single required field"
+        # The three natives that declare no pinned structure — `_pinned_structure` returns None for
+        # exactly these, so `unknown` is the honest kind and no other native may join them.
         assert _field_by_name(natives, "dynamic_in").kind == FieldKind.UNKNOWN
         assert _field_by_name(natives, "anything_in").kind == FieldKind.UNKNOWN
-        assert _field_by_name(natives, "json_in").kind == FieldKind.UNKNOWN
         for field in natives.fields:
             assert field.concept_ref is not None
             assert field.concept_ref.startswith("native.")
@@ -736,12 +762,42 @@ class TestKindAssignmentTable:
         assert field_less.required is True
         assert field_less.gating is True
 
-    async def test_unmappable_class_falls_back_to_unknown(self, load_empty_library: Callable[[], str]) -> None:
-        """Reflection is faithful-or-absent: a class with an unmappable field yields `unknown`, with identity kept."""
+    async def test_an_unmappable_annotation_is_unknown_on_that_field_alone(self, load_empty_library: Callable[[], str]) -> None:
+        """Class reflection is partial: the field no annotation maps is `unknown`, its siblings stay stated."""
         input_form = await self._derive_kind_table(load_empty_library)
-        unmappable = _field_by_name(input_form["input_form_kinds.edges"], "unmappable")
+        partly_mappable = _field_by_name(input_form["input_form_kinds.edges"], "partly_mappable")
 
-        assert unmappable.kind == FieldKind.UNKNOWN
-        assert unmappable.concept_ref == "input_form_kinds.Unmappable"
-        assert unmappable.description is not None
-        assert "PROBE_desc_concept_Unmappable" in unmappable.description
+        assert partly_mappable.kind == FieldKind.OBJECT, "One defeated annotation no longer collapses the whole payload"
+        assert partly_mappable.concept_ref == "input_form_kinds.PartlyMappable"
+        assert partly_mappable.description is not None
+        assert "PROBE_desc_concept_PartlyMappable" in partly_mappable.description
+        by_name = fields_by_name(partly_mappable)
+
+        payload = by_name["payload"]
+        assert payload.kind == FieldKind.UNKNOWN, "A union that is neither optional nor numeric has no honest node"
+        assert payload.description == "PROBE_desc_reflected_payload", "The unmappable field keeps its identity and helper text"
+        assert by_name["label"].kind == FieldKind.TEXT, "The mappable sibling is stated, not lost with it"
+
+    async def test_file_positions_below_a_defeated_sibling_stay_visible(self, load_empty_library: Callable[[], str]) -> None:
+        """What partial reflection is for: a consumer preparing inputs must still see every file position.
+
+        The collapse hid these — an `image` nested in a plain model, a list of `document` — behind the
+        one sibling annotation the reflection could not map, and a local path at such a position went
+        through un-uploaded.
+        """
+        input_form = await self._derive_kind_table(load_empty_library)
+        by_name = fields_by_name(_field_by_name(input_form["input_form_kinds.edges"], "partly_mappable"))
+
+        attachment = by_name["attachment"]
+        assert attachment.kind == FieldKind.OBJECT, "A nested non-native model is walked into, not flattened to an opaque dict"
+        assert attachment.description == "PROBE_desc_reflected_attachment"
+        nested = fields_by_name(attachment)
+        assert nested["caption"].kind == FieldKind.TEXT
+        assert nested["picture"].kind == FieldKind.IMAGE, "The file position one level down is reported"
+        assert nested["picture"].concept_ref == "native.Image", "A content class maps to its native by identity"
+        assert nested["picture"].description == "PROBE_desc_reflected_picture", "The field's own description wins over the native's"
+
+        scans = as_list(by_name["scans"])
+        assert scans.concept_ref == "native.Document", "A list of a content class names the element concept"
+        assert scans.item.kind == FieldKind.DOCUMENT
+        assert not hasattr(scans.item, "name"), "A list item has no authored name"

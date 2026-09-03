@@ -6,6 +6,7 @@ from pydantic import Field, field_validator, model_validator
 from pipelex.cogt.config_cogt import InferenceConfig
 from pipelex.graph.graph_config import GraphConfig
 from pipelex.language.mthds_config import MthdsConfig
+from pipelex.methods.methods_config import MethodsConfig
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.configuration.pipe_func_config import PipeFuncConfig
@@ -201,6 +202,7 @@ class InterpreterConfig(ConfigModel):
     """
 
     mthds: MthdsConfig
+    methods: MethodsConfig
     pipe_run: PipeRunConfig
     pipe_func: PipeFuncConfig
     pipeline_execution: PipelineExecutionConfig

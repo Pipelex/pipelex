@@ -16,3 +16,9 @@ This is not a defect in the PR — it is the repo's standing convention. Existin
 ## Recommendation
 
 Decide once, for the whole repo: either keep the current tags-for-standard-actions / SHAs-for-privileged-actions split as deliberate policy, or pin every third-party action to a reviewed SHA across all workflows in one sweep (with Dependabot or pin tooling such as `pinact` to keep the pins moving). If pinning wins, the sweep should cover all workflows in `.github/workflows/`, not just the new one.
+
+## Raised again on PR #1184 (2026-09-02)
+
+Greptile reported the identical finding on the new `Tests (ts emission gates)` job in `.github/workflows/tests-check.yml` — thread `PRRT_kwDOOwmMFc6eS72b`, flagging `actions/checkout@v4`, `astral-sh/setup-uv@v7` and `actions/setup-node@v4`. Deferred here unchanged, for the same reason and with one addition specific to that PR: the new job sits in the same file as the eight `matrix-test` shards, which already run `actions/checkout@v4` and `astral-sh/setup-uv@v7` unpinned on every pull request. Pinning only the new job would change nothing about what third-party code executes per PR, while making one job in the file disagree with the rest of it.
+
+The recurrence is itself an argument for the recommendation above: the bots will raise this on every new workflow or job until the repo decides once and sweeps.

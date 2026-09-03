@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from kajson.class_registry import ClassRegistry
+from kajson.kajson_manager import KajsonManager
 from mthds.package.dependency_resolver import ResolvedDependency, determine_exported_pipes, resolve_all_dependencies
 from mthds.package.discovery import find_package_manifest
 from mthds.package.exceptions import DependencyResolveError, ManifestError
@@ -14,7 +15,6 @@ from typing_extensions import override
 
 import pipelex.builder as builder_pkg  # package import — used for __file__ path
 from pipelex import log
-from pipelex.cli.installed_methods import find_method_by_full_address
 from pipelex.config import is_pipe_func_sandbox_hosted
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -43,6 +43,7 @@ from pipelex.libraries.library_utils import (
 )
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.libraries.visibility_utils import check_visibility_for_blueprints, make_visibility_checker
+from pipelex.methods.fetch_on_miss import resolve_address_based_method
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.handle_pipe_errors import categorize_pipe_validation_error
 from pipelex.mthds_parsing.parser import MthdsParser
@@ -187,9 +188,46 @@ class LibraryManager(LibraryManagerAbstract):
             the_library = self._libraries[library_id]
         else:
             the_library = LibraryFactory.make_empty()
+            the_library.set_class_registry(self._make_library_class_registry())
             self._libraries[library_id] = the_library
 
         return library_id, the_library
+
+    @classmethod
+    def _make_library_class_registry(cls) -> ClassRegistry:
+        """Build the per-library ClassRegistry every manager-opened Library carries.
+
+        Concept materialization registers dynamically generated structure classes under a
+        *name* key (``domain__Concept``), and kajson's ``register_class`` overwrites an existing
+        key unconditionally. A library that carried no registry of its own resolved through to the
+        process-global registry, which made two libraries loading the same concept ref share one
+        slot: whichever loaded last owned the class, and neither teardown removed it. Two
+        contaminations followed — a later load reusing an earlier one's class (``ConceptFactory``
+        reuses a registered class for a basic concept), and two concurrent loads overwriting each
+        other at any ``await`` between generation and use. Both crossed request boundaries wherever
+        one process serves several bundles, and the generated classes are what
+        ``pipe_io_contracts`` renders schemas from.
+
+        Giving the registry to the library at open time makes the isolation structural rather than
+        opt-in: the classes a load generates live and die with the library that asked for them, and
+        the process-global registry keeps only what boot put there.
+
+        The seed is a snapshot of the process-global registry — the boot-time core and test models,
+        plus anything registered outside any library — taken from ``KajsonManager`` rather than from
+        the ambient ``get_class_registry()``: opening a library while another one is current must not
+        copy that library's dynamic classes into the new one. Being a snapshot, it is taken at open
+        time: a class registered globally *after* a library is open is not visible to that library.
+        Nothing in-tree does that — boot registers before any library exists, and every load-time
+        registration runs under the library it is loading into — so the ordering that would make it
+        matter is a host registering classes mid-flight, which is a case for registering them at
+        startup instead.
+        """
+        library_class_registry = ClassRegistry()
+        # The global registry really is empty before boot registers anything; kajson's
+        # register_classes_dict is a no-op on an empty dict, so a library opened there comes out
+        # carrying its own empty registry rather than failing to open.
+        library_class_registry.register_classes_dict(KajsonManager.get_class_registry().get_classes_dict())
+        return library_class_registry
 
     @override
     def open_fresh_library(self, library_id: str) -> Library:
@@ -1131,7 +1169,10 @@ class LibraryManager(LibraryManagerAbstract):
         Collects all cross-package pipe references from controller blueprints
         (sequences, batches, conditions, parallels), identifies those whose
         alias contains '/' (i.e. a full package address), and loads each
-        unique address-based dependency.
+        unique address-based dependency. A dependency missing from the
+        installed methods is fetched by address (honoring an ``@<tag>`` pin)
+        and installed when fetch-on-miss is enabled; an unresolvable
+        dependency raises a diagnostic rather than passing silently.
 
         Also searches for .mthds/methods/ directories relative to the bundle
         source path, walking up ancestor directories to find installed methods
@@ -1177,25 +1218,25 @@ class LibraryManager(LibraryManagerAbstract):
         *,
         full_address: str,
         extra_search_dirs: list[Path] | None = None,
-    ) -> bool:
-        """Load an installed method package on demand using its full address.
+    ) -> None:
+        """Load a method package on demand using its full address, fetching it on a miss.
 
-        Discovers the matching installed method, builds a ResolvedDependency,
-        and delegates to _load_single_dependency() to load it as a child
-        library with the full address as alias.
+        Resolves the address to an installed method — fetching and installing the package
+        (honoring an ``@<tag>`` pin) when no installed method matches and fetch-on-miss is
+        enabled — builds a ResolvedDependency, and delegates to _load_single_dependency()
+        to load it as a child library with the full address as alias.
 
         Args:
             library: The main library to load into
             full_address: The full package address (e.g. "github.com/Pipelex/methods/documents")
             extra_search_dirs: Additional .mthds/methods/ directories to scan
 
-        Returns:
-            True if the dependency was successfully loaded, False otherwise
+        Raises:
+            MethodRefError: The address resolves to no installed method and could not be
+                fetched — fetch-on-miss disabled, an unfetchable address, a failed fetch,
+                or a failed install. Never a silent pass.
         """
-        installed = find_method_by_full_address(full_address=full_address, extra_search_dirs=extra_search_dirs)
-        if installed is None:
-            log.warning(f"No installed method found for address '{full_address}'")
-            return False
+        installed = resolve_address_based_method(full_address=full_address, extra_search_dirs=extra_search_dirs)
 
         exported_pipe_codes = determine_exported_pipes(manifest=installed.manifest)
 
@@ -1212,8 +1253,6 @@ class LibraryManager(LibraryManagerAbstract):
             library=library,
             resolved_dep=resolved_dep,
         )
-
-        return True
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
         library = self.get_current_library()

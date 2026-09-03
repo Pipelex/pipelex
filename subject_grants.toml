@@ -348,9 +348,9 @@ rationale = "Verb-object: fixes the bundle at bundle_path; options stay keyword.
 param = "input_file"
 rationale = "Renders the input file to a graph; single operand."
 
-["pipelex/cli/commands/init/backends.py::disable_gateway_backend"]
+["pipelex/cli/commands/init/backends.py::disable_managed_gateway_backends"]
 param = "backends_toml_path"
-rationale = "Edits the backends TOML at the path to disable the gateway; single operand."
+rationale = "Edits the backends TOML at the path to disable the managed gateway backends; single operand."
 
 ["pipelex/cli/commands/init/backends.py::get_selected_backend_keys"]
 param = "backends_toml_path"
@@ -1068,6 +1068,10 @@ rationale = "Noun-named derivation: the type expr for the concept; context stays
 param = "concepts"
 rationale = "Verb-object: emits the binder for the concepts; mapping stays keyword."
 
+["pipelex/codegen/emitters/ts_zod.py::_explode_enum_call"]
+param = "call"
+rationale = "Verb-object: explodes the enum call it is handed; the column stays keyword."
+
 ["pipelex/codegen/emitters/ts_zod.py::_find_recursive_concept_refs"]
 param = "concepts"
 rationale = "Single-operand analysis over the concepts collection."
@@ -1076,9 +1080,21 @@ rationale = "Single-operand analysis over the concepts collection."
 param = "value"
 rationale = "Single-operand formatting of the value."
 
+["pipelex/codegen/emitters/ts_zod.py::_is_enum_call"]
+param = "call"
+rationale = "Verb-object predicate over the one member call it classifies."
+
 ["pipelex/codegen/emitters/ts_zod.py::_jsdoc"]
 param = "description"
 rationale = "Noun-named derivation: builds the JSDoc from the description; extras stay keyword."
+
+["pipelex/codegen/emitters/ts_zod.py::_presence_modifiers"]
+param = "concept_field"
+rationale = "Reads as a verb-object sentence over the one field it describes, matching every other renderer in this emitter."
+
+["pipelex/codegen/emitters/ts_zod.py::_render_broken_call"]
+param = "call"
+rationale = "Verb-object: renders the one member call it is handed; the column stays keyword."
 
 ["pipelex/codegen/emitters/ts_zod.py::_render_field"]
 param = "concept_field"
@@ -1104,9 +1120,29 @@ rationale = "Single-operand sanitization of the text."
 param = "concept"
 rationale = "Noun-named derivation: the schema expr for the concept; context stays keyword."
 
+["pipelex/codegen/emitters/ts_zod.py::_split_enum_members"]
+param = "members_text"
+rationale = "Verb-object: splits the enum member text it is handed, its one operand."
+
+["pipelex/codegen/emitters/ts_zod.py::_split_member_chain"]
+param = "expr"
+rationale = "Verb-object: splits the zod expression into its member chain, its one operand."
+
+["pipelex/codegen/emitters/ts_zod.py::_ts_literal"]
+param = "value"
+rationale = "Single-operand formatting of the value, matching the sibling default-value renderers."
+
+["pipelex/codegen/emitters/ts_zod.py::_ts_object_key"]
+param = "key"
+rationale = "Single-operand formatting of the key it quotes."
+
 ["pipelex/codegen/emitters/ts_zod.py::_ts_signature"]
 param = "name"
 rationale = "Verb-object: renders the signature for the named function; param and return type are context."
+
+["pipelex/codegen/emitters/ts_zod.py::_ts_string"]
+param = "text"
+rationale = "Single-operand formatting of the text it quotes."
 
 ["pipelex/codegen/emitters/ts_zod.py::_ts_type"]
 param = "resolved_type"
@@ -1152,25 +1188,9 @@ rationale = "Single-operand conversion of the annotation; description stays keyw
 param = "annotation"
 rationale = "Predicate on the annotation; single operand."
 
-["pipelex/codegen/native_expansion.py::_is_number_union"]
-param = "annotation"
-rationale = "Predicate on the annotation; single operand."
-
 ["pipelex/codegen/native_expansion.py::_list_blueprint"]
 param = "list_annotation"
 rationale = "Noun-named derivation from the list annotation; the rest stays keyword."
-
-["pipelex/codegen/native_expansion.py::_native_code_for_content_class"]
-param = "annotation"
-rationale = "Noun-named derivation: inspects the annotation for its native code; single operand."
-
-["pipelex/codegen/native_expansion.py::_scalar_field_type"]
-param = "annotation"
-rationale = "Noun-named derivation: inspects the annotation for its scalar type; single operand."
-
-["pipelex/codegen/native_expansion.py::_strip_optional"]
-param = "annotation"
-rationale = "Single-operand transformation of the annotation."
 
 ["pipelex/codegen/native_expansion.py::collect_native_refs_from_structure"]
 param = "structure"
@@ -1776,6 +1796,10 @@ rationale = "Parses the response; single operand."
 param = "value"
 rationale = "Parses the value; single operand."
 
+["pipelex/cogt/inference/error_classification.py::_pipelex_service_error_code_from_body"]
+param = "body"
+rationale = "Reads an error code out of one body dict, exactly as its siblings _provider_error_code_from_body and _provider_error_code_from_flat_body do; the body is the single obvious operand and all three read as one verb-object sentence."
+
 ["pipelex/cogt/inference/error_classification.py::_provider_error_code_from_body"]
 param = "body"
 rationale = "Extracts/derives from the body; single operand."
@@ -1829,6 +1853,10 @@ param = "exc"
 rationale = "Extracts from the exc; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::extract_local_extract_metadata"]
+param = "exc"
+rationale = "Extracts from the exc; single operand."
+
+["pipelex/cogt/inference/error_classification.py::extract_manifold_metadata"]
 param = "exc"
 rationale = "Extracts from the exc; single operand."
 
@@ -2012,10 +2040,6 @@ rationale = "Keyed accessor by the key; single operand."
 param = "model_name"
 rationale = "Keyed accessor by the model_name; single operand."
 
-["pipelex/cogt/model_backends/backend.py::PipelexBackend.is_gateway_backend"]
-param = "backend_name"
-rationale = "Predicate on the backend_name; single operand."
-
 ["pipelex/cogt/model_backends/backend_credentials.py::BackendCredentialsErrorMsgFactory.make_comprehensive_error_msg"]
 param = "backend_credential_reports"
 rationale = "Factory from source: builds the result from the backend_credential_reports; single operand."
@@ -2032,10 +2056,6 @@ rationale = "Loads model specs from the gateway config; single operand."
 param = "backend_name"
 rationale = "Loads model specs for the named backend; single operand."
 
-["pipelex/cogt/model_backends/backend_library.py::InferenceBackendLibrary.check_backend_credentials"]
-param = "path"
-rationale = "Verb–object: validates/checks the path; single operand."
-
 ["pipelex/cogt/model_backends/backend_library.py::InferenceBackendLibrary.get_inference_backend"]
 param = "backend_name"
 rationale = "Keyed accessor by the backend_name; single operand."
@@ -2051,10 +2071,6 @@ rationale = "Factory from source: builds the result from the backend_name; singl
 ["pipelex/cogt/model_routing/routing_profile_factory.py::RoutingProfileFactory.make_routing_profile"]
 param = "name"
 rationale = "Factory from source: builds the result from the name; single operand."
-
-["pipelex/cogt/model_routing/routing_profile_loader.py::load_active_routing_profile"]
-param = "routing_profile_library_path"
-rationale = "Deck/file op on the routing_profile_library_path; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::DeckSyncReport.files_with_status"]
 param = "status"
@@ -2225,8 +2241,8 @@ param = "deck"
 rationale = "Keyed accessor by the deck; single operand."
 
 ["pipelex/cogt/models/model_manager.py::ModelManager._enforce_gateway_model_membership"]
-param = "gateway_config"
-rationale = "Operates on the gateway_config; single operand (qualifiers keyword-only)."
+param = "managed_gateway_configs"
+rationale = "Operates on the managed gateway configs; single operand (qualifiers keyword-only)."
 
 ["pipelex/cogt/models/model_manager.py::ModelManager._extract_choice_handle"]
 param = "choice"
@@ -4612,6 +4628,10 @@ rationale = "Verb-object read: the slot value whose hints are extracted."
 param = "pipes"
 rationale = "Reads as a verb-object sentence over the loaded pipes, mirroring build_pipe_io_contracts."
 
+["pipelex/pipeline/input_form.py::build_output_form"]
+param = "pipes"
+rationale = "The output twin of build_input_form; the two are called side by side and must read alike."
+
 ["pipelex/pipeline/input_normalizer.py::_normalize_list"]
 param = "items"
 rationale = "Verb-object: normalizes the items; context stays keyword."
@@ -5071,6 +5091,58 @@ rationale = "Plugin protocol register: the registrar is the sole sink the plugin
 ["pipelex/providers/linkup/linkup_search_worker.py::LinkupSearchWorker._parse_date"]
 param = "date_str"
 rationale = "Parses/consumes the date_str; single operand."
+
+["pipelex/providers/manifold/manifold_completions_factory.py::ManifoldCompletionsFactory.make_openai_client_for_completions"]
+param = "model_handle"
+rationale = "Factory from source: builds the result from the model_handle; single operand."
+
+["pipelex/providers/manifold/manifold_constants.py::ManifoldOpenAISdkVariant.is_completions"]
+param = "sdk"
+rationale = "Predicate on the sdk; single operand."
+
+["pipelex/providers/manifold/manifold_constants.py::ManifoldOpenAISdkVariant.is_responses"]
+param = "sdk"
+rationale = "Predicate on the sdk; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory._make_gemini_image_config"]
+param = "inference_model"
+rationale = "Factory from source: builds the result from the inference_model; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.get_api_key"]
+param = "backend"
+rationale = "Derives the value from the backend config; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.get_base_url"]
+param = "backend"
+rationale = "Derives the value from the backend config; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.get_origin"]
+param = "backend"
+rationale = "Derives the value from the backend config; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.is_debug_enabled"]
+param = "backend"
+rationale = "Predicate: reports whether debug logging is enabled for the backend; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.make_auth_headers"]
+param = "backend"
+rationale = "Factory from source: builds the result from the backend; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.make_extras"]
+param = "inference_model"
+rationale = "Factory from source: builds the result from the inference_model; single operand."
+
+["pipelex/providers/manifold/manifold_factory.py::ManifoldFactory.make_portkey_client"]
+param = "backend"
+rationale = "Factory from source: builds the result from the backend; single operand."
+
+["pipelex/providers/manifold/manifold_plugin.py::ManifoldPlugin.register"]
+param = "registrar"
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
+
+["pipelex/providers/manifold/manifold_responses_factory.py::ManifoldResponsesFactory.make_openai_client_for_responses"]
+param = "model_handle"
+rationale = "Factory from source: builds the result from the model_handle; single operand."
 
 ["pipelex/providers/mistral/mistral_config.py::MistralConfig.get_reasoning_level"]
 param = "effort"
@@ -5552,13 +5624,13 @@ rationale = "Verb-object: merges the gateway model specs; merge context stays ke
 param = "gateway_api_key"
 rationale = "Derivation: hashes the gateway API key into a distinct id; single operand."
 
-["pipelex/system/pipelex_service/pipelex_service_config.py::is_pipelex_gateway_enabled"]
-param = "backends_file_path"
-rationale = "Predicate inspecting the backends file at the path; single operand."
-
 ["pipelex/system/pipelex_service/pipelex_service_config.py::load_pipelex_service_config_if_exists"]
 param = "config_dir"
 rationale = "Verb-object: loads from the config dir; single operand."
+
+["pipelex/system/pipelex_service/remote_config.py::RemoteConfig.get_model_specs_section"]
+param = "section_name"
+rationale = "Keyed accessor by the section_name; single operand."
 
 ["pipelex/system/pipelex_service/remote_config_cache.py::RemoteConfigCache.store"]
 param = "remote_config_payload"
@@ -6256,18 +6328,6 @@ rationale = "Inner helper: collects diffs from the dir comparison; single operan
 param = "file_list"
 rationale = "Inner helper: filters the file list; single operand."
 
-["pipelex/tools/misc/document_utils.py::DocumentFormat.from_mime_type"]
-param = "mime_type"
-rationale = "Factory from source: builds the result from the mime_type; single operand."
-
-["pipelex/tools/misc/document_utils.py::DocumentFormat.is_supported_mime_type"]
-param = "mime_type"
-rationale = "Predicate on the mime_type; single operand."
-
-["pipelex/tools/misc/document_utils.py::DocumentFormat.raise_if_unsupported_mime_type"]
-param = "mime_type"
-rationale = "Validates/checks the mime_type; single operand."
-
 ["pipelex/tools/misc/exceptions.py::TomlError.from_tomli_error"]
 param = "exc"
 rationale = "Factory from source: builds the result from the exc; single operand."
@@ -6631,6 +6691,10 @@ rationale = "Parses/reads the doc; single operand."
 ["pipelex/tools/misc/toml_sync.py::set_nested_value"]
 param = "doc"
 rationale = "Setter: installs the doc; single operand."
+
+["pipelex/tools/misc/toml_utils.py::load_toml_from_base_and_overrides"]
+param = "paths"
+rationale = "Loads and merges the paths; single operand, same shape as its sibling load_toml_from_path_and_merge_with_overrides."
 
 ["pipelex/tools/misc/toml_utils.py::load_toml_from_content"]
 param = "content"

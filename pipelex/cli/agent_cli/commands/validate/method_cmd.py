@@ -32,7 +32,7 @@ from pipelex.pipeline.validation_render import format_validate_markdown
 def validate_method_cmd(
     name: Annotated[
         str,
-        typer.Argument(help="Installed method name, method address (github.com/owner/repo[/name][@tag]), or GitHub URL"),
+        typer.Argument(help="Installed method name, method address (github.com/owner/repo\\[/name]\\[@tag]), or GitHub URL"),
     ],
     pipe: Annotated[
         str | None,

@@ -24,8 +24,15 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     record_setup_warning,
     set_agent_cli_error_format,
 )
-from pipelex.cogt.exceptions import CogtError, InferenceBackendCredentialsError, InferenceBackendCredentialsErrorType, InferenceErrorCategory
+from pipelex.cogt.exceptions import (
+    CogtError,
+    InferenceBackendCredentialsError,
+    InferenceBackendCredentialsErrorType,
+    InferenceErrorCategory,
+    ModelChoiceNotFoundError,
+)
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.pipeline.exceptions import ValidateBundleError
 
 if TYPE_CHECKING:
@@ -340,17 +347,45 @@ class TestAgentOutput:
         assert "retryable" not in parsed
 
     def test_agent_error_error_domain_and_category_coexist(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """error_domain (from lookup) and error_category (from report) should both appear."""
-        # Use an error_type that is in AGENT_ERROR_DOMAINS
-        error_type = "ModelChoiceNotFoundError"
+        """error_domain (from lookup) and error_category (from report) should both appear.
+
+        The cause carries the ``UNKNOWN`` category deliberately: every other category derives an
+        ``error_domain`` onto the report, and the report-first read then wins outright, so the
+        lookup fallback would never be exercised. ``UNKNOWN`` asserts no domain — classification
+        itself failed — which leaves exactly the composition this test is about: the category comes
+        from the report, the domain from the lookup.
+        """
+        # An error_type in AGENT_ERROR_DOMAINS that is NOT a CogtError subclass, so no derived
+        # domain can pre-empt the lookup.
+        error_type = "PipeOperatorModelChoiceError"
         assert error_type in AGENT_ERROR_DOMAINS, "precondition: error_type must be in AGENT_ERROR_DOMAINS"
 
-        cause = CogtError("model not found", error_category=InferenceErrorCategory.CONFIGURATION)
+        cause = CogtError("model not found", error_category=InferenceErrorCategory.UNKNOWN)
         with pytest.raises(typer.Exit):
             agent_error("model not found", error_type=error_type, cause=cause)
 
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error_domain"] == AGENT_ERROR_DOMAINS[error_type]
+        assert parsed["error_category"] == "unknown"
+
+    def test_agent_error_report_domain_beats_the_lookup(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """A categorized CogtError cause supplies the domain itself, so the lookup is not consulted.
+
+        `ModelChoiceNotFoundError` used to be an `AGENT_ERROR_DOMAINS` entry reading `input`. It now
+        declares that domain on the class, which is what the report carries — same answer for this
+        CLI, from the single source of truth the drift test enforces.
+        """
+        cause = ModelChoiceNotFoundError(
+            message="model not found",
+            model_type=ModelType.LLM,
+            model_choice="gpt-nope",
+        )
+        with pytest.raises(typer.Exit):
+            agent_error("model not found", error_type="ModelChoiceNotFoundError", cause=cause)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert "ModelChoiceNotFoundError" not in AGENT_ERROR_DOMAINS, "the class is the single source of truth now"
+        assert parsed["error_domain"] == "input"
         assert parsed["error_category"] == "configuration"
 
     def test_agent_error_uses_report_error_domain(self, capsys: pytest.CaptureFixture[str]) -> None:

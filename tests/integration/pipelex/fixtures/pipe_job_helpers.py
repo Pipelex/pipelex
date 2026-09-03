@@ -65,7 +65,6 @@ def pipe_job_from_library(
     load_fn: Callable[[str], None],
     pipe_code: str,
     pipe_run_mode: PipeRunMode = PipeRunMode.DRY,
-    isolated_registry: bool = False,
     working_memory_builder: Callable[[PipeAbstract], WorkingMemory] | None = None,
 ) -> Generator[PipeJob, None, None]:
     """Shared fixture skeleton: open library, load via load_fn, build PipeJob, yield, teardown.
@@ -74,28 +73,16 @@ def pipe_job_from_library(
         load_fn: Callable that loads content into the library.
         pipe_code: The pipe code to look up after loading.
         pipe_run_mode: Dry, mock, or live execution mode.
-        isolated_registry: When True, gives the library a scoped ClassRegistry so dynamic
-            concept classes are registered there instead of the global KajsonManager
-            registry. This simulates a clean worker process where the global registry
-            has no dynamic classes, forcing the deferred hydration path.
         working_memory_builder: Optional builder invoked with the looked-up pipe to
             produce a pre-populated working memory (e.g. mock inputs synthesized from
             ``pipe.needed_inputs()``). When omitted, the job carries an empty working
             memory.
     """
     library_manager = get_library_manager()
-    library_id, library = library_manager.open_library()
-    if isolated_registry:
-        from kajson.class_registry import ClassRegistry  # ruff: ignore[import-outside-top-level]
-        from kajson.kajson_manager import KajsonManager  # ruff: ignore[import-outside-top-level]
-
-        # Pre-seed from global so core framework classes (PipeSequenceFactory, etc.)
-        # are available. Dynamic concept classes added during load_fn() will go to
-        # this scoped registry instead of the global, keeping the global clean.
-        global_registry = KajsonManager.get_class_registry()
-        scoped_registry = ClassRegistry()
-        scoped_registry.register_classes_dict(global_registry.get_classes_dict())
-        library.set_class_registry(scoped_registry)
+    # The library arrives carrying its own ClassRegistry seeded from the process-global one
+    # (``open_library`` attaches it), so the dynamic concept classes ``load_fn`` registers die
+    # with the library and never reach the global registry.
+    library_id, _library = library_manager.open_library()
     set_current_library(library_id=library_id)
 
     pipeline_run_id = _make_unique_pipeline_run_id()
@@ -118,7 +105,6 @@ def pipe_job_from_bundle(
     bundle_file: str,
     pipe_code: str,
     pipe_run_mode: PipeRunMode = PipeRunMode.DRY,
-    isolated_registry: bool = False,
 ) -> Generator[PipeJob, None, None]:
     """Build a PipeJob by loading a bundle from an mthds file."""
 
@@ -127,4 +113,4 @@ def pipe_job_from_bundle(
         blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
         get_library_manager().load_from_blueprints(library_id=library_id, blueprints=[blueprint])
 
-    yield from pipe_job_from_library(_load, pipe_code=pipe_code, pipe_run_mode=pipe_run_mode, isolated_registry=isolated_registry)
+    yield from pipe_job_from_library(_load, pipe_code=pipe_code, pipe_run_mode=pipe_run_mode)

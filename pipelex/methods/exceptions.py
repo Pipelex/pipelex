@@ -34,5 +34,21 @@ class MethodPackageTooLargeError(MethodRefError):
     """Fetched content exceeds a ceiling: the selected package's file count or total bytes, or the repository's manifest scan."""
 
 
+class MethodPackageSymlinkError(MethodRefError):
+    """The fetched package contains a symlink, which fetched packages must not carry (it would bypass the content scans)."""
+
+
 class MethodStructuresRefusedError(MethodRefError):
     """The fetched package declares in-process Python structure classes, which hosted execution refuses."""
+
+
+class MethodInstallError(MethodRefError):
+    """Installing a fetched method package into the installed-methods directory failed (occupied target, path escape, or copy failure)."""
+
+
+class MethodFetchDisabledError(MethodRefError):
+    """An address-referenced method is not installed and fetch-on-miss is disabled, so it cannot be fetched."""
+
+
+class MethodDependencyFetchError(MethodRefError):
+    """An address-referenced method is not installed and fetching it failed (or its address is not fetchable)."""

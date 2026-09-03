@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import shutil
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pipelex.cli.commands.doctor_cmd import (
@@ -11,10 +13,9 @@ from pipelex.cli.commands.doctor_cmd import (
     replace_backend_file,
 )
 from pipelex.cogt.exceptions import InferenceBackendLibraryError
+from pipelex.kit.paths import get_kit_configs_dir
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     import pytest
     from pytest_mock import MockerFixture
 
@@ -38,6 +39,12 @@ def _write_backends_toml(config_dir: Path, content: str = BACKENDS_TOML) -> Path
     backends_toml = inference_dir / "backends.toml"
     backends_toml.write_text(content, encoding="utf-8")
     return backends_toml
+
+
+def _write_backends_override(config_dir: Path, content: str) -> Path:
+    override = config_dir / "inference" / "backends_override.toml"
+    override.write_text(content, encoding="utf-8")
+    return override
 
 
 class TestDoctorBackendChecks:
@@ -89,7 +96,7 @@ class TestDoctorBackendChecks:
     def test_credentials_broad_failure_reported(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Any unexpected failure during the scan becomes a finding, not a crash."""
         _write_backends_toml(tmp_path)
-        mocker.patch("pipelex.cli.commands.doctor_cmd.load_toml_from_path", side_effect=RuntimeError("kaboom"))
+        mocker.patch("pipelex.cli.commands.doctor_cmd.load_toml_from_base_and_overrides", side_effect=RuntimeError("kaboom"))
 
         healthy, reports, message = check_backend_credentials(config_dir=tmp_path)
 
@@ -150,10 +157,10 @@ class TestDoctorBackendChecks:
         assert reports["openai"].has_kit_template is True
 
     def test_backend_files_library_error_naming_backend(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """A library error naming the backend marks that file invalid."""
+        """A library error declaring the backend marks that file invalid."""
         self._setup_backend_file(tmp_path)
         library_mock = mocker.Mock()
-        library_mock.load.side_effect = InferenceBackendLibraryError("openai: invalid model spec")
+        library_mock.load.side_effect = InferenceBackendLibraryError("invalid model spec", backend_name="openai")
         mocker.patch("pipelex.cli.commands.doctor_cmd.InferenceBackendLibrary.make_empty", return_value=library_mock)
 
         healthy, reports, message = check_backend_files(config_dir=tmp_path)
@@ -161,10 +168,10 @@ class TestDoctorBackendChecks:
         assert healthy is False
         assert message == "1 backend file(s) have validation errors"
         assert reports["openai"].is_valid is False
-        assert reports["openai"].error_message == "openai: invalid model spec"
+        assert reports["openai"].error_message == "invalid model spec"
 
     def test_backend_files_library_error_not_naming_backend(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """A library error that names neither the backend nor its file leaves it valid."""
+        """A library error that declares no backend and names no file leaves it valid."""
         self._setup_backend_file(tmp_path)
         library_mock = mocker.Mock()
         library_mock.load.side_effect = InferenceBackendLibraryError("some unrelated failure")
@@ -174,6 +181,79 @@ class TestDoctorBackendChecks:
 
         assert healthy is True
         assert reports["openai"].is_valid is True
+
+    def test_backend_files_library_error_about_another_backend(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """An error about another backend leaves this one valid, even when its prose mentions this one."""
+        self._setup_backend_file(tmp_path)
+        library_mock = mocker.Mock()
+        library_mock.load.side_effect = InferenceBackendLibraryError(
+            "Unknown key on model 'x' for backend 'anthropic': not an openai-style header", backend_name="anthropic"
+        )
+        mocker.patch("pipelex.cli.commands.doctor_cmd.InferenceBackendLibrary.make_empty", return_value=library_mock)
+
+        healthy, reports, _ = check_backend_files(config_dir=tmp_path)
+
+        assert healthy is True
+        assert reports["openai"].is_valid is True
+
+    def _copy_kit_inference(self, tmp_path: Path) -> Path:
+        """Provision the shipped defaults: the kit's whole inference/ tree, untouched."""
+        shutil.copytree(Path(str(get_kit_configs_dir())) / "inference", tmp_path / "inference")
+        return tmp_path / "inference" / "backends"
+
+    def test_credentials_read_the_override_over_the_base(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A backend the personal override disables is not asked for credentials, and one it enables is."""
+        _write_backends_toml(tmp_path)
+        _write_backends_override(tmp_path, "[openai]\nenabled = false\n\n[azure]\nenabled = true\n")
+        monkeypatch.delenv("TEST_DOCTOR_OPENAI_KEY", raising=False)
+        monkeypatch.delenv("TEST_DOCTOR_AZURE_KEY", raising=False)
+
+        healthy, reports, _ = check_backend_credentials(config_dir=tmp_path)
+
+        assert healthy is False
+        assert "openai" not in reports
+        assert reports["azure"].missing_vars == ["TEST_DOCTOR_AZURE_KEY"]
+
+    def test_backend_files_read_the_override_over_the_base(self, tmp_path: Path) -> None:
+        """The file probe walks the merged document: a backend the override turns off is not probed,
+        one it turns on is — and the loader it probes with is handed the same merged document.
+        """
+        self._copy_kit_inference(tmp_path)
+        _write_backends_override(tmp_path, "[openai]\nenabled = false\n\n[vertexai]\nenabled = true\n")
+
+        healthy, reports, _ = check_backend_files(config_dir=tmp_path)
+
+        assert healthy is True
+        assert "openai" not in reports
+        assert reports["vertexai"].is_valid is True
+
+    def test_backend_files_stock_kit_is_healthy(self, tmp_path: Path) -> None:
+        """The shipped defaults enable the gateway and ship its override file; the probe hands the
+        loader no gateway config, and that must not be reported as a malformed file.
+        """
+        self._copy_kit_inference(tmp_path)
+
+        healthy, reports, message = check_backend_files(config_dir=tmp_path)
+
+        assert healthy is True
+        assert message == "All backend files are valid"
+        assert reports["pipelex_gateway"].is_valid is True
+        assert all(report.is_valid for report in reports.values())
+
+    def test_backend_files_malformed_file_still_caught_under_leniency(self, tmp_path: Path) -> None:
+        """Leniency skips the gateway, not a malformed file — and the gateway no longer hides one behind it."""
+        backends_dir = self._copy_kit_inference(tmp_path)
+        anthropic_file = backends_dir / "anthropic.toml"
+        anthropic_file.write_text(anthropic_file.read_text(encoding="utf-8") + '\n[bogus_key_table]\nfoo = "bar"\n', encoding="utf-8")
+
+        healthy, reports, message = check_backend_files(config_dir=tmp_path)
+
+        assert healthy is False
+        assert message == "1 backend file(s) have validation errors"
+        assert reports["anthropic"].is_valid is False
+        assert reports["anthropic"].error_message is not None
+        assert "anthropic" in reports["anthropic"].error_message
+        assert reports["pipelex_gateway"].is_valid is True
 
     def test_kit_template_exists_for_shipped_backend(self) -> None:
         """The kit ships an openai backend template."""

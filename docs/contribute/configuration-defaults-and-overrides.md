@@ -45,6 +45,16 @@ Load order:
 !!! note "Unit-test special case"
     When `runtime_manager.is_unit_testing` is true, the `pipelex_{run_mode}.toml` entry is sourced exclusively from `./tests/pipelex_{run_mode}.toml` (e.g. `tests/pipelex_unit_test.toml`). Global and project run_mode files are not loaded, keeping test runs hermetic from machine-wide overrides.
 
+### The inference documents
+
+`.pipelex/inference/backends.toml` and `.pipelex/inference/routing_profiles.toml` are not part of the `pipelex.toml` merge. Each is its own document with a shorter sequence, built by `ConfigLoader.backends_file_paths()` / `routing_profiles_file_paths()` and read by `load_toml_from_base_and_overrides`:
+
+1. **The base** — the project's file if the project `.pipelex/inference/` has one, otherwise the global one. One file, winner takes all; a personal override cannot stand in for it.
+2. **Global override** — `~/.pipelex/inference/backends_override.toml` (respectively `routing_profiles_override.toml`), if present.
+3. **Project override** — the same file under the project's `.pipelex/inference/`, if present and distinct from the global one.
+
+The order differs from `pipelex.toml`'s on purpose: there the project base beats the global override, here the global override beats the project base. A global inference override exists so one machine-wide choice ("run on this backend") reaches every project, and every project carries a tracked `backends.toml`, so a project base that won would defeat the file. The project override still wins over the global one. With an explicit `config_dir` (the doctor's `--global`, an init targeting one directory), the sequence is that directory's base and its own override, nothing layered.
+
 ## Where to change things in code
 
 - **Config merge logic**: `pipelex/system/configuration/config_loader.py`

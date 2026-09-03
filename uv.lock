@@ -1916,15 +1916,15 @@ wheels = [
 
 [[package]]
 name = "kajson"
-version = "0.7.0"
+version = "0.7.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
     { name = "tzdata" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d2/a4/da91af6dac42516e45a9897ba901d8ec2ee2b13b135caf6ce120867aac2b/kajson-0.7.0.tar.gz", hash = "sha256:1c8f80d157f980c9adb9fda0e77c1cc0078f50547d84ef548a5e19b5a84d8d37", size = 25071, upload-time = "2026-06-10T10:00:56.097Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5e/06/69bacab23fd509b2063489a4e4d3c44c6ce47133606a2d99d0f81cf17a47/kajson-0.7.1.tar.gz", hash = "sha256:725f5c02c065f829d4b4e409553b6016258784a77de2140246a96c851c64f362", size = 25057, upload-time = "2026-08-30T19:39:43.489Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f0/1c/8251c0dadd1843e020edf4ef162aaa7dd0e98cbd2e1fe33d843807cd7ce9/kajson-0.7.0-py3-none-any.whl", hash = "sha256:d9903327bc7f182ec481ffafd074765347365600592e5f9f67866d5b0ae4f939", size = 31524, upload-time = "2026-06-10T10:00:54.952Z" },
+    { url = "https://files.pythonhosted.org/packages/0c/55/24cb6081dc828db12b4fd6c88dd67ed70f628cc8a4c9fc8d1aa7716c81fb/kajson-0.7.1-py3-none-any.whl", hash = "sha256:ba1249bbac58eaa8701a99f321c94edc103809e265506f7e9e270b9ef906126e", size = 31512, upload-time = "2026-08-30T19:39:42.179Z" },
 ]
 
 [[package]]
@@ -2552,7 +2552,7 @@ wheels = [
 
 [[package]]
 name = "mthds"
-version = "0.11.1"
+version = "0.13.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -2561,9 +2561,9 @@ dependencies = [
     { name = "tomlkit" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/44/9a/93d688320010ad14a31c863c3882fabc2f8637622f69fd8e4aed64a3f2bb/mthds-0.11.1.tar.gz", hash = "sha256:5f52b703835abe9e40a000d76023e2bd29124655c049b1ef9eeab4a8761b6e2c", size = 170790, upload-time = "2026-08-28T11:17:02.146Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e4/b6/6c67b86693d01d473444523db0aeadc1afdffaa1748a264dfab9c1c77b1c/mthds-0.13.0.tar.gz", hash = "sha256:ef59ffa94902da72371390cc39d8c0d85dfd2a524dbca2a8909a0a1ba6255607", size = 216142, upload-time = "2026-09-02T15:09:15.937Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e5/1c/74abc1b8b63813c0de69218b003e777cc92a7327d21b90911c10502b2e69/mthds-0.11.1-py3-none-any.whl", hash = "sha256:760cd7d3f7e86b8f962e1d3a4e87e6146b94968b9422ddfc22e006a3fc305ba3", size = 71954, upload-time = "2026-08-28T11:17:00.67Z" },
+    { url = "https://files.pythonhosted.org/packages/89/26/f73e625b54cfba2e09a29df5e7173e508c25d3f7ce106be69fae6065d76c/mthds-0.13.0-py3-none-any.whl", hash = "sha256:606fef7978bbc8a5b249882c0b9377fed37123f618f8183f29e89b71a4eadac0", size = 85993, upload-time = "2026-09-02T15:09:14.334Z" },
 ]
 
 [[package]]
@@ -3303,7 +3303,7 @@ wheels = [
 
 [[package]]
 name = "pipelex"
-version = "0.55.0"
+version = "0.56.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -3459,7 +3459,7 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.4" },
     { name = "json2html", specifier = ">=1.3.0" },
     { name = "jsonschema", marker = "extra == 'dev'", specifier = ">=4.20.0" },
-    { name = "kajson", specifier = "==0.7.0" },
+    { name = "kajson", specifier = "==0.7.1" },
     { name = "linkup-sdk", marker = "extra == 'linkup'", specifier = ">=0.12.0" },
     { name = "lxml", marker = "extra == 'docling'", specifier = ">=6.1.0" },
     { name = "markdown", specifier = ">=3.6" },
@@ -3472,7 +3472,7 @@ requires-dist = [
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "mkdocs-redirects", marker = "extra == 'docs'", specifier = "==1.2.2" },
     { name = "moto", extras = ["dynamodb", "s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "mthds", specifier = "==0.11.1" },
+    { name = "mthds", specifier = "==0.13.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=2.0.0" },

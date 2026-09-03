@@ -9,11 +9,14 @@ from datetime import UTC, datetime
 from fnmatch import fnmatch
 from pathlib import Path
 
+import pytest
+
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.migration.backup import backup_path_for, rescue_path_for
 from pipelex.migration.gitignore import (
     BACKUP_IGNORE_PATTERN,
     CONFIG_DIR_GITIGNORE_NAME,
+    PERSONAL_OVERRIDE_IGNORE_PATTERNS,
     ensure_config_dir_gitignore,
 )
 from pipelex.migration.run import migrate_config_directories
@@ -80,6 +83,36 @@ class TestEnsureConfigDirGitignore:
         written = (tmp_path / CONFIG_DIR_GITIGNORE_NAME).read_text()
 
         assert any(fnmatch("pipelex_override.toml.bak.20260818T121441Z", line) for line in written.splitlines() if line and not line.startswith("#"))
+
+    @pytest.mark.parametrize(
+        "relative_path",
+        [
+            "pipelex_override.toml",
+            "pipelex_temporary_override.toml",
+            "telemetry_override.toml",
+            "inference/backends_override.toml",
+            "inference/routing_profiles_override.toml",
+        ],
+    )
+    def test_the_file_it_writes_ignores_every_personal_override(self, tmp_path: Path, relative_path: str) -> None:
+        """A fresh project must not see a developer's own override in `git status`.
+
+        Matched against the written file's rules, path and all: the inference overrides sit one
+        directory down, so their rules carry the subdirectory and are anchored to this file.
+        """
+        ensure_config_dir_gitignore(directory=tmp_path)
+        rules = [line for line in (tmp_path / CONFIG_DIR_GITIGNORE_NAME).read_text().splitlines() if line and not line.startswith("#")]
+
+        assert any(fnmatch(relative_path, rule) for rule in rules)
+        assert relative_path in PERSONAL_OVERRIDE_IGNORE_PATTERNS
+
+    def test_the_file_it_writes_keeps_a_tracked_tier_file_visible(self, tmp_path: Path) -> None:
+        """`pipelex_local.toml` and the environment tier are the project's, not a personal override."""
+        ensure_config_dir_gitignore(directory=tmp_path)
+        rules = [line for line in (tmp_path / CONFIG_DIR_GITIGNORE_NAME).read_text().splitlines() if line and not line.startswith("#")]
+
+        for tracked_name in ("pipelex.toml", "pipelex_local.toml", "pipelex_dev.toml", "inference/backends.toml", "inference/routing_profiles.toml"):
+            assert not any(fnmatch(tracked_name, rule) for rule in rules), tracked_name
 
     def test_it_never_touches_a_gitignore_that_is_already_there(self, tmp_path: Path) -> None:
         """Once the file exists it is a file in the user's repo, and theirs to maintain."""

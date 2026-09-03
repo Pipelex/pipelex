@@ -594,6 +594,9 @@ def build_config_surface_registry() -> SurfaceRegistry:
             # ledger over the same files would be two tools writing one directory. Not
             # `inference/routing_profiles.toml` either: it has neither mechanism, but it also has no
             # break to repair, and a surface is claimed when there is something to carry forward.
+            # The personal `backends_override.toml` and `routing_profiles_override.toml` beside those
+            # two are outside every surface for the same reason, and for one more: an override
+            # carries only the keys it sets, and a ledger replays over a whole document.
             #
             # What *is* in scope is the schema of a backend file — which keys a model table may carry
             # — and not its content: which models a machine defines is the machine's business.
