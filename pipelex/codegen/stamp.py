@@ -7,8 +7,12 @@ artifacts), any output-affecting options, and a **content hash of the body below
 hand edit anywhere under the stamp is detectable without the engine, the network, or the lock.
 
 The stamp hashes the crate fingerprint (the semantic hash), not raw authored bytes: reformatting or
-commenting a `.mthds` file never changes a stamp; changing a method's effective type surface always
-does. The block is emitted in the target language's comment syntax (`#` for Python, `//` for
+commenting a `.mthds` file never changes a stamp. The fingerprint covers the whole normalized crate
+— concepts, pipes and domains — not only the slice a projection emits, so any semantic edit moves it:
+an edited prompt or a swapped model exactly as much as a renamed concept field. `content_hash`, not
+`crate_fingerprint`, is what tells such a restamp apart from a real change to the generated body.
+
+The block is emitted in the target language's comment syntax (`#` for Python, `//` for
 TypeScript), delimited by `>>> … >>>` / `<<< … <<<` fences so the offline check can split stamp from
 body byte-exactly and recompute the hash.
 """

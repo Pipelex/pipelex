@@ -12,6 +12,7 @@
 
 ### Fixed
 
+- **The codegen stamp reference no longer understates what moves a fingerprint:** [Codegen Projections](under-the-hood/codegen-projections.md) said a stamp moves only when a method's effective type surface changes, which would have a reader mistake an ordinary restamp for drift and expect a prompt edit to leave the generated tree alone. The crate fingerprint is computed over the whole normalized crate — concepts, pipes and domains — so an edited `system_prompt` or a swapped model restamps every generated file exactly as a renamed concept field does, with the body below the fence byte-identical. `content_hash`, in the stamp header and in the lock's `artifacts[]` entries, is what distinguishes that harmless restamp from a real change to the generated code. The `pipelex/codegen/stamp.py` module docstring carried the same understatement and was corrected with it.
 - **Compound version constraints written the documented way now parse:** `parse_constraint` stripped no whitespace around the comma that ANDs a compound constraint's clauses, so `>=1.0.0, <2.0.0` — the exact spelling of the MTHDS standard's own example — was rejected while the identical `>=1.0.0,<2.0.0` parsed. A manifest's `mthds_version` written that way therefore got no compatibility check at all, since the load path degrades an unparseable constraint to a log line. A malformed compound such as `>=1.0.0,,<2.0.0` still fails, because normalizing whitespace must not repair a broken constraint.
 
 ## [v0.56.0] - 2026-09-03
