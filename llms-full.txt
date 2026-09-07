@@ -9685,6 +9685,26 @@ These flags work on any `pipelex` command and are position-agnostic — place th
 - `--traceback` - print the full Rich-rendered stack trace before the friendly one-line error. Off by default. Both `pipelex run --traceback pipe ...` and `pipelex run pipe ... --traceback` work.
 - `--no-logo` - suppress the startup logo banner. Handy for clean logs and to save tokens in agent output.
 
+`--version` / `-V` is **not** one of these: it is an option on the root command, so it goes before any subcommand (`pipelex --version`, never `pipelex show --version`). See below.
+
+## The version handshake
+
+`pipelex --version` reports three numbers, not one, because a client needs all three to know what it is talking to and they move on independent cadences:
+
+```
+pipelex <runtime version>
+mthds-protocol <MTHDS Protocol version>
+mthds-standard <MTHDS standard version>
+```
+
+- `pipelex` — the installed runtime's own version.
+- `mthds-protocol` — the version of the MTHDS Protocol this runtime speaks — the request and response shapes of the runner operations.
+- `mthds-standard` — the version of the [MTHDS standard](https://mthds.ai/latest/) it implements: the language, the native concept set, and what a manifest's `mthds_version` constraint is evaluated against.
+
+`pipelex-agent --version` prints the same three lines, with `pipelex-agent` naming the first.
+
+The shape is a contract rather than presentation: the output is exactly these three lines, each `<label> <version>`, the labels are stable, and the first line keeps the historical `<program> <version>` form. It is meant to be read by clients that drive the CLI as a subprocess and turn it into a protocol `VersionInfo` — a consumer should match on the label rather than on line position, and must not treat the whole of stdout as a single version string.
+
 ## Related CLI Surface
 
 Package manifest management currently lives in the `mthds` CLI:
@@ -10463,6 +10483,18 @@ country = "France"
 ## Output Format
 
 The output JSON contains the complete working memory after pipeline execution, including all intermediate results and the final output.
+
+### The results directory
+
+Each run that saves anything gets its own numbered directory under `--output-dir` (`results/<pipe_code>_output_01/`, then `_02`, and so on). With `--save-working-memory` it holds `working_memory.json`, with `--save-main-stuff` the `main_stuff.*` renders, and with `--graph` the graph outputs that `graphs_inclusion` enables: `graphspec.json`, the Mermaid code and viewer, and the ReactFlow viewer.
+
+Beside `graphspec.json`, and gated by the same `graphspec_json` flag, the run writes the three files that describe the data the graph carries:
+
+- `pipe_io_contracts.json` - each pipe's input and output contract, with the JSON Schema of its output
+- `input_form.json` - each pipe's input-form descriptor
+- `output_form.json` - each pipe's output-form descriptor
+
+They are the same artifacts a validation report returns under those names, keyed by namespaced `pipe_ref` for every pipe in the library the run executed against, and they are what a graph viewer needs to show a data node's value rather than only the concept's structure: the VS Code extension reads them from the graphspec's own directory. A run with `--no-graph` writes none of them. See [Execution Graph Tracing](../../under-the-hood/execution-graph-tracing.md#outputs).
 
 ### Absent main output
 
@@ -11466,7 +11498,7 @@ It is consumed by the `mthds-agent` CLI (from the `mthds` npm package) which its
 | Option | Description |
 |--------|-------------|
 | `--runner` | Select the runner backend to use (`pipelex` or `api`) |
-| `--version` | Print the version and exit |
+| `--version` | Print the version handshake — the runtime version, the MTHDS Protocol version and the MTHDS standard version — and exit. Same three lines as `pipelex --version`; see the [CLI reference](index.md#the-version-handshake) |
 
 There is no `--log-level` flag: `pipelex-agent` is machine-consumed, so logging is cut off process-wide by design.
 
@@ -11653,6 +11685,8 @@ For the structured commands, exactly one such object is written to stderr per fa
 ## Graph Visualization
 
 Graph visualization is available through the `validate bundle` subcommand with the `--graph` flag, and through `run` subcommands where it is enabled by default. Use `--no-graph` on `run` to disable it.
+
+A `run` with the graph on writes, beside its bundle, the ReactFlow viewer (`dry_run.html` or `live_run.html`) and the graph itself: `graphspec.json` on a dry run, `live_run_graph.json` on a live run. Beside the graph, under their canonical names whatever the graph file is called, sit the three files that describe its data: `pipe_io_contracts.json`, `input_form.json` and `output_form.json`, the same artifacts `validate` reports under those names, keyed by namespaced `pipe_ref`. A graph viewer resolves them from the graph file's directory, not from its name. With `--with-memory`, the JSON envelope's `graph_files` object names every one of these paths (`graph_html`, `graph_spec` on a live run, `pipe_io_contracts`, `input_form`, `output_form`).
 
 
 ## Overview
@@ -15542,7 +15576,7 @@ Drift — generated code that no longer matches the method it was generated from
 # <<< pipelex-codegen-stamp <<<
 ```
 
-The `crate_fingerprint` is the crate's semantic hash, so reformatting or commenting a `.mthds` file never changes a stamp — only a change to the method's effective type surface does. The `content_hash` is a SHA-256 over the body **below** the stamp, so a lone file can testify that it has not been hand-edited, without the engine, the network, or the lock.
+The `crate_fingerprint` is the crate's *semantic* hash, so reformatting or commenting a `.mthds` file never changes a stamp. What it covers is the whole normalized crate — concepts, pipes and domains — and not only the slice a given projection emits, so an edited `system_prompt` or a swapped model moves it exactly as a renamed concept field does. The consequence reads as drift at first sight and is not: a prompt-only edit brings every generated file back restamped with a one-line diff, the `crate_fingerprint` line, while the body below the fence stays byte-identical. The `content_hash` is a SHA-256 over that body, so a lone file can testify that it has not been hand-edited, without the engine, the network, or the lock — and it is what tells a harmless restamp apart from a real change to the generated code, both in the stamp header and in the lock's `artifacts[]` entries.
 
 The header itself is read strictly, because the content hash covers only what is *below* it. Every line between the fences must carry the file's comment prefix, so a line injected into the block — an uncommented statement sitting inside a header that says `DO NOT EDIT`, or a blank line — makes the stamp unparseable, which the offline check reports as **hand-edited**. What counts as a line there is deliberately wider than `\n`: the reader breaks wherever Python's `str.splitlines()` breaks, U+2028 and U+2029 included, because those two terminate a `//` comment in JavaScript. A TypeScript artifact whose header carried one raw would be a single commented line to a narrower reader and two lines to the engine running it — executable text inside the header, on a file the check would still call current, since the hash covers only the body. The second implementation of the check splits on the same set, so both readers reach the same verdict. The `options` value must be conformant JSON: Python's non-standard `NaN` / `Infinity` / `-Infinity` literals are refused, since the stamp header is a cross-language interchange format and a stamp only one language can read is not a valid stamp. None of this is a signature — there is no MAC anywhere, and the real defence against a malicious edit is diff review; the rule exists so a file that claims to be pristine cannot quietly carry code that was edited in.
 
@@ -16220,9 +16254,14 @@ graph_spec = response.pipe_output.graph_spec
 | Output | File | Purpose |
 |--------|------|---------|
 | `graphspec_json` | `graphspec.json` | Canonical graph representation |
+| `graphspec_json` | `pipe_io_contracts.json` | The graphspec's companion: each pipe's I/O contract, keyed by `pipe_ref` |
+| `graphspec_json` | `input_form.json` | The graphspec's companion: each pipe's input-form descriptor |
+| `graphspec_json` | `output_form.json` | The graphspec's companion: each pipe's output-form descriptor |
 | `mermaidflow_mmd` | `mermaidflow.mmd` | Mermaid flowchart code |
 | `mermaidflow_html` | `mermaidflow.html` | Standalone Mermaid viewer |
 | `reactflow_html` | `reactflow.html` | Interactive ReactFlow viewer |
+
+The three companions are the validation report's `pipe_io_contracts`, `input_form` and `output_form` under the standard's names: a graph carries every payload the run produced and nothing that says what those payloads are, and a graph viewer (`@pipelex/mthds-ui`'s `GraphViewer`) shows a data node's value only when it holds both the contracts and the output form for the producing `pipe_ref`. They are built once, at the end of `PipeRun.run` inside the run's own library window (the builders need the loaded library, which `PipelineRunner.execute` tears down before the CLI writes anything), over the run library's own pipes (the validated bundle and whatever `library_dirs` loaded beside it; a dependency package's pipes are keyed by alias in the library and described by no blueprint the host holds, so they are left out, as a validation of the bundle leaves them out), and carried on `pipe_output.pipe_io_artifacts` beside `graph_spec`; a failure of the builders, whatever its kind, is reported on `pipe_output.pipe_io_artifacts_error`, mirroring `graph_assembly_error`, and never fails the run: the build sits in the run's `finally` ahead of the delivery, so an exception escaping it would replace the run's outcome and skip the delivery of a run that completed. The build is gated by `describe_pipe_io` on the trace context, which the run setup derives from `graphspec_json`, and which validate's own graph dry run turns off since validate already built the artifacts for its report. Every writer that serializes the graphspec writes them beside it: `save_graph_outputs_to_dir` for the CLIs, the delivery executor for a hosted results prefix. They follow the `graphspec_json` inclusion flag, so a run that asks for no graphspec builds nothing that describes one, and a written graphspec owns the three names beside it: when the run carries no artifacts, a companion left by an earlier run in the same directory is removed, with a warning naming it, rather than paired with the new graph. The agent CLI, which always writes a graphspec with `--graph`, applies that inclusion before the run so the companions are built in the window rather than lost to a render-time override. Their bytes are those of the projection fixture corpus for the same bundle, since both go through `render_pipe_io_artifact_files` (`pipelex/core/pipes/pipe_io_artifacts.py`). The `pipe_io_artifacts` field crosses the SPI payload as `pipe_io_artifacts_dump`; the synchronous `/execute` response carries the description once the API relays that field, and a hosted run's results prefix once our Temporal plugin builds the artifacts in the crate's window.
 
 ---
 
@@ -16395,7 +16434,7 @@ graph_spec = manager.close_tracer(pipeline_run_id)
 
 Trace events travel through an `EventLogProtocol` backend (`pipelex/tracing/`): the tracer emits events into it during the run (write side, wired in `pipeline_run_setup`), and `assemble_tracing` reads them back after the run to build the `GraphSpec` and usage aggregates (read side, triggered from `PipeRun.run`). Both sides normally build their backend instance independently from `tracing_config` via `make_event_log` — NDJSON files or DynamoDB bridge the two instances through external storage.
 
-The assembled usage rides back on `pipe_output.tokens_usages` (with any assembly failure on `usage_assembly_error`), which the sync `/execute` response returns directly. For delivery-enabled runs (a storage target set), the delivery executor (`pipelex/pipe_run/delivery_executor.py`) also persists it as a `tokens_usages.json` result artifact — `{"tokens_usages": [...], "usage_assembly_error": null}` — next to `working_memory.json`, the `main_stuff.*` renders, and the graph outputs, so a durable client polling result files gets the same usage records a sync caller does. The artifact is written unconditionally on every successful result delivery: explicit nulls mean usage assembly was off for that run. A failed run stores no result files at all, so an absent `tokens_usages.json` means either the run failed or it was delivered before the artifact existed — tell those apart from the delivery status, not from the file's presence.
+The assembled usage rides back on `pipe_output.tokens_usages` (with any assembly failure on `usage_assembly_error`), which the sync `/execute` response returns directly. For delivery-enabled runs (a storage target set), the delivery executor (`pipelex/pipe_run/delivery_executor.py`) also persists it as a `tokens_usages.json` result artifact — `{"tokens_usages": [...], "usage_assembly_error": null}` — next to `working_memory.json`, the `main_stuff.*` renders, and the graph outputs (`graphspec.json` with its three companions `pipe_io_contracts.json`, `input_form.json` and `output_form.json`, see [Outputs](#outputs)), so a durable client polling result files gets the same usage records a sync caller does. The artifact is written unconditionally on every successful result delivery: explicit nulls mean usage assembly was off for that run. A failed run stores no result files at all, so an absent `tokens_usages.json` means either the run failed or it was delivered before the artifact existed — tell those apart from the delivery status, not from the file's presence.
 
 For fully in-process runs, `pipelex.runtime_hub.scoped_event_log` pins one shared instance for both sides instead:
 
@@ -16556,7 +16595,7 @@ error_stack_traces = true       # Include full stack traces
 pipe_and_concept_registry = true  # Include pipe and concept registries in the GraphSpec
 
 [interpreter.pipeline_execution.graph.graphs_inclusion]
-graphspec_json = true           # Generate GraphSpec JSON
+graphspec_json = true           # Generate GraphSpec JSON, and its three companions beside it
 mermaidflow_mmd = true          # Generate Mermaid code
 mermaidflow_html = true         # Generate Mermaid HTML
 reactflow_html = true           # Generate ReactFlow HTML
@@ -21531,7 +21570,7 @@ There is deliberately **no** `pipelex.hub`. It was deleted rather than kept as a
 | --- | --- |
 | container | `InterpreterHub`, `get_interpreter_hub`, `set_interpreter_hub` |
 | library manager | `get_library_manager`, `get_library` |
-| library lookups | `get_concept_library`, `get_required_concept`, `get_native_concept`, `get_required_domain`, `get_optional_domain`, `get_pipe_library`, `get_pipes`, `get_required_pipe`, `get_optional_pipe`, `get_required_entry_pipe`, `get_optional_entry_pipe`, `get_pipe_source` |
+| library lookups | `get_concept_library`, `get_required_concept`, `get_native_concept`, `get_required_domain`, `get_optional_domain`, `get_pipe_library`, `get_pipes`, `get_own_pipes`, `get_required_pipe`, `get_optional_pipe`, `get_required_entry_pipe`, `get_optional_entry_pipe`, `get_pipe_source` |
 | current-library contextvar | `set_current_library`, `get_current_library`, `get_current_library_id_or_none`, `clear_current_library`, `scoped_current_library` |
 | library dirs | `resolve_library_dirs`, `get_default_library_dirs` |
 | pipe router | `get_pipe_router`, `set_pipe_router`, `teardown_current_pipe_router`, `scoped_pipe_router` |
