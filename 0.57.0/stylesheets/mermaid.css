@@ -1,0 +1,60 @@
+/* docs/stylesheets/mermaid.css
+   Tweak the colours Material exposes for Mermaid.
+   Material uses --md-mermaid-* for flowcharts and --md-mermaid-sequence-* for
+   sequence diagrams. Both sets must be defined for consistent styling. */
+
+.mermaid {
+    /* Flowchart variables */
+    --md-mermaid-edge-color: #000000;
+    --md-mermaid-label-bg-color: #ffdbfa;
+    --md-mermaid-label-fg-color: #000000;
+    --md-mermaid-node-bg-color: #fff9db;
+    --md-mermaid-node-fg-color: #000000;
+
+    /* Sequence diagram variables */
+    --md-mermaid-sequence-actor-bg-color: #fff9db;
+    --md-mermaid-sequence-actor-border-color: #333;
+    --md-mermaid-sequence-actor-fg-color: #000;
+    --md-mermaid-sequence-actor-line-color: #666;
+    --md-mermaid-sequence-actorman-bg-color: #fff9db;
+    --md-mermaid-sequence-actorman-line-color: #666;
+    --md-mermaid-sequence-box-bg-color: #f5f5f5;
+    --md-mermaid-sequence-box-fg-color: #000;
+    --md-mermaid-sequence-label-bg-color: #ffdbfa;
+    --md-mermaid-sequence-label-fg-color: #000;
+    --md-mermaid-sequence-loop-bg-color: #f5f5f5;
+    --md-mermaid-sequence-loop-border-color: #666;
+    --md-mermaid-sequence-loop-fg-color: #000;
+    --md-mermaid-sequence-message-fg-color: #000;
+    --md-mermaid-sequence-message-line-color: #000;
+    --md-mermaid-sequence-note-bg-color: #ffdbfa;
+    --md-mermaid-sequence-note-border-color: #333;
+    --md-mermaid-sequence-note-fg-color: #000;
+    --md-mermaid-sequence-number-bg-color: #333;
+    --md-mermaid-sequence-number-fg-color: #fff;
+}
+
+/* Give the diagram itself a code-block like backdrop so it stands out
+   on both light and dark themes. */
+.md-typeset .mermaid {
+    padding: 0.3rem;
+    border-radius: 0.3rem;
+    overflow: auto;
+}
+
+/* --- Light color scheme ---------------------------------------------- */
+
+[data-md-color-scheme="default"] .md-typeset .mermaid {
+    background-color: hsla(140, 27%, 98%, 0.983);
+}
+
+/* --- Dark color scheme ------------------------------------------------ */
+
+[data-md-color-scheme="slate"] .md-typeset .mermaid {
+    background-color: hsla(140, 27%, 98%, 0.983);
+}
+
+/* Ensure text inside nodes and labels is black */
+.mermaid text {
+    fill: #000 !important;
+}
