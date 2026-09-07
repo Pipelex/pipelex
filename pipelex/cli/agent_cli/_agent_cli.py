@@ -25,7 +25,7 @@ from pipelex.cli.agent_cli.commands.models_cmd import agent_models_cmd
 from pipelex.cli.agent_cli.commands.pipe_cmd import pipe_cmd
 from pipelex.cli.agent_cli.commands.run.app import run_app
 from pipelex.cli.agent_cli.commands.validate.app import validate_app
-from pipelex.tools.misc.package_utils import get_package_version
+from pipelex.cli.version_report import version_report_lines
 
 
 class PipelexAgentCLI(TyperGroup):
@@ -77,10 +77,10 @@ app = typer.Typer(
 
 
 def version_callback(value: bool) -> None:  # kw-only: ignore — click invokes Option callbacks positionally
-    """Print version and exit when --version is passed."""
+    """Print the version handshake and exit when --version is passed."""
     if value:
-        package_version = get_package_version()
-        typer.echo(f"pipelex-agent {package_version}")
+        for line in version_report_lines(program_name="pipelex-agent"):
+            typer.echo(line)
         raise typer.Exit
 
 

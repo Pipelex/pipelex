@@ -80,7 +80,7 @@ are visible in the same sentence of an upstream changelog.
 | Number | Where it lives | What it means |
 |---|---|---|
 | The **`mthds` package version** | `mthds-python/pyproject.toml`, PyPI | The Python client's own release number. **This is what you are bumping.** |
-| The **MTHDS standard version** | `MTHDS_STANDARD_VERSION` in `mthds/package/manifest/schema.py` | The version of the *standard* that client implements. Currently `1.0.0`. |
+| The **MTHDS standard version** | `MTHDS_STANDARD_VERSION` in `mthds/package/manifest/schema.py` | The version of the *standard* that client implements. Read it from the installed package rather than from memory — step 6 prints it. |
 | The **spec site's release number** | the `mthds/` repo's own CHANGELOG | The documentation site's release, e.g. `v0.9.0`. Coincidentally close to the package number; unrelated to it. |
 
 So "mthds 0.9.0 ships the artifacts the standard owns since MTHDS v0.9.0, which
