@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
@@ -18,6 +18,21 @@ from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outpu
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.misc.json_utils import clean_json_dumps
+
+if TYPE_CHECKING:
+    from pipelex.system.configuration.configs import PipelineExecutionConfig
+
+
+def _with_agent_graphs_inclusion(*, execution_config: PipelineExecutionConfig) -> PipelineExecutionConfig:
+    """The agent CLI's graph outputs: the graphspec and the ReactFlow viewer, never the Mermaid page."""
+    graphs_inclusion = execution_config.graph.graphs_inclusion.model_copy(
+        update={
+            "graphspec_json": True,
+            "mermaidflow_html": False,
+            "reactflow_html": True,
+        }
+    )
+    return execution_config.model_copy(update={"graph": execution_config.graph.model_copy(update={"graphs_inclusion": graphs_inclusion})})
 
 
 async def run_pipeline_core(
@@ -68,6 +83,12 @@ async def run_pipeline_core(
         generate_usage=costs,
         mock_inputs=mock_inputs or None,
     )
+    if graph:
+        # The agent CLI writes the graphspec and the ReactFlow viewer whatever the configured inclusion
+        # says. The override is applied before the run, not at render time: the run setup gates the
+        # graphspec's companion artifacts on this same flag, and they are built inside the run's library
+        # window, which is gone by the time anything is rendered.
+        execution_config = _with_agent_graphs_inclusion(execution_config=execution_config)
 
     runner = PipelexMTHDSProtocol(
         bundle_uris=bundle_uris,
@@ -150,7 +171,7 @@ async def run_pipeline_core(
     # Generate and save graph visualizations if requested
     if graph and pipe_output.graph_spec:
         graph_config = execution_config.graph
-        # Enable ReactFlow HTML output and data inclusion for the render
+        # Full data inclusion for the render (the graphs inclusion was settled before the run)
         render_graph_config = graph_config.model_copy(
             update={
                 "data_inclusion": graph_config.data_inclusion.model_copy(
@@ -160,13 +181,6 @@ async def run_pipeline_core(
                         "stuff_html_content": True,
                     }
                 ),
-                "graphs_inclusion": graph_config.graphs_inclusion.model_copy(
-                    update={
-                        "graphspec_json": True,
-                        "mermaidflow_html": False,
-                        "reactflow_html": True,
-                    }
-                ),
             }
         )
 
@@ -174,6 +188,7 @@ async def run_pipeline_core(
             graph_spec=pipe_output.graph_spec,
             graph_config=render_graph_config,
             pipe_code=pipe_code,
+            pipe_io_artifacts=pipe_output.pipe_io_artifacts,
         )
 
         saved_files = save_graph_outputs_to_dir(graph_outputs=graph_outputs, output_dir=output_dir)
@@ -192,6 +207,13 @@ async def run_pipeline_core(
             final_graphspec_path = graphspec_path.parent / "live_run_graph.json"
             shutil.move(str(graphspec_path), str(final_graphspec_path))
             side_effects.setdefault("graph_files", {})["graph_spec"] = str(final_graphspec_path)
+
+        # The graphspec's companions keep their canonical names beside it: a reader resolves them
+        # from the graphspec's directory, not from its name.
+        for output_key in ("pipe_io_contracts_json", "input_form_json", "output_form_json"):
+            companion_path = saved_files.get(output_key)
+            if companion_path:
+                side_effects.setdefault("graph_files", {})[output_key.removesuffix("_json")] = str(companion_path)
 
     # Save output JSON (includes side-effect paths for on-disk reference)
     output_filename = "dry_run.json" if dry_run else "live_run.json"

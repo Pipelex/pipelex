@@ -280,6 +280,8 @@ async def pipeline_run_setup(
                 pipeline_run_id=pipeline_run_id,
                 emit_graph_events=is_generate_graph,
                 emit_usage_events=is_generate_usage,
+                # The I/O artifacts are the graphspec's companions: a run that writes no graphspec builds none.
+                describe_pipe_io=is_generate_graph and execution_config.graph.graphs_inclusion.graphspec_json,
                 mode=pipe_run_mode.graphspec_mode,
             )
 

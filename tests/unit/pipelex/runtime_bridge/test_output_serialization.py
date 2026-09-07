@@ -3,6 +3,7 @@ import pytest
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
+from pipelex.core.pipes.pipe_io_artifacts import PipeIOArtifacts
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.text_content import TextContent
@@ -54,6 +55,22 @@ class TestSerializeCompletedOutput:
         assert dto.graph_assembly_error == "graph boom"
         assert dto.pipeline_run_id == "run-with-usage"
 
+    def test_pipe_io_artifacts_and_their_error_cross_the_bridge_boundary(self) -> None:
+        """The artifacts ride the SPI as a JSON-mode dump beside graph_spec, their error beside its error."""
+        artifacts = PipeIOArtifacts(pipe_io_contracts={}, input_form={}, output_form={})
+        pipe_output = PipeOutput(
+            working_memory=_memory_with_aliased_main("result"),
+            pipeline_run_id="run-with-artifacts",
+            pipe_io_artifacts=artifacts,
+            pipe_io_artifacts_error="artifacts boom",
+        )
+
+        dto = serialize_completed_output(pipe_output=pipe_output, workflow_id=None)
+
+        assert dto.pipe_io_artifacts_dump == artifacts.model_dump(mode="json")
+        assert PipeIOArtifacts.model_validate(dto.pipe_io_artifacts_dump) == artifacts
+        assert dto.pipe_io_artifacts_error == "artifacts boom"
+
     def test_absent_assembly_serializes_to_none(self) -> None:
         """When the run produced no usage/graph, the boundary fields stay None (not [])."""
         pipe_output = PipeOutput(
@@ -69,6 +86,8 @@ class TestSerializeCompletedOutput:
         assert dto.tokens_usages_dump is None
         assert dto.usage_assembly_error is None
         assert dto.graph_assembly_error is None
+        assert dto.pipe_io_artifacts_dump is None
+        assert dto.pipe_io_artifacts_error is None
 
     def test_main_stuff_name_resolves_aliased_root_key(self) -> None:
         """The DTO's main_stuff_name is the actual root key the alias points at."""

@@ -14,6 +14,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.absence_render import build_absence_html, build_absence_json, build_absence_markdown
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
+from pipelex.core.pipes.pipe_io_artifacts import INPUT_FORM_FILE_NAME, OUTPUT_FORM_FILE_NAME, PIPE_IO_CONTRACTS_FILE_NAME
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
@@ -26,6 +27,7 @@ from pipelex.tools.misc.json_utils import clean_json_dumps
 from pipelex.tools.network.ssrf_guard import SsrfGuardedTransport
 
 if TYPE_CHECKING:
+    from pipelex.core.pipes.pipe_io_artifacts import PipeIOArtifacts
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus, StorageTarget, WebhookTarget
 
@@ -142,7 +144,7 @@ class DeliveryExecutor:
 
         graph_spec = pipe_output.graph_spec
         if graph_spec:
-            await self._generate_graph_files(graph_spec, files=files)
+            await self._generate_graph_files(graph_spec, pipe_io_artifacts=pipe_output.pipe_io_artifacts, files=files)
 
         return files
 
@@ -274,14 +276,25 @@ class DeliveryExecutor:
             files=files, filename="main_stuff_viewer.html", render=render_stuff_viewer(main_stuff), content_type="text/html"
         )
 
-    async def _generate_graph_files(self, graph_spec: Any, *, files: dict[str, ResultFile]) -> None:
+    async def _generate_graph_files(self, graph_spec: Any, *, pipe_io_artifacts: PipeIOArtifacts | None, files: dict[str, ResultFile]) -> None:
         try:
             graph_config = get_config().interpreter.pipeline_execution.graph
             graph_outputs = await generate_graph_outputs(
                 graph_spec=graph_spec,
                 graph_config=graph_config,
+                pipe_io_artifacts=pipe_io_artifacts,
             )
             self._add_optional_text_file(files=files, filename="graphspec.json", text=graph_outputs.graphspec_json, content_type="application/json")
+            # The graphspec's companions, under the standard's names beside it.
+            self._add_optional_text_file(
+                files=files, filename=PIPE_IO_CONTRACTS_FILE_NAME, text=graph_outputs.pipe_io_contracts_json, content_type="application/json"
+            )
+            self._add_optional_text_file(
+                files=files, filename=INPUT_FORM_FILE_NAME, text=graph_outputs.input_form_json, content_type="application/json"
+            )
+            self._add_optional_text_file(
+                files=files, filename=OUTPUT_FORM_FILE_NAME, text=graph_outputs.output_form_json, content_type="application/json"
+            )
             self._add_optional_text_file(files=files, filename="mermaidflow.mmd", text=graph_outputs.mermaidflow_mmd, content_type="text/plain")
             self._add_optional_text_file(files=files, filename="mermaidflow.html", text=graph_outputs.mermaidflow_html, content_type="text/html")
             self._add_optional_text_file(files=files, filename="reactflow.html", text=graph_outputs.reactflow_html, content_type="text/html")

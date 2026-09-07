@@ -33,13 +33,12 @@ import pytest
 from pipelex.cli.dev_cli.commands.generate_projection_corpus_cmd import (
     ENGINE_DIR_NAME,
     EXPECTED_UNSHAPEABLE,
-    INPUT_FORM_FILE_NAME,
     MANIFEST_FILE_NAME,
-    PIPE_IO_CONTRACTS_FILE_NAME,
     TEMPLATES_DIR_NAME,
     CorpusManifest,
     generate_projection_corpus,
 )
+from pipelex.core.pipes.pipe_io_artifacts import INPUT_FORM_FILE_NAME, PIPE_IO_CONTRACTS_FILE_NAME
 
 CORPUS_BUNDLES = [
     Path("tests/data/input_semantics/hinted_bundle.mthds"),

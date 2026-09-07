@@ -1,5 +1,6 @@
 import json
 import socket
+from datetime import UTC, datetime
 
 import pytest
 from pytest_mock import MockerFixture, MockType
@@ -14,8 +15,15 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_io_artifacts import (
+    INPUT_FORM_FILE_NAME,
+    OUTPUT_FORM_FILE_NAME,
+    PIPE_IO_CONTRACTS_FILE_NAME,
+    render_pipe_io_artifact_files,
+)
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.graph.graphspec import GraphSpec, PipelineRef
 from pipelex.pipe_run.delivery_assignment import (
     DeliveryAssignment,
     DeliveryStatus,
@@ -26,6 +34,7 @@ from pipelex.pipe_run.delivery_executor import DeliveryExecutor
 from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, WebhookDeliveryError
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.tools.network.exceptions import SsrfBlockedError
+from tests.helpers.pipe_io_artifacts import make_pipe_io_artifacts
 
 
 def _make_main_stuff() -> Stuff:
@@ -47,7 +56,21 @@ def _make_output_mock(mocker: MockerFixture) -> MockType:
     mock_output: MockType = mocker.MagicMock()
     mock_output.tokens_usages = None
     mock_output.usage_assembly_error = None
+    mock_output.pipe_io_artifacts = None
     return mock_output
+
+
+def _make_graph_spec() -> GraphSpec:
+    return GraphSpec(
+        graph_id="delivery_test_graph",
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+        pipeline_ref=PipelineRef(domain="test_domain", main_pipe="my_sequence"),
+        nodes=[],
+        edges=[],
+    )
+
+
+_COMPANION_FILE_NAMES = (PIPE_IO_CONTRACTS_FILE_NAME, INPUT_FORM_FILE_NAME, OUTPUT_FORM_FILE_NAME)
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -378,6 +401,69 @@ class TestDeliveryExecutor:
 
         usage_doc = json.loads(files["tokens_usages.json"].data.decode("utf-8"))
         assert usage_doc == {"tokens_usages": None, "usage_assembly_error": "usage event read failed"}
+
+    async def test_generate_result_files_writes_the_graphspec_companions_typed(self, mocker: MockerFixture) -> None:
+        """A run that carried its I/O artifacts delivers them beside graphspec.json, byte for byte as the
+        run's own renderer wrote them, so a hosted results prefix reads like a local results directory.
+        """
+        mock_output = _make_output_mock(mocker)
+        mock_output.working_memory_raw = None
+        mock_output.working_memory.smart_dump.return_value = {"root": {}, "aliases": {}}
+        mock_output.working_memory.resolve_main_stuff.return_value = _make_main_stuff()
+        mock_output.graph_spec = _make_graph_spec()
+        artifacts = make_pipe_io_artifacts()
+        mock_output.pipe_io_artifacts = artifacts
+
+        files = await DeliveryExecutor().generate_result_files(mock_output)
+
+        assert "graphspec.json" in files
+        expected = render_pipe_io_artifact_files(artifacts)
+        for file_name in _COMPANION_FILE_NAMES:
+            assert files[file_name].content_type == "application/json"
+            assert files[file_name].data.decode("utf-8") == expected[file_name]
+
+    async def test_generate_result_files_writes_the_graphspec_companions_raw(self, mocker: MockerFixture) -> None:
+        """The raw working-memory branch (a worker without the bundle's classes) delivers them too: the
+        artifacts are already built, so no class registry is needed to write them.
+        """
+        mock_output = _make_output_mock(mocker)
+        mock_output.working_memory_raw = {"root": {"main_stuff": {"content": {"text": "hi"}}}, "aliases": {}}
+        mock_output.graph_spec = _make_graph_spec()
+        mock_output.pipe_io_artifacts = make_pipe_io_artifacts()
+
+        files = await DeliveryExecutor().generate_result_files(mock_output)
+
+        assert "graphspec.json" in files
+        for file_name in _COMPANION_FILE_NAMES:
+            assert file_name in files
+
+    async def test_generate_result_files_omits_the_companions_without_artifacts(self, mocker: MockerFixture) -> None:
+        mock_output = _make_output_mock(mocker)
+        mock_output.working_memory_raw = None
+        mock_output.working_memory.smart_dump.return_value = {"root": {}, "aliases": {}}
+        mock_output.working_memory.resolve_main_stuff.return_value = _make_main_stuff()
+        mock_output.graph_spec = _make_graph_spec()
+
+        files = await DeliveryExecutor().generate_result_files(mock_output)
+
+        assert "graphspec.json" in files
+        for file_name in _COMPANION_FILE_NAMES:
+            assert file_name not in files
+
+    async def test_generate_result_files_omits_the_companions_without_a_graph(self, mocker: MockerFixture) -> None:
+        """The companions describe a graphspec: no graphspec, no companions, whatever the output carries."""
+        mock_output = _make_output_mock(mocker)
+        mock_output.working_memory_raw = None
+        mock_output.working_memory.smart_dump.return_value = {"root": {}, "aliases": {}}
+        mock_output.working_memory.resolve_main_stuff.return_value = _make_main_stuff()
+        mock_output.graph_spec = None
+        mock_output.pipe_io_artifacts = make_pipe_io_artifacts()
+
+        files = await DeliveryExecutor().generate_result_files(mock_output)
+
+        assert "graphspec.json" not in files
+        for file_name in _COMPANION_FILE_NAMES:
+            assert file_name not in files
 
     async def test_try_local_hydrate_stuff_returns_typed_for_builtin(self) -> None:
         from pipelex.core.stuffs.text_content import TextContent  # ruff: ignore[import-outside-top-level]

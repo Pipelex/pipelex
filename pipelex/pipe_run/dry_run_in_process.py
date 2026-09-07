@@ -132,6 +132,8 @@ async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str) -> Gra
         pipeline_run_id=pipeline_run_id,
         emit_graph_events=True,
         emit_usage_events=False,
+        # Validate builds the I/O artifacts once, for its report; this dry run keeps only the graph.
+        describe_pipe_io=False,
         mode=GraphSpecMode.DRY,
     )
     try:

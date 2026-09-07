@@ -38,6 +38,9 @@ class TraceContext(BaseModel):
         emit_usage_events: Whether usage (cost) trace events should be emitted for this run
             (driven by ``is_generate_usage``). Independent of ``emit_graph_events`` so cost reporting
             survives ``--no-graph``.
+        describe_pipe_io: Whether the run builds the three I/O artifacts that describe its graphspec's
+            data (driven by ``graphs_inclusion.graphspec_json``). Off for a run that writes no
+            graphspec, and for validate's own graph dry run, which already built them for its report.
     """
 
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -49,6 +52,7 @@ class TraceContext(BaseModel):
     data_inclusion: DataInclusionConfig = Field(description="Controls which data formats to capture")
     emit_graph_events: bool = Field(default=True, description="Whether to emit graph (node/edge) trace events")
     emit_usage_events: bool = Field(default=True, description="Whether to emit usage (cost) trace events")
+    describe_pipe_io: bool = Field(default=True, description="Whether to build the I/O artifacts describing the graphspec's data")
 
     @property
     def lookup_key(self) -> str:
@@ -81,4 +85,5 @@ class TraceContext(BaseModel):
             data_inclusion=self.data_inclusion,
             emit_graph_events=self.emit_graph_events,
             emit_usage_events=self.emit_usage_events,
+            describe_pipe_io=self.describe_pipe_io,
         )

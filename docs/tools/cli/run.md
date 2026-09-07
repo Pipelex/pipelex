@@ -212,6 +212,18 @@ country = "France"
 
 The output JSON contains the complete working memory after pipeline execution, including all intermediate results and the final output.
 
+### The results directory
+
+Each run that saves anything gets its own numbered directory under `--output-dir` (`results/<pipe_code>_output_01/`, then `_02`, and so on). With `--save-working-memory` it holds `working_memory.json`, with `--save-main-stuff` the `main_stuff.*` renders, and with `--graph` the graph outputs that `graphs_inclusion` enables: `graphspec.json`, the Mermaid code and viewer, and the ReactFlow viewer.
+
+Beside `graphspec.json`, and gated by the same `graphspec_json` flag, the run writes the three files that describe the data the graph carries:
+
+- `pipe_io_contracts.json` - each pipe's input and output contract, with the JSON Schema of its output
+- `input_form.json` - each pipe's input-form descriptor
+- `output_form.json` - each pipe's output-form descriptor
+
+They are the same artifacts a validation report returns under those names, keyed by namespaced `pipe_ref` for every pipe in the library the run executed against, and they are what a graph viewer needs to show a data node's value rather than only the concept's structure: the VS Code extension reads them from the graphspec's own directory. A run with `--no-graph` writes none of them. See [Execution Graph Tracing](../../under-the-hood/execution-graph-tracing.md#outputs).
+
 ### Absent main output
 
 A run whose main output resolves as a recorded absence (an optional `?` output that produced nothing — e.g. a `PipeCondition` `continue` outcome, or a skipped producer) is a **successful** run. The CLI prints the absence with its reason, and `--save-main-stuff` writes an explicit absence artifact instead of a value dump: `main_stuff.json` is `{"absent": true, ...}` with the absence record, and `main_stuff.md` is a human-readable summary including the provenance chain (no HTML render or interactive viewer is produced — there is nothing to view). `--save-csv` fails with an explicit error and a non-zero exit code, the same way it does for any main output that is not a flat list — there is no tabular value to save.

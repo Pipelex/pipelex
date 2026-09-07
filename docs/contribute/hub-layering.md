@@ -58,7 +58,7 @@ There is deliberately **no** `pipelex.hub`. It was deleted rather than kept as a
 | --- | --- |
 | container | `InterpreterHub`, `get_interpreter_hub`, `set_interpreter_hub` |
 | library manager | `get_library_manager`, `get_library` |
-| library lookups | `get_concept_library`, `get_required_concept`, `get_native_concept`, `get_required_domain`, `get_optional_domain`, `get_pipe_library`, `get_pipes`, `get_required_pipe`, `get_optional_pipe`, `get_required_entry_pipe`, `get_optional_entry_pipe`, `get_pipe_source` |
+| library lookups | `get_concept_library`, `get_required_concept`, `get_native_concept`, `get_required_domain`, `get_optional_domain`, `get_pipe_library`, `get_pipes`, `get_own_pipes`, `get_required_pipe`, `get_optional_pipe`, `get_required_entry_pipe`, `get_optional_entry_pipe`, `get_pipe_source` |
 | current-library contextvar | `set_current_library`, `get_current_library`, `get_current_library_id_or_none`, `clear_current_library`, `scoped_current_library` |
 | library dirs | `resolve_library_dirs`, `get_default_library_dirs` |
 | pipe router | `get_pipe_router`, `set_pipe_router`, `teardown_current_pipe_router`, `scoped_pipe_router` |

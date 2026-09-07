@@ -342,6 +342,11 @@ def get_pipes() -> list[PipeAbstract]:
     return get_interpreter_hub().get_required_pipe_library().get_pipes()
 
 
+def get_own_pipes() -> list[PipeAbstract]:
+    """The current library's own pipes, without its dependency packages' aliased entries."""
+    return get_interpreter_hub().get_required_pipe_library().get_own_pipes()
+
+
 def get_required_pipe(pipe_code: str) -> PipeAbstract:
     return get_interpreter_hub().get_required_pipe_library().get_required_pipe(pipe_code=pipe_code)
 
