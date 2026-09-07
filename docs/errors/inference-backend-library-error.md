@@ -7,6 +7,8 @@ description: "Reference for the `InferenceBackendLibraryError` Pipelex error cla
 
 # Inference backend library
 
+A backend the library cannot load.
+
 | Field | Value |
 |---|---|
 | `error_type` | `InferenceBackendLibraryError` |
