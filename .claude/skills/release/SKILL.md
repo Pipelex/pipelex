@@ -1,250 +1,89 @@
 ---
 name: release
 description: >
-  Automates the Pipelex release workflow: bumps the version in pyproject.toml,
-  finalizes the CHANGELOG.md Unreleased section, runs quality checks, creates a
-  release/vX.Y.Z branch, commits, pushes, and opens a PR to main. Use when user
-  says "release", "cut a release", "bump version", "prepare a release", "make a
-  release", "ship it", "create release branch", or any variation of shipping a
-  new version of pipelex. The user can optionally provide changelog content
-  inline when invoking the skill (e.g. "/release Added new extract backend"),
-  which will be used as the changelog entry for this version.
+  Cut a release of the pipelex Python package: the gates, the migration-ledger
+  cross-check, the CHANGELOG.md entry, the pyproject.toml bump with the lock and
+  the badge, one commit, and a pull request to main that publishes to PyPI on
+  merge. Use when the user says "release", "cut a release", "bump version",
+  "prepare a release", "make a release", "ship it", "create release branch",
+  "promote dev to main", or any variation of shipping a new version of pipelex.
+  Changelog content passed inline ("/release Added new extract backend") becomes
+  the entry. The merge is landed by /ledger-land, never by this skill.
 ---
 
-# Pipelex Release Workflow
+# Releasing pipelex
 
-This skill handles the full release cycle for the `pipelex` Python package.
+The procedure is the workspace release play, [`docs/releasing.md`](../../../../docs/releasing.md) at the workspace root — `../docs/releasing.md` from this repo's own root, which resolves the same from the main checkout and from any worktree. Read it first, then run it with what follows. The repo key is `pipelex`, the base is `dev`, and the pull request targets `main`. The release worktree is `_pipelex--release`, made with `wt add pipelex release --branch release/vX.Y.Z`.
 
-## Files touched
+## What ships
 
-- **`pyproject.toml`** — the `version` field (line 3)
-- **`CHANGELOG.md`** — add `[vX.Y.Z] - YYYY-MM-DD` entry (remove `[Unreleased]` if present)
-- **`uv.lock`** — regenerated via `make li` (lock + install)
-- **`.badges/tests.json`** — test count updated to match actual count
-- **`.test_durations`** — regenerated via `make store-test-durations` so the CI test shards stay balanced (see step 8b)
-- **`pipelex/migration/ledgers/*.toml`** and **`pipelex/migration/goldens/`** — only when step 3b finds an unaccounted schema change; written by the `add-migration` skill, never by hand
+- **PyPI: `pipelex`.** `.github/workflows/publish-pypi.yml` builds and publishes through trusted publishing. It fires on the release pull request **closing merged into `main`** (`pull_request: types: [closed]`), not on the push to `main` — so the run is keyed to the release branch and its `headSha` is that branch's last commit, never the merge commit. Where the play says "the run on the merge SHA", read it here as the run on `release/vX.Y.Z`.
+- **The GitHub Release and the `vX.Y.Z` tag.** The same workflow's `github-release` job creates them, and the tag exists only as a side effect of `gh release create`. The release is created and the dists attached *before* Sigstore signing, which is allowed to fail: an unsigned release is reported as a warning, not a failure, because the tag is the record of what shipped.
+- **The documentation site.** `.github/workflows/deploy-docs.yml` fires on the push to `main` and runs `make docs-deploy-stable`, which deploys the version read from `pyproject.toml` with the `latest` alias and republishes the root sitemap.
 
-## Workflow
-
-### 1. Pre-flight checks
-
-- Read the current version from `pyproject.toml`.
-- Read `CHANGELOG.md` to understand the current state.
-- Run `git status` and `git log origin/main..HEAD` to assess the working tree:
-  - If there are **uncommitted changes** (staged or unstaged), warn the user and
-    ask whether to commit them as part of the release, stash them, or abort.
-  - If there are **unpushed commits** on the current branch, list them so the
-    user is aware — these will be included in the release branch.
-
-### 2. Determine the bump type
-
-Ask the user which kind of version bump they want — **patch**, **minor**, or
-**major** — unless they already specified it. Show the current version and what
-the new version would be for each option so the choice is concrete.
-
-### 3. Run quality checks
-
-Run `make agent-check`. This is the gate — if it fails, stop and report the
-errors so they can be fixed before retrying. Do not proceed past this step on
-failure.
-
-### 3b. Ledger completeness
-
-`make agent-check` does not run the coverage gate — it is a golden check and lives
-in `make check` only — so a schema change that has not been accounted for reaches
-here unseen. This step is what makes it impossible for a release to ship a moved
-configuration schema without the migration that repairs a user's file.
-
-Run:
+The landing verifies the publish from three places:
 
 ```bash
-make check-migration-schemas
+gh run list --workflow=publish-pypi.yml --branch release/vX.Y.Z --limit 3 --json name,conclusion,headSha,event,url   # success
+pip index versions pipelex                                          # the registry answers X.Y.Z
+git -C <main> fetch --tags --prune origin && git -C <main> tag --list vX.Y.Z
 ```
 
-- **If it fails**, the release is blocked. Invoke the **`add-migration`** skill: it
-  derives the entry from the fingerprint diff the gate just printed, bumps the
-  surface's schema version, regenerates the goldens and adds the changelog bullet.
-  Then re-run this step. Do not proceed on a red gate, and do not regenerate the
-  goldens to make it quiet — a green gate over an unaccounted removal is exactly
-  the failure the gate exists to prevent.
-- **If it passes**, check whether any schema version moved in this release. Diff
-    the ledgers against the tag of the version read in step 1 — the previous
-    release, whichever branch the skill was invoked from (`origin/main` is not a
-    safe baseline: from `main` itself that diff is empty):
+`gh release view vX.Y.Z` confirms the Release and its notes. A publish that failed *after* the merge is recoverable only by hand: re-running the run replays the workflow file it started with, so use `workflow_dispatch`, which accepts `main`, `release/vX.Y.Z` and `pre-release/v*` and nothing else. The Release step is idempotent — it edits an existing release rather than failing on it.
 
-    ```bash
-    git diff v<current version> -- pipelex/migration/ledgers/
-    ```
+## Version files and the lock
 
-    For each entry that is new since that release and carries `breaking = true`, confirm
-    the changelog carries a matching `**Migration:**` bullet naming the entry id and
-    what a user has to do. The ledger and the changelog are deliberately separate
-    artifacts saying the same thing to different readers, and this is the only place
-    they are checked against each other — if the bullet is missing, write it now
-    (house style: bold label, then two to four complete sentences).
+- **`pyproject.toml`** — the `[project]` table's `version`, the one and only place the number is written. Nothing in the package restates it: the runtime reads it back through `get_package_version()`. Keep it the file's **first** `version = ` line: `changelog-check.yml` and `publish-pypi.yml` both read it with `grep -m 1 'version = '`, and `version-check.yml` with `grep '^version'`.
+- **The lock** — `make li` (lock + install) regenerates `uv.lock`. Stop and report if it fails; `uv-lock-check` in CI fails the pull request over a stale lock.
+- **Also stamped:**
+  - **`.badges/tests.json`** — set `"message"` to what `make test-count` prints, leaving every other field alone, then run `make check-test-badge` to confirm the two agree. A mismatch is a CI failure on the pull request.
+  - **`.test_durations`** — `make store-test-durations`, the per-test timing map `pytest-split` uses to balance the CI test shards. The refresh is incremental: it collects the suite and measures only the tests missing from the map, so it takes seconds on a quiet release and writes no diff at all when nothing was missing. Read the coverage line it prints before judging how long it should take — past roughly 40% of the suite missing it falls back to re-measuring everything, which takes minutes; treat a long run as a hang only when it reported few tests missing. Include the file in the commit only when it changed. `make store-test-durations-force` is **not** part of the release flow; it is for when recorded values are no longer comparable to each other because the machine or the suite changed shape. The rationale is `docs/contribute/test-duration-map.md`.
+  - **`pipelex/migration/ledgers/*.toml` and `pipelex/migration/goldens/`** — only when the migration gate below finds an unaccounted schema change, and then written by the `add-migration` skill, never by hand.
 
-    **A renumbered entry shows up in that diff as two ids, and both need a mention.**
-    A pre-history entry inserted below existing ones takes a version already in use
-    and pushes everything above it up, so the diff reads as one id modified and one
-    added — which looks like two independent breaking changes and is one insertion.
-    Do not treat the pushed-up id as an unbulleted new entry: the changelog must
-    name the new entry *and* say that the existing one was renumbered, so a reader
-    who quoted the old id somewhere can find it. Confirm `introduced_in` on both.
+## Gates
 
-    **A breaking ledger entry makes this a minor release**, per the house
-    convention — if step 2 chose a patch bump and this step found one, go back and
-    settle the bump first, because the next check writes the new version into the
-    entry.
+1. **`make agent-check`** — format, lint, pyright, mypy, plus the migration-ledger legality check, the keyword-only convention, the hub-layering check and the drift contracts. It **rewrites files** (`fix-unused-imports`, `fix-keyword-only`, `format`), so whatever it touched joins the release commit. Red blocks the release: fix the errors, never skip the target.
+2. **`make check-migration-schemas`** — the schema-coverage gate, which `make agent-check` does **not** run (it is a golden check and lives in `make check`), so without this step a moved configuration surface reaches a release with no migration to repair a user's file. Red blocks the release, and the cure is the **`add-migration`** skill: it derives the entry from the fingerprint diff the gate just printed, bumps the surface's schema version, regenerates the goldens and adds the changelog bullet. Then re-run the gate. Never run `make up-migration-schemas` to make it quiet — a green gate over an unaccounted removal is precisely the failure the gate exists to prevent.
+3. **The ledger-against-changelog cross-check**, once the gate is green. Diff the ledgers against the tag of the version the pre-flight read — the previous release. `origin/main` is not a safe baseline, and from `main` itself that diff is empty:
 
-    Then confirm each such entry's `introduced_in` matches the version being cut.
-    It is written when the entry is authored, before the release number is known, so
-    it is routinely one bump off. Nothing branches on it, but it is what a reader
-    correlates the changelog against, so fix it here rather than leaving it wrong.
+   ```bash
+   git diff v<current version> -- pipelex/migration/ledgers/
+   ```
 
-### 4. Ensure we're on the right branch
+   The migration ledger and the changelog are deliberately separate artifacts saying the same thing to different readers, and this is the only place they are checked against each other. For every entry new since that release carrying `breaking = true`, confirm the changelog has a matching `**Migration:**` bullet naming the entry id and what a user has to do — house style is a bold label, then two to four complete sentences. Write it now if it is missing.
 
-The release branch must be named `release/vX.Y.Z` where X.Y.Z is the **new**
-version. All file modifications (changelog, version bump, lock, badge) must
-happen on this branch.
+   - **A renumbered entry reads as two ids, and both need a mention.** A pre-history entry inserted below existing ones takes a version already in use and pushes everything above it up, so the diff shows one id modified and one added — which looks like two independent breaking changes and is one insertion. The changelog must name the new entry *and* say that the existing one was renumbered, so a reader who quoted the old id somewhere can still find it.
+   - **Confirm `introduced_in` on every such entry.** It is written when the entry is authored, before the release number is known, so it is routinely one bump off. Nothing branches on it, but it is what a reader correlates the changelog against: fix it here rather than leaving it wrong.
+   - **A breaking ledger entry makes this a minor release**, per the pre-1.0 convention. If the bump was settled as a patch and this step finds one, go back and settle the bump again before writing the version into the entry.
 
-- If already on `release/vX.Y.Z` matching the new version, stay on it.
-- If on `dev`, `main`, or any other branch, create and switch to
-  `release/vX.Y.Z` from the current HEAD.
-- If on a `release/` branch for a **different** version, warn the user and ask
-  how to proceed.
+   Full context: `docs/migration-ledger.md`.
 
-### 5. Finalize the changelog
+## The release commit
 
-Add a new version entry at the top of the changelog for the release.
+`pyproject.toml`, `CHANGELOG.md`, `uv.lock`, `.badges/tests.json`, `.test_durations` when `make store-test-durations` changed it, whatever `make agent-check` rewrote, and the `pipelex/migration/ledgers/*.toml` and `pipelex/migration/goldens/` files the `add-migration` skill wrote when it ran. By name.
 
-1. If there is an `## [Unreleased]` section, **remove it** (including any blank
-   lines that follow it) and replace it with the new version heading. Any
-   content that was under `[Unreleased]` becomes the content of the new version.
-2. If there is no `[Unreleased]` section, insert the new version heading
-   directly after the `# Changelog` title.
-3. **Never add an `[Unreleased]` heading.** The changelog should only contain
-   concrete version entries.
-4. If the user provided changelog content when invoking the skill (e.g.
-   `/release Added new extract backend`), **merge** that content with any
-   existing `[Unreleased]` content (do not discard either source). Format the
-   combined content properly under the appropriate headings (e.g. `### Added`,
-   `### Changed`, `### Fixed`), inferring headings from the content when
-   possible.
-5. If the release has no changelog content yet (neither from an `[Unreleased]`
-   section nor from inline user input), ask the user what to include before
-   proceeding.
-6. The result should look like:
+## CI on the release pull request
 
-```markdown
-# Changelog
+The checks that exist for the release:
 
-## [vX.Y.Z] - YYYY-MM-DD
+- **`guard-branches.yml`** (`gate-main`) — refuses any head branch into `main` that is not `release/vX.Y.Z` exactly. This is what makes the two checks below unavoidable.
+- **`version-check.yml`** — `pyproject.toml`'s version equals the version in the branch name. It exits 0 and skips itself when the head is not a `release/vX.Y.Z` branch, so on its own it is no gate at all; the branch guard is.
+- **`changelog-check.yml`** — `CHANGELOG.md` carries `## [vX.Y.Z] - ` for the version in `pyproject.toml`. It asserts nothing about `[Unreleased]`: a leftover heading passes CI and ships a wrong changelog, so removing it is this skill's job, not CI's.
+- **`check-test-count-badge.yml`** — `make check-test-badge` on every pull request to `main`.
+- **`package-check.yml`** (`uv-lock-check`, on every pull request) — `uv lock --locked` leaves `uv.lock` unchanged, and `requires-python` still starts at `>=3.11`.
 
-### Changed
-- ...
+The pre-main gates a release pull request meets that a pull request to `dev` never does — they are slower, and a red here is the release stopping:
 
-## [vPREVIOUS] - PREVIOUS-DATE
-...
-```
+- **`lint-fresh-check.yml`** — the read-only lint suite across every supported Python version with no mypy cache, so incremental-mypy drift and version-specific breakage cannot reach `main`.
+- **`tests-full-check.yml`** — the full Python matrix, sharded and balanced by `.test_durations`.
+- **`doc-check.yml`** — `mkdocs build --strict`, which runs unconditionally when the base is `main` rather than only when `docs/` changed.
+- **`dependency-review.yml`** — fails on a newly introduced dependency vulnerable at moderate severity or above.
 
-### 6. Bump the version in pyproject.toml
+Everything that runs on every pull request gates it too, including `lint-check.yml`'s `Lint (agent-rules)` job (`make check-rules`, which `make agent-check` does not run), `tests-check.yml` and `mthds-standard-check.yml`. A red in `mthds-standard-check.yml` with no pinned-set change in the branch means the MTHDS standard moved, and the remedy is a dedicated change bringing the pinned natives to the standard's page — never a tweak to the release branch.
 
-Edit `pyproject.toml` line 3 to the new version string. Only change the version
-field — don't touch anything else.
+## Particulars
 
-### 7. Lock dependencies
-
-Run `make li` to regenerate `uv.lock` and reinstall. This ensures the lockfile
-reflects the new version in `pyproject.toml`. If this step fails, stop and
-report the error.
-
-### 8. Update the test count badge
-
-Run `make test-count` to get the current number of tests. Then update
-`.badges/tests.json` — set the `"message"` field to the count returned by
-`make test-count`. Keep all other fields unchanged.
-
-After updating, run `make check-test-badge` to verify the badge matches. If it
-fails, re-check the count and fix the badge file.
-
-### 8b. Refresh the test-duration map
-
-Run `make store-test-durations`. This refreshes `.test_durations`, the per-test
-timing file `pytest-split` uses to balance the 8 CI test shards on feature PRs.
-
-The refresh is incremental: it collects the suite, then measures only the tests
-that are missing from the map. That is the part that matters — a map with stale
-values but complete coverage costs about 7% of shard balance, while one missing
-entries for recently added tests costs over 50%, because `pytest-split` imputes
-an unknown test at the suite mean (~0.25s) when the median test is ~0.002s.
-
-- It takes seconds when little has been added, and only re-measures new tests
-  otherwise. Read the coverage line it prints before judging how long it should
-  take: past ~40% of the suite missing it falls back to re-measuring everything,
-  which takes minutes. Treat a long run as a hang only when it reported few
-  tests missing.
-- If it changed the file, `.test_durations` is included in the release commit
-  (step 9). When nothing was missing it writes no diff at all, which is the
-  expected outcome for a quiet release — skip it in that case.
-- `make store-test-durations-force` re-measures everything. It is NOT part of
-  the release flow; use it only when recorded values are no longer comparable
-  to each other (the machine or the suite changed shape).
-
-See `docs/contribute/test-duration-map.md` for the full rationale.
-
-### 9. Commit and push
-
-Stage all release-related changes. This includes at minimum `pyproject.toml`,
-`CHANGELOG.md`, `uv.lock`, and `.badges/tests.json`, plus `.test_durations` if
-step 8b changed it, plus any other files the user chose to include in step 1
-(e.g. previously uncommitted work that belongs in this release).
-
-Commit with the message:
-
-```
-Release vX.Y.Z
-```
-
-Push the branch to origin with `-u` to set up tracking.
-
-### 10. Open a PR
-
-Create a pull request targeting `main` with:
-
-- **Title:** `Release vX.Y.Z`
-- **Body:** Include:
-  - The changelog entries for this version (copied from CHANGELOG.md)
-  - A note about the version bump from old to new
-
-Use this format for the PR body:
-
-```markdown
-## Release vX.Y.Z
-
-Bumps version from `A.B.C` to `X.Y.Z`.
-
-### Changelog
-
-<paste the changelog entries for this version here>
-```
-
-Report the PR URL back to the user.
-
-## Important details
-
-- The version follows semver: `MAJOR.MINOR.PATCH`.
-- Always confirm the bump type with the user before making changes.
-- If `make agent-check` fails, the release is blocked — help the user fix the
-  issues rather than skipping the checks.
-- If `make check-migration-schemas` fails (step 3b), the release is blocked too,
-  and the fix is an entry written by the `add-migration` skill — never a golden
-  regeneration that makes the gate quiet.
-- The CI will validate that:
-  - The `pyproject.toml` version matches the branch name (`version-check.yml`)
-  - The `CHANGELOG.md` has an entry for the version (`changelog-check.yml`)
-  - The `.badges/tests.json` count matches the actual test count (`check-test-badge`)
-  - The `uv.lock` file is in sync with `pyproject.toml` (`uv-lock-check`)
-- All checks must pass for the PR to be mergeable, so getting the changelog,
-  version, test badge, and lockfile right is critical.
-- Today's date for the changelog entry: use the current date in `YYYY-MM-DD`
-  format.
+- **The migration gate feeds back into the bump.** A breaking entry found by the cross-check above turns a patch into a minor, so the bump is not final until that gate has run.
+- **The pre-release track is a different flow, not this play.** `pre-release/vX.Y.Z(a|b|rc)N` is a *base* branch that work merges into: `prerelease-version-check.yml` validates the PEP 440 form against the branch name, `publish-pypi.yml` also fires on a merge into it and marks the GitHub Release a pre-release, and `deploy-docs.yml` publishes those docs under the `pre-release` alias. A `release/vX.Y.Z` branch therefore never carries a pre-release version: `version-check.yml` would skip a non-matching head, and `guard-branches.yml` would refuse it into `main` anyway.
+- **The changelog heading carries the `v`** — `## [vX.Y.Z] - YYYY-MM-DD`, which is exactly what `changelog-check.yml` greps for and what `publish-pypi.yml` slices the GitHub Release notes out of. No `[Unreleased]` heading is left behind; the next change re-creates one.
+- **`.worktreeinclude` names the gitignored files a fresh worktree needs** — `.env`, the `.pipelex/` overrides and `.pipelex-dev/test_profiles_override.toml` — and `wt add` provisions them. A gate that fails in `_pipelex--release` on a missing local config means that file is short: add it there rather than hand-copying the file every release.
