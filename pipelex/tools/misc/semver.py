@@ -40,8 +40,18 @@ def parse_version(version_str: str) -> Version:
 def parse_constraint(constraint_str: str) -> SimpleSpec:
     """Parse a constraint string into a semantic_version.SimpleSpec.
 
+    The MTHDS grammar ANDs the clauses of a compound constraint with a comma and writes
+    that form with a space after it (`>=1.0.0, <2.0.0` — the "Compound" row of the spec's
+    version-constraint table, whose syntax column is literally ``constraint ", " constraint``).
+    ``SimpleSpec`` splits on the comma but does not strip the clauses, so it rejects the
+    documented form on the leading space alone. Normalizing the whitespace around each
+    clause is what makes the two spellings the same constraint, as they are in the grammar.
+
+    An empty clause is deliberately left empty rather than dropped, so `>=1.0.0,,<2.0.0`
+    stays a parse error instead of being silently repaired.
+
     Args:
-        constraint_str: The constraint string to parse (e.g. "^1.2.3", ">=1.0.0,<2.0.0").
+        constraint_str: The constraint string to parse (e.g. "^1.2.3", ">=1.0.0, <2.0.0").
 
     Returns:
         The parsed SimpleSpec object.
@@ -49,8 +59,9 @@ def parse_constraint(constraint_str: str) -> SimpleSpec:
     Raises:
         SemVerError: If the constraint string is not valid.
     """
+    normalized = ",".join(clause.strip() for clause in constraint_str.split(","))
     try:
-        return SimpleSpec(constraint_str)
+        return SimpleSpec(normalized)
     except ValueError as exc:
         msg = f"Invalid semver constraint: {constraint_str!r}"
         raise SemVerError(msg) from exc

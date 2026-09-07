@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **The `--version` handshake reports three numbers (breaking):** `pipelex --version` and `pipelex-agent --version` now print the runtime version, the MTHDS Protocol version and the MTHDS standard version, one `<label> <version>` line each, instead of the runtime version alone. A client needs all three to know what it is talking to, and they move on independent cadences under the standard's own versioning rule, so no one of them can be inferred from another. The first line keeps its historical `<program> <version>` form, so a consumer that matches a version out of the text is unaffected — but one that treats the whole of stdout as a single version string now holds three lines, and both `mthds` runners have to be adapted. Match on the label, not on the shape of the output as a whole. The two MTHDS numbers are read from the `mthds` package rather than restated here. See [CLI Reference](tools/cli/index.md#the-version-handshake).
+
+### Changed
+
+- **The MTHDS standard version this runtime implements is now `2.0.0` (breaking):** `mthds` moves to `==0.14.0`, whose `MTHDS_STANDARD_VERSION` was cut from `1.0.0` to `2.0.0` — the standard's first cut under its own versioning rule, accounting for breaking changes to the native set and to the manifest, lock and resolution rules that had already shipped unversioned. Two things follow for users, and no pipelex line caused either: every normalized crate this engine emits is stamped `2.0.0` instead of `1.0.0` (crate fingerprints are unaffected — `mthds_version` is excluded from the hashed payload by design), and a `METHODS.toml` whose `mthds_version` pinned the old major, such as `^1.0.0`, now warns where it did not before. A plain floor like `>=1.0.0` is still satisfied. The protocol version is unchanged at `0.6.0`. The pin stays exact, so everyone downstream inherits `mthds==0.14.0`; a consumer depending on `mthds` directly must move in step.
+
+### Fixed
+
+- **Compound version constraints written the documented way now parse:** `parse_constraint` stripped no whitespace around the comma that ANDs a compound constraint's clauses, so `>=1.0.0, <2.0.0` — the exact spelling of the MTHDS standard's own example — was rejected while the identical `>=1.0.0,<2.0.0` parsed. A manifest's `mthds_version` written that way therefore got no compatibility check at all, since the load path degrades an unparseable constraint to a log line. A malformed compound such as `>=1.0.0,,<2.0.0` still fails, because normalizing whitespace must not repair a broken constraint.
+
 ## [v0.56.0] - 2026-09-03
 
 ### Added

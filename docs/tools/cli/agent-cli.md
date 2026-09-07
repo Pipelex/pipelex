@@ -13,7 +13,7 @@ It is consumed by the `mthds-agent` CLI (from the `mthds` npm package) which its
 | Option | Description |
 |--------|-------------|
 | `--runner` | Select the runner backend to use (`pipelex` or `api`) |
-| `--version` | Print the version and exit |
+| `--version` | Print the version handshake — the runtime version, the MTHDS Protocol version and the MTHDS standard version — and exit. Same three lines as `pipelex --version`; see the [CLI reference](index.md#the-version-handshake) |
 
 There is no `--log-level` flag: `pipelex-agent` is machine-consumed, so logging is cut off process-wide by design.
 
