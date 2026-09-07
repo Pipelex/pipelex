@@ -328,3 +328,18 @@ class TestPipeLibraryLookup:
         library.root["scoring.compute_score"] = mock_pipe
         library.remove_pipes_by_refs(pipe_refs=["scoring.compute_score"])
         assert "scoring.compute_score" not in library.root
+
+
+class TestPipeLibraryOwnPipes:
+    """`get_own_pipes` is the library's own pipes: the aliased dependency entries are not among them."""
+
+    def test_own_pipes_exclude_dependency_entries(self, mocker: MockerFixture):
+        library = PipeLibrary.make_empty()
+        own = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
+        library.add_new_pipe(own)
+        # A dependency sharing the host's `domain.code`: keyed by alias, so it lands beside the host's.
+        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="scoring"))
+        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="other", domain_code="analytics"))
+
+        assert library.get_own_pipes() == [own]
+        assert len(library.get_pipes()) == 3

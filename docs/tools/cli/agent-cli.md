@@ -200,3 +200,5 @@ For the structured commands, exactly one such object is written to stderr per fa
 ## Graph Visualization
 
 Graph visualization is available through the `validate bundle` subcommand with the `--graph` flag, and through `run` subcommands where it is enabled by default. Use `--no-graph` on `run` to disable it.
+
+A `run` with the graph on writes, beside its bundle, the ReactFlow viewer (`dry_run.html` or `live_run.html`) and the graph itself: `graphspec.json` on a dry run, `live_run_graph.json` on a live run. Beside the graph, under their canonical names whatever the graph file is called, sit the three files that describe its data: `pipe_io_contracts.json`, `input_form.json` and `output_form.json`, the same artifacts `validate` reports under those names, keyed by namespaced `pipe_ref`. A graph viewer resolves them from the graph file's directory, not from its name. With `--with-memory`, the JSON envelope's `graph_files` object names every one of these paths (`graph_html`, `graph_spec` on a live run, `pipe_io_contracts`, `input_form`, `output_form`).

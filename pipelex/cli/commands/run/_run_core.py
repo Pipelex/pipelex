@@ -282,6 +282,7 @@ async def _execute_run(
             graph_spec=graph_spec,
             graph_config=execution_config.graph,
             pipe_code=pipe_code,
+            pipe_io_artifacts=pipe_output.pipe_io_artifacts,
         )
 
         saved_graph_files = save_graph_outputs_to_dir(graph_outputs=graph_outputs, output_dir=output_path)

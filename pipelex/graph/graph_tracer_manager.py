@@ -104,6 +104,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         tracer_key: str | None = None,
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
+        describe_pipe_io: bool = True,
         mode: GraphSpecMode = GraphSpecMode.LIVE,
     ) -> TraceContext:
         """Create and initialize a new tracer for a pipeline run.
@@ -125,6 +126,9 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
                 (no post-hoc model_copy needed at the call site).
             emit_usage_events: Whether this run emits usage (cost) events. Threaded into setup
                 so the returned TraceContext is born with the correct flag.
+            describe_pipe_io: Whether the run builds the I/O artifacts describing its graphspec's
+                data. Read by the run, never by the tracer, so it is stamped on the context here
+                rather than threaded into setup.
             mode: Provenance mode to stamp onto generated GraphSpecs.
 
         Returns:
@@ -168,6 +172,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         # Set the tracer_key on the TraceContext so downstream lookups use the same key
         if tracer_key is not None:
             trace_context = trace_context.model_copy(update={"tracer_key": tracer_key})
+        if not describe_pipe_io:
+            trace_context = trace_context.model_copy(update={"describe_pipe_io": False})
 
         # Register only once setup has fully succeeded: a failure above must not leave
         # an unusable tracer entry in the process-wide manager.

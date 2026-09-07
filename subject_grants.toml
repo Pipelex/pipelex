@@ -2924,6 +2924,14 @@ rationale = "Setter: installs the default domain code; single operand."
 param = "named"
 rationale = "Factory from source: builds from the named spec; context stays keyword."
 
+["pipelex/core/pipes/pipe_io_artifacts.py::_render_json_text"]
+param = "payload"
+rationale = "Verb-object: renders the payload as JSON text; single operand."
+
+["pipelex/core/pipes/pipe_io_artifacts.py::render_pipe_io_artifact_files"]
+param = "artifacts"
+rationale = "Verb-object: renders the artifacts into their files; single operand."
+
 ["pipelex/core/pipes/pipe_output.py::PipeOutput.main_stuff_as"]
 param = "content_type"
 rationale = "Type-directed accessor: the target content type; single operand."
@@ -4423,6 +4431,10 @@ rationale = "Derivation: collects the entry refs from the batch's blueprints; si
 ["pipelex/pipeline/blueprint_selection.py::select_primary_blueprint"]
 param = "blueprints"
 rationale = "Verb-object: selects among the blueprints; single operand."
+
+["pipelex/pipeline/build_pipe_io_artifacts.py::build_pipe_io_artifacts"]
+param = "pipes"
+rationale = "Reads as a verb-object sentence over the loaded pipes, like the three builders it wraps."
 
 ["pipelex/pipeline/bundle_graph_rendering.py::_dry_run_bundle"]
 param = "bundle_path"

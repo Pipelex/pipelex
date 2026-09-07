@@ -174,6 +174,7 @@ async def run_pipeline_core(
             graph_spec=pipe_output.graph_spec,
             graph_config=render_graph_config,
             pipe_code=pipe_code,
+            pipe_io_artifacts=pipe_output.pipe_io_artifacts,
         )
 
         saved_files = save_graph_outputs_to_dir(graph_outputs=graph_outputs, output_dir=output_dir)
@@ -192,6 +193,13 @@ async def run_pipeline_core(
             final_graphspec_path = graphspec_path.parent / "live_run_graph.json"
             shutil.move(str(graphspec_path), str(final_graphspec_path))
             side_effects.setdefault("graph_files", {})["graph_spec"] = str(final_graphspec_path)
+
+        # The graphspec's companions keep their canonical names beside it: a reader resolves them
+        # from the graphspec's directory, not from its name.
+        for output_key in ("pipe_io_contracts_json", "input_form_json", "output_form_json"):
+            companion_path = saved_files.get(output_key)
+            if companion_path:
+                side_effects.setdefault("graph_files", {})[output_key.removesuffix("_json")] = str(companion_path)
 
     # Save output JSON (includes side-effect paths for on-disk reference)
     output_filename = "dry_run.json" if dry_run else "live_run.json"

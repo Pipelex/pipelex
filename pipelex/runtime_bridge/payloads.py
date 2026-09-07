@@ -91,6 +91,11 @@ class PipelexPipeRunOutput(BaseModel):
     graph_assembly_error: str | None = None
     tokens_usages_dump: list[dict[str, Any]] | None = None
     usage_assembly_error: str | None = None
+    # The JSON-mode dump of `PipeOutput.pipe_io_artifacts` — the `pipe_io_contracts`, `input_form` and
+    # `output_form` describing the graph's data — beside graph_spec_dump, so wherever the graph
+    # travels its description travels with it; pipe_io_artifacts_error mirrors graph_assembly_error.
+    pipe_io_artifacts_dump: dict[str, Any] | None = None
+    pipe_io_artifacts_error: str | None = None
 
 
 class PipelexPipeDispatchAck(BaseModel):

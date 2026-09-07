@@ -90,9 +90,14 @@ graph_spec = response.pipe_output.graph_spec
 | Output | File | Purpose |
 |--------|------|---------|
 | `graphspec_json` | `graphspec.json` | Canonical graph representation |
+| `graphspec_json` | `pipe_io_contracts.json` | The graphspec's companion: each pipe's I/O contract, keyed by `pipe_ref` |
+| `graphspec_json` | `input_form.json` | The graphspec's companion: each pipe's input-form descriptor |
+| `graphspec_json` | `output_form.json` | The graphspec's companion: each pipe's output-form descriptor |
 | `mermaidflow_mmd` | `mermaidflow.mmd` | Mermaid flowchart code |
 | `mermaidflow_html` | `mermaidflow.html` | Standalone Mermaid viewer |
 | `reactflow_html` | `reactflow.html` | Interactive ReactFlow viewer |
+
+The three companions are the validation report's `pipe_io_contracts`, `input_form` and `output_form` under the standard's names: a graph carries every payload the run produced and nothing that says what those payloads are, and a graph viewer (`@pipelex/mthds-ui`'s `GraphViewer`) shows a data node's value only when it holds both the contracts and the output form for the producing `pipe_ref`. They are built once, at the end of `PipeRun.run` inside the run's own library window (the builders need the loaded library, which `PipelineRunner.execute` tears down before the CLI writes anything), over the bundle's own pipes (a dependency package's pipes are keyed by alias in the library and described by no blueprint the host holds, so they are left out, as a validation of the bundle leaves them out), and carried on `pipe_output.pipe_io_artifacts` beside `graph_spec`; a failure of the builders' own is reported on `pipe_output.pipe_io_artifacts_error`, mirroring `graph_assembly_error`, and never fails the run, while any other exception surfaces as the bug it is. The build is gated by `describe_pipe_io` on the trace context, which the run setup derives from `graphspec_json`, and which validate's own graph dry run turns off since validate already built the artifacts for its report. Every writer that serializes the graphspec writes them beside it: `save_graph_outputs_to_dir` for the CLIs, the delivery executor for a hosted results prefix. They follow the `graphspec_json` inclusion flag, so a run that asks for no graphspec builds nothing that describes one, and a written graphspec owns the three names beside it: when the run carries no artifacts, a companion left by an earlier run in the same directory is removed rather than paired with the new graph. Their bytes are those of the projection fixture corpus for the same bundle, since both go through `render_pipe_io_artifact_files` (`pipelex/core/pipes/pipe_io_artifacts.py`). The `pipe_io_artifacts` field crosses the SPI payload as `pipe_io_artifacts_dump`; the synchronous `/execute` response carries the description once the API relays that field, and a hosted run's results prefix once our Temporal plugin builds the artifacts in the crate's window.
 
 ---
 
@@ -265,7 +270,7 @@ graph_spec = manager.close_tracer(pipeline_run_id)
 
 Trace events travel through an `EventLogProtocol` backend (`pipelex/tracing/`): the tracer emits events into it during the run (write side, wired in `pipeline_run_setup`), and `assemble_tracing` reads them back after the run to build the `GraphSpec` and usage aggregates (read side, triggered from `PipeRun.run`). Both sides normally build their backend instance independently from `tracing_config` via `make_event_log` — NDJSON files or DynamoDB bridge the two instances through external storage.
 
-The assembled usage rides back on `pipe_output.tokens_usages` (with any assembly failure on `usage_assembly_error`), which the sync `/execute` response returns directly. For delivery-enabled runs (a storage target set), the delivery executor (`pipelex/pipe_run/delivery_executor.py`) also persists it as a `tokens_usages.json` result artifact — `{"tokens_usages": [...], "usage_assembly_error": null}` — next to `working_memory.json`, the `main_stuff.*` renders, and the graph outputs, so a durable client polling result files gets the same usage records a sync caller does. The artifact is written unconditionally on every successful result delivery: explicit nulls mean usage assembly was off for that run. A failed run stores no result files at all, so an absent `tokens_usages.json` means either the run failed or it was delivered before the artifact existed — tell those apart from the delivery status, not from the file's presence.
+The assembled usage rides back on `pipe_output.tokens_usages` (with any assembly failure on `usage_assembly_error`), which the sync `/execute` response returns directly. For delivery-enabled runs (a storage target set), the delivery executor (`pipelex/pipe_run/delivery_executor.py`) also persists it as a `tokens_usages.json` result artifact — `{"tokens_usages": [...], "usage_assembly_error": null}` — next to `working_memory.json`, the `main_stuff.*` renders, and the graph outputs (`graphspec.json` with its three companions `pipe_io_contracts.json`, `input_form.json` and `output_form.json`, see [Outputs](#outputs)), so a durable client polling result files gets the same usage records a sync caller does. The artifact is written unconditionally on every successful result delivery: explicit nulls mean usage assembly was off for that run. A failed run stores no result files at all, so an absent `tokens_usages.json` means either the run failed or it was delivered before the artifact existed — tell those apart from the delivery status, not from the file's presence.
 
 For fully in-process runs, `pipelex.runtime_hub.scoped_event_log` pins one shared instance for both sides instead:
 
@@ -426,7 +431,7 @@ error_stack_traces = true       # Include full stack traces
 pipe_and_concept_registry = true  # Include pipe and concept registries in the GraphSpec
 
 [interpreter.pipeline_execution.graph.graphs_inclusion]
-graphspec_json = true           # Generate GraphSpec JSON
+graphspec_json = true           # Generate GraphSpec JSON, and its three companions beside it
 mermaidflow_mmd = true          # Generate Mermaid code
 mermaidflow_html = true         # Generate Mermaid HTML
 reactflow_html = true           # Generate ReactFlow HTML

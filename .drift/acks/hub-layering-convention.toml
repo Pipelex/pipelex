@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:28bbb28a72966c425d409154d0ae3c8c07bdff6e1ce01e0e0a7fb3b5897d94f7"
+digest = "sha256:db6f431f6d19eada9e44890a88a38218c5ec408e4bd603ebd0ea3a2119d6c7dd"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-08-17T08:18:22Z"
-rationale = "The trigger is runtime_hub.py, and the change is reset_boot_state releasing the isolated-execution probe: a body and a docstring, with no accessor added, renamed or removed. Re-derived the partition table rather than reading it - enumerated every public module-level function in pipelex/runtime_hub.py by AST and checked each against docs/contribute/hub-layering.md, and every one is named there, so the table is still complete and the probe's accessor is_in_isolated_execution keeps its existing reporting row. The page specifies the boundary and the accessor partition and says nothing about what a teardown releases, so the release reaches no sentence in it. No doc change needed."
+reviewed_at = "2026-09-07T12:04:46Z"
+rationale = "interpreter_hub gains get_own_pipes, a library-lookup accessor beside get_pipes returning the current library's own pipes without the aliased dependency entries. Added it to the library-lookups row of the accessor partition table in docs/contribute/hub-layering.md; the boundary, the one-arrow rule and the closure claim are untouched."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:2dbadcbab7d44364a7b5f1d16268b23b26700a00"
-"pipelex/interpreter_hub.py" = "blob:b8c35e37814f0e94c3bf1c364b06a98d0c22ee93"
+"pipelex/interpreter_hub.py" = "blob:327e75d0fbb5bdf46f6cbf06024f83840f0106d0"
 "pipelex/runtime_hub.py" = "blob:498312f15921753263a4ad3475c9da5eefb8e4ba"

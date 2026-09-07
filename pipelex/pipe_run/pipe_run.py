@@ -2,16 +2,19 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.base_exceptions import ErrorReport, PipelexError, PipelexUnexpectedError
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
+from pipelex.interpreter_hub import get_own_pipes
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
 from pipelex.pipe_run.exceptions import DeliveryError
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipe_run.tracing_assembly import assemble_tracing_on_output
+from pipelex.pipeline.build_pipe_io_artifacts import build_pipe_io_artifacts
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_output import PipeOutput
@@ -88,6 +91,8 @@ class PipeRun(PipeRunProtocol):
                     main_pipe_code=pipe_job.pipe.code,
                     run_mode=pipe_job.pipe_run_params.run_mode,
                 )
+                if trace_context.describe_pipe_io and pipe_output.graph_spec is not None:
+                    self._build_pipe_io_artifacts_on_output(pipe_output=pipe_output, pipeline_run_id=pipeline_run_id)
 
             if delivery_assignment is not None:
                 log.debug(f"Executing delivery for pipeline_run_id={pipeline_run_id}, status={status}")
@@ -115,3 +120,25 @@ class PipeRun(PipeRunProtocol):
 
         assert pipe_output is not None
         return pipe_output
+
+    @classmethod
+    def _build_pipe_io_artifacts_on_output(cls, *, pipe_output: PipeOutput, pipeline_run_id: str) -> None:
+        """Describe the graph's data: build the three I/O artifacts over the run library's own pipes and set them on the output.
+
+        Runs inside the run's library window — `PipelineRunner.execute` tears the run library down
+        after this returns, and the builders need it — and before the direct-mode delivery below,
+        which writes the artifacts beside the graphspec. The scope is the library's own pipes, as
+        validate's is: a dependency package's pipes are keyed by alias in the library but by bare
+        `pipe_ref` in the artifacts, where they would collide with the host's, and the host's crate
+        holds no blueprint of theirs to describe them from. Best-effort like the graph assembly: a
+        failure of the builders' own — a contract that will not render, a crate that will not
+        normalize, a protocol model that will not validate — is reported on
+        `pipe_io_artifacts_error` and never fails a run that succeeded; anything else is a bug and
+        surfaces.
+        """
+        try:
+            pipe_output.pipe_io_artifacts = build_pipe_io_artifacts(get_own_pipes())
+        except (PipelexError, ValidationError) as build_error:
+            message = f"Failed to build the I/O artifacts for pipeline_run_id={pipeline_run_id}: {build_error}"
+            log.warning(message)
+            pipe_output.pipe_io_artifacts_error = message
